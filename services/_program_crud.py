@@ -23,11 +23,8 @@ from services.program_service_errors import ProgramServiceValidationError
 
 class _ProgramCrudMixin:
     @classmethod
-    def get_program_summaries(
-        cls, session, root_id: str, current_user_id: str | None = None,
-        *, range_start=None, range_end=None,
-    ) -> List[Dict]:
-        """Return lightweight program and visible-range block calendar metadata."""
+    def get_program_summaries(cls, session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
+        """Return every program's lightweight metadata; the calendar feed owns dated content."""
         cls._require_root_access(session, root_id, current_user_id)
         programs = session.query(
             Program.id,
@@ -37,33 +34,8 @@ class _ProgramCrudMixin:
             Program.start_date,
             Program.end_date,
         ).filter_by(root_id=root_id).all()
-        blocks_by_program = {}
-        if range_start is not None and range_end is not None:
-            block_rows = session.query(
-                ProgramBlock.id,
-                ProgramBlock.program_id,
-                ProgramBlock.name,
-                ProgramBlock.start_date,
-                ProgramBlock.end_date,
-                ProgramBlock.color,
-            ).join(Program, Program.id == ProgramBlock.program_id).filter(
-                Program.root_id == root_id,
-                ProgramBlock.start_date <= range_end,
-                ProgramBlock.end_date >= range_start,
-            ).order_by(ProgramBlock.start_date, ProgramBlock.id).all()
-            for block_id, program_id, name, start_value, end_value, color in block_rows:
-                blocks_by_program.setdefault(program_id, []).append({
-                    "id": block_id,
-                    "program_id": program_id,
-                    "name": name,
-                    "start_date": format_utc(start_value),
-                    "end_date": format_utc(end_value),
-                    "color": color,
-                })
-
-        summaries = []
-        for program_id, program_root_id, name, color, start_value, end_value in programs:
-            summary = {
+        return [
+            {
                 "id": program_id,
                 "root_id": program_root_id,
                 "name": name,
@@ -71,10 +43,8 @@ class _ProgramCrudMixin:
                 "start_date": format_utc(start_value),
                 "end_date": format_utc(end_value),
             }
-            if range_start is not None and range_end is not None:
-                summary["blocks"] = blocks_by_program.get(program_id, [])
-            summaries.append(summary)
-        return summaries
+            for program_id, program_root_id, name, color, start_value, end_value in programs
+        ]
 
     @classmethod
     def get_programs(cls, session, root_id: str, current_user_id: str | None = None, *, as_of=None) -> List[Dict]:

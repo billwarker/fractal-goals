@@ -31,6 +31,27 @@ describe('renderProgramCalendarEventContent', () => {
         );
     });
 
+    it('prefers the ribbon\'s own program state over the selected program\'s state', () => {
+        const { container } = render(renderProgramCalendarEventContent(
+            {
+                event: {
+                    title: 'Other program day',
+                    extendedProps: {
+                        type: 'program_day',
+                        isCompleted: false,
+                        dayState: { state: 'rest', manual_status: 'rest', scheduled: true, closed: true },
+                    },
+                },
+            },
+            undefined,
+            { state: 'scheduled_met', scheduled: true, closed: true },
+        ));
+
+        expect(container.querySelector('[data-program-day-status]')).toHaveAttribute(
+            'data-program-day-status', 'rest',
+        );
+    });
+
     it('shows a completed session on an unscheduled date with its accessible state', () => {
         const { container } = render(renderProgramCalendarEventContent(
             { event: { title: 'Run', extendedProps: { type: 'completed_session' } } },

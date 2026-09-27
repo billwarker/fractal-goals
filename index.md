@@ -126,13 +126,17 @@ completion when available, including manually credited sessions. The date streak
 all scheduled program days on that date are met. Symbols are decorative beside each ribbon's
 assistive state text.
 The page calendar has one toolbar on desktop and mobile (‹ › Today, a **Continuous** checkbox, title,
-multi-day actions); compact calendars keep FullCalendar's header. Its calendar-summary endpoint reads
-only program IDs, names, colors, and date bounds plus block colors and date bounds intersecting the
-visible calendar range. Full program details load for the focused program and for each program whose
-date range reaches the month currently in view; continuous scrolling triggers these loads by month,
-and visited details remain cached for later views. Session summaries load for those same visible
-programs and dates, so completed sessions remain visible when the calendar scrolls outside the
-focused program. Clicking a date or program-day label within a
+multi-day actions); compact calendars keep FullCalendar's header. Calendar content comes from one
+root-scoped feed, `GET /api/<root_id>/programs/calendar-feed` (`ProgramCalendarFeedService`, schema
+v1, at most 62 days), loaded by `useProgramCalendarFeed` in calendar-month chunks for the rows
+actually on screen (the month grid, or the scrolled continuous rows) plus one month of idle-time
+overscan. Each chunk carries overlapping programs and blocks, every program's canonical date facts
+(built by the same `build_range_facts` path as the day read model) with light occurrence ribbons,
+completed sessions once (credits unioned across programs), and calendar periods. Chunks are cached
+under stable keys nested in the day-read-model root, so root-level read-model invalidation refreshes
+them; they revalidate with a weak ETag (`304` when unchanged), and a loading month shimmers only its
+own cells. `/programs/calendar` returns only every program's name, color, and span. Full program
+detail loads only for the scoped program's side pane and editors. Clicking a date or program-day label within a
 program immediately scopes the sidepane to that program. Every program keeps its color across its
 date range and its name appears in its first date cell. Empty-space clicks
 preserve a selected completed program's context; that context is page-local, so reloading or returning
@@ -190,6 +194,7 @@ Detailed design:
 - [Manual and bulk program-day statuses](planning/program-day-manual-statuses.md)
 - [Day review summary and session credit](planning/program-day-review-summary-and-credit.md)
 - [Calendar events and occurrence scheduling](planning/program-calendar-periods-and-scheduling.md)
+- [Viewport-driven calendar feed](planning/program-calendar-viewport-feed.md)
 
 ### Notes and analytics
 

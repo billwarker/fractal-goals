@@ -6,8 +6,23 @@ function nextMonthTitle(title) {
     return date.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function spanDays(url) {
+    const params = new URL(url).searchParams;
+    return (Date.parse(params.get('range_end')) - Date.parse(params.get('range_start'))) / DAY_MS + 1;
+}
+
 test('the program calendar can scroll weeks continuously and remembers the choice', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    // Calendar content loads as month chunks for the rows in view, never as a year.
+    const feedRequests = [];
+    const readModelRequests = [];
+    page.on('request', (request) => {
+        const url = request.url();
+        if (url.includes('/programs/calendar-feed')) feedRequests.push(url);
+        if (url.includes('/day-read-model')) readModelRequests.push(url);
+    });
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
     await page.goto('/');
     await page.getByText('LOG IN', { exact: true }).click();
@@ -38,6 +53,15 @@ test('the program calendar can scroll weeks continuously and remembers the choic
         .toHaveText(/^[A-Z][a-z]{2}1$/);
     // No cell carries FullCalendar's month-prefixed day number.
     await expect(page.locator('.fc-daygrid-day-number', { hasText: /^[A-Z][a-z]+ \d/ })).toHaveCount(0);
+
+    expect(feedRequests.length).toBeGreaterThan(0);
+    for (const url of feedRequests) expect(spanDays(url)).toBeLessThanOrEqual(31);
+    for (const url of readModelRequests) expect(spanDays(url)).toBeLessThanOrEqual(62);
+    // Scrolling a few months ahead loads (or reuses) those months' chunks.
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await page.getByRole('button', { name: 'Next month' }).click();
+    await expect.poll(() => new Set(feedRequests.map((url) => new URL(url).searchParams.get('range_start'))).size)
+        .toBeGreaterThanOrEqual(4);
 
     await page.reload();
     await expect(page.getByRole('checkbox', { name: 'Continuous' })).toBeChecked();

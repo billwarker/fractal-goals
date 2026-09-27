@@ -76,6 +76,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
             queryKeys.programCalendarRoot(rootId),
+            queryKeys.programCalendarFeedRoot(rootId),
             queryKeys.programDayOptions(rootId),
             queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
@@ -88,6 +89,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
             queryKeys.programCalendarRoot(rootId),
+            queryKeys.programCalendarFeedRoot(rootId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -97,6 +99,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
             queryKeys.programCalendarRoot(rootId),
+            queryKeys.programCalendarFeedRoot(rootId),
             queryKeys.sessions(rootId),
             queryKeys.sessionsAll(rootId),
             queryKeys.programDayOptions(rootId),
@@ -110,6 +113,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.program(rootId, programId),
             queryKeys.programs(rootId),
             queryKeys.programCalendarRoot(rootId),
+            queryKeys.programCalendarFeedRoot(rootId),
             queryKeys.goalsTree(rootId),
             queryKeys.activities(rootId),
             queryKeys.activityGroups(rootId),

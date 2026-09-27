@@ -77,8 +77,20 @@ vi.mock('../../hooks/useProgramData', () => ({
         };
     },
 }));
-vi.mock('../../hooks/useVisibleProgramCalendarDetails', () => ({
-    useVisibleProgramCalendarDetails: () => ({ details: new Map(), completedSessionDays: [] }),
+vi.mock('../../hooks/useProgramCalendarFeed', () => ({
+    useProgramCalendarFeed: () => ({
+        feed: {
+            programs: [],
+            blocks: [],
+            programDays: [
+                { program_id: 'program-1', date: '2026-09-02', scheduled: true, occurrences: [] },
+                { program_id: 'program-1', date: '2026-09-08', scheduled: true, occurrences: [] },
+            ],
+            completedSessionDays: [],
+            periods: [],
+        },
+        loadingMonths: new Set(),
+    }),
 }));
 vi.mock('../../hooks/useProgramGoalSets', () => ({
     useProgramGoalSets: () => ({
@@ -118,10 +130,6 @@ vi.mock('../../hooks/useProgramMetrics', () => ({
 }));
 vi.mock('../../hooks/useProgramDayReadModel', () => ({
     useProgramDayDetail: () => ({ data: null }),
-    useProgramDayRange: () => ({ data: { days: [
-        { date: '2026-09-02', scheduled: true },
-        { date: '2026-09-08', scheduled: true },
-    ] } }),
     useUpdateProgramDayStatuses: () => ({ mutateAsync: mutateStatuses, isPending: false }),
     useSetProgramDaySessionCredit: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));

@@ -25,6 +25,8 @@ const CONTINUOUS_VIEW = 'dayGridContinuous';
 // A row counts as "in view" once this much of it is below the scroller's top edge.
 const TITLE_ROW_THRESHOLD = 24;
 const MAX_READY_FRAMES = 30;
+// Trailing delay before a scrolled viewport range is reported for data loading.
+const VISIBLE_RANGE_SETTLE_MS = 120;
 
 function prefersReducedMotion() {
     return typeof window !== 'undefined'
@@ -80,6 +82,8 @@ function ProgramCalendarView({
     initialDate = new Date(),
     onDatesSet,
     onVisibleMonthChange,
+    onVisibleRangeChange,
+    loadingMonths = null,
     selectedDate,
     selectedRange,
     selectedRangeLabel,
@@ -289,6 +293,8 @@ function ProgramCalendarView({
             .forEach((label) => label.remove());
         frame.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
         clearStreakDecoration(dayEl, frame);
+        if (loadingMonths?.has(dateStr.slice(0, 7))) dayEl.setAttribute('data-loading', 'true');
+        else dayEl.removeAttribute('data-loading');
         frame.removeAttribute('data-block-label');
         frame.style.removeProperty('--program-block-label-color');
 
@@ -342,7 +348,7 @@ function ProgramCalendarView({
             labelButton.style.setProperty('--program-label-offset', `${index * 16}px`);
             frame.appendChild(labelButton);
         });
-    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
+    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, loadingMonths, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
@@ -353,6 +359,7 @@ function ProgramCalendarView({
         dayEl.removeAttribute('aria-label');
         dayEl.removeAttribute('tabindex');
         dayEl.removeAttribute('data-program-selectable-date');
+        dayEl.removeAttribute('data-loading');
         frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
             .forEach((label) => label.remove());
         frame?.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
@@ -420,23 +427,51 @@ function ProgramCalendarView({
         setWindowAnchor(dateStr);
     };
 
-    // Continuous mode: the month title follows the week row at the top of the scroller.
+    const onVisibleRangeChangeRef = React.useRef(onVisibleRangeChange);
+    onVisibleRangeChangeRef.current = onVisibleRangeChange;
+    const reportedRangeRef = React.useRef('');
+    const reportVisibleRange = React.useCallback((range) => {
+        const key = range ? `${range.start}:${range.end}` : '';
+        if (!range || key === reportedRangeRef.current) return;
+        reportedRangeRef.current = key;
+        onVisibleRangeChangeRef.current?.(range);
+    }, []);
+
+    // Continuous mode: the month title follows the week row at the top of the
+    // scroller, and the rows actually on screen (top to bottom) drive data loading.
     React.useEffect(() => {
         if (!continuous) return undefined;
         let scroller = null;
         let frame = null;
         let initialScrollFrame = null;
+        let settleTimer = null;
+        const rowDates = (row) => [...(row?.querySelectorAll('.fc-daygrid-day[data-date]') || [])]
+            .map((cell) => cell.getAttribute('data-date'));
         const syncTitle = () => {
             frame = null;
             if (!scroller) return;
-            const top = scroller.getBoundingClientRect().top + TITLE_ROW_THRESHOLD;
-            const row = [...scroller.querySelectorAll('.fc-daygrid-body tr')]
-                .find((candidate) => candidate.getBoundingClientRect().bottom > top);
-            const month = getWeekRowMonth([...(row?.querySelectorAll('.fc-daygrid-day[data-date]') || [])]
-                .map((cell) => cell.getAttribute('data-date')));
+            const bounds = scroller.getBoundingClientRect();
+            const top = bounds.top + TITLE_ROW_THRESHOLD;
+            const rows = [...scroller.querySelectorAll('.fc-daygrid-body tr')];
+            const row = rows.find((candidate) => candidate.getBoundingClientRect().bottom > top);
+            const month = getWeekRowMonth(rowDates(row));
             if (month) {
                 setVisibleMonth((current) => (current === month ? current : month));
                 onVisibleMonthChange?.(month);
+            }
+            const visibleRows = rows.filter((candidate) => {
+                const rect = candidate.getBoundingClientRect();
+                return rect.bottom > bounds.top && rect.top < bounds.bottom;
+            });
+            const firstDates = rowDates(visibleRows[0]).sort();
+            const lastDates = rowDates(visibleRows[visibleRows.length - 1]).sort();
+            if (firstDates.length && lastDates.length) {
+                const range = { start: firstDates[0], end: lastDates[lastDates.length - 1] };
+                if (settleTimer !== null) window.clearTimeout(settleTimer);
+                settleTimer = window.setTimeout(() => {
+                    settleTimer = null;
+                    reportVisibleRange(range);
+                }, reportedRangeRef.current ? VISIBLE_RANGE_SETTLE_MS : 0);
             }
         };
         const onScroll = () => {
@@ -474,9 +509,10 @@ function ProgramCalendarView({
             cancelReady();
             if (frame !== null) cancelAnimationFrame(frame);
             if (initialScrollFrame !== null) cancelAnimationFrame(initialScrollFrame);
+            if (settleTimer !== null) window.clearTimeout(settleTimer);
             scroller?.removeEventListener('scroll', onScroll);
         };
-    }, [calendarKey, continuous, getScroller, onVisibleMonthChange, scrollToDate]);
+    }, [calendarKey, continuous, getScroller, onVisibleMonthChange, reportVisibleRange, scrollToDate]);
 
     const handleDatesSet = (info) => {
         if (continuous && pendingScrollRef.current) {
@@ -489,6 +525,12 @@ function ProgramCalendarView({
             }));
         }
         if (!continuous && info?.view) {
+            if (info.startStr && info.endStr) {
+                reportVisibleRange({
+                    start: info.startStr.slice(0, 10),
+                    end: addDaysToDateString(info.endStr.slice(0, 10), -1),
+                });
+            }
             setMonthTitle(info.view.title || '');
             if (info.view.currentStart instanceof Date) {
                 const month = `${formatCalendarCellDate(info.view.currentStart).slice(0, 7)}-01`;

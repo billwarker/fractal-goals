@@ -15,10 +15,10 @@ from services.program_day_credits import (
 from services.program_day_occurrences import (
     build_day_facts,
     date_part,
-    effective_session_date,
     program_day_explicitly_scheduled_on,
     summarize_chain_facts,
 )
+from services.program_calendar_sessions import load_completed_sessions_by_date
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.program_day_summary import session_alignment
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
@@ -79,39 +79,17 @@ class ProgramDayReadModelService:
         if not program:
             return None, "Program not found", 404
 
-        program_start = date_part(program.start_date) or start
-        program_end = date_part(program.end_date) or end
-        chain_start, chain_end, chain_context_truncated = self._resolve_chain_window(
-            program_start, program_end, start, end
-        )
-        session_credits = load_program_session_credits(
-            self.db_session, [program.id], chain_start, chain_end,
-        )[program.id]
-        utc_start, utc_end = local_date_utc_bounds(chain_start, chain_end, zone)
-        sessions = load_program_credit_candidates(
-            self.db_session, root_id, current_user_id, [program], utc_start, utc_end,
-            {program.id: session_credits},
-        )[program.id]
-        status_overrides = self.db_session.query(ProgramDayStatusOverride).filter(
-            ProgramDayStatusOverride.program_id == program_id,
-            ProgramDayStatusOverride.date >= chain_start,
-            ProgramDayStatusOverride.date <= chain_end,
-        ).all()
-        periods = load_calendar_periods(self.db_session, root_id, current_user_id, chain_start, chain_end)
-        scope = resolve_program_scope(self.db_session, root_id, program_id)
-        range_evidence, goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
-            root_id, current_user_id, zone, scope.goal_ids,
-            start=start, end=min(end, datetime.now(zone).date()),
-        )
-        aligned_evidence = [item for item in range_evidence if item["in_scope_ids"]]
-        local_today = datetime.now(zone).date()
-        all_facts = build_day_facts(
-            program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today,
-            status_overrides=status_overrides, session_credits=session_credits, periods=periods,
-        )
-        facts = [item for item in all_facts if start <= item["date"] <= end]
-        completed_by_date = self._load_completed_sessions_by_date(
-            root_id, current_user_id, start, min(end, local_today), zone,
+        built = self.build_range_facts(root_id, current_user_id, program, start, end, zone)
+        all_facts = built["all_facts"]
+        facts = built["facts"]
+        periods = built["periods"]
+        scope = built["scope"]
+        goals_by_id = built["goals_by_id"]
+        local_today = built["local_today"]
+        chain_start = built["chain_start"]
+        chain_context_truncated = built["chain_context_truncated"]
+        completed_by_date = load_completed_sessions_by_date(
+            self.db_session, root_id, current_user_id, start, min(end, local_today), zone,
         )
         payload = self._summary(program, facts, start, end, timezone_name, completed_by_date)
         payload["periods"] = [
@@ -136,6 +114,56 @@ class ProgramDayReadModelService:
                 scope_goal_ids=scope.goal_ids, local_today=local_today, goals_by_id=goals_by_id,
             )
         return payload, None, 200
+
+    def build_range_facts(self, root_id, current_user_id, program, start, end, zone, *, periods=None):
+        """Load one program's evaluator inputs and return canonical facts for ``start..end``.
+
+        Facts are evaluated over the bounded chain window so chain roles stay correct
+        at the range edges. ``periods`` may be passed in when a caller already loaded
+        them for the root over a covering window.
+        """
+        program_start = date_part(program.start_date) or start
+        program_end = date_part(program.end_date) or end
+        chain_start, chain_end, chain_context_truncated = self._resolve_chain_window(
+            program_start, program_end, start, end
+        )
+        session_credits = load_program_session_credits(
+            self.db_session, [program.id], chain_start, chain_end,
+        )[program.id]
+        utc_start, utc_end = local_date_utc_bounds(chain_start, chain_end, zone)
+        sessions = load_program_credit_candidates(
+            self.db_session, root_id, current_user_id, [program], utc_start, utc_end,
+            {program.id: session_credits},
+        )[program.id]
+        status_overrides = self.db_session.query(ProgramDayStatusOverride).filter(
+            ProgramDayStatusOverride.program_id == program.id,
+            ProgramDayStatusOverride.date >= chain_start,
+            ProgramDayStatusOverride.date <= chain_end,
+        ).all()
+        if periods is None:
+            periods = load_calendar_periods(self.db_session, root_id, current_user_id, chain_start, chain_end)
+        scope = resolve_program_scope(self.db_session, root_id, program.id)
+        local_today = datetime.now(zone).date()
+        range_evidence, goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
+            root_id, current_user_id, zone, scope.goal_ids,
+            start=start, end=min(end, local_today),
+        )
+        aligned_evidence = [item for item in range_evidence if item["in_scope_ids"]]
+        all_facts = build_day_facts(
+            program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today,
+            status_overrides=status_overrides, session_credits=session_credits, periods=periods,
+        )
+        return {
+            "all_facts": all_facts,
+            "facts": [item for item in all_facts if start <= item["date"] <= end],
+            "periods": periods,
+            "scope": scope,
+            "goals_by_id": goals_by_id,
+            "local_today": local_today,
+            "chain_start": chain_start,
+            "chain_end": chain_end,
+            "chain_context_truncated": chain_context_truncated,
+        }
 
     @classmethod
     def _resolve_chain_window(cls, program_start, program_end, start, end):
@@ -163,8 +191,6 @@ class ProgramDayReadModelService:
                 longest_range_run = max(longest_range_run, range_run)
             elif fact["breaks_chain"]:
                 range_run = 0
-            linked_sessions = [session for row in fact["occurrences"] for session in row["sessions"]]
-            block_ids = sorted({row["block"].id for row in fact["occurrences"]})
             for evidence in fact["aligned_items"]:
                 goals_touched.update(evidence["in_scope_ids"])
             for occurrence in fact["occurrences"]:
@@ -179,20 +205,7 @@ class ProgramDayReadModelService:
                     row["color"] = get_template_color(template.template_data)
                     row["scheduled_occurrences"] += 1
                     row["completed_occurrences"] += int(template.id in completed)
-            days.append({
-                key: (value.isoformat() if key == "date" else value)
-                for key, value in fact.items()
-                if key not in {"occurrences", "aligned_items", "date_evaluation"}
-            } | {
-                "occurrence_count": len(fact["occurrences"]),
-                "duration_seconds": sum(
-                    session_duration_seconds_from_row(
-                        item.total_duration_seconds, item.duration_minutes,
-                        item.session_start, item.session_end,
-                    ) for item in linked_sessions
-                ),
-                "aligned_instance_count": len(fact["aligned_items"]),
-                "block_ids": block_ids,
+            days.append(self.serialize_day_fact(fact) | {
                 "completed_sessions": [
                     self._serialize_calendar_session(item, fact.get("session_credits", {}).get(item.id))
                     for item in completed_by_date.get(fact["date"], [])
@@ -238,6 +251,26 @@ class ProgramDayReadModelService:
                 "goals_touched_ids": sorted(goals_touched),
             },
             "days": days,
+        }
+
+    @staticmethod
+    def serialize_day_fact(fact):
+        """Calendar projection of one canonical date fact (no session list)."""
+        linked_sessions = [session for row in fact["occurrences"] for session in row["sessions"]]
+        return {
+            key: (value.isoformat() if key == "date" else value)
+            for key, value in fact.items()
+            if key not in {"occurrences", "aligned_items", "date_evaluation"}
+        } | {
+            "occurrence_count": len(fact["occurrences"]),
+            "duration_seconds": sum(
+                session_duration_seconds_from_row(
+                    item.total_duration_seconds, item.duration_minutes,
+                    item.session_start, item.session_end,
+                ) for item in linked_sessions
+            ),
+            "aligned_instance_count": len(fact["aligned_items"]),
+            "block_ids": sorted({row["block"].id for row in fact["occurrences"]}),
         }
 
     def _detail(self, root_id, current_user_id, program, facts, detail_date, zone, limit, offset,
@@ -377,25 +410,6 @@ class ProgramDayReadModelService:
             return offset
         except (ValueError, UnicodeDecodeError, base64.binascii.Error) as exc:
             raise ValueError("Invalid cursor") from exc
-
-    def _load_completed_sessions_by_date(self, root_id, current_user_id, start, end, zone):
-        """Completed sessions of the owner in any program, bucketed by local date."""
-        grouped = defaultdict(list)
-        if end < start:
-            return grouped
-        utc_start, utc_end = local_date_utc_bounds(start, end, zone)
-        effective = effective_session_timestamp()
-        rows = self.db_session.query(Session).options(selectinload(Session.template)).filter(
-            Session.root_id == root_id,
-            Session.owner_id == current_user_id,
-            Session.deleted_at.is_(None),
-            Session.completed.is_(True),
-            effective >= utc_start,
-            effective < utc_end,
-        ).order_by(effective.asc(), Session.id.asc()).all()
-        for session in rows:
-            grouped[effective_session_date(session, zone)].append(session)
-        return grouped
 
     @staticmethod
     def _session_relation(session, program_id, credit_fact):

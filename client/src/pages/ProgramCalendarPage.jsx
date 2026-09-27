@@ -27,25 +27,19 @@ import { useProgramCalendarSelection } from '../hooks/useProgramCalendarSelectio
 import { useProgramStatusSelection } from '../hooks/useProgramStatusSelection';
 import {
     useProgramDayDetail,
-    useProgramDayRange,
     useSetProgramDaySessionCredit,
     useUpdateProgramDayStatuses,
 } from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
-import { useVisibleProgramCalendarDetails } from '../hooks/useVisibleProgramCalendarDetails';
+import { useProgramCalendarFeed } from '../hooks/useProgramCalendarFeed';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { addDaysToDateString, formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
-import { getContinuousWindow } from '../utils/programCalendarContinuous';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
-import {
-    buildCalendarPeriodEvents,
-    buildCompletedSessionEvents,
-    mergeCompletedSessionDays,
-    nestContributingSessionsInProgramDays,
-} from '../utils/programDayState';
-import { useCalendarPeriodEditor, useCalendarPeriods } from '../hooks/useCalendarPeriods';
+import { nestContributingSessionsInProgramDays } from '../utils/programDayState';
+import { attachFeedBlocks, buildCalendarFeedEvents } from '../utils/programCalendarFeed';
+import { useCalendarPeriodEditor } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
 import { buildProgramBlockLabels, buildProgramsCalendarEvents, getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
@@ -94,11 +88,8 @@ function shiftDatePart(dateValue, dayOffset) {
     return shifted.toISOString().slice(0, 10);
 }
 
-function getInitialCalendarRange(dateValue, continuous) {
-    if (continuous) {
-        const { start, end } = getContinuousWindow(dateValue);
-        return { start, end };
-    }
+/** The six-week month grid around `dateValue`: the first rows in view on load, in either mode. */
+function getInitialCalendarRange(dateValue) {
     const [year, month] = dateValue.slice(0, 7).split('-').map(Number);
     const firstOfMonth = new Date(Date.UTC(year, month - 1, 1));
     firstOfMonth.setUTCDate(firstOfMonth.getUTCDate() - firstOfMonth.getUTCDay());
@@ -134,10 +125,7 @@ function ProgramCalendarPage() {
         () => readLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY) === 'true',
     );
     const [visibleCalendarRange, setVisibleCalendarRange] = useState(
-        () => getInitialCalendarRange(todayInTimezone, isCalendarContinuous),
-    );
-    const [visibleCalendarMonth, setVisibleCalendarMonth] = useState(
-        () => `${todayInTimezone.slice(0, 7)}-01`,
+        () => getInitialCalendarRange(todayInTimezone),
     );
     const handleCalendarContinuousChange = useCallback((enabled) => {
         setIsCalendarContinuous(enabled);
@@ -161,8 +149,7 @@ function ProgramCalendarPage() {
         programLabels,
         loading,
         refetchPrograms,
-        calendarProjectionReady = true,
-    } = useProgramsCalendarData(rootId, { timezone, visibleRange: visibleCalendarRange });
+    } = useProgramsCalendarData(rootId, { timezone });
 
     const activeProgramId = useMemo(
         () => programs.find((program) => isProgramActive(program, todayInTimezone))?.id || null,
@@ -188,32 +175,35 @@ function ProgramCalendarPage() {
     } = useProgramData(rootId, selectedProgramId, timezone || 'UTC');
 
     const displayProgram = detailedProgram || selectedProgram;
-    const visibleProgramCalendarData = useVisibleProgramCalendarDetails(
-        rootId, programs, visibleCalendarMonth, selectedProgramId, timezone,
+    // Everything the calendar draws for the rows in view, across every program.
+    const {
+        feed: calendarFeed,
+        loadingMonths: calendarLoadingMonths,
+    } = useProgramCalendarFeed(rootId, timezone, visibleCalendarRange);
+    const calendarPrograms = useMemo(
+        () => attachFeedBlocks(programs, calendarFeed.blocks),
+        [calendarFeed.blocks, programs],
     );
-    const calendarPrograms = useMemo(() => programs.map((program) => (
-        visibleProgramCalendarData.details.get(program.id) || program
-    )), [programs, visibleProgramCalendarData.details]);
-    const calendarEvents = useMemo(() => buildProgramsCalendarEvents(
-        calendarProjectionReady ? calendarPrograms : [],
+    const goalDeadlineEvents = useMemo(() => buildProgramsCalendarEvents(
+        [],
         goals,
         getGoalColor,
         getGoalTextColor,
         timezone,
         { getGoalSecondaryColor, getGoalIcon },
-    ).filter((event) => event.extendedProps?.type !== 'session'), [
-        calendarPrograms, calendarProjectionReady, getGoalColor, getGoalIcon, getGoalSecondaryColor,
-        getGoalTextColor, goals, timezone,
-    ]);
+    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, timezone]);
     const blockLabels = useMemo(() => (
-        programs.flatMap((program) => buildProgramBlockLabels({
+        calendarPrograms.flatMap((program) => buildProgramBlockLabels({
             program,
             includeProgramId: true,
         }))
-    ), [programs]);
-    const dayRangeQuery = useProgramDayRange(
-        rootId, displayProgram?.id, timezone, visibleCalendarRange,
-    );
+    ), [calendarPrograms]);
+    // The selected program's date facts drive status marks, streaks, and selection.
+    const selectedDayStates = useMemo(() => (
+        displayProgram
+            ? calendarFeed.programDays.filter((day) => String(day.program_id) === String(displayProgram.id))
+            : []
+    ), [calendarFeed.programDays, displayProgram]);
     const dayDetailQuery = useProgramDayDetail(
         rootId,
         displayProgram?.id,
@@ -223,18 +213,14 @@ function ProgramCalendarPage() {
     const dayStatusMutation = useUpdateProgramDayStatuses(rootId, displayProgram?.id);
     const sessionCreditMutation = useSetProgramDaySessionCredit(rootId, displayProgram?.id, timezone);
     const periodEditor = useCalendarPeriodEditor(rootId);
-    const fallbackPeriods = useCalendarPeriods(rootId, visibleCalendarRange, { enabled: !displayProgram }).data;
-    const calendarEventsWithSessions = useMemo(() => {
-        const completedSessionDays = mergeCompletedSessionDays(
-            visibleProgramCalendarData.completedSessionDays,
-            dayRangeQuery.data?.days || [],
-        );
-        return nestContributingSessionsInProgramDays([
-            ...calendarEvents,
-            ...buildCompletedSessionEvents(completedSessionDays, displayProgram?.id),
-            ...buildCalendarPeriodEvents(dayRangeQuery.data?.periods || fallbackPeriods, displayProgram?.id),
-        ]);
-    }, [calendarEvents, dayRangeQuery.data, displayProgram?.id, fallbackPeriods, visibleProgramCalendarData.completedSessionDays]);
+    const calendarEventsWithSessions = useMemo(() => nestContributingSessionsInProgramDays([
+        ...buildCalendarFeedEvents({
+            feed: calendarFeed,
+            programs: calendarPrograms,
+            selectedProgramId: displayProgram?.id || null,
+        }),
+        ...goalDeadlineEvents,
+    ]), [calendarFeed, calendarPrograms, displayProgram?.id, goalDeadlineEvents]);
     const displayGoals = detailGoals?.length ? detailGoals : goals;
 
     const {
@@ -296,8 +282,8 @@ function ProgramCalendarPage() {
         setIsSidePaneVisible,
     });
 
-    const selectableDayStates = useMemo(() => (dayRangeQuery.data?.days || []).filter((day) => (
-        isProgramActive(displayProgram, day.date))), [dayRangeQuery.data?.days, displayProgram]);
+    const selectableDayStates = useMemo(() => selectedDayStates.filter((day) => (
+        isProgramActive(displayProgram, day.date))), [displayProgram, selectedDayStates]);
     const {
         selectedStatusDates,
         selectedScheduledDates,
@@ -601,14 +587,12 @@ function ProgramCalendarPage() {
         dispatchCalendarContext({ type: 'focus_day', date: nextDate, programId: displayProgram.id });
     };
 
-    const handleCalendarDatesSet = (info) => {
-        setVisibleCalendarRange({
-            start: getDatePart(info.startStr),
-            end: subtractDaysToDateString(info.endStr, 1),
-        });
-    };
-    const handleCalendarVisibleMonthChange = useCallback((month) => {
-        setVisibleCalendarMonth((current) => (current === month ? current : month));
+    // The calendar reports the rows actually on screen (the month grid, or the
+    // scrolled continuous rows); the feed loads the month chunks they touch.
+    const handleCalendarVisibleRangeChange = useCallback((range) => {
+        setVisibleCalendarRange((current) => (
+            current?.start === range.start && current?.end === range.end ? current : range
+        ));
     }, []);
 
     const handleCalendarBackgroundClick = (event) => {
@@ -859,11 +843,11 @@ function ProgramCalendarPage() {
                                 onBlockLabelClick={handleBlockLabelClick}
                                 onProgramLabelClick={handleProgramLabelClick}
                                 programLabels={programLabels}
-                                onDatesSet={handleCalendarDatesSet}
-                                onVisibleMonthChange={handleCalendarVisibleMonthChange}
+                                onVisibleRangeChange={handleCalendarVisibleRangeChange}
+                                loadingMonths={calendarLoadingMonths}
                                 continuous={isCalendarContinuous}
                                 onContinuousChange={handleCalendarContinuousChange}
-                                dayStates={dayRangeQuery.data?.days || []}
+                                dayStates={selectedDayStates}
                                 selectedProgramName={displayProgram?.name || ''}
                                 selectedProgramId={displayProgram?.id || null}
                                 selectedStatusDates={selectedStatusDates}

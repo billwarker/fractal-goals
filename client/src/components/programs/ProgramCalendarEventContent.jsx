@@ -44,10 +44,13 @@ function renderCompletedSession(title, props, nested = false) {
     );
 }
 
-export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, dayState) {
+export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, selectedDayState) {
     const {
         type, blockColor, isCompleted, goalIcon,
     } = eventInfo.event.extendedProps;
+    // Feed ribbons carry their own program's date fact; other events fall back to
+    // the selected program's state for that date.
+    const dayState = eventInfo.event.extendedProps.dayState || selectedDayState;
     if (type === 'block_background') return null;
     const title = eventInfo.event.title;
 

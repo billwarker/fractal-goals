@@ -287,6 +287,32 @@
     cursor: pointer;
 }
 
+/* A month whose calendar data has not arrived yet: a quiet sweep on its own cells
+   only, so loaded months never blank out while a neighbour loads. */
+.calendarContainer :global(.fc-daygrid-day[data-loading] .fc-daygrid-day-frame) {
+    background-image: linear-gradient(
+        100deg,
+        transparent 30%,
+        color-mix(in srgb, var(--color-text-muted) 9%, transparent) 50%,
+        transparent 70%
+    );
+    background-size: 220% 100%;
+    animation: calendarCellLoading 1.4s ease-in-out infinite;
+}
+
+@keyframes calendarCellLoading {
+    from { background-position: 120% 0; }
+    to { background-position: -120% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .calendarContainer :global(.fc-daygrid-day[data-loading] .fc-daygrid-day-frame) {
+        animation: none;
+        background-image: none;
+        background-color: color-mix(in srgb, var(--color-text-muted) 6%, transparent);
+    }
+}
+
 /* ─── Custom Event Pills ─────────────────────────────────────────────────── */
 
 /* Reset FullCalendar's default event wrapper so our pill owns all styling */

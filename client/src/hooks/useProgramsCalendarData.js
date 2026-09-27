@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { flattenGoals } from '../utils/goalHelpers';
 import { buildProgramSummaryLabels } from '../utils/programViewModel';
@@ -7,24 +7,19 @@ import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 
-export function useProgramsCalendarData(rootId, { timezone, visibleRange } = {}) {
-    const rangeStart = visibleRange?.start || null;
-    const rangeEnd = visibleRange?.end || null;
+/**
+ * Every program's lightweight metadata (name, color, span) for pickers, labels,
+ * and active-program resolution. Date-bounded calendar content comes from
+ * `useProgramCalendarFeed`.
+ */
+export function useProgramsCalendarData(rootId, { timezone } = {}) {
+    const queryClient = useQueryClient();
     const programsQuery = useQuery({
-        queryKey: queryKeys.programCalendar(rootId, timezone || 'UTC', rangeStart, rangeEnd),
+        queryKey: queryKeys.programCalendar(rootId, timezone || 'UTC'),
         enabled: Boolean(rootId),
         staleTime: 5 * 60 * 1000,
-        placeholderData: (previousData, previousQuery) => (
-            String(previousQuery?.queryKey?.[1]) === String(rootId) ? previousData : undefined
-        ),
         queryFn: async () => {
-            const response = await fractalApi.getProgramSummaries(rootId, {
-                timezone: timezone || 'UTC',
-                ...(rangeStart && rangeEnd ? {
-                    range_start: rangeStart,
-                    range_end: rangeEnd,
-                } : {}),
-            });
+            const response = await fractalApi.getProgramSummaries(rootId, { timezone: timezone || 'UTC' });
             return response.data || [];
         },
     });
@@ -46,16 +41,19 @@ export function useProgramsCalendarData(rootId, { timezone, visibleRange } = {})
 
     const programLabels = useMemo(() => buildProgramSummaryLabels(sortedPrograms), [sortedPrograms]);
 
+    const { refetch: refetchProgramList } = programsQuery;
+    const refetchPrograms = useCallback(() => Promise.all([
+        refetchProgramList(),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
+    ]), [queryClient, refetchProgramList, rootId]);
+
     return {
         programs: sortedPrograms,
         goals,
         programLabels,
         loading: programsQuery.isLoading || goalsQuery.isLoading,
-        calendarProjectionReady: Boolean(
-            rangeStart && rangeEnd && !programsQuery.isPlaceholderData && programsQuery.data,
-        ),
         treeData: goalsQuery.data || null,
-        refetchPrograms: programsQuery.refetch,
+        refetchPrograms,
         refetchGoals: goalsQuery.refetch,
     };
 }

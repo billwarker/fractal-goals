@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
@@ -15,20 +15,31 @@ function unwrapReadModelResponse(response) {
     return payload;
 }
 
-function useMidnightInvalidation(rootId, programId, timezone) {
-    const queryClient = useQueryClient();
+/** Run `onRollover` once the local date in `timezone` changes (checked each minute). */
+export function useLocalDateRollover(timezone, onRollover, enabled = true) {
+    const onRolloverRef = useRef(onRollover);
     useEffect(() => {
-        if (!rootId || !programId) return undefined;
+        onRolloverRef.current = onRollover;
+    }, [onRollover]);
+    useEffect(() => {
+        if (!enabled) return undefined;
         let currentDate = getISOYMDInTimezone(new Date(), timezone || 'UTC');
         const timer = window.setInterval(() => {
             const nextDate = getISOYMDInTimezone(new Date(), timezone || 'UTC');
             if (nextDate === currentDate) return;
             currentDate = nextDate;
-            queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId, programId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
+            onRolloverRef.current();
         }, 60 * 1000);
         return () => window.clearInterval(timer);
-    }, [programId, queryClient, rootId, timezone]);
+    }, [enabled, timezone]);
+}
+
+function useMidnightInvalidation(rootId, programId, timezone) {
+    const queryClient = useQueryClient();
+    useLocalDateRollover(timezone, () => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId, programId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
+    }, Boolean(rootId && programId));
 }
 
 function useReadModel(rootId, programId, timezone, rangeStart, rangeEnd, detailDate = null) {
@@ -106,6 +117,7 @@ function invalidateProgramDayDependents(queryClient, rootId, programId, { except
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
     ]);
 }
 

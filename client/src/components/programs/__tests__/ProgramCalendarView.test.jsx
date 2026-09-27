@@ -187,6 +187,28 @@ describe('ProgramCalendarView', () => {
         expect(secondHandler).toHaveBeenCalledTimes(1);
     });
 
+    it('reports the rendered month grid as the visible range, once per change', () => {
+        const onVisibleRangeChange = vi.fn();
+        renderCalendar({ onVisibleRangeChange });
+        const datesSet = (startStr, endStr) => mockCalendarState.props.datesSet({
+            startStr, endStr, view: { title: 'September 2026', currentStart: new Date(2026, 8, 1) },
+        });
+
+        datesSet('2026-08-30T00:00:00', '2026-10-11T00:00:00');
+        datesSet('2026-08-30T00:00:00', '2026-10-11T00:00:00');
+
+        expect(onVisibleRangeChange).toHaveBeenCalledTimes(1);
+        expect(onVisibleRangeChange).toHaveBeenCalledWith({ start: '2026-08-30', end: '2026-10-10' });
+    });
+
+    it('marks only cells in months whose calendar data is still loading', () => {
+        const { rerender, props } = renderCalendar({ loadingMonths: new Set(['2026-05']) });
+        expect(screen.getByTestId('mock-day-cell')).toHaveAttribute('data-loading', 'true');
+
+        rerender(<ProgramCalendarView {...props} loadingMonths={new Set(['2026-06'])} />);
+        expect(screen.getByTestId('mock-day-cell')).not.toHaveAttribute('data-loading');
+    });
+
     it('keeps the Today button wired to context reset', () => {
         const { props } = renderCalendar();
 

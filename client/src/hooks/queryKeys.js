@@ -20,6 +20,12 @@ export const queryKeys = {
     programDayReadModelRoot: (rootId, programId = null) => programId
         ? ['program-day-read-model', rootId, programId]
         : ['program-day-read-model', rootId],
+    // The calendar feed is a root-wide day read model, so every root-level read-model
+    // invalidation (sessions, activities, periods, targets) refreshes it too.
+    programCalendarFeedRoot: (rootId) => ['program-day-read-model', rootId, 'calendar-feed'],
+    programCalendarFeed: (rootId, timezone, month) => [
+        'program-day-read-model', rootId, 'calendar-feed', { timezone, month },
+    ],
     programDayReadModel: (rootId, programId, timezone, rangeStart, rangeEnd, detailDate = null) => [
         'program-day-read-model', rootId, programId,
         { timezone, rangeStart, rangeEnd, detailDate },

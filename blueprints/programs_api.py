@@ -28,10 +28,10 @@ from blueprints.api_utils import get_db_session, internal_error, parse_optional_
 from services import event_bus, Event, Events
 from services.program_metrics_service import ProgramMetricsService
 from services.program_day_read_model_service import ProgramDayReadModelService
+from services.program_calendar_feed_service import ProgramCalendarFeedService
 from services.session_filters import resolve_timezone
 
 logger = logging.getLogger(__name__)
-MAX_PROGRAM_CALENDAR_RANGE_DAYS = 366
 
 # Create blueprint
 programs_bp = Blueprint('programs', __name__, url_prefix='/api')
@@ -49,39 +49,12 @@ def _request_timezone_and_date():
     return timezone_name, datetime.now(zone).date()
 
 
-def _request_program_calendar_range():
-    raw_start = request.args.get("range_start")
-    raw_end = request.args.get("range_end")
-    if raw_start is None and raw_end is None:
-        return None, None
-    if raw_start is None or raw_end is None:
-        raise ValueError("Both range_start and range_end are required")
-    try:
-        range_start = date.fromisoformat(raw_start)
-        range_end = date.fromisoformat(raw_end)
-    except ValueError as error:
-        raise ValueError("Calendar range must use YYYY-MM-DD dates") from error
-    if range_start > range_end:
-        raise ValueError("range_start must not be after range_end")
-    if (range_end - range_start).days + 1 > MAX_PROGRAM_CALENDAR_RANGE_DAYS:
-        raise ValueError(f"Calendar range cannot exceed {MAX_PROGRAM_CALENDAR_RANGE_DAYS} days")
-    return range_start, range_end
-
-
 def _get_program_response(current_user, root_id, *, calendar_summary=False):
     """Share the scoped read and database error boundary for program lists."""
     session = get_db_session()
     try:
         if calendar_summary:
-            try:
-                range_start, range_end = _request_program_calendar_range()
-            except ValueError as error:
-                return jsonify({"error": str(error)}), 400
-            return jsonify(ProgramService.get_program_summaries(
-                session, root_id, current_user.id,
-                range_start=range_start,
-                range_end=range_end,
-            ))
+            return jsonify(ProgramService.get_program_summaries(session, root_id, current_user.id))
         timezone_name, as_of = _request_timezone_and_date()
         if timezone_name is None:
             return jsonify({"error": "Invalid timezone"}), 400
@@ -113,7 +86,7 @@ def get_programs(current_user, root_id):
 @programs_bp.route('/<root_id>/programs/calendar', methods=['GET'])
 @token_required
 def get_program_calendar_summaries(current_user, root_id):
-    """Get calendar-only program metadata without blocks, days, or sessions."""
+    """Get every program's name, color, and span; date-bounded content is the calendar feed."""
     return _get_program_response(current_user, root_id, calendar_summary=True)
 
 
@@ -172,16 +145,68 @@ def get_program_metrics(current_user, root_id, program_id):
         session.close()
 
 
-@programs_bp.route('/<root_id>/programs/<program_id>/day-read-model', methods=['GET'])
-@token_required
-def get_program_day_read_model(current_user, root_id, program_id):
+def _calendar_read_model_response(label, build):
+    """Shared request boundary for timezone-scoped calendar read models.
+
+    ``build(session, timezone_name)`` returns ``(payload, error, status)`` or a
+    ready response for request-shape errors.
+    """
     session = get_db_session()
     try:
-        if request.args.get('date'):
-            return jsonify({"error": "Use range_start and range_end."}), 400
         timezone_name = request.args.get('timezone')
         if not timezone_name:
             return jsonify({"error": "Timezone is required."}), 400
+        payload, error, status = build(session, timezone_name)
+        if error:
+            return jsonify({"error": error}), status
+        return payload
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Error building %s", label)
+        return internal_error(logger, f"{label.capitalize()} request failed")
+    finally:
+        session.close()
+
+
+@programs_bp.route('/<root_id>/programs/calendar-feed', methods=['GET'])
+@token_required
+def get_program_calendar_feed(current_user, root_id):
+    """Everything the program calendar draws for one bounded date range, across programs."""
+    started = time.perf_counter()
+
+    def build(session, timezone_name):
+        payload, error, status = ProgramCalendarFeedService(session).get(
+            root_id,
+            current_user.id,
+            range_start=request.args.get('range_start'),
+            range_end=request.args.get('range_end'),
+            timezone_name=timezone_name,
+        )
+        if error:
+            return payload, error, status
+        response = jsonify(payload)
+        logger.info(
+            "calendar_feed_response range=%s..%s programs=%s days=%s session_days=%s "
+            "response_bytes=%s request_ms=%.2f",
+            payload["range"]["start"], payload["range"]["end"], len(payload["programs"]),
+            len(payload["program_days"]), len(payload["completed_session_days"]),
+            len(response.get_data()), (time.perf_counter() - started) * 1000,
+        )
+        # Revalidate every time; an unchanged chunk answers 304 without a body.
+        response.headers["Cache-Control"] = "private, no-cache"
+        response.add_etag(weak=True)
+        return response.make_conditional(request), None, 200
+
+    return _calendar_read_model_response("program calendar feed", build)
+
+
+@programs_bp.route('/<root_id>/programs/<program_id>/day-read-model', methods=['GET'])
+@token_required
+def get_program_day_read_model(current_user, root_id, program_id):
+    if request.args.get('date'):
+        return jsonify({"error": "Use range_start and range_end."}), 400
+
+    def build(session, timezone_name):
         payload, error, status = ProgramDayReadModelService(session).get(
             root_id,
             program_id,
@@ -193,15 +218,9 @@ def get_program_day_read_model(current_user, root_id, program_id):
             session_limit=request.args.get('session_limit', 50),
             session_cursor=request.args.get('session_cursor'),
         )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload)
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error building program day read model")
-        return internal_error(logger, "Program day read model request failed")
-    finally:
-        session.close()
+        return (jsonify(payload) if payload is not None else None), error, status
+
+    return _calendar_read_model_response("program day read model", build)
 
 
 @programs_bp.route('/<root_id>/programs/<program_id>/day-statuses', methods=['PATCH'])
