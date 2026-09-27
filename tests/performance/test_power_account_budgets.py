@@ -23,6 +23,7 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
+    ProgramSessionPlan,
     SessionTemplate,
     Target,
     activity_goal_associations,
@@ -143,6 +144,7 @@ def power_account_dataset(db_session, test_user):
     db_session.flush()
     for goal in goals[:20]:
         db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=goal.id))
+    program_days = []
     for block_index in range(4):
         block_start = (now - timedelta(days=84 - block_index * 28)).date()
         block = ProgramBlock(
@@ -157,6 +159,7 @@ def power_account_dataset(db_session, test_user):
         )
         day.templates.append(template)
         db_session.add(day)
+        program_days.append((block, day))
 
     db_session.commit()
     return {
@@ -164,6 +167,8 @@ def power_account_dataset(db_session, test_user):
         "goals": goals,
         "sessions": sessions,
         "program": program,
+        "program_days": program_days,
+        "template": template,
         "headers": session_headers_for(test_user),
     }
 
@@ -261,3 +266,34 @@ def test_power_account_goal_mutation_returns_subtree_in_constant_queries(client,
     assert response.status_code == 200
     assert response.get_json()["children"]
     assert query_counter["total"] <= 14
+
+
+def test_power_account_program_session_plan_budgets(client, db_session, query_counter, power_account_dataset):
+    """Every occurrence holds a stored plan, so per-date or per-plan loading would show up here."""
+    root_id = power_account_dataset["root"].id
+    program_id = power_account_dataset["program"].id
+    template = power_account_dataset["template"]
+    block, day = power_account_dataset["program_days"][-1]
+    dates = [
+        block.start_date + timedelta(days=offset)
+        for offset in range((block.end_date - block.start_date).days + 1)
+        if (block.start_date + timedelta(days=offset)).strftime("%A") in day.day_of_week
+    ]
+    template_sections = json.loads(template.template_data).get("sections") or [{"name": "Main", "items": []}]
+    for plan_date in dates:
+        db_session.add(ProgramSessionPlan(
+            root_id=root_id, program_id=program_id, program_day_id=day.id, session_template_id=template.id,
+            date=plan_date, plan_data={"sections": template_sections},
+        ))
+    db_session.commit()
+    headers = power_account_dataset["headers"]
+    base = f"/api/{root_id}/programs/{program_id}/days/{day.id}"
+
+    response, elapsed_ms = _budget_get(client, f"{base}/plan-occurrences", headers, query_counter)
+    assert_response_budget(response, max_bytes=20_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    assert len(response.get_json()["dates"]) == len(dates)
+    assert query_counter["total"] <= 8
+
+    response, elapsed_ms = _budget_get(client, f"{base}/plans?date={dates[-1].isoformat()}", headers, query_counter)
+    assert_response_budget(response, max_bytes=40_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 10

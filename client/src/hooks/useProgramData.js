@@ -79,6 +79,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.programCalendarFeedRoot(rootId),
             queryKeys.programDayOptions(rootId),
             queryKeys.programDayReadModelRoot(rootId, programId),
+            queryKeys.programSessionPlansRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -104,6 +105,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.sessionsAll(rootId),
             queryKeys.programDayOptions(rootId),
             queryKeys.programDayReadModelRoot(rootId, programId),
+            queryKeys.programSessionPlansRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);
@@ -121,6 +123,7 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.sessionsAll(rootId),
             queryKeys.programDayOptions(rootId),
             queryKeys.programDayReadModelRoot(rootId, programId),
+            queryKeys.programSessionPlansRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, rootId, programId]);

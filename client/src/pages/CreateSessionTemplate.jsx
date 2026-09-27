@@ -89,6 +89,8 @@ function CreateSessionTemplate() {
         },
         onSuccess: async (_, variables) => {
             await queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId) });
+            // Template edits change which plans report "Template changed".
+            await queryClient.invalidateQueries({ queryKey: queryKeys.programSessionPlansRoot(rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
             setShowBuilder(false);
             setEditingTemplate(null);

@@ -22,6 +22,64 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 
+def _seed_planning_fractal(db, suffix, user, level, today):
+    """A separate fractal whose weekly program day uses a set-based template, for plan workflows.
+
+    It has no active session, so browser specs can start a planned session there. Models are
+    imported here because they must load after the isolated database URL is configured.
+    """
+    from datetime import datetime, timedelta
+    from models import (
+        ActivityDefinition,
+        Goal,
+        MetricDefinition,
+        Program,
+        ProgramBlock,
+        ProgramDay,
+        ProgramDayTemplate,
+        SessionTemplate,
+    )
+
+    root_id = f"browser-plan-root-{suffix}"
+    db.add(Goal(id=root_id, root_id=root_id, owner_id=user.id, level_id=level.id, name=f"Browser Planning {suffix}"))
+    db.flush()
+    db.add(ActivityDefinition(
+        id=f"browser-plan-bench-{suffix}", root_id=root_id, name="Bench Press", has_sets=True, has_metrics=True,
+    ))
+    db.flush()
+    db.add(MetricDefinition(
+        id=f"browser-plan-weight-{suffix}", activity_id=f"browser-plan-bench-{suffix}", root_id=root_id,
+        name="Weight", unit="kg",
+    ))
+    db.add(SessionTemplate(
+        id=f"browser-plan-template-{suffix}", root_id=root_id, name="Bench Day",
+        template_data={"session_type": "normal", "sections": [{"name": "Main", "items": [{
+            "type": "activity", "activity_definition_id": f"browser-plan-bench-{suffix}",
+            "name": "Bench Press", "item_key": "bench",
+        }]}]},
+    ))
+    db.add(Program(
+        id=f"browser-plan-program-{suffix}", root_id=root_id, name=f"Strength {suffix}",
+        start_date=datetime.combine(today - timedelta(days=7), datetime.min.time()),
+        end_date=datetime.combine(today + timedelta(days=21), datetime.max.time()),
+        weekly_schedule={},
+    ))
+    db.add(ProgramBlock(
+        id=f"browser-plan-block-{suffix}", program_id=f"browser-plan-program-{suffix}", name="Block 1",
+        start_date=today - timedelta(days=7), end_date=today + timedelta(days=21),
+    ))
+    db.flush()
+    db.add(ProgramDay(
+        id=f"browser-plan-day-{suffix}", block_id=f"browser-plan-block-{suffix}", name="Upper A",
+        day_of_week=[today.strftime("%A")],
+    ))
+    db.flush()
+    db.add(ProgramDayTemplate(
+        program_day_id=f"browser-plan-day-{suffix}", session_template_id=f"browser-plan-template-{suffix}",
+        is_required=True, order=0,
+    ))
+
+
 def main():
     source = make_url(config.get_database_url())
     if source.host not in ("localhost", "127.0.0.1", "::1"):
@@ -214,8 +272,14 @@ def main():
                         data={},
                     )
                 )
+                _seed_planning_fractal(db, suffix, user, ultimate_level, today)
             db.commit()
         from app import app
+        from extensions import limiter
+
+        # RATELIMIT_ENABLED is read from app config, not the environment; every spec logs in
+        # through the UI from one address, so the login limit must be off here.
+        limiter.enabled = False
 
         worker_environment = os.environ.copy()
         worker_environment["AGENT_WORKER_IDLE_SECONDS"] = "10"

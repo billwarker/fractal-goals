@@ -658,3 +658,16 @@
         gap: 12px;
     }
 }
+
+.planToggle {
+    white-space: nowrap;
+}
+
+.planEditor {
+    margin: -4px 0 8px;
+    padding: 10px 12px;
+    background: var(--color-bg-subtle);
+    border: 1px solid var(--color-border);
+    border-top: none;
+    border-radius: 0 0 4px 4px;
+}

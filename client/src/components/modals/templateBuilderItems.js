@@ -50,17 +50,21 @@ export function canUseTemplateItemInQuickSession(item) {
 }
 
 export function getTemplateItemKey(item, index) {
+    if (item.item_key) return item.item_key;
     return `${item.activity_id || item.circuit_definition_id || item.name}-${index}`;
 }
 
 export function serializeTemplateItem(item) {
+    const identity = item.item_key ? { item_key: item.item_key } : {};
     if (item.item_type === 'circuit') {
-        return { type: 'circuit', circuit_definition_id: item.circuit_definition_id };
+        return { type: 'circuit', circuit_definition_id: item.circuit_definition_id, ...identity };
     }
     return {
         type: 'activity',
         activity_definition_id: item.activity_id,
         name: item.name,
+        ...identity,
+        ...(item.prescription ? { prescription: item.prescription } : {}),
     };
 }
 

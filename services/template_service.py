@@ -9,6 +9,7 @@ from sqlalchemy import distinct
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_session_template
+from services.prescriptions import check_section_prescriptions
 from services.quota_service import QuotaService
 from services.session_runtime import is_quick_session
 from services.session_structure import build_template_data_from_session
@@ -55,6 +56,15 @@ def seed_default_template(db_session, root_id, current_user_id):
     )
     db_session.add(template)
     return template
+
+
+def _load_template_data(raw):
+    if isinstance(raw, str):
+        try:
+            return json.loads(raw)
+        except ValueError:
+            return None
+    return raw
 
 
 class TemplateService:
@@ -161,6 +171,7 @@ class TemplateService:
 
         try:
             template_data = validate_session_template_data(data.get('template_data') or {})
+            check_section_prescriptions(self.db_session, root_id, template_data.get('sections'))
         except ValueError as exc:
             return None, str(exc), 400
         _, storage_error, storage_status = quota_service.check_storage_available(
@@ -233,7 +244,7 @@ class TemplateService:
 
     def update_template(self, root_id, template_id, current_user_id, data) -> ServiceResult[SessionTemplate]:
         template, error, status = self.get_template(root_id, template_id, current_user_id)
-        if error:
+        if error or template is None:
             return None, error, status
 
         if 'name' in data:
@@ -241,6 +252,13 @@ class TemplateService:
         if 'description' in data:
             template.description = data['description']
         if 'template_data' in data:
+            try:
+                check_section_prescriptions(self.db_session, root_id, data['template_data'].get('sections'))
+            except ValueError as exc:
+                return None, str(exc), 400
+            if _load_template_data(template.template_data) != data['template_data']:
+                # Plans compare against this to offer "Pull template changes".
+                template.revision = (template.revision or 1) + 1  # pyright: ignore[reportAttributeAccessIssue] - legacy Column typing
             template.template_data = json.dumps(data['template_data'])
         if 'is_archived' in data:
             template.archived_at = models.utc_now() if data['is_archived'] else None

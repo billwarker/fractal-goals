@@ -144,6 +144,8 @@ from .programs import (
     ProgramDayTemplateConfigSchema,
     ProgramDayUpdateSchema,
     ProgramGoalDeadlineSchema,
+    ProgramSessionPlanPullSchema,
+    ProgramSessionPlanSaveSchema,
     ProgramUpdateSchema,
     VALID_DAYS_OF_WEEK,
 )
@@ -248,6 +250,8 @@ __all__ = [
     "ProgramDayOccurrenceUnscheduleSchema",
     "ProgramDayScheduleSchema",
     "ProgramDaySessionCreditSchema",
+    "ProgramSessionPlanPullSchema",
+    "ProgramSessionPlanSaveSchema",
     "ProgramDayTemplateConfigSchema",
     "ProgramDayUpdateSchema",
     "ProgramGoalDeadlineSchema",

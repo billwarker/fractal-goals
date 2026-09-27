@@ -78,6 +78,16 @@ circuit activities are instantiated; circuits added later attach their member go
 Primary code: `services/session_*`, `services/activity_*`, `services/progress_service.py`,
 `services/timer_service.py`, `blueprints/sessions_api.py`, and the matching client hooks/views.
 
+Template section items carry a stable `item_key` (never `id`, a legacy activity-id alias) and an
+optional `prescription`: planned values per set or per metric plus activity and set notes
+(`validators/prescriptions.py` owns shape; `services/prescriptions.py` checks that metrics and splits
+belong to the item's activity and respect metric bounds). Templates count content edits in
+`revision`. Session creation snapshots the authoritative template's or dated plan's prescription onto
+`activity_instances.prescription`, looked up by `item_key`; client-sent planned values are ignored.
+Planned set activities start with one empty `planned` set per planned set; plans are reference-only,
+so metric defaults are not auto-filled for them. The session card shows a "plan" chip beside the
+progress indicator, coloured met/under by `utils/sessionPrescription.js`. Plans never feed targets.
+
 Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a
 terminal timer boundary: its open ordinary activity work interval is closed in the same
@@ -186,8 +196,22 @@ expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provi
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
 
+The Programs page has Calendar, Blocks, and **Days** views. Days (`components/programs/days/`) programs
+one program day's occurrence dates: each date's templates render side by side as editable plans.
+`program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
+holds one dated plan per program day, template, and date: an independent snapshot of the template's
+sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.
+Plans are virtual until first saved: an unplanned occurrence is seeded from the latest earlier plan
+still on an occurrence date, else the template. Saves use `row_version` (409 on conflict); template
+edits never rewrite plans, which report `template_changed` and offer an explicit pull that keeps
+planned values by `item_key` and plan-added items. Plans off the schedule are dormant, never seeds.
+Create Session offers today's occurrence plan, then unexecuted plans from the previous 14 days; a
+chosen virtual plan is materialized in the session's transaction and linked by
+`sessions.program_session_plan_id`. Agent proposals keep the base session contract without plans.
+
 Detailed design:
 
+- [Program days and dated session plans](planning/program-days-session-plans.md)
 - [Program calendar and chain read model](planning/programs-scoped-sidepane-chain-calendar.md)
 - [Program metrics](planning/program-metrics-insights.md)
 - [Program-aware session creation](planning/program-aware-create-session.md)
@@ -333,4 +357,6 @@ Read-path query and payload budgets for a power-user-sized account live in
 - Add neighbouring boundary cases for every classifier, count, state, and cursor fix.
 - Remove retired adapters and render paths when their replacement becomes canonical.
 - Treat destructive schema work as an explicit, backed-up rollout decision.
+- Planned values are snapshots: sessions keep the prescription they started with, plans keep the
+  template revision they copied, and neither ever becomes target or completion evidence.
 - Keep this file a map; link to details instead of embedding a changelog.

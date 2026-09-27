@@ -19,11 +19,14 @@ import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import ViewToggleTabs from '../common/ViewToggleTabs';
+import PrescriptionEditor from '../prescriptions/PrescriptionEditor';
+import useTemplateItemPlans from './useTemplateItemPlans';
 
 import {
     SESSION_TYPE_NORMAL,
     SESSION_TYPE_QUICK,
 } from '../../utils/sessionRuntime';
+import { summarizePrescription } from '../../utils/prescriptionModel';
 import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import {
@@ -82,6 +85,11 @@ function TemplateBuilderModalContent({
     const sectionCircuitById = useMemo(
         () => new Map(sectionCircuits.map((circuit) => [circuit.id, circuit])),
         [sectionCircuits],
+    );
+    const { openPlanKeys, togglePlan, updatePrescription } = useTemplateItemPlans(setCurrentTemplate);
+    const activityDefinitionById = useMemo(
+        () => new Map(sectionActivityDefinitions.map((definition) => [definition.id, definition])),
+        [sectionActivityDefinitions],
     );
     const totalDuration = currentTemplate.sections.reduce((sum, section) => sum + section.duration_minutes, 0);
     const activityGroupOptions = useMemo(
@@ -226,7 +234,8 @@ function TemplateBuilderModalContent({
                 ...targetSection,
                 activities: [
                     ...(targetSection.activities || []),
-                    item,
+                    // A client-assigned key keeps plan editors attached through reorders; the server keeps it.
+                    { ...item, item_key: item.item_key || createSectionId() },
                 ],
             };
 
@@ -687,11 +696,15 @@ function TemplateBuilderModalContent({
                                                     />
 
                                                     <div className={styles.activitiesList}>
-                                                        {(section.activities || []).map((activity, activityIndex) => (
-                                                            <div
-                                                                key={getTemplateItemKey(activity, activityIndex)}
-                                                                className={styles.activityItem}
-                                                            >
+                                                        {(section.activities || []).map((activity, activityIndex) => {
+                                                            const planKey = activity.item_key || `${sectionIndex}:${activityIndex}`;
+                                                            const planDefinition = isTemplateCircuitItem(activity)
+                                                                ? null
+                                                                : activityDefinitionById.get(activity.activity_id);
+                                                            const isPlanOpen = openPlanKeys.has(planKey);
+                                                            return (
+                                                            <React.Fragment key={getTemplateItemKey(activity, activityIndex)}>
+                                                            <div className={styles.activityItem}>
                                                                 <div className={styles.activityInfo}>
                                                                     <div className={styles.activityName}>{activity.name}</div>
                                                                     {activity.type && (
@@ -727,6 +740,18 @@ function TemplateBuilderModalContent({
                                                                             ↓
                                                                         </button>
                                                                     </div>
+                                                                    {planDefinition && (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="secondary"
+                                                                            className={styles.planToggle}
+                                                                            onClick={() => togglePlan(planKey)}
+                                                                            aria-expanded={isPlanOpen}
+                                                                            title="Planned values and notes"
+                                                                        >
+                                                                            {summarizePrescription(activity.prescription) || 'Plan'}
+                                                                        </Button>
+                                                                    )}
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => handleRemoveActivity(sectionIndex, activityIndex)}
@@ -737,7 +762,19 @@ function TemplateBuilderModalContent({
                                                                     </button>
                                                                 </div>
                                                             </div>
-                                                        ))}
+                                                            {planDefinition && isPlanOpen && (
+                                                                <div className={styles.planEditor}>
+                                                                    <PrescriptionEditor
+                                                                        definition={planDefinition}
+                                                                        value={activity.prescription || null}
+                                                                        idPrefix={`template-plan-${planKey}`}
+                                                                        onChange={(prescription) => updatePrescription(sectionIndex, activityIndex, prescription)}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            </React.Fragment>
+                                                            );
+                                                        })}
                                                         {!(showActivityModal && selectedSectionIndex === sectionIndex) && (
                                                             <button
                                                                 type="button"

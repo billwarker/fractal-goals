@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint, Index
+from sqlalchemy import text
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -268,6 +269,51 @@ class ProgramDaySessionCredit(Base):
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     program = relationship('Program', back_populates='day_session_credits')
+
+
+class ProgramSessionPlan(Base):
+    """A dated plan of one template for one program-day occurrence.
+
+    ``plan_data`` is an independent snapshot of the template's ``sections`` whose
+    activity items may carry ``prescription`` values and notes. Template edits never
+    rewrite it; ``source_template_revision`` records which revision it copied. A plan
+    whose date stops being an occurrence of its day is dormant, not deleted.
+    """
+
+    __tablename__ = 'program_session_plans'
+    __table_args__ = (
+        Index(
+            'uq_program_session_plans_day_template_date',
+            'program_day_id', 'session_template_id', 'date',
+            unique=True,
+            postgresql_where=text('deleted_at IS NULL'),
+        ),
+        Index('ix_program_session_plans_root_template_date', 'root_id', 'session_template_id', 'date'),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
+    program_id = Column(String, ForeignKey('programs.id', ondelete='CASCADE'), nullable=False, index=True)
+    program_day_id = Column(String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=False)
+    session_template_id = Column(
+        String, ForeignKey('session_templates.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    date = Column(Date, nullable=False)
+    plan_data = Column(JSON_TYPE, nullable=False)
+    source_template_revision = Column(Integer, nullable=False, default=1, server_default='1')
+    seeded_from_plan_id = Column(
+        String, ForeignKey('program_session_plans.id', ondelete='SET NULL'), nullable=True,
+    )
+    created_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
+    deleted_at = Column(DateTime, nullable=True)
+    row_version = Column(Integer, nullable=False, default=1, server_default='1')
+
+    __mapper_args__ = {'version_id_col': row_version}
+
+    program_day = relationship('ProgramDay')
+    template = relationship('SessionTemplate')
 
 
 def get_program_day_template_rules(day):

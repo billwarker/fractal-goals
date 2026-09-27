@@ -76,6 +76,7 @@ export default function ProgramDayPane({
     onSetSessionCredit,
     sessionCreditUpdating = false,
     onEditPeriod,
+    onEditPlan,
 }) {
     const detail = query.data?.detail;
     if (query.isLoading && !detail) return <div className={styles.state} aria-busy="true">Loading day details…</div>;
@@ -185,6 +186,13 @@ export default function ProgramDayPane({
                                 </p>
                                 <div className={styles.sessionList}>{uncreditedSessions.map(renderSession)}</div>
                             </div>
+                        ) : null}
+                        {onEditPlan && occurrence.templates.length ? (
+                            <button
+                                type="button"
+                                className={styles.quietAction}
+                                onClick={() => onEditPlan(occurrence.program_day_id, date)}
+                            >{date < today ? 'View plan' : 'Edit plan'}</button>
                         ) : null}
                         {occurrence.definition_note ? <p className={styles.note}><strong>Schedule note:</strong> {occurrence.definition_note}</p> : null}
                         {occurrence.scheduled_explicitly && date > today ? (

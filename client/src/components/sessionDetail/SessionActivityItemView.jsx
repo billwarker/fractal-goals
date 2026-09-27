@@ -82,6 +82,8 @@ function SessionActivityItemView({
     hasSplits,
     renderMetricEditor,
     renderMetricProgress,
+    activityPlanNote = null,
+    getSetPlanNote = () => null,
     getSetMetricDisplayValue,
     hasSetMetricDraft,
     handleSetMetricDraftChange,
@@ -551,6 +553,7 @@ function SessionActivityItemView({
 
             {/* Content Area */}
             <div className={styles.contentArea}>
+                {activityPlanNote && <p className={styles.planNote}>{activityPlanNote}</p>}
 
                 {/* SETS VIEW */}
                 {hasSets ? (
@@ -589,7 +592,7 @@ function SessionActivityItemView({
                                                                     unitClassName: styles.metricUnit,
                                                                     onDraftChange: (value) => handleSetMetricDraftChange(setIdx, m.id, value, split.id),
                                                                     onCommit: (value) => commitSetMetricInput(setIdx, m, split.id, value),
-                                                                    progress: renderMetricProgress(m.id, { setIndex: setIdx }),
+                                                                    progress: renderMetricProgress(m.id, { setIndex: setIdx, splitId: split.id }),
                                                                 })}
                                                             </div>
                                                         ))}
@@ -614,6 +617,10 @@ function SessionActivityItemView({
                                                     </div>
                                                 ))
                                             )
+                                        )}
+
+                                        {getSetPlanNote(setIdx) && (
+                                            <p className={styles.planNote}>{getSetPlanNote(setIdx)}</p>
                                         )}
 
                                         {/* Cascade Buttons Container */}
@@ -728,7 +735,7 @@ function SessionActivityItemView({
                                                         unitClassName: styles.metricUnitLarge,
                                                         onDraftChange: (value) => handleSingleMetricDraftChange(m.id, value, split.id),
                                                         onCommit: (value) => commitSingleMetricInput(m, split.id, value),
-                                                        progress: renderMetricProgress(m.id),
+                                                        progress: renderMetricProgress(m.id, { splitId: split.id }),
                                                     })}
                                                 </div>
                                             ))}

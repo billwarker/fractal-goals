@@ -19,7 +19,7 @@ from validators.programs import (
     ProgramDayScheduleSchema,
 )
 from validators.templates import SessionTemplateCreateSchema
-from validators.sessions import SessionCreateSchema, SessionUpdateSchema
+from validators.sessions import SessionCreateBaseSchema, SessionUpdateSchema
 
 
 OperationId = Annotated[
@@ -141,7 +141,7 @@ class CreateNoteOperation(BaseModel):
     data: NoteCreateSchema = Field(description="Note content and an in-fractal context reference.")
 
 
-class StrictSessionCreateSchema(SessionCreateSchema):
+class StrictSessionCreateSchema(SessionCreateBaseSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 

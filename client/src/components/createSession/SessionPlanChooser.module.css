@@ -1,0 +1,38 @@
+.chooser {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-card);
+    border-radius: 8px;
+}
+
+.label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.chooser select {
+    min-height: 40px;
+    padding: 6px 10px;
+    font: inherit;
+    color: var(--color-text-primary);
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border-input);
+    border-radius: 6px;
+}
+
+.chooser select:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.hint {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}

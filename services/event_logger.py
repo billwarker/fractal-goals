@@ -216,6 +216,12 @@ def _get_event_description(event: Event):
             f"Scheduled program day: {event.data.get('day_name', 'Unknown')}"
             + (f" on {event.data.get('scheduled_date')}" if event.data.get('scheduled_date') else "")
         ),
+        Events.PROGRAM_SESSION_PLAN_SAVED: (
+            f"Planned {event.data.get('template_name', 'session')} for {event.data.get('date', 'a program day')}"
+        ),
+        Events.PROGRAM_SESSION_PLAN_RESET: (
+            f"Reset plan for {event.data.get('template_name', 'session')} on {event.data.get('date', 'a program day')}"
+        ),
         Events.PROGRAM_DAY_UNSCHEDULED: (
             f"Unscheduled program day: {event.data.get('day_name', 'Unknown')}"
             + (f" on {event.data.get('date')}" if event.data.get('date') else "")

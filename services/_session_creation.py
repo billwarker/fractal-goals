@@ -7,11 +7,12 @@ from datetime import datetime, timezone
 import uuid
 from typing import Any
 from sqlalchemy import text
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session as OrmSession, joinedload
 import models
 from models import (
     ActivityDefinition,
     ActivityInstance,
+    ActivitySet,
     Goal,
     Session,
     session_goals,
@@ -31,6 +32,7 @@ from services.session_runtime import (
     get_template_session_type,
 )
 from services.program_scope import resolve_program_scope
+from services.prescriptions import item_activity_id, iter_activity_items, planned_set_count, snapshot_prescription
 from services._session_lifecycle_common import _parse_iso_datetime_strict
 
 
@@ -55,9 +57,23 @@ class _SessionDraft:
     program_day_id: str | None = None
     program_goal_ids: set | None = None
     created_circuit_runs: list = field(default_factory=list)
+    # item_key -> (activity id, prescription) from the authoritative template or plan.
+    # Client-sent sections only carry item keys; planned values never come from the client.
+    prescriptions_by_item_key: dict = field(default_factory=dict)
+
+
+def _index_prescriptions(sections):
+    return {
+        item['item_key']: (item_activity_id(item), item['prescription'])
+        for item in iter_activity_items(sections)
+        if item.get('item_key') and item.get('prescription')
+    }
 
 
 class _SessionCreationMixin:
+    # Host attribute supplied by SessionService; declared so the mixin type-checks on its own.
+    db_session: OrmSession
+
     def create_session(
         self,
         root_id,
@@ -185,7 +201,7 @@ class _SessionCreationMixin:
                 if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
                     draft.program_day_id = requested_day_id
                     new_session.program_day_id = draft.program_day_id
-                    p_day.row_version += 1
+                    p_day.row_version += 1  # pyright: ignore[reportAttributeAccessIssue] - legacy Column typing
                     new_session.program_id = p_day.block.program.id
                     new_session.program_block_id = p_day.block.id
                     program_context['program_id'] = p_day.block.program.id
@@ -212,7 +228,7 @@ class _SessionCreationMixin:
                     return "Invalid program context for this fractal", 400
                 if goal_scope_enabled:
                     draft.program_goal_ids = set(resolve_program_scope(
-                        self.db_session, root_id, program.id
+                        self.db_session, root_id, program.id,  # pyright: ignore[reportArgumentType] - legacy Column typing
                     ).goal_ids)
                 program_context['program_name'] = program.name
                 program_context['program_color'] = program.color
@@ -255,6 +271,8 @@ class _SessionCreationMixin:
             if draft.template_session_type == SESSION_TYPE_QUICK:
                 if draft.program_day_id:
                     return "Quick session templates cannot be used from a program day", 400
+                if draft.data.get('program_session_plan_id') or draft.data.get('plan_ref'):
+                    return "Quick session templates cannot be planned", 400
                 if not new_session.session_start:
                     new_session.session_start = datetime.now(timezone.utc)
             elif isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
@@ -266,7 +284,42 @@ class _SessionCreationMixin:
                     ):
                         session_data_dict['total_duration_minutes'] = template_payload.get('total_duration_minutes')
 
+            if isinstance(template_payload, dict):
+                draft.prescriptions_by_item_key = _index_prescriptions(template_payload.get('sections'))
+            error = self._apply_session_plan(draft)
+            if error:
+                return error
             new_session.attributes = copy.deepcopy(session_data_dict)
+        return None
+
+    def _apply_session_plan(self, draft) -> PhaseError:
+        """Execute a dated program session plan: its sections and planned values replace the template's."""
+        from services.program_session_plans import ProgramSessionPlanService, plan_sections_for_session
+
+        plan_id = draft.data.get('program_session_plan_id')
+        plan_ref = draft.data.get('plan_ref')
+        if not plan_id and not plan_ref:
+            return None
+        try:
+            plan = ProgramSessionPlanService(self.db_session).resolve_for_session(
+                draft.root_id,
+                draft.template,
+                {'program_session_plan_id': plan_id} if plan_id else plan_ref,
+                draft.current_user_id,
+            )
+        except ValueError as exc:
+            return str(exc), 400
+        if draft.program_day_id and plan.program_day_id != draft.program_day_id:
+            return "That plan belongs to a different program day", 400
+        sections = plan_sections_for_session(plan)
+        draft.session_data['sections'] = sections
+        draft.session_data['program_session_plan'] = {
+            'id': plan.id,
+            'date': plan.date.isoformat(),
+            'program_day_id': plan.program_day_id,
+        }
+        draft.prescriptions_by_item_key = _index_prescriptions(sections)
+        draft.new_session.program_session_plan_id = plan.id
         return None
 
     def _collect_section_exercises(self, input_sections):
@@ -405,6 +458,7 @@ class _SessionCreationMixin:
                     activity_definition_id=activity_id,
                     root_id=draft.root_id
                 )
+                self._apply_item_prescription(draft, instance, exercise, activity_map[activity_id])
                 self.db_session.add(instance)
                 self.db_session.flush()
                 section_activity_ids.append(instance_id)
@@ -417,6 +471,23 @@ class _SessionCreationMixin:
             if 'estimated_duration_minutes' not in section and section.get('duration_minutes') is not None:
                 section['estimated_duration_minutes'] = section.get('duration_minutes')
         return None
+
+    def _apply_item_prescription(self, draft, instance, exercise, definition):
+        """Snapshot the source item's planned values onto the new instance.
+
+        Planned set activities get one empty set row per planned set so each planned
+        value lines up with a row; values stay blank because plans are reference-only.
+        """
+        source = draft.prescriptions_by_item_key.get(exercise.get('item_key'))
+        if not source or source[0] != instance.activity_definition_id:
+            return
+        prescription = snapshot_prescription(source[1])
+        instance.prescription = prescription
+        if definition.has_sets:
+            instance.sets = [
+                ActivitySet(sort_order=index, status='planned')
+                for index in range(planned_set_count(prescription))
+            ]
 
     def _attach_section_circuits(self, draft, sections, circuit_items) -> PhaseError:
         from services.circuit_service import CircuitService

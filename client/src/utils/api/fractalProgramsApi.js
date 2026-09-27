@@ -47,6 +47,25 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
+    getProgramDayPlanOccurrences: (rootId, programId, dayId, params = {}) => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plan-occurrences`, { params },
+    ),
+    getProgramDayPlans: (rootId, programId, dayId, date) => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans`, { params: { date } },
+    ),
+    saveProgramSessionPlan: (rootId, programId, dayId, templateId, date, data) => axios.put(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}`, data,
+    ),
+    resetProgramSessionPlan: (rootId, programId, dayId, templateId, date) => axios.delete(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}`,
+    ),
+    pullProgramSessionPlanTemplate: (rootId, programId, dayId, templateId, date, data) => axios.post(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}/pull-template`,
+        data,
+    ),
+    getSessionPlanCandidates: (rootId, templateId, date) => axios.get(
+        `${API_BASE}/${rootId}/session-plans/candidates`, { params: { template_id: templateId, date } },
+    ),
     getProgramDayOptions: (rootId, date, timezone) => axios.get(
         `${API_BASE}/${rootId}/programs/day-options`,
         { params: { date, timezone } },

@@ -25,6 +25,8 @@ function normalizeSection(section) {
             type: 'activity',
             name: (typeof item === 'object' ? item.name : null) || 'Activity',
             activity_definition_id: activityId,
+            // The server looks planned values up by item_key from the template or plan.
+            ...(typeof item === 'object' && item.item_key ? { item_key: item.item_key } : {}),
         };
     }).filter(Boolean);
     const sectionFields = { ...section };
@@ -37,7 +39,8 @@ function normalizeSection(section) {
     };
 }
 
-export function buildTemplateSessionPayload(template, selectedProgramDay, goalIds = []) {
+/** `planReference` names the dated program session plan a normal session executes, if any. */
+export function buildTemplateSessionPayload(template, selectedProgramDay, goalIds = [], planReference = {}) {
     const quickTemplate = isQuickSession(template);
     const shared = {
         template_id: template.id,
@@ -79,6 +82,6 @@ export function buildTemplateSessionPayload(template, selectedProgramDay, goalId
         duration_minutes: quickTemplate ? 0 : (template.template_data?.total_duration_minutes || 0),
         session_start: getLocalISOString(),
         session_data: sessionDataPayload,
-        ...(quickTemplate ? {} : { goal_ids: goalIds }),
+        ...(quickTemplate ? {} : { goal_ids: goalIds, ...planReference }),
     };
 }

@@ -22,6 +22,8 @@ export default function MetricValueEditor({
     isDraft = false,
     disabled = false,
     inputId,
+    placeholder,
+    ariaLabel,
 }) {
     const allowedValues = useMemo(() => getAllowedMetricValues(metricDef), [metricDef]);
     const formattedValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
@@ -42,6 +44,7 @@ export default function MetricValueEditor({
                 {allowedValues.length > 0 ? (
                     <select
                         id={inputId}
+                        aria-label={ariaLabel}
                         className={`${inputClassName} ${styles.metricSelect}`}
                         value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
                         disabled={disabled}
@@ -51,7 +54,7 @@ export default function MetricValueEditor({
                             onCommit(nextValue);
                         }}
                     >
-                        <option value="">--</option>
+                        <option value="">{placeholder ?? '--'}</option>
                         {allowedValues.map((allowedValue) => (
                             <option key={`${metricDef.id}-${allowedValue}`} value={allowedValue}>
                                 {formatAllowedMetricValueLabel(metricDef, allowedValue)}
@@ -61,8 +64,10 @@ export default function MetricValueEditor({
                 ) : (
                     <input
                         {...getMetricInputProps(metricDef)}
+                        {...(placeholder != null ? { placeholder } : {})}
                         ref={inputRef}
                         id={inputId}
+                        aria-label={ariaLabel}
                         className={inputClassName}
                         defaultValue={formattedValue}
                         disabled={disabled}

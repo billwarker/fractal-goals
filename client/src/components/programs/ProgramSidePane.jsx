@@ -76,6 +76,7 @@ export default function ProgramSidePane({
     onSetSessionCredit,
     sessionCreditUpdating = false,
     onEditPeriod,
+    onEditPlan,
 }) {
     const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     const [collapsedSections, setCollapsedSections] = useState({
@@ -149,6 +150,7 @@ export default function ProgramSidePane({
                     dayStatusUpdating={dayStatusUpdating}
                     onSetSessionCredit={onSetSessionCredit}
                     onEditPeriod={onEditPeriod}
+                    onEditPlan={onEditPlan}
                     sessionCreditUpdating={sessionCreditUpdating}
                 />
             ) : null}

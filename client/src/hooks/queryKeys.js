@@ -30,6 +30,20 @@ export const queryKeys = {
         'program-day-read-model', rootId, programId,
         { timezone, rangeStart, rangeEnd, detailDate },
     ],
+    // Dated session plans. Creating or deleting a session changes their executed state,
+    // so session mutations invalidate the root key.
+    programSessionPlansRoot: (rootId, programId = null) => programId
+        ? ['program-session-plans', rootId, programId]
+        : ['program-session-plans', rootId],
+    programPlanOccurrences: (rootId, programId, dayId) => [
+        'program-session-plans', rootId, programId, 'occurrences', dayId,
+    ],
+    programDayPlans: (rootId, programId, dayId, date) => [
+        'program-session-plans', rootId, programId, 'day', dayId, date,
+    ],
+    sessionPlanCandidates: (rootId, templateId, date) => [
+        'program-session-plans', rootId, 'candidates', templateId, date,
+    ],
     analyticsSummary: (rootId, limit = 50) => ['analytics-summary', rootId, limit],
     analyticsSessions: (rootId, limit = 50) => ['analytics-sessions', rootId, limit],
     activityHistory: (rootId, activityDefinitionId, excludeSessionId = null, limit = 10) => [

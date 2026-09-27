@@ -320,6 +320,8 @@ class Events:
     PROGRAM_DAY_DELETED = 'program_day.deleted'
     PROGRAM_DAY_SCHEDULED = 'program_day.scheduled'
     PROGRAM_DAY_UNSCHEDULED = 'program_day.unscheduled'
+    PROGRAM_SESSION_PLAN_SAVED = 'program_session_plan.saved'
+    PROGRAM_SESSION_PLAN_RESET = 'program_session_plan.reset'
 
     # Association events
     GOAL_BLOCK_ASSOCIATED = 'goal.block_associated'

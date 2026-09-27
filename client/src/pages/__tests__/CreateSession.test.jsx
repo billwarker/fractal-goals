@@ -62,6 +62,8 @@ vi.mock('../../components/createSession', () => ({
             <button type="button" onClick={() => props.onProgramScopeChange?.(!props.programScopeEnabled)}>Toggle program scope</button>
         </div>;
     },
+    SessionPlanChooser: () => null,
+    useSessionPlanChoice: () => ({ candidates: [], value: 'template', onChange: () => {}, payload: {} }),
     ProgramDayTodayBanner: ({ onJumpToProgramDay }) => <button type="button" onClick={onJumpToProgramDay}>Start this day</button>,
     QuickSessionModal: ({ isOpen, onClose, onComplete }) => isOpen ? (
         <div role="dialog" aria-label="Quick Session">

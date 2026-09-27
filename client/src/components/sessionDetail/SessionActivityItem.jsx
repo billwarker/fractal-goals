@@ -11,6 +11,8 @@ import { SummaryDelta } from './SessionActivityProgressSummary';
 import SessionActivityItemView from './SessionActivityItemView';
 import MetricValueEditor from './MetricValueEditor';
 import useMetricDrafts from './useMetricDrafts';
+import usePlannedValues from './usePlannedValues';
+import { prescriptionPlansValues } from '../../utils/sessionPrescription';
 import { useActivityHistory } from '../../hooks/useActivityHistory';
 import { useProgressComparison } from '../../hooks/useProgressComparison';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
@@ -256,8 +258,11 @@ function SessionActivityItem({
     });
     const appliedMetricDefaultsRef = React.useRef('');
 
+    const plansValues = prescriptionPlansValues(exercise.prescription);
     useEffect(() => {
-        if (!hasMetrics) return;
+        // Planned values are the only guidance for a planned activity; defaults would
+        // pre-fill results the user has not done yet.
+        if (!hasMetrics || plansValues) return;
 
         const metricDefinitions = def.metric_definitions || [];
         const metricsWithDefaults = metricDefinitions.filter((metric) => getMetricDefaultStorageValue(metric) !== '');
@@ -374,6 +379,7 @@ function SessionActivityItem({
         hasSets,
         hasSplits,
         onUpdate,
+        plansValues,
         resolveMetricId,
         resolveSplitId,
     ]);
@@ -566,6 +572,18 @@ function SessionActivityItem({
         );
     }, [activeProgress, deltaDisplayMode, hasSets, isCompleted, metricProgressById, setProgressVisibility]);
 
+    const { activityPlanNote, getSetPlanNote, renderPlannedValue } = usePlannedValues({
+        exercise,
+        metricDefinitions: def.metric_definitions,
+        getMetricValue,
+    });
+    const renderMetricGuidance = useCallback((metricId, options = {}) => {
+        const progress = renderMetricProgress(metricId, options);
+        const planned = renderPlannedValue(metricId, options);
+        if (!planned) return progress;
+        return <>{progress}{planned}</>;
+    }, [renderMetricProgress, renderPlannedValue]);
+
     const groupLabel = useMemo(() => {
         const groupId = activityDefinition?.group_id || exercise.group_id || null;
         if (groupId && Array.isArray(activityGroups) && activityGroups.length > 0) {
@@ -737,7 +755,9 @@ function SessionActivityItem({
             hasMetrics={hasMetrics}
             hasSplits={hasSplits}
             renderMetricEditor={renderMetricEditor}
-            renderMetricProgress={renderMetricProgress}
+            renderMetricProgress={renderMetricGuidance}
+            activityPlanNote={activityPlanNote}
+            getSetPlanNote={getSetPlanNote}
             getSetMetricDisplayValue={getSetMetricDisplayValue}
             hasSetMetricDraft={hasSetMetricDraft}
             handleSetMetricDraftChange={handleSetMetricDraftChange}

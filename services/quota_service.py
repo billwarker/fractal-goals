@@ -14,7 +14,7 @@ from account_tiers import (
     TIER_PAID,
 )
 import models
-from models import ActivityDefinition, ActivityGroup, ActivityInstance, ActivityProgressView, ActivityTagDefinition, CircuitDefinition, CircuitSlot, AnalyticsDashboard, AppSetting, FractalMetricDefinition, Goal, MetricDefinition, Note, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, Session, SessionTemplate, Target, User
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, ActivityProgressView, ActivityTagDefinition, CircuitDefinition, CircuitSlot, AnalyticsDashboard, AppSetting, FractalMetricDefinition, Goal, MetricDefinition, Note, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramSessionPlan, Session, SessionTemplate, Target, User
 from services.ops_log import log_ops_event
 from services.service_types import JsonDict, ServiceResult
 
@@ -308,7 +308,9 @@ class QuotaService:
                 CircuitDefinition.root_id.in_(roots), CircuitDefinition.deleted_at.is_(None),
             ),
             table_total(
-                text_bytes(ActivityInstance.notes) + json_bytes(ActivityInstance.data),
+                text_bytes(ActivityInstance.notes)
+                + json_bytes(ActivityInstance.data)
+                + json_bytes(ActivityInstance.prescription),
                 ActivityInstance.root_id.in_(roots), ActivityInstance.deleted_at.is_(None),
             ),
             table_total(
@@ -347,6 +349,10 @@ class QuotaService:
                 text_bytes(ProgramDay.name, ProgramDay.notes, ProgramDay.day_of_week),
                 Program.root_id.in_(roots),
                 select_from=ProgramDay.__table__.join(ProgramBlock.__table__).join(Program.__table__),
+            ),
+            table_total(
+                json_bytes(ProgramSessionPlan.plan_data),
+                ProgramSessionPlan.root_id.in_(roots), ProgramSessionPlan.deleted_at.is_(None),
             ),
             table_total(
                 text_bytes(ProgramDayStatusOverride.status),

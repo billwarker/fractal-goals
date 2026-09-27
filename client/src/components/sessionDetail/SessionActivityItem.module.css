@@ -1245,3 +1245,57 @@
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
 }
+
+/* Planned values (prescriptions) are reference-only guidance beside progress. */
+.plannedValue {
+    margin-left: 4px;
+    padding: 0 5px;
+    font-size: 11px;
+    line-height: 16px;
+    color: var(--color-text-secondary);
+    border: 1px dashed var(--color-border);
+    border-radius: 8px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.metricMetaLarge .plannedValue {
+    font-size: 12px;
+}
+
+.plannedValueMet {
+    color: var(--color-brand-success);
+    border-color: var(--color-brand-success-muted);
+    border-style: solid;
+}
+
+.plannedValueUnder {
+    color: var(--color-brand-warning);
+    border-color: var(--color-brand-warning-muted);
+    border-style: solid;
+}
+
+.planNote {
+    margin: 0;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--color-text-secondary);
+}
+
+.planNote::before {
+    content: 'Plan: ';
+    font-style: normal;
+    color: var(--color-text-muted);
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

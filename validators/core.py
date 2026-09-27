@@ -164,6 +164,44 @@ def parse_date_string(value: str) -> date:
     return datetime.strptime(value, '%Y-%m-%d').date()
 
 
+def validate_section_items(items: list, seen_item_keys: set) -> None:
+    """Validate typed section items in place, giving each a unique ``item_key``.
+
+    Shared by session templates and dated program session plans.
+    """
+    from .prescriptions import normalize_item_key, validate_prescription
+
+    for item_index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ValueError(f'section items[{item_index}] must be an object')
+        item_type = item.get('type')
+        if item_type == 'circuit':
+            circuit_id = item.get('circuit_definition_id')
+            if not isinstance(circuit_id, str) or not circuit_id.strip():
+                raise ValueError(f'section items[{item_index}] circuit_definition_id is required')
+            # Circuit member prescriptions are not supported yet.
+            item.pop('prescription', None)
+        elif item_type == 'activity':
+            activity_id = item.get('activity_definition_id') or item.get('activity_id') or item.get('id')
+            if not isinstance(activity_id, str) or not activity_id.strip():
+                raise ValueError(f'section items[{item_index}] activity_definition_id is required')
+            prescription = validate_prescription(
+                item.get('prescription'),
+                f'section items[{item_index}].prescription',
+            )
+            if prescription is None:
+                item.pop('prescription', None)
+            else:
+                item['prescription'] = prescription
+        else:
+            raise ValueError(f"section items[{item_index}].type must be 'activity' or 'circuit'")
+        if normalize_item_key(item) in seen_item_keys:
+            # A duplicated key (e.g. an item copied client-side) gets a fresh identity.
+            item.pop('item_key')
+            normalize_item_key(item)
+        seen_item_keys.add(item['item_key'])
+
+
 def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(template_data, dict):
         raise ValueError('template_data must be an object')
@@ -186,6 +224,7 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
         sections = normalized.get('sections')
         if not isinstance(sections, list) or len(sections) == 0:
             raise ValueError('normal templates must include at least one section')
+        seen_item_keys = set()
         for section in sections:
             if not isinstance(section, dict):
                 raise ValueError('each section must be an object')
@@ -214,20 +253,7 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
             if not isinstance(section_activities, list):
                 raise ValueError('section activities must be a list')
             if 'items' in section:
-                for item_index, item in enumerate(section_activities):
-                    if not isinstance(item, dict):
-                        raise ValueError(f'section items[{item_index}] must be an object')
-                    item_type = item.get('type')
-                    if item_type == 'circuit':
-                        circuit_id = item.get('circuit_definition_id')
-                        if not isinstance(circuit_id, str) or not circuit_id.strip():
-                            raise ValueError(f'section items[{item_index}] circuit_definition_id is required')
-                    elif item_type == 'activity':
-                        activity_id = item.get('activity_definition_id') or item.get('activity_id') or item.get('id')
-                        if not isinstance(activity_id, str) or not activity_id.strip():
-                            raise ValueError(f'section items[{item_index}] activity_definition_id is required')
-                    else:
-                        raise ValueError(f"section items[{item_index}].type must be 'activity' or 'circuit'")
+                validate_section_items(section_activities, seen_item_keys)
         quick_activities = normalized.get('activities')
         if isinstance(quick_activities, list) and len(quick_activities) > 0:
             raise ValueError('normal templates cannot define top-level activities')

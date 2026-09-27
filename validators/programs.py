@@ -407,3 +407,19 @@ class ProgramGoalDeadlineSchema(BaseModel):
     def validate_deadline(cls, v: str) -> str:
         parse_date_string(v)
         return v
+
+
+class ProgramSessionPlanSaveSchema(BaseModel):
+    """Replace-all save of one dated plan's sections.
+
+    ``row_version`` is the version the edit started from; omit it only when the plan
+    was still a virtual seed. Item-level shape and planned values are validated by the
+    plan service, which also checks them against the activity definitions.
+    """
+    sections: List[Dict[str, Any]] = Field(..., min_length=1, max_length=50)
+    row_version: Optional[int] = Field(None, ge=1)
+
+
+class ProgramSessionPlanPullSchema(BaseModel):
+    """Pull a template's current sections into a plan, keeping its planned values."""
+    row_version: Optional[int] = Field(None, ge=1)

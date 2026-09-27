@@ -149,6 +149,8 @@ export function useSessionDetailMutations({
             queryClient.removeQueries({ queryKey: sessionActivitiesKey });
             queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
+            // A deleted session no longer executes its plan.
+            queryClient.invalidateQueries({ queryKey: queryKeys.programSessionPlansRoot(rootId) });
             notify.success('Session deleted successfully');
         },
         onError: () => {

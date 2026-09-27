@@ -4,7 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
-import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
+import { invalidateAfterSessionCreated, invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
 import {
@@ -17,6 +17,7 @@ import {
     SessionGoalScopePanel,
     ProgramDayTodayBanner,
     ProgramName,
+    SessionPlanChooser, useSessionPlanChoice,
 } from '../components/createSession';
 import LoadingState from '../components/common/LoadingState';
 import { QueuedQuickSessionProvider } from '../contexts/ActiveSessionContext';
@@ -205,16 +206,7 @@ function CreateSession() {
 
         queryClient.setQueryData(queryKeys.session(rootId, createdSessionId), createdSession);
 
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsAll(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsPaginated(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsSearch(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionsHeatmap(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.sessionTemplates(rootId), refetchType: 'inactive' });
-        queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) });
-        queryClient.invalidateQueries({ queryKey: queryKeys.activeSessionRoot() });
+        invalidateAfterSessionCreated(queryClient, rootId, queryKeys);
         // Advances the onboarding "Create your first session" step.
         invalidateOnboardingProgress(queryClient, queryKeys);
     };
@@ -238,6 +230,7 @@ function CreateSession() {
                 template,
                 programContext ? { ...programContext, goal_scope_enabled: programScopeEnabled } : null,
                 manualGoalIds,
+                planChoice.payload,
             );
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSession = response.data;
@@ -326,6 +319,7 @@ function CreateSession() {
         rootId, userId: user?.id, todayISO, programDays, selectedProgramDay, activeProgram,
         goalTree, allGoals, manualGoalIds, quickTemplateSelected,
     });
+    const planChoice = useSessionPlanChoice(rootId, selectedTemplate, todayISO, programContext?.day_id || null);
     const scopePreviewQuery = useQuery({
         queryKey: queryKeys.sessionGoalScopePreview(
             rootId,
@@ -544,6 +538,7 @@ function CreateSession() {
                             />
                         )}
 
+                        {selectedTemplateIsNormal ? <SessionPlanChooser {...planChoice} /> : null}
                         {/* Step 1: Select Template */}
                         {(effectiveSessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
                             <TemplatePicker

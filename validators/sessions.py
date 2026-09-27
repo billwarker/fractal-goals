@@ -7,8 +7,14 @@ from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import MAX_NAME_LENGTH, MAX_DESCRIPTION_LENGTH, sanitize_string
 
-class SessionCreateSchema(BaseModel):
-    """Schema for creating a new session."""
+class SessionPlanRefSchema(BaseModel):
+    """A dated plan occurrence that may not be stored yet (a virtual, seeded plan)."""
+    program_day_id: str = Field(..., min_length=1)
+    date: str = Field(..., min_length=10, max_length=10)
+
+
+class SessionCreateBaseSchema(BaseModel):
+    """Session creation fields shared by the app and reviewed agent proposals."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
     name: Optional[str] = Field('Untitled Session', max_length=MAX_NAME_LENGTH)
@@ -39,7 +45,7 @@ class SessionCreateSchema(BaseModel):
         return sanitize_string(v)
 
     @model_validator(mode='after')
-    def check_parent_linkage(self) -> 'SessionCreateSchema':
+    def check_parent_linkage(self) -> 'SessionCreateBaseSchema':
         # Ensure at least one way of linking to a parent goal is provided
         # OR it's template-backed
         # OR it's part of a program (indicated by program_context in session_data)
@@ -50,6 +56,24 @@ class SessionCreateSchema(BaseModel):
 
         if not any([self.parent_id, self.parent_ids, self.goal_ids, self.template_id, is_program_linked]):
              raise ValueError('Session must be linked to a parent goal, template, or program')
+        return self
+
+
+class SessionCreateSchema(SessionCreateBaseSchema):
+    """Schema for creating a new session in the app.
+
+    Dated program session plans are app-only for now; agent proposals keep the base contract.
+    """
+    # The dated program session plan this session executes; requires template_id.
+    program_session_plan_id: Optional[str] = None
+    plan_ref: Optional[SessionPlanRefSchema] = None
+
+    @model_validator(mode='after')
+    def check_plan_reference(self) -> 'SessionCreateSchema':
+        if (self.program_session_plan_id or self.plan_ref) and not self.template_id:
+            raise ValueError('A planned session must name its template')
+        if self.program_session_plan_id and self.plan_ref:
+            raise ValueError('Send either program_session_plan_id or plan_ref, not both')
         return self
 
 

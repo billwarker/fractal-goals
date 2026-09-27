@@ -113,7 +113,7 @@ describe('TemplateBuilderModal', () => {
         expect(onSave).toHaveBeenCalledTimes(1);
         expect(onSave.mock.calls[0][0].template_data.sections[0].items).toEqual([
             { type: 'activity', activity_definition_id: 'activity-1', name: 'Squat' },
-            { type: 'circuit', circuit_definition_id: 'circuit-1' },
+            { type: 'circuit', circuit_definition_id: 'circuit-1', item_key: expect.any(String) },
         ]);
         expect(onSave.mock.calls[0][0].template_data.sections[0].activities).toBeUndefined();
     });
@@ -192,7 +192,7 @@ describe('TemplateBuilderModal', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Update Template' }));
         expect(onSave.mock.calls[0][0].template_data.sections[0].items).toEqual([
-            { type: 'circuit', circuit_definition_id: 'circuit-new' },
+            { type: 'circuit', circuit_definition_id: 'circuit-new', item_key: expect.any(String) },
         ]);
     });
 

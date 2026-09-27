@@ -29,6 +29,10 @@ class Session(Base):
     program_day_id = Column(String, ForeignKey('program_days.id'), nullable=True, index=True)
     program_id = Column(String, ForeignKey('programs.id', ondelete='SET NULL'), nullable=True, index=True)
     program_block_id = Column(String, ForeignKey('program_blocks.id', ondelete='SET NULL'), nullable=True, index=True)
+    # The dated program session plan this session executed, if any.
+    program_session_plan_id = Column(
+        String, ForeignKey('program_session_plans.id', ondelete='SET NULL'), nullable=True, index=True,
+    )
     
     attributes = Column(JSON_TYPE, nullable=True)
     
@@ -129,6 +133,8 @@ class SessionTemplate(Base):
     archived_at = Column(DateTime, nullable=True)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     template_data = Column(JSON_TYPE, nullable=False)
+    # Incremented on every template edit; dated plans record the revision they copied.
+    revision = Column(Integer, nullable=False, default=1, server_default='1')
 
     __table_args__ = (
         sa.Index('ix_session_templates_root_archived_deleted', 'root_id', 'archived_at', 'deleted_at'),

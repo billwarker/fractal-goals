@@ -9,3 +9,4 @@ export { default as SessionGoalScopePanel } from './SessionGoalScopePanel';
 export { default as ProgramDayTodayBanner } from './ProgramDayTodayBanner';
 export { default as ProgramName } from '../atoms/ProgramName';
 export { default as QuickSessionModal } from './QuickSessionModal';
+export { default as SessionPlanChooser, useSessionPlanChoice } from './SessionPlanChooser';

@@ -52,7 +52,8 @@ const CONTINUOUS_CALENDAR_PREFERENCE_KEY = 'program-calendar-continuous';
 const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
 const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
+const ProgramDaysView = lazyWithRetry(() => import('../components/programs/days/ProgramDaysView'), 'components/programs/days/ProgramDaysView');
+const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks', 'days'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
@@ -132,6 +133,8 @@ function ProgramCalendarPage() {
         writeLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY, String(enabled));
     }, []);
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
+    // Days tab selection: which program day and occurrence date is being planned.
+    const [daysSelection, setDaysSelection] = useState(null);
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
     });
@@ -802,10 +805,16 @@ function ProgramCalendarPage() {
         </>
     );
 
+    const openDayPlan = (dayId, date) => {
+        setDaysSelection({ dayId, date });
+        setViewMode('days');
+        if (isMobile) setIsSidePaneVisible(false);
+    };
+
     return (
         <div className={`${styles.container} page-reveal`}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
-                <div className={`${styles.mainColumn} ${viewMode === 'blocks' ? styles.mainColumnBlocksMode : ''}`}>
+                <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
                         title={pageTitle}
                         subtitle={pageSubtitle}
@@ -813,8 +822,8 @@ function ProgramCalendarPage() {
                         actions={viewActions}
                     />
 
-                    <div className={`${styles.calendarPanel} ${viewMode === 'blocks' ? styles.blocksModePanel : ''}`}>
-                        {loading || (viewMode === 'blocks' && detailLoading) ? (
+                    <div className={`${styles.calendarPanel} ${viewMode !== 'calendar' ? styles.blocksModePanel : ''}`}>
+                        {loading || (viewMode !== 'calendar' && detailLoading) ? (
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
@@ -865,6 +874,21 @@ function ProgramCalendarPage() {
                                     />
                                 ) : null}
                             />
+                        ) : viewMode === 'days' && displayProgram ? (
+                            <div className={styles.blocksPanel}>
+                                <Suspense fallback={<div className={styles.loading}>Loading days...</div>}>
+                                    <ProgramDaysView
+                                        rootId={rootId}
+                                        program={displayProgram}
+                                        blocks={sortedBlocks}
+                                        activities={activities}
+                                        activityGroups={activityGroups}
+                                        today={todayInTimezone}
+                                        selection={daysSelection}
+                                        onSelectionChange={setDaysSelection}
+                                    />
+                                </Suspense>
+                            </div>
                         ) : displayProgram ? (
                             <div className={styles.blocksPanel}>
                                 <ProgramBlockView
@@ -922,6 +946,7 @@ function ProgramCalendarPage() {
                     onSetDayStatus={(status) => updateDayStatuses([contextDate], status)}
                     dayStatusUpdating={dayStatusMutation.isPending}
                     onEditPeriod={periodEditor.openEdit}
+                    onEditPlan={openDayPlan}
                     onSetSessionCredit={updateSessionCredit}
                     sessionCreditUpdating={sessionCreditMutation.isPending}
                 />

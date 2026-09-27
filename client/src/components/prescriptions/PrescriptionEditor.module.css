@@ -1,0 +1,129 @@
+.editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.setTable {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+.headerRow,
+.setRow {
+    display: grid;
+    grid-template-columns: 32px repeat(var(--plan-columns, 1), minmax(72px, 1fr)) 72px;
+    align-items: center;
+    gap: 6px;
+    min-width: calc(110px + var(--plan-columns, 1) * 78px);
+}
+
+.setBlock {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.setLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.columnLabel {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.valueCell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.valueInput {
+    width: 100%;
+    min-width: 0;
+    padding: 5px 6px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-primary);
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border-input);
+    border-radius: 4px;
+}
+
+.valueInput::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.valueInput:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.valueMeta {
+    display: inline-flex;
+    align-items: center;
+}
+
+.valueUnit {
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.rowActions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.addSet {
+    align-self: flex-start;
+}
+
+.flatRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.flatField {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 96px;
+    flex: 1 1 96px;
+}
+
+.noteInput,
+.activityNote {
+    width: 100%;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--color-text-primary);
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border-input);
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.noteInput {
+    margin-left: 38px;
+    width: calc(100% - 38px);
+}
+
+.noteInput::placeholder,
+.activityNote::placeholder {
+    color: var(--color-text-tertiary);
+}

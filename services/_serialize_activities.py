@@ -163,6 +163,7 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
         "tag_assignment_version": instance.tag_assignment_version,
         "progress_comparison": getattr(instance, '_dynamic_progress', None),
+        "prescription": getattr(instance, 'prescription', None),
     }
 
 

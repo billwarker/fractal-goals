@@ -386,6 +386,8 @@ class ActivityInstance(Base):
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)
     data = Column(JSON_TYPE, nullable=True)
+    # Planned values and notes snapshotted from the template or dated plan at creation.
+    prescription = Column(JSON_TYPE, nullable=True)
     
     __table_args__ = (
         sa.CheckConstraint(
