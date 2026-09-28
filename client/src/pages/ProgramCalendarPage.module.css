@@ -72,6 +72,24 @@
     gap: 8px 12px;
 }
 
+/* Title-row placement of the program span and status, just left of the header actions. */
+.headerMetaInline {
+    display: inline-flex;
+    align-items: center;
+    align-self: center;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+@media (min-width: 769px) {
+    .compactHeader {
+        align-items: center;
+        padding-top: 14px;
+        padding-bottom: 14px;
+    }
+}
+
 .statusBadgeActive {
     border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
     background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
@@ -168,6 +186,15 @@
     min-height: 680px;
     padding: 24px;
     overflow: auto;
+}
+
+/* The Days tab starts its content right under the header. */
+.daysModePanel {
+    margin: 0;
+}
+
+.daysModePanel .blocksPanel {
+    padding: 12px 24px 24px;
 }
 
 .mainColumnBlocksMode .blocksPanel {

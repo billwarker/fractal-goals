@@ -19,13 +19,12 @@ def _respond(result):
     return jsonify(payload), status
 
 
-@program_session_plans_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/plan-occurrences', methods=['GET'])
+@program_session_plans_bp.route('/<root_id>/programs/<program_id>/plan-occurrences', methods=['GET'])
 @token_required
-def list_plan_occurrences(current_user, root_id, program_id, day_id):
-    """The day's occurrence dates with each template's plan state; defaults to its block."""
-    return _respond(ProgramSessionPlanService(get_db_session()).list_occurrences(
-        root_id, current_user.id, program_id, day_id,
-        request.args.get('start'), request.args.get('end'),
+def list_plan_occurrences(current_user, root_id, program_id):
+    """Every plannable program day's dates with plan states and canonical day statuses."""
+    return _respond(ProgramSessionPlanService(get_db_session()).list_program_occurrences(
+        root_id, current_user.id, program_id, request.args.get('timezone'),
     ))
 
 
@@ -34,7 +33,7 @@ def list_plan_occurrences(current_user, root_id, program_id, day_id):
 def get_day_plans(current_user, root_id, program_id, day_id):
     """Every template's plan for one occurrence date, stored or seeded."""
     return _respond(ProgramSessionPlanService(get_db_session()).get_day_plans(
-        root_id, current_user.id, program_id, day_id, request.args.get('date'),
+        root_id, current_user.id, program_id, day_id, request.args.get('date'), request.args.get('timezone'),
     ))
 
 
@@ -44,6 +43,7 @@ def get_day_plans(current_user, root_id, program_id, day_id):
 def save_plan(current_user, root_id, program_id, day_id, template_id, plan_date, validated_data):
     return _respond(ProgramSessionPlanService(get_db_session()).save_plan(
         root_id, current_user.id, program_id, day_id, template_id, plan_date, validated_data,
+        request.args.get('timezone'),
     ))
 
 
@@ -52,7 +52,7 @@ def save_plan(current_user, root_id, program_id, day_id, template_id, plan_date,
 def reset_plan(current_user, root_id, program_id, day_id, template_id, plan_date):
     """Discard a stored plan so the date falls back to its seed."""
     return _respond(ProgramSessionPlanService(get_db_session()).reset_plan(
-        root_id, current_user.id, program_id, day_id, template_id, plan_date,
+        root_id, current_user.id, program_id, day_id, template_id, plan_date, request.args.get('timezone'),
     ))
 
 
@@ -62,6 +62,7 @@ def reset_plan(current_user, root_id, program_id, day_id, template_id, plan_date
 def pull_template_changes(current_user, root_id, program_id, day_id, template_id, plan_date, validated_data):
     return _respond(ProgramSessionPlanService(get_db_session()).pull_template_changes(
         root_id, current_user.id, program_id, day_id, template_id, plan_date, validated_data,
+        request.args.get('timezone'),
     ))
 
 

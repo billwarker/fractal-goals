@@ -60,3 +60,43 @@ describe('CircuitMemberMetrics draft performance', () => {
         ]));
     });
 });
+
+describe('CircuitMemberMetrics planned values', () => {
+    const definition = {
+        id: 'activity-1',
+        name: 'Row',
+        has_splits: false,
+        metric_definitions: [{ id: 'reps', name: 'Reps', unit: 'reps', input_type: 'integer', precision: 0 }],
+    };
+
+    it('shows the round\'s planned value beside the input, coloured once a value is logged', () => {
+        const { rerender } = render(
+            <CircuitMemberMetrics
+                memberId="m"
+                rootId="root"
+                definition={definition}
+                metrics={[]}
+                progress={{ planned: [{ metric_id: 'reps', split_id: null, value: 12 }] }}
+                onSave={vi.fn()}
+            />,
+        );
+        expect(screen.getByTitle('Planned 12')).toHaveTextContent('plan 12');
+
+        rerender(
+            <CircuitMemberMetrics
+                memberId="m"
+                rootId="root"
+                definition={definition}
+                metrics={[{ metric_id: 'reps', value: 10 }]}
+                progress={{ planned: [{ metric_id: 'reps', split_id: null, value: 12 }] }}
+                onSave={vi.fn()}
+            />,
+        );
+        expect(screen.getByTitle('Planned 12 · under plan')).toBeInTheDocument();
+    });
+
+    it('shows no plan chip for an unplanned circuit', () => {
+        render(<CircuitMemberMetrics memberId="m" rootId="root" definition={definition} metrics={[]} onSave={vi.fn()} />);
+        expect(screen.queryByText(/^plan /)).not.toBeInTheDocument();
+    });
+});

@@ -259,6 +259,7 @@ def serialize_circuit_run(run):
         "name": run.name,
         "description": run.description or "",
         "round_count": len(rounds),
+        "prescription": getattr(run, "prescription", None),
         "status": run.status,
         "time_start": format_utc(run.time_start),
         "time_stop": format_utc(run.time_stop),

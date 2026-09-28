@@ -106,19 +106,50 @@ def test_duplicate_item_keys_are_reassigned():
     assert keys[1] != 'same'
 
 
-def test_template_validation_normalizes_prescriptions_and_strips_circuit_ones():
+def test_template_validation_normalizes_activity_and_circuit_prescriptions():
     data = validate_session_template_data(_template(
         _activity(prescription={'notes': ''}),
         _activity(prescription={'metrics': [{'metric_id': 'w', 'value': 5}]}),
-        {'type': 'circuit', 'circuit_definition_id': 'c-1', 'prescription': {'notes': 'x'}},
+        {'type': 'circuit', 'circuit_definition_id': 'c-1', 'prescription': {'rounds': [
+            {'slots': [{'slot_id': 's1', 'metrics': [{'metric_id': 'r', 'value': 10}]}], 'notes': 'fast'},
+            {'slots': []},
+        ]}},
+        {'type': 'circuit', 'circuit_definition_id': 'c-2', 'prescription': {}},
     ))
     items = data['sections'][0]['items']
 
     assert 'prescription' not in items[0]
     assert items[1]['prescription']['metrics'][0]['value'] == 5
-    assert 'prescription' not in items[2]
+    assert items[2]['prescription'] == {'schema': 1, 'rounds': [
+        {'slots': [{'slot_id': 's1', 'metrics': [{'metric_id': 'r', 'split_id': None, 'value': 10}]}], 'notes': 'fast'},
+        {'slots': [], 'notes': None},
+    ]}
+    assert 'prescription' not in items[3]
+
+
+def test_circuit_prescription_rejects_bad_shapes_and_bounds():
+    from services.circuit_rules import MAX_CIRCUIT_ROUNDS
+    from validators.prescriptions import validate_circuit_prescription
+
+    assert len(validate_circuit_prescription({'rounds': [{}] * MAX_CIRCUIT_ROUNDS})['rounds']) == MAX_CIRCUIT_ROUNDS
+    with pytest.raises(ValueError, match='at most'):
+        validate_circuit_prescription({'rounds': [{}] * (MAX_CIRCUIT_ROUNDS + 1)})
+    with pytest.raises(ValueError, match='slot_id is required'):
+        validate_circuit_prescription({'rounds': [{'slots': [{'metrics': []}]}]})
+    with pytest.raises(ValueError, match='repeats a slot'):
+        validate_circuit_prescription({'rounds': [{'slots': [{'slot_id': 's'}, {'slot_id': 's'}]}]})
+    with pytest.raises(ValueError, match='finite number'):
+        validate_circuit_prescription({'rounds': [{'slots': [{'slot_id': 's', 'metrics': [{'metric_id': 'm', 'value': 'x'}]}]}]})
 
 
 def test_template_validation_reports_item_path_for_bad_prescription():
     with pytest.raises(ValueError, match=r'items\[0\]\.prescription'):
         validate_session_template_data(_template(_activity(prescription='heavy')))
+
+
+def test_planned_tags_are_deduplicated_and_count_as_a_plan():
+    assert validate_prescription({'tags': ['a', 'a', 'b']}) == {'schema': 1, 'tags': ['a', 'b']}
+    result = validate_prescription({'sets': [{'metrics': [], 'tags': ['t']}, {'metrics': []}]})
+    assert result['sets'] == [{'metrics': [], 'notes': None, 'tags': ['t']}, {'metrics': [], 'notes': None}]
+    with pytest.raises(ValueError, match='tag id'):
+        validate_prescription({'tags': ['']})

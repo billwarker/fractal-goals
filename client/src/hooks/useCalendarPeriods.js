@@ -21,6 +21,7 @@ function invalidatePeriodDependents(queryClient, rootId) {
     return Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.calendarPeriodsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programSessionPlansRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
     ]);

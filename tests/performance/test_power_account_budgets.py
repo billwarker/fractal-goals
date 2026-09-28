@@ -289,11 +289,29 @@ def test_power_account_program_session_plan_budgets(client, db_session, query_co
     headers = power_account_dataset["headers"]
     base = f"/api/{root_id}/programs/{program_id}/days/{day.id}"
 
-    response, elapsed_ms = _budget_get(client, f"{base}/plan-occurrences", headers, query_counter)
-    assert_response_budget(response, max_bytes=20_000, max_ms=5000, elapsed_ms=elapsed_ms)
-    assert len(response.get_json()["dates"]) == len(dates)
-    assert query_counter["total"] <= 8
+    response, elapsed_ms = _budget_get(
+        client, f"/api/{root_id}/programs/{program_id}/plan-occurrences?timezone=UTC", headers, query_counter,
+    )
+    assert_response_budget(response, max_bytes=60_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    days = {entry["day_id"]: entry["dates"] for entry in response.get_json()["days"]}
+    assert len(days) == len(power_account_dataset["program_days"])
+    assert len(days[day.id]) == len(dates)
+    # One evaluator pass for the whole program (credits, overrides, periods, scope, evidence);
+    # the count is fixed per request, not per program day, date, or plan.
+    assert query_counter["total"] <= 26
 
     response, elapsed_ms = _budget_get(client, f"{base}/plans?date={dates[-1].isoformat()}", headers, query_counter)
     assert_response_budget(response, max_bytes=40_000, max_ms=5000, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 10
+
+    # A past date also attaches what was logged, through the same evaluator loads.
+    past_block, past_day = power_account_dataset["program_days"][0]
+    past_date = next(
+        past_block.start_date + timedelta(days=offset)
+        for offset in range(7)
+        if (past_block.start_date + timedelta(days=offset)).strftime("%A") in past_day.day_of_week
+    )
+    past_url = f"/api/{root_id}/programs/{program_id}/days/{past_day.id}/plans?date={past_date.isoformat()}&timezone=UTC"
+    response, elapsed_ms = _budget_get(client, past_url, headers, query_counter)
+    assert_response_budget(response, max_bytes=60_000, max_ms=5000, elapsed_ms=elapsed_ms)
+    assert query_counter["total"] <= 30

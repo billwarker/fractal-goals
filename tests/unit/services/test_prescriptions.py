@@ -202,3 +202,53 @@ def test_client_sent_prescriptions_are_ignored(db_session, sample_goal_hierarchy
     instance = db_session.query(ActivityInstance).filter_by(session_id=created['id']).one()
     assert instance.prescription is None
     assert instance.sets == []
+
+
+def _tag(db_session, root_id, activity, name):
+    from models import ActivityTag, ActivityTagDefinition
+
+    definition = ActivityTagDefinition(root_id=root_id, name=name, scope='selected')
+    db_session.add(definition)
+    db_session.flush()
+    tag = ActivityTag(root_id=root_id, activity_definition_id=activity.id, definition_id=definition.id)
+    db_session.add(tag)
+    db_session.commit()
+    return tag
+
+
+def test_session_from_template_applies_planned_activity_and_set_tags(
+    db_session, sample_goal_hierarchy, sample_activity_definition, test_user,
+):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    weight, reps = _metrics(sample_activity_definition)
+    paused = _tag(db_session, root_id, sample_activity_definition, 'Paused')
+    top = _tag(db_session, root_id, sample_activity_definition, 'Top set')
+    plan = _set_plan(weight, reps, (100, 5), (105, 3))
+    plan['tags'] = [paused.id]
+    plan['sets'][1]['tags'] = [top.id]
+    template = SessionTemplate(
+        id=str(uuid.uuid4()), name='Bench day', root_id=root_id,
+        template_data=json.dumps({'session_type': 'normal', 'sections': _sections(sample_activity_definition, plan)}),
+    )
+    db_session.add(template)
+    db_session.commit()
+
+    created, error, _ = SessionService(db_session).create_session(root_id, test_user.id, {'name': 'Bench', 'template_id': template.id})
+    assert error is None, error
+
+    instance = db_session.query(ActivityInstance).filter_by(session_id=created['id']).one()
+    assert [tag.id for tag in instance.tags] == [paused.id]
+    assert [[tag.id for tag in activity_set.tags] for activity_set in instance.sets] == [[], [top.id]]
+
+
+def test_planned_tags_must_belong_to_the_activity(db_session, sample_ultimate_goal, sample_activity_definition):
+    other = ActivityDefinition(id=str(uuid.uuid4()), root_id=sample_ultimate_goal.id, name='Row', has_sets=True)
+    db_session.add(other)
+    db_session.commit()
+    foreign = _tag(db_session, sample_ultimate_goal.id, other, 'Row only')
+    weight, reps = _metrics(sample_activity_definition)
+    plan = _set_plan(weight, reps, (100, 5))
+    plan['sets'][0]['tags'] = [foreign.id]
+
+    with pytest.raises(ValueError, match='tags are unavailable'):
+        check_section_prescriptions(db_session, sample_ultimate_goal.id, _sections(sample_activity_definition, plan))

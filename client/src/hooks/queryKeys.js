@@ -35,11 +35,11 @@ export const queryKeys = {
     programSessionPlansRoot: (rootId, programId = null) => programId
         ? ['program-session-plans', rootId, programId]
         : ['program-session-plans', rootId],
-    programPlanOccurrences: (rootId, programId, dayId) => [
-        'program-session-plans', rootId, programId, 'occurrences', dayId,
+    programPlanOccurrences: (rootId, programId, timezone = null) => [
+        'program-session-plans', rootId, programId, 'occurrences', ...(timezone ? [{ timezone }] : []),
     ],
-    programDayPlans: (rootId, programId, dayId, date) => [
-        'program-session-plans', rootId, programId, 'day', dayId, date,
+    programDayPlans: (rootId, programId, dayId, date, timezone = 'UTC') => [
+        'program-session-plans', rootId, programId, 'day', dayId, date, { timezone },
     ],
     sessionPlanCandidates: (rootId, templateId, date) => [
         'program-session-plans', rootId, 'candidates', templateId, date,

@@ -51,11 +51,22 @@ def _seed_planning_fractal(db, suffix, user, level, today):
         id=f"browser-plan-weight-{suffix}", activity_id=f"browser-plan-bench-{suffix}", root_id=root_id,
         name="Weight", unit="kg",
     ))
+    db.add(ActivityDefinition(
+        id=f"browser-plan-row-{suffix}", root_id=root_id, name="Barbell Row", has_sets=True, has_metrics=True,
+    ))
+    db.flush()
+    db.add(MetricDefinition(
+        id=f"browser-plan-row-weight-{suffix}", activity_id=f"browser-plan-row-{suffix}", root_id=root_id,
+        name="Weight", unit="kg",
+    ))
     db.add(SessionTemplate(
         id=f"browser-plan-template-{suffix}", root_id=root_id, name="Bench Day",
         template_data={"session_type": "normal", "sections": [{"name": "Main", "items": [{
             "type": "activity", "activity_definition_id": f"browser-plan-bench-{suffix}",
             "name": "Bench Press", "item_key": "bench",
+        }, {
+            "type": "activity", "activity_definition_id": f"browser-plan-row-{suffix}",
+            "name": "Barbell Row", "item_key": "row",
         }]}]},
     ))
     db.add(Program(

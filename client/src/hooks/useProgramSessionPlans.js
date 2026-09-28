@@ -3,21 +3,29 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-/** A day's occurrence dates with each template's plan state (the Days tab date strip). */
-export function useProgramPlanOccurrences(rootId, programId, dayId) {
+/**
+ * Every plannable program day's dates with plan states and the canonical day status, keyed
+ * by program day id (the Days tab rails). Statuses depend on the local date, so the key
+ * includes the timezone.
+ */
+export function useProgramPlanOccurrences(rootId, programId, timezone = 'UTC') {
     return useQuery({
-        queryKey: queryKeys.programPlanOccurrences(rootId, programId, dayId),
-        queryFn: async () => (await fractalApi.getProgramDayPlanOccurrences(rootId, programId, dayId)).data,
-        enabled: Boolean(rootId && programId && dayId),
+        queryKey: queryKeys.programPlanOccurrences(rootId, programId, timezone),
+        queryFn: async () => (await fractalApi.getProgramPlanOccurrences(rootId, programId, { timezone })).data,
+        select: (data) => new Map((data?.days || []).map((entry) => [String(entry.day_id), entry.dates])),
+        enabled: Boolean(rootId && programId),
         staleTime: 60 * 1000,
     });
 }
 
-/** Every template's plan for one occurrence, stored or seeded. */
-export function useProgramDayPlans(rootId, programId, dayId, date) {
+/**
+ * Every template's plan for one occurrence, stored or seeded, plus what was logged in the
+ * sessions that completed it (which sessions count depends on the local date).
+ */
+export function useProgramDayPlans(rootId, programId, dayId, date, timezone = 'UTC') {
     return useQuery({
-        queryKey: queryKeys.programDayPlans(rootId, programId, dayId, date),
-        queryFn: async () => (await fractalApi.getProgramDayPlans(rootId, programId, dayId, date)).data,
+        queryKey: queryKeys.programDayPlans(rootId, programId, dayId, date, timezone),
+        queryFn: async () => (await fractalApi.getProgramDayPlans(rootId, programId, dayId, date, timezone)).data,
         enabled: Boolean(rootId && programId && dayId && date),
         staleTime: 30 * 1000,
     });
@@ -38,16 +46,19 @@ export function useSessionPlanCandidates(rootId, templateId, date) {
  * refreshed plan entry, which replaces the cached entry before the day's
  * occurrence strip is refreshed.
  */
-export function useProgramSessionPlanMutations(rootId, programId, dayId, date) {
+export function useProgramSessionPlanMutations(rootId, programId, dayId, date, timezone = 'UTC') {
     const queryClient = useQueryClient();
-    const dayPlansKey = queryKeys.programDayPlans(rootId, programId, dayId, date);
+    const dayPlansKey = queryKeys.programDayPlans(rootId, programId, dayId, date, timezone);
 
     const applyEntry = (entry) => {
         queryClient.setQueryData(dayPlansKey, (current) => (current ? {
             ...current,
-            plans: current.plans.map((plan) => (plan.template.id === entry.template.id ? entry : plan)),
+            // Plan writes return the plan only; keep the logged sessions already loaded for the date.
+            plans: current.plans.map((plan) => (plan.template.id === entry.template.id
+                ? { ...entry, logged_sessions: entry.logged_sessions ?? plan.logged_sessions }
+                : plan)),
         } : current));
-        queryClient.invalidateQueries({ queryKey: queryKeys.programPlanOccurrences(rootId, programId, dayId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.programPlanOccurrences(rootId, programId) });
         // Later occurrences may be seeded from this one.
         queryClient.invalidateQueries({
             queryKey: queryKeys.programSessionPlansRoot(rootId, programId),
@@ -61,13 +72,13 @@ export function useProgramSessionPlanMutations(rootId, programId, dayId, date) {
             await fractalApi.saveProgramSessionPlan(rootId, programId, dayId, templateId, date, {
                 sections,
                 ...(rowVersion ? { row_version: rowVersion } : {}),
-            })
+            }, timezone)
         ).data,
         onSuccess: applyEntry,
     });
     const reset = useMutation({
         mutationFn: async ({ templateId }) => (
-            await fractalApi.resetProgramSessionPlan(rootId, programId, dayId, templateId, date)
+            await fractalApi.resetProgramSessionPlan(rootId, programId, dayId, templateId, date, timezone)
         ).data,
         onSuccess: applyEntry,
     });
@@ -75,7 +86,7 @@ export function useProgramSessionPlanMutations(rootId, programId, dayId, date) {
         mutationFn: async ({ templateId, rowVersion }) => (
             await fractalApi.pullProgramSessionPlanTemplate(rootId, programId, dayId, templateId, date, {
                 ...(rowVersion ? { row_version: rowVersion } : {}),
-            })
+            }, timezone)
         ).data,
         onSuccess: applyEntry,
     });

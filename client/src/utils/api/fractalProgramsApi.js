@@ -47,21 +47,25 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
     deleteBlockDay: (rootId, programId, blockId, dayId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
-    getProgramDayPlanOccurrences: (rootId, programId, dayId, params = {}) => axios.get(
-        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plan-occurrences`, { params },
+    getProgramPlanOccurrences: (rootId, programId, params = {}) => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/plan-occurrences`, { params },
     ),
-    getProgramDayPlans: (rootId, programId, dayId, date) => axios.get(
-        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans`, { params: { date } },
+    getProgramDayPlans: (rootId, programId, dayId, date, timezone = 'UTC') => axios.get(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans`, { params: { date, timezone } },
     ),
-    saveProgramSessionPlan: (rootId, programId, dayId, templateId, date, data) => axios.put(
+    // Plan writes send the viewer's timezone: past program days (in local time) are read-only.
+    saveProgramSessionPlan: (rootId, programId, dayId, templateId, date, data, timezone = 'UTC') => axios.put(
         `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}`, data,
+        { params: { timezone } },
     ),
-    resetProgramSessionPlan: (rootId, programId, dayId, templateId, date) => axios.delete(
+    resetProgramSessionPlan: (rootId, programId, dayId, templateId, date, timezone = 'UTC') => axios.delete(
         `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}`,
+        { params: { timezone } },
     ),
-    pullProgramSessionPlanTemplate: (rootId, programId, dayId, templateId, date, data) => axios.post(
+    pullProgramSessionPlanTemplate: (rootId, programId, dayId, templateId, date, data, timezone = 'UTC') => axios.post(
         `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}/pull-template`,
         data,
+        { params: { timezone } },
     ),
     getSessionPlanCandidates: (rootId, templateId, date) => axios.get(
         `${API_BASE}/${rootId}/session-plans/candidates`, { params: { template_id: templateId, date } },

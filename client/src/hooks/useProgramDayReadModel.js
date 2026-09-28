@@ -118,6 +118,7 @@ function invalidateProgramDayDependents(queryClient, rootId, programId, { except
         queryClient.invalidateQueries({ queryKey: queryKeys.programs(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayOptions(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.programSessionPlansRoot(rootId, programId) }),
     ]);
 }
 

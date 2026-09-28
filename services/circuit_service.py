@@ -290,11 +290,17 @@ class CircuitService:
             return None, "Circuit not found", 404
         if not definition.slots:
             return None, "Circuit has no activity slots", 409
-        result_count = len(definition.slots)
-        shape_error = validate_circuit_shape(1, len(definition.slots))
+        prescription = data.get("prescription") or None
+        # A planned circuit starts with its planned rounds; otherwise with one.
+        round_count = max(1, len((prescription or {}).get("rounds") or []))
+        result_count = len(definition.slots) * round_count
+        shape_error = validate_circuit_shape(round_count, len(definition.slots))
         if shape_error:
             return None, shape_error, 409
-        required_instances = len(definition.slots)
+        required_instances = sum(
+            1 if slot.activity_definition.has_sets else round_count
+            for slot in definition.slots
+        )
         quota = QuotaService(self.db_session)
         _, quota_error, quota_status = quota.check_available(user_id, "activity_instances", required_instances)
         if quota_error:
@@ -323,6 +329,7 @@ class CircuitService:
             source_version=definition.version,
             name=definition.name,
             description=definition.description,
+            prescription=prescription,
         )
         self.db_session.add(run)
         self.db_session.flush()
@@ -349,7 +356,8 @@ class CircuitService:
                 run_slot.activity_instance_id = instance.id
             self.db_session.add(run_slot)
         self.db_session.flush()
-        self._create_round_occurrences(run, 1)
+        for round_number in range(1, round_count + 1):
+            self._create_round_occurrences(run, round_number)
         if attach_goals:
             self._attach_member_goals(session, definition, root_id)
         structure_error = append_circuit_run_item(

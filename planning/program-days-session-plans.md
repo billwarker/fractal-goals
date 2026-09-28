@@ -233,3 +233,35 @@ Verification:
   - three Playwright specs fail (agent connections on both viewports, program-day status on desktop);
   - 12 basedpyright errors;
   - frontend maintainability budgets were already exceeded on `main`. `TemplateBuilderModal.jsx` and `ProgramCalendarPage.jsx` grew by about 37 and 25 lines.
+
+### Follow-ups (2026-09-27)
+
+- **Circuits.** Legacy `activities` lists that mix typed circuits and activities now convert faithfully. They get positional `legacy-<section>-<item>` keys, and plan cards show each circuit's name and members. Circuit member prescriptions are still deferred.
+- **Side pane.** On the Days tab the side pane shows a day/template navigator (`ProgramDaysNavigator`). Choosing a template scrolls to its card. Narrow screens get a compact select in the main view instead.
+- **Status marks.** The date strip uses the canonical status marks. `plan-occurrences?timezone=` returns each date's `state`, `manual_status`, `closed`, `program_day_completed` and credited `sessions`, all from `build_range_facts`. Its window cap now matches the read model's 366 days.
+- **Two columns.** The main area shows two date columns: the focused date and the occurrence before it. By default that is the latest program day (on or before today) and the next one.
+  - Clicking a date in the strip focuses it on the right, with its predecessor on the left.
+  - The first date shows alone.
+  - Plan cards keep only unsaved edits locally, so an untouched seed refreshes when the plan it starts from is saved in the other column.
+- **Latest completed column.** The left column is the latest *completed* occurrence before the focused date, falling back to the previous occurrence. Its caption reads "Last completed".
+  - `GET .../plans?date=&timezone=` now returns `logged_sessions` per template: the sessions credited to that template on that date, with each activity's logged sets and metrics. It reuses the canonical credit facts and is only computed for today and earlier.
+  - Cards with logged sessions are read-only. They show a logged-values table per activity, with planned values as met/under chips. Logged activities are matched to plan items in order, including circuit members; leftovers appear under "Also logged".
+- **Date rails in the side pane.** Each program day in the side pane now shows its date rail (status marks, plan dot, selected and compared dates) under its name. The main area starts directly with the columns; narrow screens keep a day select and date strip in the main area.
+  - The per-day occurrences endpoint is replaced by `GET /api/<root>/programs/<program>/plan-occurrences?timezone=`, which returns every plannable day's dates from one `build_range_facts` pass over the program span. Programs longer than 366 days are capped to a window around today. It is budgeted at 26 queries regardless of how many days the program has.
+  - `useProgramDaysTab` owns the occurrences query and resolves the selection (`resolveDaysSelection`), so the rails and columns always agree.
+- **Past days are read-only.** Save, reset and pull reject dates before today in the viewer's timezone (`?timezone=`) with 409 "Past program days can't be re-planned". The Days tab shows past and completed columns read-only: logged values when a session completed the day, otherwise the planned values as a table with a short note. Sessions can still execute an unexecuted recent plan.
+- **Completed templates show their session.** A template completed on a date shows that session's section containers and recorded activity data (the Sessions page `SessionSectionGrid`, sharing the session detail cache) under a slim title row with an "Open session" link. The session metadata block is not shown. Sections stack in the narrow column (`session-sections` container query). Its sections and activities carry the same alignment keys as the plan card, so matching activities at the same index line up across the columns. The earlier logged-values view and matcher were removed; `logged_sessions` now carries only session identity. Past, un-logged days show their planned values read-only (`PlannedValuesTable`).
+- **Circuit plans.** Circuit items in templates and dated plans can now carry a plan: `{schema, notes?, rounds: [{notes?, slots: [{slot_id, metrics}]}]}`.
+  - `slot_id` is a circuit definition slot. The shape is validated in `validate_circuit_prescription` (reusing the circuit round and slot limits), and the service checks that slots belong to the circuit and metrics to each slot's activity.
+  - Session creation starts the run with the planned number of rounds and snapshots the plan on `circuit_runs.prescription` (migration `e5a7c9b1d3f4`); client-sent plans are ignored.
+  - Planned rounds start empty. Members show "plan" chips and round notes on the session page.
+  - Editors: `CircuitPrescriptionEditor`, in the template builder and on Days plan cards. Past days show `PlannedCircuitTable`.
+- **One layout for both columns.** Completed templates are shown in the plan card layout rather than the Sessions page grid, which is easier to program from. `CompletedSessionCard` renders the session's own sections; activities show logged sets (`ActivityValuesTable`) and circuits show logged rounds by slot (`CircuitValuesTable`), with the same alignment keys as plan cards. The Sessions page components are unchanged.
+- **Scoped notes and planned tags.** Plan cards and the template builder's plan editor now scope like the session page.
+  - Clicking an activity highlights it. Clicking a set (or a circuit round) narrows the scope to that set, clicking the set label again or the activity's own container scopes back to the whole activity. The per-set and per-round Note buttons and the separate note fields are gone.
+  - A note composer at the bottom of the scoped item edits the scoped note ("Coaching note for X" or "Note for X · Set N"). Notes outside the current scope show as muted text.
+  - Planned tags: `prescription.tags` and `sets[].tags` hold activity tag binding ids. The activity's tag button sits next to its remove button in the card header, and each set's tag button sits just left of its remove button. Picks go into the plan draft (`ActivityTagEditor` controlled mode); creating a new tag still adds it to the catalog.
+  - The server validates tags (at most 50 per scope, active bindings of the item's activity) and applies them to the new activity instance and its planned sets at session creation (`load_planned_tags`). Past read-only plans list their tags by name.
+  - The set table uses a subgrid, so the selected set's highlight is no longer clipped and columns stay aligned.
+  - Section helpers moved from the plan service to `services/plan_sections.py` (backend file-size gate).
+

@@ -77,6 +77,9 @@ export default function ProgramSidePane({
     sessionCreditUpdating = false,
     onEditPeriod,
     onEditPlan,
+    daysNavigator = null,
+    viewToggle = null,
+    showSubViews = false,
 }) {
     const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     const [collapsedSections, setCollapsedSections] = useState({
@@ -88,36 +91,68 @@ export default function ProgramSidePane({
             [key]: !current[key],
         }));
     };
+    const collapseButton = onCollapse
+        ? <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>
+        : null;
+    const subViewToggle = (
+        <ViewToggleTabs
+            className={styles.sidePaneViewToggle}
+            items={[
+                { value: 'details', label: 'Details' },
+                { value: 'goals', label: 'Goals' },
+            ]}
+            value={view}
+            onChange={onViewChange}
+            ariaLabel="Program side pane views"
+            style={{
+                '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
+            }}
+        />
+    );
+    // Desktop: the page's view toggle leads the pane, with Details/Goals beneath it in the
+    // calendar view. The mobile sheet keeps its own headers and a Collapse (close) control.
+    const viewSwitcher = viewToggle ? (
+        <div className={styles.viewSwitcher}>
+            {viewToggle}
+            {showSubViews && scope === 'program' ? subViewToggle : null}
+        </div>
+    ) : null;
+
+    if (daysNavigator) {
+        // The Days tab replaces the pane's review content with its day/template selector.
+        return (
+            <aside className={styles.sidePane} aria-label="Program side pane">
+                {viewSwitcher || (
+                    <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
+                        <h2 className={styles.daysPaneTitle}>Program days</h2>
+                    </SidePaneHeader>
+                )}
+                <div className={styles.daysPaneBody}>{daysNavigator}</div>
+            </aside>
+        );
+    }
     return (
         <aside className={styles.sidePane} aria-label="Program side pane">
+            {viewSwitcher}
             {scope === 'day' ? (
                 <header className={styles.dayReviewHeader}>
-                    <div className={styles.dayReviewHeading}>
+                    <div className={`${styles.dayReviewHeading} ${collapseButton ? '' : styles.dayReviewHeadingFixed}`.trim()}>
                         <Button unstyled className={styles.dayNavButton} onClick={onPreviousDay} aria-label="Previous day">‹</Button>
                         <div className={styles.dayReviewTitle}>
                             <h2>{formatLiteralDate(contextDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
                         </div>
                         <Button unstyled className={styles.dayNavButton} onClick={onNextDay} aria-label="Next day">›</Button>
-                        <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>
+                        {collapseButton}
                     </div>
                 </header>
-            ) : <SidePaneHeader
-                className={scope === 'program' ? styles.programHeader : styles.scopedHeader}
-                actions={<SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>Collapse</SidePaneHeaderButton>}
-            >
-                {scope === 'program' ? <ViewToggleTabs
-                    className={styles.sidePaneViewToggle}
-                    items={[
-                        { value: 'details', label: 'Details' },
-                        { value: 'goals', label: 'Goals' },
-                    ]}
-                    value={view}
-                    onChange={onViewChange}
-                    ariaLabel="Program side pane views"
-                    style={{
-                        '--view-toggle-panel-bg': 'var(--color-bg-sidebar)',
-                    }}
-                /> : (
+            ) : scope === 'program' ? (
+                viewSwitcher ? null : (
+                    <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
+                        {subViewToggle}
+                    </SidePaneHeader>
+                )
+            ) : (
+                <SidePaneHeader className={styles.scopedHeader} actions={collapseButton}>
                     <nav className={styles.scopeNav} aria-label="Program scope">
                         <span className={styles.rangeSummary}>
                             <span className={styles.rangeNavLabel}>Selected timeframe</span>
@@ -126,8 +161,8 @@ export default function ProgramSidePane({
                             </span>
                         </span>
                     </nav>
-                )}
-            </SidePaneHeader>}
+                </SidePaneHeader>
+            )}
 
             {program && scope === 'day' ? (
                 <ProgramDayPane

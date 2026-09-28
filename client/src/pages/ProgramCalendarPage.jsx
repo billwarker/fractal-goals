@@ -31,6 +31,7 @@ import {
     useUpdateProgramDayStatuses,
 } from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
+import useProgramDaysTab from '../hooks/useProgramDaysTab';
 import { useProgramCalendarFeed } from '../hooks/useProgramCalendarFeed';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -133,8 +134,6 @@ function ProgramCalendarPage() {
         writeLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY, String(enabled));
     }, []);
     const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
-    // Days tab selection: which program day and occurrence date is being planned.
-    const [daysSelection, setDaysSelection] = useState(null);
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
     });
@@ -419,19 +418,22 @@ function ProgramCalendarPage() {
             ))}
         </span>
     );
+    // The program's span and status. Desktop shows it on the title row beside the header
+    // actions; mobile hides the title copy, so it stays the subtitle there.
+    const programMeta = displayProgram ? (
+        <span className={styles.headerMetaRow}>
+            <span>{formatLiteralDate(displayProgram.start_date)} - {formatLiteralDate(displayProgram.end_date)}</span>
+            {displayProgramStatus ? (
+                <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
+                    {getStatusLabel(displayProgramStatus)}
+                </span>
+            ) : null}
+            {selectedTimeframeLabel ? <span>{selectedTimeframeLabel}</span>
+                : selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
+        </span>
+    ) : null;
     const pageSubtitle = displayProgram
-        ? (
-            <span className={styles.headerMetaRow}>
-                <span>{formatLiteralDate(displayProgram.start_date)} - {formatLiteralDate(displayProgram.end_date)}</span>
-                {displayProgramStatus ? (
-                    <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
-                        {getStatusLabel(displayProgramStatus)}
-                    </span>
-                ) : null}
-                {selectedTimeframeLabel ? <span>{selectedTimeframeLabel}</span>
-                    : selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
-            </span>
-        )
+        ? (isMobile ? programMeta : null)
         : (selectedRangeText ? 'No program scheduled for these days.' : 'No program scheduled for this day.');
     const duplicateInitialData = useMemo(() => {
         if (builderState.mode !== 'duplicate' || !builderState.duplicateSource) return null;
@@ -778,51 +780,60 @@ function ProgramCalendarPage() {
         programs: 'Other Programs',
     }[programOptionsView] || 'Program Options';
 
-    const viewActions = displayProgram ? (
+    const viewToggle = displayProgram ? (
+        <ViewToggleTabs
+            className={styles.mobileViewToggle}
+            items={PROGRAM_VIEW_ITEMS}
+            value={viewMode}
+            onChange={setViewMode}
+            ariaLabel="Program view"
+        />
+    ) : null;
+    // Desktop: the view toggle leads the always-open side pane. Mobile: the pane is a sheet,
+    // so the toggle stays in the header beside the button that opens it.
+    const viewActions = (
         <>
-            <ViewToggleTabs
-                className={styles.mobileViewToggle}
-                items={PROGRAM_VIEW_ITEMS}
-                value={viewMode}
-                onChange={setViewMode}
-                ariaLabel="Program view"
-            />
+            {isMobile ? viewToggle : null}
+            {!isMobile && programMeta ? <span className={styles.headerMetaInline}>{programMeta}</span> : null}
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
-            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
-                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-            </HeaderButton>
-        </>
-    ) : (
-        <>
-            <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
-                Program Options
-            </HeaderButton>
-            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
-                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-            </HeaderButton>
+            {isMobile ? (
+                <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
+                    {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+                </HeaderButton>
+            ) : null}
         </>
     );
 
-    const openDayPlan = (dayId, date) => {
-        setDaysSelection({ dayId, date });
-        setViewMode('days');
-        if (isMobile) setIsSidePaneVisible(false);
-    };
+    const daysTab = useProgramDaysTab({
+        rootId,
+        programId: displayProgram?.id,
+        blocks: sortedBlocks,
+        today: todayInTimezone,
+        timezone: timezone || 'UTC',
+        enabled: viewMode === 'days',
+        setViewMode,
+        onLeavePane: () => { if (isMobile) setIsSidePaneVisible(false); },
+    });
 
     return (
         <div className={`${styles.container} page-reveal`}>
-            <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
+            <div className={`${styles.workspace} ${isMobile && !isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
                 <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
+                        className={styles.compactHeader}
                         title={pageTitle}
                         subtitle={pageSubtitle}
                         hideTitleOnMobile
                         actions={viewActions}
                     />
 
-                    <div className={`${styles.calendarPanel} ${viewMode !== 'calendar' ? styles.blocksModePanel : ''}`}>
+                    <div className={[
+                        styles.calendarPanel,
+                        viewMode !== 'calendar' ? styles.blocksModePanel : '',
+                        viewMode === 'days' ? styles.daysModePanel : '',
+                    ].filter(Boolean).join(' ')}>
                         {loading || (viewMode !== 'calendar' && detailLoading) ? (
                             <div className={styles.loading}>Loading programs...</div>
                         ) : viewMode === 'calendar' ? (
@@ -884,8 +895,12 @@ function ProgramCalendarPage() {
                                         activities={activities}
                                         activityGroups={activityGroups}
                                         today={todayInTimezone}
-                                        selection={daysSelection}
-                                        onSelectionChange={setDaysSelection}
+                                        timezone={timezone || 'UTC'}
+                                        resolved={daysTab.resolved}
+                                        occurrencesQuery={daysTab.occurrencesQuery}
+                                        focusTemplateId={daysTab.selection?.templateId || null}
+                                        onSelectionChange={daysTab.setSelection}
+                                        showDateControls={isMobile}
                                     />
                                 </Suspense>
                             </div>
@@ -914,12 +929,15 @@ function ProgramCalendarPage() {
 
                 <ResponsiveProgramSidePane
                     isMobile={isMobile}
-                    isVisible={isSidePaneVisible}
+                    isVisible={!isMobile || isSidePaneVisible}
                     onClose={() => setIsSidePaneVisible(false)}
+                    viewToggle={isMobile ? null : viewToggle}
+                    showSubViews={viewMode === 'calendar'}
                     program={displayProgram}
                     goals={displayGoals}
                     onCreate={() => openCreateProgram()}
-                    view={sidePaneView}
+                    // Details/Goals is a calendar sub-view; Blocks always shows details.
+                    view={viewMode === 'blocks' && !isMobile ? 'details' : sidePaneView}
                     onViewChange={setSidePaneView}
                     programMetrics={overviewMetricsQuery.data}
                     programMetricsLoading={overviewMetricsQuery.isLoading}
@@ -946,7 +964,8 @@ function ProgramCalendarPage() {
                     onSetDayStatus={(status) => updateDayStatuses([contextDate], status)}
                     dayStatusUpdating={dayStatusMutation.isPending}
                     onEditPeriod={periodEditor.openEdit}
-                    onEditPlan={openDayPlan}
+                    onEditPlan={daysTab.openDayPlan}
+                    daysNavigator={viewMode === 'days' && displayProgram ? daysTab.navigator : null}
                     onSetSessionCredit={updateSessionCredit}
                     sessionCreditUpdating={sessionCreditMutation.isPending}
                 />

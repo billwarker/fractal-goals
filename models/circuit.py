@@ -99,6 +99,8 @@ class CircuitRun(Base):
     created_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now, server_default=sa.func.now())
     completed_at = Column(DateTime, nullable=True)
+    # Planned rounds and member values snapshotted from the template or dated plan at creation.
+    prescription = Column(JSON_TYPE, nullable=True)
 
     definition = relationship("CircuitDefinition")
     session = relationship("Session", back_populates="circuit_runs")

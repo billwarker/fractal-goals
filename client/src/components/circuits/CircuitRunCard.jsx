@@ -279,7 +279,7 @@ export default function CircuitRunCard({
                             <div className={styles.roundHeader}>
                                 <div className={styles.roundIdentity}>
                                     <span className={styles.roundNumber}>#{round.round_number}</span>
-                                    <div className={styles.roundTitle}><strong>Round {round.round_number}</strong></div>
+                                    <div className={styles.roundTitle}><strong>Round {round.round_number}</strong>{derived.roundPlanNote(round) ? <p className={activityStyles.planNote}>{derived.roundPlanNote(round)}</p> : null}</div>
                                 </div>
                                 <div className={styles.roundActions}>
                                     <CircuitRoundTagControl
@@ -377,7 +377,7 @@ export default function CircuitRunCard({
                                                     metrics={metrics}
                                                     disabled={disabled}
                                                     saving={action.isPending}
-                                                    progress={{ comparison: instance?.progress_comparison, setIndex }}
+                                                    progress={{ comparison: instance?.progress_comparison, setIndex, planned: derived.plannedMemberValues(round, slot) }}
                                                     onSave={(nextMetrics) => action.saveMemberMetrics
                                                         ? action.saveMemberMetrics({
                                                             runId: run.id,

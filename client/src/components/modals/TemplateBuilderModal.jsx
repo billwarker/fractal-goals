@@ -19,7 +19,7 @@ import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import ViewToggleTabs from '../common/ViewToggleTabs';
-import PrescriptionEditor from '../prescriptions/PrescriptionEditor';
+import TemplateItemPlanEditor from './TemplateItemPlanEditor';
 import useTemplateItemPlans from './useTemplateItemPlans';
 
 import {
@@ -84,6 +84,10 @@ function TemplateBuilderModalContent({
     );
     const sectionCircuitById = useMemo(
         () => new Map(sectionCircuits.map((circuit) => [circuit.id, circuit])),
+        [sectionCircuits],
+    );
+    const circuitByDefinitionId = useMemo(
+        () => new Map(sectionCircuits.map((circuit) => [circuit.circuit_definition_id, circuit])),
         [sectionCircuits],
     );
     const { openPlanKeys, togglePlan, updatePrescription } = useTemplateItemPlans(setCurrentTemplate);
@@ -698,9 +702,11 @@ function TemplateBuilderModalContent({
                                                     <div className={styles.activitiesList}>
                                                         {(section.activities || []).map((activity, activityIndex) => {
                                                             const planKey = activity.item_key || `${sectionIndex}:${activityIndex}`;
-                                                            const planDefinition = isTemplateCircuitItem(activity)
-                                                                ? null
-                                                                : activityDefinitionById.get(activity.activity_id);
+                                                            const planCircuit = isTemplateCircuitItem(activity)
+                                                                ? circuitByDefinitionId.get(activity.circuit_definition_id)
+                                                                : null;
+                                                            const planDefinition = planCircuit ? null : activityDefinitionById.get(activity.activity_id);
+                                                            const canPlan = Boolean(planCircuit || planDefinition);
                                                             const isPlanOpen = openPlanKeys.has(planKey);
                                                             return (
                                                             <React.Fragment key={getTemplateItemKey(activity, activityIndex)}>
@@ -740,7 +746,7 @@ function TemplateBuilderModalContent({
                                                                             ↓
                                                                         </button>
                                                                     </div>
-                                                                    {planDefinition && (
+                                                                    {canPlan && (
                                                                         <Button
                                                                             size="sm"
                                                                             variant="secondary"
@@ -762,11 +768,13 @@ function TemplateBuilderModalContent({
                                                                     </button>
                                                                 </div>
                                                             </div>
-                                                            {planDefinition && isPlanOpen && (
+                                                            {canPlan && isPlanOpen && (
                                                                 <div className={styles.planEditor}>
-                                                                    <PrescriptionEditor
+                                                                    <TemplateItemPlanEditor
+                                                                        item={activity}
                                                                         definition={planDefinition}
-                                                                        value={activity.prescription || null}
+                                                                        circuit={planCircuit}
+                                                                        activityById={activityDefinitionById}
                                                                         idPrefix={`template-plan-${planKey}`}
                                                                         onChange={(prescription) => updatePrescription(sectionIndex, activityIndex, prescription)}
                                                                     />

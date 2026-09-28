@@ -1,3 +1,4 @@
+import * as model from '../prescriptionModel';
 import {
     MAX_PRESCRIPTION_SETS,
     getPrescriptionColumns,
@@ -25,6 +26,16 @@ const weight = { id: 'w', name: 'Weight', unit: 'kg' };
 const reps = { id: 'r', name: 'Reps', unit: 'reps' };
 
 describe('prescriptionModel', () => {
+    it('keeps planned tags on the activity and its sets, and a tags-only plan counts', () => {
+        const tagged = model.withPrescriptionTags(null, ['a', 'a', 'b']);
+        expect(tagged).toEqual({ schema: 1, tags: ['a', 'b'] });
+        const withSet = model.withSetTags(withAddedSet(tagged), 0, ['c']);
+        expect(withSet.sets[0].tags).toEqual(['c']);
+        expect(summarizePrescription(withSet)).toBe('1 set · tags');
+        expect(model.withSetTags(withSet, 0, []).sets[0]).not.toHaveProperty('tags');
+        expect(model.withPrescriptionTags({ schema: 1, tags: ['a'] }, [])).toBeNull();
+    });
+
     it('builds columns per metric, and per split × metric for split activities', () => {
         expect(getPrescriptionColumns({ metric_definitions: [weight, reps] }).map((column) => column.key))
             .toEqual(['w', 'r']);
@@ -115,5 +126,35 @@ describe('sessionPrescription', () => {
         expect(formatPlannedValue({ precision: 2 }, 102.25)).toBe('102.25');
         expect(formatPlannedValue({ input_type: 'integer', precision: 0 }, 5)).toBe('5');
         expect(formatPlannedValue({ precision: 2 }, null)).toBe('');
+    });
+});
+
+describe('circuit plans', () => {
+
+    it('lists a circuit\'s slots in order with their activity definitions', () => {
+        const circuit = { slots: [
+            { id: 'b', sort_order: 1, activity_definition_id: 'push', activity: { id: 'push', name: 'Push' } },
+            { id: 'a', sort_order: 0, activity_definition_id: 'row' },
+        ] };
+        const slots = model.getCircuitPlanSlots(circuit, new Map([['row', { id: 'row', name: 'Row' }]]));
+        expect(slots.map((slot) => [slot.id, slot.definition.name])).toEqual([['a', 'Row'], ['b', 'Push']]);
+    });
+
+    it('sets values per round and slot, repeats the last round, and removes rounds', () => {
+        let plan = model.withCircuitRoundValue(null, 0, 'a', 'reps', null, 10);
+        plan = model.withAddedRound(plan);
+        plan = model.withCircuitRoundValue(plan, 1, 'a', 'reps', null, 12);
+
+        expect(model.getCircuitRoundEntries(plan, 0, 'a')).toEqual([{ metric_id: 'reps', split_id: null, value: 10 }]);
+        expect(model.getCircuitRoundEntries(plan, 1, 'a')[0].value).toBe(12);
+        expect(model.summarizePrescription(plan)).toBe('2 rounds');
+        expect(model.withRemovedRound(plan, 0).rounds).toHaveLength(1);
+    });
+
+    it('keeps empty rounds (they plan how many rounds to run) and drops an empty plan', () => {
+        const plan = model.withAddedRound(model.withAddedRound(null));
+        expect(plan.rounds).toEqual([{ slots: [], notes: null }, { slots: [], notes: null }]);
+        expect(model.withRemovedRound(model.withRemovedRound(plan, 0), 0)).toBeNull();
+        expect(model.withRoundNotes(plan, 1, 'finisher').rounds[1].notes).toBe('finisher');
     });
 });

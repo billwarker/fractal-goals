@@ -1850,3 +1850,97 @@ def test_database_enforces_circuit_shape_and_lifecycle_constraints(
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
+
+
+
+def _planned_circuit_template(db_session, root, definition, prescription):
+    template = SessionTemplate(
+        id=str(uuid.uuid4()), name="Circuit day", root_id=root.id,
+        template_data={"session_type": "normal", "sections": [{"name": "Main", "items": [
+            {"type": "circuit", "circuit_definition_id": definition["id"], "item_key": "circ", "prescription": prescription},
+        ]}]},
+    )
+    db_session.add(template)
+    db_session.commit()
+    return template
+
+
+def test_session_from_template_starts_circuit_with_planned_rounds_and_snapshot(
+    authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+):
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    weight = next(metric for metric in sample_activity_definition.metric_definitions if metric.name == "Weight")
+    bench_slot = definition["slots"][0]["id"]
+    prescription = {"schema": 1, "rounds": [
+        {"slots": [{"slot_id": bench_slot, "metrics": [{"metric_id": weight.id, "split_id": None, "value": 60}]}], "notes": None},
+        {"slots": [{"slot_id": bench_slot, "metrics": [{"metric_id": weight.id, "split_id": None, "value": 65}]}], "notes": None},
+        {"slots": [], "notes": "finisher"},
+    ]}
+    template = _planned_circuit_template(db_session, sample_ultimate_goal, definition, prescription)
+
+    created = authed_client.post(f"/api/{sample_ultimate_goal.id}/sessions", json={
+        "name": "Circuit day", "template_id": template.id,
+    })
+    assert created.status_code == 201, created.get_json()
+
+    run = db_session.query(CircuitRun).filter_by(session_id=created.get_json()["id"]).one()
+    assert len(run.rounds) == 3
+    assert run.prescription == prescription
+    # Planned rounds start empty: values are reference-only.
+    bench_instance = next(slot for slot in run.slots if slot.has_sets).activity_instance
+    assert len(bench_instance.sets) == 3
+    assert all(not activity_set.metric_values for activity_set in bench_instance.sets)
+
+
+def test_circuit_plans_reject_slots_and_metrics_from_elsewhere(
+    authed_client, db_session, sample_ultimate_goal, sample_activity_definition, test_user,
+):
+    from services.template_service import TemplateService
+
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    weight = next(metric for metric in sample_activity_definition.metric_definitions if metric.name == "Weight")
+    service = TemplateService(db_session)
+
+    def create(prescription):
+        return service.create_template(sample_ultimate_goal.id, test_user.id, {
+            "name": "Circuit day",
+            "template_data": {"session_type": "normal", "sections": [{"name": "Main", "items": [
+                {"type": "circuit", "circuit_definition_id": definition["id"], "prescription": prescription},
+            ]}]},
+        })
+
+    _, error, status = create({"rounds": [{"slots": [
+        {"slot_id": "not-a-slot", "metrics": [{"metric_id": weight.id, "value": 1}]},
+    ]}]})
+    assert status == 400 and "not part of this circuit" in error
+    burpee_slot = definition["slots"][1]["id"]
+    _, error, status = create({"rounds": [{"slots": [
+        {"slot_id": burpee_slot, "metrics": [{"metric_id": weight.id, "value": 1}]},
+    ]}]})
+    assert status == 400 and "does not belong" in error
+    bench_slot = definition["slots"][0]["id"]
+    template, error, status = create({"rounds": [{"slots": [
+        {"slot_id": bench_slot, "metrics": [{"metric_id": weight.id, "value": 1}]},
+    ]}]})
+    assert (error, status) == (None, 201)
+
+
+def test_client_sent_circuit_plans_are_ignored(authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    template = _planned_circuit_template(db_session, sample_ultimate_goal, definition, None)
+    forged = [{"name": "Main", "items": [{
+        "type": "circuit", "circuit_definition_id": definition["id"], "item_key": "circ",
+        "prescription": {"schema": 1, "rounds": [{"slots": []}] * 5},
+    }]}]
+
+    created = authed_client.post(f"/api/{sample_ultimate_goal.id}/sessions", json={
+        "name": "Circuit day", "template_id": template.id, "session_data": {"sections": forged},
+    })
+
+    assert created.status_code == 201, created.get_json()
+    run = db_session.query(CircuitRun).filter_by(session_id=created.get_json()["id"]).one()
+    assert len(run.rounds) == 1
+    assert run.prescription is None

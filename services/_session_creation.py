@@ -32,7 +32,13 @@ from services.session_runtime import (
     get_template_session_type,
 )
 from services.program_scope import resolve_program_scope
-from services.prescriptions import item_activity_id, iter_activity_items, planned_set_count, snapshot_prescription
+from services.prescriptions import (
+    item_activity_id,
+    iter_activity_items,
+    iter_circuit_items,
+    load_planned_tags,
+    snapshot_prescription,
+)
 from services._session_lifecycle_common import _parse_iso_datetime_strict
 
 
@@ -63,11 +69,18 @@ class _SessionDraft:
 
 
 def _index_prescriptions(sections):
-    return {
+    """item_key -> (activity or circuit definition id, prescription) for planned items."""
+    planned = {
         item['item_key']: (item_activity_id(item), item['prescription'])
         for item in iter_activity_items(sections)
         if item.get('item_key') and item.get('prescription')
     }
+    planned.update({
+        item['item_key']: (item.get('circuit_definition_id'), item['prescription'])
+        for item in iter_circuit_items(sections)
+        if item.get('item_key') and item.get('prescription')
+    })
+    return planned
 
 
 class _SessionCreationMixin:
@@ -335,7 +348,9 @@ class _SessionCreationMixin:
                 if isinstance(exercise, dict) and exercise.get('type') == 'circuit':
                     circuit_definition_id = exercise.get('circuit_definition_id')
                     if circuit_definition_id:
-                        local_circuit_items.append((section_index, item_index, circuit_definition_id))
+                        local_circuit_items.append(
+                            (section_index, item_index, circuit_definition_id, exercise.get('item_key')),
+                        )
                     continue
                 activity_id = self._extract_activity_definition_id(exercise)
                 if not activity_id:
@@ -482,11 +497,19 @@ class _SessionCreationMixin:
         if not source or source[0] != instance.activity_definition_id:
             return
         prescription = snapshot_prescription(source[1])
+        if prescription is None:
+            return
         instance.prescription = prescription
+        # Planned tags are applied up front, like tags the user would add during the session.
+        instance.tags = load_planned_tags(self.db_session, draft.root_id, definition.id, prescription.get('tags'))
         if definition.has_sets:
             instance.sets = [
-                ActivitySet(sort_order=index, status='planned')
-                for index in range(planned_set_count(prescription))
+                ActivitySet(
+                    sort_order=index,
+                    status='planned',
+                    tags=load_planned_tags(self.db_session, draft.root_id, definition.id, planned_set.get('tags')),
+                )
+                for index, planned_set in enumerate(prescription.get('sets') or [])
             ]
 
     def _attach_section_circuits(self, draft, sections, circuit_items) -> PhaseError:
@@ -512,13 +535,17 @@ class _SessionCreationMixin:
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(new_session, 'attributes')
         circuit_service = CircuitService(self.db_session)
-        for section_index, item_index, circuit_definition_id in circuit_items:
+        for section_index, item_index, circuit_definition_id, item_key in circuit_items:
+            # Planned rounds and values come from the authoritative template or plan only.
+            source = draft.prescriptions_by_item_key.get(item_key)
+            prescription = snapshot_prescription(source[1]) if source and source[0] == circuit_definition_id else None
             created_run, circuit_error, circuit_status = circuit_service.create_run(
                 draft.root_id, new_session.id, draft.current_user_id,
                 {
                     'circuit_definition_id': circuit_definition_id,
                     'section_index': section_index,
                     'item_index': item_index,
+                    'prescription': prescription,
                 },
                 commit=False,
                 emit=False,

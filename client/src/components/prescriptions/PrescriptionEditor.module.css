@@ -6,26 +6,127 @@
 }
 
 .setTable {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    /* Set label, one column per metric, the set's tags, then its remove button. */
+    grid-template-columns: 32px repeat(var(--plan-columns, 1), minmax(72px, 1fr)) auto 28px;
+    column-gap: 6px;
+    row-gap: 4px;
     min-width: 0;
     overflow-x: auto;
 }
 
+/* Each set spans the table on a subgrid, so its selected border sits inside the table
+   (nothing to clip) while every row keeps the same columns as the header. */
 .headerRow,
-.setRow {
+.setBlock {
+    grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 32px repeat(var(--plan-columns, 1), minmax(72px, 1fr)) 72px;
+    grid-template-columns: subgrid;
     align-items: center;
-    gap: 6px;
-    min-width: calc(110px + var(--plan-columns, 1) * 78px);
+    row-gap: 4px;
+    padding: 3px 4px;
+    border: 1px solid transparent;
+    border-radius: 4px;
 }
 
+.setRow {
+    display: contents;
+}
+
+/* Set rows scope like session set rows: click to select, click again for the whole activity. */
 .setBlock {
+    cursor: pointer;
+}
+
+.setBlock:hover {
+    background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
+}
+
+.setBlockSelected,
+.setBlockSelected:hover {
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
+    border-color: var(--color-brand-success);
+}
+
+.setExtras {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.setNote {
+    grid-column: 2 / -1;
+}
+
+.setToggle {
+    padding: 2px 0;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.setToggle:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+    border-radius: 3px;
+}
+
+.itemMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    min-width: 0;
+}
+
+.plannedNote {
+    margin: 0;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--color-text-muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+/* The scoped note, at the bottom of the item like the session page's quick note. */
+.composer {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
+}
+
+.composerLabel {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.composerInput {
+    width: 100%;
+    min-height: 30px;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--color-text-primary);
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border-input);
+    border-radius: 6px;
+    resize: vertical;
+}
+
+.composerInput::placeholder {
+    color: var(--color-text-tertiary);
+}
+
+.composerInput:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
 }
 
 .setLabel {
@@ -81,14 +182,10 @@
     color: var(--color-text-muted);
 }
 
-.rowActions {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-
 .addSet {
+    grid-column: 1 / -1;
     align-self: flex-start;
+    justify-self: start;
 }
 
 .flatRow {
@@ -105,25 +202,70 @@
     flex: 1 1 96px;
 }
 
-.noteInput,
-.activityNote {
-    width: 100%;
-    padding: 5px 8px;
-    font: inherit;
+/* Circuit plans: rounds stacked vertically, one activity per row within each round. */
+.rounds {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.round {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px 10px;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.roundHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.roundSelected {
+    background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-surface));
+    border-color: var(--color-brand-success);
+}
+
+.roundTitle {
     font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.roundSlot {
+    display: grid;
+    grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
+    align-items: end;
+    gap: 10px;
+    padding-top: 6px;
+    border-top: 1px solid var(--color-border);
+}
+
+.roundSlotName {
+    padding-bottom: 7px;
+    font-size: 13px;
+    font-weight: 500;
     color: var(--color-text-primary);
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border-input);
-    border-radius: 4px;
-    resize: vertical;
+    overflow-wrap: anywhere;
 }
 
-.noteInput {
-    margin-left: 38px;
-    width: calc(100% - 38px);
+.roundSlotValues {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
 }
 
-.noteInput::placeholder,
-.activityNote::placeholder {
-    color: var(--color-text-tertiary);
+/* Fixed-width fields so the same metric sits in the same place in every round. */
+.roundSlotField {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 116px;
 }

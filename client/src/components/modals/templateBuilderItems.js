@@ -56,15 +56,16 @@ export function getTemplateItemKey(item, index) {
 
 export function serializeTemplateItem(item) {
     const identity = item.item_key ? { item_key: item.item_key } : {};
+    const plan = item.prescription ? { prescription: item.prescription } : {};
     if (item.item_type === 'circuit') {
-        return { type: 'circuit', circuit_definition_id: item.circuit_definition_id, ...identity };
+        return { type: 'circuit', circuit_definition_id: item.circuit_definition_id, ...identity, ...plan };
     }
     return {
         type: 'activity',
         activity_definition_id: item.activity_id,
         name: item.name,
         ...identity,
-        ...(item.prescription ? { prescription: item.prescription } : {}),
+        ...plan,
     };
 }
 

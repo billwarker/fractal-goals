@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
@@ -11,13 +11,18 @@ import {
     withAddedSet,
     withFlatValue,
     withPrescriptionNotes,
+    withPrescriptionTags,
     withRemovedSet,
     withSetNotes,
+    withSetTags,
     withSetValue,
 } from '../../utils/prescriptionModel';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import { formatPlannedValue } from '../../utils/sessionPrescription';
+import PlanNoteComposer from './PlanNoteComposer';
+import PlanTagEditor from './PlanTagEditor';
 import styles from './PrescriptionEditor.module.css';
+import usePlanRowSelection, { isItemSurfaceClick } from './usePlanRowSelection';
 
 function columnLabel(column) {
     return column.split ? `${column.split.name} ${column.metric.name}` : column.metric.name;
@@ -29,24 +34,44 @@ function ghostValue(column, entries) {
 }
 
 /**
- * Edits the planned values and notes for one activity item. Values are reference
+ * Edits the planned values, tags and notes for one activity item. Values are reference
  * targets only; they never become session results.
+ *
+ * Like an activity on the session page, the item is scoped by clicking: `active` means the
+ * item is selected, and clicking a set row narrows the scope to that set. Whatever is scoped
+ * gets the note composer at the bottom and an editable tag picker; clicking the item's own
+ * surface goes back to the whole item. `selectedSetIndex`/`onSelectSet` let the caller own
+ * the set scope, and `showItemTags={false}` when the caller shows the item's tags itself.
  *
  * `previous` is the plan this one was seeded from; its values show as placeholders
  * so the user sees the step they are programming.
  */
 export default function PrescriptionEditor({
+    rootId,
     definition,
     value,
     onChange,
     previous = null,
     idPrefix,
     disabled = false,
+    active = true,
+    itemName = null,
+    selectedSetIndex,
+    onSelectSet = null,
+    showItemTags = true,
 }) {
-    const [openSetNotes, setOpenSetNotes] = useState(() => new Set());
     const columns = getPrescriptionColumns(definition);
     const hasSets = Boolean(definition?.has_sets);
     const sets = value?.sets || [];
+    const { selectedIndex, clearSelection, rowProps } = usePlanRowSelection(
+        active,
+        hasSets ? sets.length : 0,
+        onSelectSet ? { selectedIndex: selectedSetIndex ?? null, onSelect: onSelectSet } : null,
+    );
+    const activityTagIds = value?.tags || [];
+    const activityTags = (definition?.tags || []).filter((tag) => activityTagIds.includes(tag.id));
+    const editable = active && !disabled;
+    const name = itemName || definition?.name || 'this activity';
 
     const commitValue = (column, rawValue, setIndex = null) => {
         const normalized = normalizeMetricValueForStorage(column.metric, rawValue);
@@ -56,15 +81,6 @@ export default function PrescriptionEditor({
             ? withFlatValue(value, column.metric.id, splitId, normalized)
             : withSetValue(value, setIndex, column.metric.id, splitId, normalized));
         return true;
-    };
-
-    const toggleSetNote = (setIndex) => {
-        setOpenSetNotes((current) => {
-            const next = new Set(current);
-            if (next.has(setIndex)) next.delete(setIndex);
-            else next.add(setIndex);
-            return next;
-        });
     };
 
     const renderValueCell = (column, entries, previousEntries, setIndex = null) => (
@@ -85,8 +101,30 @@ export default function PrescriptionEditor({
         </div>
     );
 
+    const scopedSet = selectedIndex == null ? null : sets[selectedIndex];
+    const activityTagsControl = showItemTags ? (
+        <PlanTagEditor
+            rootId={rootId}
+            definition={definition}
+            tagIds={activityTagIds}
+            onChangeTags={(tagIds) => onChange(withPrescriptionTags(value, tagIds))}
+            editable={editable}
+        />
+    ) : null;
+    // The scoped note is edited in the composer, so it isn't repeated above it.
+    const showActivityNote = Boolean(value?.notes) && !(active && selectedIndex == null);
+
     return (
-        <div className={styles.editor}>
+        <div
+            className={styles.editor}
+            onClick={(event) => { if (isItemSurfaceClick(event)) clearSelection(); }}
+        >
+            {activityTagsControl || showActivityNote ? (
+                <div className={styles.itemMeta}>
+                    {activityTagsControl}
+                    {showActivityNote ? <p className={styles.plannedNote}>{value.notes}</p> : null}
+                </div>
+            ) : null}
             {columns.length > 0 && hasSets && (
                 <div
                     className={styles.setTable}
@@ -100,54 +138,60 @@ export default function PrescriptionEditor({
                             <span key={column.key} className={styles.columnLabel}>{columnLabel(column)}</span>
                         ))}
                         <span />
+                        <span />
                     </div>
                     {sets.map((plannedSet, setIndex) => {
-                        const noteOpen = openSetNotes.has(setIndex) || Boolean(plannedSet.notes);
+                        const isSelected = selectedIndex === setIndex;
+                        const setTagIds = plannedSet.tags || [];
+                        const showSetNote = Boolean(plannedSet.notes) && !isSelected;
                         return (
                             // Planned sets have no identity beyond their position.
-                            <div key={setIndex} className={styles.setBlock}>
+                            <div
+                                key={setIndex}
+                                className={`${styles.setBlock} ${isSelected ? styles.setBlockSelected : ''}`}
+                                {...rowProps(setIndex)}
+                            >
                                 <div className={styles.setRow}>
-                                    <span className={styles.setLabel}>S{setIndex + 1}</span>
+                                    <Button
+                                        unstyled
+                                        className={styles.setToggle}
+                                        data-scope-toggle
+                                        aria-pressed={isSelected}
+                                        aria-label={`Set ${setIndex + 1}${isSelected ? ', selected' : ''}`}
+                                    >
+                                        S{setIndex + 1}
+                                    </Button>
                                     {columns.map((column) => renderValueCell(
                                         column,
                                         plannedSet.metrics,
                                         previous?.sets?.[setIndex]?.metrics,
                                         setIndex,
                                     ))}
-                                    <span className={styles.rowActions}>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => toggleSetNote(setIndex)}
-                                            disabled={disabled || Boolean(plannedSet.notes)}
-                                            aria-expanded={noteOpen}
-                                        >
-                                            Note
-                                        </Button>
-                                        <IconButton
-                                            size="sm"
-                                            onClick={() => onChange(withRemovedSet(value, setIndex))}
-                                            disabled={disabled}
-                                            aria-label={`Remove planned set ${setIndex + 1}`}
-                                        >
-                                            <CloseIcon size={12} />
-                                        </IconButton>
+                                    <span className={styles.setExtras}>
+                                        <PlanTagEditor
+                                            rootId={rootId}
+                                            definition={definition}
+                                            tagIds={setTagIds}
+                                            onChangeTags={(tagIds) => onChange(withSetTags(value, setIndex, tagIds))}
+                                            editable={editable && isSelected}
+                                            inheritedTags={activityTags}
+                                            setScope
+                                        />
                                     </span>
-                                </div>
-                                {noteOpen && (
-                                    <input
-                                        // Remount when the committed note moves (e.g. a set above is removed).
-                                        key={plannedSet.notes || ''}
-                                        type="text"
-                                        className={styles.noteInput}
-                                        defaultValue={plannedSet.notes || ''}
-                                        placeholder={previous?.sets?.[setIndex]?.notes || 'Set note'}
-                                        aria-label={`Set ${setIndex + 1} note`}
-                                        maxLength={1000}
+                                    <IconButton
+                                        size="sm"
+                                        onClick={(event) => {
+                                            event.stopPropagation();
+                                            clearSelection();
+                                            onChange(withRemovedSet(value, setIndex));
+                                        }}
                                         disabled={disabled}
-                                        onBlur={(event) => onChange(withSetNotes(value, setIndex, event.target.value))}
-                                    />
-                                )}
+                                        aria-label={`Remove planned set ${setIndex + 1}`}
+                                    >
+                                        <CloseIcon size={12} />
+                                    </IconButton>
+                                </div>
+                                {showSetNote ? <p className={`${styles.plannedNote} ${styles.setNote}`}>{plannedSet.notes}</p> : null}
                             </div>
                         );
                     })}
@@ -172,21 +216,27 @@ export default function PrescriptionEditor({
                     ))}
                 </div>
             )}
-            <textarea
-                key={value?.notes || ''}
-                className={styles.activityNote}
-                defaultValue={value?.notes || ''}
-                placeholder={previous?.notes || 'Coaching note for this activity'}
-                aria-label="Activity plan note"
-                rows={1}
-                maxLength={1000}
-                disabled={disabled}
-                onBlur={(event) => {
-                    if ((event.target.value || '') !== (value?.notes || '')) {
-                        onChange(withPrescriptionNotes(value, event.target.value));
-                    }
-                }}
-            />
+            {active ? (
+                scopedSet ? (
+                    <PlanNoteComposer
+                        scopeKey={`set-${selectedIndex}`}
+                        label={`Note for ${name} · Set ${selectedIndex + 1}`}
+                        value={scopedSet.notes}
+                        placeholder={previous?.sets?.[selectedIndex]?.notes || `Note for set ${selectedIndex + 1}…`}
+                        disabled={disabled}
+                        onCommit={(notes) => onChange(withSetNotes(value, selectedIndex, notes))}
+                    />
+                ) : (
+                    <PlanNoteComposer
+                        scopeKey="item"
+                        label={`Coaching note for ${name}`}
+                        value={value?.notes}
+                        placeholder={previous?.notes || (hasSets ? 'Add a note about this activity, or pick a set…' : 'Add a note about this activity…')}
+                        disabled={disabled}
+                        onCommit={(notes) => onChange(withPrescriptionNotes(value, notes))}
+                    />
+                )
+            ) : null}
         </div>
     );
 }

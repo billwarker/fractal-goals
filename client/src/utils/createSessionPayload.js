@@ -17,7 +17,11 @@ function normalizeSection(section) {
     const templateItems = section.items || section.activities || section.exercises || [];
     const items = templateItems.map((item) => {
         if (item?.type === 'circuit' && item.circuit_definition_id) {
-            return { type: 'circuit', circuit_definition_id: item.circuit_definition_id };
+            return {
+                type: 'circuit',
+                circuit_definition_id: item.circuit_definition_id,
+                ...(item.item_key ? { item_key: item.item_key } : {}),
+            };
         }
         const activityId = extractActivityId(item);
         if (!activityId) return null;

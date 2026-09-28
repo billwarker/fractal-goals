@@ -169,7 +169,7 @@ def validate_section_items(items: list, seen_item_keys: set) -> None:
 
     Shared by session templates and dated program session plans.
     """
-    from .prescriptions import normalize_item_key, validate_prescription
+    from .prescriptions import normalize_item_key, validate_circuit_prescription, validate_prescription
 
     for item_index, item in enumerate(items):
         if not isinstance(item, dict):
@@ -179,8 +179,14 @@ def validate_section_items(items: list, seen_item_keys: set) -> None:
             circuit_id = item.get('circuit_definition_id')
             if not isinstance(circuit_id, str) or not circuit_id.strip():
                 raise ValueError(f'section items[{item_index}] circuit_definition_id is required')
-            # Circuit member prescriptions are not supported yet.
-            item.pop('prescription', None)
+            prescription = validate_circuit_prescription(
+                item.get('prescription'),
+                f'section items[{item_index}].prescription',
+            )
+            if prescription is None:
+                item.pop('prescription', None)
+            else:
+                item['prescription'] = prescription
         elif item_type == 'activity':
             activity_id = item.get('activity_definition_id') or item.get('activity_id') or item.get('id')
             if not isinstance(activity_id, str) or not activity_id.strip():

@@ -79,13 +79,20 @@ Primary code: `services/session_*`, `services/activity_*`, `services/progress_se
 `services/timer_service.py`, `blueprints/sessions_api.py`, and the matching client hooks/views.
 
 Template section items carry a stable `item_key` (never `id`, a legacy activity-id alias) and an
-optional `prescription`: planned values per set or per metric plus activity and set notes
-(`validators/prescriptions.py` owns shape; `services/prescriptions.py` checks that metrics and splits
-belong to the item's activity and respect metric bounds). Templates count content edits in
+optional `prescription`: planned values per set or per metric, activity and set notes, and planned
+tags (`tags`: activity tag binding ids on the activity and on each set) (`validators/prescriptions.py`
+owns shape; `services/prescriptions.py` checks that metrics and splits belong to the item's activity
+and respect metric bounds, and that tags are active bindings of that activity). Planned tags are
+applied to the new instance and its planned sets at session creation, like tags added in-session. Templates count content edits in
 `revision`. Session creation snapshots the authoritative template's or dated plan's prescription onto
 `activity_instances.prescription`, looked up by `item_key`; client-sent planned values are ignored.
+Circuit items may plan rounds and per-round slot values; the run starts with the planned rounds and
+snapshots the plan on `circuit_runs.prescription`.
 Planned set activities start with one empty `planned` set per planned set; plans are reference-only,
-so metric defaults are not auto-filled for them. The session card shows a "plan" chip beside the
+so metric defaults are not auto-filled for them. Plan editors (`components/prescriptions/`) scope
+like the session page: click an item, then optionally a set or round; the scoped target gets the
+note composer (`PlanNoteComposer`) and tag picker (`PlanTagEditor`, `ActivityTagEditor` in controlled
+mode). Plan section helpers live in `services/plan_sections.py`. The session card shows a "plan" chip beside the
 progress indicator, coloured met/under by `utils/sessionPrescription.js`. Plans never feed targets.
 
 Timer mutations persist the timer state and derived duration statistics in one
@@ -196,8 +203,16 @@ expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provi
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
 
-The Programs page has Calendar, Blocks, and **Days** views. Days (`components/programs/days/`) programs
-one program day's occurrence dates: each date's templates render side by side as editable plans.
+The Programs page has Calendar, Blocks, and **Days** views. On desktop the side pane is always
+open (like session detail) and leads with the view toggle, with Details/Goals as a Calendar sub-view;
+mobile keeps the toggle in the header and the pane as a closable sheet. Days (`components/programs/days/`) programs
+one program day's occurrence dates in two columns: a focused date (by default the next program day)
+beside the latest completed occurrence before it (else the previous one), each with its canonical
+status mark and credited sessions. A template completed on a date shows its session in the plan card
+layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. On this tab the side pane lists every plannable program day with its
+templates, and each column has its own date rail (canonical status marks; A picks the comparison, B
+the date being planned). One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
+evaluates all days in a single evaluator pass.
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
 holds one dated plan per program day, template, and date: an independent snapshot of the template's
 sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.

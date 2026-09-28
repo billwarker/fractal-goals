@@ -10,7 +10,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy.orm import selectinload
 
-from models import ActivityDefinition, MetricDefinition
+from models import ActivityDefinition, ActivityTag, CircuitDefinition, CircuitSlot, MetricDefinition
 
 
 def iter_activity_items(sections: Iterable[Dict[str, Any]]):
@@ -19,6 +19,15 @@ def iter_activity_items(sections: Iterable[Dict[str, Any]]):
             continue
         for item in section.get('items') or []:
             if isinstance(item, dict) and item.get('type') == 'activity':
+                yield item
+
+
+def iter_circuit_items(sections: Iterable[Dict[str, Any]]):
+    for section in sections or []:
+        if not isinstance(section, dict):
+            continue
+        for item in section.get('items') or []:
+            if isinstance(item, dict) and item.get('type') == 'circuit':
                 yield item
 
 
@@ -34,6 +43,7 @@ def _load_activity_definitions(db_session, root_id, activity_ids):
         .options(
             selectinload(ActivityDefinition.metric_definitions).joinedload(MetricDefinition.fractal_metric),
             selectinload(ActivityDefinition.split_definitions),
+            selectinload(ActivityDefinition.tags).joinedload(ActivityTag.definition),
         )
         .filter(
             ActivityDefinition.root_id == root_id,
@@ -74,12 +84,60 @@ def _check_metric_entries(definition, entries: List[Dict[str, Any]], path: str) 
         _check_value(metric, entry['value'], entry_path)
 
 
+def _check_circuit_prescriptions(db_session, root_id, sections) -> None:
+    prescribed = [item for item in iter_circuit_items(sections) if item.get('prescription')]
+    if not prescribed:
+        return
+    circuits = {
+        circuit.id: circuit
+        for circuit in (
+            db_session.query(CircuitDefinition)
+            .options(
+                selectinload(CircuitDefinition.slots)
+                .joinedload(CircuitSlot.activity_definition)
+                .selectinload(ActivityDefinition.metric_definitions)
+                .joinedload(MetricDefinition.fractal_metric),
+                selectinload(CircuitDefinition.slots)
+                .joinedload(CircuitSlot.activity_definition)
+                .selectinload(ActivityDefinition.split_definitions),
+            )
+            .filter(
+                CircuitDefinition.root_id == root_id,
+                CircuitDefinition.id.in_({item.get('circuit_definition_id') for item in prescribed}),
+            )
+            .all()
+        )
+    }
+    for item in prescribed:
+        circuit = circuits.get(item.get('circuit_definition_id'))
+        if circuit is None:
+            raise ValueError('Circuit plan: circuit not found')
+        slots = {slot.id: slot for slot in circuit.slots}
+        for round_index, planned_round in enumerate(item['prescription'].get('rounds') or []):
+            for planned_slot in planned_round.get('slots') or []:
+                slot = slots.get(planned_slot['slot_id'])
+                path = f'{circuit.name} round {round_index + 1}'
+                if slot is None:
+                    raise ValueError(f'{path}: activity is not part of this circuit')
+                _check_metric_entries(slot.activity_definition, planned_slot.get('metrics') or [], path)
+
+
+def _check_tag_ids(definition, tag_ids, path: str) -> None:
+    """Planned tags must be active tag bindings of the item's activity."""
+    if not tag_ids:
+        return
+    available = {tag.id for tag in (definition.tags or []) if tag.deleted_at is None and not tag.catalog_archived}
+    if any(tag_id not in available for tag_id in tag_ids):
+        raise ValueError(f'{path}: one or more tags are unavailable for {definition.name}')
+
+
 def check_section_prescriptions(db_session, root_id, sections) -> None:
     """Raise ValueError when any structurally valid prescription is semantically wrong.
 
     Items whose activity no longer exists keep their prescription untouched; they are
     skipped at session creation exactly like un-prescribed deleted activities.
     """
+    _check_circuit_prescriptions(db_session, root_id, sections)
     prescribed = [item for item in iter_activity_items(sections) if item.get('prescription')]
     if not prescribed:
         return
@@ -102,7 +160,9 @@ def check_section_prescriptions(db_session, root_id, sections) -> None:
             raise ValueError(f'{path}: {definition.name} is planned per set')
         for set_index, planned_set in enumerate(prescription.get('sets') or []):
             _check_metric_entries(definition, planned_set.get('metrics') or [], f'{path} set {set_index + 1}')
+            _check_tag_ids(definition, planned_set.get('tags'), f'{path} set {set_index + 1}')
         _check_metric_entries(definition, prescription.get('metrics') or [], path)
+        _check_tag_ids(definition, prescription.get('tags'), path)
 
 
 def snapshot_prescription(prescription: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -110,7 +170,18 @@ def snapshot_prescription(prescription: Optional[Dict[str, Any]]) -> Optional[Di
     return copy.deepcopy(prescription) if prescription else None
 
 
-def planned_set_count(prescription: Optional[Dict[str, Any]]) -> int:
-    if not prescription:
-        return 0
-    return len(prescription.get('sets') or [])
+def load_planned_tags(db_session, root_id, activity_definition_id, tag_ids):
+    """Active tag bindings of one activity, by id, for applying planned tags at creation.
+
+    Tags archived or removed since planning are skipped rather than failing the session.
+    """
+    if not tag_ids:
+        return []
+    rows = db_session.query(ActivityTag).filter(
+        ActivityTag.root_id == root_id,
+        ActivityTag.activity_definition_id == activity_definition_id,
+        ActivityTag.id.in_(tag_ids),
+        ActivityTag.deleted_at.is_(None),
+    ).all()
+    by_id = {row.id: row for row in rows if not row.catalog_archived}
+    return [by_id[tag_id] for tag_id in tag_ids if tag_id in by_id]

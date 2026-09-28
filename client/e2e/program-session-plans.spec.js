@@ -16,23 +16,59 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
 
     await page.goto(`/${rootId}/programs`);
     await page.getByRole('tab', { name: 'Days' }).click();
-    const card = page.getByRole('article', { name: 'Bench Day plan' });
+    // Today is the latest program day; next week's sits beside it.
+    const cards = page.getByRole('article', { name: /^Bench Day plan/ });
+    await expect(cards).toHaveCount(2);
+    const card = cards.first();
     await expect(card).toContainText('Template default');
+    const benchKey = `[data-align-key*="|a:browser-plan-bench-${suffix}#0"]`;
+    const bench = card.locator(benchKey);
 
     // Week 1: two planned sets at 100 kg.
-    await card.getByRole('button', { name: '+ Add set' }).click();
-    const firstWeight = card.getByLabel('Set 1 planned Weight');
+    await bench.getByRole('button', { name: '+ Add set' }).click();
+    const firstWeight = bench.getByLabel('Set 1 planned Weight');
     await firstWeight.fill('100');
     await firstWeight.press('Enter');
-    await card.getByRole('button', { name: '+ Add set' }).click();
+    await bench.getByRole('button', { name: '+ Add set' }).click();
+
+    // Picking a set scopes the note and tags to it: its highlight stays inside the set table
+    // (nothing clipped), and its tag button sits just left of its remove button.
+    await bench.getByRole('button', { name: 'Set 1', exact: true }).click();
+    await expect(bench.getByLabel('Note for Bench Press · Set 1')).toBeVisible();
+    const [table, selectedSet, setTag, setRemove] = await Promise.all([
+        bench.getByRole('group', { name: 'Planned sets' }),
+        bench.locator('[data-scope-row][data-selected="true"]'),
+        bench.getByRole('group', { name: 'Set tags' }).getByRole('button', { name: 'Add tag' }),
+        bench.getByRole('button', { name: 'Remove planned set 1' }),
+    ].map((locator) => locator.boundingBox()));
+    expect(selectedSet.x).toBeGreaterThanOrEqual(table.x);
+    expect(selectedSet.x + selectedSet.width).toBeLessThanOrEqual(table.x + table.width + 0.5);
+    expect(setTag.x + setTag.width).toBeLessThanOrEqual(setRemove.x);
+    expect(Math.abs((setTag.y + setTag.height / 2) - (setRemove.y + setRemove.height / 2))).toBeLessThanOrEqual(2);
+    // Clicking the activity's own container scopes back to the whole activity.
+    await bench.getByText('Bench Press', { exact: true }).click();
+    await expect(bench.getByLabel('Coaching note for Bench Press')).toBeVisible();
+
     await card.getByRole('button', { name: 'Save plan' }).click();
     await expect(card).toContainText('Planned');
 
-    // Week 2 starts from week 1, showing its values as placeholders.
-    await page.getByRole('button', { name: 'Next date' }).click();
-    const nextCard = page.getByRole('article', { name: 'Bench Day plan' });
+    // Next week, in the neighbouring column, now starts from week 1 with its values as placeholders.
+    const nextCard = cards.nth(1);
     await expect(nextCard).toContainText('Starts from');
-    await expect(nextCard.getByLabel('Set 2 planned Weight')).toHaveAttribute('placeholder', '100');
+    await expect(nextCard.locator(benchKey).getByLabel('Set 2 planned Weight')).toHaveAttribute('placeholder', '100');
+
+    if (suffix === 'desktop') {
+        // A third set on next week's Bench Press makes that card taller; the Barbell Row rows
+        // below still line up side by side.
+        await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
+        const rowKey = `[data-align-key*="|a:browser-plan-row-${suffix}#0"]`;
+        await expect(async () => {
+            const [left, right] = await Promise.all([card, nextCard].map((plan) => plan.locator(rowKey).boundingBox()));
+            expect(Math.abs(left.y - right.y)).toBeLessThanOrEqual(1);
+        }).toPass();
+        await nextCard.getByRole('button', { name: 'Discard' }).click();
+    }
+
 
     // Today's session executes the plan; the planned value is a reference beside the input.
     await page.goto(
@@ -50,4 +86,21 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
     // Set 1 is now under plan; set 2 is still waiting for a value.
     await expect(page.getByTitle('Planned 100 · under plan')).toHaveCount(1);
     await expect(page.getByTitle('Planned 100', { exact: true })).toHaveCount(1);
+
+    // Back on the Days tab, today's template shows the session that is completing it, as on
+    // the Sessions page, beside next week's plan.
+    if (suffix === 'desktop') {
+        await page.goto(`/${rootId}/programs`);
+        await page.getByRole('tab', { name: 'Days' }).click();
+        const sessionCard = page.getByRole('article', { name: 'Bench Day session' });
+        const nextPlan = page.getByRole('article', { name: /^Bench Day plan/ });
+        await expect(sessionCard).toHaveCount(1);
+        await expect(nextPlan).toHaveCount(1);
+        // The session's Barbell Row lines up with the same activity in next week's plan.
+        const rowKey = `[data-align-key*="|a:browser-plan-row-${suffix}#0"]`;
+        await expect(async () => {
+            const [left, right] = await Promise.all([sessionCard, nextPlan].map((card) => card.locator(rowKey).boundingBox()));
+            expect(Math.abs(left.y - right.y)).toBeLessThanOrEqual(1);
+        }).toPass();
+    }
 });

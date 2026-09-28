@@ -12,6 +12,7 @@ const changedRootQueryKeys = (rootId) => [
     queryKeys.programCalendarRoot(rootId),
     ['program', rootId],
     queryKeys.programDayReadModelRoot(rootId),
+    queryKeys.programSessionPlansRoot(rootId),
     queryKeys.sessions(rootId),
     queryKeys.sessionRoot(rootId),
     queryKeys.sessionTemplates(rootId),

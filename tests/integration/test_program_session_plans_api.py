@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import pytest
 
@@ -16,7 +16,8 @@ from models import (
     SessionTemplate,
     User,
 )
-from services.program_session_plans import CANDIDATE_LOOKBACK_DAYS, merge_template_changes
+from services.plan_sections import merge_template_changes, typed_template_sections
+from services.program_session_plans import CANDIDATE_LOOKBACK_DAYS, MAX_OCCURRENCE_WINDOW_DAYS
 from tests.conftest import session_headers_for
 
 
@@ -35,20 +36,25 @@ def _plan(weight, reps, *values, notes=None):
 
 @pytest.fixture
 def plan_world(db_session, test_user, sample_goal_hierarchy, sample_activity_definition):
-    """A weekly 'Upper A' day on Mondays for four weeks, using one Bench template."""
+    """A weekly 'Upper A' day on Mondays using one Bench template.
+
+    ``mondays`` are the next four Mondays (plannable); ``past_mondays`` are the two before
+    this week's, which are read-only history.
+    """
     root = sample_goal_hierarchy['ultimate']
     today = datetime.now(timezone.utc).date()
-    first_monday = today - timedelta(days=today.weekday()) - timedelta(days=7)
+    this_monday = today - timedelta(days=today.weekday())
+    first_monday = this_monday - timedelta(days=14)
+    last_day = this_monday + timedelta(days=7 * 4 + 6)
     program = Program(
         root_id=root.id, name='Strength',
         start_date=datetime.combine(first_monday, time.min),
-        end_date=datetime.combine(first_monday + timedelta(days=27), time.max),
+        end_date=datetime.combine(last_day, time.max),
         weekly_schedule={},
     )
     db_session.add(program)
     db_session.flush()
-    block = ProgramBlock(program_id=program.id, name='Block 1',
-                         start_date=first_monday, end_date=first_monday + timedelta(days=27))
+    block = ProgramBlock(program_id=program.id, name='Block 1', start_date=first_monday, end_date=last_day)
     db_session.add(block)
     db_session.flush()
     by_name = {metric.name: metric for metric in sample_activity_definition.metric_definitions}
@@ -69,10 +75,11 @@ def plan_world(db_session, test_user, sample_goal_hierarchy, sample_activity_def
     db_session.flush()
     db_session.add(ProgramDayTemplate(program_day_id=day.id, session_template_id=template.id, is_required=True, order=0))
     db_session.commit()
-    mondays = [first_monday + timedelta(days=7 * week) for week in range(4)]
+    mondays = [this_monday + timedelta(days=7 * week) for week in range(1, 5)]
+    past_mondays = [first_monday, first_monday + timedelta(days=7)]
     return {
         'root': root, 'program': program, 'block': block, 'day': day, 'template': template,
-        'mondays': mondays, 'weight': by_name['Weight'], 'reps': by_name['Reps'],
+        'mondays': mondays, 'past_mondays': past_mondays, 'weight': by_name['Weight'], 'reps': by_name['Reps'],
         'activity': sample_activity_definition,
     }
 
@@ -91,6 +98,14 @@ def _day_plans(client, world, plan_date):
     )
     assert response.status_code == 200, response.get_json()
     return response.get_json()['plans'][0]
+
+
+def _occurrences(client, world, query=''):
+    """The world's program day dates from the program-wide occurrence listing."""
+    response = client.get(f"/api/{world['root'].id}/programs/{world['program'].id}/plan-occurrences{query}")
+    assert response.status_code == 200, response.get_json()
+    [day] = [entry for entry in response.get_json()['days'] if entry['day_id'] == world['day'].id]
+    return day['dates']
 
 
 def _save(client, world, plan_date, sections, row_version=None):
@@ -198,12 +213,10 @@ def test_dormant_plans_neither_show_nor_seed(authed_client, db_session, plan_wor
     db_session.commit()
 
     entry = _day_plans(authed_client, plan_world, week2)
-    occurrences = authed_client.get(
-        f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/days/{day.id}/plan-occurrences"
-    ).get_json()
+    occurrences = _occurrences(authed_client, plan_world)
 
     assert entry['source'] == 'template'
-    assert [row['date'] for row in occurrences['dates']] == [week2.isoformat()]
+    assert [row['date'] for row in occurrences] == [week2.isoformat()]
 
 
 def test_occurrence_strip_reports_plan_states(authed_client, db_session, test_user, plan_world):
@@ -215,23 +228,26 @@ def test_occurrence_strip_reports_plan_states(authed_client, db_session, test_us
                            template_id=plan_world['template'].id, program_session_plan_id=week1_plan['plan_id']))
     db_session.commit()
 
-    response = authed_client.get(
-        f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/days/{plan_world['day'].id}/plan-occurrences"
-    )
-
-    states = [row['templates'][0]['state'] for row in response.get_json()['dates']]
-    assert states == ['executed', 'planned', 'seeded', 'seeded']
+    states = {row['date']: row['templates'][0]['state'] for row in _occurrences(authed_client, plan_world)}
+    assert [states[monday.isoformat()] for monday in plan_world['mondays']] == ['executed', 'planned', 'seeded', 'seeded']
+    assert states[plan_world['past_mondays'][0].isoformat()] == 'seeded'
 
 
-def test_occurrence_window_is_bounded(authed_client, plan_world):
-    base = (
-        f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/days/{plan_world['day'].id}"
-        "/plan-occurrences"
-    )
-    start = plan_world['mondays'][0]
-    assert authed_client.get(f"{base}?start={start}&end={start + timedelta(days=369)}").status_code == 200
-    assert authed_client.get(f"{base}?start={start}&end={start + timedelta(days=370)}").status_code == 400
+def test_occurrence_window_covers_the_program_and_caps_very_long_ones():
+    from services.program_session_plans import ProgramSessionPlanService as Service
 
+    today = date(2026, 9, 27)
+    short = Program(start_date=datetime(2026, 9, 1), end_date=datetime(2026, 10, 31))
+    assert Service._occurrence_window(short, today) == (date(2026, 9, 1), date(2026, 10, 31))
+
+    long = Program(start_date=datetime(2025, 1, 1), end_date=datetime(2027, 12, 31))
+    start, end = Service._occurrence_window(long, today)
+    assert (end - start).days + 1 == MAX_OCCURRENCE_WINDOW_DAYS
+    assert start <= today <= end
+
+    ending_soon = Program(start_date=datetime(2024, 1, 1), end_date=datetime(2026, 10, 1))
+    start, end = Service._occurrence_window(ending_soon, today)
+    assert end == date(2026, 10, 1) and (end - start).days + 1 == MAX_OCCURRENCE_WINDOW_DAYS
 
 def test_session_from_virtual_plan_materializes_it_and_snapshots_values(
     authed_client, db_session, plan_world,
@@ -359,7 +375,9 @@ def test_other_users_cannot_read_or_write_plans(client, db_session, plan_world):
     base = f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/days/{plan_world['day'].id}"
 
     assert client.get(f"{base}/plans?date={monday}", headers=headers).status_code == 404
-    assert client.get(f"{base}/plan-occurrences", headers=headers).status_code == 404
+    assert client.get(
+        f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/plan-occurrences", headers=headers,
+    ).status_code == 404
     assert client.put(_plan_url(plan_world, monday), headers=headers,
                       json={'sections': [{'name': 'Main', 'items': []}]}).status_code == 404
     assert client.delete(_plan_url(plan_world, monday), headers=headers).status_code == 404
@@ -377,3 +395,88 @@ def test_deleting_the_program_day_cascades_plans(authed_client, db_session, plan
     db_session.commit()
 
     assert db_session.query(ProgramSessionPlan).count() == 0
+
+
+def test_occurrences_report_canonical_status_and_credited_sessions(authed_client, db_session, test_user, plan_world):
+    week1, week2 = plan_world['past_mondays'][-1], plan_world['mondays'][0]
+    started = datetime.combine(week1, time(12), tzinfo=timezone.utc)
+    session = Session(
+        owner_id=test_user.id, root_id=plan_world['root'].id, name='Bench done',
+        template_id=plan_world['template'].id, completed=True,
+        session_start=started, session_end=started + timedelta(hours=1),
+        completed_at=started + timedelta(hours=1),
+    )
+    db_session.add(session)
+    db_session.commit()
+
+    dates = {row['date']: row for row in _occurrences(authed_client, plan_world, '?timezone=UTC')}
+    assert dates[week1.isoformat()]['program_day_completed'] is True
+    assert dates[week1.isoformat()]['closed'] is True
+    assert [item['name'] for item in dates[week1.isoformat()]['sessions']] == ['Bench done']
+    assert dates[week2.isoformat()]['program_day_completed'] is False
+    assert dates[week2.isoformat()]['sessions'] == []
+
+
+def test_invalid_timezone_is_rejected(authed_client, plan_world):
+    response = authed_client.get(
+        f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/plan-occurrences?timezone=Not/AZone"
+    )
+    assert response.status_code == 400
+
+
+def test_legacy_activity_lists_keep_circuits_and_stable_keys():
+    template = SessionTemplate(template_data=json.dumps({'sections': [{'name': 'Exercises', 'activities': [
+        {'type': 'circuit', 'circuit_definition_id': 'circ-1'},
+        {'activity_id': 'act-1', 'name': 'Shoulder Rehab', 'type': 'activity'},
+        'act-2',
+    ]}]}))
+
+    items = typed_template_sections(template)[0]['items']
+
+    assert items == [
+        {'type': 'circuit', 'circuit_definition_id': 'circ-1', 'item_key': 'legacy-0-0'},
+        {'type': 'activity', 'activity_definition_id': 'act-1', 'name': 'Shoulder Rehab', 'item_key': 'legacy-0-1'},
+        {'type': 'activity', 'activity_definition_id': 'act-2', 'item_key': 'legacy-0-2'},
+    ]
+    assert typed_template_sections(template)[0]['items'] == items
+
+
+def test_day_plans_list_the_sessions_that_completed_each_template(authed_client, db_session, test_user, plan_world):
+    week1 = plan_world['past_mondays'][-1]
+    started = datetime.combine(week1, time(12), tzinfo=timezone.utc)
+    session = Session(
+        owner_id=test_user.id, root_id=plan_world['root'].id, name='Bench done',
+        template_id=plan_world['template'].id, completed=True,
+        session_start=started, session_end=started + timedelta(hours=1), completed_at=started + timedelta(hours=1),
+    )
+    db_session.add(session)
+    db_session.commit()
+    base = f"/api/{plan_world['root'].id}/programs/{plan_world['program'].id}/days/{plan_world['day'].id}/plans"
+
+    entry = authed_client.get(f"{base}?date={week1.isoformat()}&timezone=UTC").get_json()['plans'][0]
+
+    assert entry['logged_sessions'] == [{'id': session.id, 'name': 'Bench done', 'completed': True}]
+    future = plan_world['mondays'][3]
+    assert authed_client.get(f"{base}?date={future.isoformat()}&timezone=UTC").get_json()['plans'][0]['logged_sessions'] == []
+
+def test_past_program_days_are_read_only(authed_client, plan_world):
+    past = plan_world['past_mondays'][-1]
+    entry = _day_plans(authed_client, plan_world, past)
+
+    save = authed_client.put(_plan_url(plan_world, past) + '?timezone=UTC', json={'sections': entry['sections']})
+    reset = authed_client.delete(_plan_url(plan_world, past) + '?timezone=UTC')
+    pull = authed_client.post(_plan_url(plan_world, past, '/pull-template') + '?timezone=UTC', json={})
+
+    assert [response.status_code for response in (save, reset, pull)] == [409, 409, 409]
+    assert "can't be re-planned" in save.get_json()['error']
+    # The next upcoming date stays plannable.
+    upcoming = plan_world['mondays'][0]
+    assert _save(authed_client, plan_world, upcoming, _day_plans(authed_client, plan_world, upcoming)['sections']).status_code == 200
+
+
+def test_plan_writes_reject_an_invalid_timezone(authed_client, plan_world):
+    upcoming = plan_world['mondays'][0]
+    sections = _day_plans(authed_client, plan_world, upcoming)['sections']
+    response = authed_client.put(_plan_url(plan_world, upcoming) + '?timezone=Not/AZone', json={'sections': sections})
+    assert response.status_code == 400
+    assert response.get_json()['error'] == 'Invalid timezone'

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { getCircuitRoundEntries } from '../../utils/prescriptionModel';
 import { collectCircuitAvailableTags } from './CircuitTagControls';
 import { getCircuitNotes, getCircuitNoteTarget } from './circuitNoteTarget';
 
@@ -34,5 +35,19 @@ export default function useCircuitRunDerivedState({
     );
     const circuitNotes = useMemo(() => getCircuitNotes(run, allNotes), [allNotes, run]);
 
-    return { slotById, instanceById, definitionById, circuitAvailableTags, noteTarget, circuitNotes };
+    // The run's plan (snapshotted at session creation): a round's note and a member's values.
+    const plan = run.prescription || null;
+    const roundPlanNote = (round) => plan?.rounds?.[round.round_number - 1]?.notes || null;
+    const plannedMemberValues = (round, slot) => getCircuitRoundEntries(plan, round.round_number - 1, slot?.source_slot_id);
+
+    return {
+        slotById,
+        instanceById,
+        definitionById,
+        circuitAvailableTags,
+        noteTarget,
+        circuitNotes,
+        roundPlanNote,
+        plannedMemberValues,
+    };
 }

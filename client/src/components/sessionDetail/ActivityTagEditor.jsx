@@ -24,7 +24,13 @@ function ActivityTagEditor({
     inheritedTags = [],
     editable = true,
     triggerFirst = false,
+    // Controlled mode (planned tags): the ids live in the caller's draft and nothing is
+    // assigned through the API. Creating a tag still adds it to the activity's catalog.
+    selectedTagIds = null,
+    onChangeTags = null,
+    setScope = false,
 }) {
+    const isSetScope = Boolean(setId) || setScope;
     const assignmentKey = setId || instanceId;
     const editorRef = useRef(null);
     const pickerRef = useRef(null);
@@ -54,9 +60,12 @@ function ActivityTagEditor({
         assignSetTags,
         isPending,
     } = useActivityTagMutations(rootId, activityId);
-    const selectedIds = optimisticSelection?.assignmentKey === assignmentKey
-        ? optimisticSelection.ids
-        : tags.map((tag) => tag.id);
+    const isControlled = typeof onChangeTags === 'function';
+    const selectedIds = isControlled
+        ? (selectedTagIds || [])
+        : optimisticSelection?.assignmentKey === assignmentKey
+            ? optimisticSelection.ids
+            : tags.map((tag) => tag.id);
     const pendingCreatedTags = createdTags.activityId === activityId ? createdTags.tags : [];
     const availableTagIds = new Set(availableTags.map((tag) => tag.id));
     const knownTagIds = new Set([...availableTagIds, ...pendingCreatedTags.map((tag) => tag.id)]);
@@ -136,6 +145,10 @@ function ActivityTagEditor({
     }, [assignableTags.length, closePicker, isPickerOpen]);
 
     const persist = async (nextIds) => {
+        if (isControlled) {
+            onChangeTags(nextIds);
+            return;
+        }
         const generation = assignmentGenerationRef.current + 1;
         assignmentGenerationRef.current = generation;
         setOptimisticSelection({ assignmentKey, ids: nextIds });
@@ -286,10 +299,10 @@ function ActivityTagEditor({
 
     return (
         <div
-            className={`${styles.editor} ${setId ? styles.setEditor : styles.instanceEditor} ${className}`}
+            className={`${styles.editor} ${isSetScope ? styles.setEditor : styles.instanceEditor} ${className}`}
             ref={editorRef}
             role="group"
-            aria-label={setId ? 'Set tags' : 'Activity tags'}
+            aria-label={isSetScope ? 'Set tags' : 'Activity tags'}
             onClick={(event) => event.stopPropagation()}
         >
             <div className={styles.tags} ref={tagOverflow.containerRef}>
@@ -326,7 +339,7 @@ function ActivityTagEditor({
                 {triggerFirst ? null : addTagTrigger}
             </div>
             {editable && isPickerOpen && createPortal(
-                <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={setId ? 'Choose set tags' : 'Choose activity tags'}>
+                <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={isSetScope ? 'Choose set tags' : 'Choose activity tags'}>
                     <div className={styles.pickerHeader}>
                         <span>Choose tags</span>
                         <CloseButton size={14} buttonSize="sm" className={styles.pickerClose} aria-label="Close tag picker" onClick={() => closePicker()} />

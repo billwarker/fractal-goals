@@ -20,7 +20,7 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import { flattenGoals } from '../utils/goalHelpers';
-import { formatDateInTimezone } from '../utils/dateUtils';
+import { formatSessionCardDate } from '../utils/sessionCardDates';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
@@ -234,24 +234,10 @@ function Sessions() {
         return allGoals;
     }, [goalTree]);
 
-    const formatDate = useCallback((dateString, options = {}) => {
-        if (!dateString) return '';
-        if (typeof dateString === 'string' && dateString.length === 10 && dateString.includes('-') && !dateString.includes('T')) {
-            const [year, month, day] = dateString.split('-').map(Number);
-            const date = new Date(year, month - 1, day);
-            return date.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-            });
-        }
-        return formatDateInTimezone(dateString, timezone, {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-            ...options,
-        });
-    }, [timezone]);
+    const formatDate = useCallback(
+        (dateString, options = {}) => formatSessionCardDate(dateString, timezone, options),
+        [timezone],
+    );
 
     const handleSessionSelect = useCallback((sessionId) => {
         setSelectedSessionId(sessionId);

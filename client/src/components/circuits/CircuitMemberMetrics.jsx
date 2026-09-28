@@ -6,6 +6,9 @@ import { isMetricValueEmpty, normalizeMetricValueForStorage } from '../../utils/
 import ProgressHint from '../common/ProgressHint';
 import MetricCascadeButton from '../common/MetricCascadeButton';
 import MetricValueEditor from '../sessionDetail/MetricValueEditor';
+import PlannedValueChip from '../sessionDetail/PlannedValueChip';
+import { getEntryValue } from '../../utils/prescriptionModel';
+import { evaluatePlannedMetric, formatPlannedValue } from '../../utils/sessionPrescription';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 import styles from './CircuitRunCard.module.css';
 
@@ -27,6 +30,8 @@ export default function CircuitMemberMetrics({
     canCascade,
     onCascade,
 }) {
+    // `progress.planned`: this round's planned values for the member, if the circuit was planned.
+    const planned = progress?.planned || EMPTY_METRICS;
     const { progressSettings } = useRootProgressSettings(rootId);
     const draftsRef = useRef({});
     const [localMetrics, setLocalMetrics] = useState(metrics);
@@ -93,6 +98,22 @@ export default function CircuitMemberMetrics({
         return true;
     };
 
+    // The planned value for this round's member, beside the progress hint (as on activities).
+    const renderPlanned = (metric, split, currentValue) => {
+        const plannedValue = getEntryValue(planned, metric.id, split?.id ?? null);
+        if (plannedValue == null) return null;
+        return (
+            <PlannedValueChip
+                label={formatPlannedValue(metric, plannedValue)}
+                state={evaluatePlannedMetric({
+                    planned: plannedValue,
+                    actual: currentValue,
+                    higherIsBetter: metric.higher_is_better,
+                })}
+            />
+        );
+    };
+
     const renderMetric = (metric, split = null) => {
         const key = metricKey(metric.id, split?.id);
         const inputId = `circuit-metric-${memberId}-${key}`;
@@ -119,12 +140,15 @@ export default function CircuitMemberMetrics({
                         metaClassName={isSplitMetric ? activityStyles.metricMeta : activityStyles.metricMetaLarge}
                         unitClassName={isSplitMetric ? activityStyles.metricUnit : activityStyles.metricUnitLarge}
                         progress={(
-                            <ProgressHint
-                                metricId={metric.id}
-                                setIndex={progress?.setIndex}
-                                progressComparison={progress?.comparison}
-                                displayMode={resolveEffectiveDeltaDisplayMode(definition, progressSettings)}
-                            />
+                            <>
+                                <ProgressHint
+                                    metricId={metric.id}
+                                    setIndex={progress?.setIndex}
+                                    progressComparison={progress?.comparison}
+                                    displayMode={resolveEffectiveDeltaDisplayMode(definition, progressSettings)}
+                                />
+                                {renderPlanned(metric, split, currentValue)}
+                            </>
                         )}
                         disabled={disabled || saving}
                         inputId={inputId}

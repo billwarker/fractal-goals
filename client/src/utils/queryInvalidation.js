@@ -13,6 +13,8 @@ export function invalidateSessionLists(queryClient, rootId, queryKeys, options =
         queryKeys.sessionsAll(rootId),
         queryKeys.sessionsPaginated(rootId),
         queryKeys.programMetricsRoot(rootId),
+        // Days-tab occurrence statuses and executed plans follow session changes.
+        queryKeys.programSessionPlansRoot(rootId),
     ], options);
 }
 

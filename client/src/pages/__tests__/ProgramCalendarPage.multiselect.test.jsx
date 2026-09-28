@@ -134,6 +134,9 @@ vi.mock('../../hooks/useProgramDayReadModel', () => ({
     useSetProgramDaySessionCredit: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 const openPeriodEditor = vi.fn();
+vi.mock('../../hooks/useProgramSessionPlans', () => ({
+    useProgramPlanOccurrences: () => ({ data: undefined, isLoading: false, error: null }),
+}));
 vi.mock('../../hooks/useCalendarPeriods', () => ({
     useCalendarPeriods: () => ({ data: [] }),
     useCalendarPeriodEditor: () => ({

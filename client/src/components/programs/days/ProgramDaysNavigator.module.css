@@ -1,0 +1,106 @@
+.navigator {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 12px 14px 20px;
+}
+
+.empty {
+    margin: 0;
+    padding: 16px 14px;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.block {
+    margin: 0;
+    padding-left: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    border-left: 3px solid var(--block-color);
+}
+
+.days {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.day {
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.day:not(.daySelected):hover {
+    background: var(--color-bg-hover);
+    border-color: var(--color-border);
+}
+
+.daySelected {
+    background: var(--color-bg-selected);
+    border-color: var(--color-border-active);
+}
+
+.dayName {
+    display: block;
+    width: 100%;
+    padding: 6px 8px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: left;
+    color: var(--color-text-primary);
+    background: none;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.daySelected .dayName {
+    font-weight: 600;
+}
+
+.dayName:hover {
+    background: var(--color-bg-hover);
+}
+
+.templates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0;
+    padding: 0 8px 6px;
+    list-style: none;
+}
+
+.template {
+    display: inline-flex;
+    max-width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.dayName:focus-visible,
+.template:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
