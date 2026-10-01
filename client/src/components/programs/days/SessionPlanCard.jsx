@@ -21,7 +21,6 @@ import {
     setPlanItemPrescription,
 } from '../../../utils/sessionPlanDraft';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
-import { PlannedCircuitTable, PlannedValuesTable } from './ValuesTables';
 import styles from './ProgramDaysView.module.css';
 
 function errorMessage(error) {
@@ -228,31 +227,32 @@ export default function SessionPlanCard({
                                         </span>
                                     ) : null}
                                 </div>
-                                {definition && readOnly ? (
-                                    <PlannedValuesTable definition={definition} prescription={item.prescription} />
-                                ) : null}
-                                {definition && !readOnly ? (
+                                {definition ? (
+                                    // A past day shows the same fields, read-only, so it lines up beside a live plan.
                                     <PrescriptionEditor
                                         rootId={rootId}
                                         definition={definition}
                                         itemName={name}
                                         active={isSelected}
-                                        showItemTags={false}
+                                        readOnly={readOnly}
+                                        emptyText="No planned values."
+                                        showItemTags={readOnly}
                                         selectedSetIndex={rowScope.selectedIndex}
                                         onSelectSet={rowScope.onSelect}
                                         value={item.prescription || null}
                                         previous={previousByKey.get(item.item_key) || null}
                                         idPrefix={`plan-${templateId}-${item.item_key || itemIndex}`}
-                                        disabled={readOnly || isBusy}
+                                        disabled={isBusy}
                                         onChange={(prescription) => edit((current) => (
                                             setPlanItemPrescription(current, sectionIndex, itemIndex, prescription)
                                         ))}
                                     />
                                 ) : null}
-                                {circuit && !readOnly ? (
+                                {circuit && (!readOnly || item.prescription?.rounds?.length) ? (
                                     <CircuitPrescriptionEditor
                                         circuit={circuit}
                                         active={isSelected}
+                                        readOnly={readOnly}
                                         selectedRoundIndex={rowScope.selectedIndex}
                                         onSelectRound={rowScope.onSelect}
                                         activityById={activityById}
@@ -264,9 +264,6 @@ export default function SessionPlanCard({
                                             setPlanItemPrescription(current, sectionIndex, itemIndex, prescription)
                                         ))}
                                     />
-                                ) : null}
-                                {circuit && readOnly && item.prescription?.rounds?.length ? (
-                                    <PlannedCircuitTable circuit={circuit} activityById={activityById} prescription={item.prescription} />
                                 ) : null}
                                 {circuit?.slots?.length && readOnly && !item.prescription?.rounds?.length ? (
                                     <ol className={styles.circuitMembers} aria-label={`${name} activities`}>

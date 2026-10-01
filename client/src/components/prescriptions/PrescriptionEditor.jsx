@@ -45,6 +45,10 @@ function ghostValue(column, entries) {
  *
  * `previous` is the plan this one was seeded from; its values show as placeholders
  * so the user sees the step they are programming.
+ *
+ * `readOnly` shows values in the same layout and fields with nothing to edit: a past plan,
+ * or what a session logged (`valueKind="logged"`), so either lines up beside a live plan.
+ * `emptyText` replaces the layout when a read-only value has nothing in it.
  */
 export default function PrescriptionEditor({
     rootId,
@@ -59,18 +63,21 @@ export default function PrescriptionEditor({
     selectedSetIndex,
     onSelectSet = null,
     showItemTags = true,
+    readOnly = false,
+    valueKind = 'planned',
+    emptyText = null,
 }) {
     const columns = getPrescriptionColumns(definition);
     const hasSets = Boolean(definition?.has_sets);
     const sets = value?.sets || [];
     const { selectedIndex, clearSelection, rowProps } = usePlanRowSelection(
-        active,
+        active && !readOnly,
         hasSets ? sets.length : 0,
         onSelectSet ? { selectedIndex: selectedSetIndex ?? null, onSelect: onSelectSet } : null,
     );
     const activityTagIds = value?.tags || [];
     const activityTags = (definition?.tags || []).filter((tag) => activityTagIds.includes(tag.id));
-    const editable = active && !disabled;
+    const editable = active && !disabled && !readOnly;
     const name = itemName || definition?.name || 'this activity';
 
     const commitValue = (column, rawValue, setIndex = null) => {
@@ -92,11 +99,12 @@ export default function PrescriptionEditor({
                 metaClassName={styles.valueMeta}
                 unitClassName={styles.valueUnit}
                 inputId={`${idPrefix}-${setIndex ?? 'flat'}-${column.key}`}
-                ariaLabel={`${setIndex == null ? '' : `Set ${setIndex + 1} `}planned ${columnLabel(column)}`}
-                placeholder={ghostValue(column, previousEntries)}
+                ariaLabel={`${setIndex == null ? '' : `Set ${setIndex + 1} `}${valueKind} ${columnLabel(column)}`}
+                placeholder={readOnly ? undefined : ghostValue(column, previousEntries)}
                 disabled={disabled}
+                readOnly={readOnly}
                 onDraftChange={() => {}}
-                onCommit={(rawValue) => commitValue(column, rawValue, setIndex)}
+                onCommit={(rawValue) => (readOnly ? false : commitValue(column, rawValue, setIndex))}
             />
         </div>
     );
@@ -112,7 +120,13 @@ export default function PrescriptionEditor({
         />
     ) : null;
     // The scoped note is edited in the composer, so it isn't repeated above it.
-    const showActivityNote = Boolean(value?.notes) && !(active && selectedIndex == null);
+    const showActivityNote = Boolean(value?.notes) && !(active && !readOnly && selectedIndex == null);
+    const groupLabel = `${valueKind === 'logged' ? 'Logged' : 'Planned'} ${hasSets ? 'sets' : 'values'}`;
+
+    const hasContent = Boolean(value?.metrics?.length || sets.length || value?.notes || activityTagIds.length);
+    if (readOnly && emptyText && !hasContent) {
+        return <p className={styles.plannedNote}>{emptyText}</p>;
+    }
 
     return (
         <div
@@ -129,7 +143,7 @@ export default function PrescriptionEditor({
                 <div
                     className={styles.setTable}
                     role="group"
-                    aria-label="Planned sets"
+                    aria-label={groupLabel}
                     style={{ '--plan-columns': columns.length }}
                 >
                     <div className={styles.headerRow} aria-hidden="true">
@@ -148,19 +162,27 @@ export default function PrescriptionEditor({
                             // Planned sets have no identity beyond their position.
                             <div
                                 key={setIndex}
-                                className={`${styles.setBlock} ${isSelected ? styles.setBlockSelected : ''}`}
-                                {...rowProps(setIndex)}
+                                className={[
+                                    styles.setBlock,
+                                    readOnly ? styles.setBlockStatic : '',
+                                    isSelected ? styles.setBlockSelected : '',
+                                ].filter(Boolean).join(' ')}
+                                {...(readOnly ? {} : rowProps(setIndex))}
                             >
                                 <div className={styles.setRow}>
-                                    <Button
-                                        unstyled
-                                        className={styles.setToggle}
-                                        data-scope-toggle
-                                        aria-pressed={isSelected}
-                                        aria-label={`Set ${setIndex + 1}${isSelected ? ', selected' : ''}`}
-                                    >
-                                        S{setIndex + 1}
-                                    </Button>
+                                    {readOnly ? (
+                                        <span className={styles.setToggle}>S{setIndex + 1}</span>
+                                    ) : (
+                                        <Button
+                                            unstyled
+                                            className={styles.setToggle}
+                                            data-scope-toggle
+                                            aria-pressed={isSelected}
+                                            aria-label={`Set ${setIndex + 1}${isSelected ? ', selected' : ''}`}
+                                        >
+                                            S{setIndex + 1}
+                                        </Button>
+                                    )}
                                     {columns.map((column) => renderValueCell(
                                         column,
                                         plannedSet.metrics,
@@ -178,36 +200,41 @@ export default function PrescriptionEditor({
                                             setScope
                                         />
                                     </span>
-                                    <IconButton
-                                        size="sm"
-                                        onClick={(event) => {
-                                            event.stopPropagation();
-                                            clearSelection();
-                                            onChange(withRemovedSet(value, setIndex));
-                                        }}
-                                        disabled={disabled}
-                                        aria-label={`Remove planned set ${setIndex + 1}`}
-                                    >
-                                        <CloseIcon size={12} />
-                                    </IconButton>
+                                    {/* Read-only keeps the remove column empty so values sit where a live plan's do. */}
+                                    {readOnly ? <span className={styles.rowActionSpacer} aria-hidden="true" /> : (
+                                        <IconButton
+                                            size="sm"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                clearSelection();
+                                                onChange(withRemovedSet(value, setIndex));
+                                            }}
+                                            disabled={disabled}
+                                            aria-label={`Remove planned set ${setIndex + 1}`}
+                                        >
+                                            <CloseIcon size={12} />
+                                        </IconButton>
+                                    )}
                                 </div>
                                 {showSetNote ? <p className={`${styles.plannedNote} ${styles.setNote}`}>{plannedSet.notes}</p> : null}
                             </div>
                         );
                     })}
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        className={styles.addSet}
-                        onClick={() => onChange(withAddedSet(value))}
-                        disabled={disabled || sets.length >= MAX_PRESCRIPTION_SETS}
-                    >
-                        + Add set
-                    </Button>
+                    {readOnly ? null : (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className={styles.addSet}
+                            onClick={() => onChange(withAddedSet(value))}
+                            disabled={disabled || sets.length >= MAX_PRESCRIPTION_SETS}
+                        >
+                            + Add set
+                        </Button>
+                    )}
                 </div>
             )}
             {columns.length > 0 && !hasSets && (
-                <div className={styles.flatRow} role="group" aria-label="Planned values">
+                <div className={styles.flatRow} role="group" aria-label={groupLabel}>
                     {columns.map((column) => (
                         <label key={column.key} className={styles.flatField}>
                             <span className={styles.columnLabel}>{columnLabel(column)}</span>
@@ -216,7 +243,7 @@ export default function PrescriptionEditor({
                     ))}
                 </div>
             )}
-            {active ? (
+            {active && !readOnly ? (
                 scopedSet ? (
                     <PlanNoteComposer
                         scopeKey={`set-${selectedIndex}`}

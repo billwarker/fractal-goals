@@ -7,7 +7,8 @@ import SessionTemplateNameBadge from '../../common/SessionTemplateNameBadge';
 import { queryKeys } from '../../../hooks/queryKeys';
 import { fractalApi } from '../../../utils/api';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
-import { ActivityValuesTable, CircuitValuesTable } from './ValuesTables';
+import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
+import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import styles from './ProgramDaysView.module.css';
 
 /** A session section's recorded work items, from hydrated typed items or legacy exercises. */
@@ -28,9 +29,12 @@ function activityIdOf(activity) {
     return activity.activity_id || activity.activity_definition_id;
 }
 
+const noop = () => {};
+
 /**
  * The session that completed a program day's template, in the plan card's layout: the
- * session's own sections with each activity's logged sets, and each circuit's logged rounds.
+ * session's own sections with each activity's logged sets, and each circuit's logged rounds,
+ * in the plan editors' read-only fields so they compare field for field with a plan.
  * Shares the session detail cache. `alignmentPrefix` (the template it completed) lines its
  * rows up with the same template's plan in the other column.
  */
@@ -73,14 +77,19 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
         const definition = activityById.get(activityIdOf(activity));
         if (!definition) return null;
         return (
-            <ActivityValuesTable
+            <PrescriptionEditor
+                rootId={rootId}
                 definition={definition}
-                values={{
+                value={{
                     sets: (activity.sets || []).map((loggedSet) => ({ metrics: loggedSet.metrics, notes: loggedSet.notes })),
                     metrics: activity.metrics || [],
                     notes: activity.notes || null,
                 }}
-                caption="Logged values"
+                onChange={noop}
+                idPrefix={`logged-${sessionId}-${activity.instance_id || activity.id}`}
+                active={false}
+                readOnly
+                valueKind="logged"
                 emptyText="No values logged."
             />
         );
@@ -94,16 +103,27 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
                 definition: activityById.get(slot.activity_definition_id)
                     || { ...(slot.activity_schema || {}), name: slot.activity_name },
             }));
-        const rounds = [...(run.rounds || [])].sort((left, right) => left.round_number - right.round_number);
+        // The logged rounds in the plan's shape, so the circuit editor shows them read-only.
+        const rounds = [...(run.rounds || [])]
+            .sort((left, right) => left.round_number - right.round_number)
+            .map((round) => ({
+                slots: slots.map((slot) => ({
+                    slot_id: slot.id,
+                    metrics: round.members?.find((member) => member.circuit_run_slot_id === slot.id)?.metrics || [],
+                })),
+                notes: null,
+            }));
+        if (!rounds.length) return <p className={styles.planEmpty}>No rounds logged.</p>;
         return (
-            <CircuitValuesTable
-                name={run.name}
+            <CircuitPrescriptionEditor
+                circuit={{ name: run.name }}
                 slots={slots}
-                roundCount={rounds.length}
-                entriesFor={(roundIndex, slotId) => (
-                    rounds[roundIndex]?.members?.find((member) => member.circuit_run_slot_id === slotId)?.metrics || []
-                )}
-                caption="Logged rounds"
+                value={{ rounds, notes: null }}
+                onChange={noop}
+                idPrefix={`logged-${sessionId}-${run.id}`}
+                active={false}
+                readOnly
+                valueKind="logged"
             />
         );
     };

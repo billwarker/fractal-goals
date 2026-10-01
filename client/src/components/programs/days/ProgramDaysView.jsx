@@ -16,11 +16,11 @@ import { plannableDayGroups } from './ProgramDaysNavigator';
 import styles from './ProgramDaysView.module.css';
 
 /**
- * Programs page Days tab main area: two columns, each under its own date rail. Rail B
- * (right) picks the date being planned, by default the next program day; rail A (left)
- * picks what to compare against, by default the latest completed day before it, so the
- * user programs each week from what they actually did. The day selector lives in the side
- * pane; narrow screens get a day select here instead. Plans are reference values.
+ * Programs page Days tab main area: one date column under its own rail, by default the next
+ * program day. With compare on (a side-pane toggle), a left column joins it with its own
+ * rail, by default the latest completed day before it, so the user programs each week from
+ * what they actually did. The day selector lives in the side pane; narrow screens get a day
+ * select here instead. Plans are reference values.
  */
 export default function ProgramDaysView({
     rootId,
@@ -123,7 +123,7 @@ export default function ProgramDaysView({
                 />
             ) : null}
             {columnDates.length ? (
-                <div className={styles.columns} ref={columnsRef}>
+                <div className={`${styles.columns} ${compareDate ? '' : styles.columnsSingle}`} ref={columnsRef}>
                     {columnDates.map((value) => (
                         <PlanDateColumn
                             key={value === date ? 'focus' : 'compare'}
@@ -133,7 +133,8 @@ export default function ProgramDaysView({
                                     selectedDate={value}
                                     blockedDate={value === date ? compareDate : date}
                                     today={today}
-                                    label={value === date ? 'Right column dates' : 'Left column dates'}
+                                    label={!compareDate ? 'Program day dates'
+                                        : value === date ? 'Right column dates' : 'Left column dates'}
                                     onSelect={(nextDate) => onSelectionChange((current) => ({
                                         ...current,
                                         dayId: found.day.id,

@@ -12,13 +12,15 @@ export function plannableDayGroups(blocks) {
 /**
  * Side-pane selector for the Days tab: program days grouped by block, each with its
  * templates. Choosing a template selects its day and brings that template's plan into view;
- * each column's date rail lives in the main area.
+ * each column's date rail lives in the main area. The compare toggle adds a second column.
  */
 export default function ProgramDaysNavigator({
     blocks,
     selectedDayId,
     onSelectDay,
     onSelectTemplate,
+    compare = false,
+    onCompareChange,
 }) {
     const groups = plannableDayGroups(blocks);
     if (!groups.length) {
@@ -26,6 +28,16 @@ export default function ProgramDaysNavigator({
     }
     return (
         <nav className={styles.navigator} aria-label="Program days">
+            {onCompareChange ? (
+                <label className={styles.compareToggle}>
+                    <input
+                        type="checkbox"
+                        checked={compare}
+                        onChange={(event) => onCompareChange(event.target.checked)}
+                    />
+                    Compare two days
+                </label>
+            ) : null}
             {groups.map(({ block, days }) => (
                 <section key={block.id} className={styles.group} aria-labelledby={`days-block-${block.id}`}>
                     <h3

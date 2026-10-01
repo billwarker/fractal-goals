@@ -12,6 +12,37 @@
     color: var(--color-text-secondary);
 }
 
+.compareToggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    user-select: none;
+}
+
+.compareToggle input {
+    width: 15px;
+    height: 15px;
+    margin: 0;
+    accent-color: var(--color-brand-primary);
+    cursor: pointer;
+}
+
+.compareToggle:has(input:checked) {
+    color: var(--color-text-primary);
+}
+
+.compareToggle:has(input:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
 .group {
     display: flex;
     flex-direction: column;

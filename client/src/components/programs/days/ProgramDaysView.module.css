@@ -200,6 +200,24 @@
     align-items: start;
 }
 
+/* One date on its own: a readable width, centred in the area beside the side pane. */
+.columnsSingle {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 880px;
+    margin-inline: auto;
+}
+
+/* Its rail's dates centre between the arrows too. Auto margins collapse to zero once the
+   dates overflow, so a long rail still scrolls from its first date. */
+.columnsSingle .stripDates > li:first-child {
+    margin-left: auto;
+}
+
+.columnsSingle .stripDates > li:last-child {
+    margin-right: auto;
+}
+
 .column {
     display: flex;
     flex-direction: column;
@@ -410,55 +428,6 @@
 .planFooterActions {
     display: inline-flex;
     gap: 8px;
-}
-
-/* Logged values from the session that completed a program day. */
-.logged {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    overflow-x: auto;
-}
-
-.loggedTable {
-    border-collapse: collapse;
-    font-size: 13px;
-    font-variant-numeric: tabular-nums;
-}
-
-.loggedTable th {
-    padding: 2px 12px 2px 0;
-    font-size: 11px;
-    font-weight: 600;
-    text-align: left;
-    color: var(--color-text-muted);
-}
-
-.loggedTable tbody th {
-    font-size: 12px;
-    color: var(--color-text-secondary);
-}
-
-.loggedValue {
-    padding: 3px 12px 3px 0;
-    color: var(--color-text-primary);
-    white-space: nowrap;
-}
-
-.loggedUnit {
-    font-size: 11px;
-    color: var(--color-text-muted);
-}
-
-.loggedEmpty {
-    color: var(--color-text-tertiary);
-}
-
-.loggedNote {
-    margin: 0;
-    font-size: 12px;
-    color: var(--color-text-secondary);
 }
 
 .circuitMembers li + li {

@@ -21,6 +21,7 @@ export default function MetricValueEditor({
     progress = null,
     isDraft = false,
     disabled = false,
+    readOnly = false,
     inputId,
     placeholder,
     ariaLabel,
@@ -47,7 +48,7 @@ export default function MetricValueEditor({
                         aria-label={ariaLabel}
                         className={`${inputClassName} ${styles.metricSelect}`}
                         value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
-                        disabled={disabled}
+                        disabled={disabled || readOnly}
                         onChange={(event) => {
                             const nextValue = allowedValues.includes(event.target.value) ? event.target.value : '';
                             onDraftChange(nextValue);
@@ -71,6 +72,7 @@ export default function MetricValueEditor({
                         className={inputClassName}
                         defaultValue={formattedValue}
                         disabled={disabled}
+                        readOnly={readOnly}
                         onChange={(event) => {
                             const nextValue = event.target.value;
                             onDraftChange(nextValue);

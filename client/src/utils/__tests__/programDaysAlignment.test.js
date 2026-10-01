@@ -43,7 +43,17 @@ describe('Days tab column selection', () => {
         occurrence('2026-09-14', true), occurrence('2026-09-21', false), occurrence('2026-09-28', false),
         occurrence('2026-10-05', false), occurrence('2026-10-12', false),
     ]]]);
-    const resolve = (selection) => resolveDaysSelection({ blocks, occurrencesByDay, selection, today: '2026-10-01' });
+    const resolve = (selection) => resolveDaysSelection({
+        blocks, occurrencesByDay, selection, today: '2026-10-01', compare: true,
+    });
+
+    it('shows only the next day unless comparing', () => {
+        const single = resolveDaysSelection({
+            blocks, occurrencesByDay, selection: { dayId: 'd', compareDate: '2026-09-28' }, today: '2026-10-01',
+        });
+        expect(single.columnDates).toEqual(['2026-10-05']);
+        expect(single.compareDate).toBeNull();
+    });
 
     it('defaults to the latest completed day beside the next one', () => {
         expect(resolve(null).columnDates).toEqual(['2026-09-14', '2026-10-05']);
@@ -62,7 +72,9 @@ describe('Days tab column selection', () => {
 
     it('shows one column for a day with a single date', () => {
         const single = new Map([['d', [occurrence('2026-10-05', false)]]]);
-        expect(resolveDaysSelection({ blocks, occurrencesByDay: single, selection: null, today: '2026-10-01' }).columnDates)
+        expect(resolveDaysSelection({
+            blocks, occurrencesByDay: single, selection: null, today: '2026-10-01', compare: true,
+        }).columnDates)
             .toEqual(['2026-10-05']);
     });
 });

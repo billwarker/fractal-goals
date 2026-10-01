@@ -79,10 +79,10 @@ export function planCardElementId(templateId, date) {
  * The Days tab's resolved selection: the program day, its dates, and the two columns.
  * The right column (`date`, rail B) defaults to the next program day; the left column
  * (`compareDate`, rail A) defaults to the latest completed day before it, unless the user
- * picked one (or, with nothing earlier, the next date). A day with a single date shows
- * one column.
+ * picked one (or, with nothing earlier, the next date). Without `compare`, or for a day
+ * with a single date, only the right column shows.
  */
-export function resolveDaysSelection({ blocks, occurrencesByDay, selection, today }) {
+export function resolveDaysSelection({ blocks, occurrencesByDay, selection, today, compare = false }) {
     const dayId = selection?.dayId || pickDefaultDayId(blocks, today);
     const found = dayId ? findProgramDay(blocks, dayId) : null;
     const occurrences = (found && occurrencesByDay?.get(String(found.day.id))) || [];
@@ -97,7 +97,7 @@ export function resolveDaysSelection({ blocks, occurrencesByDay, selection, toda
         // Nothing earlier: compare against the next date so both rails stay available.
         return dates[dates.indexOf(date) + 1] || null;
     };
-    const compareDate = chosenCompare && chosenCompare !== date && dates.includes(chosenCompare)
+    const compareDate = !compare ? null : chosenCompare && chosenCompare !== date && dates.includes(chosenCompare)
         ? chosenCompare
         : fallbackCompare();
     const hasCompare = Boolean(compareDate && compareDate !== date);

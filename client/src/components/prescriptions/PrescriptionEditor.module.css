@@ -42,6 +42,26 @@
     background: color-mix(in srgb, var(--color-text-primary) 4%, transparent);
 }
 
+/* Read-only rows (past plans, logged sessions) keep the layout but aren't selectable. */
+.setBlockStatic,
+.setBlockStatic:hover {
+    background: none;
+    cursor: default;
+}
+
+/* Holds a remove button's space in read-only rows so they match a live plan's rows. */
+.rowActionSpacer {
+    width: 28px;
+    height: 28px;
+}
+
+@media (pointer: coarse) {
+    .rowActionSpacer {
+        width: 44px;
+        height: 44px;
+    }
+}
+
 .setBlockSelected,
 .setBlockSelected:hover {
     background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
@@ -163,6 +183,14 @@
     border-radius: 4px;
 }
 
+.valueInput[readonly] {
+    cursor: default;
+}
+
+.valueInput[readonly]:focus-visible {
+    outline: none;
+}
+
 .valueInput::placeholder {
     color: var(--color-text-tertiary);
 }
@@ -227,6 +255,12 @@
     gap: 8px;
 }
 
+.roundStatic,
+.roundStatic .setToggle,
+.setBlockStatic .setToggle {
+    cursor: default;
+}
+
 .roundSelected {
     background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-surface));
     border-color: var(--color-brand-success);
@@ -241,14 +275,13 @@
 .roundSlot {
     display: grid;
     grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
-    align-items: end;
+    align-items: center;
     gap: 10px;
     padding-top: 6px;
     border-top: 1px solid var(--color-border);
 }
 
 .roundSlotName {
-    padding-bottom: 7px;
     font-size: 13px;
     font-weight: 500;
     color: var(--color-text-primary);
@@ -258,14 +291,33 @@
 .roundSlotValues {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    align-items: center;
+    gap: 8px 16px;
     min-width: 0;
 }
 
-/* Fixed-width fields so the same metric sits in the same place in every round. */
+/* Label beside its field, never above it. A field that no longer fits moves to its own
+   line as a whole; every round lays out the same, so each metric lines up across rounds. */
 .roundSlotField {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 116px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: none;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.roundSlotLabel {
+    min-width: 0;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.roundSlotField .valueCell {
+    flex: none;
+}
+
+.roundSlotField .valueInput {
+    width: 64px;
 }

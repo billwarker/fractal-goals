@@ -99,7 +99,7 @@ function renderView(props = {}) {
     return renderViewWithClient(props);
 }
 
-function renderViewWithClient(props = {}) {
+function renderViewWithClient({ compare = false, ...props } = {}) {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     testingLibraryRender(
         <QueryClientProvider client={queryClient}>
@@ -108,6 +108,7 @@ function renderViewWithClient(props = {}) {
             </MemoryRouter>
         </QueryClientProvider>,
     );
+    if (compare) fireEvent.click(within(pane()).getByRole('checkbox', { name: 'Compare two days' }));
     return { queryClient };
 }
 
@@ -169,8 +170,27 @@ describe('Days view date selection', () => {
 });
 
 describe('ProgramDaysView', () => {
-    it('shows the latest and next program days side by side', async () => {
+    it('shows one program day by default and adds a comparison from the side pane', async () => {
         renderView();
+
+        expect(await screen.findByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Monday, Sep 28' })).not.toBeInTheDocument();
+        const rail = screen.getByRole('list', { name: 'Program day dates' });
+        expect(within(rail).queryByRole('button', { name: /shown in the other column/ })).not.toBeInTheDocument();
+
+        const toggle = within(pane()).getByRole('checkbox', { name: 'Compare two days' });
+        expect(toggle).not.toBeChecked();
+        fireEvent.click(toggle);
+
+        expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
+        expect(screen.getByRole('list', { name: 'Left column dates' })).toBeInTheDocument();
+
+        fireEvent.click(toggle);
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Monday, Sep 28' })).not.toBeInTheDocument());
+    });
+
+    it('shows the latest and next program days side by side', async () => {
+        renderView({ compare: true });
 
         const latest = await screen.findByRole('region', { name: 'Monday, Sep 28' });
         const next = screen.getByRole('region', { name: 'Monday, Oct 5' });
@@ -253,7 +273,7 @@ describe('ProgramDaysView', () => {
     });
 
     it('gives each column its own date rail and picks the two dates independently', async () => {
-        renderView();
+        renderView({ compare: true });
         const left = await screen.findByRole('list', { name: 'Left column dates' });
         const right = screen.getByRole('list', { name: 'Right column dates' });
         // Each rail marks its own date and blocks the one the other column shows.
@@ -276,7 +296,7 @@ describe('ProgramDaysView', () => {
     it('marks each date with the canonical day status and asks for the local timezone', async () => {
         renderView({ timezone: 'America/New_York' });
 
-        const right = await screen.findByRole('list', { name: 'Right column dates' });
+        const right = await screen.findByRole('list', { name: 'Program day dates' });
         const completed = within(right).getByRole('button', { name: /Monday, .*completed, planned/ });
         expect(completed.querySelector('[data-program-day-status="complete"]')).not.toBeNull();
         expect(within(right).getByRole('button', { name: /scheduled, not planned yet/ })
@@ -325,20 +345,24 @@ describe('ProgramDaysView', () => {
                 ] },
             }] }],
         } }));
-        renderView();
+        renderView({ compare: true });
 
         const past = await screen.findByRole('article', { name: 'Bench Day plan, Mon, Sep 28' });
-        const table = within(past).getByRole('table', { name: 'Planned rounds for Core Finisher' });
-        expect(within(table).getByText('40 kg')).toBeInTheDocument();
-        expect(within(table).getByText('R2')).toBeInTheDocument();
+        // The editor's round fields, read-only.
+        const rounds = within(past).getByRole('group', { name: 'Planned rounds' });
+        const weight = within(rounds).getByLabelText('Round 1 Bench Press planned Weight');
+        expect(weight).toHaveValue('40');
+        expect(weight).toHaveAttribute('readonly');
+        expect(within(rounds).getByText('Round 2')).toBeInTheDocument();
         expect(within(past).queryByRole('button', { name: '+ Add round' })).not.toBeInTheDocument();
+        expect(within(past).queryByRole('button', { name: /Remove planned round/ })).not.toBeInTheDocument();
     });
 
     it('offers a day select in the main area on narrow screens', async () => {
         renderView({ showDateControls: true });
 
         expect(await screen.findByLabelText('Program day')).toHaveValue('upper');
-        expect(await screen.findByRole('list', { name: 'Right column dates' })).toBeInTheDocument();
+        expect(await screen.findByRole('list', { name: 'Program day dates' })).toBeInTheDocument();
     });
 
     it('compares against the latest completed day, skipping a missed one', async () => {
@@ -356,7 +380,7 @@ describe('ProgramDaysView', () => {
                 state: 'scheduled_pending', manual_status: null, closed: false, program_day_completed: false, sessions: [],
             },
         ] }] } });
-        renderView();
+        renderView({ compare: true });
 
         const completed = await screen.findByRole('region', { name: 'Monday, Sep 21' });
         expect(within(completed).getByText('Last completed')).toBeInTheDocument();
@@ -364,13 +388,39 @@ describe('ProgramDaysView', () => {
         expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
     });
 
+    it('shows no plans for a past program day without sessions', async () => {
+        api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
+            {
+                date: '2026-09-28', templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
+                state: 'scheduled_missed', manual_status: null, closed: true, program_day_completed: false, sessions: [],
+            },
+            {
+                date: '2026-10-05', templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
+                state: 'scheduled_pending', manual_status: null, closed: false, program_day_completed: false, sessions: [],
+            },
+        ] }] } });
+        renderView({ compare: true });
+
+        const missed = await screen.findByRole('region', { name: 'Monday, Sep 28' });
+        expect(within(missed).getByText('No sessions logged')).toBeInTheDocument();
+        // A card saying so, in place of the template plans.
+        expect(within(missed).getByRole('article', { name: 'No sessions logged' })).toBeInTheDocument();
+        expect(within(missed).queryByRole('article', { name: /plan/ })).not.toBeInTheDocument();
+        expect(api.getProgramDayPlans).not.toHaveBeenCalledWith('root', 'program', 'upper', '2026-09-28', 'UTC');
+        // The upcoming day still plans as usual.
+        expect(await nextCard()).toBeInTheDocument();
+    });
+
     it('shows a past program day read-only, without saving or editing controls', async () => {
-        renderView();
+        renderView({ compare: true });
 
         const past = await screen.findByRole('article', { name: 'Bench Day plan, Mon, Sep 28' });
         expect(within(past).getByText("Past program day · this plan can't be changed.")).toBeInTheDocument();
-        const planned = within(past).getByRole('table', { name: 'Planned values for Bench Press' });
-        expect(within(planned).getByText('100')).toBeInTheDocument();
+        // The same set fields as the editable day beside it, read-only.
+        const planned = within(past).getByLabelText('Set 1 planned Weight');
+        expect(planned).toHaveValue('100');
+        expect(planned).toHaveAttribute('readonly');
+        expect(within(past).queryByRole('button', { name: /Remove planned set/ })).not.toBeInTheDocument();
         expect(within(past).queryByRole('button', { name: /Save/ })).not.toBeInTheDocument();
         expect(within(past).queryByRole('button', { name: 'Reset' })).not.toBeInTheDocument();
         expect(within(past).queryByRole('button', { name: '+ Add activity' })).not.toBeInTheDocument();
@@ -421,18 +471,21 @@ describe('ProgramDaysView', () => {
             ...WEEK_ONE,
             logged_sessions: [{ id: 'sess-1', name: 'Bench Day', completed: true }],
         } }));
-        renderView();
+        renderView({ compare: true });
 
         const session = await screen.findByRole('article', { name: 'Bench Day session' });
         expect(api.getSession).toHaveBeenCalledWith('root', 'sess-1');
         // The plan card layout: the session's sections, each activity's logged sets, circuit rounds.
         expect(within(session).getByRole('heading', { name: 'Main' })).toBeInTheDocument();
-        const logged = within(session).getByRole('table', { name: 'Logged values for Bench Press' });
-        expect(within(logged).getByText('102.5')).toBeInTheDocument();
+        // Logged values sit in the plan editor's fields, read-only, so they compare field for field.
+        const logged = within(session).getByRole('group', { name: 'Logged sets' });
+        expect(within(logged).getByLabelText('Set 1 logged Weight')).toHaveValue('102.5');
+        expect(within(logged).getByLabelText('Set 1 logged Weight')).toHaveAttribute('readonly');
         expect(within(session).getByText('felt strong')).toBeInTheDocument();
-        const rounds = within(session).getByRole('table', { name: 'Logged rounds for Core Finisher' });
-        expect(within(rounds).getByText('40 kg')).toBeInTheDocument();
-        expect(within(rounds).getByText('R2')).toBeInTheDocument();
+        const rounds = within(session).getByRole('group', { name: 'Logged rounds' });
+        expect(within(rounds).getByLabelText('Round 1 Bench Press logged Weight')).toHaveValue('40');
+        expect(within(rounds).getByText('Round 2')).toBeInTheDocument();
+        expect(within(session).queryByRole('button', { name: /Remove|Add/ })).not.toBeInTheDocument();
         expect(within(session).getByRole('link', { name: 'Completed · Open session' })).toHaveAttribute('href', '/root/session/sess-1');
         expect(session.querySelector('[data-align-key="tmpl|a:bench#0"]')).not.toBeNull();
         expect(session.querySelector('[data-align-key="tmpl|c:circ#0"]')).not.toBeNull();

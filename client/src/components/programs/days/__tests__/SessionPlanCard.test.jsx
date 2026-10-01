@@ -130,7 +130,9 @@ describe('SessionPlanCard scoping', () => {
             }] }],
         };
         const { card } = renderCard({ entry: tagged, readOnly: true });
-        expect(within(card).getByText('Tags: Paused · S1 Top set')).toBeInTheDocument();
+        // The same tag chips a live plan shows, without the picker.
+        expect(within(card).getByText('Paused')).toBeInTheDocument();
+        expect(within(card).getByText('Top set')).toBeInTheDocument();
         expect(within(card).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
     });
 });

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useProgramDayPlans, useProgramSessionPlanMutations } from '../../../hooks/useProgramSessionPlans';
 import { formatLiteralDate } from '../../../utils/dateUtils';
 import { occurrenceStatus, planCardElementId } from '../../../utils/programDaysView';
+import EmptyState from '../../common/EmptyState';
 import ProgramDayStatusMark from '../ProgramDayStatusMark';
 import CompletedSessionCard from './CompletedSessionCard';
 import SessionPlanCard from './SessionPlanCard';
@@ -43,7 +44,8 @@ function OccurrenceSummary({ rootId, occurrence }) {
 
 /**
  * One occurrence date of a program day under its own date rail: its status, sessions, and
- * every template's plan.
+ * every template's plan. A past date with no sessions has no evidence to show, so it shows
+ * neither plans nor logged work.
  */
 export default function PlanDateColumn({
     rootId,
@@ -61,7 +63,8 @@ export default function PlanDateColumn({
     activityGroups,
 }) {
     const { date } = occurrence;
-    const plansQuery = useProgramDayPlans(rootId, programId, dayId, date, timezone);
+    const isEmptyPast = date < today && !(occurrence.sessions || []).length;
+    const plansQuery = useProgramDayPlans(rootId, programId, dayId, isEmptyPast ? null : date, timezone);
     const mutations = useProgramSessionPlanMutations(rootId, programId, dayId, date, timezone);
     const headingId = `plan-column-${date}`;
 
@@ -77,6 +80,15 @@ export default function PlanDateColumn({
                 </h3>
                 <OccurrenceSummary rootId={rootId} occurrence={occurrence} />
             </header>
+            {isEmptyPast ? (
+                <article className={styles.planCard} aria-label="No sessions logged">
+                    <EmptyState
+                        compact
+                        title="No sessions logged"
+                        description="Nothing was recorded for this program day."
+                    />
+                </article>
+            ) : null}
             {plansQuery.isLoading ? <p className={styles.state} aria-busy="true">Loading plans…</p> : null}
             {plansQuery.error ? (
                 <p className={styles.state} role="alert">
