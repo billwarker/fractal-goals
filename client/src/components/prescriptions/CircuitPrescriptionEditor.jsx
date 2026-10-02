@@ -127,7 +127,9 @@ export default function CircuitPrescriptionEditor({
                                 const previousEntries = getCircuitRoundEntries(previous, roundIndex, slot.id);
                                 return (
                                     <div key={slot.id} className={styles.roundSlot}>
-                                        <span className={styles.roundSlotName}>{slot.definition.name}</span>
+                                        <span className={styles.roundSlotName} style={{ '--slot-rows': Math.max(columns.length, 1) }}>
+                                            {slot.definition.name}
+                                        </span>
                                         <span className={styles.roundSlotValues}>
                                             {columns.length === 0 ? (
                                                 <span className={styles.columnLabel}>No metrics</span>
