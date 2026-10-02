@@ -232,12 +232,14 @@
     gap: 8px;
 }
 
-/* Tight widths stack each metric on its own line as name | metric label | input. Every
-   slot shares these tracks (subgrid), so all of a round's inputs start at one edge however
-   long the names and labels run. Wide widths put a slot's fields side by side (below). */
+/* Circuit rounds lay out on one grid: activity name, then field columns, each a metric
+   label and its input. Every slot shares these tracks (subgrid), so inputs line up across
+   all of a round's activities. Wider rounds get more field columns (below); an activity
+   with more metrics than columns wraps its extra fields onto the next line, still aligned. */
 .round {
+    --field-columns: 1;
     display: grid;
-    grid-template-columns: minmax(96px, 30%) fit-content(45%) minmax(0, 1fr);
+    grid-template-columns: minmax(96px, 28%) repeat(var(--field-columns), fit-content(140px) max-content);
     gap: 6px 10px;
     padding: 8px 10px 10px;
     background: var(--color-bg-surface);
@@ -278,89 +280,59 @@
     display: grid;
     grid-template-columns: subgrid;
     align-items: center;
-    row-gap: 8px;
     padding-top: 6px;
     border-top: 1px solid var(--color-border);
 }
 
-/* Spans every metric row of its slot; the row count comes from the markup. */
 .roundSlotName {
     grid-column: 1;
-    grid-row: span var(--slot-rows, 1);
     font-size: 13px;
     font-weight: 500;
     color: var(--color-text-primary);
     overflow-wrap: anywhere;
 }
 
-/* The values and each field dissolve into the slot's grid: label in column 2, input in 3. */
-.roundSlotValues,
+/* The field columns, as a nested subgrid so wrapped rows never disturb the name. */
+.roundSlotValues {
+    grid-column: 2 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: center;
+    row-gap: 8px;
+    min-width: 0;
+}
+
+.roundSlotValues > .columnLabel {
+    grid-column: 1 / -1;
+}
+
+/* Each field dissolves into the columns: its label, then its input and unit. */
 .roundSlotField {
     display: contents;
 }
 
-.roundSlotValues > .columnLabel {
-    grid-column: 2 / -1;
-}
-
 .roundSlotLabel {
-    grid-column: 2;
     min-width: 0;
     font-size: 12px;
     color: var(--color-text-secondary);
     overflow-wrap: anywhere;
 }
 
+/* Breathing room before the next field's label. */
 .roundSlotField .valueCell {
-    grid-column: 3;
+    padding-right: 8px;
 }
 
-/* Room for fields side by side: each slot is name | fields, with label beside its input.
-   A field that no longer fits moves to the next line as a whole. */
-@container circuit-rounds (min-width: 760px) {
-    .round {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
+@container circuit-rounds (min-width: 640px) {
+    .round { --field-columns: 2; }
+}
 
-    .roundSlot {
-        grid-template-columns: minmax(96px, 30%) minmax(0, 1fr);
-        column-gap: 10px;
-    }
+@container circuit-rounds (min-width: 1000px) {
+    .round { --field-columns: 3; }
+}
 
-    .roundSlotName {
-        grid-row: auto;
-    }
-
-    .roundSlotValues {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px 16px;
-        min-width: 0;
-    }
-
-    .roundSlotValues > .columnLabel {
-        grid-column: auto;
-    }
-
-    .roundSlotField {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        max-width: 100%;
-        min-width: 0;
-    }
-
-    .roundSlotLabel,
-    .roundSlotField .valueCell {
-        grid-column: auto;
-    }
-
-    .roundSlotField .valueCell {
-        flex: none;
-    }
+@container circuit-rounds (min-width: 1300px) {
+    .round { --field-columns: 4; }
 }
 
 .roundSlotField .valueInput {
