@@ -186,7 +186,7 @@ export default function CircuitPrescriptionEditor({
                         scopeKey={`round-${selectedIndex}`}
                         label={`Note for ${name} · Round ${selectedIndex + 1}`}
                         value={scopedRound.notes}
-                        placeholder={previous?.rounds?.[selectedIndex]?.notes || `Note for round ${selectedIndex + 1}…`}
+                        placeholder={previous?.rounds?.[selectedIndex]?.notes || `Add a programming note for round ${selectedIndex + 1}…`}
                         disabled={disabled}
                         onCommit={(notes) => onChange(withRoundNotes(value, selectedIndex, notes))}
                     />
@@ -195,7 +195,7 @@ export default function CircuitPrescriptionEditor({
                         scopeKey="item"
                         label={`Coaching note for ${name}`}
                         value={value?.notes}
-                        placeholder={previous?.notes || 'Add a note about this circuit, or pick a round…'}
+                        placeholder={previous?.notes || 'Add a programming note for this circuit, or pick a round…'}
                         disabled={disabled}
                         onCommit={(notes) => onChange(withCircuitNotes(value, notes))}
                     />

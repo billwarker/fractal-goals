@@ -249,7 +249,7 @@ export default function PrescriptionEditor({
                         scopeKey={`set-${selectedIndex}`}
                         label={`Note for ${name} · Set ${selectedIndex + 1}`}
                         value={scopedSet.notes}
-                        placeholder={previous?.sets?.[selectedIndex]?.notes || `Note for set ${selectedIndex + 1}…`}
+                        placeholder={previous?.sets?.[selectedIndex]?.notes || `Add a programming note for set ${selectedIndex + 1}…`}
                         disabled={disabled}
                         onCommit={(notes) => onChange(withSetNotes(value, selectedIndex, notes))}
                     />
@@ -258,7 +258,7 @@ export default function PrescriptionEditor({
                         scopeKey="item"
                         label={`Coaching note for ${name}`}
                         value={value?.notes}
-                        placeholder={previous?.notes || (hasSets ? 'Add a note about this activity, or pick a set…' : 'Add a note about this activity…')}
+                        placeholder={previous?.notes || (hasSets ? 'Add a programming note for this activity, or pick a set…' : 'Add a programming note for this activity…')}
                         disabled={disabled}
                         onCommit={(notes) => onChange(withPrescriptionNotes(value, notes))}
                     />

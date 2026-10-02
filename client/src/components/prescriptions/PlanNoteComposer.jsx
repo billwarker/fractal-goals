@@ -13,7 +13,6 @@ export default function PlanNoteComposer({ scopeKey, label, value, placeholder, 
     };
     return (
         <div className={styles.composer}>
-            <span className={styles.composerLabel}>{label}</span>
             <textarea
                 // Remount per scope so switching sets never carries a half-typed note across.
                 key={`${scopeKey}:${value || ''}`}
