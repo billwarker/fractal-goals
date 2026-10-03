@@ -117,4 +117,22 @@ describe('useSessionSidePaneViewModel', () => {
         expect(result.current.details.isCompleted).toBe(!initial);
     });
 
+    it('exposes the pause time only while an incomplete session is paused', () => {
+        const pausedSession = {
+            id: 'session-1',
+            completed: false,
+            is_paused: true,
+            last_paused_at: '2026-10-01T16:53:44Z',
+        };
+        useActiveSessionData.mockReturnValue({ sessionId: 'session-1', session: pausedSession });
+        const { result, rerender } = renderHook(() => useSessionSidePaneViewModel({}));
+        expect(result.current.details.pausedAt).toBe('2026-10-01T16:53:44Z');
+
+        useActiveSessionData.mockReturnValue({
+            sessionId: 'session-1',
+            session: { ...pausedSession, completed: true },
+        });
+        rerender();
+        expect(result.current.details.pausedAt).toBeNull();
+    });
 });

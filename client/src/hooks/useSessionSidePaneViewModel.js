@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { useActiveSessionActions, useActiveSessionData } from '../contexts/ActiveSessionContext';
+import { getSessionPauseState } from './useSessionDuration';
 
 export function useSessionSidePaneViewModel({
     selectedActivity,
@@ -31,6 +32,8 @@ export function useSessionSidePaneViewModel({
     } = useActiveSessionData();
     const { toggleSessionComplete } = useActiveSessionActions();
     const isCompleted = Boolean(session?.completed ?? session?.attributes?.completed);
+    const { isPaused, lastPausedAt } = getSessionPauseState(session);
+    const pausedAt = !isCompleted && isPaused ? lastPausedAt : null;
 
     const sessionActivityDefs = useMemo(() => {
         if (!activityInstances || !activityDefinitions) return [];
@@ -44,6 +47,7 @@ export function useSessionSidePaneViewModel({
         details: {
             sessionId,
             isCompleted,
+            pausedAt,
             onToggleComplete: toggleSessionComplete,
             onOptions,
             onNoteAdded,
@@ -82,6 +86,7 @@ export function useSessionSidePaneViewModel({
         onModeChange,
         onNoteAdded,
         onOptions,
+        pausedAt,
         previousSessionNotes,
         pinNote,
         rootId,

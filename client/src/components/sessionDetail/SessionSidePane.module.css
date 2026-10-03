@@ -54,6 +54,13 @@
     --completion-button-width: 100%;
 }
 
+.pausedCompletionHint {
+    grid-column: 1 / -1;
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
 .optionsButton {
     background: color-mix(in srgb, var(--color-brand-primary) 18%, var(--color-bg-surface));
     border-color: color-mix(in srgb, var(--color-brand-primary) 48%, var(--color-border));

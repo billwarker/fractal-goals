@@ -20,13 +20,27 @@ from services._session_lifecycle_common import _as_utc_datetime, _parse_iso_date
 
 class _SessionUpdatesMixin:
     @staticmethod
+    def _pause_completion_boundary(session_obj):
+        """A session completed while paused ends at its pause, not at the click."""
+        if is_quick_session(session_obj) or not session_obj.is_paused:
+            return None
+        paused_at = _as_utc_datetime(session_obj.last_paused_at)
+        if not paused_at:
+            return None
+        start_at = _as_utc_datetime(session_obj.session_start)
+        return max(paused_at, start_at) if start_at else paused_at
+
+    @staticmethod
     def _finalize_paused_session_duration(session_obj, completion_time: datetime):
         if is_quick_session(session_obj):
             return
 
         completion_at = _as_utc_datetime(completion_time) or datetime.now(timezone.utc)
+        start_at = _as_utc_datetime(session_obj.session_start)
         if session_obj.is_paused and session_obj.last_paused_at:
             paused_at = _as_utc_datetime(session_obj.last_paused_at)
+            if paused_at and start_at:
+                paused_at = max(paused_at, start_at)
             if paused_at and completion_at > paused_at:
                 paused_duration = int((completion_at - paused_at).total_seconds())
                 session_obj.total_paused_seconds = (session_obj.total_paused_seconds or 0) + paused_duration
@@ -36,7 +50,6 @@ class _SessionUpdatesMixin:
         if not session_obj.session_end:
             session_obj.session_end = completion_at
 
-        start_at = _as_utc_datetime(session_obj.session_start)
         end_at = _as_utc_datetime(session_obj.session_end)
         if start_at and end_at and end_at > start_at:
             wall_duration = int((end_at - start_at).total_seconds())
@@ -116,6 +129,7 @@ class _SessionUpdatesMixin:
         if 'duration_minutes' in data:
             session.duration_minutes = data['duration_minutes']
 
+        paused_completion = False
         if 'completed' in data:
             if not data['completed'] and session.completed:
                 conflict = self._active_session_conflict(
@@ -127,8 +141,13 @@ class _SessionUpdatesMixin:
                     return None, conflict, 409
             session.completed = data['completed']
             if data['completed']:
-                completion_time = datetime.now(timezone.utc)
-                session.completed_at = completion_time
+                session.completed_at = datetime.now(timezone.utc)
+                completion_time = session.completed_at
+                pause_boundary = self._pause_completion_boundary(session)
+                if pause_boundary:
+                    paused_completion = True
+                    completion_time = pause_boundary
+                    session.session_end = pause_boundary
                 circuit_completion_time = completion_time.replace(tzinfo=None)
                 incomplete_circuits = self.db_session.query(CircuitRun).filter(
                     CircuitRun.session_id == session.id,
@@ -205,7 +224,8 @@ class _SessionUpdatesMixin:
             except ValueError:
                 return None, "Invalid session_start format. Use ISO-8601.", 400
 
-        if 'session_end' in data:
+        # The pause boundary is authoritative; a client-supplied end is ignored.
+        if 'session_end' in data and not paused_completion:
             try:
                 session.session_end = _parse_iso_datetime_strict(data['session_end'])
             except ValueError:

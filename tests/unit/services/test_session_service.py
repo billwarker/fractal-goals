@@ -331,10 +331,10 @@ def test_update_session_completion_excludes_paused_time(
     db_session, session_service, sample_practice_session, test_user
 ):
     start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
-    end = start + timedelta(minutes=30)
+    paused_at = start + timedelta(minutes=20)
     sample_practice_session.session_start = start
     sample_practice_session.is_paused = True
-    sample_practice_session.last_paused_at = end - timedelta(minutes=10)
+    sample_practice_session.last_paused_at = paused_at
     sample_practice_session.total_paused_seconds = 5 * 60
     db_session.commit()
 
@@ -344,7 +344,8 @@ def test_update_session_completion_excludes_paused_time(
         test_user.id,
         {
             'completed': True,
-            'session_end': end.isoformat(),
+            # A client-supplied end is ignored: the pause is the session's end.
+            'session_end': (paused_at + timedelta(minutes=10)).isoformat(),
         },
     )
 
@@ -352,8 +353,85 @@ def test_update_session_completion_excludes_paused_time(
     assert status_code == 200
     assert result['completed'] is True
     assert result['is_paused'] is False
-    assert result['total_paused_seconds'] == 15 * 60
+    assert result['session_end'] == paused_at.isoformat().replace('+00:00', 'Z')
+    assert result['total_paused_seconds'] == 5 * 60
     assert result['total_duration_seconds'] == 15 * 60
+
+
+def test_completing_paused_session_ends_at_pause_and_keeps_completion_time(
+    db_session, session_service, sample_practice_session, test_user
+):
+    start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    paused_at = start + timedelta(minutes=40)
+    sample_practice_session.session_start = start
+    sample_practice_session.is_paused = True
+    sample_practice_session.last_paused_at = paused_at
+    db_session.commit()
+
+    before = datetime.now(timezone.utc)
+    result, error_msg, status_code = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {'completed': True},
+    )
+
+    assert error_msg is None
+    assert status_code == 200
+    assert result['session_end'] == paused_at.isoformat().replace('+00:00', 'Z')
+    assert result['total_duration_seconds'] == 40 * 60
+    assert result['total_paused_seconds'] == 0
+    session_obj = get_session_by_id(db_session, sample_practice_session.id)
+    completed_at = session_obj.completed_at
+    if completed_at.tzinfo is None:
+        completed_at = completed_at.replace(tzinfo=timezone.utc)
+    assert completed_at >= before - timedelta(seconds=1)
+
+
+def test_completing_unpaused_session_ends_at_completion_time(
+    db_session, session_service, sample_practice_session, test_user
+):
+    start = datetime.now(timezone.utc) - timedelta(minutes=30)
+    sample_practice_session.session_start = start
+    sample_practice_session.total_paused_seconds = 5 * 60
+    db_session.commit()
+
+    before = datetime.now(timezone.utc)
+    result, error_msg, status_code = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {'completed': True},
+    )
+
+    assert error_msg is None
+    assert status_code == 200
+    session_end = datetime.fromisoformat(result['session_end'].replace('Z', '+00:00'))
+    assert session_end >= before - timedelta(seconds=1)
+    assert 24 * 60 <= result['total_duration_seconds'] <= 26 * 60
+
+
+def test_completing_paused_session_clamps_pause_before_edited_start(
+    db_session, session_service, sample_practice_session, test_user
+):
+    start = datetime(2026, 1, 1, 10, 0, tzinfo=timezone.utc)
+    sample_practice_session.session_start = start
+    sample_practice_session.is_paused = True
+    sample_practice_session.last_paused_at = start - timedelta(minutes=5)
+    db_session.commit()
+
+    result, error_msg, status_code = session_service.update_session(
+        sample_practice_session.root_id,
+        sample_practice_session.id,
+        test_user.id,
+        {'completed': True},
+    )
+
+    assert error_msg is None
+    assert status_code == 200
+    assert result['session_end'] == start.isoformat().replace('+00:00', 'Z')
+    assert (result['total_duration_seconds'] or 0) == 0
+    assert result['total_paused_seconds'] == 0
 
 
 def test_update_completed_session_time_recomputes_duration_excluding_pauses(

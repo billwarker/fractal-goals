@@ -1013,6 +1013,84 @@ class TestSessionCRUDEndpoints:
         payload = next(item for item in activities.get_json() if item['id'] == instance_id)
         assert payload['time_stop'] is not None
     
+    def test_completing_paused_session_closes_open_work_at_the_pause(
+        self, authed_client, db_session, sample_practice_session, sample_activity_definition
+    ):
+        root_id = sample_practice_session.root_id
+        session_id = sample_practice_session.id
+
+        created = authed_client.post(
+            f'/api/{root_id}/sessions/{session_id}/activities',
+            json={'activity_definition_id': sample_activity_definition.id},
+        )
+        assert created.status_code == 201
+        instance_id = created.get_json()['id']
+        assert authed_client.post(f'/api/{root_id}/activity-instances/{instance_id}/start').status_code == 200
+        assert authed_client.post(f'/api/{root_id}/timers/session/{session_id}/pause').status_code == 200
+
+        # Backdate the work so the pause sits well before the completion click.
+        db_session.expire_all()
+        start = datetime(2026, 1, 1, 10, 0)
+        paused_at = start + timedelta(minutes=20)
+        session = db_session.get(Session, session_id)
+        session.session_start = start
+        session.last_paused_at = paused_at
+        instance = db_session.get(ActivityInstance, instance_id)
+        assert instance.is_paused is True
+        instance.time_start = start + timedelta(minutes=5)
+        instance.last_paused_at = paused_at
+        instance.total_paused_seconds = 0
+        run = CircuitRun(
+            root_id=root_id,
+            session_id=session_id,
+            name='Paused circuit',
+            status='paused',
+            time_start=start + timedelta(minutes=2),
+            is_paused=True,
+            last_paused_at=paused_at,
+        )
+        db_session.add(run)
+        db_session.commit()
+        run_id = run.id
+
+        completed = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}',
+            json={'completed': True},
+        )
+        assert completed.status_code == 200, completed.get_json()
+        body = completed.get_json()
+        assert body['session_end'] == '2026-01-01T10:20:00Z'
+        assert body['total_duration_seconds'] == 20 * 60
+
+        db_session.expire_all()
+        instance = db_session.get(ActivityInstance, instance_id)
+        assert instance.completed is True
+        assert instance.is_paused is False
+        assert instance.time_stop.replace(tzinfo=None) == paused_at
+        assert instance.duration_seconds == 15 * 60
+        run = db_session.get(CircuitRun, run_id)
+        assert run.status == 'completed'
+        assert run.time_stop == paused_at
+        assert run.duration_seconds == 18 * 60
+
+    def test_resumed_then_completed_session_ends_at_completion_time(
+        self, authed_client, sample_practice_session
+    ):
+        root_id = sample_practice_session.root_id
+        session_id = sample_practice_session.id
+
+        assert authed_client.post(f'/api/{root_id}/timers/session/{session_id}/pause').status_code == 200
+        assert authed_client.post(f'/api/{root_id}/timers/session/{session_id}/resume').status_code == 200
+
+        before = datetime.now(timezone.utc)
+        completed = authed_client.put(
+            f'/api/{root_id}/sessions/{session_id}',
+            json={'completed': True},
+        )
+        assert completed.status_code == 200, completed.get_json()
+        session_end = datetime.fromisoformat(completed.get_json()['session_end'].replace('Z', '+00:00'))
+        assert session_end >= before - timedelta(seconds=1)
+
     def test_delete_session(self, authed_client, sample_practice_session):
         """Test deleting a session."""
         root_id = sample_practice_session.root_id

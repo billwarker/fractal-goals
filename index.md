@@ -99,7 +99,9 @@ Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a
 terminal timer boundary: its open ordinary activity work interval is closed in the same
 transaction before the session is committed; circuit-child timing remains owned by the circuit
-clock. `services/timer_loading.py`
+clock. Completing a paused session ends it at the pause boundary (`last_paused_at`), not the click:
+`session_end`, paused activity timers, and paused circuit runs all close there, and any client-sent
+`session_end` is ignored; `completed_at` still records the click. `services/timer_loading.py`
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
 

@@ -7,7 +7,9 @@
  * - Timeline: Activity history
  */
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { formatDateValue } from '../../utils/dateUtils';
 import SessionInfoPanel from './SessionInfoPanel';
 import Button from '../atoms/Button';
 import SessionCompletionButton from '../common/SessionCompletionButton';
@@ -28,6 +30,11 @@ function SessionSidePane({
     const details = model?.details;
     const goals = model?.goals;
     const timeline = model?.timeline;
+    const { timezone } = useTimezone();
+    const pausedHintId = useId();
+    const pausedAtLabel = details?.pausedAt
+        ? formatDateValue(details.pausedAt, 'h:mm A', timezone)
+        : null;
     const [detailsPanel, setDetailsPanel] = useState('hierarchy');
 
     return (
@@ -63,6 +70,10 @@ function SessionSidePane({
                                 <SessionCompletionButton
                                     onClick={details?.onToggleComplete}
                                     completed={details?.isCompleted}
+                                    title={pausedAtLabel
+                                        ? `Ends the session at ${pausedAtLabel}, when it was paused. Resume first to keep timing.`
+                                        : undefined}
+                                    aria-describedby={pausedAtLabel ? pausedHintId : undefined}
                                     className={styles.sessionCompletionButton}
                                 />
                                 <Button
@@ -73,6 +84,11 @@ function SessionSidePane({
                                 >
                                     Options
                                 </Button>
+                                {pausedAtLabel && (
+                                    <p id={pausedHintId} className={styles.pausedCompletionHint}>
+                                        Paused — completing now ends the session at {pausedAtLabel}.
+                                    </p>
+                                )}
                             </div>
 
                             {/* Divider */}

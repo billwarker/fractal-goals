@@ -1,8 +1,11 @@
 import { useCallback } from 'react';
 
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateValue } from '../utils/dateUtils';
 import { logError } from '../utils/logger';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
+import { getSessionPauseState } from './useSessionDuration';
 
 
 export function useSessionCompletion({
@@ -13,17 +16,20 @@ export function useSessionCompletion({
     queryClient,
     updateSession,
 }) {
+    const { timezone } = useTimezone();
+
     return useCallback(async () => {
         if (!session) return;
         const completed = typeof session.completed === 'boolean'
             ? session.completed
             : Boolean(session.attributes?.completed);
         const nextCompleted = !completed;
-        const updatePayload = { completed: nextCompleted };
-        if (nextCompleted) updatePayload.session_end = new Date().toISOString();
+        // The server owns the end boundary: a paused session ends at its pause.
+        const { isPaused, lastPausedAt } = getSessionPauseState(session);
+        const completingWhilePaused = nextCompleted && isPaused;
 
         try {
-            await updateSession(updatePayload);
+            const response = await updateSession({ completed: nextCompleted });
             if (nextCompleted) {
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) => (
                     Array.isArray(previous)
@@ -52,11 +58,17 @@ export function useSessionCompletion({
                     queryKey: queryKeys.sessionProgressSummary(sessionId),
                 });
             }
-            notify.success(nextCompleted ? 'Session completed!' : 'Session marked as incomplete');
+            if (completingWhilePaused) {
+                const endedAt = response?.data?.session_end || lastPausedAt;
+                const endedAtLabel = formatDateValue(endedAt, 'h:mm A', timezone);
+                notify.success(`Session completed — ended at ${endedAtLabel} when paused`);
+            } else {
+                notify.success(nextCompleted ? 'Session completed!' : 'Session marked as incomplete');
+            }
         } catch (error) {
             logError('Failed to toggle session completion', error);
             const reason = error?.response?.data?.error || error?.message || 'Unknown error';
             notify.error(`Failed to update session completion: ${reason}`);
         }
-    }, [queryClient, rootId, session, sessionActivitiesKey, sessionId, updateSession]);
+    }, [queryClient, rootId, session, sessionActivitiesKey, sessionId, timezone, updateSession]);
 }

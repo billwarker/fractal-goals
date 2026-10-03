@@ -41,7 +41,7 @@ it('aligns every activity and circuit control after completing the session', asy
 
     await act(async () => result.current());
 
-    expect(updateSession).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
+    expect(updateSession).toHaveBeenCalledWith({ completed: true });
     expect(queryClient.getQueryData(activitiesKey)).toEqual([
         { id: 'inst-1', completed: true, time_start: '2026-08-25T10:00:00Z' },
         { id: 'inst-unstarted', completed: false, time_start: null },
@@ -54,4 +54,35 @@ it('aligns every activity and circuit control after completing the session', asy
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: activitiesKey });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: circuitsKey });
     expect(notify.success).toHaveBeenCalledWith('Session completed!');
+});
+
+it('lets the server choose the end time and reports a paused completion', async () => {
+    notify.success.mockClear();
+    const queryClient = new QueryClient();
+    const updateSession = vi.fn().mockResolvedValue({
+        data: { completed: true, session_end: '2026-10-01T16:53:44Z' },
+    });
+    const wrapper = ({ children }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSessionCompletion({
+        rootId: 'root-1',
+        sessionId: 'session-1',
+        session: {
+            id: 'session-1',
+            completed: false,
+            is_paused: true,
+            last_paused_at: '2026-10-01T16:53:44Z',
+        },
+        sessionActivitiesKey: queryKeys.sessionActivities('root-1', 'session-1'),
+        queryClient,
+        updateSession,
+    }), { wrapper });
+
+    await act(async () => result.current());
+
+    expect(updateSession).toHaveBeenCalledWith({ completed: true });
+    expect(notify.success).toHaveBeenCalledWith(
+        expect.stringMatching(/^Session completed — ended at \d{1,2}:53 (AM|PM) when paused$/),
+    );
 });
