@@ -220,7 +220,7 @@ day detail. The client rejects unsupported schema versions. FullCalendar block l
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
 
 The Programs page has Calendar, Blocks, and **Days** views. On desktop the side pane is always
-open (like session detail) and leads with the view toggle, with Details/Goals as a Calendar sub-view;
+open (like session detail) and leads with the view toggle. Calendar's pane shows headline metrics, events, and the goal hierarchy (or the day review when a date is scoped); Blocks' pane shows every block's whole-program results (`ProgramBlocksSummary`), independent of the calendar's selection;
 mobile keeps the toggle in the header and the pane as a closable sheet. Days (`components/programs/days/`) programs
 one program day's occurrence dates in two columns: a focused date (by default the next program day)
 beside the latest completed occurrence before it (else the previous one), each with its canonical

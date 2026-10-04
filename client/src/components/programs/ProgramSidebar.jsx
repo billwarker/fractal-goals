@@ -19,6 +19,7 @@ function ProgramSidebar({
     hideGoals = false,
     hideGoalsHeader = false,
     flushMetricsPadding = false,
+    embedded = false, // Flows inside another scroller (the calendar overview) without its own frame.
     className = ''
 }) {
     const {
@@ -36,7 +37,7 @@ function ProgramSidebar({
     const isAuthoritativeMetrics = Boolean(programMetrics?.calculation_version);
 
     return (
-        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${flushMetricsPadding ? styles.flushMetricsPadding : ''} ${className}`}>
+        <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${flushMetricsPadding ? styles.flushMetricsPadding : ''} ${embedded ? styles.embedded : ''} ${className}`}>
             {/* Fixed Top Section */}
             {!hideMetrics && (
                 <div className={`${styles.topSection} ${compact ? styles.compactTopSection : ''}`}>

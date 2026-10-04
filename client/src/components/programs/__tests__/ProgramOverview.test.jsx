@@ -3,18 +3,6 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import ProgramOverview from '../ProgramOverview';
 
-vi.mock('../../../contexts/GoalLevelsContext', () => ({
-    useGoalLevels: () => ({
-        getGoalColor: () => '#8b6fff',
-        getGoalSecondaryColor: () => '#181329',
-        getGoalIcon: () => 'triangle',
-    }),
-}));
-
-vi.mock('../../atoms/GoalIcon', () => ({
-    default: ({ shape }) => <svg data-testid="overview-goal-icon" data-shape={shape} />,
-}));
-
 const metrics = {
     program: { progress: { rate: 0.32 } },
     window: { display_start: '2026-08-20', display_end: '2026-10-31', as_of: '2026-09-04', is_partial: false, observed_days: 16, total_days: 73 },
@@ -43,31 +31,18 @@ describe('ProgramOverview', () => {
         expect(screen.queryByText('Adherence by day')).not.toBeInTheDocument();
     });
 
-    it('renders compact effort shares and only blocks that have started', () => {
-        render(<ProgramOverview metrics={metrics} />);
+    it('leaves block results and goal coverage to other views and shows the goal hierarchy last', () => {
+        render(<ProgramOverview metrics={metrics} goalHierarchy={<ul aria-label="Goal tree" />} />);
 
-        const goalSection = screen.getByRole('heading', { name: 'Goal coverage' }).closest('section');
-        expect(within(goalSection).getByText('Ship the insight')).toBeInTheDocument();
-        expect(within(goalSection).getByText('42%')).toBeInTheDocument();
-        expect(within(goalSection).queryByText('Build consistency')).not.toBeInTheDocument();
-        expect(within(goalSection).getAllByTestId('overview-goal-icon')).toHaveLength(1);
-        expect(within(goalSection).getAllByRole('listitem').map((row) => row.textContent)).toEqual([
-            'Ship the insight42%',
-        ]);
-
-        const blockSection = screen.getByRole('heading', { name: 'Blocks in scope' }).closest('section');
-        expect(within(blockSection).getByText('Preparation')).toBeInTheDocument();
-        const currentBlock = within(blockSection).getByText('Month 1').closest('li');
-        expect(within(blockSection).queryByText('Month 2')).not.toBeInTheDocument();
-        expect(within(currentBlock).getAllByText('2 / 3')).toHaveLength(2);
-        expect(within(currentBlock).getByText('80%')).toBeInTheDocument();
-        expect(within(currentBlock).getByText('6')).toBeInTheDocument();
-        expect(within(currentBlock).getByText('Daily practice').closest('li')).toHaveTextContent('Daily practice2 / 3');
-        expect(within(currentBlock).getByText('Weekly review').closest('li')).toHaveTextContent('Weekly review1 / 1');
-        expect(blockSection.compareDocumentPosition(goalSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(screen.queryByRole('heading', { name: 'Blocks in scope' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Goal coverage' })).not.toBeInTheDocument();
+        expect(screen.queryByText('Month 1')).not.toBeInTheDocument();
+        const goals = screen.getByRole('heading', { name: 'Goals' }).closest('section');
+        expect(within(goals).getByRole('list', { name: 'Goal tree' })).toBeInTheDocument();
+        expect(screen.getByLabelText('Program metrics').compareDocumentPosition(goals) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
-    it('uses the selected timeframe for progress and block visibility', () => {
+    it('uses the selected timeframe for progress', () => {
         const scopedMetrics = {
             ...metrics,
             window: { display_start: '2026-09-01', display_end: '2026-09-03', as_of: '2026-09-04', is_partial: true, observed_days: 3, total_days: 3 },
@@ -75,8 +50,6 @@ describe('ProgramOverview', () => {
         render(<ProgramOverview metrics={scopedMetrics} />);
 
         expect(screen.getByLabelText('Program metrics')).toHaveTextContent('Program progress100%');
-        expect(screen.queryByText('Preparation')).not.toBeInTheDocument();
-        expect(screen.getByText('Month 1')).toBeInTheDocument();
     });
 
     it('explains days protected by events and lists overlapping events', () => {

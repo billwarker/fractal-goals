@@ -148,3 +148,18 @@
         font-size: 11px;
     }
 }
+
+/* Embedded in the calendar overview: the pane scrolls, so the hierarchy just flows. */
+.sidebar.embedded {
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    border: none;
+    background: transparent;
+}
+
+.sidebar.embedded .bottomSection {
+    flex: none;
+    overflow: visible;
+    padding: 0;
+}

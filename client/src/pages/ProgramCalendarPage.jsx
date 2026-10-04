@@ -137,7 +137,6 @@ function ProgramCalendarPage() {
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
         return !getIsMobileViewport();
     });
-    const [sidePaneView, setSidePaneView] = useState('details');
     const [isProgramOptionsOpen, setIsProgramOptionsOpen] = useState(false);
     const [programOptionsView, setProgramOptionsView] = useState('actions');
     const [programPickerQuery, setProgramPickerQuery] = useState('');
@@ -302,6 +301,10 @@ function ProgramCalendarPage() {
         : getProgramOverviewMetricsRange(calendarContext);
     const overviewMetricsQuery = useProgramMetrics(
         rootId, displayProgram?.id, timezone, overviewMetricsRange,
+    );
+    // The Blocks view always summarizes the whole program, whatever the calendar has selected.
+    const blockMetricsQuery = useProgramMetrics(
+        rootId, viewMode === 'blocks' ? displayProgram?.id : null, timezone,
     );
 
     /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses the desktop side pane on mobile. */
@@ -932,16 +935,16 @@ function ProgramCalendarPage() {
                     isVisible={!isMobile || isSidePaneVisible}
                     onClose={() => setIsSidePaneVisible(false)}
                     viewToggle={isMobile ? null : viewToggle}
-                    showSubViews={viewMode === 'calendar'}
+                    mode={viewMode === 'blocks' ? 'blocks' : 'calendar'}
                     program={displayProgram}
                     goals={displayGoals}
                     onCreate={() => openCreateProgram()}
-                    // Details/Goals is a calendar sub-view; Blocks always shows details.
-                    view={viewMode === 'blocks' && !isMobile ? 'details' : sidePaneView}
-                    onViewChange={setSidePaneView}
                     programMetrics={overviewMetricsQuery.data}
                     programMetricsLoading={overviewMetricsQuery.isLoading}
                     programMetricsError={overviewMetricsQuery.error}
+                    blockMetrics={blockMetricsQuery.data}
+                    blockMetricsLoading={blockMetricsQuery.isLoading}
+                    blockMetricsError={blockMetricsQuery.error}
                     programGoalSeeds={hierarchyGoalSeeds}
                     onGoalClick={openGoalModal}
                     rootId={rootId}
@@ -1129,7 +1132,9 @@ function ProgramCalendarPage() {
                         <button
                             className={styles.optionButton}
                             onClick={() => {
-                                setSidePaneView('goals');
+                                // Goals sit under the calendar's program overview.
+                                setViewMode('calendar');
+                                dispatchCalendarContext({ type: 'focus_program', programId: displayProgram?.id });
                                 setIsSidePaneVisible(true);
                                 closeProgramOptions();
                             }}
