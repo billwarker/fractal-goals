@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useProgramDayPlans, useProgramSessionPlanMutations } from '../../../hooks/useProgramSessionPlans';
@@ -7,6 +7,7 @@ import { occurrenceStatus, planCardElementId } from '../../../utils/programDaysV
 import EmptyState from '../../common/EmptyState';
 import ProgramDayStatusMark from '../ProgramDayStatusMark';
 import CompletedSessionCard from './CompletedSessionCard';
+import OptionalTemplateSelector from './OptionalTemplateSelector';
 import SessionPlanCard from './SessionPlanCard';
 import styles from './ProgramDaysView.module.css';
 
@@ -44,8 +45,9 @@ function OccurrenceSummary({ rootId, occurrence }) {
 
 /**
  * One occurrence date of a program day under its own date rail: its status, sessions, and
- * every template's plan. A past date with no sessions has no evidence to show, so it shows
- * neither plans nor logged work.
+ * the plans on the day. Required templates are always open; optional ones wait in a selector
+ * until loaded into the date. A past date with no sessions has no evidence to show, so it
+ * shows neither plans nor logged work.
  */
 export default function PlanDateColumn({
     rootId,
@@ -67,6 +69,28 @@ export default function PlanDateColumn({
     const plansQuery = useProgramDayPlans(rootId, programId, dayId, isEmptyPast ? null : date, timezone);
     const mutations = useProgramSessionPlanMutations(rootId, programId, dayId, date, timezone);
     const headingId = `plan-column-${date}`;
+    const readOnly = date < today;
+    const entries = plansQuery.data?.plans || [];
+    // Older payloads have no is_loaded: every template stays open, as before.
+    const dayEntries = entries.filter((entry) => entry.is_loaded ?? true);
+    const unloadedOptional = readOnly ? [] : entries.filter((entry) => !(entry.is_loaded ?? true));
+
+    // Move focus to a card after it is added, and back to the selector after a removal. The
+    // write updates the cached plans, so the render that shows the target runs this effect.
+    const selectorHeadingRef = useRef(null);
+    const pendingFocusRef = useRef(null);
+    const setFocusTarget = (target) => { pendingFocusRef.current = target; };
+    useEffect(() => {
+        const target = pendingFocusRef.current;
+        if (!target) return;
+        const element = target === 'selector'
+            ? selectorHeadingRef.current
+            : document.getElementById(planCardElementId(target, date));
+        if (element) {
+            element.focus();
+            pendingFocusRef.current = null;
+        }
+    });
 
     return (
         <section className={styles.column} aria-labelledby={headingId} data-align-column>
@@ -95,7 +119,7 @@ export default function PlanDateColumn({
                     Plans could not be loaded. <button type="button" onClick={() => plansQuery.refetch()}>Retry</button>
                 </p>
             ) : null}
-            {(plansQuery.data?.plans || []).map((entry) => (entry.logged_sessions?.length
+            {dayEntries.map((entry) => (entry.logged_sessions?.length
                 // A completed template shows its session in the plan card layout.
                 ? entry.logged_sessions.map((session, index) => (
                     <CompletedSessionCard
@@ -121,9 +145,16 @@ export default function PlanDateColumn({
                         activityGroups={activityGroups}
                         mutations={mutations}
                         // Past program days keep the plan they had; only upcoming ones are edited.
-                        readOnly={date < today}
+                        readOnly={readOnly}
+                        onRemoved={() => setFocusTarget('selector')}
                     />
                 )))}
+            <OptionalTemplateSelector
+                entries={unloadedOptional}
+                mutations={mutations}
+                headingRef={selectorHeadingRef}
+                onLoaded={(templateId) => setFocusTarget(templateId)}
+            />
         </section>
     );
 }

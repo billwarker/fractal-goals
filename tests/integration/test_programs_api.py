@@ -9,6 +9,13 @@ from models import Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, 
 from services.program_day_read_model_service import ProgramDayReadModelService
 from services.programs import ProgramService
 
+
+def _delete_sample_blocks(client, root_id, program_id):
+    """Free the sample program's dates; blocks in one program may not overlap."""
+    program = client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+    for block in program['blocks']:
+        assert client.delete(f'/api/{root_id}/programs/{program_id}/blocks/{block["id"]}').status_code == 200
+
 @pytest.fixture
 def sample_program(authed_client, sample_ultimate_goal):
     """Create a sample program for testing."""
@@ -606,6 +613,7 @@ class TestProgramStructure:
         """Test creating, updating, and deleting a block via dedicated endpoints."""
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
+        _delete_sample_blocks(authed_client, root_id, program_id)
         
         # 1. Create a Block
         start_date = datetime.utcnow()
@@ -658,6 +666,7 @@ class TestProgramStructure:
     def test_block_create_accepts_camel_case_dates_and_starts_empty(self, authed_client, sample_ultimate_goal, sample_program):
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
+        _delete_sample_blocks(authed_client, root_id, program_id)
 
         start_date = datetime.utcnow()
         end_date = start_date + timedelta(days=6)
@@ -1120,11 +1129,7 @@ class TestProgramStructure:
 
         block_response = authed_client.post(
             f'/api/{root_id}/programs/{program_id}/blocks',
-            json={
-                'name': 'Second Block',
-                'start_date': datetime.utcnow().strftime('%Y-%m-%d'),
-                'end_date': (datetime.utcnow() + timedelta(days=7)).strftime('%Y-%m-%d'),
-            }
+            json={'name': 'Second Block'}
         )
         assert block_response.status_code == 201
 
@@ -1145,3 +1150,47 @@ class TestProgramStructure:
 
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
+
+
+class TestProgramCalendarInvariantsApi:
+    def test_overlapping_block_returns_structured_409(self, authed_client, sample_ultimate_goal, sample_program):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+
+        response = authed_client.post(f'/api/{root_id}/programs/{program_id}/blocks', json={
+            'name': 'Overlap',
+            'start_date': datetime.utcnow().strftime('%Y-%m-%d'),
+            'end_date': (datetime.utcnow() + timedelta(days=2)).strftime('%Y-%m-%d'),
+        })
+
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload['code'] == 'program_block_overlap'
+        assert payload['conflicts'][0]['name'] == 'Week 1'
+
+    def test_block_with_reversed_dates_is_a_validation_error(self, authed_client, sample_ultimate_goal, sample_program):
+        root_id = sample_ultimate_goal.id
+        response = authed_client.post(f'/api/{root_id}/programs/{sample_program["id"]}/blocks', json={
+            'name': 'Backwards',
+            'start_date': (datetime.utcnow() + timedelta(days=3)).strftime('%Y-%m-%d'),
+            'end_date': datetime.utcnow().strftime('%Y-%m-%d'),
+        })
+
+        assert response.status_code == 400
+
+    def test_double_booked_date_returns_structured_409(self, authed_client, sample_ultimate_goal, sample_program):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        block_id = sample_program['blocks'][0]['id'] if sample_program.get('blocks') else authed_client.get(
+            f'/api/{root_id}/programs/{program_id}'
+        ).get_json()['blocks'][0]['id']
+        weekday = datetime.utcnow().strftime('%A')
+        days_url = f'/api/{root_id}/programs/{program_id}/blocks/{block_id}/days'
+        assert authed_client.post(days_url, json={'name': 'First', 'day_of_week': [weekday]}).status_code == 201
+
+        response = authed_client.post(days_url, json={'name': 'Second', 'day_of_week': [weekday]})
+
+        assert response.status_code == 409
+        payload = response.get_json()
+        assert payload['code'] == 'program_day_date_conflict'
+        assert {row['day_name'] for row in payload['conflicts']} >= {'First', 'Second'}

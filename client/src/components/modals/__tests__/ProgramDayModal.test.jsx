@@ -127,7 +127,7 @@ describe('ProgramDayModal', () => {
     describe('scheduling', () => {
         const block = { id: 'block-1', start_date: '2026-09-01', end_date: '2026-09-30' };
 
-        function renderModal(initialData, onSave = vi.fn()) {
+        function renderModal(initialData, onSave = vi.fn(), modalBlock = block) {
             getSessionTemplates.mockResolvedValue({ data: [] });
             getActivities.mockResolvedValue({ data: [] });
             getActivityGroups.mockResolvedValue({ data: [] });
@@ -138,7 +138,7 @@ describe('ProgramDayModal', () => {
                         onClose={vi.fn()}
                         onSave={onSave}
                         rootId="root-1"
-                        block={block}
+                        block={modalBlock}
                         initialData={initialData}
                     />
                 </QueryClientProvider>
@@ -224,6 +224,58 @@ describe('ProgramDayModal', () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
             expect(onSave.mock.calls[0][0]).toMatchObject({ day_of_week: [], scheduled_dates: ['2026-09-15'] });
+        });
+
+        describe('one program day per date', () => {
+            const busyBlock = {
+                ...block,
+                days: [
+                    { id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [] },
+                    { id: 'test', name: 'Test Day', day_of_week: [], scheduled_dates: ['2026-09-17'] },
+                ],
+            };
+
+            it('marks weekdays another day already holds as taken', () => {
+                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: [], templates: [] }, vi.fn(), busyBlock);
+
+                expect(screen.getByRole('button', { name: 'Monday, taken by Leg Day' })).toBeDisabled();
+                expect(screen.getByRole('button', { name: 'Thursday, taken by Test Day' })).toBeDisabled();
+                expect(screen.getByRole('button', { name: 'Friday' })).toBeEnabled();
+            });
+
+            it('ignores the day being edited when finding taken dates', () => {
+                renderModal({ id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [], templates: [] }, vi.fn(), busyBlock);
+
+                expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'true');
+                expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
+            });
+
+            it('refuses a specific date that another day already holds', () => {
+                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: ['2026-09-15'], templates: [] }, vi.fn(), busyBlock);
+
+                fireEvent.change(screen.getByLabelText('Date to add'), { target: { value: '2026-09-14' } });
+
+                expect(screen.getByRole('button', { name: 'Add date' })).toBeDisabled();
+                expect(screen.getByText('Mon, Sep 14, 2026 already has Leg Day.')).toBeInTheDocument();
+            });
+
+            it('blocks saving a planned date that collides with another day', () => {
+                renderModal({ name: 'Upper', day_of_week: ['Friday'], scheduled_dates: ['2026-09-21'], templates: [] }, vi.fn(), busyBlock);
+
+                expect(screen.getByRole('button', { name: 'Add Day' })).toBeDisabled();
+                expect(screen.getByText(/Mon, Sep 21 already has Leg Day/)).toBeInTheDocument();
+            });
+
+            it('shows a server calendar conflict inline and stays open', async () => {
+                const onSave = vi.fn().mockRejectedValue({ response: { status: 409, data: {
+                    code: 'program_day_date_conflict', error: 'Sep 19, 2026 would hold Upper and Other.',
+                } } });
+                renderModal({ name: 'Upper', day_of_week: ['Saturday'], scheduled_dates: [], templates: [] }, onSave, busyBlock);
+
+                fireEvent.click(screen.getByRole('button', { name: 'Add Day' }));
+
+                expect(await screen.findByRole('alert')).toHaveTextContent('Sep 19, 2026 would hold Upper and Other.');
+            });
         });
     });
 });

@@ -38,13 +38,16 @@ function DateChips({ dates, onRemove, label }) {
  */
 export default function ProgramDayScheduleField({
     mode, onModeChange, weekdays, onToggleWeekday, dates, onAddDate, onRemoveDate, minDate, maxDate,
+    takenWeekdays = new Map(), occupiedDates = new Map(),
 }) {
     const [draftDate, setDraftDate] = useState('');
     const groupId = useId();
     const dateInputId = useId();
+    const draftOwner = draftDate ? occupiedDates.get(draftDate) : null;
     const inRange = draftDate
         && (!minDate || draftDate >= minDate)
-        && (!maxDate || draftDate <= maxDate);
+        && (!maxDate || draftDate <= maxDate)
+        && !draftOwner;
 
     const addDraftDate = () => {
         if (!inRange) return;
@@ -76,18 +79,29 @@ export default function ProgramDayScheduleField({
                     <div className={styles.dayGrid}>
                         {WEEKDAY_NAMES.map((name) => {
                             const selected = weekdays.includes(name);
+                            // A taken weekday stays enabled while selected so it can be cleared.
+                            const owner = takenWeekdays.get(name);
+                            const taken = Boolean(owner) && !selected;
                             return (
                                 <button
                                     key={name}
                                     type="button"
                                     aria-pressed={selected}
-                                    aria-label={name}
+                                    aria-label={owner ? `${name}, taken by ${owner}` : name}
+                                    title={owner ? `Taken by ${owner}` : undefined}
+                                    disabled={taken}
                                     onClick={() => onToggleWeekday(name)}
-                                    className={`${styles.dayBtn} ${selected ? styles.dayBtnSelected : ''}`}
+                                    className={`${styles.dayBtn} ${selected ? styles.dayBtnSelected : ''} ${owner ? styles.dayBtnTaken : ''}`}
                                 >{name.slice(0, 3)}</button>
                             );
                         })}
                     </div>
+                    {takenWeekdays.size ? (
+                        <div className={styles.hint}>
+                            {[...takenWeekdays].map(([weekday, owner]) => `${weekday.slice(0, 3)}: ${owner}`).join(' · ')}
+                            {' '}already {takenWeekdays.size === 1 ? 'has its day' : 'have their days'}.
+                        </div>
+                    ) : null}
                     <div className={styles.hint}>
                         {weekdays.length
                             ? formatWeekdaySchedule(weekdays)
@@ -129,9 +143,11 @@ export default function ProgramDayScheduleField({
                         >Add date</button>
                     </div>
                     <div className={styles.hint} aria-live="polite">
-                        {dates.length
-                            ? formatSpecificDatesSummary(dates)
-                            : 'Add at least one date, or switch to Weekly.'}
+                        {draftOwner
+                            ? `${formatLiteralDate(draftDate, { weekday: 'short' })} already has ${draftOwner}.`
+                            : dates.length
+                                ? formatSpecificDatesSummary(dates)
+                                : 'Add at least one date, or switch to Weekly.'}
                     </div>
                 </>
             )}
@@ -149,4 +165,8 @@ ProgramDayScheduleField.propTypes = {
     onRemoveDate: PropTypes.func.isRequired,
     minDate: PropTypes.string,
     maxDate: PropTypes.string,
+    /** Weekday name -> the other program day that already holds a date on it. */
+    takenWeekdays: PropTypes.instanceOf(Map),
+    /** ISO date -> the other program day that already holds it. */
+    occupiedDates: PropTypes.instanceOf(Map),
 };

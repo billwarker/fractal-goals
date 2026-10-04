@@ -56,6 +56,15 @@ def reset_plan(current_user, root_id, program_id, day_id, template_id, plan_date
     ))
 
 
+@program_session_plans_bp.route(f'{PLAN_PATH}/load', methods=['POST'])
+@token_required
+def load_plan(current_user, root_id, program_id, day_id, template_id, plan_date):
+    """Load an optional template into an upcoming date; removing it is the DELETE reset."""
+    return _respond(ProgramSessionPlanService(get_db_session()).load_plan(
+        root_id, current_user.id, program_id, day_id, template_id, plan_date, request.args.get('timezone'),
+    ))
+
+
 @program_session_plans_bp.route(f'{PLAN_PATH}/pull-template', methods=['POST'])
 @token_required
 @validate_request(ProgramSessionPlanPullSchema)

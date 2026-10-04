@@ -337,6 +337,9 @@ def update_program(current_user, root_id, program_id, validated_data):
         if not result:
             return jsonify({"error": "Program not found"}), 404
         return jsonify(result)
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -397,6 +400,9 @@ def create_block(current_user, root_id, program_id, validated_data):
     try:
         block_dict = ProgramService.create_block(session, root_id, program_id, validated_data, current_user.id)
         return jsonify(block_dict), 201
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -415,6 +421,9 @@ def update_block(current_user, root_id, program_id, block_id, validated_data):
     try:
         block_dict = ProgramService.update_block(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify(block_dict)
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -450,6 +459,9 @@ def add_block_day(current_user, root_id, program_id, block_id, validated_data):
     try:
         result = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data, current_user.id)
         return jsonify(result), 201
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
          return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -468,6 +480,9 @@ def update_block_day(current_user, root_id, program_id, block_id, day_id, valida
     try:
         result = ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify(result)
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -503,6 +518,9 @@ def copy_block_day(current_user, root_id, program_id, block_id, day_id, validate
     try:
         result = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
         return jsonify(result)
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:
@@ -529,6 +547,9 @@ def schedule_block_day(current_user, root_id, program_id, block_id, day_id, vali
             current_user.id,
         )
         return jsonify(occurrence), 201
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
     except ValueError as e:
         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
     except SQLAlchemyError:

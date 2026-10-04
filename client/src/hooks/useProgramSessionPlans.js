@@ -42,7 +42,8 @@ export function useSessionPlanCandidates(rootId, templateId, date) {
 }
 
 /**
- * Save, reset, and pull-template mutations for one day's plans. Each returns the
+ * Save, reset, load, and pull-template mutations for one day's plans. Loading stores an
+ * optional template's seeded plan on the date; resetting an optional plan unloads it. Each returns the
  * refreshed plan entry, which replaces the cached entry before the day's
  * occurrence strip is refreshed.
  */
@@ -82,6 +83,12 @@ export function useProgramSessionPlanMutations(rootId, programId, dayId, date, t
         ).data,
         onSuccess: applyEntry,
     });
+    const load = useMutation({
+        mutationFn: async ({ templateId }) => (
+            await fractalApi.loadProgramSessionPlan(rootId, programId, dayId, templateId, date, timezone)
+        ).data,
+        onSuccess: applyEntry,
+    });
     const pullTemplate = useMutation({
         mutationFn: async ({ templateId, rowVersion }) => (
             await fractalApi.pullProgramSessionPlanTemplate(rootId, programId, dayId, templateId, date, {
@@ -92,5 +99,5 @@ export function useProgramSessionPlanMutations(rootId, programId, dayId, date, t
     });
     const refresh = () => queryClient.invalidateQueries({ queryKey: dayPlansKey });
 
-    return { save, reset, pullTemplate, refresh };
+    return { save, reset, load, pullTemplate, refresh };
 }

@@ -11,7 +11,7 @@ import ProgramDaySessionRow from './ProgramDaySessionRow';
 import ProgramDayStatusMenu from './ProgramDayStatusMenu';
 import styles from './ProgramSidePane.module.css';
 
-function ProgramDayPlanCard({ date, blocks, scheduledDayIds, onScheduleDay, onCreateDay }) {
+function ProgramDayPlanCard({ date, blocks, onScheduleDay, onCreateDay }) {
     const activeBlocks = blocks.filter((block) => (
         (!block.start_date || date >= block.start_date)
         && (!block.end_date || date <= block.end_date)
@@ -22,7 +22,7 @@ function ProgramDayPlanCard({ date, blocks, scheduledDayIds, onScheduleDay, onCr
             <p className={styles.explainer}>Add a dated definition or schedule one of this program’s reusable day definitions.</p>
             <div className={styles.actionList}>
                 {activeBlocks.flatMap((block) => (block.days || [])
-                    .filter((day) => !day.date && !scheduledDayIds.has(String(day.id)))
+                    .filter((day) => !day.date)
                     .map((day) => (
                         <button key={`${block.id}:${day.id}`} type="button" onClick={() => onScheduleDay?.(block.id, date, day)}>
                             Schedule {day.name} · {block.name}
@@ -232,11 +232,11 @@ export default function ProgramDayPane({
             {date < today && !detail.occurrences.length && !sessions.length ? (
                 <p className={styles.state}>No sessions logged on this day.</p>
             ) : null}
-            {date >= today ? (
+            {/* A date holds one program day, so planning is offered only on free upcoming dates. */}
+            {date >= today && !detail.occurrences.length ? (
                 <ProgramDayPlanCard
                     date={date}
                     blocks={blocks}
-                    scheduledDayIds={new Set(detail.occurrences.map((occurrence) => String(occurrence.program_day_id)))}
                     onScheduleDay={onScheduleDay}
                     onCreateDay={onCreateDay}
                 />

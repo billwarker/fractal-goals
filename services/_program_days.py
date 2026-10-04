@@ -25,6 +25,10 @@ from services.program_day_occurrences import (
     resolve_occurrence_credits,
 )
 from services.program_status_override_queries import load_program_status_overrides
+from services.program_calendar_invariants import (
+    assert_single_program_day_per_date,
+    lock_program_calendar,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +41,8 @@ class _ProgramDaysMixin:
         create_only=False,
     ) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
+        if not lock_program_calendar(session, program_id, root_id):
+            raise ValueError("Program not found")
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
         if not block:
             raise ValueError("Block not found")
@@ -115,6 +121,7 @@ class _ProgramDaysMixin:
                 'root_id': root_id,
             })
 
+        assert_single_program_day_per_date(session, program_id)
         cls._commit(session, commit=commit)
         for event_payload in emitted_days:
             cls._queue_or_emit_event(
@@ -136,13 +143,11 @@ class _ProgramDaysMixin:
         syncs_schedule = 'scheduled_dates' in data
         block = None
         day_query = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id)
+        # Same program -> block -> day lock order as schedule_block_day; the program
+        # lock serializes every calendar write so the one-day-per-date check holds.
+        if not lock_program_calendar(session, program_id, root_id):
+            raise ValueError("Program not found")
         if syncs_schedule:
-            # Same program -> block -> day lock order as schedule_block_day.
-            program = session.query(Program).filter_by(
-                id=program_id, root_id=root_id,
-            ).populate_existing().with_for_update().first()
-            if not program:
-                raise ValueError("Program not found")
             block = session.query(ProgramBlock).filter_by(
                 id=block_id, program_id=program_id,
             ).populate_existing().with_for_update().first()
@@ -211,6 +216,7 @@ class _ProgramDaysMixin:
                         cls._validate_program_day_completion_min(t_day)
             except StopIteration: pass
 
+        assert_single_program_day_per_date(session, program_id)
         cls._commit(session, day, commit=commit)
 
         event = Event(Events.PROGRAM_DAY_UPDATED, {
@@ -249,6 +255,8 @@ class _ProgramDaysMixin:
     @classmethod
     def copy_block_day(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
+        if not lock_program_calendar(session, program_id, root_id):
+            raise ValueError("Program not found")
         source_day = session.query(ProgramDay).filter_by(id=day_id).first()
         if not source_day:
             raise ValueError("Source day not found")
@@ -299,6 +307,7 @@ class _ProgramDaysMixin:
              copied_count += 1
              copied_days.append(target_day)
         
+        assert_single_program_day_per_date(session, program_id)
         cls._commit(session)
         return {
             "days": [serialize_program_day(day) for day in copied_days],
@@ -401,6 +410,7 @@ class _ProgramDaysMixin:
         )
         session.add(schedule_row)
         day.row_version += 1
+        assert_single_program_day_per_date(session, program_id)
         cls._commit(session, day, commit=commit)
 
         scheduled_event = Event(Events.PROGRAM_DAY_SCHEDULED, {

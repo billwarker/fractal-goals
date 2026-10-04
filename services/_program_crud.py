@@ -16,6 +16,14 @@ from services.quota_service import QuotaService
 from services.serializers import serialize_program, serialize_program_block
 from services.program_scope import resolve_program_scope, resolve_program_scopes
 from services._serialize_common import format_utc
+from services.program_calendar_invariants import (
+    assert_block_dates_valid,
+    assert_blocks_within_program,
+    assert_no_block_overlap,
+    assert_single_program_day_per_date,
+    flush_block_dates,
+    lock_program_calendar,
+)
 
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
@@ -74,12 +82,14 @@ class _ProgramCrudMixin:
         current_user_id: str | None = None, *, commit=True, pending_events=None,
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
-        program = get_owned_program(session, root_id, program_id)
+        program = lock_program_calendar(session, program_id, root_id)
         if not program:
             raise ValueError("Program not found")
 
         start_date_val = cls._parse_optional_block_date(data, 'start_date', 'startDate')
         end_date_val = cls._parse_optional_block_date(data, 'end_date', 'endDate')
+        assert_block_dates_valid(program, start_date_val, end_date_val)
+        assert_no_block_overlap(session, program.id, start_date_val, end_date_val)
 
         new_block = ProgramBlock(
             program_id=program.id,
@@ -89,7 +99,7 @@ class _ProgramCrudMixin:
             color=data.get('color')
         )
         session.add(new_block)
-        session.flush() # Get ID
+        flush_block_dates(session, new_block)
 
         if data.get('goal_ids'):
             cls._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
@@ -110,7 +120,7 @@ class _ProgramCrudMixin:
         current_user_id: str | None = None, *, commit=True, pending_events=None,
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
-        program = get_owned_program(session, root_id, program_id)
+        program = lock_program_calendar(session, program_id, root_id)
         if not program:
             raise ValueError("Program not found")
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
@@ -122,10 +132,23 @@ class _ProgramCrudMixin:
         if 'color' in data:
             block.color = data['color']
             
-        if 'start_date' in data or 'startDate' in data:
-            block.start_date = cls._parse_optional_block_date(data, 'start_date', 'startDate')
-        if 'end_date' in data or 'endDate' in data:
-            block.end_date = cls._parse_optional_block_date(data, 'end_date', 'endDate')
+        changes_dates = any(key in data for key in ('start_date', 'startDate', 'end_date', 'endDate'))
+        if changes_dates:
+            # Validate before assigning so autoflush never sends a conflicting range.
+            next_start = (
+                cls._parse_optional_block_date(data, 'start_date', 'startDate')
+                if 'start_date' in data or 'startDate' in data else block.start_date
+            )
+            next_end = (
+                cls._parse_optional_block_date(data, 'end_date', 'endDate')
+                if 'end_date' in data or 'endDate' in data else block.end_date
+            )
+            assert_block_dates_valid(program, next_start, next_end)
+            assert_no_block_overlap(session, program.id, next_start, next_end, exclude_block_id=block.id)
+            block.start_date, block.end_date = next_start, next_end
+            flush_block_dates(session, block)
+            # Moving a block re-expands its weekday days and dormant explicit dates.
+            assert_single_program_day_per_date(session, program.id)
 
         if 'goal_ids' in data:
             cls._replace_block_goals(session, block.id, data['goal_ids'], root_id)
@@ -145,7 +168,7 @@ class _ProgramCrudMixin:
     @classmethod
     def delete_block(cls, session, root_id: str, program_id: str, block_id: str, current_user_id: str | None = None):
         cls._require_root_access(session, root_id, current_user_id)
-        program = get_owned_program(session, root_id, program_id)
+        program = lock_program_calendar(session, program_id, root_id)
         if not program:
             raise ValueError("Program not found")
         block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program.id).first()
@@ -220,7 +243,11 @@ class _ProgramCrudMixin:
         current_user_id: str | None = None, *, commit=True, pending_events=None,
     ) -> Optional[Dict]:
         cls._require_root_access(session, root_id, current_user_id)
-        program = get_owned_program(session, root_id, program_id)
+        changes_dates = 'start_date' in validated_data or 'end_date' in validated_data
+        program = (
+            lock_program_calendar(session, program_id, root_id) if changes_dates
+            else get_owned_program(session, root_id, program_id)
+        )
         if not program:
             return None
 
@@ -232,7 +259,7 @@ class _ProgramCrudMixin:
             validated_data.get('end_date', program.end_date),
             'end_date',
         )
-        if 'start_date' in validated_data or 'end_date' in validated_data:
+        if changes_dates:
             cls._check_no_program_overlap(
                 session,
                 root_id,
@@ -240,6 +267,7 @@ class _ProgramCrudMixin:
                 next_end_date,
                 exclude_program_id=program_id,
             )
+            assert_blocks_within_program(session, program.id, next_start_date, next_end_date)
         
         if 'name' in validated_data:
             program.name = validated_data['name']

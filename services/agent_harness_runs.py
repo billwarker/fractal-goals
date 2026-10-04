@@ -11,7 +11,7 @@ from services.goal_service import GoalService, sync_goal_targets
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 
-from services.agent_harness_common import AgentHarnessError, _aware, _digest
+from services.agent_harness_common import AgentHarnessError, _aware, _digest, harness_validation_error
 from services.agent_operation_versions import operation_restore_payload, operation_state_hash
 from services.agent_operation_registry import OPERATION_REGISTRY
 
@@ -319,7 +319,7 @@ class AgentRunsMixin:
                     )
                     entity_id = input_data["day_id"]
             except ValueError as exc:
-                raise AgentHarnessError(str(exc), 400, "validation_failed") from exc
+                raise harness_validation_error(exc) from exc
             if entity is None:
                 raise AgentHarnessError("Program was not found", 404, "not_found")
             result = {
@@ -465,15 +465,18 @@ class AgentRunsMixin:
         elif operation.kind == "create_block":
             from services.programs import ProgramService
 
-            entity = ProgramService.create_block(
-                self.db_session,
-                locked_run.root_id,
-                input_data["program_id"],
-                input_data["data"],
-                locked_run.user_id,
-                commit=False,
-                pending_events=pending_events,
-            )
+            try:
+                entity = ProgramService.create_block(
+                    self.db_session,
+                    locked_run.root_id,
+                    input_data["program_id"],
+                    input_data["data"],
+                    locked_run.user_id,
+                    commit=False,
+                    pending_events=pending_events,
+                )
+            except ValueError as exc:
+                raise harness_validation_error(exc) from exc
             result = {
                 "id": entity["id"],
                 "name": entity.get("name"),
@@ -483,17 +486,20 @@ class AgentRunsMixin:
         elif operation.kind == "create_program_day":
             from services.programs import ProgramService
 
-            created = ProgramService.add_block_day(
-                self.db_session,
-                locked_run.root_id,
-                input_data["program_id"],
-                input_data["block_id"],
-                input_data["data"],
-                locked_run.user_id,
-                commit=False,
-                pending_events=pending_events,
-                create_only=True,
-            )
+            try:
+                created = ProgramService.add_block_day(
+                    self.db_session,
+                    locked_run.root_id,
+                    input_data["program_id"],
+                    input_data["block_id"],
+                    input_data["data"],
+                    locked_run.user_id,
+                    commit=False,
+                    pending_events=pending_events,
+                    create_only=True,
+                )
+            except ValueError as exc:
+                raise harness_validation_error(exc) from exc
             first_day = (created.get("days") or [{}])[0]
             result = {
                 "id": first_day.get("id"),
@@ -505,17 +511,20 @@ class AgentRunsMixin:
             from services.programs import ProgramService
 
             input_data.pop("expected_source_hash", None)
-            scheduled = ProgramService.schedule_block_day(
-                self.db_session,
-                locked_run.root_id,
-                input_data["program_id"],
-                input_data["block_id"],
-                input_data["day_id"],
-                input_data["data"],
-                locked_run.user_id,
-                commit=False,
-                pending_events=pending_events,
-            )
+            try:
+                scheduled = ProgramService.schedule_block_day(
+                    self.db_session,
+                    locked_run.root_id,
+                    input_data["program_id"],
+                    input_data["block_id"],
+                    input_data["day_id"],
+                    input_data["data"],
+                    locked_run.user_id,
+                    commit=False,
+                    pending_events=pending_events,
+                )
+            except ValueError as exc:
+                raise harness_validation_error(exc) from exc
             result = {
                 "id": scheduled.get("id"),
                 "program_day_id": input_data["day_id"],

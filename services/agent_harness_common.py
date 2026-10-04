@@ -20,6 +20,14 @@ class AgentHarnessError(ValueError):
         self.code = code
 
 
+def harness_validation_error(exc):
+    """Map a service validation failure to a harness error, keeping structured codes and statuses."""
+    payload = getattr(exc, "payload", None)
+    if isinstance(payload, dict) and payload.get("code"):
+        return AgentHarnessError(str(exc), getattr(exc, "status_code", 400), payload["code"])
+    return AgentHarnessError(str(exc), 400, "validation_failed")
+
+
 def _canonical_json(value):
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
 

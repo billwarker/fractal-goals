@@ -5,6 +5,7 @@ import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { useProgramLogic } from './useProgramLogic';
 import { logError } from '../utils/logger';
+import { calendarConflictMessage } from '../utils/programCalendarConflicts';
 
 function formatGoalTypeLabel(type) {
     if (!type) return 'Goal';
@@ -55,7 +56,11 @@ export function useProgramDetailMutations({
             onBlockSaved?.();
         } catch (error) {
             logError('Failed to save training block:', error);
-            notify.error(`Failed to save training block: ${formatError(error)}`);
+            // Calendar conflicts are shown inline by the modal, which stays open.
+            if (!calendarConflictMessage(error)) {
+                notify.error(`Failed to save training block: ${formatError(error)}`);
+            }
+            throw error;
         }
     }, [actions, onBlockSaved]);
 
@@ -77,7 +82,10 @@ export function useProgramDetailMutations({
             onDaySaved?.();
         } catch (error) {
             logError('Failed to save day:', error);
-            notify.error(`Failed to save day: ${formatError(error)}`);
+            if (!calendarConflictMessage(error)) {
+                notify.error(`Failed to save day: ${formatError(error)}`);
+            }
+            throw error;
         }
     }, [actions, dayModalInitialData, selectedBlockId, onDaySaved]);
 

@@ -5,7 +5,7 @@ import { queryKeys } from '../../hooks/queryKeys';
 import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries';
 import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
 import { useCircuits, useCreateCircuitDefinition } from '../../hooks/useCircuitQueries';
-import { getDatePart } from '../../utils/dateUtils';
+import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
 import { getProgramDaySpecificDates, getProgramDayWeekdays } from '../../utils/programViewModel';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
@@ -23,6 +23,12 @@ import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import { buildTemplateActivityCatalogue } from './templateBuilderItems';
 import ProgramDayScheduleField, { SCHEDULE_MODES } from './ProgramDayScheduleField';
+import {
+    calendarConflictMessage,
+    findDraftDayConflicts,
+    occupiedBlockDates,
+    takenWeekdays,
+} from '../../utils/programCalendarConflicts';
 
 function parseLegacyWeekdays(dayOfWeek) {
     if (typeof dayOfWeek !== 'string' || !dayOfWeek.trim().startsWith('[')) return dayOfWeek;
@@ -88,11 +94,24 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
     const blockStart = getDatePart(block?.start_date) || '';
     const blockEnd = getDatePart(block?.end_date) || '';
     const isDatesMode = scheduleMode === SCHEDULE_MODES.dates;
+    const [serverError, setServerError] = useState('');
+    // A date holds one program day: show which dates the block's other days already hold.
+    const occupiedDates = useMemo(
+        () => occupiedBlockDates(block, { excludeDayId: initialData?.id }),
+        [block, initialData?.id],
+    );
+    const weekdayOwners = useMemo(() => takenWeekdays(occupiedDates), [occupiedDates]);
+    const [firstConflict] = findDraftDayConflicts(block, occupiedDates, {
+        weekdays: isDatesMode ? [] : selectedDaysOfWeek,
+        dates: specificDates,
+    });
     const saveBlockedReason = !name.trim()
         ? 'Give the day a name to save it.'
         : isDatesMode && !specificDates.length
             ? 'Add at least one date to save a specific-dates day.'
-            : '';
+            : firstConflict
+                ? `${formatLiteralDate(firstConflict.date, { weekday: 'short', year: undefined })} already has ${firstConflict.dayName}. A date can hold only one program day.`
+                : '';
 
     const { sessionTemplates = [] } = useSessionTemplates(rootId);
     const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
@@ -128,8 +147,9 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
         },
     });
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (saveBlockedReason) return;
+        setServerError('');
         const templateConfigs = selectedTemplates.map((entry, index) => ({
             template_id: entry.templateId,
             is_required: entry.isRequired !== false,
@@ -139,16 +159,21 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
             ? null
             : Math.max(1, Math.min(Number(completionMinTemplates) || 1, templateConfigs.length || 1));
 
-        onSave({
-            name,
-            template_ids: templateConfigs.map((entry) => entry.template_id),
-            template_configs: templateConfigs,
-            // Specific dates are always explicit schedule rows; the legacy
-            // fixed `date` is never written and converts server-side on save.
-            day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
-            scheduled_dates: specificDates,
-            completion_min_templates: parsedMinTemplates,
-        });
+        try {
+            await onSave({
+                name,
+                template_ids: templateConfigs.map((entry) => entry.template_id),
+                template_configs: templateConfigs,
+                // Specific dates are always explicit schedule rows; the legacy
+                // fixed `date` is never written and converts server-side on save.
+                day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
+                scheduled_dates: specificDates,
+                completion_min_templates: parsedMinTemplates,
+            });
+        } catch (error) {
+            // Other failures are already reported by a toast; the modal stays open.
+            setServerError(calendarConflictMessage(error) || '');
+        }
     };
 
     const handleToggleDay = (day) => {
@@ -262,6 +287,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                             onRemoveDate={handleRemoveDate}
                             minDate={blockStart}
                             maxDate={blockEnd}
+                            takenWeekdays={weekdayOwners}
+                            occupiedDates={occupiedDates}
                         />
 
                         <div className={styles.field}>
@@ -378,6 +405,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                     <div className={styles.rightActions} style={{ display: 'flex', gap: '8px' }}>
                         {saveBlockedReason ? (
                             <span id="program-day-save-blocked" className={styles.saveBlockedReason}>{saveBlockedReason}</span>
+                        ) : serverError ? (
+                            <span className={styles.saveBlockedReason} role="alert">{serverError}</span>
                         ) : null}
                         <Button variant="secondary" onClick={onClose}>
                             Cancel

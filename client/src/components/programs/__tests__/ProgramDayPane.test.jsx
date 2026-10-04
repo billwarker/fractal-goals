@@ -281,4 +281,14 @@ describe('ProgramDayPane', () => {
         expect(onScheduleDay).toHaveBeenCalledWith('block-1', '2026-09-02', reusable);
         expect(onCreateDay).toHaveBeenCalledWith('block-1', '2026-09-02');
     });
+
+    it('offers no planning actions on a date that already has its program day', () => {
+        renderPane({
+            blocks: [{ id: 'block-1', name: 'Foundation', days: [{ id: 'reusable-1', name: 'Reusable', date: null }] }],
+        });
+
+        expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Schedule Reusable · Foundation' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'New day in Foundation' })).not.toBeInTheDocument();
+    });
 });

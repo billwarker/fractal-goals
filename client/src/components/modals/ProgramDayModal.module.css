@@ -135,7 +135,17 @@
     color: white !important;
 }
 
-.dayBtn:hover:not(.dayBtnSelected) {
+.dayBtnTaken:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    text-decoration: line-through;
+}
+
+.dayBtnSelected.dayBtnTaken {
+    border-color: var(--color-brand-danger);
+}
+
+.dayBtn:hover:not(.dayBtnSelected):not(:disabled) {
     background: var(--color-bg-card-hover);
     border-color: var(--color-border-hover);
 }

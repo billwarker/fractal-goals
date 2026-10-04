@@ -276,6 +276,9 @@ class ProgramSessionPlanService:
                 'revision': template.revision or 1,
             },
             'is_required': bool(rule['is_required']) if rule else True,
+            # Required templates are always on the day; an optional one is loaded into a
+            # date by storing its plan (get_day_plans also counts a logged session).
+            'is_loaded': bool(stored) or (bool(rule['is_required']) if rule else True),
             'date': plan_date.isoformat(),
             'plan_id': stored.id if stored else None,
             'row_version': stored.row_version if stored else None,
@@ -435,6 +438,7 @@ class ProgramSessionPlanService:
                 template, rule, plan_date, resolved, executed.get(stored.id, []) if stored else [],
             )
             entry['logged_sessions'] = logged_by_template.get(template.id, [])
+            entry['is_loaded'] = entry['is_loaded'] or bool(entry['logged_sessions'])
             plans.append(entry)
         return {
             'date': plan_date.isoformat(),
@@ -539,6 +543,42 @@ class ProgramSessionPlanService:
             return self._conflict()
         self._emit(Events.PROGRAM_SESSION_PLAN_SAVED, root_id, stored, template)
         return self._reload_entry(day, block, rule, plan_date, stored)
+
+    @_handles_plan_errors
+    def load_plan(self, root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name=None):
+        """Load an optional template into one date by storing its seeded plan (idempotent)."""
+        target = self._load_for_write(root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name)
+        day, block, rule, plan_date, stored = target.day, target.block, target.rule, target.plan_date, target.stored
+        if rule['is_required']:
+            raise PlanRequestError('Required templates are already part of this program day', 400)
+        if stored is not None:
+            self.db_session.rollback()
+            return self._reload_entry(day, block, rule, plan_date, stored)
+
+        template = rule['template']
+        resolved = self._resolve(day, block, template, plan_date)
+        sections = copy.deepcopy(resolved['sections'])
+        quota = QuotaService(self.db_session)
+        _, storage_error, storage_status = quota.check_storage_available(
+            owner_id, QuotaService._payload_size({'sections': sections}),
+        )
+        if storage_error:
+            self.db_session.rollback()
+            return None, storage_error, storage_status
+
+        stored = self._materialize(day, block, template, plan_date, sections, owner_id, resolved=resolved)
+        try:
+            self.db_session.commit()
+        except IntegrityError:
+            # Another request loaded the same occurrence first; return that plan.
+            self.db_session.rollback()
+            stored = self._stored_plan(day.id, template.id, plan_date)
+            if stored is None:
+                return self._conflict()
+            return self._reload_entry(day, block, rule, plan_date, stored)
+        self._emit(Events.PROGRAM_SESSION_PLAN_SAVED, root_id, stored, template)
+        entry, error, _ = self._reload_entry(day, block, rule, plan_date, stored)
+        return entry, error, 201
 
     @_handles_plan_errors
     def reset_plan(self, root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name=None):

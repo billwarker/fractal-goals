@@ -40,15 +40,13 @@ function renderPane({ date = '2026-09-05', today = '2026-09-02', detail = {}, da
 }
 
 describe('ProgramDayPane planning and events', () => {
-    it('keeps planning available on a scheduled future date without re-offering scheduled definitions', () => {
-        const onScheduleDay = vi.fn();
+    it('offers removal but no further planning on a scheduled future date', () => {
         const onUnscheduleDay = vi.fn();
-        renderPane({ onScheduleDay, onUnscheduleDay });
+        renderPane({ onUnscheduleDay });
 
-        const plan = screen.getByRole('heading', { name: 'Plan this day' }).closest('section');
-        expect(within(plan).queryByRole('button', { name: /Schedule Strength day/ })).not.toBeInTheDocument();
-        fireEvent.click(within(plan).getByRole('button', { name: 'Schedule Mobility · Foundation' }));
-        expect(onScheduleDay).toHaveBeenCalledWith('block-1', '2026-09-05', blocks[0].days[1]);
+        // A date holds one program day, so a scheduled date offers no other definitions.
+        expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Schedule Mobility · Foundation' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove from this date' }));
         expect(onUnscheduleDay).toHaveBeenCalledWith('block-1', 'day-1', '2026-09-05');
     });

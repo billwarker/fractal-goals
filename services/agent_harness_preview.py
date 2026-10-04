@@ -4,7 +4,7 @@ from services.activity_service import ActivityService
 from services.goal_service import GoalService, sync_goal_targets
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
-from services.agent_harness_common import AgentHarnessError
+from services.agent_harness_common import AgentHarnessError, harness_validation_error
 from services.agent_operation_versions import operation_restore_payload
 
 
@@ -108,7 +108,7 @@ class AgentProposalPreviewMixin:
                     )
                     entity_id = operation["day_id"]
             except ValueError as exc:
-                raise AgentHarnessError(str(exc), 400, "validation_failed") from exc
+                raise harness_validation_error(exc) from exc
             if entity is None:
                 raise AgentHarnessError("Program was not found", 404, "not_found")
             before_data = before.get("data", {})
@@ -332,15 +332,18 @@ class AgentProposalPreviewMixin:
         if operation["type"] == "create_block":
             from services.programs import ProgramService
 
-            entity = ProgramService.create_block(
-                self.db_session,
-                task.root_id,
-                operation["program_id"],
-                operation["data"],
-                user_id,
-                commit=False,
-                pending_events=[],
-            )
+            try:
+                entity = ProgramService.create_block(
+                    self.db_session,
+                    task.root_id,
+                    operation["program_id"],
+                    operation["data"],
+                    user_id,
+                    commit=False,
+                    pending_events=[],
+                )
+            except ValueError as exc:
+                raise harness_validation_error(exc) from exc
             return {
                 "operation_id": operation["operation_id"],
                 "type": operation["type"],
@@ -363,17 +366,20 @@ class AgentProposalPreviewMixin:
         if operation["type"] == "create_program_day":
             from services.programs import ProgramService
 
-            result = ProgramService.add_block_day(
-                self.db_session,
-                task.root_id,
-                operation["program_id"],
-                operation["block_id"],
-                operation["data"],
-                user_id,
-                commit=False,
-                pending_events=[],
-                create_only=True,
-            )
+            try:
+                result = ProgramService.add_block_day(
+                    self.db_session,
+                    task.root_id,
+                    operation["program_id"],
+                    operation["block_id"],
+                    operation["data"],
+                    user_id,
+                    commit=False,
+                    pending_events=[],
+                    create_only=True,
+                )
+            except ValueError as exc:
+                raise harness_validation_error(exc) from exc
             first_day = (result.get("days") or [{}])[0]
             return {
                 "operation_id": operation["operation_id"],
@@ -410,7 +416,7 @@ class AgentProposalPreviewMixin:
                     pending_events=[],
                 )
             except ValueError as error:
-                raise AgentHarnessError(str(error), 400, "validation_failed") from error
+                raise harness_validation_error(error) from error
             return {
                 "operation_id": operation["operation_id"],
                 "type": operation["type"],

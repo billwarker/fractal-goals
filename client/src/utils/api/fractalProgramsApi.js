@@ -62,6 +62,11 @@ export const fractalProgramsApi = {
         `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}`,
         { params: { timezone } },
     ),
+    loadProgramSessionPlan: (rootId, programId, dayId, templateId, date, timezone = 'UTC') => axios.post(
+        `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}/load`,
+        null,
+        { params: { timezone } },
+    ),
     pullProgramSessionPlanTemplate: (rootId, programId, dayId, templateId, date, data, timezone = 'UTC') => axios.post(
         `${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/plans/${templateId}/${date}/pull-template`,
         data,

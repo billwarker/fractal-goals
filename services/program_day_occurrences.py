@@ -214,7 +214,9 @@ def evaluate_date(occurrence_rows):
 
     ``completion_min_templates`` is a day-level threshold. Overlapping definitions
     therefore contribute distinct templates to one pool and the strongest configured
-    threshold wins; thresholds are never added together.
+    threshold wins; thresholds are never added together. Calendar writes now keep one
+    definition per date (services/program_calendar_invariants.py); the merge stays as a
+    defensive fallback.
     """
     evaluations = [row["evaluation"] for row in occurrence_rows]
     scheduled_template_ids = {

@@ -4,6 +4,8 @@ import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import { calendarConflictMessage, findBlockOverlap } from '../../utils/programCalendarConflicts';
+import { formatLiteralDate } from '../../utils/dateUtils';
 import styles from './ProgramBlockModal.module.css';
 
 function buildInitialBlockFormData(initialData) {
@@ -36,7 +38,7 @@ function clampDateToRange(value, min, max) {
     return value;
 }
 
-const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDates = {} }) => {
+const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDates = {}, siblingBlocks = [] }) => {
     const programStart = getDatePart(programDates.start);
     const programEnd = getDatePart(programDates.end);
     const [formData, setFormData] = useState(() => {
@@ -61,6 +63,11 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
     });
     const [errors, setErrors] = useState({});
     const [isSaving, setIsSaving] = useState(false);
+    const [serverError, setServerError] = useState('');
+    const overlap = findBlockOverlap(siblingBlocks, formData);
+    const overlapMessage = overlap
+        ? `Overlaps ${overlap.name} (${formatLiteralDate(overlap.start_date, { year: undefined })} – ${formatLiteralDate(overlap.end_date, { year: undefined })}). Blocks can't overlap.`
+        : '';
 
     const validate = () => {
         const newErrors = {};
@@ -95,13 +102,17 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
     };
 
     const handleSave = async () => {
-        if (!validate() || isSaving) {
+        if (!validate() || isSaving || overlap) {
             return;
         }
 
         setIsSaving(true);
+        setServerError('');
         try {
             await onSave(formData);
+        } catch (error) {
+            // Other failures are already reported by a toast.
+            setServerError(calendarConflictMessage(error) || '');
         } finally {
             setIsSaving(false);
         }
@@ -113,6 +124,7 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
             ? nextStartDate
             : clampDateToRange(formData.endDate, nextStartDate || programStart, programEnd);
 
+        setServerError('');
         setFormData({
             ...formData,
             startDate: nextStartDate,
@@ -122,6 +134,7 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
 
     const handleEndDateChange = (event) => {
         const minEndDate = formData.startDate || programStart;
+        setServerError('');
         setFormData({
             ...formData,
             endDate: clampDateToRange(event.target.value, minEndDate, programEnd),
@@ -182,6 +195,10 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
                         <div className={styles.error}>{errors.dateRange}</div>
                     )}
 
+                    {(overlapMessage || serverError) && (
+                        <div className={styles.error} role="alert">{overlapMessage || serverError}</div>
+                    )}
+
                     <div className={styles.field}>
                         <label className={styles.colorLabel}>
                             Color Code
@@ -203,7 +220,7 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
                 <Button variant="secondary" onClick={onClose} disabled={isSaving}>
                     Cancel
                 </Button>
-                <Button variant="primary" onClick={handleSave} isLoading={isSaving}>
+                <Button variant="primary" onClick={handleSave} isLoading={isSaving} disabled={Boolean(overlap)}>
                     Save Block
                 </Button>
             </ModalFooter>
@@ -211,7 +228,7 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
     );
 };
 
-const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {} }) => {
+const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, programDates = {}, siblingBlocks = [] }) => {
     if (!isOpen) {
         return null;
     }
@@ -224,6 +241,7 @@ const ProgramBlockModal = ({ isOpen, onClose, onSave, initialData = null, progra
             onSave={onSave}
             initialData={initialData}
             programDates={programDates}
+            siblingBlocks={siblingBlocks}
         />
     );
 };

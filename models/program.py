@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint, Index
-from sqlalchemy import text
+from sqlalchemy import DDL, event, func, text
+from sqlalchemy.dialects.postgresql import ExcludeConstraint
 from sqlalchemy.orm import relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -92,6 +93,21 @@ class ProgramBlock(Base):
     is_completed = Column(Boolean, default=False)
     row_version = Column(Integer, nullable=False, default=1, server_default='1')
     __mapper_args__ = {'version_id_col': row_version}
+    # Backstop for the service guard in services/program_calendar_invariants.py:
+    # dated blocks in one program never overlap (inclusive ranges).
+    __table_args__ = (
+        CheckConstraint(
+            'start_date IS NULL OR end_date IS NULL OR start_date <= end_date',
+            name='ck_program_blocks_date_order',
+        ),
+        ExcludeConstraint(
+            (program_id, '='),
+            (func.daterange(start_date, end_date, text("'[]'")), '&&'),
+            name='ex_program_blocks_no_overlap',
+            using='gist',
+            where=text('start_date IS NOT NULL AND end_date IS NOT NULL'),
+        ),
+    )
     
     program = relationship("Program", back_populates="blocks")
     days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
@@ -101,6 +117,13 @@ class ProgramBlock(Base):
         backref="program_blocks",
         viewonly=True
     )
+
+event.listen(
+    ProgramBlock.__table__,
+    'before_create',
+    DDL('CREATE EXTENSION IF NOT EXISTS btree_gist').execute_if(dialect='postgresql'),
+)
+
 
 class ProgramDay(Base):
     __tablename__ = 'program_days'

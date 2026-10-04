@@ -125,6 +125,19 @@ class ProgramUpdateSchema(BaseModel):
                     raise e
         return self
 
+def _validate_block_date_range(model):
+    """Reject a block whose end precedes its start; the service owns span and overlap rules."""
+    if model.start_date and model.end_date:
+        try:
+            start = parse_date_string(model.start_date)
+            end = parse_date_string(model.end_date)
+        except ValueError:
+            raise ValueError('Invalid date format')
+        if start > end:
+            raise ValueError('end_date must be after or equal to start_date')
+    return model
+
+
 class ProgramBlockSchema(BaseModel):
     """Schema for a program block."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -147,6 +160,10 @@ class ProgramBlockSchema(BaseModel):
         if 'end_date' not in normalized and 'endDate' in normalized:
             normalized['end_date'] = normalized['endDate']
         return normalized
+
+    @model_validator(mode='after')
+    def validate_date_range(self) -> 'ProgramBlockSchema':
+        return _validate_block_date_range(self)
 
 
 class ProgramBlockUpdateSchema(BaseModel):
@@ -171,6 +188,10 @@ class ProgramBlockUpdateSchema(BaseModel):
         if 'end_date' not in normalized and 'endDate' in normalized:
             normalized['end_date'] = normalized['endDate']
         return normalized
+
+    @model_validator(mode='after')
+    def validate_date_range(self) -> 'ProgramBlockUpdateSchema':
+        return _validate_block_date_range(self)
 
 
 

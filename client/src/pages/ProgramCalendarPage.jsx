@@ -1164,6 +1164,7 @@ function ProgramCalendarPage() {
                         onSave={saveBlock}
                         initialData={blockModalData}
                         programDates={{ start: displayProgram.start_date, end: displayProgram.end_date }}
+                        siblingBlocks={displayProgram.blocks || []}
                     />
                 </Suspense>
             )}

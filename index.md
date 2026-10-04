@@ -111,6 +111,20 @@ Programs contain dated blocks and reusable or dated program-day definitions. Pro
 resolved by `services/program_scope.py`; execution metrics use bounded read models rather than
 client recomputation.
 
+Two calendar invariants hold on every write path (UI, API, agent proposals):
+`services/program_calendar_invariants.py` rejects overlapping blocks (inclusive ranges, inside
+the program's dates; backed by the `ex_program_blocks_no_overlap` exclusion constraint) and any
+date holding more than one program day (checked after flush through `build_occurrences`, so
+weekday, explicit, and legacy dates count alike). Every calendar write takes the program row lock
+first. Violations are `ProgramServiceValidationError`s with `program_block_overlap` /
+`program_day_date_conflict` codes (409) and a `conflicts` list; `utils/programCalendarConflicts.js`
+mirrors them as editor hints (taken weekdays and dates, sibling-block overlap), and the block and
+day modals show server conflicts inline.
+Migration `f1b3d5a7c9e2` repairs pre-existing violations at startup before adding the constraints:
+an overlapping block with fewer logged sessions is undated (kept, off the calendar), and on a
+double-booked date the day with more sessions keeps it while the other loses only that schedule
+row, weekday, or legacy date. Each repair is logged.
+
 `services/program_day_occurrences.py` is the canonical calendar evaluator. It owns the seven
 day states, stable chain roles, and per-calendar-day completion semantics. When definitions
 overlap, required/completed templates are deduplicated and the strongest configured
@@ -211,7 +225,7 @@ mobile keeps the toggle in the header and the pane as a closable sheet. Days (`c
 one program day's occurrence dates in two columns: a focused date (by default the next program day)
 beside the latest completed occurrence before it (else the previous one), each with its canonical
 status mark and credited sessions. A template completed on a date shows its session in the plan card
-layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. On this tab the side pane lists every plannable program day with its
+layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every plannable program day with its
 templates, and each column has its own date rail (canonical status marks; A picks the comparison, B
 the date being planned). One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
 evaluates all days in a single evaluator pass.
@@ -236,6 +250,7 @@ Detailed design:
 - [Day review summary and session credit](planning/program-day-review-summary-and-credit.md)
 - [Calendar events and occurrence scheduling](planning/program-calendar-periods-and-scheduling.md)
 - [Viewport-driven calendar feed](planning/program-calendar-viewport-feed.md)
+- [Calendar invariants and optional templates](planning/program-calendar-invariants-and-optional-templates.md)
 
 ### Notes and analytics
 

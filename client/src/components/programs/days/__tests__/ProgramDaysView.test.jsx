@@ -9,6 +9,7 @@ const api = {
     getProgramDayPlans: vi.fn(),
     saveProgramSessionPlan: vi.fn(),
     resetProgramSessionPlan: vi.fn(),
+    loadProgramSessionPlan: vi.fn(),
     pullProgramSessionPlanTemplate: vi.fn(),
     getActivityTagCatalog: vi.fn(),
 };
@@ -491,5 +492,78 @@ describe('ProgramDaysView', () => {
         expect(session.querySelector('[data-align-key="tmpl|c:circ#0"]')).not.toBeNull();
         expect(screen.queryByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).not.toBeInTheDocument();
         expect(await nextCard()).toBeInTheDocument();
+    });
+});
+
+
+describe('Optional session templates', () => {
+    const accessories = (overrides = {}) => planEntry({
+        template: { id: 'acc', name: 'Accessories', color: '#aa5500', revision: 1 },
+        is_required: false,
+        is_loaded: false,
+        source: 'template',
+        seeded_from_date: null,
+        previous: null,
+        sections: [{ name: 'Main', items: [
+            { type: 'activity', activity_definition_id: 'bench', name: 'Curls', item_key: 'c1' },
+            { type: 'activity', activity_definition_id: 'bench', name: 'Rows', item_key: 'c2' },
+        ] }],
+        ...overrides,
+    });
+    const withOptional = (optional) => (_root, _program, _day, date) => Promise.resolve({ data: { date, plans: [
+        date === '2026-09-28' ? WEEK_ONE : planEntry({ is_loaded: true }),
+        { ...optional, date },
+    ] } });
+    const selector = () => screen.findByRole('region', { name: 'Optional sessions' });
+
+    it('opens required templates and lists optional ones in a selector', async () => {
+        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
+        renderView();
+
+        expect(await nextCard()).toBeInTheDocument();
+        const list = await selector();
+        expect(within(list).getByText('Accessories')).toBeInTheDocument();
+        expect(within(list).getByText('2 activities')).toBeInTheDocument();
+        expect(screen.queryByRole('article', { name: 'Accessories plan, Mon, Oct 5' })).not.toBeInTheDocument();
+    });
+
+    it('adds an optional template to the day as an editable plan card', async () => {
+        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
+        api.loadProgramSessionPlan.mockResolvedValue({ data: accessories({
+            date: '2026-10-05', is_loaded: true, plan_id: 'pa', row_version: 1, source: 'plan',
+        }) });
+        renderView();
+
+        fireEvent.click(within(await selector()).getByRole('button', { name: 'Add Accessories to this day' }));
+
+        const card = await screen.findByRole('article', { name: 'Accessories plan, Mon, Oct 5' });
+        expect(api.loadProgramSessionPlan).toHaveBeenCalledWith('root', 'program', 'upper', 'acc', '2026-10-05', 'UTC');
+        expect(within(card).getByText('Optional')).toBeInTheDocument();
+        expect(within(card).getByRole('button', { name: 'Remove from day' })).toBeInTheDocument();
+        await waitFor(() => expect(card).toHaveFocus());
+        expect(screen.queryByRole('region', { name: 'Optional sessions' })).not.toBeInTheDocument();
+    });
+
+    it('removes a loaded optional template back into the selector', async () => {
+        api.getProgramDayPlans.mockImplementation(withOptional(accessories({
+            is_loaded: true, plan_id: 'pa', row_version: 1, source: 'plan',
+        })));
+        api.resetProgramSessionPlan.mockResolvedValue({ data: accessories({ date: '2026-10-05' }) });
+        renderView();
+
+        const card = await screen.findByRole('article', { name: 'Accessories plan, Mon, Oct 5' });
+        fireEvent.click(within(card).getByRole('button', { name: 'Remove from day' }));
+
+        const list = await selector();
+        expect(api.resetProgramSessionPlan).toHaveBeenCalledWith('root', 'program', 'upper', 'acc', '2026-10-05', 'UTC');
+        expect(within(list).getByText('Accessories')).toBeInTheDocument();
+    });
+
+    it('shows no selector on a past program day', async () => {
+        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
+        renderView({ compare: true });
+
+        expect(await screen.findByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).toBeInTheDocument();
+        await waitFor(() => expect(screen.getAllByRole('region', { name: 'Optional sessions' })).toHaveLength(1));
     });
 });

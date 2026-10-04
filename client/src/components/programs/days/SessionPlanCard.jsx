@@ -46,6 +46,7 @@ export default function SessionPlanCard({
     activityGroups,
     mutations,
     readOnly = false,
+    onRemoved,
 }) {
     // Only unsaved edits are local. An untouched card always shows the latest server plan,
     // so a seed refreshes when the plan it comes from is saved in the neighbouring column.
@@ -94,6 +95,11 @@ export default function SessionPlanCard({
         if (!window.confirm(`Discard the plan for ${entry.template.name} on this date? It will start again from ${entry.previous ? 'the previous plan' : 'the template'}.`)) return;
         mutations.reset.mutate({ templateId }, { onError: handleFailure });
     };
+    // An optional template is on the day because its plan is stored; removing deletes it.
+    const removeFromDay = () => {
+        if (isDirty && !window.confirm(`Remove ${entry.template.name} from this day? Your unsaved changes will be lost.`)) return;
+        mutations.reset.mutate({ templateId }, { onError: handleFailure, onSuccess: onRemoved });
+    };
     const pullTemplate = () => mutations.pullTemplate.mutate(
         { templateId, rowVersion: entry.row_version },
         { onError: handleFailure },
@@ -110,8 +116,8 @@ export default function SessionPlanCard({
             <header className={styles.planCardHeader}>
                 <SessionTemplateNameBadge name={entry.template.name} color={entry.template.color} wrap />
                 <span className={styles.planSource}>
+                    {!entry.is_required ? <Badge size="sm">Optional</Badge> : null}
                     {describePlanSource(entry, formatShortDate)}
-                    {!entry.is_required ? ' · optional' : ''}
                 </span>
             </header>
 
@@ -322,7 +328,9 @@ export default function SessionPlanCard({
 
             {!readOnly ? (
                 <footer className={styles.planCardFooter}>
-                    {entry.plan_id ? (
+                    {!entry.is_required ? (
+                        <Button size="sm" variant="ghost" onClick={removeFromDay} disabled={isBusy}>Remove from day</Button>
+                    ) : entry.plan_id ? (
                         <Button size="sm" variant="ghost" onClick={reset} disabled={isBusy}>Reset</Button>
                     ) : <span />}
                     <span className={styles.planFooterActions}>

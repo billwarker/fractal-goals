@@ -480,3 +480,82 @@ def test_plan_writes_reject_an_invalid_timezone(authed_client, plan_world):
     response = authed_client.put(_plan_url(plan_world, upcoming) + '?timezone=Not/AZone', json={'sections': sections})
     assert response.status_code == 400
     assert response.get_json()['error'] == 'Invalid timezone'
+
+
+@pytest.fixture
+def optional_world(db_session, plan_world):
+    """``plan_world`` plus an optional 'Accessories' template on the same Monday day."""
+    accessories = SessionTemplate(
+        id=str(uuid.uuid4()), name='Accessories', root_id=plan_world['root'].id,
+        template_data=json.dumps({'session_type': 'normal', 'sections': [{
+            'name': 'Main',
+            'items': [{
+                'type': 'activity', 'activity_definition_id': plan_world['activity'].id,
+                'name': 'Curls', 'item_key': 'curls',
+            }],
+        }]}),
+    )
+    db_session.add(accessories)
+    db_session.flush()
+    db_session.add(ProgramDayTemplate(
+        program_day_id=plan_world['day'].id, session_template_id=accessories.id, is_required=False, order=1,
+    ))
+    db_session.commit()
+    return {**plan_world, 'template': accessories, 'required_template': plan_world['template']}
+
+
+def _all_day_plans(client, world, plan_date):
+    response = client.get(
+        f"/api/{world['root'].id}/programs/{world['program'].id}/days/{world['day'].id}/plans"
+        f"?date={plan_date.isoformat()}"
+    )
+    assert response.status_code == 200, response.get_json()
+    return {entry['template']['id']: entry for entry in response.get_json()['plans']}
+
+
+def test_optional_templates_start_unloaded_and_required_ones_loaded(authed_client, optional_world):
+    plans = _all_day_plans(authed_client, optional_world, optional_world['mondays'][0])
+
+    assert plans[optional_world['required_template'].id]['is_loaded'] is True
+    optional = plans[optional_world['template'].id]
+    assert optional['is_required'] is False
+    assert optional['is_loaded'] is False
+    assert optional['plan_id'] is None
+
+
+def test_loading_an_optional_template_stores_its_seed_idempotently(authed_client, db_session, optional_world):
+    monday = optional_world['mondays'][0]
+
+    response = authed_client.post(_plan_url(optional_world, monday, '/load'))
+    assert response.status_code == 201, response.get_json()
+    loaded = response.get_json()
+    assert loaded['is_loaded'] is True
+    assert loaded['plan_id']
+    assert loaded['sections'][0]['items'][0]['item_key'] == 'curls'
+
+    again = authed_client.post(_plan_url(optional_world, monday, '/load'))
+    assert again.status_code == 200
+    assert again.get_json()['plan_id'] == loaded['plan_id']
+    assert db_session.query(ProgramSessionPlan).filter_by(
+        session_template_id=optional_world['template'].id, deleted_at=None,
+    ).count() == 1
+    assert _all_day_plans(authed_client, optional_world, monday)[optional_world['template'].id]['is_loaded'] is True
+
+
+def test_removing_a_loaded_optional_template_unloads_it(authed_client, optional_world):
+    monday = optional_world['mondays'][0]
+    assert authed_client.post(_plan_url(optional_world, monday, '/load')).status_code == 201
+
+    removed = authed_client.delete(_plan_url(optional_world, monday))
+    assert removed.status_code == 200
+    assert removed.get_json()['is_loaded'] is False
+    assert _all_day_plans(authed_client, optional_world, monday)[optional_world['template'].id]['is_loaded'] is False
+
+
+def test_loading_rejects_required_templates_and_past_dates(authed_client, optional_world):
+    required_world = {**optional_world, 'template': optional_world['required_template']}
+    required = authed_client.post(_plan_url(required_world, optional_world['mondays'][0], '/load'))
+    assert required.status_code == 400
+
+    past = authed_client.post(_plan_url(optional_world, optional_world['past_mondays'][0], '/load'))
+    assert past.status_code == 409

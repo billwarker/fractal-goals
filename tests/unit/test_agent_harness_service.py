@@ -1300,3 +1300,67 @@ def test_later_operation_failure_preserves_committed_progress_and_skips_dependen
     ]
     assert result["operations"][1]["error"]["code"] == "dependency_failed"
     assert db_session.query(Note).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+
+
+def test_block_and_day_proposals_keep_calendar_invariant_codes(
+    db_session, test_user, sample_ultimate_goal,
+):
+    service = AgentHarnessService(db_session)
+    task = service.create_task(test_user.id, {
+        "root_id": sample_ultimate_goal.id,
+        "request_text": "Build overlapping blocks.",
+        "timezone": "UTC",
+    })
+    start_date = _next_weekday(date.today() + timedelta(days=200), "Monday")
+    end_date = start_date + timedelta(days=27)
+    program_op = {
+        "operation_id": "program",
+        "type": "create_program",
+        "data": {
+            "name": "Overlap plan",
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "selectedGoals": [sample_ultimate_goal.id],
+        },
+    }
+    block_op = {
+        "operation_id": "block-1",
+        "type": "create_block",
+        "program_id": "$ref:program",
+        "data": {"name": "Block 1", "start_date": start_date.isoformat(), "end_date": (start_date + timedelta(days=13)).isoformat()},
+    }
+
+    with pytest.raises(AgentHarnessError) as overlap:
+        service.create_proposal(test_user.id, task["id"], {"operations": [
+            program_op,
+            block_op,
+            {
+                "operation_id": "block-2",
+                "type": "create_block",
+                "program_id": "$ref:program",
+                "data": {"name": "Block 2", "start_date": (start_date + timedelta(days=7)).isoformat(), "end_date": end_date.isoformat()},
+            },
+        ]})
+    assert overlap.value.code == "program_block_overlap"
+    assert overlap.value.status == 409
+
+    with pytest.raises(AgentHarnessError) as double_booked:
+        service.create_proposal(test_user.id, task["id"], {"operations": [
+            program_op,
+            block_op,
+            {
+                "operation_id": "day-1",
+                "type": "create_program_day",
+                "program_id": "$ref:program",
+                "block_id": "$ref:block-1",
+                "data": {"name": "Upper", "day_of_week": ["Monday"]},
+            },
+            {
+                "operation_id": "day-2",
+                "type": "create_program_day",
+                "program_id": "$ref:program",
+                "block_id": "$ref:block-1",
+                "data": {"name": "Lower", "day_of_week": ["Monday"]},
+            },
+        ]})
+    assert double_booked.value.code == "program_day_date_conflict"
