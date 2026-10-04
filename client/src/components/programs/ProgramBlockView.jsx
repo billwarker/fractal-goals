@@ -198,11 +198,7 @@ function ProgramBlockView({
                                 });
 
                                 return (
-                                    <div className={styles.daysGrid}>
-                                        {uniqueDays.length === 0 && (
-                                            <div className={styles.emptyState}>No days added yet.</div>
-                                        )}
-
+                                    <div className={`${styles.daysGrid} ${uniqueDays.length === 0 ? styles.daysGridEmpty : ''}`}>
                                         {uniqueDays.map(day => (
                                             <div
                                                 key={day.id}

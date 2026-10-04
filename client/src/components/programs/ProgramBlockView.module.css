@@ -182,10 +182,8 @@
     gap: 14px;
 }
 
-.emptyState {
-    color: var(--color-text-muted);
-    font-size: 13px;
-    padding: 8px 0;
+.daysGridEmpty {
+    justify-content: center;
 }
 
 .addBlockButton {
