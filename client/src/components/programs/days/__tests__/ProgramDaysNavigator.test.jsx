@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import ProgramDaysNavigator from '../ProgramDaysNavigator';
 
@@ -44,6 +44,33 @@ describe('ProgramDaysNavigator', () => {
         // A day without templates stays listed, so a newly created day never disappears.
         expect(dayButton('Rest')).toHaveTextContent('Not scheduled');
         expect(screen.getByText('Add a session template to plan this day.')).toBeInTheDocument();
+    });
+
+    it('shows each day\'s dates by status and its consistency', () => {
+        const occurrence = (date, state, closed = true) => ({
+            date, state, closed, manual_status: null, program_day_completed: state === 'scheduled_met',
+        });
+        renderNavigator({ occurrencesByDay: new Map([
+            ['d1', [
+                occurrence('2026-09-21', 'scheduled_met'),
+                occurrence('2026-09-28', 'scheduled_missed'),
+                occurrence('2026-10-05', 'scheduled_met'),
+                occurrence('2026-10-12', 'scheduled_pending', false),
+            ]],
+            ['d2', [occurrence('2026-10-08', 'scheduled_pending', false)]],
+        ]) });
+
+        const counts = screen.getByRole('list', { name: 'Planche Focus - Day 1 results by status' });
+        expect(within(counts).getByRole('img', { name: '2 completed' })).toBeInTheDocument();
+        expect(within(counts).getByRole('img', { name: '1 missed' })).toBeInTheDocument();
+        expect(within(counts).getByRole('img', { name: '4 scheduled in total' })).toBeInTheDocument();
+        expect(screen.getByText('67%')).toBeInTheDocument();
+        expect(screen.getByText('2/3')).toBeInTheDocument();
+        // Nothing completed or missed yet: no consistency figure.
+        expect(within(screen.getByRole('list', { name: 'Front Lever Focus - Day 2 results by status' }).parentElement)
+            .getByText('—')).toBeInTheDocument();
+        // A day without dates has no stats.
+        expect(screen.queryByRole('list', { name: 'Rest results by status' })).not.toBeInTheDocument();
     });
 
     it('creates and edits program days from the side pane', () => {

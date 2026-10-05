@@ -115,7 +115,7 @@ function renderViewWithClient({ compare = false, ...props } = {}) {
             </MemoryRouter>
         </QueryClientProvider>,
     );
-    if (compare) fireEvent.click(within(pane()).getByRole('checkbox', { name: 'Compare two days' }));
+    if (compare) fireEvent.click(within(pane()).getByRole('button', { name: 'Compare two days' }));
     return { queryClient };
 }
 
@@ -185,11 +185,12 @@ describe('ProgramDaysView', () => {
         const rail = screen.getByRole('list', { name: 'Program day dates' });
         expect(within(rail).queryByRole('button', { name: /shown in the other column/ })).not.toBeInTheDocument();
 
-        const toggle = within(pane()).getByRole('checkbox', { name: 'Compare two days' });
-        expect(toggle).not.toBeChecked();
+        const toggle = within(pane()).getByRole('button', { name: 'Compare two days' });
+        expect(toggle).toHaveAttribute('aria-pressed', 'false');
         fireEvent.click(toggle);
 
         expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
+        expect(toggle).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('list', { name: 'Left column dates' })).toBeInTheDocument();
 
         fireEvent.click(toggle);
@@ -230,8 +231,9 @@ describe('ProgramDaysView', () => {
         expect(within(card).getByLabelText('Set 1 planned Weight')).toHaveAttribute('placeholder', '100');
         // A day without templates stays in the side pane, marked as needing one.
         expect(within(pane()).getByText('Rest')).toBeInTheDocument();
-        // The column names the block its date falls in, with the tracked week.
-        expect(screen.getByText('Hypertrophy · Week 6')).toBeInTheDocument();
+        // The buckets above the rail name the block its date falls in, with the tracked week.
+        expect(screen.getByRole('button', { name: /^Hypertrophy, Sep 1 – Oct 31/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: /^Week 6, Oct 5 – Oct 11/ })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('saves an edited value with the whole plan and no row version for a seed', async () => {
@@ -304,8 +306,9 @@ describe('ProgramDaysView', () => {
         expect(within(right).getByRole('button', { name: /Monday, .*scheduled/ })).toHaveAttribute('aria-pressed', 'true');
         expect(within(pane()).queryByRole('list', { name: /dates/ })).not.toBeInTheDocument();
 
-        // Picking the date the other column shows swaps the two columns.
-        fireEvent.click(within(right).getByRole('button', { name: /shown in the other column/ }));
+        // Picking the week whose only date the other column shows swaps the two columns.
+        const rightWeeks = screen.getByRole('group', { name: 'Right column dates: weeks of Hypertrophy' });
+        fireEvent.click(within(rightWeeks).getByRole('button', { name: /^Week 5,/ }));
 
         await waitFor(() => expect(within(screen.getByRole('list', { name: 'Right column dates' }))
             .getByRole('button', { name: /Monday, .*completed/ })).toHaveAttribute('aria-pressed', 'true'));
@@ -516,6 +519,64 @@ describe('ProgramDaysView', () => {
     });
 });
 
+
+describe('Block and week buckets', () => {
+    const occurrence = (date, state = 'scheduled_pending') => ({
+        date, templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
+        state, manual_status: null, closed: state !== 'scheduled_pending',
+        program_day_completed: state === 'scheduled_met', sessions: [],
+    });
+
+    beforeEach(() => {
+        // Mon/Thu in weeks 5 and 6, nothing in week 7, then week 8.
+        api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
+            occurrence('2026-09-28', 'scheduled_met'), occurrence('2026-10-01', 'scheduled_met'),
+            occurrence('2026-10-05'), occurrence('2026-10-08'),
+            occurrence('2026-10-19'), occurrence('2026-10-22'),
+        ] }] } });
+    });
+
+    const weeks = () => screen.getByRole('group', { name: 'Program day dates: weeks of Hypertrophy' });
+    const railDates = () => within(screen.getByRole('list', { name: 'Program day dates' })).getAllByRole('button');
+
+    it('keeps every date on the rail and marks the selected date\'s block and week', async () => {
+        renderView();
+
+        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+        expect(railDates()).toHaveLength(6);
+        expect(within(weeks()).getAllByRole('button')).toHaveLength(9);
+        expect(within(weeks()).getByRole('button', { name: /^Week 6,/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(weeks()).getByRole('button', { name: /^Week 5,.*2 dates, 2 done/ })).toBeInTheDocument();
+    });
+
+    it('jumps to the start of a picked week, and ignores weeks without dates', async () => {
+        renderView();
+        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+
+        const empty = within(weeks()).getByRole('button', { name: /^Week 7,.*no dates for this day/ });
+        expect(empty).toHaveAttribute('aria-disabled', 'true');
+        fireEvent.click(empty);
+        expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
+
+        fireEvent.click(within(weeks()).getByRole('button', { name: /^Week 8,/ }));
+        expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
+
+        // Mid-week, picking the current week returns to its first date.
+        fireEvent.click(screen.getByRole('button', { name: 'Program day dates: next date' }));
+        expect(await screen.findByRole('region', { name: 'Thursday, Oct 22' })).toBeInTheDocument();
+        fireEvent.click(within(weeks()).getByRole('button', { name: /^Week 8,/ }));
+        expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
+    });
+
+    it('jumps to the start of a picked block', async () => {
+        renderView();
+        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+
+        fireEvent.click(screen.getByRole('button', { name: /^Hypertrophy,/ }));
+        expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
+        expect(within(weeks()).getByRole('button', { name: /^Week 5,/ })).toHaveAttribute('aria-pressed', 'true');
+    });
+});
 
 describe('Optional session templates', () => {
     const accessories = (overrides = {}) => planEntry({

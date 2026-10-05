@@ -1,8 +1,7 @@
 .navigator {
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    padding: 12px 14px 20px;
+    min-height: 100%;
 }
 
 .empty {
@@ -12,35 +11,97 @@
     color: var(--color-text-secondary);
 }
 
+/* The compare toggle leads the pane; it stays in view while the day list scrolls. */
+.toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 12px 14px 8px;
+    background: var(--color-bg-sidebar);
+}
+
 .compareToggle {
     display: flex;
     align-items: center;
-    gap: 8px;
-    min-height: 32px;
-    padding: 0 8px;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 0 12px;
+    font: inherit;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
     cursor: pointer;
-    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.compareToggle input {
-    width: 15px;
-    height: 15px;
-    margin: 0;
-    accent-color: var(--color-brand-primary);
-    cursor: pointer;
-}
-
-.compareToggle:has(input:checked) {
+.compareToggle:hover {
     color: var(--color-text-primary);
+    border-color: var(--color-border-hover);
 }
 
-.compareToggle:has(input:focus-visible) {
+.compareToggle[aria-pressed='true'] {
+    color: var(--color-text-primary);
+    background: var(--color-brand-primary-soft);
+    border-color: var(--color-brand-primary);
+}
+
+.compareToggle:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
-    border-radius: 6px;
+}
+
+/* On/off switch inside the toggle. */
+.switch {
+    position: relative;
+    flex: none;
+    width: 28px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--color-border-hover);
+    transition: background 0.15s ease;
+}
+
+.switchThumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-bg-surface);
+    transition: transform 0.15s ease;
+}
+
+.compareToggle[aria-pressed='true'] .switch {
+    background: var(--color-brand-primary);
+}
+
+.compareToggle[aria-pressed='true'] .switchThumb {
+    transform: translateX(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .compareToggle,
+    .switch,
+    .switchThumb {
+        transition: none;
+    }
+}
+
+/* New program day: a footer pinned to the bottom of the pane. */
+.footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin-top: auto;
+    padding: 12px 14px;
+    background: var(--color-bg-sidebar);
+    border-top: 1px solid var(--color-border);
 }
 
 .createDay {
@@ -83,7 +144,7 @@
     flex-direction: column;
     gap: 4px;
     margin: 0;
-    padding: 0;
+    padding: 4px 14px 16px;
     list-style: none;
 }
 
@@ -181,10 +242,6 @@
     }
 }
 
-.dayName:hover {
-    background: var(--color-bg-hover);
-}
-
 .templates {
     display: flex;
     flex-wrap: wrap;
@@ -204,9 +261,58 @@
     cursor: pointer;
 }
 
-.dayName:focus-visible,
 .editDay:focus-visible,
 .template:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
+}
+
+/* The row is the one highlight: the day-name button has no surface of its own, so its
+   keyboard focus ring is drawn on the row. */
+.dayName:focus-visible {
+    outline: none;
+}
+
+.day:has(.dayName:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.stats {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 8px 8px;
+}
+
+.consistency {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    flex: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.consistencyValue {
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.consistencyDetail {
+    color: var(--color-text-muted);
+    font-size: 11px;
+}
+
+.visuallyHidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

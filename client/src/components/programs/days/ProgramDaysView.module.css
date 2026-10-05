@@ -435,11 +435,137 @@
     }
 }
 
-/* The block (and tracked week) a column's date falls in, under its date rail. */
-.columnContext {
+/* Block and week buckets above a column's date rail: one ruler, the block row sitting on the
+   week row, inset to line up with the rail's dates between its arrows. Buckets are sized by their days;
+   picking one jumps the rail to the first date in its period. */
+.buckets {
+    display: flex;
+    min-width: 0;
+    margin: 0 32px;
+}
+
+.bucketTrack {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+}
+
+.bucketList {
+    display: flex;
     margin: 0;
-    color: var(--color-text-muted);
-    font-size: 12px;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.bucketList > li {
+    flex-basis: 0;
+    min-width: 36px;
+}
+
+.blockList > li {
+    min-width: 64px;
+}
+
+.blockList > li + li {
+    border-left: 1px solid var(--color-border);
+}
+
+/* The week row hangs off the selected block: its top edge is that block's colour. */
+.weekList {
+    border-top: 2px solid var(--bucket-block, var(--color-border));
+}
+
+.weekList > li + li {
+    border-left: 1px solid var(--color-border);
+}
+
+.bucket {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 26px;
+    padding: 0 6px;
+    overflow: hidden;
+    font: inherit;
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    cursor: pointer;
+}
+
+.bucket:hover:not([aria-disabled='true']):not([aria-pressed='true']) {
+    color: var(--color-text-primary);
+    background: var(--color-bg-subtle);
+}
+
+.bucket[aria-pressed='true'] {
+    color: var(--color-text-primary);
     font-weight: 600;
-    letter-spacing: 0.02em;
+    background: color-mix(in srgb, var(--bucket-block, var(--color-brand-primary)) 24%, transparent);
+    cursor: default;
+}
+
+/* Block names are written in the block's colour; the selected block is tinted with it. */
+.bucketColored,
+.bucketColored:hover:not([aria-disabled='true']):not([aria-pressed='true']) {
+    color: var(--bucket-color);
+}
+
+.bucketColored[aria-pressed='true'] {
+    color: var(--bucket-color);
+    background: color-mix(in srgb, var(--bucket-color) 18%, transparent);
+}
+
+.bucket:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
+}
+
+.bucketEmpty {
+    opacity: 0.3;
+    cursor: default;
+}
+
+.bucketLabel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bucketToday {
+    flex: none;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* The share of this day's dates in the bucket that are done. */
+.bucketProgress {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: var(--bucket-done);
+    height: 2px;
+    background: var(--color-brand-success);
+}
+
+@media (max-width: 768px) {
+    .buckets {
+        margin: 0;
+    }
+
+    .bucket {
+        height: 44px;
+    }
 }

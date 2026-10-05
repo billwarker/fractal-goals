@@ -16,6 +16,10 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
 
     await page.goto(`/${rootId}/programs`);
     await page.getByRole('tab', { name: 'Days' }).click();
+    // Comparing two dates is a side-pane toggle (a sheet on phones).
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+    await page.getByRole('button', { name: 'Compare two days' }).click();
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
     // Today is the latest program day; next week's sits beside it.
     const cards = page.getByRole('article', { name: /^Bench Day plan/ });
     await expect(cards).toHaveCount(2);
@@ -92,6 +96,7 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
     if (suffix === 'desktop') {
         await page.goto(`/${rootId}/programs`);
         await page.getByRole('tab', { name: 'Days' }).click();
+        await page.getByRole('button', { name: 'Compare two days' }).click();
         const sessionCard = page.getByRole('article', { name: 'Bench Day session' });
         const nextPlan = page.getByRole('article', { name: /^Bench Day plan/ });
         await expect(sessionCard).toHaveCount(1);

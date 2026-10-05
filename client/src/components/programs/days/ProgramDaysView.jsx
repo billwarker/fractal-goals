@@ -12,9 +12,9 @@ import {
     planCardElementId,
 } from '../../../utils/programDaysView';
 import PlanDateColumn from './PlanDateColumn';
+import PlanBucketRows from './PlanBucketRows';
 import PlanOccurrenceStrip from './PlanOccurrenceStrip';
-import { blockWeekLabel } from '../../../utils/programBlockWeeks';
-import { blockForDate } from '../../../utils/programViewModel';
+import { bucketScope, buildDayBuckets } from '../../../utils/programDayBuckets';
 import styles from './ProgramDaysView.module.css';
 
 /**
@@ -45,6 +45,8 @@ export default function ProgramDaysView({
         () => new Map(occurrences.map((occurrence) => [occurrence.date, occurrence])),
         [occurrences],
     );
+    // The day's dates by block and week; each column's buckets jump its rail to a period.
+    const buckets = useMemo(() => buildDayBuckets(program?.blocks, occurrences), [program?.blocks, occurrences]);
     const { data: circuits = [] } = useCircuits(rootId);
     // Matching templates, sections, and activities line up across the two columns.
     const columnsRef = useRef(null);
@@ -84,9 +86,6 @@ export default function ProgramDaysView({
             />
         );
     }
-    // Each column's date sits in at most one block; name it (and its week when tracked).
-    const blockContext = (value) => blockWeekLabel(blockForDate(program?.blocks, value), value);
-
     return (
         <section className={styles.main} aria-labelledby="program-days-title">
             {showDateControls ? (
@@ -131,43 +130,59 @@ export default function ProgramDaysView({
             ) : null}
             {columnDates.length ? (
                 <div className={`${styles.columns} ${compareDate ? '' : styles.columnsSingle}`} ref={columnsRef}>
-                    {columnDates.map((value) => (
-                        <PlanDateColumn
-                            key={value === date ? 'focus' : 'compare'}
-                            rail={(
-                                <PlanOccurrenceStrip
-                                    occurrences={occurrences}
-                                    selectedDate={value}
-                                    blockedDate={value === date ? compareDate : date}
-                                    today={today}
-                                    label={!compareDate ? 'Program day dates'
-                                        : value === date ? 'Right column dates' : 'Left column dates'}
-                                    onSelect={(nextDate) => onSelectionChange((current) => ({
-                                        ...current,
-                                        dayId: found.day.id,
-                                        templateId: null,
-                                        ...pickColumnDate({ isFocus: value === date, nextDate, date, compareDate }),
-                                    }))}
-                                />
-                            )}
-                            rootId={rootId}
-                            programId={program.id}
-                            dayId={found.day.id}
-                            occurrence={occurrenceByDate.get(value)}
-                            context={blockContext(value)}
-                            caption={describeOccurrenceDate(value, occurrenceDates, today, {
-                                completed: occurrenceStatus(occurrenceByDate.get(value)) === 'complete',
-                                isComparison: columnDates.length > 1 && value === columnDates[0],
-                            })}
-                            today={today}
-                            timezone={timezone}
-                            activityById={activityById}
-                            circuitById={circuitById}
-                            activities={activities}
-                            circuits={circuits}
-                            activityGroups={activityGroups}
-                        />
-                    ))}
+                    {columnDates.map((value) => {
+                        const blockedDate = value === date ? compareDate : date;
+                        const railLabel = !compareDate ? 'Program day dates'
+                            : value === date ? 'Right column dates' : 'Left column dates';
+                        const selectDate = (nextDate) => onSelectionChange((current) => ({
+                            ...current,
+                            dayId: found.day.id,
+                            templateId: null,
+                            ...pickColumnDate({ isFocus: value === date, nextDate, date, compareDate }),
+                        }));
+                        const scope = bucketScope(buckets, value);
+                        return (
+                            <PlanDateColumn
+                                key={value === date ? 'focus' : 'compare'}
+                                rail={(
+                                    <>
+                                        <PlanBucketRows
+                                            buckets={buckets}
+                                            scope={scope}
+                                            dayName={found.day.name}
+                                            today={today}
+                                            blockedDate={blockedDate}
+                                            label={railLabel}
+                                            onSelect={selectDate}
+                                        />
+                                        <PlanOccurrenceStrip
+                                            occurrences={occurrences}
+                                            selectedDate={value}
+                                            blockedDate={blockedDate}
+                                            today={today}
+                                            label={railLabel}
+                                            onSelect={selectDate}
+                                        />
+                                    </>
+                                )}
+                                rootId={rootId}
+                                programId={program.id}
+                                dayId={found.day.id}
+                                occurrence={occurrenceByDate.get(value)}
+                                caption={describeOccurrenceDate(value, occurrenceDates, today, {
+                                    completed: occurrenceStatus(occurrenceByDate.get(value)) === 'complete',
+                                    isComparison: columnDates.length > 1 && value === columnDates[0],
+                                })}
+                                today={today}
+                                timezone={timezone}
+                                activityById={activityById}
+                                circuitById={circuitById}
+                                activities={activities}
+                                circuits={circuits}
+                                activityGroups={activityGroups}
+                            />
+                        );
+                    })}
                 </div>
             ) : null}
         </section>

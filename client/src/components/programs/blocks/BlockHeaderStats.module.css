@@ -7,26 +7,9 @@
     min-width: 0;
 }
 
+/* Layout hook for the shared status counts. */
 .statuses {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.count {
-    color: var(--color-text-primary);
-    font-size: 15px;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
+    min-width: 0;
 }
 
 .metrics {

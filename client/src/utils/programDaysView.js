@@ -46,6 +46,30 @@ export function occurrenceStatus(occurrence) {
 }
 
 /**
+ * One program day's dates by status symbol and its consistency, matching the server's block
+ * rollups (services/program_rollups.py): ``scheduled`` counts every date and ``pending`` those
+ * still to come; consistency is completed dates over completed and missed ones (rest days and
+ * dates not yet due don't count).
+ */
+export function programDayStats(occurrences = []) {
+    const statusCounts = { complete: 0, missed: 0, rest: 0, pending: 0, scheduled: 0 };
+    (occurrences || []).forEach((occurrence) => {
+        const status = occurrenceStatus(occurrence);
+        statusCounts[status === 'scheduled' ? 'pending' : status] += 1;
+        statusCounts.scheduled += 1;
+    });
+    const observed = statusCounts.complete + statusCounts.missed;
+    return {
+        statusCounts,
+        consistency: {
+            met_days: statusCounts.complete,
+            scheduled_days_observed: observed,
+            rate: observed ? statusCounts.complete / observed : null,
+        },
+    };
+}
+
+/**
  * The two columns: what to compare against, then the focused date. The comparison is the
  * latest completed occurrence before the focused one, so the user programs from what they
  * actually did; without one it is simply the previous occurrence. The first date shows alone.

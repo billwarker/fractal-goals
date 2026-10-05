@@ -117,8 +117,8 @@ copies templates, goals, and notes without a schedule. Blocks can **track weeks*
 (`track_weeks`, `week_start_day` 0 = Monday): Week 1 starts on the block's start date and each
 later week on the chosen weekday. `services/program_rollups.block_weeks` and
 `client/src/utils/programBlockWeeks.js` share one definition, tested against
-`tests/fixtures/block_weeks_cases.json`; the calendar shows W1, W2… chips, and the day pane and Days
-columns show "Block · Week n". See [Program-level days and block weeks](planning/program-level-days-and-block-weeks.md).
+`tests/fixtures/block_weeks_cases.json`; the calendar shows W1, W2… chips, the day pane shows "Block · Week n",
+and the Days tab's rails sit under block and week buckets. See [Program-level days and block weeks](planning/program-level-days-and-block-weeks.md).
 Program scope is resolved by `services/program_scope.py`; execution metrics use bounded read models
 rather than client recomputation.
 
@@ -255,10 +255,15 @@ mobile keeps the toggle in the header and the pane as a closable sheet. Days (`c
 one program day's occurrence dates in two columns: a focused date (by default the next program day)
 beside the latest completed occurrence before it (else the previous one), each with its canonical
 status mark and credited sessions. A template completed on a date shows its session in the plan card
-layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every program day once (schedule summary, next date, templates,
-and an Edit button; days without templates are listed and prompt for one) under a **New program day**
-button, and each column has its own date rail (canonical status marks; A picks the comparison, B
-the date being planned). One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
+layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every program day once (schedule summary, next date, its dates by
+status with consistency (`programDayStats`, the block rollups' rules), templates,
+and an Edit button; days without templates are listed and prompt for one) between a **Compare two
+days** toggle at the top and a pinned **New program day** footer, and each column has its own date rail (canonical status marks; A picks the comparison, B
+the date being planned). Above each rail, a ruler of **block** and **week** buckets (`utils/programDayBuckets.js`,
+`PlanBucketRows.jsx`): block names in the block's colour, the selected block's weeks beneath it.
+The selected date marks its block and week; picking a bucket jumps the rail to the first date in
+that period (the rail keeps every date). Weeks follow the block's tracked start day, or 7-day steps
+from its start when untracked; buckets without this day's dates are dimmed. One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
 evaluates all days in a single evaluator pass.
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
 holds one dated plan per program day, template, and date: an independent snapshot of the template's

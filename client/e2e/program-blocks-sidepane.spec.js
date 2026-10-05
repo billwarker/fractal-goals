@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root, and "Block 1"
 // runs from a week ago to three weeks ahead.
-test('summarizes a block in the calendar pane and adds a day with optional goals', async ({ page }, testInfo) => {
+test('summarizes a block in the calendar pane and adds a program day with optional goals', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const rootId = `browser-plan-root-${suffix}`;
     const rootName = `Browser Planning ${suffix}`;
@@ -28,15 +28,19 @@ test('summarizes a block in the calendar pane and adds a day with optional goals
     await expect(block.getByText('Goals completed/due')).toBeVisible();
     await expect(block.getByText(/Alignment|Pick a focus/)).toHaveCount(0);
 
-    // Days take optional goals from the program's goals.
-    await block.getByRole('button', { name: '+ Add day' }).click();
-    const editor = page.getByRole('dialog', { name: 'Add Program Day' });
+    // Program days belong to the program: they are created from the Days tab's side pane and
+    // take optional goals from the program's goals.
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    await page.getByRole('tab', { name: 'Days' }).click();
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+    await page.getByRole('button', { name: 'New program day' }).click();
+    const editor = page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'New Program Day' }) });
     await editor.getByLabel('Day Name *').fill('Tempo');
     await expect(editor.getByText('Day goals', { exact: true })).toBeVisible();
     await editor.getByRole('button', { name: 'Choose goals' }).click();
     await page.getByRole('checkbox', { name: `Select ${rootName}` }).check();
     await page.getByRole('button', { name: /^Apply \(1\)$/ }).click();
-    await editor.getByRole('button', { name: 'Add Day' }).click();
+    await editor.getByRole('button', { name: 'Create Day' }).click();
     await expect(editor).toBeHidden();
-    await expect(block.getByRole('button', { name: 'Edit Tempo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit Tempo' })).toBeVisible();
 });

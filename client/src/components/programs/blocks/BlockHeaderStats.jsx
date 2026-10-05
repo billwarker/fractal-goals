@@ -1,18 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import ProgramDayStatusMark from '../ProgramDayStatusMark';
+import ProgramDayStatusCounts from '../ProgramDayStatusCounts';
 import styles from './BlockHeaderStats.module.css';
 
-// The scheduled mark counts every scheduled program day in the block, not just those still to come.
-const STATUSES = [
-    ['complete', 'completed'],
-    ['missed', 'missed'],
-    ['rest', 'rest'],
-    ['scheduled', 'scheduled in total'],
-];
-
-function consistencyFigure(consistency) {
+export function consistencyFigure(consistency) {
     if (!consistency?.scheduled_days_observed || consistency.rate == null) return { value: '—', detail: '' };
     return {
         value: `${Math.round(consistency.rate * 100)}%`,
@@ -36,17 +28,11 @@ export default function BlockHeaderStats({ card, compact = false }) {
     ];
     return (
         <div className={`${styles.stats} ${compact ? styles.compact : ''}`}>
-            <ul className={styles.statuses} aria-label={`${card.name} program days by status`}>
-                {STATUSES.map(([status, label]) => {
-                    const count = card.statusCounts[status] ?? 0;
-                    return (
-                        <li key={status} className={styles.status} title={`${count} ${label}`}>
-                            <ProgramDayStatusMark status={status} label={`${count} ${label}`} />
-                            <span className={styles.count} aria-hidden="true">{count}</span>
-                        </li>
-                    );
-                })}
-            </ul>
+            <ProgramDayStatusCounts
+                counts={card.statusCounts}
+                label={`${card.name} program days by status`}
+                className={styles.statuses}
+            />
             <dl className={styles.metrics}>
                 {metrics.map(([label, value, detail]) => (
                     <div key={label} className={styles.metric}>
