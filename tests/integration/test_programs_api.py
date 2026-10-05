@@ -1012,6 +1012,30 @@ class TestProgramStructure:
         assert updated.status_code == 200
         assert (updated.get_json()['track_weeks'], updated.get_json()['week_start_day']) == (True, 6)
 
+    def test_reordering_days_sets_their_order_from_the_full_list(self, authed_client, sample_ultimate_goal, sample_program):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        ids = [
+            authed_client.post(f'/api/{root_id}/programs/{program_id}/days', json={'name': name}).get_json()['id']
+            for name in ('A', 'B', 'C')
+        ]
+        url = f'/api/{root_id}/programs/{program_id}/days/order'
+
+        response = authed_client.put(url, json={'day_ids': [ids[2], ids[0], ids[1]]})
+
+        assert response.status_code == 200
+        assert response.get_json()['days'] == [
+            {'id': ids[2], 'day_number': 1}, {'id': ids[0], 'day_number': 2}, {'id': ids[1], 'day_number': 3},
+        ]
+        program = authed_client.get(f'/api/{root_id}/programs/{program_id}').get_json()
+        assert [day['name'] for day in sorted(program['days'], key=lambda day: day['day_number'])] == ['C', 'A', 'B']
+        # The list must name every day exactly once.
+        assert authed_client.put(url, json={'day_ids': ids[:2]}).status_code == 400
+        assert authed_client.put(url, json={'day_ids': [ids[0], ids[0], ids[1]]}).status_code == 400
+        assert authed_client.put(url, json={'day_ids': [*ids, 'not-a-day']}).status_code == 400
+        missing = authed_client.put(f'/api/{root_id}/programs/not-a-program/days/order', json={'day_ids': ids})
+        assert missing.status_code == 404
+
     def test_deleting_a_day_with_history_keeps_its_sessions(
         self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template,
     ):

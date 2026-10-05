@@ -197,6 +197,29 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         }, source='cls.delete_program_day'))
 
     @classmethod
+    def reorder_program_days(
+        cls, session, root_id: str, program_id: str, day_ids: List[str], current_user_id: str | None = None,
+    ) -> List[Dict[str, Any]]:
+        """Set the program's day order (``day_number``) from a full list of its day ids.
+
+        The list must name every day of the program exactly once, so a stale client can't
+        drop or duplicate a position; the order is purely presentational.
+        """
+        cls._require_root_access(session, root_id, current_user_id)
+        program = lock_program_calendar(session, program_id, root_id)
+        if not program:
+            raise ValueError("Program not found")
+        days_by_id = {str(day.id): day for day in program.days}
+        if set(map(str, day_ids)) != set(days_by_id):
+            raise ValueError("day_ids must list every program day exactly once")
+        for position, day_id in enumerate(day_ids, start=1):
+            day = days_by_id[str(day_id)]
+            if day.day_number != position:
+                day.day_number = position
+        cls._commit(session)
+        return [{"id": day_id, "day_number": position} for position, day_id in enumerate(day_ids, start=1)]
+
+    @classmethod
     def duplicate_program_day(cls, session, root_id: str, program_id: str, day_id: str, current_user_id: str | None = None) -> Dict[str, Any]:
         """Copy a day's definition (templates, goals, notes) without its schedule.
 

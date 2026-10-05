@@ -200,7 +200,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-.editDay {
+.iconButton {
     display: inline-flex;
     flex: none;
     align-items: center;
@@ -218,13 +218,13 @@
     transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
-.day:hover .editDay,
-.daySelected .editDay,
-.editDay:focus-visible {
+.day:hover .iconButton,
+.daySelected .iconButton,
+.iconButton:focus-visible {
     opacity: 1;
 }
 
-.editDay:hover {
+.iconButton:hover:not(:disabled) {
     background: var(--color-bg-hover);
     color: var(--color-text-primary);
 }
@@ -236,8 +236,22 @@
     font-size: 12px;
 }
 
+/* An arrow at the end of the list stays in place, faded, so the controls don't shift. */
+.iconButton:disabled,
+.day:hover .iconButton:disabled,
+.daySelected .iconButton:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+/* Up/down sit together beside Edit in the card's top-right corner. */
+.moveButtons {
+    display: inline-flex;
+    flex: none;
+}
+
 @media (hover: none) {
-    .editDay {
+    .iconButton:not(:disabled) {
         opacity: 1;
     }
 }
@@ -261,7 +275,7 @@
     cursor: pointer;
 }
 
-.editDay:focus-visible,
+.iconButton:focus-visible,
 .template:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;

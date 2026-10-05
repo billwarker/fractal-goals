@@ -73,6 +73,36 @@ describe('ProgramDaysNavigator', () => {
         expect(screen.queryByRole('list', { name: 'Rest results by status' })).not.toBeInTheDocument();
     });
 
+    it('moves a day up or down from its card, keeping focus on the moved day', () => {
+        const onMoveDay = vi.fn();
+        const { rerender } = renderNavigator({ onMoveDay });
+
+        expect(screen.getByRole('button', { name: 'Move Planche Focus - Day 1 up' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Move Rest down' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Move Planche Focus - Day 1 down' }));
+        expect(onMoveDay).toHaveBeenCalledWith('d1', 1);
+        expect(screen.getByText('Planche Focus - Day 1 moved to position 2 of 3')).toBeInTheDocument();
+
+        // The list re-renders in its new order; focus follows the moved day.
+        rerender(
+            <ProgramDaysNavigator
+                days={[days[1], days[0], days[2]]}
+                occurrencesByDay={occurrencesByDay}
+                today="2026-10-05"
+                selectedDayId="d2"
+                onSelectDay={vi.fn()}
+                onSelectTemplate={vi.fn()}
+                onMoveDay={onMoveDay}
+            />,
+        );
+        expect(screen.getByRole('button', { name: 'Move Planche Focus - Day 1 down' })).toHaveFocus();
+    });
+
+    it('offers no move buttons without a handler or with a single day', () => {
+        renderNavigator();
+        expect(screen.queryByRole('button', { name: /^Move / })).not.toBeInTheDocument();
+    });
+
     it('creates and edits program days from the side pane', () => {
         const onCreateDay = vi.fn();
         const onEditDay = vi.fn();

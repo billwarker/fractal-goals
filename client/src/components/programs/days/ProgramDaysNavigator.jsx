@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
+import ChevronIcon from '../../atoms/ChevronIcon';
 import EditIcon from '../../atoms/EditIcon';
 import SessionTemplateNameBadge from '../../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../../utils/dateUtils';
@@ -52,10 +53,29 @@ export default function ProgramDaysNavigator({
     onSelectTemplate,
     onCreateDay = null,
     onEditDay = null,
+    onMoveDay = null,
     today = '',
     compare = false,
     onCompareChange,
 }) {
+    // After a move the list re-renders in its new order: keep focus on the moved day's arrow
+    // (or its other arrow at an end) and announce the new position.
+    const navRef = useRef(null);
+    const [moved, setMoved] = useState(null);
+    const [announcement, setAnnouncement] = useState('');
+    useEffect(() => {
+        if (!moved || !navRef.current) return;
+        const buttons = [moved.direction, moved.direction === 'up' ? 'down' : 'up']
+            .map((direction) => navRef.current.querySelector(`[data-move="${moved.dayId}:${direction}"]`));
+        (buttons.find((button) => button && !button.disabled) || buttons[0])?.focus();
+    }, [moved, days]);
+    const move = (day, direction, index) => {
+        const to = index + (direction === 'up' ? -1 : 1);
+        setMoved({ dayId: String(day.id), direction });
+        setAnnouncement(`${day.name || 'Program day'} moved to position ${to + 1} of ${days.length}`);
+        onMoveDay(day.id, direction === 'up' ? -1 : 1);
+    };
+
     // New days are created from a footer pinned to the bottom of the pane.
     const footer = onCreateDay ? (
         <div className={styles.footer}>
@@ -77,7 +97,8 @@ export default function ProgramDaysNavigator({
         );
     }
     return (
-        <nav className={styles.navigator} aria-label="Program days">
+        <nav className={styles.navigator} aria-label="Program days" ref={navRef}>
+            <p className={styles.visuallyHidden} aria-live="polite">{announcement}</p>
             {onCompareChange ? (
                 <div className={styles.toolbar}>
                     <button
@@ -94,7 +115,7 @@ export default function ProgramDaysNavigator({
                 </div>
             ) : null}
             <ul className={styles.days}>
-                {days.map((day) => {
+                {days.map((day, index) => {
                     const selected = String(day.id) === String(selectedDayId);
                     const plannable = isPlannableDay(day);
                     const name = day.name || 'Program day';
@@ -122,10 +143,36 @@ export default function ProgramDaysNavigator({
                                         {scheduleSummary(day, occurrences, today)}
                                     </span>
                                 </button>
+                                {onMoveDay && days.length > 1 ? (
+                                    <span className={styles.moveButtons}>
+                                        <button
+                                            type="button"
+                                            className={styles.iconButton}
+                                            data-move={`${day.id}:up`}
+                                            onClick={() => move(day, 'up', index)}
+                                            disabled={index === 0}
+                                            aria-label={`Move ${name} up`}
+                                            title="Move up"
+                                        >
+                                            <ChevronIcon size={14} direction="up" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={styles.iconButton}
+                                            data-move={`${day.id}:down`}
+                                            onClick={() => move(day, 'down', index)}
+                                            disabled={index === days.length - 1}
+                                            aria-label={`Move ${name} down`}
+                                            title="Move down"
+                                        >
+                                            <ChevronIcon size={14} direction="down" />
+                                        </button>
+                                    </span>
+                                ) : null}
                                 {onEditDay ? (
                                     <button
                                         type="button"
-                                        className={styles.editDay}
+                                        className={styles.iconButton}
                                         onClick={() => onEditDay(day)}
                                         aria-label={`Edit ${name}`}
                                         title="Edit day"

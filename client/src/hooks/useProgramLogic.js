@@ -101,6 +101,12 @@ export function useProgramLogic(rootId, program, refreshers) {
         return response?.data ?? null;
     }, [invalidateProgram, rootId, programId]);
 
+    // The order is presentational: only the program (its days list) needs refreshing.
+    const reorderDays = useCallback(async (dayIds) => {
+        await fractalApi.reorderProgramDays(rootId, programId, dayIds);
+        await invalidateProgram();
+    }, [invalidateProgram, rootId, programId]);
+
     const deleteDay = useCallback(async (dayId) => {
         await fractalApi.deleteProgramDay(rootId, programId, dayId);
         await Promise.all([invalidateProgram(), invalidateScheduling()]);
@@ -126,6 +132,7 @@ export function useProgramLogic(rootId, program, refreshers) {
         deleteBlock,
         saveDay,
         duplicateDay,
+        reorderDays,
         deleteDay,
         scheduleDay,
         unscheduleDay,

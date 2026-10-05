@@ -36,6 +36,8 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/days`, data),
     updateProgramDay: (rootId, programId, dayId, data) =>
         axios.put(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}`, data),
+    reorderProgramDays: (rootId, programId, dayIds) =>
+        axios.put(`${API_BASE}/${rootId}/programs/${programId}/days/order`, { day_ids: dayIds }),
     duplicateProgramDay: (rootId, programId, dayId) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/duplicate`),
     scheduleProgramDay: (rootId, programId, dayId, data) =>

@@ -7,6 +7,7 @@ const api = {
     createProgramDay: vi.fn(),
     updateProgramDay: vi.fn(),
     duplicateProgramDay: vi.fn(),
+    reorderProgramDays: vi.fn(),
     scheduleProgramDay: vi.fn(),
     updateBlock: vi.fn(),
     createBlock: vi.fn(),
@@ -24,6 +25,7 @@ describe('useProgramLogic', () => {
         api.createProgramDay.mockResolvedValue({ data: { id: 'day-new', name: 'Legs' } });
         api.updateProgramDay.mockResolvedValue({ data: { id: 'day-1', name: 'Legs' } });
         api.duplicateProgramDay.mockResolvedValue({ data: { id: 'day-copy', name: 'Legs (copy)' } });
+        api.reorderProgramDays.mockResolvedValue({ data: { days: [] } });
         api.scheduleProgramDay.mockResolvedValue({ data: { id: 'schedule-1', program_day_id: 'day-1', date: '2026-03-16' } });
         api.updateBlock.mockResolvedValue({ data: {} });
         api.createBlock.mockResolvedValue({ data: {} });
@@ -67,6 +69,16 @@ describe('useProgramLogic', () => {
 
         expect(api.duplicateProgramDay).toHaveBeenCalledWith('root-1', 'program-1', 'day-1');
         expect(copy.name).toBe('Legs (copy)');
+    });
+
+    it('saves the program\'s day order', async () => {
+        const { result } = renderHook(() => useProgramLogic('root-1', program, vi.fn().mockResolvedValue(undefined)));
+
+        await act(async () => {
+            await result.current.reorderDays(['day-2', 'day-1']);
+        });
+
+        expect(api.reorderProgramDays).toHaveBeenCalledWith('root-1', 'program-1', ['day-2', 'day-1']);
     });
 
     it('sends week tracking with block saves', async () => {

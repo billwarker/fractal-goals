@@ -101,6 +101,16 @@ export function useProgramDetailMutations({
         }
     }, [actions, onDaySaved]);
 
+    const reorderDays = useCallback(async (dayIds) => {
+        try {
+            await actions.reorderDays(dayIds);
+        } catch (error) {
+            logError('Failed to reorder days:', error);
+            notify.error(`Failed to reorder days: ${formatError(error)}`);
+            throw error;
+        }
+    }, [actions]);
+
     const deleteDay = useCallback(async (dayId) => {
         try {
             await actions.deleteDay(dayId);
@@ -195,6 +205,7 @@ export function useProgramDetailMutations({
         deleteBlock,
         saveDay,
         duplicateDay,
+        reorderDays,
         deleteDay,
         scheduleDay,
         unscheduleDay,

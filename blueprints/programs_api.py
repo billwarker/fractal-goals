@@ -10,6 +10,7 @@ from validators import (
     ProgramUpdateSchema,
     ProgramDayCreateSchema,
     ProgramDayUpdateSchema,
+    ProgramDayOrderSchema,
     ProgramDayScheduleSchema,
     ProgramDayOccurrenceUnscheduleSchema,
     ProgramDayStatusesUpdateSchema,
@@ -479,6 +480,19 @@ def create_program_day(current_user, root_id, program_id, validated_data):
             session, root_id, program_id, validated_data, current_user.id,
         ),
         lambda day: (jsonify(day), 201),
+    )
+
+@programs_bp.route('/<root_id>/programs/<program_id>/days/order', methods=['PUT'])
+@token_required
+@validate_request(ProgramDayOrderSchema)
+def reorder_program_days(current_user, root_id, program_id, validated_data):
+    """Arrange the program's days: the full list of day ids in their new order."""
+    return _program_day_write(
+        "Error reordering program days",
+        lambda session: ProgramService.reorder_program_days(
+            session, root_id, program_id, validated_data['day_ids'], current_user.id,
+        ),
+        lambda days: jsonify({"days": days}),
     )
 
 @programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>', methods=['PUT'])

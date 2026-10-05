@@ -112,7 +112,8 @@ program** (`program_days.program_id`), not to a block: a day's weekdays repeat a
 program span and its explicit dates may fall anywhere in it. Blocks only label and group the dates
 they cover (`block_for_date`; an occurrence's `block` is null outside every block), so moving,
 resizing, or deleting a block never changes which days occur. Days are managed program-scoped at
-`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/goals]]`; **Duplicate**
+`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/goals]]`, and
+`PUT …/days/order` sets their side-pane order (`day_number`) from the full list of day ids; **Duplicate**
 copies templates, goals, and notes without a schedule. Blocks can **track weeks**
 (`track_weeks`, `week_start_day` 0 = Monday): Week 1 starts on the block's start date and each
 later week on the chosen weekday. `services/program_rollups.block_weeks` and

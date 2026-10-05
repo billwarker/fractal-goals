@@ -321,6 +321,7 @@ function ProgramCalendarPage() {
         deleteBlock,
         saveDay,
         duplicateDay,
+        reorderDays,
         deleteDay,
         scheduleDay,
         unscheduleDay,
@@ -784,6 +785,7 @@ function ProgramCalendarPage() {
         onLeavePane: () => { if (isMobile) setIsSidePaneVisible(false); },
         onCreateDay: handleAddDayClick,
         onEditDay: handleEditDay,
+        onReorderDays: reorderDays,
     });
     useEffect(() => {
         showSavedDayRef.current = daysTab.showDay;

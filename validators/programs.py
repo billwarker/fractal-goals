@@ -293,6 +293,18 @@ class ProgramDayGoalAttachSchema(BaseModel):
     goal_id: str = Field(..., min_length=1)
 
 
+class ProgramDayOrderSchema(BaseModel):
+    """Every program day of a program, in the order the user arranged them."""
+    day_ids: List[str] = Field(..., min_length=1, max_length=500)
+
+    @field_validator('day_ids')
+    @classmethod
+    def unique_ids(cls, value):
+        if len(set(value)) != len(value):
+            raise ValueError('day_ids must not repeat a day')
+        return value
+
+
 class ProgramDayScheduleSchema(BaseModel):
     """Schedule a reusable program day onto one calendar date.
 
