@@ -1,7 +1,7 @@
 from sqlalchemy import Column, String, Boolean, DateTime, Date, Integer, Float, ForeignKey, Text, Table, CheckConstraint, UniqueConstraint, Index
 from sqlalchemy import DDL, event, func, text
 from sqlalchemy.dialects.postgresql import ExcludeConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
 import uuid
 from .base import Base, utc_now, JSON_TYPE
 
@@ -216,7 +216,11 @@ class ProgramDaySession(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
-    program_day = relationship("ProgramDay", backref="day_sessions")
+    # The ledger belongs to its day: deleting the day removes its rows (the FK cascades too).
+    program_day = relationship(
+        "ProgramDay",
+        backref=backref("day_sessions", cascade="all, delete-orphan", passive_deletes=True),
+    )
     template = relationship("SessionTemplate")
     session = relationship("Session")
 

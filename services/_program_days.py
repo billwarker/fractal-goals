@@ -180,6 +180,12 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         day = cls._get_program_day(session, program_id, day_id)
 
         day_name = day.name # Capture before delete
+        # Template links are reachable through two relationships (template_links and the
+        # templates secondary); remove them once here so the delete doesn't do it twice.
+        session.query(ProgramDayTemplate).filter(
+            ProgramDayTemplate.program_day_id == day.id,
+        ).delete(synchronize_session=False)
+        session.expire(day, ['templates', 'template_links'])
         session.delete(day)
         cls._commit(session)
 

@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from threading import Barrier
 from sqlalchemy import event
 from services.events import Events
-from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayStatusOverride, ProgramDayTemplate, Session, get_engine, get_session, program_goals, program_block_goals
+from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDaySession, ProgramDayStatusOverride, ProgramDayTemplate, ProgramSessionPlan, Session, get_engine, get_session, program_goals, program_block_goals
 from services.program_day_read_model_service import ProgramDayReadModelService
 from services.programs import ProgramService
 
@@ -1011,6 +1011,48 @@ class TestProgramStructure:
 
         assert updated.status_code == 200
         assert (updated.get_json()['track_weeks'], updated.get_json()['week_start_day']) == (True, 6)
+
+    def test_deleting_a_day_with_history_keeps_its_sessions(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        today = datetime.now(timezone.utc).date()
+        created = authed_client.post(f'/api/{root_id}/programs/{program_id}/days', json={
+            'name': 'Logged Day', 'template_ids': [sample_session_template.id],
+        })
+        assert created.status_code == 201
+        day_id = created.get_json()['id']
+        assert authed_client.post(
+            f'/api/{root_id}/programs/{program_id}/days/{day_id}/schedule', json={'date': today.isoformat()},
+        ).status_code in (200, 201)
+        logged = Session(
+            owner_id=sample_ultimate_goal.owner_id, root_id=root_id, name='Logged work', completed=True,
+            template_id=sample_session_template.id, program_id=program_id, program_day_id=day_id,
+            session_start=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc),
+        )
+        db_session.add(logged)
+        db_session.flush()
+        db_session.add(ProgramDaySession(
+            program_day_id=day_id, session_template_id=sample_session_template.id, session_id=logged.id,
+        ))
+        db_session.add(ProgramSessionPlan(
+            root_id=root_id, program_id=program_id, program_day_id=day_id,
+            session_template_id=sample_session_template.id, date=today, plan_data={'sections': []},
+        ))
+        db_session.commit()
+        logged_id = logged.id
+
+        response = authed_client.delete(f'/api/{root_id}/programs/{program_id}/days/{day_id}')
+
+        assert response.status_code == 200
+        db_session.expire_all()
+        assert db_session.get(ProgramDay, day_id) is None
+        # Logged work outlives the definition: the session stays, unlinked from the day.
+        session = db_session.get(Session, logged_id)
+        assert session is not None and session.program_day_id is None
+        assert db_session.query(ProgramDaySession).filter_by(program_day_id=day_id).count() == 0
+        assert db_session.query(ProgramSessionPlan).filter_by(program_day_id=day_id).count() == 0
 
 
 class TestProgramCalendarInvariantsApi:
