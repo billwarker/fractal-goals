@@ -10,13 +10,18 @@
 .rangeNavLabel { color: var(--color-text-muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .rangeNavDate { display: block; min-width: 0; color: var(--color-text-primary); font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap; }
 .collapseButton { min-height: 32px; padding-inline: 10px; }
-.viewSwitcher { display: grid; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
-.viewSwitcher > * { width: 100%; }
+.viewSwitcher { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
+.viewSwitcherToggle { min-width: 0; }
+.viewSwitcherToggle > * { width: 100%; }
+.subViewBar { padding: 14px 16px 0; }
+.sidePaneViewToggle { width: 100%; }
+.goalsPane { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 18px 16px 28px; }
 .daysPaneBody { min-height: 0; flex: 1; overflow-y: auto; }
 .dayReviewHeadingFixed { grid-template-columns: 32px minmax(0, 1fr) 32px; }
 .dayReviewHeader { display: grid; padding: 14px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-sidebar); }
 .dayReviewHeading { display: grid; grid-template-columns: 32px minmax(0, 1fr) 32px auto; align-items: center; gap: 10px; }
-.dayReviewTitle { min-width: 0; min-height: 32px; display: flex; align-items: center; justify-content: center; text-align: center; }
+.dayReviewTitle { min-width: 0; min-height: 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.dayReviewContext { margin: 2px 0 0; color: var(--color-text-muted); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
 .dayReviewTitle h2 { margin: 0; color: var(--color-text-primary); font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
 .detailsPane { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 0 16px; }
 .detailsPane { padding: 0; }
@@ -111,6 +116,7 @@
     .mobileSidePaneSheet { z-index: calc(var(--z-sheet) + 2); display: flex; width: 100%; height: min(82dvh, 760px); max-height: calc(var(--app-viewport-height, 100vh) - var(--app-nav-height, 0px)); min-height: 0; padding-bottom: env(safe-area-inset-bottom, 0px); border: 1px solid var(--color-border); border-bottom: none; border-radius: var(--sheet-radius) var(--sheet-radius) 0 0; background: var(--color-bg-sidebar); box-shadow: var(--shadow-lg); box-sizing: border-box; overflow: hidden; touch-action: auto; }
     .mobileSidePaneSheet .sidePane { flex: 1; width: 100%; height: 100%; min-height: 0; border: none; overflow: hidden; }
     .programHeader, .scopedHeader { padding: 18px 16px 14px; }
+    .sidePaneViewToggle :global(button[role="tab"]) { min-height: 44px; }
     .dayReviewHeader { padding: 16px; }
     .dayNavButton { width: 44px; height: 44px; }
     .dayReviewHeading { grid-template-columns: 44px minmax(0, 1fr) 44px auto; }

@@ -5,7 +5,7 @@ import { addDaysToDateString, getTodayLocalDate, getWeekdayName, subtractDaysToD
 import { useProgramDetailViewModel } from '../useProgramDetailViewModel';
 
 describe('useProgramDetailViewModel', () => {
-    it('derives sorted blocks, deadline-based block-goal state, active block metrics, and attached goal calendar events', () => {
+    it('derives sorted blocks, active block metrics, and attached goal calendar events', () => {
         const today = getTodayLocalDate();
         const tomorrow = addDaysToDateString(today, 1);
         const yesterday = subtractDaysToDateString(today, 1);
@@ -61,7 +61,6 @@ describe('useProgramDetailViewModel', () => {
             },
         ];
 
-        const goalById = Object.fromEntries(goals.map((goal) => [goal.id, goal]));
         const sessions = [
             {
                 id: 'session-1',
@@ -83,8 +82,6 @@ describe('useProgramDetailViewModel', () => {
             timezone: 'UTC',
             getGoalColor: () => '#00aaff',
             getGoalTextColor: () => '#ffffff',
-            getGoalDetails: (goalId) => goalById[goalId] || null,
-            attachBlockId: 'block-active',
             attachedGoalIds,
             hierarchyGoalSeeds: [],
             expandAssociatedGoalIds: (goalIds) => {
@@ -97,8 +94,6 @@ describe('useProgramDetailViewModel', () => {
 
         expect(result.current.sortedBlocks.map((block) => block.id)).toEqual(['block-active', 'block-late']);
         expect(result.current.activeBlock?.id).toBe('block-active');
-        expect(result.current.attachBlock?.id).toBe('block-active');
-        expect(result.current.blockGoalsByBlockId.get('block-active').map((goal) => goal.id)).toEqual(['goal-parent', 'goal-child']);
         expect(result.current.programMetrics).toBeUndefined();
         expect(result.current.blockMetrics).toBeUndefined();
         expect(result.current.calendarEvents.some((event) => event.id === 'block-bg-block-active')).toBe(true);

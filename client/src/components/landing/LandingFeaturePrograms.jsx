@@ -1,16 +1,13 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import ProgramBlockView from '../programs/ProgramBlockView';
 import ProgramCalendarView from '../programs/ProgramCalendarView';
 import ProgramSidebar from '../programs/ProgramSidebar';
+import ProgramStatusBadge from '../programs/ProgramStatusBadge';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import {
-    buildBlockGoalsByBlockId,
     buildProgramBlockLabels,
     buildProgramSidePaneData,
     buildProgramsCalendarEvents,
-    flattenProgramSessions,
     getProgramColor,
-    sortProgramBlocks,
 } from '../../utils/programViewModel';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
 import { getProgramStatus } from '../../utils/programGoalWindow';
@@ -53,11 +50,9 @@ function findBlockForDate(program, dateValue) {
 // whole multi-month plan.
 export default function LandingFeaturePrograms({ example, program, windowStart, windowEnd, isMobile }) {
     const { getGoalColor, getGoalTextColor } = useGoalLevels();
-    const [viewMode, setViewMode] = useState('calendar');
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(true);
     const [sidePaneView, setSidePaneView] = useState('details');
     const programStatus = getProgramStatus(program, new Date());
-    const programStatusLabel = `${programStatus.charAt(0).toUpperCase()}${programStatus.slice(1)}`;
     const goals = useMemo(
         () => flattenGoalTree(example.tree).map(normalizeGoal).filter(Boolean),
         [example.tree]
@@ -82,14 +77,6 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
     ), [getGoalDetails, goals, program]);
     const focusedBlock = findBlockForDate(program, initialDate) || sidePaneData.activeBlock;
     const programColor = getProgramColor(program);
-    const sortedBlocks = useMemo(() => sortProgramBlocks(program?.blocks || []), [program?.blocks]);
-    const programSessions = useMemo(() => flattenProgramSessions(program), [program]);
-    const blockGoalsByBlockId = useMemo(() => (
-        buildBlockGoalsByBlockId({
-            sortedBlocks,
-            associatedGoals: goals,
-        })
-    ), [goals, sortedBlocks]);
 
     if (!program) {
         return <div className={styles.emptyState}>Publish an example program to preview the calendar.</div>;
@@ -114,7 +101,7 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                             </h3>
                             <div className={styles.programPreviewMeta}>
                                 <span>{formatDate(program.start_date)} - {formatDate(program.end_date)}</span>
-                                <span className={styles.programStatusBadge}>{programStatusLabel}</span>
+                                <ProgramStatusBadge status={programStatus} />
                                 {focusedBlock ? (
                                     <span
                                         className={styles.programBlockBadge}
@@ -129,24 +116,6 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                             </div>
                         </div>
                         <div className={styles.programPreviewActions} aria-label="Program view controls">
-                            <div className={styles.programViewToggle} aria-label="Program view">
-                                <button
-                                    type="button"
-                                    className={viewMode === 'calendar' ? styles.programViewToggleActive : ''}
-                                    onClick={() => setViewMode('calendar')}
-                                    aria-pressed={viewMode === 'calendar'}
-                                >
-                                    Calendar
-                                </button>
-                                <button
-                                    type="button"
-                                    className={viewMode === 'blocks' ? styles.programViewToggleActive : ''}
-                                    onClick={() => setViewMode('blocks')}
-                                    aria-pressed={viewMode === 'blocks'}
-                                >
-                                    Blocks
-                                </button>
-                            </div>
                             <button type="button">Program Options</button>
                             <button
                                 type="button"
@@ -158,9 +127,8 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                         </div>
                     </div>
 
-                    <div className={`${styles.programPreviewCalendarPanel} ${viewMode === 'blocks' ? styles.programPreviewBlocksPanel : ''}`}>
-                        {viewMode === 'calendar' ? (
-                            <ProgramCalendarView
+                    <div className={styles.programPreviewCalendarPanel}>
+                        <ProgramCalendarView
                                 calendarEvents={calendarEvents}
                                 blockLabels={blockLabels}
                                 blockCreationMode={false}
@@ -174,22 +142,6 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                                 onEventClick={() => {}}
                                 onBlockLabelClick={() => {}}
                             />
-                        ) : (
-                            <div className={styles.programPreviewBlocksScroll}>
-                                <ProgramBlockView
-                                    blocks={sortedBlocks}
-                                    blockGoalsByBlockId={blockGoalsByBlockId}
-                                    sessions={programSessions}
-                                    onEditDay={() => {}}
-                                    onAttachGoal={() => {}}
-                                    onEditBlock={() => {}}
-                                    onDeleteBlock={() => {}}
-                                    onAddDay={() => {}}
-                                    onGoalClick={() => {}}
-                                    onAddBlock={() => {}}
-                                />
-                            </div>
-                        )}
                     </div>
                 </div>
 

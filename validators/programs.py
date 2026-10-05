@@ -15,7 +15,7 @@ from .core import (
 
 VALID_DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 MAX_PROGRAM_DAY_SCHEDULED_DATES = 366
-# Program-day schemas have a field named ``date``, which shadows the type in the class body.
+# The schedule schema has a field named ``date``, which shadows the type in a class body.
 CalendarDate = date
 
 
@@ -36,11 +36,6 @@ def _normalize_scheduled_dates(values: Optional[List[Any]]) -> Optional[List[dat
         raise ValueError(f"A program day can have at most {MAX_PROGRAM_DAY_SCHEDULED_DATES} scheduled dates")
     return sorted(parsed)
 
-
-def _reject_date_with_scheduled_dates(model):
-    if model.date and model.scheduled_dates is not None:
-        raise ValueError("Send either date or scheduled_dates, not both")
-    return model
 
 class ProgramCreateSchema(BaseModel):
     """Schema for creating a program."""
@@ -94,6 +89,8 @@ class ProgramUpdateSchema(BaseModel):
     end_date: Optional[str] = None
     weeklySchedule: Optional[List[Dict[str, Any]]] = None
     selectedGoals: Optional[List[str]] = None
+    # Confirms removing program-day goals that fall outside the new program goals.
+    prune_day_goals: Optional[bool] = None
 
     @field_validator('name')
     @classmethod
@@ -146,7 +143,9 @@ class ProgramBlockSchema(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
-    goal_ids: Optional[List[str]] = None
+    # Week tracking: weeks start on week_start_day (0 = Monday ... 6 = Sunday).
+    track_weeks: Optional[bool] = None
+    week_start_day: Optional[int] = Field(None, ge=0, le=6)
 
     @model_validator(mode='before')
     @classmethod
@@ -163,6 +162,8 @@ class ProgramBlockSchema(BaseModel):
 
     @model_validator(mode='after')
     def validate_date_range(self) -> 'ProgramBlockSchema':
+        if self.track_weeks and self.week_start_day is None:
+            raise ValueError('week_start_day is required when track_weeks is true')
         return _validate_block_date_range(self)
 
 
@@ -174,7 +175,9 @@ class ProgramBlockUpdateSchema(BaseModel):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
-    goal_ids: Optional[List[str]] = None
+    # Week tracking: weeks start on week_start_day (0 = Monday ... 6 = Sunday).
+    track_weeks: Optional[bool] = None
+    week_start_day: Optional[int] = Field(None, ge=0, le=6)
 
     @model_validator(mode='before')
     @classmethod
@@ -205,17 +208,18 @@ class ProgramDayTemplateConfigSchema(BaseModel):
 
 
 class ProgramDayCreateBaseSchema(BaseModel):
-    """Schema for adding a day to a program block."""
+    """Schema for adding a day to a program; weekdays repeat across the whole program."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
     name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
-    date: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     day_of_week: Optional[List[str]] = None
     template_id: Optional[str] = None
     template_ids: Optional[List[str]] = None
     template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
     completion_min_templates: Optional[int] = Field(None, ge=1)
-    cascade: Optional[bool] = False
+    # Optional program-day goals, inside the program's goals; they scope the day's sessions.
+    goal_ids: Optional[List[str]] = None
 
     @field_validator('day_of_week')
     @classmethod
@@ -228,7 +232,7 @@ class ProgramDayCreateBaseSchema(BaseModel):
         return v
 
 class ProgramDayCreateSchema(ProgramDayCreateBaseSchema):
-    """Schema for adding a day to a program block from the app.
+    """Schema for adding a day to a program from the app.
 
     Adds ``scheduled_dates``, the replace-all set of explicit occurrence dates
     (program_day_occurrence_schedules). Agent proposals extend the base schema,
@@ -241,9 +245,6 @@ class ProgramDayCreateSchema(ProgramDayCreateBaseSchema):
     def validate_scheduled_dates(cls, v):
         return _normalize_scheduled_dates(v)
 
-    @model_validator(mode='after')
-    def validate_date_modes(self):
-        return _reject_date_with_scheduled_dates(self)
 
 
 class ProgramDayUpdateBaseSchema(BaseModel):
@@ -251,12 +252,13 @@ class ProgramDayUpdateBaseSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
     
     name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
-    date: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     day_of_week: Optional[List[str]] = None
     template_ids: Optional[List[str]] = None
     template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
     completion_min_templates: Optional[int] = Field(None, ge=1)
-    cascade: Optional[bool] = False
+    # Optional program-day goals, inside the program's goals; they scope the day's sessions.
+    goal_ids: Optional[List[str]] = None
 
     @field_validator('day_of_week')
     @classmethod
@@ -282,39 +284,13 @@ class ProgramDayUpdateSchema(ProgramDayUpdateBaseSchema):
     def validate_scheduled_dates(cls, v):
         return _normalize_scheduled_dates(v)
 
-    @model_validator(mode='after')
-    def validate_date_modes(self):
-        return _reject_date_with_scheduled_dates(self)
 
-
-class ProgramBlockGoalAttachSchema(BaseModel):
-    """Schema for attaching a goal to a block."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-    
-    goal_id: str = Field(..., min_length=1)
-    deadline: Optional[str] = None
-    
-    @field_validator('deadline')
-    @classmethod
-    def validate_deadline(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or v == '': 
-            return None
-        try:
-            parse_date_string(v)
-            return v
-        except ValueError:
-            raise ValueError('Invalid date format')
 
 class ProgramDayGoalAttachSchema(BaseModel):
     """Schema for attaching a goal to a program day."""
     model_config = ConfigDict(str_strip_whitespace=True)
     
     goal_id: str = Field(..., min_length=1)
-
-
-class ProgramDayCopySchema(BaseModel):
-    """Schema for copying a block day across blocks."""
-    target_mode: Optional[str] = Field('all', pattern=r'^(all|selected)$')
 
 
 class ProgramDayScheduleSchema(BaseModel):

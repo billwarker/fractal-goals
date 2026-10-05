@@ -6,6 +6,9 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { calendarConflictMessage, findBlockOverlap } from '../../utils/programCalendarConflicts';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import { DEFAULT_WEEK_START_DAY } from '../../utils/programBlockWeeks';
+import BlockLengthField from './BlockLengthField';
+import BlockWeekTrackingField from './BlockWeekTrackingField';
 import styles from './ProgramBlockModal.module.css';
 
 function buildInitialBlockFormData(initialData) {
@@ -14,7 +17,9 @@ function buildInitialBlockFormData(initialData) {
             name: '',
             startDate: '',
             endDate: '',
-            color: 'var(--color-brand-primary)',
+            color: '#3A86FF',
+            trackWeeks: false,
+            weekStartDay: DEFAULT_WEEK_START_DAY,
         };
     }
 
@@ -24,6 +29,8 @@ function buildInitialBlockFormData(initialData) {
         startDate: initialData.startDate || initialData.start_date || '',
         endDate: initialData.endDate || initialData.end_date || '',
         color: initialData.color || '#3A86FF',
+        trackWeeks: Boolean(initialData.track_weeks ?? initialData.trackWeeks),
+        weekStartDay: initialData.week_start_day ?? initialData.weekStartDay ?? DEFAULT_WEEK_START_DAY,
     };
 }
 
@@ -109,7 +116,11 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
         setIsSaving(true);
         setServerError('');
         try {
-            await onSave(formData);
+            await onSave({
+                ...formData,
+                track_weeks: formData.trackWeeks,
+                week_start_day: formData.weekStartDay,
+            });
         } catch (error) {
             // Other failures are already reported by a toast.
             setServerError(calendarConflictMessage(error) || '');
@@ -185,11 +196,32 @@ const ProgramBlockModalInner = ({ onClose, onSave, initialData = null, programDa
                         />
                     </div>
 
+                    <BlockLengthField
+                        startDate={formData.startDate}
+                        endDate={formData.endDate}
+                        programEnd={programEnd}
+                        onEndDateChange={(endDate) => {
+                            setServerError('');
+                            setFormData({ ...formData, endDate });
+                        }}
+                    />
+
                     {programStart && programEnd && (
                         <div className={styles.dateHint}>
                             Blocks must stay between {programStart} and {programEnd}.
                         </div>
                     )}
+
+                    <BlockWeekTrackingField
+                        startDate={formData.startDate}
+                        endDate={formData.endDate}
+                        trackWeeks={formData.trackWeeks}
+                        weekStartDay={formData.weekStartDay}
+                        onChange={({ trackWeeks, weekStartDay }) => {
+                            setServerError('');
+                            setFormData({ ...formData, trackWeeks, weekStartDay });
+                        }}
+                    />
 
                     {errors.dateRange && (
                         <div className={styles.error}>{errors.dateRange}</div>

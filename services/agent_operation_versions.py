@@ -14,7 +14,7 @@ from models import (
     Target,
     SplitDefinition,
     activity_goal_associations,
-    program_block_goals,
+    program_day_goals,
     program_day_templates,
     program_goals,
 )
@@ -206,18 +206,12 @@ def operation_state_hash(session, root_id, operation, *, for_update=False):
         block = block_query.first()
         if block is None:
             raise AgentHarnessError("Program block is no longer available", 409, "stale_context")
-        goal_ids = session.execute(
-            program_block_goals.select().with_only_columns(program_block_goals.c.goal_id).where(
-                program_block_goals.c.program_block_id == block.id
-            )
-        ).all()
-        return _digest({"block": _columns(block), "goal_ids": sorted(row[0] for row in goal_ids)})
+        return _digest({"block": _columns(block)})
 
     if operation_type == "update_program_day":
-        day_query = session.query(ProgramDay).join(ProgramBlock).join(Program).filter(
+        day_query = session.query(ProgramDay).join(Program).filter(
             ProgramDay.id == operation["day_id"],
-            ProgramDay.block_id == operation["block_id"],
-            ProgramBlock.program_id == operation["program_id"],
+            ProgramDay.program_id == operation["program_id"],
             Program.root_id == root_id,
         ).populate_existing()
         if for_update:
@@ -231,9 +225,19 @@ def operation_state_hash(session, root_id, operation, *, for_update=False):
         if for_update:
             links_query = links_query.with_for_update()
         links = session.execute(links_query).mappings().all()
-        return _digest({"day": _columns(day), "templates": [dict(link) for link in links]})
+        return _digest({"day": _columns(day), "templates": [dict(link) for link in links],
+                        "goal_ids": _active_day_goal_ids(session, day.id)})
 
     raise AgentHarnessError("This operation has no version snapshot", 400, "unsupported_operation")
+
+
+def _active_day_goal_ids(session, day_id):
+    return sorted(row[0] for row in session.execute(
+        program_day_goals.select().with_only_columns(program_day_goals.c.goal_id).where(
+            program_day_goals.c.program_day_id == day_id,
+            program_day_goals.c.deleted_at.is_(None),
+        )
+    ).all())
 
 
 def operation_restore_payload(session, root_id, operation):
@@ -355,24 +359,20 @@ def operation_restore_payload(session, root_id, operation):
         ).first()
         if block is None:
             raise AgentHarnessError("Program block is no longer available", 409, "stale_context")
-        goal_ids = sorted(row[0] for row in session.execute(
-            program_block_goals.select().with_only_columns(program_block_goals.c.goal_id).where(
-                program_block_goals.c.program_block_id == block.id
-            )
-        ).all())
         prior = {"name": block.name,
                          "start_date": block.start_date.isoformat() if block.start_date else None,
                          "end_date": block.end_date.isoformat() if block.end_date else None,
-                         "color": block.color, "goal_ids": goal_ids}
+                         "color": block.color,
+                         "track_weeks": bool(block.track_weeks),
+                         "week_start_day": block.week_start_day}
         return {"type": kind, "program_id": operation["program_id"], "block_id": block.id,
                 "data": {key: value for key, value in prior.items() if key in data},
                 "undo_supported": True}
 
     if kind == "update_program_day":
-        day = session.query(ProgramDay).join(ProgramBlock).join(Program).filter(
+        day = session.query(ProgramDay).join(Program).filter(
             ProgramDay.id == operation["day_id"],
-            ProgramDay.block_id == operation["block_id"],
-            ProgramBlock.program_id == operation["program_id"],
+            ProgramDay.program_id == operation["program_id"],
             Program.root_id == root_id,
         ).first()
         if day is None:
@@ -384,21 +384,20 @@ def operation_restore_payload(session, root_id, operation):
         ).mappings().all()
         prior = {
                     "name": day.name,
-                    "date": day.date.isoformat() if day.date else None,
                     "day_of_week": day.day_of_week or [],
                     "completion_min_templates": day.completion_min_templates,
+                    "goal_ids": _active_day_goal_ids(session, day.id),
                     "template_configs": [
                         {"template_id": link["session_template_id"],
                          "is_required": bool(link["is_required"]), "order": link["order"]}
                         for link in links
                     ],
-                    "cascade": False,
                 }
         restore_data = {key: value for key, value in prior.items() if key in data}
         if "template_ids" in data or "template_configs" in data:
             restore_data["template_configs"] = prior["template_configs"]
         return {"type": kind, "program_id": operation["program_id"],
-                "block_id": operation["block_id"], "day_id": day.id,
+                "day_id": day.id,
                 "data": restore_data,
                 "undo_supported": True}
 

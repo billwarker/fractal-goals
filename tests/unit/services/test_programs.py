@@ -4,8 +4,9 @@ from datetime import datetime, date, timezone, timedelta
 from unittest.mock import patch
 
 import models
-from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, Goal, Session, get_session
+from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, Goal, Session, get_session, program_goals
 from services.programs import ProgramService
+from services.program_service_errors import ProgramServiceValidationError
 from services.events import event_bus, Events, Event
 
 @pytest.fixture
@@ -22,6 +23,8 @@ def sample_program(db_session, sample_goal_hierarchy):
         is_active=True
     )
     db_session.add(program)
+    db_session.flush()
+    db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=root_id))
     db_session.commit()
     return program
 
@@ -153,16 +156,39 @@ def test_create_block_starts_empty_and_can_add_day(db_session, sample_program, s
     assert block_res['name'] == 'Test Block 1'
     block_id = block_res['id']
     
-    block_db = db_session.query(ProgramBlock).get(block_id)
-    assert len(block_db.days) == 0
-    
-    day_res_count = ProgramService.add_block_day(db_session, root_id, sample_program.id, block_id, {
+    assert block_res['track_weeks'] is False
+    assert block_res['week_start_day'] is None
+
+    day = ProgramService.create_program_day(db_session, root_id, sample_program.id, {
         'name': 'Bonus Day',
         'day_of_week': ['Monday']
     })
-    
-    assert day_res_count['count'] == 1
-    assert day_res_count['days'][0]['name'] == 'Bonus Day'
+
+    assert day['name'] == 'Bonus Day'
+    assert day['program_id'] == sample_program.id
+    assert db_session.query(ProgramBlock).get(block_id) is not None
+
+
+def test_block_week_tracking_round_trips_and_requires_a_start_day(db_session, sample_program, sample_goal_hierarchy):
+    root_id = sample_goal_hierarchy['ultimate'].id
+    block = ProgramService.create_block(db_session, root_id, sample_program.id, {
+        'name': 'Tracked',
+        'start_date': date.today().isoformat(),
+        'end_date': (date.today() + timedelta(days=20)).isoformat(),
+        'track_weeks': True,
+        'week_start_day': 6,
+    })
+    assert (block['track_weeks'], block['week_start_day']) == (True, 6)
+
+    updated = ProgramService.update_block(db_session, root_id, sample_program.id, block['id'], {'track_weeks': False})
+    # The start day is remembered for when tracking comes back on.
+    assert (updated['track_weeks'], updated['week_start_day']) == (False, 6)
+
+    with pytest.raises(ProgramServiceValidationError) as excinfo:
+        ProgramService.update_block(db_session, root_id, sample_program.id, block['id'], {
+            'track_weeks': True, 'week_start_day': None,
+        })
+    assert excinfo.value.payload['field'] == 'week_start_day'
 
 
 def test_get_active_program_days_filters_to_days_scheduled_today(db_session, sample_program, sample_session_template, sample_goal_hierarchy):
@@ -179,21 +205,21 @@ def test_get_active_program_days_filters_to_days_scheduled_today(db_session, sam
     db_session.flush()
 
     today_day = ProgramDay(
-        block_id=block.id,
+        program_id=block.program_id,
         name='Today Practice',
         day_number=1,
         day_of_week=[today.strftime('%A')],
     )
     today_day.templates.append(sample_session_template)
     future_day = ProgramDay(
-        block_id=block.id,
+        program_id=block.program_id,
         name='Future Practice',
         day_number=2,
         day_of_week=[tomorrow.strftime('%A')],
     )
     future_day.templates.append(sample_session_template)
     unscheduled_day = ProgramDay(
-        block_id=block.id,
+        program_id=block.program_id,
         name='Unscheduled Practice',
         day_number=3,
     )
@@ -212,7 +238,7 @@ def test_create_block_accepts_camel_case_dates(db_session, sample_program, sampl
     block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
         'name': 'Camel Case Block',
         'startDate': date.today().isoformat(),
-        'endDate': (date.today() + timedelta(days=3)).isoformat(),
+        'endDate': (date.today() + timedelta(days=3)).isoformat()
     })
 
     assert block_res['start_date'] == date.today().isoformat()
@@ -227,7 +253,7 @@ def test_create_block_emits_program_block_created_event(db_session, sample_progr
     block_res = ProgramService.create_block(db_session, root_id, sample_program.id, {
         'name': 'Emitted Block',
         'start_date': date.today().isoformat(),
-        'end_date': (date.today() + timedelta(days=3)).isoformat(),
+        'end_date': (date.today() + timedelta(days=3)).isoformat()
     })
 
     assert block_res['name'] == 'Emitted Block'
@@ -272,11 +298,11 @@ def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     db_session.add(block)
     db_session.flush()
     
-    day = ProgramDay(block_id=block.id, name="D1", day_number=1, date=date.today())
+    day = ProgramDay(program_id=block.program_id, name="D1", day_number=1, occurrence_schedules=[ProgramDayOccurrenceSchedule(date=date.today())])
     db_session.add(day)
     db_session.commit()
     
-    res = ProgramService.attach_goal_to_day(db_session, root_id, sample_program.id, block.id, day.id, {'goal_id': goal.id})
+    res = ProgramService.attach_goal_to_day(db_session, root_id, sample_program.id, day.id, {'goal_id': goal.id})
     assert res['id'] == day.id
     
     day_db = db_session.query(ProgramDay).get(day.id)
@@ -284,7 +310,7 @@ def test_attach_goal_to_day(db_session, sample_program, sample_goal_hierarchy):
     assert day_db.goals[0].id == goal.id
 
 
-def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+def test_schedule_program_day_emits_program_day_scheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
     root_id = sample_goal_hierarchy['ultimate'].id
     block = ProgramBlock(
         program_id=sample_program.id,
@@ -295,18 +321,17 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
     db_session.add(block)
     db_session.flush()
 
-    day = ProgramDay(block_id=block.id, name='Sched Day', day_number=1)
+    day = ProgramDay(program_id=block.program_id, name='Sched Day', day_number=1)
     db_session.add(day)
     db_session.commit()
 
     emitted = []
     monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
-    result = ProgramService.schedule_block_day(
+    result = ProgramService.schedule_program_day(
         db_session,
         root_id,
         sample_program.id,
-        block.id,
         day.id,
         {'date': date.today().isoformat()},
     )
@@ -319,7 +344,7 @@ def test_schedule_block_day_emits_program_day_scheduled_event(db_session, sample
     assert emitted[0].data['schedule_id'] == schedule_row.id
 
 
-def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+def test_unschedule_program_day_occurrence_emits_program_day_unscheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
     root_id = sample_goal_hierarchy['ultimate'].id
     block = ProgramBlock(
         program_id=sample_program.id,
@@ -330,7 +355,7 @@ def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_
     db_session.add(block)
     db_session.flush()
 
-    day = ProgramDay(block_id=block.id, name='Unsched Day', day_number=1)
+    day = ProgramDay(program_id=block.program_id, name='Unsched Day', day_number=1)
     db_session.add(day)
     db_session.flush()
 
@@ -349,11 +374,10 @@ def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_
     emitted = []
     monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
-    result = ProgramService.unschedule_block_day_occurrence(
+    result = ProgramService.unschedule_program_day_occurrence(
         db_session,
         root_id,
         sample_program.id,
-        block.id,
         day.id,
         {'date': scheduled_session.session_start.date().isoformat(), 'timezone': 'UTC'},
     )
@@ -364,7 +388,7 @@ def test_unschedule_block_day_occurrence_emits_program_day_unscheduled_event(db_
     assert emitted[1].data['removed_count'] == 1
 
 
-def test_unschedule_block_day_occurrence_skips_unscheduled_event_when_nothing_matches(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
+def test_unschedule_program_day_occurrence_skips_unscheduled_event_when_nothing_matches(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
     root_id = sample_goal_hierarchy['ultimate'].id
     block = ProgramBlock(
         program_id=sample_program.id,
@@ -375,18 +399,17 @@ def test_unschedule_block_day_occurrence_skips_unscheduled_event_when_nothing_ma
     db_session.add(block)
     db_session.flush()
 
-    day = ProgramDay(block_id=block.id, name='Quiet Day', day_number=1)
+    day = ProgramDay(program_id=block.program_id, name='Quiet Day', day_number=1)
     db_session.add(day)
     db_session.commit()
 
     emitted = []
     monkeypatch.setattr("services.events.event_bus.emit", lambda event: emitted.append(event))
 
-    result = ProgramService.unschedule_block_day_occurrence(
+    result = ProgramService.unschedule_program_day_occurrence(
         db_session,
         root_id,
         sample_program.id,
-        block.id,
         day.id,
         {'date': date.today().isoformat(), 'timezone': 'UTC'},
     )
@@ -394,35 +417,6 @@ def test_unschedule_block_day_occurrence_skips_unscheduled_event_when_nothing_ma
     assert result['removed_count'] == 0
     assert result['removed_session_ids'] == []
     assert emitted == []
-
-
-def test_attach_goal_to_block_preserves_program_scope_and_requires_descendant(db_session, sample_program, sample_goal_hierarchy):
-    root_id = sample_goal_hierarchy['ultimate'].id
-    mid_term_goal = sample_goal_hierarchy['mid_term']
-    short_term_goal = sample_goal_hierarchy['short_term']
-
-    ProgramService._replace_program_goals(db_session, sample_program.id, [mid_term_goal.id], root_id)
-
-    block = ProgramBlock(
-        program_id=sample_program.id,
-        name="Scoped Block",
-        start_date=date.today(),
-        end_date=date.today() + timedelta(days=7),
-    )
-    db_session.add(block)
-    db_session.commit()
-
-    result = ProgramService.attach_goal_to_block(
-        db_session,
-        root_id,
-        sample_program.id,
-        block.id,
-        {'goal_id': short_term_goal.id, 'deadline': (date.today() + timedelta(days=1)).isoformat()},
-    )
-
-    assert result['goal_ids'] == [short_term_goal.id]
-    db_session.refresh(sample_program)
-    assert [goal.id for goal in sample_program.goals] == [mid_term_goal.id]
 
 
 def test_set_goal_deadline_for_program_date_enforces_program_range(db_session, sample_program, sample_goal_hierarchy):

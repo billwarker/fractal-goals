@@ -61,6 +61,14 @@ class Program(Base):
     __mapper_args__ = {'version_id_col': row_version}
     
     blocks = relationship("ProgramBlock", back_populates="program", cascade="all, delete-orphan")
+    # Program days belong to the program; blocks only label and group the dates they cover.
+    days = relationship(
+        "ProgramDay",
+        back_populates="program",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ProgramDay.day_number",
+    )
     day_status_overrides = relationship(
         "ProgramDayStatusOverride",
         back_populates="program",
@@ -91,6 +99,10 @@ class ProgramBlock(Base):
     end_date = Column(Date, nullable=True)
     color = Column(String)
     is_completed = Column(Boolean, default=False)
+    # Week tracking: Week 1 starts on start_date; each later week starts on
+    # week_start_day (Python weekday, 0 = Monday). See services/program_rollups.block_weeks.
+    track_weeks = Column(Boolean, nullable=False, default=False, server_default='false')
+    week_start_day = Column(Integer, nullable=True)
     row_version = Column(Integer, nullable=False, default=1, server_default='1')
     __mapper_args__ = {'version_id_col': row_version}
     # Backstop for the service guard in services/program_calendar_invariants.py:
@@ -99,6 +111,14 @@ class ProgramBlock(Base):
         CheckConstraint(
             'start_date IS NULL OR end_date IS NULL OR start_date <= end_date',
             name='ck_program_blocks_date_order',
+        ),
+        CheckConstraint(
+            'week_start_day IS NULL OR (week_start_day >= 0 AND week_start_day <= 6)',
+            name='ck_program_blocks_week_start_day',
+        ),
+        CheckConstraint(
+            'NOT track_weeks OR week_start_day IS NOT NULL',
+            name='ck_program_blocks_track_weeks_start_day',
         ),
         ExcludeConstraint(
             (program_id, '='),
@@ -110,13 +130,7 @@ class ProgramBlock(Base):
     )
     
     program = relationship("Program", back_populates="blocks")
-    days = relationship("ProgramDay", back_populates="block", cascade="all, delete-orphan", order_by="ProgramDay.day_number")
-    goals = relationship(
-        "Goal",
-        secondary=program_block_goals,
-        backref="program_blocks",
-        viewonly=True
-    )
+    # program_block_goals is retained data only; blocks no longer carry goals.
 
 event.listen(
     ProgramBlock.__table__,
@@ -129,9 +143,9 @@ class ProgramDay(Base):
     __tablename__ = 'program_days'
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    block_id = Column(String, ForeignKey('program_blocks.id'), nullable=False, index=True)
-    
-    date = Column(Date, nullable=True)
+    program_id = Column(String, ForeignKey('programs.id', ondelete='CASCADE'), nullable=False, index=True)
+
+    # Sidebar order within the program.
     day_number = Column(Integer, nullable=True)
     name = Column(String)
     notes = Column(Text)
@@ -142,7 +156,7 @@ class ProgramDay(Base):
     row_version = Column(Integer, nullable=False, default=1, server_default='1')
     __mapper_args__ = {'version_id_col': row_version}
 
-    block = relationship("ProgramBlock", back_populates="days")
+    program = relationship("Program", back_populates="days")
     template_links = relationship(
         "ProgramDayTemplate",
         back_populates="program_day",

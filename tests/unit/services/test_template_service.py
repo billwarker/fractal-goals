@@ -117,7 +117,7 @@ def test_list_templates_marks_archived_template_used_by_active_program(
     db_session.add(block)
     db_session.flush()
     day = ProgramDay(
-        block_id=block.id,
+        program_id=block.program_id,
         name='Today',
         day_number=1,
         day_of_week=[today.strftime('%A')],

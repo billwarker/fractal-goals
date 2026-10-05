@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy import func, inspect
 from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
-from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, Target, MetricValue, ProgramBlock, ProgramDay, Session, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, Target, MetricValue, ProgramDay, Session, validate_root_goal
 import models
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_loading import goal_serializer_relationship_loaders, load_fractal_goals_for_serialization
@@ -86,7 +86,7 @@ class SessionService:
             selectinload(Session.activity_instances).selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.slots),
             selectinload(Session.circuit_runs).selectinload(CircuitRun.rounds).selectinload(CircuitRound.members),
-            joinedload(Session.program_day).joinedload(ProgramDay.block).joinedload(ProgramBlock.program),
+            joinedload(Session.program_day).joinedload(ProgramDay.program),
             with_loader_criteria(ActivityInstance, ActivityInstance.deleted_at == None, include_aliases=True),
         )
 
@@ -137,9 +137,9 @@ class SessionService:
 
         # Program scoping applies only when program has selected goals.
         program_goal_ids = set()
-        if getattr(session_obj, 'program_day', None) and session_obj.program_day.block and session_obj.program_day.block.program:
+        if getattr(session_obj, 'program_day', None) and session_obj.program_day.program:
             program_goal_ids = set(resolve_program_scope(
-                self.db_session, session_obj.root_id, session_obj.program_day.block.program.id
+                self.db_session, session_obj.root_id, session_obj.program_day.program.id
             ).goal_ids)
 
         derived = {}

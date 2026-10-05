@@ -59,7 +59,7 @@ describe('getProgramsAffectedByGoalCompletion', () => {
             {
                 id: 'previous-program',
                 name: 'Previous Program',
-                blocks: [{ goal_ids: ['child'], days: [] }],
+                days: [{ goal_ids: ['child'] }],
                 start_date: '2026-05-01',
                 end_date: '2026-05-31',
                 is_active: false,

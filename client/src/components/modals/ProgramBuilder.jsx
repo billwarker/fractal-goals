@@ -11,6 +11,8 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
+import FocusConflictNotice from '../programs/FocusConflictNotice';
+import { focusError, isPrunableFocusConflict } from '../../utils/programFocus';
 import styles from './ProgramBuilder.module.css';
 
 function buildInitialProgramData(initialData, initialStartDate = '', initialEndDate = '') {
@@ -51,6 +53,7 @@ function ProgramBuilderInner({
     const [errors, setErrors] = useState({});
     const [isSaving, setIsSaving] = useState(false);
     const [isGoalPickerOpen, setIsGoalPickerOpen] = useState(false);
+    const [focusConflict, setFocusConflict] = useState(null);
 
     const [programData, setProgramData] = useState(() => buildInitialProgramData(initialData, initialStartDate, initialEndDate));
 
@@ -72,6 +75,7 @@ function ProgramBuilderInner({
     }, [goalsTreeQuery.data]);
 
     const handleSelectedGoalsChange = (selectedGoals) => {
+        setFocusConflict(null);
         setProgramData({
             ...programData,
             selectedGoals,
@@ -99,13 +103,18 @@ function ProgramBuilderInner({
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSave = async () => {
+    const handleSave = async (pruneDayGoals = false) => {
         if (validateForm()) {
             try {
                 setIsSaving(true);
-                await onSave(programData);
+                await onSave({ ...programData, ...(pruneDayGoals ? { pruneDayGoals: true } : {}) });
                 handleClose();
             } catch (error) {
+                // Narrower program goals that strand program-day goals need explicit confirmation.
+                if (isPrunableFocusConflict(error)) {
+                    setFocusConflict(focusError(error));
+                    return;
+                }
                 setErrors((currentErrors) => ({
                     ...currentErrors,
                     form: error?.response?.data?.error || error?.message || 'Failed to save program',
@@ -242,6 +251,7 @@ function ProgramBuilderInner({
                             </div>
                         </div>
                     )}
+                    <FocusConflictNotice conflict={focusConflict} onConfirm={() => handleSave(true)} isSaving={isSaving} />
                     {errors.form && <div className={styles.errorText}>{errors.form}</div>}
                     </div>
                 </ModalBody>
@@ -250,7 +260,7 @@ function ProgramBuilderInner({
                     <Button variant="secondary" onClick={handleClose}>
                         Cancel
                     </Button>
-                    <Button variant="primary" onClick={handleSave} disabled={isSaving}>
+                    <Button variant="primary" onClick={() => handleSave()} disabled={isSaving}>
                         {isSaving ? 'Saving...' : (submitLabel || (initialData ? 'Save Changes' : 'Create Program'))}
                     </Button>
                 </ModalFooter>

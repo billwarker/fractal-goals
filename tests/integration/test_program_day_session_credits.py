@@ -10,7 +10,7 @@ from models import (
     ActivityInstance,
     Program,
     ProgramBlock,
-    ProgramDay,
+    ProgramDay, ProgramDayOccurrenceSchedule,
     ProgramDaySessionCredit,
     ProgramDayTemplate,
     Session,
@@ -95,7 +95,7 @@ def credit_world(db_session, test_user, sample_goal_hierarchy):
     unrelated = _template(db_session, root.id, "Run", "#669933")
     days = {}
     for label, value in (("yesterday", yesterday), ("today", today)):
-        day = ProgramDay(block_id=block.id, date=value, name=f"Day {label}")
+        day = ProgramDay(program_id=block.program_id, occurrence_schedules=[ProgramDayOccurrenceSchedule(date=value)], name=f"Day {label}")
         db_session.add(day)
         db_session.flush()
         db_session.add_all([
@@ -154,7 +154,7 @@ class TestProgramDayReviewSummary:
         off_plan = sessions[credit_world["sessions"]["off_plan"].id]
         other = sessions[credit_world["sessions"]["other"].id]
 
-        assert payload["schema_version"] == 5
+        assert payload["schema_version"] == 7
         assert detail["state"] == "scheduled_partial"
         assert detail["can_edit_credits"] is True
         assert (matched["relation"], matched["credit"]["source"]) == ("credited", "template_match")
@@ -174,10 +174,10 @@ class TestProgramDayReviewSummary:
         }]
         assert "summary" not in detail
         day = payload["days"][0]
-        assert day["completed_sessions"] == [
+        assert [{"id": row["id"], "name": row["name"]} for row in day["completed_sessions"]] == [
             {"id": credit_world["sessions"]["matched"].id, "name": "Planche Focus"},
             {"id": credit_world["sessions"]["off_plan"].id, "name": "Run"},
-            {"id": credit_world["sessions"]["other"].id, "name": "Handstand"},
+            {"id": credit_world["sessions"]["other"].id, "name": "Other program"},
         ]
 
     def test_day_sessions_are_cursor_paged_in_effective_order(
@@ -312,7 +312,7 @@ class TestProgramDaySessionCredits:
             f"/api/{credit_world['root'].id}/programs/{credit_world['program'].id}/metrics"
             f"?range_start={yesterday}&range_end={yesterday}&timezone=UTC"
         ).get_json()
-        assert metrics["calculation_version"] == 6
+        assert metrics["calculation_version"] == 9
         assert metrics["days"][0]["state"] == "scheduled_met"
 
         restored = _put_credit(authed_client, credit_world, session_id=off_plan_id, disposition="automatic")

@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timezone
 
 from models.goal import Goal
-from models.program import Program, ProgramBlock, ProgramDay
+from models.program import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule
 from models.user import User
 
 # Test 1: Cross-fractal parent assignment
@@ -65,21 +65,20 @@ def test_attach_goal_to_day_validation(authed_client, db_session, test_user):
     """
     root_id = str(uuid.uuid4())
     prog_id = str(uuid.uuid4())
-    block_id = str(uuid.uuid4())
     day_id = str(uuid.uuid4())
     
     # We don't even need the models to exist to hit the payload validation 400 first
     
     # Try with empty body
     response = authed_client.post(
-        f'/api/{root_id}/programs/{prog_id}/blocks/{block_id}/days/{day_id}/goals',
+        f'/api/{root_id}/programs/{prog_id}/days/{day_id}/goals',
         # No JSON
     )
     assert response.status_code in [400, 415] # Flask validation error or unsupported media type
     
     # Try with empty JSON
     response2 = authed_client.post(
-        f'/api/{root_id}/programs/{prog_id}/blocks/{block_id}/days/{day_id}/goals',
+        f'/api/{root_id}/programs/{prog_id}/days/{day_id}/goals',
         json={}
     )
     assert response2.status_code == 400
@@ -93,10 +92,9 @@ def test_day_of_week_schema_validation(authed_client, test_user):
     """
     root_id = str(uuid.uuid4())
     prog_id = str(uuid.uuid4())
-    block_id = str(uuid.uuid4())
     
     response = authed_client.post(
-        f'/api/{root_id}/programs/{prog_id}/blocks/{block_id}/days',
+        f'/api/{root_id}/programs/{prog_id}/days',
         json={
             'name': 'Day 1',
             'day_of_week': ['Funday'] # Invalid string
@@ -138,9 +136,9 @@ def test_idempotent_attach_goal(authed_client, db_session, test_user):
     )
     day = ProgramDay(
         id=str(uuid.uuid4()), 
-        block_id=block.id, 
+        program_id=block.program_id,
         name="Day",
-        date=datetime.now(timezone.utc).date(),
+        occurrence_schedules=[ProgramDayOccurrenceSchedule(date=datetime.now(timezone.utc).date())],
     )
     goal = Goal(
         id=str(uuid.uuid4()),
@@ -150,18 +148,21 @@ def test_idempotent_attach_goal(authed_client, db_session, test_user):
     )
     
     db_session.add_all([program, block, day, goal])
+    db_session.flush()
+    from models import program_goals
+    db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=goal.id))
     db_session.commit()
     
     # First attach
     resp1 = authed_client.post(
-        f'/api/{my_root.id}/programs/{program.id}/blocks/{block.id}/days/{day.id}/goals',
+        f'/api/{my_root.id}/programs/{program.id}/days/{day.id}/goals',
         json={'goal_id': goal.id}
     )
     assert resp1.status_code == 201
     
     # Second attach identically
     resp2 = authed_client.post(
-        f'/api/{my_root.id}/programs/{program.id}/blocks/{block.id}/days/{day.id}/goals',
+        f'/api/{my_root.id}/programs/{program.id}/days/{day.id}/goals',
         json={'goal_id': goal.id}
     )
     assert resp2.status_code == 201

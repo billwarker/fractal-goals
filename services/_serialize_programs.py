@@ -36,6 +36,7 @@ def serialize_program(program, *, scope=None, as_of=None):
         "end_date": format_utc(program.end_date),
         "weekly_schedule": schedule_from_db or _safe_load_json(program.weekly_schedule, []),
         "blocks": schedule_from_db,
+        "days": [serialize_program_day(day) for day in (program.days or [])],
         "goal_ids": [g.id for g in (program.goals or [])],
         "selected_goals": [g.id for g in (program.goals or [])],  # Keep both for safety
         "scope_seed_goal_ids": sorted(getattr(scope, "seed_goal_ids", ()) or ()),
@@ -47,7 +48,6 @@ def serialize_program(program, *, scope=None, as_of=None):
 
 def serialize_program_block(block):
     """Serialize a ProgramBlock object."""
-    block_goal_ids = [g.id for g in (block.goals or [])]
     program_goal_ids = [g.id for g in (block.program.goals or [])] if getattr(block, 'program', None) else []
     return {
         "id": block.id,
@@ -57,9 +57,9 @@ def serialize_program_block(block):
         "end_date": format_utc(block.end_date),
         "color": block.color,
         "is_completed": block.is_completed,
-        "goal_ids": block_goal_ids,
+        "track_weeks": bool(getattr(block, 'track_weeks', False)),
+        "week_start_day": getattr(block, 'week_start_day', None),
         "program_goal_ids": program_goal_ids,
-        "days": [serialize_program_day(d) for d in block.days]
     }
 
 
@@ -79,11 +79,10 @@ def serialize_program_day(day):
 
     return {
         "id": day.id,
-        "block_id": day.block_id,
+        "program_id": day.program_id,
         "day_number": day.day_number,
         "name": day.name,
         "notes": day.notes,
-        "date": format_utc(day.date),
         "day_of_week": day.day_of_week or [],
         "templates": serialized_templates,
         "goal_ids": [g.id for g in (day.goals or [])],

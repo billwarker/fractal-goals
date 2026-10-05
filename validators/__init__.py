@@ -130,11 +130,9 @@ from .analytics import (
 )
 from .calendar_periods import CalendarPeriodCreateSchema, CalendarPeriodUpdateSchema
 from .programs import (
-    ProgramBlockGoalAttachSchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
     ProgramCreateSchema,
-    ProgramDayCopySchema,
     ProgramDayCreateSchema,
     ProgramDayGoalAttachSchema,
     ProgramDayOccurrenceUnscheduleSchema,
@@ -240,11 +238,9 @@ __all__ = [
     "PageSurfaceUpdateSchema",
     "CalendarPeriodCreateSchema",
     "CalendarPeriodUpdateSchema",
-    "ProgramBlockGoalAttachSchema",
     "ProgramBlockSchema",
     "ProgramBlockUpdateSchema",
     "ProgramCreateSchema",
-    "ProgramDayCopySchema",
     "ProgramDayCreateSchema",
     "ProgramDayGoalAttachSchema",
     "ProgramDayOccurrenceUnscheduleSchema",

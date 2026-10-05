@@ -6,13 +6,15 @@ import { useCircuits } from '../../../hooks/useCircuitQueries';
 import { formatLiteralDate } from '../../../utils/dateUtils';
 import {
     describeOccurrenceDate,
+    isPlannableDay,
     occurrenceStatus,
     pickColumnDate,
     planCardElementId,
 } from '../../../utils/programDaysView';
 import PlanDateColumn from './PlanDateColumn';
 import PlanOccurrenceStrip from './PlanOccurrenceStrip';
-import { plannableDayGroups } from './ProgramDaysNavigator';
+import { blockWeekLabel } from '../../../utils/programBlockWeeks';
+import { blockForDate } from '../../../utils/programViewModel';
 import styles from './ProgramDaysView.module.css';
 
 /**
@@ -25,7 +27,7 @@ import styles from './ProgramDaysView.module.css';
 export default function ProgramDaysView({
     rootId,
     program,
-    blocks,
+    days = [],
     activities,
     activityGroups,
     today,
@@ -34,6 +36,7 @@ export default function ProgramDaysView({
     occurrencesQuery,
     focusTemplateId = null,
     onSelectionChange,
+    onEditDay = null,
     showDateControls = false,
 }) {
     const { found, occurrences, date, compareDate, columnDates } = resolved;
@@ -76,11 +79,13 @@ export default function ProgramDaysView({
     if (!found) {
         return (
             <EmptyState
-                title="No program days to plan"
-                description="Add a program day with at least one session template, then plan its sessions here."
+                title="No program days yet"
+                description="Create a program day from the side pane, give it a session template, then plan its sessions here."
             />
         );
     }
+    // Each column's date sits in at most one block; name it (and its week when tracked).
+    const blockContext = (value) => blockWeekLabel(blockForDate(program?.blocks, value), value);
 
     return (
         <section className={styles.main} aria-labelledby="program-days-title">
@@ -91,21 +96,13 @@ export default function ProgramDaysView({
                         value={found.day.id}
                         onChange={(event) => onSelectionChange({ dayId: event.target.value, date: null })}
                     >
-                        {plannableDayGroups(blocks).map(({ block, days }) => (
-                            <optgroup key={block.id} label={block.name}>
-                                {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
-                            </optgroup>
-                        ))}
+                        {days.map((day) => <option key={day.id} value={day.id}>{day.name}</option>)}
                     </select>
                 </label>
             ) : null}
             {/* The highlighted day in the side pane names the selection on desktop; keep the
                 heading for screen readers and show it where the side pane is a hidden sheet. */}
             <header className={showDateControls ? styles.mainHeader : styles.visuallyHidden}>
-                <span className={styles.mainHeaderBlock} style={{ color: found.block.color || undefined }}>
-                    {found.block.name}
-                </span>
-                <span className={styles.mainHeaderDivider} aria-hidden="true">/</span>
                 <h2 id="program-days-title">{found.day.name}</h2>
             </header>
             <p className={styles.visuallyHidden} aria-live="polite">{announcement}</p>
@@ -115,11 +112,21 @@ export default function ProgramDaysView({
                     Dates could not be loaded. <button type="button" onClick={() => occurrencesQuery.refetch()}>Retry</button>
                 </p>
             ) : null}
-            {!occurrencesQuery.isLoading && !occurrencesQuery.error && !occurrences.length ? (
+            {!isPlannableDay(found.day) ? (
+                <EmptyState
+                    compact
+                    title="No sessions on this day yet"
+                    description="Add a session template to this program day to plan it."
+                    actionLabel={onEditDay ? 'Edit day' : undefined}
+                    onAction={onEditDay ? () => onEditDay(found.day) : undefined}
+                />
+            ) : !occurrencesQuery.isLoading && !occurrencesQuery.error && !occurrences.length ? (
                 <EmptyState
                     compact
                     title="Not scheduled yet"
-                    description="Give this day weekdays or specific dates within its block to plan its sessions."
+                    description="Give this day weekdays or specific dates in the program to plan its sessions."
+                    actionLabel={onEditDay ? 'Edit schedule' : undefined}
+                    onAction={onEditDay ? () => onEditDay(found.day) : undefined}
                 />
             ) : null}
             {columnDates.length ? (
@@ -147,6 +154,7 @@ export default function ProgramDaysView({
                             programId={program.id}
                             dayId={found.day.id}
                             occurrence={occurrenceByDate.get(value)}
+                            context={blockContext(value)}
                             caption={describeOccurrenceDate(value, occurrenceDates, today, {
                                 completed: occurrenceStatus(occurrenceByDate.get(value)) === 'complete',
                                 isComparison: columnDates.length > 1 && value === columnDates[0],

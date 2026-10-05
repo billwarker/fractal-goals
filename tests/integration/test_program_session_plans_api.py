@@ -70,7 +70,7 @@ def plan_world(db_session, test_user, sample_goal_hierarchy, sample_activity_def
         }]}),
     )
     db_session.add(template)
-    day = ProgramDay(block_id=block.id, name='Upper A', day_of_week=['Monday'])
+    day = ProgramDay(program_id=block.program_id, name='Upper A', day_of_week=['Monday'])
     db_session.add(day)
     db_session.flush()
     db_session.add(ProgramDayTemplate(program_day_id=day.id, session_template_id=template.id, is_required=True, order=0))

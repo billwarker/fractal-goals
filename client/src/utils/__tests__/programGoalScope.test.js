@@ -7,15 +7,13 @@ import {
 } from '../programGoalWindow';
 
 describe('program goal-tree scope', () => {
-    it('collects program, block, and day goal associations without duplicates', () => {
+    it('collects program and day goal associations without duplicates, ignoring legacy block goals', () => {
         expect(collectProgramGoalIds({
             goal_ids: ['parent'],
             selected_goals: ['parent'],
-            blocks: [{
-                goal_ids: ['child'],
-                days: [{ goal_ids: ['leaf', 'child'] }],
-            }],
-        })).toEqual(['parent', 'child', 'leaf']);
+            blocks: [{ goal_ids: ['child'] }],
+            days: [{ goal_ids: ['leaf', 'child'] }],
+        })).toEqual(['parent', 'leaf', 'child']);
     });
 
     it('expands each associated goal to its full ancestors and descendants', () => {

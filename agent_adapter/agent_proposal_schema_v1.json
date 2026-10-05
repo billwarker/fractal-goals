@@ -76,7 +76,7 @@
       "properties": {
         "data": {
           "$ref": "#/$defs/StrictProgramBlockCreateSchema",
-          "description": "Block name, dates, color, and optional goal IDs."
+          "description": "Block name, dates, color, and optional week tracking (track_weeks, week_start_day 0=Monday..6=Sunday)."
         },
         "operation_id": {
           "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
@@ -197,16 +197,9 @@
     "CreateProgramDayOperation": {
       "additionalProperties": false,
       "properties": {
-        "block_id": {
-          "description": "Opaque ID of the containing block, or $ref:<operation_id> for a block created earlier in this proposal.",
-          "maxLength": 80,
-          "minLength": 1,
-          "title": "Block Id",
-          "type": "string"
-        },
         "data": {
           "$ref": "#/$defs/StrictProgramDayCreateSchema",
-          "description": "Program day fields, including optional template_configs and template IDs."
+          "description": "Program day fields, including optional template_configs and template IDs. Weekdays repeat across the whole program."
         },
         "operation_id": {
           "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
@@ -233,7 +226,6 @@
         "operation_id",
         "type",
         "program_id",
-        "block_id",
         "data"
       ],
       "title": "CreateProgramDayOperation",
@@ -469,19 +461,12 @@
     "ScheduleProgramDayOperation": {
       "additionalProperties": false,
       "properties": {
-        "block_id": {
-          "description": "Opaque ID of the containing block.",
-          "maxLength": 80,
-          "minLength": 1,
-          "title": "Block Id",
-          "type": "string"
-        },
         "data": {
           "$ref": "#/$defs/StrictProgramDayScheduleSchema",
-          "description": "The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the block's dates. session_start is accepted for compatibility; only its date is used."
+          "description": "The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the program's dates. session_start is accepted for compatibility; only its date is used."
         },
         "day_id": {
-          "description": "Opaque ID of an existing day in the block.",
+          "description": "Opaque ID of an existing day in the program.",
           "maxLength": 80,
           "minLength": 1,
           "title": "Day Id",
@@ -512,7 +497,6 @@
         "operation_id",
         "type",
         "program_id",
-        "block_id",
         "day_id",
         "data"
       ],
@@ -896,21 +880,6 @@
           "default": null,
           "title": "End Date"
         },
-        "goal_ids": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Goal Ids"
-        },
         "name": {
           "anyOf": [
             {
@@ -936,6 +905,32 @@
           ],
           "default": null,
           "title": "Start Date"
+        },
+        "track_weeks": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Weeks"
+        },
+        "week_start_day": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Week Start Day"
         }
       },
       "title": "StrictBlockUpdateSchema",
@@ -1652,21 +1647,6 @@
           "default": null,
           "title": "End Date"
         },
-        "goal_ids": {
-          "anyOf": [
-            {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Goal Ids"
-        },
         "name": {
           "maxLength": 255,
           "minLength": 1,
@@ -1684,6 +1664,32 @@
           ],
           "default": null,
           "title": "Start Date"
+        },
+        "track_weeks": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Weeks"
+        },
+        "week_start_day": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Week Start Day"
         }
       },
       "required": [
@@ -1778,18 +1784,6 @@
     "StrictProgramDayCreateSchema": {
       "additionalProperties": false,
       "properties": {
-        "cascade": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": false,
-          "title": "Cascade"
-        },
         "completion_min_templates": {
           "anyOf": [
             {
@@ -1802,18 +1796,6 @@
           ],
           "default": null,
           "title": "Completion Min Templates"
-        },
-        "date": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Date"
         },
         "day_of_week": {
           "anyOf": [
@@ -1830,6 +1812,21 @@
           "default": null,
           "title": "Day Of Week"
         },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
         "name": {
           "anyOf": [
             {
@@ -1842,6 +1839,19 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
         },
         "template_configs": {
           "anyOf": [
@@ -1964,18 +1974,6 @@
     "StrictProgramDayUpdateSchema": {
       "additionalProperties": false,
       "properties": {
-        "cascade": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": false,
-          "title": "Cascade"
-        },
         "completion_min_templates": {
           "anyOf": [
             {
@@ -1988,18 +1986,6 @@
           ],
           "default": null,
           "title": "Completion Min Templates"
-        },
-        "date": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Date"
         },
         "day_of_week": {
           "anyOf": [
@@ -2016,6 +2002,21 @@
           "default": null,
           "title": "Day Of Week"
         },
+        "goal_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Ids"
+        },
         "name": {
           "anyOf": [
             {
@@ -2028,6 +2029,19 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
         },
         "template_configs": {
           "anyOf": [
@@ -2117,6 +2131,18 @@
           ],
           "default": null,
           "title": "Name"
+        },
+        "prune_day_goals": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prune Day Goals"
         },
         "selectedGoals": {
           "anyOf": [
@@ -2563,7 +2589,7 @@
         },
         "data": {
           "$ref": "#/$defs/StrictBlockUpdateSchema",
-          "description": "Supported block name, date range, color, and goal IDs."
+          "description": "Supported block name, date range, color, and week tracking."
         },
         "operation_id": {
           "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
@@ -2671,19 +2697,12 @@
     "UpdateProgramDayOperation": {
       "additionalProperties": false,
       "properties": {
-        "block_id": {
-          "description": "Opaque ID of the containing block.",
-          "maxLength": 80,
-          "minLength": 1,
-          "title": "Block Id",
-          "type": "string"
-        },
         "data": {
           "$ref": "#/$defs/StrictProgramDayUpdateSchema",
-          "description": "Supported program-day fields. Cascading updates are rejected."
+          "description": "Supported program-day fields."
         },
         "day_id": {
-          "description": "Opaque ID of an existing day in the block.",
+          "description": "Opaque ID of an existing day in the program.",
           "maxLength": 80,
           "minLength": 1,
           "title": "Day Id",
@@ -2714,7 +2733,6 @@
         "operation_id",
         "type",
         "program_id",
-        "block_id",
         "day_id",
         "data"
       ],

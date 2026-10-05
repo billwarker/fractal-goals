@@ -9,7 +9,7 @@ from pathlib import Path
 MAX_SOURCE_LINES = 800
 SIZE_BACKLOG = {
     # Remaining decomposition backlog, capped at current size: shrink, never grow.
-    "services/program_metrics_service.py": 847,
+    "services/program_metrics_service.py": 805,
     "blueprints/activities_api.py": 936,
     "blueprints/goals_api.py": 838,
     "services/note_service.py": 833,

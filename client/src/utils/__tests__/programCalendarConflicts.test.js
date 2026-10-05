@@ -2,15 +2,16 @@ import {
     calendarConflictMessage,
     findBlockOverlap,
     findDraftDayConflicts,
-    occupiedBlockDates,
+    occupiedProgramDates,
     programDayDates,
     takenWeekdays,
     weekdayOf,
 } from '../programCalendarConflicts';
 
-// 2026-09-07 is a Monday.
-const block = {
-    id: 'b1', start_date: '2026-09-07', end_date: '2026-09-20',
+// 2026-09-07 is a Monday. Days belong to the program; weekdays repeat across its span.
+const program = {
+    id: 'p1', start_date: '2026-09-07', end_date: '2026-09-20',
+    blocks: [{ id: 'b1', start_date: '2026-09-07', end_date: '2026-09-13' }],
     days: [
         { id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [] },
         { id: 'test', name: 'Test Day', day_of_week: [], scheduled_dates: ['2026-09-10', '2026-10-01'] },
@@ -35,34 +36,36 @@ describe('programCalendarConflicts', () => {
         expect(findBlockOverlap(blocks, { id: 'b', startDate: '2026-09-08', endDate: '2026-09-14' })).toBeNull();
     });
 
-    it('expands weekly and specific dates only inside the block', () => {
-        expect([...programDayDates(block.days[0], block)]).toEqual(['2026-09-07', '2026-09-14']);
-        expect([...programDayDates(block.days[1], block)]).toEqual(['2026-09-10']);
-        expect(programDayDates(block.days[2], block).size).toBe(0);
+    it('expands weekly and specific dates across the whole program, not just a block', () => {
+        expect([...programDayDates(program.days[0], program)]).toEqual(['2026-09-07', '2026-09-14']);
+        expect([...programDayDates(program.days[1], program)]).toEqual(['2026-09-10']);
+        expect(programDayDates(program.days[2], program).size).toBe(0);
     });
 
     it('maps occupied dates and weekdays to their day, excluding the edited day', () => {
-        const owners = occupiedBlockDates(block, { excludeDayId: 'legs' });
+        const owners = occupiedProgramDates(program, { excludeDayId: 'legs' });
 
         expect([...owners]).toEqual([['2026-09-10', 'Test Day']]);
-        expect([...takenWeekdays(occupiedBlockDates(block))]).toEqual([
+        expect([...takenWeekdays(occupiedProgramDates(program))]).toEqual([
             ['Monday', 'Leg Day'], ['Thursday', 'Test Day'],
         ]);
     });
 
     it('lists a draft definition\'s conflicting dates, earliest first', () => {
-        const owners = occupiedBlockDates(block);
+        const owners = occupiedProgramDates(program);
 
-        expect(findDraftDayConflicts(block, owners, { weekdays: ['Thursday'], dates: ['2026-09-14'] })).toEqual([
+        expect(findDraftDayConflicts(program, owners, { weekdays: ['Thursday'], dates: ['2026-09-14'] })).toEqual([
             { date: '2026-09-10', dayName: 'Test Day' },
             { date: '2026-09-14', dayName: 'Leg Day' },
         ]);
-        expect(findDraftDayConflicts(block, owners, { weekdays: ['Friday'] })).toEqual([]);
+        expect(findDraftDayConflicts(program, owners, { weekdays: ['Friday'] })).toEqual([]);
     });
 
     it('turns only calendar invariant errors into inline messages', () => {
         expect(calendarConflictMessage({ response: { data: { code: 'program_block_overlap', error: 'Overlaps.' } } }))
             .toBe('Overlaps.');
+        expect(calendarConflictMessage({ response: { data: { code: 'program_day_date_outside_program', error: 'Outside.' } } }))
+            .toBe('Outside.');
         expect(calendarConflictMessage({ response: { data: { error: 'Server exploded' } } })).toBeNull();
         expect(calendarConflictMessage(new Error('offline'))).toBeNull();
     });

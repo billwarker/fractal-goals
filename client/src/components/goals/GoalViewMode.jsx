@@ -1,6 +1,5 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isGoalAssociatedWithBlock } from '../../utils/programGoalAssociations';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { FolderIcon } from '../atoms/AppIcons';
 import NoteCard from '../notes/NoteCard';
@@ -73,13 +72,7 @@ function GoalViewMode({
 
             {/* Associated Programs */}
             {programs && (() => {
-                const associatedPrograms = programs.filter(p => {
-                    // Check directly on program
-                    const programLevel = p.goal_ids && p.goal_ids.includes(goalId);
-                    // A goal belongs to a block whenever its deadline falls inside the block range.
-                    const blockLevel = p.blocks && p.blocks.some((block) => isGoalAssociatedWithBlock(goal, block));
-                    return programLevel || blockLevel;
-                });
+                const associatedPrograms = programs.filter((p) => (p.goal_ids || []).includes(goalId));
 
                 if (associatedPrograms.length === 0) return null;
 

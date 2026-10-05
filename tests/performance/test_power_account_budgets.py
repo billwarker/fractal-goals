@@ -23,6 +23,7 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
+    ProgramDayOccurrenceSchedule,
     ProgramSessionPlan,
     SessionTemplate,
     Target,
@@ -153,9 +154,14 @@ def power_account_dataset(db_session, test_user):
         )
         db_session.add(block)
         db_session.flush()
+        # One day per block, held to that block's Mondays, Wednesdays and Fridays.
         day = ProgramDay(
-            id=str(uuid.uuid4()), block_id=block.id, name="Practice",
-            day_of_week=["Monday", "Wednesday", "Friday"],
+            id=str(uuid.uuid4()), program_id=program.id, name=f"Practice {block_index}", day_of_week=[],
+            occurrence_schedules=[
+                ProgramDayOccurrenceSchedule(date=block_start + timedelta(days=offset))
+                for offset in range(28)
+                if (block_start + timedelta(days=offset)).strftime("%A") in {"Monday", "Wednesday", "Friday"}
+            ],
         )
         day.templates.append(template)
         db_session.add(day)
@@ -274,11 +280,7 @@ def test_power_account_program_session_plan_budgets(client, db_session, query_co
     program_id = power_account_dataset["program"].id
     template = power_account_dataset["template"]
     block, day = power_account_dataset["program_days"][-1]
-    dates = [
-        block.start_date + timedelta(days=offset)
-        for offset in range((block.end_date - block.start_date).days + 1)
-        if (block.start_date + timedelta(days=offset)).strftime("%A") in day.day_of_week
-    ]
+    dates = sorted(row.date for row in day.occurrence_schedules)
     template_sections = json.loads(template.template_data).get("sections") or [{"name": "Main", "items": []}]
     for plan_date in dates:
         db_session.add(ProgramSessionPlan(
@@ -305,12 +307,8 @@ def test_power_account_program_session_plan_budgets(client, db_session, query_co
     assert query_counter["total"] <= 10
 
     # A past date also attaches what was logged, through the same evaluator loads.
-    past_block, past_day = power_account_dataset["program_days"][0]
-    past_date = next(
-        past_block.start_date + timedelta(days=offset)
-        for offset in range(7)
-        if (past_block.start_date + timedelta(days=offset)).strftime("%A") in past_day.day_of_week
-    )
+    _past_block, past_day = power_account_dataset["program_days"][0]
+    past_date = min(row.date for row in past_day.occurrence_schedules)
     past_url = f"/api/{root_id}/programs/{program_id}/days/{past_day.id}/plans?date={past_date.isoformat()}&timezone=UTC"
     response, elapsed_ms = _budget_get(client, past_url, headers, query_counter)
     assert_response_budget(response, max_bytes=60_000, max_ms=5000, elapsed_ms=elapsed_ms)

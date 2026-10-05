@@ -409,6 +409,48 @@
     font-weight: 700;
 }
 
+/* Tracked block weeks: a compact "W2" chip in the block's colour on each week's first
+   date; Week 1 rides on the block's own label. */
+.weekCellLabel {
+    cursor: default;
+    overflow: visible;
+}
+
+.blockCellLabelWithWeek {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.blockCellLabelName {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.weekChip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    padding: 0 4px;
+    border: 1px solid color-mix(in srgb, var(--program-block-label-color) 55%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--program-block-label-color) 14%, transparent);
+    color: var(--program-block-label-color);
+    font-size: 10px;
+    font-style: normal;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    line-height: 14px;
+}
+
+.weekCellLabel:hover,
+.weekCellLabel:focus-visible {
+    color: var(--program-block-label-color);
+    text-decoration: none;
+}
+
 .calendarContainerCompact .blockCellLabel {
     top: 5px;
     left: 5px;

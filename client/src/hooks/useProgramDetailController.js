@@ -9,11 +9,8 @@ export function useProgramDetailController({ goals = [] }) {
     const [blockModalData, setBlockModalData] = useState(null);
 
     const [showDayModal, setShowDayModal] = useState(false);
-    const [selectedBlockId, setSelectedBlockId] = useState(null);
     const [dayModalInitialData, setDayModalInitialData] = useState(null);
 
-    const [showAttachModal, setShowAttachModal] = useState(false);
-    const [attachBlockId, setAttachBlockId] = useState(null);
 
     const [blockCreationMode, setBlockCreationMode] = useState(false);
 
@@ -67,14 +64,13 @@ export function useProgramDetailController({ goals = [] }) {
         setBlockCreationMode(false);
     }, []);
 
-    const handleAddDayClick = useCallback((blockId) => {
-        setSelectedBlockId(blockId);
+    // Program days belong to the program, so creating or editing one needs no block.
+    const handleAddDayClick = useCallback(() => {
         setDayModalInitialData(null);
         setShowDayModal(true);
     }, []);
 
-    const handleCreateDayForDate = useCallback((blockId, date) => {
-        setSelectedBlockId(blockId);
+    const handleCreateDayForDate = useCallback((date) => {
         // A day created from a calendar date starts as a specific-dates day on that date.
         setDayModalInitialData({
             name: '',
@@ -85,8 +81,7 @@ export function useProgramDetailController({ goals = [] }) {
         setShowDayModal(true);
     }, []);
 
-    const handleEditDay = useCallback((blockId, day) => {
-        setSelectedBlockId(blockId);
+    const handleEditDay = useCallback((day) => {
         setDayModalInitialData(day);
         setShowDayModal(true);
     }, []);
@@ -99,19 +94,6 @@ export function useProgramDetailController({ goals = [] }) {
     const handleDaySaveSuccess = useCallback(() => {
         setShowDayModal(false);
         setDayModalInitialData(null);
-    }, []);
-
-    const handleAttachGoalClick = useCallback((blockId) => {
-        setAttachBlockId(blockId);
-        setShowAttachModal(true);
-    }, []);
-
-    const closeAttachModal = useCallback(() => {
-        setShowAttachModal(false);
-    }, []);
-
-    const handleAttachGoalSaveSuccess = useCallback(() => {
-        setShowAttachModal(false);
     }, []);
 
 
@@ -143,10 +125,7 @@ export function useProgramDetailController({ goals = [] }) {
         showBlockModal,
         blockModalData,
         showDayModal,
-        selectedBlockId,
         dayModalInitialData,
-        showAttachModal,
-        attachBlockId,
         blockCreationMode,
         setBlockCreationMode,
         showGoalModal,
@@ -164,9 +143,6 @@ export function useProgramDetailController({ goals = [] }) {
         handleEditDay,
         closeDayModal,
         handleDaySaveSuccess,
-        handleAttachGoalClick,
-        closeAttachModal,
-        handleAttachGoalSaveSuccess,
         handleEventClick,
         handleAddChildGoal,
     };

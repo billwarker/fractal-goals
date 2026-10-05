@@ -27,7 +27,7 @@ describe('useProgramDayDetail', () => {
         const occurrences = [{ occurrence_key: 'day:date', credits: [{ session_id: 'session-2' }] }];
         getProgramDayReadModel
             .mockResolvedValueOnce({ data: {
-                schema_version: 6,
+                schema_version: 7,
                 days: [{ date: '2026-09-02', state: 'scheduled_met' }],
                 detail: {
                     occurrences,
@@ -37,7 +37,7 @@ describe('useProgramDayDetail', () => {
                 },
             } })
             .mockResolvedValueOnce({ data: {
-                schema_version: 6,
+                schema_version: 7,
                 days: [{ date: '2026-09-02', state: 'scheduled_met' }],
                 detail: {
                     occurrences,
@@ -96,7 +96,7 @@ describe('useProgramDayDetail', () => {
         const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
         let finishSecondRequest;
         getProgramDayReadModel
-            .mockResolvedValueOnce({ data: { schema_version: 6, days: [{ date: '2026-09-02', program_id: 'program-1' }] } })
+            .mockResolvedValueOnce({ data: { schema_version: 7, days: [{ date: '2026-09-02', program_id: 'program-1' }] } })
             .mockImplementationOnce(() => new Promise((resolve) => { finishSecondRequest = resolve; }));
         let programId = 'program-1';
 
@@ -111,7 +111,7 @@ describe('useProgramDayDetail', () => {
         expect(result.current.data).toBeUndefined();
 
         await act(async () => finishSecondRequest({
-            data: { schema_version: 6, days: [{ date: '2026-09-02', program_id: 'program-2' }] },
+            data: { schema_version: 7, days: [{ date: '2026-09-02', program_id: 'program-2' }] },
         }));
         await waitFor(() => expect(result.current.data?.days[0]?.program_id).toBe('program-2'));
     });
@@ -145,7 +145,7 @@ describe('useSetProgramDaySessionCredit', () => {
         const queryClient = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
         const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
         const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-        const day = { schema_version: 6, detail: { state: 'scheduled_met', sessions: [] } };
+        const day = { schema_version: 7, detail: { state: 'scheduled_met', sessions: [] } };
         updateProgramDaySessionCredit.mockResolvedValueOnce({ data: { disposition: 'credit', day } });
         const { result } = renderHook(
             () => useSetProgramDaySessionCredit('root-1', 'program-1', 'America/Toronto'),

@@ -4,16 +4,19 @@ from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 import logging
 import time as time_module
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 
-from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Session, Target, validate_root_goal
+from models import ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Session, Target, validate_root_goal
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_contribution import resolve_contribution_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
-from services.program_scope import resolve_program_scope, resolve_program_scopes
+from services.program_block_metrics import build_block_rows, current_block_summary, schedule_outlook
+from services.program_focus import focus_scopes_from_goals, load_focus_seed_rows
+from services.program_rollups import build_date_records
+from services.program_scope import ProgramScope, expand_descendants, resolve_program_scopes
 from services.program_day_credits import (
     completed_credits_by_occurrence_template,
     credited_block_ids_by_session,
@@ -32,7 +35,7 @@ from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 366
-CALCULATION_VERSION = 6
+CALCULATION_VERSION = 9
 MINIMUM_SUFFICIENCY_DAYS = 7
 
 
@@ -70,8 +73,9 @@ class ProgramMetricsService:
 
     @staticmethod
     def _read_options():
-        days = joinedload(Program.blocks).joinedload(ProgramBlock.days)
+        days = selectinload(Program.days)
         return (
+            joinedload(Program.blocks),
             days.selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
             days.selectinload(ProgramDay.templates),
         )
@@ -162,13 +166,14 @@ class ProgramMetricsService:
             window["previous_range"] = None
             window["next_range"] = None
 
-        scope = resolve_program_scope(self.db_session, root_id, program.id, programs=[program])
+        seed_rows = load_focus_seed_rows(self.db_session, program.id)
         evidence_rows = self._load_evidence(
             root_id, current_user_id, window, zone
         )
         goals_by_id = load_fractal_goals_for_serialization(
             self.db_session, root_id, include_group_activities=True
-        ) if scope.goal_ids or evidence_rows else {}
+        ) if seed_rows or evidence_rows else {}
+        focus, scope = self._focus_and_scope(program, seed_rows, goals_by_id)
         activity_ids = {row.activity_definition_id for row in evidence_rows if row.activity_definition_id}
         effective_goals = resolve_effective_goals_by_activity(goals_by_id, activity_ids)
         evidence = self._resolve_evidence(evidence_rows, effective_goals, goals_by_id, scope.goal_ids, zone)
@@ -190,6 +195,7 @@ class ProgramMetricsService:
         payload = self._aggregate(
             program=program,
             scope=scope,
+            focus=focus,
             goals_by_id=goals_by_id,
             evidence=evidence,
             program_sessions=program_sessions,
@@ -313,7 +319,6 @@ class ProgramMetricsService:
                 if item["closed"] or item["counts_as_success"]
             ]
             met_dates = [item for item in observed_scheduled if item["counts_as_success"]]
-            total_duration = sum(item["duration"] for item in resolved)
             aligned_duration = sum(item["duration"] for item in aligned)
             rows.append({
                 "program_id": program.id,
@@ -326,8 +331,7 @@ class ProgramMetricsService:
                     "as_of": local_today.isoformat(),
                     "timezone": timezone_name or "UTC",
                 },
-                "adherence_rate": _rate(len(met_dates), len(observed_scheduled)),
-                "alignment_rate": _rate(aligned_duration, total_duration),
+                "consistency_rate": _rate(len(met_dates), len(observed_scheduled)),
                 "aligned_duration_seconds": aligned_duration,
                 "instances": len(aligned),
                 "met_days": len(met_dates),
@@ -479,7 +483,14 @@ class ProgramMetricsService:
             })
         return resolved
 
-    def _aggregate(self, *, program, scope, goals_by_id, evidence, program_sessions, targets, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
+    @staticmethod
+    def _focus_and_scope(program, seed_rows, goals_by_id):
+        """Focus scopes and the legacy program-wide scope from one seed load and the loaded goal tree."""
+        focus, children = focus_scopes_from_goals(seed_rows, goals_by_id)
+        seed_ids = frozenset(goal_id for _, _, goal_id in seed_rows if goal_id in goals_by_id)
+        return focus, ProgramScope(seed_ids, expand_descendants(seed_ids, children))
+
+    def _aggregate(self, *, program, scope, focus, goals_by_id, evidence, program_sessions, targets, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
         program_start, program_end = _date_part(program.start_date), _date_part(program.end_date)
         if local_today < program_start:
             status = "upcoming"
@@ -522,6 +533,7 @@ class ProgramMetricsService:
                 item.session_start or item.completed_at or item.created_at, zone
             ) in selected_dates]
             status_overrides = [item for item in status_overrides if item.date in selected_dates]
+        records = build_date_records(day_facts)
         days = []
         observed_scheduled = met_days = active_days = unscheduled_evidence = 0
         for fact in day_facts:
@@ -568,7 +580,7 @@ class ProgramMetricsService:
                 "instances": len(aligned_items),
                 "duration_seconds": sum(item["duration"] for item in aligned_items),
                 "weekday": day_value.weekday(),
-                "block_ids": sorted({row["block"].id for row in fact["occurrences"]}),
+                "block_ids": sorted({row["block"].id for row in fact["occurrences"] if row["block"] is not None}),
             })
 
         mode = "scheduled" if any(item["scheduled"] for item in day_facts) else "density"
@@ -577,9 +589,7 @@ class ProgramMetricsService:
         current_streak, longest_streak = self._streaks(days, mode, selected_dates is not None)
 
         aligned = [item for item in evidence if item["in_scope_ids"]]
-        other = [item for item in evidence if not item["in_scope_ids"]]
         aligned_duration = sum(item["duration"] for item in aligned)
-        total_duration = sum(item["duration"] for item in evidence)
 
         coverage = allocate_equal_split(aligned, lambda item: item["in_scope_ids"])
 
@@ -620,14 +630,6 @@ class ProgramMetricsService:
                 "targets_met_in_window": sum(in_selected_window(target.completed_at) for target in goal_targets),
             })
 
-        other_groups = allocate_equal_split(other, lambda item: item["out_scope_ids"] or {None})
-        other_goals = [{
-            "goal_id": goal_id,
-            "name": goals_by_id[goal_id].name if goal_id in goals_by_id else "Unassociated",
-            "instances": values["instances"],
-            "allocated_duration_seconds": round(values["duration"]),
-        } for goal_id, values in other_groups.items()]
-
         sessions_by_occurrence = completed_credits_by_occurrence_template(day_facts)
         template_stats = defaultdict(lambda: {"scheduled": 0, "completed": 0, "extra": 0, "required": False, "last": None, "template": None})
         for day_obj, _block, day_value, link in template_occurrences:
@@ -653,74 +655,11 @@ class ProgramMetricsService:
             "last_completed_at": stats["last"].isoformat().replace("+00:00", "Z") if stats["last"] else None,
         } for template_id, stats in template_stats.items()]
 
-        program_day_stats_by_block = defaultdict(
-            lambda: defaultdict(lambda: {
-                "name": "Program day",
-                "day_number": None,
-                "scheduled_occurrences": 0,
-                "completed_occurrences": 0,
-            })
+        block_rows = build_block_rows(
+            blocks=blocks, window=window, day_facts=day_facts, records=records,
+            program_sessions=program_sessions, credited_blocks_by_session=credited_blocks_by_session,
+            goals_by_id=goals_by_id, program_goal_ids=focus.program_goal_ids, selected_dates=selected_dates,
         )
-        for fact in day_facts:
-            for occurrence in fact["occurrences"]:
-                day_obj = occurrence["program_day"]
-                stats = program_day_stats_by_block[occurrence["block"].id][day_obj.id]
-                stats["name"] = day_obj.name or "Program day"
-                stats["day_number"] = day_obj.day_number
-                stats["scheduled_occurrences"] += 1
-                stats["completed_occurrences"] += int(
-                    occurrence["evaluation"]["requirements_met"]
-                )
-
-        block_rows = []
-        for block in blocks:
-            block_start = max(window["display_start"], block.start_date or window["display_start"])
-            block_end = min(window["display_end"], block.end_date or window["display_end"])
-            if selected_dates is not None and not any(block_start <= value <= block_end for value in selected_dates):
-                continue
-            block_days = [item for item in days if block.id in item["block_ids"]]
-            program_day_stats = program_day_stats_by_block[block.id]
-            block_sessions = [
-                item for item in program_sessions
-                if item.program_block_id == block.id or block.id in credited_blocks_by_session.get(item.id, ())
-            ]
-            block_evidence = [
-                item for item in evidence
-                if item["program_block_id"] == block.id
-                and block_start <= item["date"] <= block_end
-            ] if block_start <= block_end else []
-            block_aligned = [item for item in block_evidence if item["in_scope_ids"]]
-            block_rows.append({
-                "block_id": block.id,
-                "name": block.name,
-                "color": block.color,
-                "start_date": block.start_date.isoformat() if block.start_date else None,
-                "end_date": block.end_date.isoformat() if block.end_date else None,
-                "adherence": {
-                    "met_days": sum(item["met"] for item in block_days if item["closed"] or item["met"]),
-                    "scheduled_days_observed": sum(item["counts_toward_adherence"] for item in block_days if item["closed"] or item["met"]),
-                },
-                "program_days": [
-                    {"program_day_id": day_id, **stats}
-                    for day_id, stats in sorted(
-                        program_day_stats.items(),
-                        key=lambda item: (
-                            item[1]["day_number"] is None,
-                            item[1]["day_number"] or 0,
-                            item[1]["name"],
-                            str(item[0]),
-                        ),
-                    )
-                ],
-                "alignment": {
-                    "instances": {"aligned": len(block_aligned), "total": len(block_evidence), "rate": _rate(len(block_aligned), len(block_evidence))},
-                    "duration_seconds": {"aligned": sum(item["duration"] for item in block_aligned), "total": sum(item["duration"] for item in block_evidence), "rate": _rate(sum(item["duration"] for item in block_aligned), sum(item["duration"] for item in block_evidence))},
-                },
-                "aligned_instances": len(block_aligned),
-                "aligned_duration_seconds": sum(item["duration"] for item in block_aligned),
-                "linked_sessions": len(block_sessions),
-                "linked_duration_seconds": sum(session_duration_seconds_from_row(item.total_duration_seconds, item.duration_minutes, item.session_start, item.session_end) for item in block_sessions),
-            })
 
         volume = self._volume(aligned, window)
         weekday = []
@@ -757,23 +696,20 @@ class ProgramMetricsService:
                 ),
             },
             "scope": {"goal_ids": sorted(scope.goal_ids), "seed_goal_ids": sorted(scope.seed_goal_ids), "goal_count": len(scope.goal_ids)},
-            "adherence": {
+            "consistency": {
                 "mode": mode, "streak_mode": "scheduled" if mode == "scheduled" else "calendar",
                 "scheduled_days_observed": observed_scheduled, "scheduled_days_total": sum(item["scheduled"] for item in days),
-                "adherence_eligible_days_total": sum(item["counts_toward_adherence"] for item in days),
+                "eligible_days_total": sum(item["counts_toward_adherence"] for item in days),
                 "met_days": met_days, "active_days": active_days, "denominator_days": denominator_days,
                 "rate": _rate(adherence_numerator, denominator_days), "current_streak": current_streak,
                 "longest_streak": longest_streak, "unscheduled_days_with_evidence": unscheduled_evidence,
                 "manual_complete_days": sum(item["manual_status"] == "complete" for item in days),
                 "manual_rest_days": sum(item["manual_status"] == "rest" for item in days),
                 "period_rest_days": sum(item["status_source"] == "period" for item in days),
+                **schedule_outlook(day_facts, local_today),
             },
             "periods": [serialize_calendar_period(period) for period in periods],
-            "alignment": {
-                "instances": {"aligned": len(aligned), "total": len(evidence), "rate": _rate(len(aligned), len(evidence))},
-                "duration_seconds": {"aligned": aligned_duration, "total": total_duration, "rate": _rate(aligned_duration, total_duration)},
-                "other_work": {"instances": len(other), "duration_seconds": sum(item["duration"] for item in other), "goals": other_goals},
-            },
+            "current_block": current_block_summary(blocks, block_rows, local_today),
             "execution": {"linked_sessions": len(program_sessions), "linked_duration_seconds": execution_duration},
             "days": days,
             "blocks": block_rows,

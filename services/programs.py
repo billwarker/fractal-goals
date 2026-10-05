@@ -11,7 +11,7 @@ Concern modules:
 - _program_helpers.py     parsing/date/commit/event/goal-scope helpers
 - _program_crud.py        program + block CRUD
 - _program_days.py        block-day lifecycle + scheduling + deadlines
-- _program_goals.py       goal attachment to days/blocks
+- _program_goals.py       day focus goals and block milestones
 - _program_day_statuses.py occurrence-level manual completion/rest overrides
 """
 from services.program_service_errors import ProgramServiceValidationError
@@ -26,12 +26,13 @@ __all__ = ["ProgramService", "ProgramServiceValidationError"]
 
 
 class ProgramService(
-    _ProgramHelpersMixin,
     _ProgramCrudMixin,
     _ProgramDaysMixin,
     _ProgramGoalsMixin,
     _ProgramDayStatusesMixin,
     _ProgramDaySessionCreditsMixin,
+    # Last: the concern mixins type-check against it as their base.
+    _ProgramHelpersMixin,
 ):
     """Validated backend write/read path for programs, blocks, days, and
     program-driven goal scheduling. Composed from concern mixins; their

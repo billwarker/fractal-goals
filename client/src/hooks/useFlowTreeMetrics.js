@@ -304,11 +304,6 @@ export const deriveGraphMetrics = (
     const activeProgramGoalIds = new Set();
     safePrograms.forEach((prog) => {
         if (!prog.is_active) return;
-        const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
-        blocks.forEach((b) => {
-            const gIds = Array.isArray(b.goal_ids) ? b.goal_ids : [];
-            gIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
-        });
         const pGoals = Array.isArray(prog.goal_ids) ? prog.goal_ids : [];
         pGoals.forEach((id) => activeProgramGoalIds.add(toId(id)));
     });
@@ -451,11 +446,6 @@ export const buildGraphMetricsFromSummary = (
     const activeProgramGoalIds = new Set();
     safePrograms.forEach((prog) => {
         if (!prog.is_active) return;
-        const blocks = Array.isArray(prog.blocks) ? prog.blocks : [];
-        blocks.forEach((block) => {
-            const goalIds = Array.isArray(block.goal_ids) ? block.goal_ids : [];
-            goalIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
-        });
         const programGoalIds = Array.isArray(prog.goal_ids) ? prog.goal_ids : [];
         programGoalIds.forEach((id) => activeProgramGoalIds.add(toId(id)));
     });

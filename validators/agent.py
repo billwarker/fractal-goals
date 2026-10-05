@@ -268,7 +268,7 @@ class UpdateBlockOperation(BaseModel):
     type: Literal["update_block"]
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program.")
     block_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing block in the program.")
-    data: StrictBlockUpdateSchema = Field(description="Supported block name, date range, color, and goal IDs.")
+    data: StrictBlockUpdateSchema = Field(description="Supported block name, date range, color, and week tracking.")
 
 
 class StrictProgramDayUpdateSchema(ProgramDayUpdateBaseSchema):
@@ -280,15 +280,8 @@ class UpdateProgramDayOperation(BaseModel):
     operation_id: OperationId
     type: Literal["update_program_day"]
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program.")
-    block_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing block.")
-    day_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing day in the block.")
-    data: StrictProgramDayUpdateSchema = Field(description="Supported program-day fields. Cascading updates are rejected.")
-
-    @model_validator(mode="after")
-    def disallow_cascade_updates(self):
-        if self.data.cascade:
-            raise ValueError("Program day proposals cannot cascade updates to existing days")
-        return self
+    day_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing day in the program.")
+    data: StrictProgramDayUpdateSchema = Field(description="Supported program-day fields.")
 
 
 class CreateBlockOperation(BaseModel):
@@ -296,7 +289,7 @@ class CreateBlockOperation(BaseModel):
     operation_id: OperationId
     type: Literal["create_block"]
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program, or $ref:<operation_id> for a program created earlier in this proposal.")
-    data: "StrictProgramBlockCreateSchema" = Field(description="Block name, dates, color, and optional goal IDs.")
+    data: "StrictProgramBlockCreateSchema" = Field(description="Block name, dates, color, and optional week tracking (track_weeks, week_start_day 0=Monday..6=Sunday).")
 
 
 class StrictProgramBlockCreateSchema(ProgramBlockSchema):
@@ -308,14 +301,7 @@ class CreateProgramDayOperation(BaseModel):
     operation_id: OperationId
     type: Literal["create_program_day"]
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program, or $ref:<operation_id> for a program created earlier in this proposal.")
-    block_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing block, or $ref:<operation_id> for a block created earlier in this proposal.")
-    data: "StrictProgramDayCreateSchema" = Field(description="Program day fields, including optional template_configs and template IDs.")
-
-    @model_validator(mode="after")
-    def disallow_cascade_updates(self):
-        if self.data.cascade:
-            raise ValueError("Program day proposals cannot cascade updates to existing days")
-        return self
+    data: "StrictProgramDayCreateSchema" = Field(description="Program day fields, including optional template_configs and template IDs. Weekdays repeat across the whole program.")
 
 
 class StrictProgramDayTemplateConfigSchema(ProgramDayTemplateConfigSchema):
@@ -332,9 +318,8 @@ class ScheduleProgramDayOperation(BaseModel):
     operation_id: OperationId
     type: Literal["schedule_program_day"]
     program_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing program.")
-    block_id: str = Field(min_length=1, max_length=80, description="Opaque ID of the containing block.")
-    day_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing day in the block.")
-    data: "StrictProgramDayScheduleSchema" = Field(description="The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the block's dates. session_start is accepted for compatibility; only its date is used.")
+    day_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing day in the program.")
+    data: "StrictProgramDayScheduleSchema" = Field(description="The calendar date (ISO YYYY-MM-DD) to add this reusable day on, within the program's dates. session_start is accepted for compatibility; only its date is used.")
 
 
 class StrictProgramDayScheduleSchema(ProgramDayScheduleSchema):

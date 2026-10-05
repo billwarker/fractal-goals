@@ -107,15 +107,39 @@ inside the same SQLAlchemy transaction or savepoint.
 
 ### Programs
 
-Programs contain dated blocks and reusable or dated program-day definitions. Program scope is
-resolved by `services/program_scope.py`; execution metrics use bounded read models rather than
-client recomputation.
+Programs contain dated blocks and reusable program-day definitions. **Program days belong to the
+program** (`program_days.program_id`), not to a block: a day's weekdays repeat across the whole
+program span and its explicit dates may fall anywhere in it. Blocks only label and group the dates
+they cover (`block_for_date`; an occurrence's `block` is null outside every block), so moving,
+resizing, or deleting a block never changes which days occur. Days are managed program-scoped at
+`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/goals]]`; **Duplicate**
+copies templates, goals, and notes without a schedule. Blocks can **track weeks**
+(`track_weeks`, `week_start_day` 0 = Monday): Week 1 starts on the block's start date and each
+later week on the chosen weekday. `services/program_rollups.block_weeks` and
+`client/src/utils/programBlockWeeks.js` share one definition, tested against
+`tests/fixtures/block_weeks_cases.json`; the calendar shows W1, W2… chips, and the day pane and Days
+columns show "Block · Week n". See [Program-level days and block weeks](planning/program-level-days-and-block-weeks.md).
+Program scope is resolved by `services/program_scope.py`; execution metrics use bounded read models
+rather than client recomputation.
+
+Program-day goals are optional and bounded by the program's goals and their descendants
+(`services/program_focus.py`), on every write path. Narrowing a program's goals so existing day
+goals fall outside returns 409 `program_day_goal_out_of_scope` with a `conflicts` list until resent
+with `prune_day_goals`; pre-existing violations never block unrelated edits. Sessions started from a
+program day are scoped to the day's goals, else the program's. Blocks carry no goals of their own:
+`program_block_goals` is retained legacy data that nothing reads or writes. The calendar pane's
+Blocks section (`components/programs/ProgramBlocksPanel.jsx`, program scope only) shows one summary
+per block from `buildBlockCards` (`utils/programBlocksViewModel.js`) over metrics v9: program days by
+status symbol, consistency, goals completed and goals due (program goals and descendants with a
+deadline inside the block), and longest streak, with edit and delete controls. See
+[Goal-focused program blocks](planning/program-blocks-goal-focus.md).
 
 Two calendar invariants hold on every write path (UI, API, agent proposals):
 `services/program_calendar_invariants.py` rejects overlapping blocks (inclusive ranges, inside
 the program's dates; backed by the `ex_program_blocks_no_overlap` exclusion constraint) and any
-date holding more than one program day (checked after flush through `build_occurrences`, so
-weekday, explicit, and legacy dates count alike). Every calendar write takes the program row lock
+date holding more than one program day (checked after flush through `build_occurrences` across
+the whole program, so weekday and explicit dates count alike; explicit dates outside the program are
+400 `program_day_date_outside_program`). Every calendar write takes the program row lock
 first. Violations are `ProgramServiceValidationError`s with `program_block_overlap` /
 `program_day_date_conflict` codes (409) and a `conflicts` list; `utils/programCalendarConflicts.js`
 mirrors them as editor hints (taken weekdays and dates, sibling-block overlap), and the block and
@@ -134,7 +158,7 @@ program-day link, a template match (an unlinked or same-program session using a 
 or a manual credit mapping the session to a scheduled template. Stored exclusions remove automatic
 credit. `program_day_session_credits` holds manual credits/exclusions per program/date/session; rows
 are dormant when the session's local date or the schedule no longer matches. Every evaluator caller
-loads candidates through `services/program_day_credits.py`, so calendar, metrics (calculation v5),
+loads candidates through `services/program_day_credits.py`, so calendar, metrics,
 day review, and Create Session day options attribute sessions identically.
 
 Manual Complete and Rest statuses are stored once per program/calendar date and resolved by the
@@ -152,7 +176,13 @@ the gestures (press-and-drag selects the range between cells, including over eve
 live preview; a press without movement toggles one date; Shift extends), so FullCalendar's own
 selection and clicks stand down in that mode. Status actions apply only to the scheduled subset;
 **Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
-The client expects program metrics calculation v6 and day read model schema v6.
+The client expects program metrics calculation v9 and day read model schema v7 (occurrence `block`
+may be null and carries `week_index` for tracked blocks).
+Metrics v9 reports **consistency** (met scheduled program days over observed ones; rest and
+event-protected days excluded). `services/program_rollups.py` holds the pure date records, block
+weeks (Week 1 from block start; later weeks from the tracked start weekday, else every 7 days; short weeks are partial), consistency rollups, status counts,
+and longest streak; `services/program_block_metrics.py` builds the block, week, program-day,
+`current_block`, and schedule-outlook rows plus each block's `goals: {due, completed}`.
 Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
 `getProgramDayStatusSymbol` and `ProgramDayStatusMark`; the day read model is authoritative for
 completion when available, including manually credited sessions. The date streak advances only when
@@ -188,9 +218,10 @@ tooltip and assistive text) on the run's last day (`utils/programCalendarStreaks
 A definition is scheduled weekly (`day_of_week`) and/or on specific dates. Specific dates are only
 ever written as `program_day_occurrence_schedules` rows: the Program Day modal sends a replace-all
 `scheduled_dates` set (app schemas only; agent proposals keep the base contract and schedule one date
-at a time), and saving it converts a legacy fixed `program_days.date` in place, keeping the day id.
+at a time). The legacy fixed `program_days.date` column is gone (migration `b8d4f2a6c1e3` moved it
+into schedule rows, merged identical per-block copies, and pinned every calendar to its old dates).
 Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
-(`schedule_block_day` writes a row, never a placeholder session); the evaluator treats those dates
+(`schedule_program_day` writes a row, never a placeholder session); the evaluator treats those dates
 as occurrences, and the day pane keeps "Plan this day" available for today and future dates, with
 "Remove from this date" for explicit schedules. Calendar events (`calendar_periods`,
 `services/calendar_periods.py`, `/api/<root_id>/calendar-periods`) are fractal-wide, named spans such
@@ -219,14 +250,14 @@ expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provi
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
 
-The Programs page has Calendar, Blocks, and **Days** views. On desktop the side pane is always
-open (like session detail) and leads with the view toggle. Calendar's pane shows headline metrics, events, and the goal hierarchy (or the day review when a date is scoped); Blocks' pane shows every block's whole-program results (`ProgramBlocksSummary`), independent of the calendar's selection;
+The Programs page has **Calendar** and **Days** views. On desktop the side pane leads with the view toggle and a Collapse control; the header's Show/Hide Sidebar button reopens it, and its open state is remembered per fractal. At program scope a Details | Goals toggle sits beneath the pane's header: Details shows headline metrics, events, then the program's blocks (whole-program results; block name in its colour, status counts, and one row of Consistency, Goals completed/due, and Longest streak), and Goals shows the goal hierarchy. A selected timeframe shows Details only, and a scoped date shows the day review;
 mobile keeps the toggle in the header and the pane as a closable sheet. Days (`components/programs/days/`) programs
 one program day's occurrence dates in two columns: a focused date (by default the next program day)
 beside the latest completed occurrence before it (else the previous one), each with its canonical
 status mark and credited sessions. A template completed on a date shows its session in the plan card
-layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every plannable program day with its
-templates, and each column has its own date rail (canonical status marks; A picks the comparison, B
+layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every program day once (schedule summary, next date, templates,
+and an Edit button; days without templates are listed and prompt for one) under a **New program day**
+button, and each column has its own date rail (canonical status marks; A picks the comparison, B
 the date being planned). One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
 evaluates all days in a single evaluator pass.
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)

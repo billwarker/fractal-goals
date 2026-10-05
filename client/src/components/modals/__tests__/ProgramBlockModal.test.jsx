@@ -41,6 +41,7 @@ describe('ProgramBlockModal', () => {
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
             startDate: '2026-09-08', endDate: '2026-09-14',
         })));
+        expect(onSave.mock.calls[0][0]).not.toHaveProperty('goal_ids');
     });
 
     it('does not count the block being edited as its own overlap', () => {
@@ -59,5 +60,54 @@ describe('ProgramBlockModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save Block' }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Deload already covers');
+    });
+
+    it('sets the end date from a length in weeks', async () => {
+        const onSave = renderModal({ initialData: { name: 'Week 2', start_date: '2026-09-08', end_date: '2026-09-14' } });
+
+        expect(screen.queryByText(/focus goals/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/alignment threshold/i)).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Length (weeks)')).toHaveValue(1);
+        fireEvent.change(screen.getByLabelText('Length (weeks)'), { target: { value: '3' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save Block' }));
+
+        await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ endDate: '2026-09-28' })));
+    });
+
+    describe('week tracking', () => {
+        // Sep 1, 2026 is a Tuesday.
+        const month = { name: 'Month 1', start_date: '2026-09-01', end_date: '2026-09-30' };
+
+        it('reveals a weekday picker that starts on Sunday and previews the weeks', async () => {
+            const onSave = renderModal({ siblingBlocks: [], initialData: month });
+
+            expect(screen.queryByRole('group', { name: 'Weeks start on' })).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Track weeks' }));
+
+            expect(screen.getByRole('radio', { name: 'Sunday' })).toBeChecked();
+            expect(screen.getByText('Week 1: Sep 1 – Sep 5 (partial) · 5 weeks')).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('radio', { name: 'Tuesday' }));
+            expect(screen.getByText('Week 1: Sep 1 – Sep 7 · 5 weeks')).toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save Block' }));
+            await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+                track_weeks: true, week_start_day: 1,
+            })));
+        });
+
+        it('opens an existing tracked block with its start day and can switch tracking off', async () => {
+            const onSave = renderModal({
+                siblingBlocks: [],
+                initialData: { ...month, id: 'block-1', track_weeks: true, week_start_day: 0 },
+            });
+
+            expect(screen.getByRole('radio', { name: 'Monday' })).toBeChecked();
+            fireEvent.click(screen.getByRole('checkbox', { name: 'Track weeks' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Save Block' }));
+
+            await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+                track_weeks: false, week_start_day: 0,
+            })));
+        });
     });
 });

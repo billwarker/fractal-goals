@@ -5,16 +5,19 @@ Resolves template and program goal scope, previews it, and replaces manual scope
 
 from sqlalchemy import inspect
 from sqlalchemy.orm import joinedload, selectinload
+from typing import Any
+
 import models
 from models import CircuitDefinition, Goal, session_goals, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, ServiceResult
 from services.session_runtime import SESSION_TYPE_QUICK, get_template_session_type
 from services.session_structure import extract_activity_definition_id
-from services.program_scope import resolve_program_scope
+from services.program_focus import resolve_day_focus_scope
 
 
 class _SessionGoalScopeMixin:
+    db_session: Any  # provided by the composed SessionService
     @staticmethod
     def _extract_activity_definition_id(raw_item) -> str | None:
         return extract_activity_definition_id(raw_item)
@@ -48,18 +51,11 @@ class _SessionGoalScopeMixin:
     def _program_scope_goal_ids(self, root_id, program_day_id=None):
         if program_day_id:
             program_day = self.db_session.query(models.ProgramDay).options(
-                joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
+                joinedload(models.ProgramDay.program)
             ).filter(models.ProgramDay.id == program_day_id).first()
-            if (
-                not program_day
-                or not program_day.block
-                or not program_day.block.program
-                or program_day.block.program.root_id != root_id
-            ):
+            if not program_day or not program_day.program or program_day.program.root_id != root_id:
                 return None, "Invalid program day context for this fractal"
-            return set(resolve_program_scope(
-                self.db_session, root_id, program_day.block.program.id
-            ).goal_ids), None
+            return set(resolve_day_focus_scope(self.db_session, root_id, program_day)), None
 
         return None, None
 

@@ -101,10 +101,10 @@ class AgentProposalPreviewMixin:
                     )
                     entity_id = operation["block_id"]
                 else:
-                    entity = ProgramService.update_block_day(
+                    entity = ProgramService.update_program_day(
                         self.db_session, task.root_id, operation["program_id"],
-                        operation["block_id"], operation["day_id"],
-                        operation["data"], user_id, commit=False, pending_events=[],
+                        operation["day_id"], operation["data"], user_id,
+                        commit=False, pending_events=[],
                     )
                     entity_id = operation["day_id"]
             except ValueError as exc:
@@ -115,7 +115,6 @@ class AgentProposalPreviewMixin:
             preview_relations = {}
             goal_field = {
                 "update_program": "selectedGoals",
-                "update_block": "goal_ids",
             }.get(operation["type"])
             if goal_field and goal_field in operation["data"]:
                 preview_relations = {
@@ -194,10 +193,6 @@ class AgentProposalPreviewMixin:
                 "action": "Create activity",
                 "name": entity.name,
                 "goal_ids": list(operation["data"].get("goal_ids") or []),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation["data"].get("goal_ids") or [],
-                ),
             }, {
                 "id": entity.id,
                 "name": entity.name,
@@ -351,10 +346,6 @@ class AgentProposalPreviewMixin:
                 "name": entity.get("name"),
                 "start_date": entity.get("start_date"),
                 "end_date": entity.get("end_date"),
-                "goal_names": self._goal_names(
-                    task.root_id,
-                    operation["data"].get("goal_ids") or [],
-                ),
             }, {
                 "id": entity["id"],
                 "name": entity.get("name"),
@@ -367,26 +358,22 @@ class AgentProposalPreviewMixin:
             from services.programs import ProgramService
 
             try:
-                result = ProgramService.add_block_day(
+                first_day = ProgramService.create_program_day(
                     self.db_session,
                     task.root_id,
                     operation["program_id"],
-                    operation["block_id"],
                     operation["data"],
                     user_id,
                     commit=False,
                     pending_events=[],
-                    create_only=True,
                 )
             except ValueError as exc:
                 raise harness_validation_error(exc) from exc
-            first_day = (result.get("days") or [{}])[0]
             return {
                 "operation_id": operation["operation_id"],
                 "type": operation["type"],
                 "action": "Create program day",
                 "name": first_day.get("name"),
-                "date": first_day.get("date"),
                 "day_of_week": first_day.get("day_of_week"),
                 "templates": [
                     {"id": item["id"], "name": item["name"]}
@@ -404,11 +391,10 @@ class AgentProposalPreviewMixin:
             from services.programs import ProgramService
 
             try:
-                scheduled = ProgramService.schedule_block_day(
+                scheduled = ProgramService.schedule_program_day(
                     self.db_session,
                     task.root_id,
                     operation["program_id"],
-                    operation["block_id"],
                     operation["day_id"],
                     operation["data"],
                     user_id,

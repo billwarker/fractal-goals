@@ -43,9 +43,8 @@ class _ProgramDayStatusesMixin:
             day_value
             for day_value in dates
             if program_start <= day_value <= program_end and any(
-                program_day_scheduled_on(day, block, day_value)
-                for block in program.blocks or []
-                for day in block.days or []
+                program_day_scheduled_on(day, program, day_value)
+                for day in program.days or []
             )
         }
         invalid = []

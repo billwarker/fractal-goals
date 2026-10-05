@@ -8,18 +8,18 @@ const SHORT_DATE = { year: undefined, month: 'short', day: 'numeric' };
 const formatPercent = (value) => value == null ? '—' : `${Math.round(value * 100)}%`;
 
 /**
- * The calendar pane's program summary: headline metrics and overlapping events, followed by
- * the program's goal hierarchy. Block results live on the Blocks view.
+ * The calendar pane's program summary: headline metrics, overlapping events, then the
+ * program's blocks. The goal hierarchy has its own Goals view in the side pane.
  */
-export default function ProgramOverview({ metrics, loading = false, error = null, onEditPeriod = null, goalHierarchy = null }) {
+export default function ProgramOverview({ metrics, loading = false, error = null, onEditPeriod = null, blocks = null }) {
     if (loading) return <div className={styles.state} aria-busy="true">Loading program overview…</div>;
     if (error) return <div className={styles.state} role="alert">Program overview could not be loaded. Try again shortly.</div>;
     if (!metrics) return <div className={styles.state}>Program overview is not available yet.</div>;
 
     const headlineMetrics = [
-        [metrics.adherence.mode === 'density' ? 'Active-day density' : 'Adherence', formatPercent(metrics.adherence.rate)],
-        ['Alignment', formatPercent(metrics.alignment.duration_seconds.rate)],
-        ['Current streak', `${metrics.adherence.current_streak} ${metrics.adherence.current_streak === 1 ? 'day' : 'days'}`],
+        [metrics.consistency.mode === 'density' ? 'Active-day density' : 'Consistency', formatPercent(metrics.consistency.rate)],
+        ['Goals completed', `${metrics.outcomes.goals_completed_in_window} / ${metrics.outcomes.goals_in_scope}`],
+        ['Current streak', `${metrics.consistency.current_streak} ${metrics.consistency.current_streak === 1 ? 'day' : 'days'}`],
         ['Program progress', formatPercent(
             metrics.window.is_partial
                 ? (metrics.window.total_days ? metrics.window.observed_days / metrics.window.total_days : null)
@@ -41,15 +41,15 @@ export default function ProgramOverview({ metrics, loading = false, error = null
                 ))}
             </dl>
 
-            {metrics.periods?.length || metrics.adherence.period_rest_days ? (
+            {metrics.periods?.length || metrics.consistency.period_rest_days ? (
                 <section className={styles.section} aria-labelledby="program-time-off-title">
                     <div className={styles.sectionHeading}>
                         <h2 id="program-time-off-title">Events</h2>
                     </div>
-                    {metrics.adherence.period_rest_days ? (
+                    {metrics.consistency.period_rest_days ? (
                         <p className={styles.timeOffSummary}>
-                            {metrics.adherence.period_rest_days} {metrics.adherence.period_rest_days === 1 ? 'day' : 'days'} protected
-                            by events; they don’t count against adherence or break your streak.
+                            {metrics.consistency.period_rest_days} {metrics.consistency.period_rest_days === 1 ? 'day' : 'days'} protected
+                            by events; they don’t count against consistency or break your streak.
                         </p>
                     ) : null}
                     <ul className={styles.timeOffList}>
@@ -78,14 +78,15 @@ export default function ProgramOverview({ metrics, loading = false, error = null
                 </section>
             ) : null}
 
-            {goalHierarchy ? (
-                <section className={styles.section} aria-labelledby="program-goals-title">
+            {blocks ? (
+                <section className={styles.section} aria-labelledby="program-blocks-title">
                     <div className={styles.sectionHeading}>
-                        <h2 id="program-goals-title">Goals</h2>
+                        <h2 id="program-blocks-title">Blocks</h2>
                     </div>
-                    {goalHierarchy}
+                    {blocks}
                 </section>
             ) : null}
+
         </div>
     );
 }
@@ -95,5 +96,5 @@ ProgramOverview.propTypes = {
     loading: PropTypes.bool,
     error: PropTypes.object,
     onEditPeriod: PropTypes.func,
-    goalHierarchy: PropTypes.node,
+    blocks: PropTypes.node,
 };

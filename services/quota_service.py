@@ -348,7 +348,7 @@ class QuotaService:
             table_total(
                 text_bytes(ProgramDay.name, ProgramDay.notes, ProgramDay.day_of_week),
                 Program.root_id.in_(roots),
-                select_from=ProgramDay.__table__.join(ProgramBlock.__table__).join(Program.__table__),
+                select_from=ProgramDay.__table__.join(Program.__table__),
             ),
             table_total(
                 json_bytes(ProgramSessionPlan.plan_data),

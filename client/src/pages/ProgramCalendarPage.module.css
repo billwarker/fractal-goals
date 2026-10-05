@@ -34,19 +34,6 @@
     overflow-y: auto;
 }
 
-.statusBadge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 22px;
-    padding: 0 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 999px;
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-}
 
 .headerTitleSegments {
     display: inline-flex;
@@ -90,29 +77,9 @@
     }
 }
 
-.statusBadgeActive {
-    border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
-    color: var(--color-brand-success);
-}
 
-.statusBadgeUpcoming {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent);
-    color: var(--color-brand-primary);
-}
 
-.statusBadgeCompleted {
-    border-color: color-mix(in srgb, var(--color-text-muted) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-bg-card) 72%, transparent);
-    color: var(--color-text-muted);
-}
 
-.statusBadgeInactive {
-    border-color: var(--color-border);
-    background: color-mix(in srgb, var(--color-bg-card) 72%, transparent);
-    color: var(--color-text-muted);
-}
 
 .calendarPanel {
     min-width: 0;

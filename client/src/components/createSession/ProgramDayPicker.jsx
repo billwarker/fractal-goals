@@ -19,14 +19,16 @@ function ProgramDayPicker({
     onSelectProgramSession,
     onSwitchToTemplate
 }) {
-    // Group days by block
+    // Group days by program and the block covering the date (none when outside every block).
     const groupedDays = useMemo(() => {
         const groups = {};
         const order = [];
 
         programDays.forEach(day => {
-            if (!groups[day.block_id]) {
-                groups[day.block_id] = {
+            const key = `${day.program_id}:${day.block_id ?? 'none'}`;
+            if (!groups[key]) {
+                groups[key] = {
+                    key,
                     block_id: day.block_id,
                     program_name: day.program_name,
                     program_color: day.program_color,
@@ -34,12 +36,12 @@ function ProgramDayPicker({
                     block_color: day.block_color,
                     days: []
                 };
-                order.push(day.block_id);
+                order.push(key);
             }
-            groups[day.block_id].days.push(day);
+            groups[key].days.push(day);
         });
 
-        return order.map(blockId => groups[blockId]);
+        return order.map(key => groups[key]);
     }, [programDays]);
 
     if (programDays.length === 0) {
@@ -59,7 +61,7 @@ function ProgramDayPicker({
         <StepContainer>
             <StepHeader
                 stepNumber={1}
-                title={groupedDays.length === 1
+                title={groupedDays.length === 1 && groupedDays[0].block_name
                     ? <>Select a Program Day from <span
                         className={styles.blockName}
                         style={{ color: groupedDays[0].block_color || 'var(--color-brand-primary)' }}
@@ -71,7 +73,7 @@ function ProgramDayPicker({
             <div className={styles.blockGroupList}>
                 {groupedDays.map(group => (
                     <BlockGroup
-                        key={group.block_id}
+                        key={group.key}
                         group={group}
                         selectedProgramDay={selectedProgramDay}
                         selectedProgramSession={selectedProgramSession}
@@ -97,17 +99,21 @@ function BlockGroup({
             <div className={styles.blockHeader}>
                 <div
                     className={styles.blockColorIndicator}
-                    style={{ background: group.block_color || '#2196f3' }}
+                    style={{ background: group.block_color || group.program_color || '#2196f3' }}
                 />
                 <div className={styles.blockTitle}>
                     <ProgramName name={group.program_name} color={group.program_color} />
-                    <span aria-hidden="true"> — </span>
-                    <span
-                        className={styles.blockName}
-                        style={{ color: group.block_color || 'var(--color-brand-primary)' }}
-                    >
-                        {group.block_name}
-                    </span>
+                    {group.block_name ? (
+                        <>
+                            <span aria-hidden="true"> — </span>
+                            <span
+                                className={styles.blockName}
+                                style={{ color: group.block_color || 'var(--color-brand-primary)' }}
+                            >
+                                {group.block_name}
+                            </span>
+                        </>
+                    ) : null}
                 </div>
             </div>
 

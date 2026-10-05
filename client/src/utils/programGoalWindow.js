@@ -180,15 +180,12 @@ export function getActiveProgramBlock(program, referenceDate) {
 }
 
 export function collectProgramGoalIds(program) {
-    const blockGoalIds = (program?.blocks || []).flatMap((block) => [
-        ...(block?.goal_ids || []),
-        ...(block?.days || []).flatMap((day) => day?.goal_ids || []),
-    ]);
+    const dayGoalIds = (program?.days || []).flatMap((day) => day?.goal_ids || []);
 
     return uniqueIds([
         ...(program?.goal_ids || []),
         ...(program?.selected_goals || []),
-        ...blockGoalIds,
+        ...dayGoalIds,
     ]);
 }
 

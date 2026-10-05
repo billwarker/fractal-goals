@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from models import Goal, Program, ProgramBlock, program_goals, program_block_goals
+from models import Goal, Program, ProgramBlock, ProgramDay, program_goals, program_day_goals
 from models import Session, ActivityInstance
 import services.completion_handlers as completion_handlers
 from services.completion_handlers import (
@@ -202,7 +202,7 @@ class TestProgramServiceGoalReplacement:
         assert len(rows) == 1
         assert rows[0].goal_id == goal_b.id
 
-    def test_replace_block_goals_rejects_missing_goals(self, db_session, sample_ultimate_goal):
+    def test_replace_day_goals_rejects_missing_goals(self, db_session, sample_ultimate_goal):
         program = Program(
             root_id=sample_ultimate_goal.id,
             name="Program B",
@@ -213,25 +213,24 @@ class TestProgramServiceGoalReplacement:
             is_active=True,
         )
         block = ProgramBlock(program=program, name="Block A")
+        day = ProgramDay(program=block.program, name="Day A")
         goal = Goal(name="Goal C", parent_id=sample_ultimate_goal.id, root_id=sample_ultimate_goal.id)
-        db_session.add_all([program, block, goal])
+        db_session.add_all([program, block, day, goal])
         db_session.flush()
 
-        ProgramService._replace_block_goals(
-            db_session,
-            block.id,
-            [goal.id],
-            sample_ultimate_goal.id,
-        )
+        ProgramService._replace_day_goals(db_session, day, [goal.id], sample_ultimate_goal.id)
         rows = db_session.execute(
-            program_block_goals.select().where(program_block_goals.c.program_block_id == block.id)
+            program_day_goals.select().where(
+                program_day_goals.c.program_day_id == day.id,
+                program_day_goals.c.deleted_at.is_(None),
+            )
         ).all()
         assert len(rows) == 1
 
         with pytest.raises(ValueError, match="Goals not found in this fractal"):
-            ProgramService._replace_block_goals(
+            ProgramService._replace_day_goals(
                 db_session,
-                block.id,
+                day,
                 [goal.id, "missing-goal-id"],
                 sample_ultimate_goal.id,
             )

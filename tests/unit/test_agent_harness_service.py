@@ -379,17 +379,6 @@ def test_program_day_proposals_reject_duplicate_dates_and_missing_templates(
         },
         test_user.id,
     )
-    block = ProgramService.create_block(
-        db_session,
-        sample_ultimate_goal.id,
-        program["id"],
-        {
-            "name": "Agent proposal block",
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-        },
-        test_user.id,
-    )
     service = AgentHarnessService(db_session)
     task = service.create_task(test_user.id, {
         "root_id": sample_ultimate_goal.id,
@@ -398,23 +387,21 @@ def test_program_day_proposals_reject_duplicate_dates_and_missing_templates(
     })
 
     duplicate_day = {
-        "name": "Repeated date",
-        "date": start_date.isoformat(),
+        "name": "Repeated weekday",
+        "day_of_week": [start_date.strftime("%A")],
     }
-    with pytest.raises(ValueError, match="already exists on this date"):
+    with pytest.raises(ValueError, match="only one program day"):
         service.create_proposal(test_user.id, task["id"], {"operations": [
             {
                 "operation_id": "day-1",
                 "type": "create_program_day",
                 "program_id": program["id"],
-                "block_id": block["id"],
                 "data": duplicate_day,
             },
             {
                 "operation_id": "day-2",
                 "type": "create_program_day",
                 "program_id": program["id"],
-                "block_id": block["id"],
                 "data": duplicate_day,
             },
         ]})
@@ -424,10 +411,8 @@ def test_program_day_proposals_reject_duplicate_dates_and_missing_templates(
             "operation_id": "missing-template-day",
             "type": "create_program_day",
             "program_id": program["id"],
-            "block_id": block["id"],
             "data": {
                 "name": "Unknown template",
-                "date": (start_date + timedelta(days=1)).isoformat(),
                 "template_ids": ["not-a-template"],
             },
         }]})
@@ -494,14 +479,12 @@ def test_reviewed_workflow_resolves_temporary_references_through_program_day_and
                 "operation_id": "day",
                 "type": "create_program_day",
                 "program_id": "$ref:program",
-                "block_id": "$ref:block",
                 "data": {"name": "Practice day", "day_of_week": ["Monday", "Wednesday", "Friday"], "template_ids": ["$ref:template"]},
             },
             {
                 "operation_id": "schedule",
                 "type": "schedule_program_day",
                 "program_id": "$ref:program",
-                "block_id": "$ref:block",
                 "day_id": "$ref:day",
                 "data": {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
             },
@@ -549,7 +532,7 @@ def test_reviewed_workflow_resolves_temporary_references_through_program_day_and
     context = service.get_goal_context(test_user.id, sample_ultimate_goal.id)
     assert context["programs"]["items"][0]["name"] == "Four week practice plan"
     assert context["programs"]["items"][0]["blocks"][0]["name"] == "Foundation"
-    practice_day = context["programs"]["items"][0]["blocks"][0]["days"][0]
+    practice_day = context["programs"]["items"][0]["days"][0]
     assert practice_day["name"] == "Practice day"
     assert practice_day["templates"][0]["name"] == "Practice session"
 
@@ -590,14 +573,12 @@ def test_scheduling_a_date_the_program_day_already_recurs_on_is_rejected_in_prev
                     "operation_id": "day",
                     "type": "create_program_day",
                     "program_id": "$ref:program",
-                    "block_id": "$ref:block",
                     "data": {"name": "Practice day", "day_of_week": ["Monday", "Wednesday", "Friday"]},
                 },
                 {
                     "operation_id": "schedule",
                     "type": "schedule_program_day",
                     "program_id": "$ref:program",
-                    "block_id": "$ref:block",
                     "day_id": "$ref:day",
                     "data": {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
                 },
@@ -631,21 +612,13 @@ def test_scheduling_existing_program_day_rejects_stale_preview(
         },
         test_user.id,
     )
-    block = ProgramService.create_block(
+    day = ProgramService.create_program_day(
         db_session,
         sample_ultimate_goal.id,
         program["id"],
-        {"name": "Block", "start_date": start_date.isoformat(), "end_date": end_date.isoformat()},
-        test_user.id,
-    )
-    day = ProgramService.add_block_day(
-        db_session,
-        sample_ultimate_goal.id,
-        program["id"],
-        block["id"],
         {"name": "Reviewed day", "day_of_week": ["Monday"]},
         test_user.id,
-    )["days"][0]
+    )
 
     service = AgentHarnessService(db_session)
     task = service.create_task(test_user.id, {
@@ -658,16 +631,14 @@ def test_scheduling_existing_program_day_rejects_stale_preview(
             "operation_id": "schedule",
             "type": "schedule_program_day",
             "program_id": program["id"],
-            "block_id": block["id"],
             "day_id": day["id"],
             "data": {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
         }],
     })
-    ProgramService.schedule_block_day(
+    ProgramService.schedule_program_day(
         db_session,
         sample_ultimate_goal.id,
         program["id"],
-        block["id"],
         day["id"],
         {"session_start": f"{start_date.isoformat()}T09:00:00Z"},
         test_user.id,
@@ -876,7 +847,7 @@ def test_selected_program_and_template_pagination_reaches_beyond_initial_context
     )
     selected_day = ProgramDay(
         id="selected-program-day",
-        block_id=selected_block.id,
+        program_id=programs[5].id,
         name="Selected day",
         day_number=1,
     )
@@ -1352,14 +1323,12 @@ def test_block_and_day_proposals_keep_calendar_invariant_codes(
                 "operation_id": "day-1",
                 "type": "create_program_day",
                 "program_id": "$ref:program",
-                "block_id": "$ref:block-1",
                 "data": {"name": "Upper", "day_of_week": ["Monday"]},
             },
             {
                 "operation_id": "day-2",
                 "type": "create_program_day",
                 "program_id": "$ref:program",
-                "block_id": "$ref:block-1",
                 "data": {"name": "Lower", "day_of_week": ["Monday"]},
             },
         ]})

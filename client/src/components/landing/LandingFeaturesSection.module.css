@@ -776,7 +776,6 @@
     font-size: var(--font-size-sm);
 }
 
-.programStatusBadge,
 .programBlockBadge {
     display: inline-flex;
     align-items: center;
@@ -790,12 +789,6 @@
     line-height: 1;
 }
 
-.programStatusBadge {
-    border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-brand-success) 14%, transparent);
-    color: var(--color-brand-success);
-}
-
 .programPreviewActions {
     display: flex;
     align-items: center;
@@ -804,8 +797,7 @@
     gap: 8px;
 }
 
-.programPreviewActions button,
-.programViewToggle {
+.programPreviewActions button {
     min-height: 36px;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-sm);
@@ -818,25 +810,6 @@
 
 .programPreviewActions > button {
     padding: 7px 12px;
-}
-
-.programViewToggle {
-    display: inline-flex;
-    align-items: center;
-    padding: 3px;
-}
-
-.programViewToggle button {
-    min-height: 28px;
-    padding: 4px 12px;
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-}
-
-.programViewToggle .programViewToggleActive {
-    background: var(--color-bg-app);
-    color: var(--color-text-primary);
 }
 
 .programPreviewCalendarPanel {
@@ -854,15 +827,6 @@
 .programPreviewCalendarPanel > div {
     height: 100%;
     min-height: 0;
-}
-
-.programPreviewBlocksPanel {
-    overflow: auto;
-}
-
-.programPreviewBlocksScroll {
-    min-height: 100%;
-    padding: 20px;
 }
 
 .programPreviewSidePane {
@@ -1257,7 +1221,6 @@
     .activityModalPreview,
     .activityTimelinePreview,
     .builderModalBody,
-    .programPreviewBlocksPanel,
     .programSidePaneScroll,
     .analyticsDashboardGrid,
     .analyticsFiltersPane {

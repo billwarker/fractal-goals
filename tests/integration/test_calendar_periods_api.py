@@ -35,7 +35,7 @@ def period_world(db_session, test_user, sample_ultimate_goal):
     db_session.add_all([block, template])
     db_session.flush()
     day = ProgramDay(
-        block_id=block.id, name="Every day",
+        program_id=block.program_id, name="Every day",
         day_of_week=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
     )
     db_session.add(day)
@@ -85,7 +85,7 @@ class TestCalendarPeriodsApi:
         }
 
         payload, days = _days(authed_client, period_world, period_world["start"], today)
-        assert payload["schema_version"] == 5
+        assert payload["schema_version"] == 7
         assert [item["id"] for item in payload["periods"]] == [period["id"]]
         assert days[first.isoformat()]["state"] == "rest"
         assert days[first.isoformat()]["status_source"] == "period"
@@ -98,8 +98,8 @@ class TestCalendarPeriodsApi:
             f"/api/{period_world['root'].id}/programs/{period_world['program'].id}/metrics"
             f"?range_start={period_world['start']}&range_end={today}&timezone=UTC"
         ).get_json()
-        assert metrics["calculation_version"] == 6
-        assert metrics["adherence"]["period_rest_days"] == 3
+        assert metrics["calculation_version"] == 9
+        assert metrics["consistency"]["period_rest_days"] == 3
         assert [item["id"] for item in metrics["periods"]] == [period["id"]]
         metric_states = {day["date"]: day["state"] for day in metrics["days"]}
         assert all(metric_states[key] == day["state"] for key, day in days.items() if key in metric_states)

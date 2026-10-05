@@ -51,48 +51,77 @@ def _within_block(block, target_date):
     return bool(block_start and block_end and block_start <= target_date <= block_end)
 
 
-def program_day_scheduled_on(day, block, target_date):
-    if day.date:
-        return date_part(day.date) == target_date
-    if not _within_block(block, target_date):
+def program_span(program):
+    """The program's inclusive (start, end) dates; either may be None."""
+    return date_part(getattr(program, "start_date", None)), date_part(getattr(program, "end_date", None))
+
+
+def _within_program(program, target_date):
+    start, end = program_span(program)
+    return bool(start and end and start <= target_date <= end)
+
+
+def block_for_date(program, target_date):
+    """The block covering ``target_date``, or None. Blocks never overlap."""
+    for block in getattr(program, "blocks", None) or []:
+        if _within_block(block, target_date):
+            return block
+    return None
+
+
+def weekday_names(day):
+    value = getattr(day, "day_of_week", None)
+    if isinstance(value, list):
+        return [name for name in value if name]
+    return [value] if value else []
+
+
+def program_day_scheduled_on(day, program, target_date):
+    """A program day occurs on its explicit dates and its weekdays, anywhere in the program."""
+    if not _within_program(program, target_date):
         return False
     if target_date in explicit_schedule_dates(day):
         return True
-    names = day.day_of_week if isinstance(day.day_of_week, list) else (
-        [day.day_of_week] if day.day_of_week else []
-    )
+    names = weekday_names(day)
     return bool(names and target_date.strftime("%A") in names)
 
 
-def program_day_explicitly_scheduled_on(day, block, target_date):
-    """True only for an explicit schedule row, not a dated or weekday definition."""
-    return (
-        not day.date
-        and _within_block(block, target_date)
-        and target_date in explicit_schedule_dates(day)
-    )
+def program_day_explicitly_scheduled_on(day, program, target_date):
+    """True only for an explicit schedule row, not a weekday definition."""
+    return _within_program(program, target_date) and target_date in explicit_schedule_dates(day)
 
 
 def build_occurrences(program, start: date, end: date):
-    """Return scheduled occurrences grouped by local date."""
+    """Return scheduled occurrences grouped by local date.
+
+    Each row is ``{"program_day", "block"}``; ``block`` is the block covering the
+    date, or None for a program date outside every block.
+    """
     grouped = defaultdict(list)
-    for block in program.blocks or []:
-        block_start = max(start, date_part(block.start_date) or start)
-        block_end = min(end, date_part(block.end_date) or end)
-        if block_start > block_end:
-            continue
-        for day in block.days or []:
-            if day.date:
-                candidates = [date_part(day.date)]
-            elif day.day_of_week:
-                candidates = iter_dates(block_start, block_end)
-            else:
-                candidates = sorted(explicit_schedule_dates(day))
-            for day_value in candidates:
-                if not day_value or not (start <= day_value <= end):
-                    continue
-                if program_day_scheduled_on(day, block, day_value):
-                    grouped[day_value].append({"program_day": day, "block": block})
+    program_start, program_end = program_span(program)
+    if not program_start or not program_end:
+        return grouped
+    first, last = max(start, program_start), min(end, program_end)
+    if first > last:
+        return grouped
+    blocks = [
+        block for block in getattr(program, "blocks", None) or []
+        if date_part(block.start_date) and date_part(block.end_date)
+    ]
+
+    def covering(day_value):
+        return next((block for block in blocks if _within_block(block, day_value)), None)
+
+    for day in getattr(program, "days", None) or []:
+        if weekday_names(day):
+            candidates = iter_dates(first, last)
+        else:
+            candidates = sorted(explicit_schedule_dates(day))
+        for day_value in candidates:
+            if not day_value or not (first <= day_value <= last):
+                continue
+            if program_day_scheduled_on(day, program, day_value):
+                grouped[day_value].append({"program_day": day, "block": covering(day_value)})
     return grouped
 
 

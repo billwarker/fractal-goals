@@ -91,6 +91,8 @@ export function useProgramData(rootId, programId, timezone = null) {
             queryKeys.programs(rootId),
             queryKeys.programCalendarRoot(rootId),
             queryKeys.programCalendarFeedRoot(rootId),
+            // Block milestones and focus progress follow goal deadlines and completion.
+            queryKeys.programDayReadModelRoot(rootId, programId),
             queryKeys.programMetricsRoot(rootId),
         ]);
     }, [invalidateQueryList, programId, rootId]);

@@ -49,10 +49,10 @@ function ProgramSidebar({
                                 {isAuthoritativeMetrics ? (
                                     <div className={styles.metricsList}>
                                         <div className={styles.metricValuePrimary}>
-                                            {programMetrics.adherence.rate == null ? '—' : `${Math.round(programMetrics.adherence.rate * 100)}%`} {programMetrics.adherence.mode === 'density' ? 'Active-day Density' : 'Adherence'}
+                                            {programMetrics.consistency.rate == null ? '—' : `${Math.round(programMetrics.consistency.rate * 100)}%`} {programMetrics.consistency.mode === 'density' ? 'Active-day Density' : 'Consistency'}
                                         </div>
-                                        <div><span className={styles.metricLabel}>Alignment:</span> {programMetrics.alignment.duration_seconds.rate == null ? '—' : `${Math.round(programMetrics.alignment.duration_seconds.rate * 100)}%`}</div>
-                                        <div><span className={styles.metricLabel}>Current streak:</span> {programMetrics.adherence.current_streak} days</div>
+                                        <div><span className={styles.metricLabel}>Goals completed:</span> {programMetrics.outcomes.goals_completed_in_window} / {programMetrics.outcomes.goals_in_scope}</div>
+                                        <div><span className={styles.metricLabel}>Current streak:</span> {programMetrics.consistency.current_streak} days</div>
                                         <div><span className={styles.metricLabel}>Program progress:</span> {programMetrics.program.progress.rate == null ? '—' : `${Math.round(programMetrics.program.progress.rate * 100)}%`}</div>
                                     </div>
                                 ) : <div className={styles.metricsList}>
@@ -72,9 +72,9 @@ function ProgramSidebar({
                                 <h3 className={styles.sectionHeader}>Current Block Metrics</h3>
                                 <div className={styles.metricsList}>
                                     <div className={styles.metricValuePrimary} style={{ color: blockMetrics.color }}>
-                                        {blockMetrics.adherence ? `${blockMetrics.adherence.met_days} / ${blockMetrics.adherence.scheduled_days_observed} Days Met` : `${blockMetrics.daysRemaining} Days Remaining`}
+                                        {blockMetrics.consistency ? `${blockMetrics.consistency.met_days} / ${blockMetrics.consistency.scheduled_days_observed} Days Met` : `${blockMetrics.daysRemaining} Days Remaining`}
                                     </div>
-                                    <div><span className={styles.metricLabel}>Alignment:</span> {blockMetrics.alignment ? (blockMetrics.alignment.duration_seconds.rate == null ? '—' : `${Math.round(blockMetrics.alignment.duration_seconds.rate * 100)}%`) : `${blockMetrics.completedProgramDays ?? blockMetrics.completedSessions} / ${blockMetrics.scheduledProgramDays ?? blockMetrics.scheduledSessions}`}</div>
+                                    <div><span className={styles.metricLabel}>Goals completed:</span> {blockMetrics.goals ? `${blockMetrics.goals.completed} / ${blockMetrics.goals.due}` : `${blockMetrics.goalsMet ?? 0} / ${blockMetrics.totalGoals ?? 0}`}</div>
                                     <div><span className={styles.metricLabel}>Duration:</span> {formatDurationSeconds(blockMetrics.linked_duration_seconds ?? blockMetrics.totalDuration)}</div>
                                     <div><span className={styles.metricLabel}>Linked sessions:</span> {blockMetrics.linked_sessions ?? blockMetrics.completedSessions}</div>
                                 </div>

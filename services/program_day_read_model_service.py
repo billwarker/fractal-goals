@@ -21,6 +21,7 @@ from services.program_day_occurrences import (
 from services.program_calendar_sessions import load_completed_sessions_by_date
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.program_day_summary import session_alignment
+from services.program_rollups import block_weeks
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
 from services.program_scope import resolve_program_scope
 from services.programs import ProgramService
@@ -29,7 +30,7 @@ from services.session_runtime import get_session_template_color, get_session_tem
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 6
+    SCHEMA_VERSION = 7
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
     # A hard safety bound for one local date; the summary covers every loaded
     # session while the session list itself is cursor-paged.
@@ -254,6 +255,22 @@ class ProgramDayReadModelService:
         }
 
     @staticmethod
+    def _serialize_occurrence_block(block, detail_date):
+        """The block covering a date (or None), with its week number when it tracks weeks."""
+        if block is None:
+            return None
+        week_index = None
+        if block.track_weeks:
+            week = next((
+                item for item in block_weeks(
+                    date_part(block.start_date), date_part(block.end_date), block.week_start_day,
+                )
+                if item.contains(detail_date)
+            ), None)
+            week_index = week.index if week else None
+        return {"id": block.id, "name": block.name, "color": block.color, "week_index": week_index}
+
+    @staticmethod
     def serialize_day_fact(fact):
         """Calendar projection of one canonical date fact (no session list)."""
         linked_sessions = [session for row in fact["occurrences"] for session in row["sessions"]]
@@ -270,7 +287,7 @@ class ProgramDayReadModelService:
                 ) for item in linked_sessions
             ),
             "aligned_instance_count": len(fact["aligned_items"]),
-            "block_ids": sorted({row["block"].id for row in fact["occurrences"]}),
+            "block_ids": sorted({row["block"].id for row in fact["occurrences"] if row["block"] is not None}),
         }
 
     def _detail(self, root_id, current_user_id, program, facts, detail_date, zone, limit, offset,
@@ -299,8 +316,8 @@ class ProgramDayReadModelService:
             occurrences.append({
                 "occurrence_key": f"{day.id}:{detail_date.isoformat()}",
                 "program_day_id": day.id,
-                "scheduled_explicitly": program_day_explicitly_scheduled_on(day, row["block"], detail_date),
-                "block": {"id": row["block"].id, "name": row["block"].name, "color": row["block"].color},
+                "scheduled_explicitly": program_day_explicitly_scheduled_on(day, program, detail_date),
+                "block": self._serialize_occurrence_block(row["block"], detail_date),
                 "name": day.name,
                 "definition_note": day.notes,
                 "goal_ids": [goal.id for goal in day.goals or []],

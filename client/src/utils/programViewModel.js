@@ -6,8 +6,8 @@ import {
     getISOYMDInTimezone,
     getRecurringDatesWithinRange,
 } from './dateUtils';
-import { getGoalDeadline, isGoalAssociatedWithBlock } from './programGoalAssociations';
 import { buildGoalDeadlineCalendarEvent } from './programCalendarGoalEvents';
+import { trackedBlockWeeks } from './programBlockWeeks';
 import { buildProgramGoalScope } from './programGoalWindow';
 import { isBlockActive } from './programUtils.jsx';
 
@@ -109,11 +109,9 @@ export function getProgramDayWeekdays(day) {
     return WEEKDAY_NAMES.filter((name) => dayOfWeek.includes(name));
 }
 
-/** A definition's specific dates: its explicit schedule rows plus any legacy fixed date. */
+/** A definition's specific dates: its explicit schedule rows. */
 export function getProgramDaySpecificDates(day) {
-    const dates = [...(day?.scheduled_dates || []), day?.date]
-        .map(getDatePart)
-        .filter(Boolean);
+    const dates = (day?.scheduled_dates || []).map(getDatePart).filter(Boolean);
     return [...new Set(dates)].sort();
 }
 
@@ -124,12 +122,12 @@ function joinWithAnd(parts) {
 
 const formatShortDate = (value) => formatLiteralDate(value, { year: undefined });
 
-/** "Every Monday, Wednesday and Friday in the block." */
+/** "Every Monday, Wednesday and Friday in the program." */
 export function formatWeekdaySchedule(weekdays = []) {
     const ordered = WEEKDAY_NAMES.filter((name) => weekdays.includes(name));
     if (!ordered.length) return '';
-    if (ordered.length === 7) return 'Every day in the block.';
-    return `Every ${joinWithAnd(ordered)} in the block.`;
+    if (ordered.length === 7) return 'Every day in the program.';
+    return `Every ${joinWithAnd(ordered)} in the program.`;
 }
 
 /** "1 date · Sep 26" or "3 dates · Sep 26 – Oct 10". */
@@ -169,41 +167,60 @@ export function getProgramDayTemplateRules(dayOrOccurrence) {
         .sort((left, right) => left.order - right.order);
 }
 
-export function getProgramDayScheduledDates(day, block) {
-    const blockStart = getDatePart(block?.start_date);
-    const blockEnd = getDatePart(block?.end_date);
-    const explicitDate = getDatePart(day?.date);
+/** The block covering ``dateStr`` (blocks never overlap), or ``null``. */
+export function blockForDate(blocks = [], dateStr) {
+    if (!dateStr) return null;
+    return (blocks || []).find((block) => {
+        const blockStart = getDatePart(block?.start_date);
+        const blockEnd = getDatePart(block?.end_date);
+        return Boolean(blockStart && blockEnd && blockStart <= dateStr && dateStr <= blockEnd);
+    }) || null;
+}
 
-    if (explicitDate) {
-        if (blockStart && blockEnd && (explicitDate < blockStart || explicitDate > blockEnd)) {
-            return [];
-        }
-        return [explicitDate];
-    }
+/**
+ * A program's days. Program days belong to the program; landing snapshots published before
+ * that change still nest them under blocks, so those are read from there.
+ */
+export function getProgramDays(program) {
+    if (Array.isArray(program?.days)) return program.days;
+    return (program?.blocks || []).flatMap((block) => block?.days || []);
+}
 
-    if (!blockStart || !blockEnd) {
+/** The program's days in sidebar order. */
+export function sortProgramDays(days = []) {
+    return [...(days || [])].sort((left, right) => (
+        (left.day_number ?? Number.MAX_SAFE_INTEGER) - (right.day_number ?? Number.MAX_SAFE_INTEGER)
+        || String(left.name || '').localeCompare(String(right.name || ''))
+    ));
+}
+
+export function getProgramDayScheduledDates(day, program) {
+    const programStart = getDatePart(program?.start_date);
+    const programEnd = getDatePart(program?.end_date);
+    if (!programStart || !programEnd) {
         return [];
     }
 
-    // Mirrors services/program_day_occurrences.program_day_scheduled_on: a reusable
-    // definition occurs on its explicit schedule dates and its weekdays, within the block.
+    // Mirrors services/program_day_occurrences.program_day_scheduled_on: a definition occurs
+    // on its explicit schedule dates and its weekdays, anywhere in the program.
     const explicitScheduleDates = (day?.scheduled_dates || [])
         .map(getDatePart)
-        .filter((dateStr) => dateStr && dateStr >= blockStart && dateStr <= blockEnd);
+        .filter((dateStr) => dateStr && dateStr >= programStart && dateStr <= programEnd);
     const activeDays = getProgramDayWeekdayIndexes(day);
     const recurringDates = activeDays.length
-        ? getRecurringDatesWithinRange(blockStart, blockEnd, activeDays)
+        ? getRecurringDatesWithinRange(programStart, programEnd, activeDays)
         : [];
 
     return [...new Set([...explicitScheduleDates, ...recurringDates])].sort();
 }
 
 /**
+ * Every scheduled program-day date, each with the block covering it (``null`` outside blocks).
  * @param {{ program?: any, blockFilter?: (block: any) => boolean, programIndex?: number }} [options]
  */
 export function buildProgramDayOccurrences({
     program,
-    blockFilter = () => true,
+    blockFilter = null,
     programIndex = 0,
 } = {}) {
     if (!program) {
@@ -211,30 +228,30 @@ export function buildProgramDayOccurrences({
     }
 
     const programColor = getProgramColor(program, programIndex);
+    const blocks = program.blocks || [];
 
-    return sortProgramBlocks(program.blocks || []).flatMap((block) => {
-        if (!blockFilter(block)) {
-            return [];
-        }
-
-        const blockColor = block.color || programColor;
-        return (block.days || []).flatMap((day) => (
-            getProgramDayScheduledDates(day, block).map((dateStr) => ({
-                id: `${block.id}-${day.id}-${dateStr}`,
+    return sortProgramDays(getProgramDays(program)).flatMap((day) => (
+        getProgramDayScheduledDates(day, program).flatMap((dateStr) => {
+            const block = blockForDate(blocks, dateStr);
+            if (blockFilter && !(block && blockFilter(block))) {
+                return [];
+            }
+            return [{
+                id: `${day.id}-${dateStr}`,
                 date: dateStr,
                 program,
                 programId: program.id,
                 block,
-                blockId: block.id,
-                blockName: block.name,
-                blockColor,
+                blockId: block?.id ?? null,
+                blockName: block?.name ?? null,
+                blockColor: block?.color || programColor,
                 day,
                 dayId: day.id,
                 dayName: day.name || 'Program Day',
                 templates: day.templates || [],
-            }))
-        ));
-    });
+            }];
+        })
+    )).sort((left, right) => left.date.localeCompare(right.date));
 }
 
 export function getScheduledProgramDayCompletion(occurrence, sessions = [], timezone) {
@@ -276,33 +293,19 @@ export function getScheduledProgramDayCompletion(occurrence, sessions = [], time
 export function flattenProgramSessions(program) {
     const sessionsById = new Map();
 
-    (program?.blocks || []).forEach((block) => {
-        (block.days || []).forEach((day) => {
-            (day.sessions || []).forEach((session) => {
-                if (session?.id && !sessionsById.has(session.id)) {
-                    sessionsById.set(session.id, session);
-                }
-            });
+    getProgramDays(program).forEach((day) => {
+        (day.sessions || []).forEach((session) => {
+            if (session?.id && !sessionsById.has(session.id)) {
+                sessionsById.set(session.id, session);
+            }
         });
     });
 
     return Array.from(sessionsById.values());
 }
 
-export function buildProgramDaysMap(blocks = []) {
-    const programDaysMap = new Map();
-
-    blocks.forEach((block) => {
-        (block.days || []).forEach((day) => {
-            programDaysMap.set(day.id, {
-                ...day,
-                blockId: block.id,
-                blockColor: block.color,
-            });
-        });
-    });
-
-    return programDaysMap;
+export function buildProgramDaysMap(program) {
+    return new Map(getProgramDays(program).map((day) => [day.id, day]));
 }
 
 export function sortProgramBlocks(blocks = []) {
@@ -344,8 +347,13 @@ export function buildProgramBlockLabels({
         }
 
         const blockColor = block.color || programColor;
+        const color = getThemedContrastColor(blockColor);
+        const idPrefix = `${includeProgramId ? `${program.id}-` : ''}${block.id}`;
+        // Tracked weeks: Week 1 rides on the block label; each later week gets its own chip.
+        const weeks = trackedBlockWeeks(block);
+        const weekTitle = (week) => `${block.name}, week ${week.index} of ${weeks.length}`;
         return [{
-            id: `block-label-${includeProgramId ? `${program.id}-` : ''}${block.id}`,
+            id: `block-label-${idPrefix}`,
             title: block.name,
             date: blockStart,
             startDate: blockStart,
@@ -353,8 +361,22 @@ export function buildProgramBlockLabels({
             programId: program.id,
             blockId: block.id,
             blockColor,
-            color: getThemedContrastColor(blockColor),
-        }];
+            color,
+            weekChip: weeks.length ? 'W1' : null,
+            weekTitle: weeks.length ? weekTitle(weeks[0]) : null,
+        }, ...weeks.slice(1).map((week) => ({
+            id: `week-label-${idPrefix}-${week.index}`,
+            labelType: 'week',
+            title: `W${week.index}`,
+            weekTitle: weekTitle(week),
+            date: week.start,
+            startDate: week.start,
+            endDate: week.end,
+            programId: program.id,
+            blockId: block.id,
+            blockColor,
+            color,
+        }))];
     });
 }
 
@@ -381,7 +403,6 @@ export function getProgramGoalIds(program) {
     return new Set([
         ...(program?.goal_ids || []),
         ...(program?.selected_goals || []),
-        ...(program?.blocks || []).flatMap((block) => block.goal_ids || []),
     ]);
 }
 
@@ -420,7 +441,7 @@ export function buildProgramCalendarEvents({
     const dateGroups = {};
     const blocks = program.blocks || [];
     const sortedBlocks = sortProgramBlocks(blocks);
-    const programDaysMap = buildProgramDaysMap(blocks);
+    const programDaysMap = buildProgramDaysMap(program);
     const goalById = new Map(goals.map((goal) => [goal.id, goal]));
     const goalIds = attachedGoalIds || getProgramGoalIds(program);
     const programColor = getProgramColor(program, programIndex);
@@ -439,7 +460,7 @@ export function buildProgramCalendarEvents({
             dateGroups[dateStr].groupsByDay[dayKey] = {
                 name,
                 pDay: day,
-                blockColor: block.color || programColor,
+                blockColor: block?.color || programColor,
                 sessions: [],
                 templatesByName: {},
             };
@@ -508,17 +529,10 @@ export function buildProgramCalendarEvents({
             const name = programDay.name || 'Program Day';
             const dayKey = programDay.id || `name:${name}`;
             if (!dateGroups[dateStr].groupsByDay[dayKey]) {
-                const owningBlock = blocks.find((block) =>
-                    (block.days || []).some((day) => day.id === programDayId)
-                );
-                const sessionInBlockRange = owningBlock
-                    ? dateStr >= getDatePart(owningBlock.start_date) && dateStr <= getDatePart(owningBlock.end_date)
-                    : false;
-
                 dateGroups[dateStr].groupsByDay[dayKey] = {
                     name,
                     pDay: programDay,
-                    blockColor: sessionInBlockRange ? programDay.blockColor : null,
+                    blockColor: blockForDate(blocks, dateStr)?.color || null,
                     sessions: [],
                     templatesByName: {},
                 };
@@ -798,7 +812,7 @@ export function buildDemoProgramMetrics({ program, sessions = [], programDaysMap
         return null;
     }
 
-    const scopedProgramDaysMap = programDaysMap || buildProgramDaysMap(program.blocks || []);
+    const scopedProgramDaysMap = programDaysMap || buildProgramDaysMap(program);
     const scheduledProgramDays = buildProgramDayOccurrences({ program });
     const completedProgramDays = scheduledProgramDays.filter((occurrence) => (
         getScheduledProgramDayCompletion(occurrence, sessions, timezone).isCompleted
@@ -831,43 +845,8 @@ export function buildDemoProgramMetrics({ program, sessions = [], programDaysMap
     };
 }
 
-export function buildBlockGoalsByBlockId({ sortedBlocks = [], associatedGoals = [] }) {
-    /** @type {Array<[string, any[]]>} */
-    const entries = sortedBlocks.map((block) => {
-        const seenGoalIds = new Set();
-        const blockGoals = associatedGoals
-            .filter((goal) => isGoalAssociatedWithBlock(goal, block))
-            .filter((goal) => {
-                if (!goal || seenGoalIds.has(goal.id)) {
-                    return false;
-                }
-                seenGoalIds.add(goal.id);
-                return true;
-            })
-            .sort((left, right) => {
-                const leftDeadline = getGoalDeadline(left);
-                const rightDeadline = getGoalDeadline(right);
-
-                if (leftDeadline && rightDeadline) {
-                    return new Date(leftDeadline).getTime() - new Date(rightDeadline).getTime();
-                }
-                if (leftDeadline) {
-                    return -1;
-                }
-                if (rightDeadline) {
-                    return 1;
-                }
-                return left.name.localeCompare(right.name);
-            });
-
-        return [block.id, blockGoals];
-    });
-
-    return new Map(entries);
-}
-
-/** @param {{ activeBlock: any, sessions?: any[], program: any, programDaysMap: Map<string, any>, blockGoalsByBlockId: Map<string, any[]>, timezone?: string }} options Omitted timezone means the viewer's local zone. */
-export function buildBlockMetrics({ activeBlock, sessions = [], program, programDaysMap, blockGoalsByBlockId, timezone }) {
+/** @param {{ activeBlock: any, sessions?: any[], program: any, programDaysMap: Map<string, any>, programGoalIds?: Iterable<string>, getGoalDetails?: (goalId: string) => any, timezone?: string }} options Omitted timezone means the viewer's local zone. */
+export function buildBlockMetrics({ activeBlock, sessions = [], program, programDaysMap, programGoalIds = [], getGoalDetails = () => null, timezone }) {
     if (!activeBlock) {
         return null;
     }
@@ -879,16 +858,23 @@ export function buildBlockMetrics({ activeBlock, sessions = [], program, program
     const completedProgramDays = scheduledProgramDays.filter((occurrence) => (
         getScheduledProgramDayCompletion(occurrence, sessions, timezone).isCompleted
     ));
+    // Program days span blocks, so a session belongs to the block covering its date.
+    const blockStart = getDatePart(activeBlock.start_date);
+    const blockEnd = getDatePart(activeBlock.end_date);
     const blockSessions = sessions.filter((session) => {
         const programDayId = getSessionProgramDayId(session);
-        if (!programDayId) {
+        if (!programDayId || !programDaysMap.has(programDayId)) {
             return false;
         }
-
-        return programDaysMap.get(programDayId)?.blockId === activeBlock.id;
+        const sessionDate = getISOYMDInTimezone(session.session_start || session.created_at, timezone);
+        return Boolean(sessionDate && blockStart && blockEnd && blockStart <= sessionDate && sessionDate <= blockEnd);
     });
 
-    const blockGoals = blockGoalsByBlockId.get(activeBlock.id) || [];
+    // A block's goals are the program goals due inside it.
+    const blockGoals = [...programGoalIds].map((goalId) => getGoalDetails(goalId)).filter((goal) => {
+        const deadline = String(goal?.deadline || goal?.attributes?.deadline || '').slice(0, 10);
+        return Boolean(deadline && blockStart && deadline >= blockStart && deadline <= blockEnd);
+    });
 
     return {
         name: activeBlock.name,
@@ -919,18 +905,11 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
     const programGoalSeeds = goalScope.hierarchyGoalSeeds;
     const scopedAttachedGoalIds = attachedGoalIds || new Set([
         ...goalScope.expandAssociatedGoalIds(program.goal_ids || []),
-        ...(program.blocks || []).flatMap((block) => block.goal_ids || []),
     ]);
     const sessions = flattenProgramSessions(program);
-    const programDaysMap = buildProgramDaysMap(program.blocks || []);
+    const programDaysMap = buildProgramDaysMap(program);
     const activeBlock = (program.blocks || []).find((block) => isBlockActive(block)) || null;
-    const associatedGoals = Array.from(scopedAttachedGoalIds)
-        .map((goalId) => getGoalDetails?.(goalId) || goalById.get(goalId))
-        .filter(Boolean);
-    const blockGoalsByBlockId = buildBlockGoalsByBlockId({
-        sortedBlocks: sortProgramBlocks(program.blocks || []),
-        associatedGoals,
-    });
+    const resolveGoal = (goalId) => getGoalDetails?.(goalId) || goalById.get(goalId) || null;
 
     return {
         programMetrics: buildDemoProgramMetrics({
@@ -938,7 +917,7 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
             sessions,
             programDaysMap,
             attachedGoalIds: scopedAttachedGoalIds,
-            getGoalDetails: (goalId) => getGoalDetails?.(goalId) || goalById.get(goalId) || null,
+            getGoalDetails: resolveGoal,
         }),
         activeBlock,
         blockMetrics: buildBlockMetrics({
@@ -946,7 +925,8 @@ export function buildProgramSidePaneData({ program, goals = [], attachedGoalIds,
             sessions,
             program,
             programDaysMap,
-            blockGoalsByBlockId,
+            programGoalIds: scopedAttachedGoalIds,
+            getGoalDetails: resolveGoal,
         }),
         programGoalSeeds,
     };

@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 
 import {
-    buildBlockGoalsByBlockId,
     buildProgramBlockLabels,
     buildProgramCalendarEvents,
     buildProgramDaysMap,
@@ -16,14 +15,12 @@ export function useProgramDetailViewModel({
     timezone,
     getGoalColor,
     getGoalTextColor,
-    getGoalDetails,
-    attachBlockId,
     attachedGoalIds,
     hierarchyGoalSeeds,
 }) {
     const sortedBlocks = useMemo(() => sortProgramBlocks(program?.blocks || []), [program?.blocks]);
 
-    const programDaysMap = useMemo(() => buildProgramDaysMap(program?.blocks || []), [program?.blocks]);
+    const programDaysMap = useMemo(() => buildProgramDaysMap(program), [program]);
 
     const calendarEvents = useMemo(() => buildProgramCalendarEvents({
         program,
@@ -51,29 +48,12 @@ export function useProgramDetailViewModel({
         return program?.blocks?.find((block) => isBlockActive(block)) || null;
     }, [program?.blocks]);
 
-    const associatedGoals = useMemo(() => {
-        return Array.from(attachedGoalIds || [])
-            .map((goalId) => getGoalDetails(goalId))
-            .filter(Boolean);
-    }, [attachedGoalIds, getGoalDetails]);
-
-    const blockGoalsByBlockId = useMemo(() => buildBlockGoalsByBlockId({
-        sortedBlocks,
-        associatedGoals,
-    }), [associatedGoals, sortedBlocks]);
-
-    const attachBlock = useMemo(() => {
-        return sortedBlocks.find((block) => block.id === attachBlockId) || null;
-    }, [attachBlockId, sortedBlocks]);
-
     return {
         sortedBlocks,
         calendarEvents,
         blockLabels,
         activeBlock,
-        attachBlock,
         programDaysMap,
-        blockGoalsByBlockId,
         hierarchyGoalSeeds,
     };
 }

@@ -1,0 +1,55 @@
+{
+  "description": "Shared block-week cases for services/program_rollups.block_weeks and client/src/utils/programBlockWeeks.js. week_start_day uses Python weekday numbering (0 = Monday ... 6 = Sunday); null steps 7 days from the start date.",
+  "cases": [
+    {
+      "name": "untracked weeks step seven days from the start",
+      "start": "2026-09-01", "end": "2026-09-30", "week_start_day": null,
+      "weeks": [
+        ["2026-09-01", "2026-09-07", false],
+        ["2026-09-08", "2026-09-14", false],
+        ["2026-09-15", "2026-09-21", false],
+        ["2026-09-22", "2026-09-28", false],
+        ["2026-09-29", "2026-09-30", true]
+      ]
+    },
+    {
+      "name": "Sunday weeks make a partial first week on a Tuesday start",
+      "start": "2026-09-01", "end": "2026-09-30", "week_start_day": 6,
+      "weeks": [
+        ["2026-09-01", "2026-09-05", true],
+        ["2026-09-06", "2026-09-12", false],
+        ["2026-09-13", "2026-09-19", false],
+        ["2026-09-20", "2026-09-26", false],
+        ["2026-09-27", "2026-09-30", true]
+      ]
+    },
+    {
+      "name": "a start on the chosen weekday gives a full first week",
+      "start": "2026-11-02", "end": "2026-11-15", "week_start_day": 0,
+      "weeks": [
+        ["2026-11-02", "2026-11-08", false],
+        ["2026-11-09", "2026-11-15", false]
+      ]
+    },
+    {
+      "name": "a one-day block is one partial week",
+      "start": "2026-11-02", "end": "2026-11-02", "week_start_day": 3,
+      "weeks": [
+        ["2026-11-02", "2026-11-02", true]
+      ]
+    },
+    {
+      "name": "the day before the boundary closes week one",
+      "start": "2026-11-07", "end": "2026-11-09", "week_start_day": 6,
+      "weeks": [
+        ["2026-11-07", "2026-11-07", true],
+        ["2026-11-08", "2026-11-09", true]
+      ]
+    },
+    {
+      "name": "an inverted range has no weeks",
+      "start": "2026-11-09", "end": "2026-11-02", "week_start_day": 0,
+      "weeks": []
+    }
+  ]
+}

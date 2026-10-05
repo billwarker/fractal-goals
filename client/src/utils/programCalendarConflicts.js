@@ -8,6 +8,11 @@ import { getProgramDaySpecificDates, getProgramDayWeekdays, WEEKDAY_NAMES } from
 
 export const BLOCK_OVERLAP = 'program_block_overlap';
 export const DAY_DATE_CONFLICT = 'program_day_date_conflict';
+export const DAY_DATE_OUTSIDE_PROGRAM = 'program_day_date_outside_program';
+const INLINE_CODES = new Set([
+    BLOCK_OVERLAP, DAY_DATE_CONFLICT, DAY_DATE_OUTSIDE_PROGRAM,
+    'program_block_invalid_dates', 'program_block_week_start_required', 'program_block_week_start_invalid',
+]);
 
 function parseIsoDate(value) {
     const [year, month, day] = value.split('-').map(Number);
@@ -41,35 +46,33 @@ export function findBlockOverlap(blocks, draft) {
     }) || null;
 }
 
-/** Dates a program day occupies inside its block, as ``program_day_scheduled_on`` evaluates them. */
-export function programDayDates(day, block) {
-    const blockStart = getDatePart(block?.start_date);
-    const blockEnd = getDatePart(block?.end_date);
+/**
+ * Dates a program day occupies inside its program, as ``program_day_scheduled_on`` evaluates
+ * them: its explicit dates plus every date on its weekdays, across the whole program span.
+ */
+export function programDayDates(day, program) {
+    const programStart = getDatePart(program?.start_date);
+    const programEnd = getDatePart(program?.end_date);
     const occupied = new Set();
-    if (day?.date) {
-        // A legacy fixed date always counts, as on the server.
-        occupied.add(getDatePart(day.date));
-        return occupied;
-    }
-    if (!blockStart || !blockEnd) return occupied;
+    if (!programStart || !programEnd) return occupied;
     getProgramDaySpecificDates(day)
-        .filter((value) => value >= blockStart && value <= blockEnd)
+        .filter((value) => value >= programStart && value <= programEnd)
         .forEach((value) => occupied.add(value));
     const weekdays = getProgramDayWeekdays(day);
     if (weekdays.length) {
-        eachDate(blockStart, blockEnd, (value) => {
+        eachDate(programStart, programEnd, (value) => {
             if (weekdays.includes(weekdayOf(value))) occupied.add(value);
         });
     }
     return occupied;
 }
 
-/** Every date the block's other program days occupy, mapped to the day's name. */
-export function occupiedBlockDates(block, { excludeDayId = null } = {}) {
+/** Every date the program's other days occupy, mapped to the day's name. */
+export function occupiedProgramDates(program, { excludeDayId = null } = {}) {
     const owners = new Map();
-    (block?.days || []).forEach((day) => {
+    (program?.days || []).forEach((day) => {
         if (excludeDayId && day.id === excludeDayId) return;
-        programDayDates(day, block).forEach((value) => {
+        programDayDates(day, program).forEach((value) => {
             if (!owners.has(value)) owners.set(value, day.name || 'another program day');
         });
     });
@@ -87,8 +90,8 @@ export function takenWeekdays(owners) {
 }
 
 /** The draft definition's dates that another day already holds, earliest first. */
-export function findDraftDayConflicts(block, owners, { weekdays = [], dates = [] }) {
-    const draftDates = programDayDates({ day_of_week: weekdays, scheduled_dates: dates }, block);
+export function findDraftDayConflicts(program, owners, { weekdays = [], dates = [] }) {
+    const draftDates = programDayDates({ day_of_week: weekdays, scheduled_dates: dates }, program);
     return [...draftDates]
         .filter((value) => owners.has(value))
         .sort()
@@ -99,7 +102,7 @@ export function findDraftDayConflicts(block, owners, { weekdays = [], dates = []
 export function calendarConflictMessage(error) {
     const data = error?.response?.data;
     if (!data || typeof data !== 'object') return null;
-    if (data.code === BLOCK_OVERLAP || data.code === DAY_DATE_CONFLICT || data.code === 'program_block_invalid_dates') {
+    if (INLINE_CODES.has(data.code)) {
         return data.error || 'This change conflicts with the program calendar.';
     }
     return null;

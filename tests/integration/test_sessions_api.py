@@ -20,9 +20,9 @@ from uuid import uuid4
 
 from models import (
     ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate,
-    SessionWorkInterval, Target, Program, ProgramBlock, ProgramDay,
+    SessionWorkInterval, Target, Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule,
     CircuitDefinition, CircuitSlot, CircuitRun,
-    activity_goal_associations, session_goals, program_goals,
+    activity_goal_associations, session_goals, program_goals, program_block_goals, program_day_goals,
 )
 
 
@@ -97,7 +97,7 @@ class TestSessionListEndpoints:
         )
         db_session.add(block)
         db_session.flush()
-        day = ProgramDay(block_id=block.id, date=now.date(), day_number=1, name='Today')
+        day = ProgramDay(program_id=block.program_id, occurrence_schedules=[ProgramDayOccurrenceSchedule(date=now.date())], day_number=1, name='Today')
         db_session.add(day)
         db_session.flush()
         in_program = sample_goal_hierarchy['mid_term'].id
@@ -145,7 +145,67 @@ class TestSessionListEndpoints:
             'day_date': None,
         }
         persisted = db_session.query(Session).filter_by(id=created.get_json()['id']).one()
-        assert persisted.attributes['program_context']['off_program_goal_ids'] == [off_program]
+        assert persisted.attributes['program_context']['off_focus_goal_ids'] == [off_program]
+
+    def test_program_day_session_scope_is_the_day_focus(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_session_template,
+    ):
+        """A program-day session is scoped to the day's goals, not the whole program."""
+        root_id = sample_goal_hierarchy['ultimate'].id
+        now = datetime.now(timezone.utc)
+        program = Program(
+            root_id=root_id, name='Focused program', start_date=now,
+            end_date=now + timedelta(days=7), weekly_schedule={},
+        )
+        db_session.add(program)
+        db_session.flush()
+        block = ProgramBlock(
+            program_id=program.id, name='Block',
+            start_date=now.date(), end_date=(now + timedelta(days=7)).date(),
+        )
+        db_session.add(block)
+        db_session.flush()
+        focused_day = ProgramDay(program_id=block.program_id, occurrence_schedules=[ProgramDayOccurrenceSchedule(date=now.date())], day_number=1, name='Focused')
+        open_day = ProgramDay(program_id=block.program_id, day_number=2, name='Open')
+        db_session.add_all([focused_day, open_day])
+        db_session.flush()
+        long_term = sample_goal_hierarchy['long_term'].id
+        mid_term = sample_goal_hierarchy['mid_term'].id
+        short_term = sample_goal_hierarchy['short_term'].id
+        db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=long_term))
+        # Retained block goal rows no longer narrow session scope.
+        db_session.execute(program_block_goals.insert().values(program_block_id=block.id, goal_id=mid_term))
+        db_session.execute(program_day_goals.insert().values(program_day_id=focused_day.id, goal_id=short_term))
+        db_session.commit()
+
+        def preview_scope(day_id):
+            response = authed_client.post(
+                f'/api/{root_id}/sessions/goal-scope-preview',
+                json={'template_id': sample_session_template.id, 'program_day_id': day_id},
+            )
+            assert response.status_code == 200
+            return response.get_json()['program_scope_goal_ids']
+
+        assert preview_scope(focused_day.id) == [short_term]
+        # A day without goals falls back to the program's goals.
+        assert preview_scope(open_day.id) == sorted([long_term, mid_term, short_term])
+
+        created = authed_client.post(
+            f'/api/{root_id}/sessions',
+            json={
+                'name': 'Day session',
+                'template_id': sample_session_template.id,
+                'goal_ids': [mid_term],
+                'session_data': {'program_context': {'day_id': focused_day.id}},
+            },
+        )
+        assert created.status_code == 201
+        persisted = db_session.query(Session).filter_by(id=created.get_json()['id']).one()
+        assert persisted.attributes['program_context']['off_focus_goal_ids'] == [mid_term]
 
     def test_active_session_endpoint_returns_paused_session(
         self, authed_client, db_session, sample_ultimate_goal, test_user

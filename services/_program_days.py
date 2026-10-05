@@ -1,4 +1,4 @@
-"""Block-day lifecycle: add/update/delete/copy/schedule/unschedule + deadlines.
+"""Program-day lifecycle: create/update/delete/duplicate/schedule/unschedule + deadlines.
 
 Mixin for ProgramService (audit P1-7). Methods are classmethods; cross-method
 calls use cls.<method>(...) and resolve through the composed ProgramService class.
@@ -8,9 +8,11 @@ import uuid
 import logging
 from datetime import datetime, date, time, timedelta, timezone
 from typing import List, Dict, Any
+
+from sqlalchemy import func
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate, Goal, Session, _safe_load_json
+from models import Program, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate, Goal, Session, _safe_load_json
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
 from services.serializers import format_utc, serialize_program_day, serialize_goal
@@ -19,227 +21,164 @@ from services.program_scope import resolve_program_scopes
 from services.calendar_periods import load_calendar_periods
 from services.program_day_credits import load_program_credit_candidates, load_program_session_credits
 from services.program_day_occurrences import (
+    block_for_date,
     build_occurrences,
     evaluate_occurrence,
     program_day_scheduled_on,
     resolve_occurrence_credits,
 )
 from services.program_status_override_queries import load_program_status_overrides
+from services.program_focus import assert_day_goals_valid, resolve_focus_scopes
 from services.program_calendar_invariants import (
+    assert_dates_within_program,
     assert_single_program_day_per_date,
     lock_program_calendar,
 )
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Mixins resolve shared helpers through the composed ProgramService.
+    from services._program_helpers import _ProgramHelpersMixin as _ProgramMixinBase
+else:
+    _ProgramMixinBase = object
+
 logger = logging.getLogger(__name__)
 
 
-class _ProgramDaysMixin:
+class _ProgramDaysMixin(_ProgramMixinBase):
+    @staticmethod
+    def _weekday_list(raw) -> List[str]:
+        if isinstance(raw, list):
+            return [value for value in raw if value]
+        return [raw] if raw else []
+
+    @staticmethod
+    def _get_program_day(session, program_id: str, day_id: str, *, lock=False):
+        query = session.query(ProgramDay).filter_by(id=day_id, program_id=program_id)
+        if lock:
+            query = query.populate_existing().with_for_update()
+        day = query.first()
+        if not day:
+            raise ValueError("Day not found")
+        return day
+
+    @staticmethod
+    def _day_template_configs(day) -> List[Dict[str, Any]]:
+        return [
+            {
+                'template_id': link.session_template_id,
+                'is_required': bool(link.is_required),
+                'order': link.order or index,
+            }
+            for index, link in enumerate(day.template_links or [])
+        ] or [
+            {'template_id': template.id, 'is_required': True, 'order': index}
+            for index, template in enumerate(day.templates or [])
+        ]
+
     @classmethod
-    def add_block_day(
-        cls, session, root_id: str, program_id: str, block_id: str, data: Dict,
+    def create_program_day(
+        cls, session, root_id: str, program_id: str, data: Dict,
         current_user_id: str | None = None, *, commit=True, pending_events=None,
-        create_only=False,
     ) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
-        if not lock_program_calendar(session, program_id, root_id):
+        program = lock_program_calendar(session, program_id, root_id)
+        if not program:
             raise ValueError("Program not found")
-        block = session.query(ProgramBlock).filter_by(id=block_id, program_id=program_id).first()
-        if not block:
-            raise ValueError("Block not found")
-        
-        name = data.get('name')
-        template_configs = cls._normalize_template_configs(data)
-        
-        day_of_week_raw = data.get('day_of_week')
-        day_of_week_list = day_of_week_raw if isinstance(day_of_week_raw, list) else ([day_of_week_raw] if day_of_week_raw else [])
-        cascade = data.get('cascade', False)
-        
-        target_blocks = [block]
-        if cascade:
-            all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
-            all_blocks.sort(key=lambda b: b.start_date if b.start_date else date.max)
-            try:
-                idx = next(i for i, b in enumerate(all_blocks) if b.id == block_id)
-                target_blocks.extend(all_blocks[idx+1:])
-            except StopIteration: pass
 
-        created_count = 0
-        emitted_days = []
-        touched_days: List[ProgramDay] = []
-        
-        # Determine the date if provided
-        target_date = None
-        if data.get('date'):
-            dt_str = data.get('date')
-            if 'T' in dt_str: dt_str = dt_str.split('T')[0]
-            target_date = datetime.strptime(dt_str, '%Y-%m-%d').date()
-
-        for target in target_blocks:
-            # Check if a day with this date already exists in this block
-            day = None
-            if target_date:
-                day = session.query(ProgramDay).filter_by(block_id=target.id, date=target_date).first()
-                if day and create_only:
-                    raise ValueError("A program day already exists on this date")
-            
-            if not day:
-                count = session.query(ProgramDay).filter_by(block_id=target.id).count()
-                day = ProgramDay(
-                    id=str(uuid.uuid4()),
-                    block_id=target.id,
-                    date=target_date,
-                    day_number=count + 1,
-                    name=name,
-                    day_of_week=day_of_week_list,
-                    completion_min_templates=data.get('completion_min_templates'),
-                )
-                session.add(day)
-                session.flush()
-            else:
-                if name: day.name = name
-                day.day_of_week = day_of_week_list
-                if 'completion_min_templates' in data:
-                    day.completion_min_templates = data.get('completion_min_templates')
-            
-            if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
-                cls._apply_program_day_template_configs(session, day, template_configs)
-            cls._validate_program_day_completion_min(day)
-            # Explicit dates are bound to the origin block's range; cascades copy the
-            # definition (name, templates, weekdays) but never its dates.
-            if 'scheduled_dates' in data and target is block:
-                cls._sync_occurrence_schedules(
-                    day, block, data.get('scheduled_dates') or [], current_user_id,
-                )
-            
-            created_count += 1
-            touched_days.append(day)
-            emitted_days.append({
-                'day_id': day.id,
-                'day_name': day.name or f"Day {day.day_number}",
-                'block_id': target.id,
-                'program_id': program_id,
-                'root_id': root_id,
-            })
+        day_goal_ids = assert_day_goals_valid(
+            resolve_focus_scopes(session, root_id, program_id), data.get('goal_ids'),
+        ) if data.get('goal_ids') else []
+        last_number = session.query(func.max(ProgramDay.day_number)).filter(
+            ProgramDay.program_id == program_id,
+        ).scalar() or 0
+        day = ProgramDay(
+            id=str(uuid.uuid4()),
+            program_id=program_id,
+            day_number=last_number + 1,
+            name=data.get('name'),
+            notes=data.get('notes'),
+            day_of_week=cls._weekday_list(data.get('day_of_week')),
+            completion_min_templates=data.get('completion_min_templates'),
+        )
+        session.add(day)
+        session.flush()
+        if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
+            cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
+        cls._validate_program_day_completion_min(day)
+        cls._replace_day_goals(session, day, day_goal_ids, root_id)
+        if 'scheduled_dates' in data:
+            cls._sync_occurrence_schedules(day, program, data.get('scheduled_dates') or [], current_user_id)
 
         assert_single_program_day_per_date(session, program_id)
         cls._commit(session, commit=commit)
-        for event_payload in emitted_days:
-            cls._queue_or_emit_event(
-                pending_events,
-                Event(Events.PROGRAM_DAY_CREATED, event_payload, source='cls.add_block_day'),
-            )
-        return {
-            "days": [serialize_program_day(day) for day in touched_days],
-            "count": created_count,
-        }
+        cls._queue_or_emit_event(pending_events, Event(Events.PROGRAM_DAY_CREATED, {
+            'day_id': day.id,
+            'day_name': day.name or f"Day {day.day_number}",
+            'program_id': program_id,
+            'root_id': root_id,
+        }, source='cls.create_program_day'))
+        return serialize_program_day(day)
 
     @classmethod
-    def update_block_day(
-        cls, session, root_id: str, program_id: str, block_id: str, day_id: str,
+    def update_program_day(
+        cls, session, root_id: str, program_id: str, day_id: str,
         data: Dict, current_user_id: str | None = None, *, commit=True,
         pending_events=None,
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
-        syncs_schedule = 'scheduled_dates' in data
-        block = None
-        day_query = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id)
-        # Same program -> block -> day lock order as schedule_block_day; the program
-        # lock serializes every calendar write so the one-day-per-date check holds.
-        if not lock_program_calendar(session, program_id, root_id):
+        # Program -> day lock order; the program lock serializes every calendar
+        # write so the one-day-per-date check holds.
+        program = lock_program_calendar(session, program_id, root_id)
+        if not program:
             raise ValueError("Program not found")
-        if syncs_schedule:
-            block = session.query(ProgramBlock).filter_by(
-                id=block_id, program_id=program_id,
-            ).populate_existing().with_for_update().first()
-            if not block:
-                raise ValueError("Block not found")
-            day_query = day_query.populate_existing().with_for_update()
-        day = day_query.first()
-        if not day:
-             raise ValueError("Day not found")
-        
+        syncs_schedule = 'scheduled_dates' in data
+        day = cls._get_program_day(session, program_id, day_id, lock=syncs_schedule)
+
         if 'name' in data: day.name = data['name']
+        if 'notes' in data: day.notes = data['notes']
         if 'day_number' in data: day.day_number = data['day_number']
         if 'completion_min_templates' in data:
             day.completion_min_templates = data.get('completion_min_templates')
-        
-        if 'date' in data:
-            if data['date']:
-                try:
-                    dt_str = data['date']
-                    if 'T' in dt_str: dt_str = dt_str.split('T')[0]
-                    day.date = datetime.strptime(dt_str, '%Y-%m-%d').date()
-                except ValueError:
-                    raise ValueError("Invalid date format")
-            else:
-                day.date = None
-
         if 'day_of_week' in data:
-            dows = data['day_of_week']
-            if not isinstance(dows, list):
-                dows = [dows] if dows else []
-            day.day_of_week = dows
-
-        cascade = data.get('cascade', False)
-        
-        update_sessions = False
+            day.day_of_week = cls._weekday_list(data['day_of_week'])
         if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
-            update_sessions = True
-            template_configs = cls._normalize_template_configs(data)
-
-        if update_sessions:
-            cls._apply_program_day_template_configs(session, day, template_configs)
+            cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
         cls._validate_program_day_completion_min(day)
+
+        if 'goal_ids' in data:
+            day_goal_ids = assert_day_goals_valid(resolve_focus_scopes(session, root_id, program_id), data['goal_ids'])
+            cls._replace_day_goals(session, day, day_goal_ids, root_id)
 
         scheduled_dates_added: List[date] = []
         scheduled_dates_removed: List[date] = []
         if syncs_schedule:
             scheduled_dates_added, scheduled_dates_removed = cls._sync_occurrence_schedules(
-                day, block, data.get('scheduled_dates') or [], current_user_id,
+                day, program, data.get('scheduled_dates') or [], current_user_id,
             )
-        
-        if cascade:
-            all_blocks = session.query(ProgramBlock).filter_by(program_id=program_id).all()
-            all_blocks.sort(key=lambda b: b.start_date if b.start_date else date.max)
-            try:
-                idx = next(i for i, b in enumerate(all_blocks) if b.id == block_id)
-                targets = all_blocks[idx+1:]
-                
-                for target in targets:
-                    t_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=day.day_number).first()
-                    if t_day:
-                        if 'name' in data: t_day.name = data['name']
-                        if 'completion_min_templates' in data:
-                            t_day.completion_min_templates = data.get('completion_min_templates')
-                        if update_sessions:
-                            cls._apply_program_day_template_configs(session, t_day, template_configs)
-                        cls._validate_program_day_completion_min(t_day)
-            except StopIteration: pass
 
         assert_single_program_day_per_date(session, program_id)
         cls._commit(session, day, commit=commit)
 
-        event = Event(Events.PROGRAM_DAY_UPDATED, {
+        cls._queue_or_emit_event(pending_events, Event(Events.PROGRAM_DAY_UPDATED, {
             'day_id': day.id,
             'day_name': day.name,
-            'block_id': block_id,
             'program_id': program_id,
             'root_id': root_id,
             'updated_fields': list(data.keys()),
             'scheduled_dates_added': [value.isoformat() for value in scheduled_dates_added],
             'scheduled_dates_removed': [value.isoformat() for value in scheduled_dates_removed],
-        }, source='cls.update_block_day')
-        cls._queue_or_emit_event(pending_events, event)
-
+        }, source='cls.update_program_day'))
         return serialize_program_day(day)
 
     @classmethod
-    def delete_block_day(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, current_user_id: str | None = None):
+    def delete_program_day(cls, session, root_id: str, program_id: str, day_id: str, current_user_id: str | None = None):
         cls._require_root_access(session, root_id, current_user_id)
-        day = session.query(ProgramDay).filter_by(id=day_id, block_id=block_id).first()
-        if not day:
-            raise ValueError("Day not found")
-        
+        if not lock_program_calendar(session, program_id, root_id):
+            raise ValueError("Program not found")
+        day = cls._get_program_day(session, program_id, day_id)
+
         day_name = day.name # Capture before delete
         session.delete(day)
         cls._commit(session)
@@ -247,96 +186,59 @@ class _ProgramDaysMixin:
         event_bus.emit(Event(Events.PROGRAM_DAY_DELETED, {
             'day_id': day_id,
             'day_name': day_name,
-            'block_id': block_id,
             'program_id': program_id,
             'root_id': root_id
-        }, source='cls.delete_block_day'))
+        }, source='cls.delete_program_day'))
 
     @classmethod
-    def copy_block_day(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
+    def duplicate_program_day(cls, session, root_id: str, program_id: str, day_id: str, current_user_id: str | None = None) -> Dict[str, Any]:
+        """Copy a day's definition (templates, goals, notes) without its schedule.
+
+        The copy starts unscheduled, so it can never take a date from another day.
+        """
         cls._require_root_access(session, root_id, current_user_id)
         if not lock_program_calendar(session, program_id, root_id):
             raise ValueError("Program not found")
-        source_day = session.query(ProgramDay).filter_by(id=day_id).first()
-        if not source_day:
-            raise ValueError("Source day not found")
-        
-        target_mode = data.get('target_mode', 'all')
-        
-        query = session.query(ProgramBlock).filter_by(program_id=program_id)
-        if target_mode == 'all':
-             query = query.filter(ProgramBlock.id != block_id)
-        
-        target_blocks = query.all()
-        copied_count = 0
-        copied_days: List[ProgramDay] = []
-        
-        for target in target_blocks:
-             target_day = session.query(ProgramDay).filter_by(block_id=target.id, day_number=source_day.day_number).first()
-             
-             if not target_day:
-                  target_day = ProgramDay(
-                      id=str(uuid.uuid4()),
-                      block_id=target.id,
-                      day_number=source_day.day_number,
-                      name=source_day.name,
-                      date=None,
-                      day_of_week=source_day.day_of_week,
-                      completion_min_templates=source_day.completion_min_templates,
-                  )
-                  session.add(target_day)
-                  session.flush()
-             else:
-                  target_day.name = source_day.name
-                  target_day.day_of_week = source_day.day_of_week
-                  target_day.completion_min_templates = source_day.completion_min_templates
-             
-             source_configs = [
-                 {
-                     'template_id': link.session_template_id,
-                     'is_required': bool(link.is_required),
-                     'order': link.order or index,
-                 }
-                 for index, link in enumerate(source_day.template_links or [])
-             ] or [
-                 {'template_id': template.id, 'is_required': True, 'order': index}
-                 for index, template in enumerate(source_day.templates or [])
-             ]
-             cls._apply_program_day_template_configs(session, target_day, source_configs)
-             
-             copied_count += 1
-             copied_days.append(target_day)
-        
-        assert_single_program_day_per_date(session, program_id)
-        cls._commit(session)
-        return {
-            "days": [serialize_program_day(day) for day in copied_days],
-            "count": copied_count,
-        }
+        source_day = cls._get_program_day(session, program_id, day_id)
+        source_goal_ids = sorted(resolve_focus_scopes(session, root_id, program_id).day_seed_ids.get(str(source_day.id), ()))
+        last_number = session.query(func.max(ProgramDay.day_number)).filter(
+            ProgramDay.program_id == program_id,
+        ).scalar() or 0
+        copy = ProgramDay(
+            id=str(uuid.uuid4()),
+            program_id=program_id,
+            day_number=last_number + 1,
+            name=f"{source_day.name or 'Program day'} (copy)",
+            notes=source_day.notes,
+            day_of_week=[],
+            completion_min_templates=source_day.completion_min_templates,
+        )
+        session.add(copy)
+        session.flush()
+        cls._apply_program_day_template_configs(session, copy, cls._day_template_configs(source_day))
+        cls._replace_day_goals(session, copy, source_goal_ids, root_id)
+        cls._commit(session, copy)
+
+        event_bus.emit(Event(Events.PROGRAM_DAY_CREATED, {
+            'day_id': copy.id,
+            'day_name': copy.name,
+            'program_id': program_id,
+            'root_id': root_id,
+        }, source='cls.duplicate_program_day'))
+        return serialize_program_day(copy)
 
     @staticmethod
-    def _sync_occurrence_schedules(day, block, scheduled_dates, current_user_id=None):
+    def _sync_occurrence_schedules(day, program, scheduled_dates, current_user_id=None):
         """Make ``day``'s explicit occurrence dates exactly ``scheduled_dates``.
 
-        Specific dates are stored only as occurrence schedule rows, so saving them
-        also retires a legacy ``program_days.date`` in place: the day keeps its id,
-        and linked sessions, credits, and manual statuses stay attached. Removing a
-        date leaves its sessions intact; they simply stop counting as scheduled.
-        Returns the (added, removed) dates.
+        Dates must lie inside the program. Removing a date leaves its sessions
+        intact; they simply stop counting as scheduled. Returns the (added, removed) dates.
         """
         wanted = {
             value if isinstance(value, date) else date.fromisoformat(str(value)[:10])
             for value in scheduled_dates
         }
-        if wanted and (block.start_date is None or block.end_date is None):
-            raise ValueError("The block needs start and end dates before days can be scheduled on specific dates")
-        block_start, block_end = block.start_date, block.end_date
-        if isinstance(block_start, datetime):
-            block_start = block_start.date()
-        if isinstance(block_end, datetime):
-            block_end = block_end.date()
-        if any(value < block_start or value > block_end for value in wanted):
-            raise ValueError("Scheduled date must be within the selected block date range")
+        assert_dates_within_program(program, wanted)
 
         existing = {row.date: row for row in day.occurrence_schedules or []}
         removed = sorted(set(existing) - wanted)
@@ -347,20 +249,16 @@ class _ProgramDaysMixin:
             day.occurrence_schedules.append(ProgramDayOccurrenceSchedule(
                 date=value, created_by_user_id=current_user_id,
             ))
-        converted_legacy_date = day.date is not None
-        if converted_legacy_date:
-            day.date = None
-        if added or removed or converted_legacy_date:
+        if added or removed:
             day.row_version = (day.row_version or 1) + 1
         return added, removed
 
     @classmethod
-    def schedule_block_day(
+    def schedule_program_day(
         cls,
         session,
         root_id: str,
         program_id: str,
-        block_id: str,
         day_id: str,
         data: Dict,
         current_user_id: str | None = None,
@@ -370,37 +268,16 @@ class _ProgramDaysMixin:
     ) -> Dict:
         cls._require_root_access(session, root_id, current_user_id)
 
-        # Keep scheduling in the same lock order used by reviewed snapshots:
-        # program, block, day. Ordinary UI schedules advance the same row
-        # version used by agent proposals.
-        program = session.query(Program).filter_by(
-            id=program_id, root_id=root_id,
-        ).populate_existing().with_for_update().first()
+        # Program -> day lock order, shared with reviewed agent snapshots. Ordinary
+        # UI schedules advance the same row version used by agent proposals.
+        program = lock_program_calendar(session, program_id, root_id)
         if not program:
             raise ValueError("Program not found")
-
-        block = session.query(ProgramBlock).filter_by(
-            id=block_id, program_id=program_id,
-        ).populate_existing().with_for_update().first()
-        if not block:
-            raise ValueError("Block not found")
-
-        day = session.query(ProgramDay).filter_by(
-            id=day_id, block_id=block_id,
-        ).populate_existing().with_for_update().first()
-        if not day:
-            raise ValueError("Day not found")
+        day = cls._get_program_day(session, program_id, day_id, lock=True)
 
         scheduled_date = cls._resolve_schedule_date(data)
-        if (
-            block.start_date is not None and scheduled_date < block.start_date
-        ) or (
-            block.end_date is not None and scheduled_date > block.end_date
-        ):
-            raise ValueError("Scheduled date must be within the selected block date range")
-        if day.date is not None:
-            raise ValueError("Dated program days cannot be scheduled on another date")
-        if program_day_scheduled_on(day, block, scheduled_date):
+        assert_dates_within_program(program, [scheduled_date])
+        if program_day_scheduled_on(day, program, scheduled_date):
             raise ValueError("This program day already occurs on that date")
 
         schedule_row = ProgramDayOccurrenceSchedule(
@@ -413,23 +290,17 @@ class _ProgramDaysMixin:
         assert_single_program_day_per_date(session, program_id)
         cls._commit(session, day, commit=commit)
 
-        scheduled_event = Event(Events.PROGRAM_DAY_SCHEDULED, {
+        cls._queue_or_emit_event(pending_events, Event(Events.PROGRAM_DAY_SCHEDULED, {
             'day_id': day.id,
             'day_name': day.name,
-            'block_id': block_id,
             'program_id': program_id,
             'root_id': root_id,
             'scheduled_date': scheduled_date.isoformat(),
             'schedule_id': schedule_row.id,
-        }, source='cls.schedule_block_day')
-        if pending_events is None:
-            event_bus.emit(scheduled_event)
-        else:
-            pending_events.append(scheduled_event)
+        }, source='cls.schedule_program_day'))
         return {
             "id": schedule_row.id,
             "program_day_id": day.id,
-            "block_id": block_id,
             "program_id": program_id,
             "name": day.name,
             "date": scheduled_date.isoformat(),
@@ -454,26 +325,12 @@ class _ProgramDaysMixin:
         return normalized.date()
 
     @classmethod
-    def unschedule_block_day_occurrence(cls, session, root_id: str, program_id: str, block_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
+    def unschedule_program_day_occurrence(cls, session, root_id: str, program_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
 
-        program = session.query(Program).filter_by(
-            id=program_id, root_id=root_id,
-        ).populate_existing().with_for_update().first()
-        if not program:
+        if not lock_program_calendar(session, program_id, root_id):
             raise ValueError("Program not found")
-
-        block = session.query(ProgramBlock).filter_by(
-            id=block_id, program_id=program_id,
-        ).populate_existing().with_for_update().first()
-        if not block:
-            raise ValueError("Block not found")
-
-        day = session.query(ProgramDay).filter_by(
-            id=day_id, block_id=block_id,
-        ).populate_existing().with_for_update().first()
-        if not day:
-            raise ValueError("Day not found")
+        day = cls._get_program_day(session, program_id, day_id, lock=True)
 
         target_date = cls._parse_required_date(data.get('date'), 'date')
         timezone_name = data.get('timezone') or 'UTC'
@@ -522,20 +379,19 @@ class _ProgramDaysMixin:
                 'session_id': session_id,
                 'session_name': removed_session_names.get(session_id),
                 'root_id': root_id
-            }, source='cls.unschedule_block_day_occurrence'))
+            }, source='cls.unschedule_program_day_occurrence'))
 
         if changed:
             event_bus.emit(Event(Events.PROGRAM_DAY_UNSCHEDULED, {
                 'day_id': day.id,
                 'day_name': day.name,
-                'block_id': block_id,
                 'program_id': program_id,
                 'root_id': root_id,
                 'date': target_date.isoformat(),
                 'removed_schedule_count': len(schedule_rows),
                 'removed_session_ids': removed_session_ids,
                 'removed_count': len(removed_session_ids),
-            }, source='cls.unschedule_block_day_occurrence'))
+            }, source='cls.unschedule_program_day_occurrence'))
 
         return {
             "day": serialize_program_day(day),
@@ -601,11 +457,9 @@ class _ProgramDaysMixin:
         
         from sqlalchemy.orm import selectinload
         active_programs = session.query(Program).options(
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
-                .selectinload(ProgramDay.templates),
-            selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
+            selectinload(Program.blocks),
+            selectinload(Program.days).selectinload(ProgramDay.templates),
+            selectinload(Program.days)
                 .selectinload(ProgramDay.template_links)
                 .selectinload(ProgramDayTemplate.template)
         ).filter(
@@ -644,65 +498,61 @@ class _ProgramDaysMixin:
         
         for program in active_programs:
             program_scope = scopes.get(program.id)
-            for block in program.blocks:
-                if block.start_date and block.end_date:
-                    if block.start_date <= today <= block.end_date:
-                        for day in block.days:
-                            if day.templates and cls._program_day_scheduled_on(day, block, today):
-                                session_details = []
-                                template_rules = {
-                                    link.session_template_id: {
-                                        "is_required": bool(link.is_required),
-                                        "order": link.order or 0,
-                                    }
-                                    for link in (day.template_links or [])
-                                }
-                                for index, template in enumerate(day.templates):
-                                    template_rule = template_rules.get(template.id, {})
-                                    template_data = _safe_load_json(template.template_data, {})
-                                    session_details.append({
-                                        "template_id": template.id,
-                                        "template_name": template.name,
-                                        "template_description": template.description,
-                                        "template_data": template_data,
-                                        "template_color": get_template_color(template_data),
-                                        "is_archived": bool(getattr(template, "archived_at", None)),
-                                        "archived_at": format_utc(getattr(template, "archived_at", None)),
-                                        "is_used_in_active_program": True,
-                                        "is_effectively_active": True,
-                                        "is_required": template_rule.get("is_required", True),
-                                        "order": template_rule.get("order", index),
-                                    })
-                                
-                                occurrence_credits = credits_by_occurrence.get((day.id, today), [])
-                                evaluation = evaluate_occurrence(day, occurrence_credits)
-                                result.append({
-                                    "program_id": program.id,
-                                    "program_name": program.name,
-                                    "program_color": program.color,
-                                    "block_id": block.id,
-                                    "block_name": block.name,
-                                    "block_color": block.color,
-                                    "program_goal_ids": [g.id for g in program.goals],
-                                    "scope_seed_goal_ids": sorted(getattr(program_scope, "seed_goal_ids", ()) or ()),
-                                    "scope_goal_ids": sorted(getattr(program_scope, "goal_ids", ()) or ()),
-                                    "block_goal_ids": [g.id for g in block.goals],
-                                    "day_id": day.id,
-                                    "day_name": day.name,
-                                    "day_number": day.day_number,
-                                    "day_date": format_utc(day.date),
-                                    "manual_status": manual_status_by_program.get(program.id),
-                                    "time_off": {
-                                        "id": protecting_period.id,
-                                        "name": protecting_period.name,
-                                        "kind": protecting_period.kind,
-                                    } if protecting_period else None,
-                                    "completion_min_templates": day.completion_min_templates,
-                                    "sessions": session_details,
-                                    "completed_session_count": len({
-                                        entry["session"].id for entry in occurrence_credits
-                                        if entry["session"].completed
-                                    }),
-                                    "completed_template_ids": evaluation["completed_template_ids"],
-                                })
+            block = block_for_date(program, today)
+            for day in program.days:
+                if day.templates and cls._program_day_scheduled_on(day, program, today):
+                    session_details = []
+                    template_rules = {
+                        link.session_template_id: {
+                            "is_required": bool(link.is_required),
+                            "order": link.order or 0,
+                        }
+                        for link in (day.template_links or [])
+                    }
+                    for index, template in enumerate(day.templates):
+                        template_rule = template_rules.get(template.id, {})
+                        template_data = _safe_load_json(template.template_data, {})
+                        session_details.append({
+                            "template_id": template.id,
+                            "template_name": template.name,
+                            "template_description": template.description,
+                            "template_data": template_data,
+                            "template_color": get_template_color(template_data),
+                            "is_archived": bool(getattr(template, "archived_at", None)),
+                            "archived_at": format_utc(getattr(template, "archived_at", None)),
+                            "is_used_in_active_program": True,
+                            "is_effectively_active": True,
+                            "is_required": template_rule.get("is_required", True),
+                            "order": template_rule.get("order", index),
+                        })
+
+                    occurrence_credits = credits_by_occurrence.get((day.id, today), [])
+                    evaluation = evaluate_occurrence(day, occurrence_credits)
+                    result.append({
+                        "program_id": program.id,
+                        "program_name": program.name,
+                        "program_color": program.color,
+                        "block_id": block.id if block else None,
+                        "block_name": block.name if block else None,
+                        "block_color": block.color if block else None,
+                        "program_goal_ids": [g.id for g in program.goals],
+                        "scope_seed_goal_ids": sorted(getattr(program_scope, "seed_goal_ids", ()) or ()),
+                        "scope_goal_ids": sorted(getattr(program_scope, "goal_ids", ()) or ()),
+                        "day_id": day.id,
+                        "day_name": day.name,
+                        "day_number": day.day_number,
+                        "manual_status": manual_status_by_program.get(program.id),
+                        "time_off": {
+                            "id": protecting_period.id,
+                            "name": protecting_period.name,
+                            "kind": protecting_period.kind,
+                        } if protecting_period else None,
+                        "completion_min_templates": day.completion_min_templates,
+                        "sessions": session_details,
+                        "completed_session_count": len({
+                            entry["session"].id for entry in occurrence_credits
+                            if entry["session"].completed
+                        }),
+                        "completed_template_ids": evaluation["completed_template_ids"],
+                    })
         return result

@@ -6,7 +6,6 @@ import { useActivityGroups, useActivities } from '../../hooks/useActivityQueries
 import { useSessionTemplates } from '../../hooks/useSessionTemplateQueries';
 import { useCircuits, useCreateCircuitDefinition } from '../../hooks/useCircuitQueries';
 import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
-import { getProgramDaySpecificDates, getProgramDayWeekdays } from '../../utils/programViewModel';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
@@ -23,57 +22,18 @@ import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import { buildTemplateActivityCatalogue } from './templateBuilderItems';
 import ProgramDayScheduleField, { SCHEDULE_MODES } from './ProgramDayScheduleField';
+import FocusGoalsField from '../programs/FocusGoalsField';
+import { focusError, goalsInScope } from '../../utils/programFocus';
 import {
     calendarConflictMessage,
     findDraftDayConflicts,
-    occupiedBlockDates,
+    occupiedProgramDates,
     takenWeekdays,
 } from '../../utils/programCalendarConflicts';
 
-function parseLegacyWeekdays(dayOfWeek) {
-    if (typeof dayOfWeek !== 'string' || !dayOfWeek.trim().startsWith('[')) return dayOfWeek;
-    try {
-        return JSON.parse(dayOfWeek);
-    } catch {
-        return dayOfWeek;
-    }
-}
+import { buildInitialProgramDayState } from './programDayModalState';
 
-function buildInitialProgramDayState(initialData) {
-    const selectedTemplates = initialData?.templates
-        ? initialData.templates.map((template, index) => ({
-            templateId: template.id,
-            isRequired: template.is_required !== false,
-            order: template.order ?? index,
-        }))
-        : (initialData?.sessions || []).map((session, index) => ({
-            templateId: session.session_template_id,
-            isRequired: true,
-            order: index,
-        })).filter((entry) => Boolean(entry.templateId));
-
-    const selectedDaysOfWeek = getProgramDayWeekdays({
-        day_of_week: parseLegacyWeekdays(initialData?.day_of_week),
-    });
-    const specificDates = getProgramDaySpecificDates(initialData);
-
-    return {
-        name: initialData?.name || '',
-        selectedTemplates,
-        selectedDaysOfWeek,
-        specificDates,
-        // A day with dates and no weekdays (including a legacy fixed-date day and a
-        // new day opened from a calendar date) edits as a specific-dates day.
-        scheduleMode: specificDates.length && !selectedDaysOfWeek.length
-            ? SCHEDULE_MODES.dates
-            : SCHEDULE_MODES.weekly,
-        completionMinTemplates: initialData?.completion_min_templates || '',
-        copyStatus: '',
-        copyMode: 'all',
-    };
-}
-
-const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block, initialData }) => {
+const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, program, initialData, goals = [], focusScope = null }) => {
     const queryClient = useQueryClient();
     const initialState = buildInitialProgramDayState(initialData);
     const [name, setName] = useState(initialState.name);
@@ -83,25 +43,26 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
     const [specificDates, setSpecificDates] = useState(initialState.specificDates);
 
     const [completionMinTemplates, setCompletionMinTemplates] = useState(initialState.completionMinTemplates);
-    const [copyStatus, setCopyStatus] = useState(initialState.copyStatus);
-    const [copyMode] = useState(initialState.copyMode);
+    const [goalIds, setGoalIds] = useState(initialState.goalIds);
+    const focusGoals = focusScope ? goalsInScope(goals, focusScope) : goals;
+    const [isDuplicating, setIsDuplicating] = useState(false);
 
     // Template builder modal state
     const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const isEdit = Boolean(initialData?.id);
-    const blockStart = getDatePart(block?.start_date) || '';
-    const blockEnd = getDatePart(block?.end_date) || '';
+    const programStart = getDatePart(program?.start_date) || '';
+    const programEnd = getDatePart(program?.end_date) || '';
     const isDatesMode = scheduleMode === SCHEDULE_MODES.dates;
     const [serverError, setServerError] = useState('');
-    // A date holds one program day: show which dates the block's other days already hold.
+    // A date holds one program day: show which dates the program's other days already hold.
     const occupiedDates = useMemo(
-        () => occupiedBlockDates(block, { excludeDayId: initialData?.id }),
-        [block, initialData?.id],
+        () => occupiedProgramDates(program, { excludeDayId: initialData?.id }),
+        [program, initialData?.id],
     );
     const weekdayOwners = useMemo(() => takenWeekdays(occupiedDates), [occupiedDates]);
-    const [firstConflict] = findDraftDayConflicts(block, occupiedDates, {
+    const [firstConflict] = findDraftDayConflicts(program, occupiedDates, {
         weekdays: isDatesMode ? [] : selectedDaysOfWeek,
         dates: specificDates,
     });
@@ -164,15 +125,15 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                 name,
                 template_ids: templateConfigs.map((entry) => entry.template_id),
                 template_configs: templateConfigs,
-                // Specific dates are always explicit schedule rows; the legacy
-                // fixed `date` is never written and converts server-side on save.
+                // Weekdays repeat across the whole program; specific dates are explicit rows.
                 day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
                 scheduled_dates: specificDates,
                 completion_min_templates: parsedMinTemplates,
+                goal_ids: goalIds,
             });
         } catch (error) {
             // Other failures are already reported by a toast; the modal stays open.
-            setServerError(calendarConflictMessage(error) || '');
+            setServerError(calendarConflictMessage(error) || focusError(error)?.message || '');
         }
     };
 
@@ -190,14 +151,18 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
         setSpecificDates((current) => current.filter((entry) => entry !== value));
     };
 
-    const handleCopy = async () => {
-        if (!onCopy) return;
-        setCopyStatus('Copying...');
+    // The copy keeps templates, goals and notes but starts unscheduled, so it never
+    // takes a date from this day.
+    const handleDuplicate = async () => {
+        if (!onDuplicate || isDuplicating) return;
+        setIsDuplicating(true);
         try {
-            await onCopy(initialData.id, { target_mode: copyMode });
-            setCopyStatus('Copied!');
+            await onDuplicate(initialData.id);
+            onClose();
         } catch {
-            setCopyStatus('Error');
+            // The failure is reported by a toast; the modal stays open.
+        } finally {
+            setIsDuplicating(false);
         }
     };
 
@@ -264,7 +229,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
             <Modal
                 isOpen={true}
                 onClose={onClose}
-                title={isEdit ? 'Edit Program Day' : 'Add Program Day'}
+                title={isEdit ? 'Edit Program Day' : 'New Program Day'}
                 size="md"
             >
                 <ModalBody>
@@ -277,6 +242,17 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                             fullWidth
                         />
 
+                        <FocusGoalsField
+                            label="Day goals"
+                            goals={focusGoals}
+                            selectedGoalIds={goalIds}
+                            onChange={setGoalIds}
+                            required={false}
+                            pickerTitle="Select the goals this day serves"
+                            emptyMessage="Add goals to the program to focus its days."
+                            hint="Optional. Sessions started from this day are scoped to these goals, otherwise to the program's goals."
+                        />
+
                         <ProgramDayScheduleField
                             mode={scheduleMode}
                             onModeChange={setScheduleMode}
@@ -285,8 +261,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                             dates={specificDates}
                             onAddDate={handleAddDate}
                             onRemoveDate={handleRemoveDate}
-                            minDate={blockStart}
-                            maxDate={blockEnd}
+                            minDate={programStart}
+                            maxDate={programEnd}
                             takenWeekdays={weekdayOwners}
                             occupiedDates={occupiedDates}
                         />
@@ -380,16 +356,20 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                             )}
                         </div>
 
-                        {isEdit && (
+                        {isEdit && onDuplicate && (
                             <div className={styles.copyArea}>
                                 <Button
                                     variant="secondary"
                                     size="sm"
-                                    onClick={handleCopy}
+                                    onClick={handleDuplicate}
+                                    isLoading={isDuplicating}
                                     fullWidth
                                 >
-                                    {copyStatus || 'Copy to Other Blocks'}
+                                    Duplicate day
                                 </Button>
+                                <div className={styles.hint}>
+                                    Makes an unscheduled copy with the same sessions and goals.
+                                </div>
                             </div>
                         )}
                     </div>
@@ -417,7 +397,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
                             disabled={Boolean(saveBlockedReason)}
                             aria-describedby={saveBlockedReason ? 'program-day-save-blocked' : undefined}
                         >
-                            {isEdit ? 'Save Changes' : 'Add Day'}
+                            {isEdit ? 'Save Changes' : 'Create Day'}
                         </Button>
                     </div>
                 </ModalFooter>
@@ -446,22 +426,24 @@ const ProgramDayModalInner = ({ onClose, onSave, onCopy, onDelete, rootId, block
     );
 };
 
-const ProgramDayModal = ({ isOpen, onClose, onSave, onCopy, onDelete, rootId, blockId, block = null, initialData }) => {
+const ProgramDayModal = ({ isOpen, onClose, onSave, onDuplicate, onDelete, rootId, program = null, initialData, goals = [], focusScope = null }) => {
     if (!isOpen) {
         return null;
     }
 
-    const modalKey = initialData?.id || `new-day:${blockId || 'no-block'}`;
+    const modalKey = initialData?.id || `new-day:${(initialData?.scheduled_dates || []).join(',') || 'blank'}`;
     return (
         <ProgramDayModalInner
             key={modalKey}
             onClose={onClose}
             onSave={onSave}
-            onCopy={onCopy}
+            onDuplicate={onDuplicate}
             onDelete={onDelete}
             rootId={rootId}
-            block={block}
+            program={program}
             initialData={initialData}
+            goals={goals}
+            focusScope={focusScope}
         />
     );
 };

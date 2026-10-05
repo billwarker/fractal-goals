@@ -20,7 +20,6 @@ from sqlalchemy.orm import joinedload, selectinload
 import models
 from models import (
     Program,
-    ProgramBlock,
     ProgramDay,
     ProgramDayTemplate,
     ProgramSessionPlan,
@@ -81,7 +80,7 @@ def _handles_plan_errors(method):
 class _PlanTarget:
     """The locked program day, template rule, date, and stored plan (if any) a write acts on."""
     day: ProgramDay
-    block: ProgramBlock
+    program: Program
     rule: dict
     plan_date: date
     stored: ProgramSessionPlan | None
@@ -157,10 +156,9 @@ class ProgramSessionPlanService:
             raise PlanRequestError("Fractal not found or access denied", 404)
         query = (
             self.db_session.query(ProgramDay)
-            .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
-            .join(Program, Program.id == ProgramBlock.program_id)
+            .join(Program, Program.id == ProgramDay.program_id)
             .options(
-                joinedload(ProgramDay.block).joinedload(ProgramBlock.program),
+                joinedload(ProgramDay.program),
                 selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
             )
             .filter(
@@ -174,14 +172,14 @@ class ProgramSessionPlanService:
         day = query.first()
         if day is None:
             raise PlanRequestError("Program day not found", 404)
-        return day, day.block
+        return day, day.program
 
-    def _occurrence_date(self, day, block, raw_date):
+    def _occurrence_date(self, day, program, raw_date):
         try:
             plan_date = _parse_date(raw_date)
         except ValueError as exc:
             raise PlanRequestError(str(exc), 400)
-        if not program_day_scheduled_on(day, block, plan_date):
+        if not program_day_scheduled_on(day, program, plan_date):
             raise PlanRequestError('This program day does not occur on that date', 404)
         return plan_date
 
@@ -202,7 +200,7 @@ class ProgramSessionPlanService:
             query = query.with_for_update()
         return query.first()
 
-    def _previous_plan(self, day, block, template_id, plan_date):
+    def _previous_plan(self, day, program, template_id, plan_date):
         """Latest earlier plan whose date is still an occurrence (dormant plans never seed)."""
         candidates = (
             self.db_session.query(ProgramSessionPlan)
@@ -217,7 +215,7 @@ class ProgramSessionPlanService:
             .all()
         )
         return next(
-            (plan for plan in candidates if program_day_scheduled_on(day, block, date_part(plan.date))),
+            (plan for plan in candidates if program_day_scheduled_on(day, program, date_part(plan.date))),
             None,
         )
 
@@ -242,9 +240,9 @@ class ProgramSessionPlanService:
             })
         return executed
 
-    def _resolve(self, day, block, template, plan_date, *, stored=None):
+    def _resolve(self, day, program, template, plan_date, *, stored=None):
         """The effective plan state for one template occurrence, stored or virtual."""
-        previous = self._previous_plan(day, block, template.id, plan_date)
+        previous = self._previous_plan(day, program, template.id, plan_date)
         if stored is not None:
             source = SOURCE_PLAN
             sections = _plan_sections(stored)
@@ -302,8 +300,7 @@ class ProgramSessionPlanService:
         program = (
             self.db_session.query(Program)
             .options(
-                selectinload(Program.blocks)
-                .selectinload(ProgramBlock.days)
+                selectinload(Program.days)
                 .selectinload(ProgramDay.template_links)
                 .joinedload(ProgramDayTemplate.template),
             )
@@ -343,13 +340,12 @@ class ProgramSessionPlanService:
             return {'program_id': program.id, 'days': []}, None, 200
 
         dated_days = []
-        for block in program.blocks or []:
-            for day in block.days or []:
-                rules = get_program_day_template_rules(day)
-                if not rules:
-                    continue
-                dates = [value for value in iter_dates(start, end) if program_day_scheduled_on(day, block, value)]
-                dated_days.append((day, rules, dates))
+        for day in program.days or []:
+            rules = get_program_day_template_rules(day)
+            if not rules:
+                continue
+            dates = [value for value in iter_dates(start, end) if program_day_scheduled_on(day, program, value)]
+            dated_days.append((day, rules, dates))
         day_ids = [day.id for day, _, _ in dated_days]
         plans = self.db_session.query(ProgramSessionPlan).filter(
             ProgramSessionPlan.program_day_id.in_(day_ids),
@@ -389,14 +385,14 @@ class ProgramSessionPlanService:
         )["facts"]
         return {fact["date"]: fact for fact in facts}
 
-    def _logged_sessions_by_template(self, root_id, owner_id, block, day, plan_date, zone):
+    def _logged_sessions_by_template(self, root_id, owner_id, program, day, plan_date, zone):
         """Sessions credited to this occurrence, grouped by the template they count as.
 
         The Days tab shows these sessions (as on the Sessions page) in place of the plan.
         """
         if plan_date > datetime.now(zone).date():
             return {}
-        facts_by_date = self._facts_by_date(root_id, owner_id, block.program, plan_date, plan_date, zone)
+        facts_by_date = self._facts_by_date(root_id, owner_id, program, plan_date, plan_date, zone)
         row = _day_row(facts_by_date.get(plan_date), day)
         if row is None:
             return {}
@@ -412,12 +408,12 @@ class ProgramSessionPlanService:
 
     @_handles_plan_errors
     def get_day_plans(self, root_id, owner_id, program_id, day_id, raw_date, timezone_name=None):
-        day, block = self._load_day(root_id, owner_id, program_id, day_id)
-        plan_date = self._occurrence_date(day, block, raw_date)
+        day, program = self._load_day(root_id, owner_id, program_id, day_id)
+        plan_date = self._occurrence_date(day, program, raw_date)
         zone = resolve_timezone(timezone_name)
         if zone is None:
             raise PlanRequestError('Invalid timezone', 400)
-        logged_by_template = self._logged_sessions_by_template(root_id, owner_id, block, day, plan_date, zone)
+        logged_by_template = self._logged_sessions_by_template(root_id, owner_id, program, day, plan_date, zone)
 
         rules = get_program_day_template_rules(day)
         stored_by_template = {
@@ -433,7 +429,7 @@ class ProgramSessionPlanService:
         for rule in rules:
             template = rule['template']
             stored = stored_by_template.get(template.id)
-            resolved = self._resolve(day, block, template, plan_date, stored=stored)
+            resolved = self._resolve(day, program, template, plan_date, stored=stored)
             entry = self._serialize(
                 template, rule, plan_date, resolved, executed.get(stored.id, []) if stored else [],
             )
@@ -442,7 +438,7 @@ class ProgramSessionPlanService:
             plans.append(entry)
         return {
             'date': plan_date.isoformat(),
-            'program_day': {'id': day.id, 'name': day.name, 'block_id': block.id},
+            'program_day': {'id': day.id, 'name': day.name, 'program_id': program.id},
             'plans': plans,
         }, None, 200
 
@@ -466,12 +462,12 @@ class ProgramSessionPlanService:
             raise ValueError(f'A plan can have at most {MAX_PLAN_ITEMS} items')
         check_section_prescriptions(self.db_session, root_id, sections)
 
-    def _materialize(self, day, block, template, plan_date, sections, current_user_id, *, resolved):
+    def _materialize(self, day, program, template, plan_date, sections, current_user_id, *, resolved):
         """Stage a new stored plan; the caller owns the transaction."""
         previous = resolved['previous']
         plan = ProgramSessionPlan(
-            root_id=block.program.root_id,
-            program_id=block.program_id,
+            root_id=program.root_id,
+            program_id=program.id,
             program_day_id=day.id,
             session_template_id=template.id,
             date=plan_date,
@@ -489,8 +485,8 @@ class ProgramSessionPlanService:
         zone = resolve_timezone(timezone_name)
         if zone is None:
             raise PlanRequestError('Invalid timezone', 400)
-        day, block = self._load_day(root_id, owner_id, program_id, day_id, for_update=True)
-        plan_date = self._occurrence_date(day, block, raw_date)
+        day, program = self._load_day(root_id, owner_id, program_id, day_id, for_update=True)
+        plan_date = self._occurrence_date(day, program, raw_date)
         # Plans program what is still ahead; a past program day keeps the plan it had.
         if plan_date < datetime.now(zone).date():
             raise PlanRequestError("Past program days can't be re-planned", 409)
@@ -498,7 +494,7 @@ class ProgramSessionPlanService:
         if not rule:
             raise PlanRequestError('That template is not part of this program day', 404)
         stored = self._stored_plan(day.id, template_id, plan_date, for_update=True)
-        return _PlanTarget(day=day, block=block, rule=rule, plan_date=plan_date, stored=stored)
+        return _PlanTarget(day=day, program=program, rule=rule, plan_date=plan_date, stored=stored)
 
     def _conflict(self):
         self.db_session.rollback()
@@ -507,7 +503,7 @@ class ProgramSessionPlanService:
     @_handles_plan_errors
     def save_plan(self, root_id, owner_id, program_id, day_id, template_id, raw_date, data, timezone_name=None):
         target = self._load_for_write(root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name)
-        day, block, rule, plan_date, stored = target.day, target.block, target.rule, target.plan_date, target.stored
+        day, program, rule, plan_date, stored = target.day, target.program, target.rule, target.plan_date, target.stored
         template = rule['template']
         expected_version = data.get('row_version')
         if stored is not None and expected_version != stored.row_version:
@@ -516,7 +512,7 @@ class ProgramSessionPlanService:
             # The plan this edit started from was reset or never existed.
             return self._conflict()
 
-        resolved = self._resolve(day, block, template, plan_date, stored=stored)
+        resolved = self._resolve(day, program, template, plan_date, stored=stored)
         sections = copy.deepcopy(data.get('sections'))
         try:
             self._validate_sections(root_id, sections, _section_names(resolved['sections']))
@@ -533,7 +529,7 @@ class ProgramSessionPlanService:
             return None, storage_error, storage_status
 
         if stored is None:
-            stored = self._materialize(day, block, template, plan_date, sections, owner_id, resolved=resolved)
+            stored = self._materialize(day, program, template, plan_date, sections, owner_id, resolved=resolved)
         else:
             stored.plan_data = {'sections': sections}
         try:
@@ -542,21 +538,21 @@ class ProgramSessionPlanService:
             # Another request materialized the same occurrence first.
             return self._conflict()
         self._emit(Events.PROGRAM_SESSION_PLAN_SAVED, root_id, stored, template)
-        return self._reload_entry(day, block, rule, plan_date, stored)
+        return self._reload_entry(day, program, rule, plan_date, stored)
 
     @_handles_plan_errors
     def load_plan(self, root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name=None):
         """Load an optional template into one date by storing its seeded plan (idempotent)."""
         target = self._load_for_write(root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name)
-        day, block, rule, plan_date, stored = target.day, target.block, target.rule, target.plan_date, target.stored
+        day, program, rule, plan_date, stored = target.day, target.program, target.rule, target.plan_date, target.stored
         if rule['is_required']:
             raise PlanRequestError('Required templates are already part of this program day', 400)
         if stored is not None:
             self.db_session.rollback()
-            return self._reload_entry(day, block, rule, plan_date, stored)
+            return self._reload_entry(day, program, rule, plan_date, stored)
 
         template = rule['template']
-        resolved = self._resolve(day, block, template, plan_date)
+        resolved = self._resolve(day, program, template, plan_date)
         sections = copy.deepcopy(resolved['sections'])
         quota = QuotaService(self.db_session)
         _, storage_error, storage_status = quota.check_storage_available(
@@ -566,7 +562,7 @@ class ProgramSessionPlanService:
             self.db_session.rollback()
             return None, storage_error, storage_status
 
-        stored = self._materialize(day, block, template, plan_date, sections, owner_id, resolved=resolved)
+        stored = self._materialize(day, program, template, plan_date, sections, owner_id, resolved=resolved)
         try:
             self.db_session.commit()
         except IntegrityError:
@@ -575,9 +571,9 @@ class ProgramSessionPlanService:
             stored = self._stored_plan(day.id, template.id, plan_date)
             if stored is None:
                 return self._conflict()
-            return self._reload_entry(day, block, rule, plan_date, stored)
+            return self._reload_entry(day, program, rule, plan_date, stored)
         self._emit(Events.PROGRAM_SESSION_PLAN_SAVED, root_id, stored, template)
-        entry, error, _ = self._reload_entry(day, block, rule, plan_date, stored)
+        entry, error, _ = self._reload_entry(day, program, rule, plan_date, stored)
         return entry, error, 201
 
     @_handles_plan_errors
@@ -589,16 +585,16 @@ class ProgramSessionPlanService:
             self._emit(Events.PROGRAM_SESSION_PLAN_RESET, root_id, target.stored, target.rule['template'])
         else:
             self.db_session.rollback()
-        return self._reload_entry(target.day, target.block, target.rule, target.plan_date, None)
+        return self._reload_entry(target.day, target.program, target.rule, target.plan_date, None)
 
     @_handles_plan_errors
     def pull_template_changes(self, root_id, owner_id, program_id, day_id, template_id, raw_date, data, timezone_name=None):
         target = self._load_for_write(root_id, owner_id, program_id, day_id, template_id, raw_date, timezone_name)
-        day, block, rule, plan_date, stored = target.day, target.block, target.rule, target.plan_date, target.stored
+        day, program, rule, plan_date, stored = target.day, target.program, target.rule, target.plan_date, target.stored
         if stored is not None and data.get('row_version') != stored.row_version:
             return self._conflict()
         template = rule['template']
-        resolved = self._resolve(day, block, template, plan_date, stored=stored)
+        resolved = self._resolve(day, program, template, plan_date, stored=stored)
         merged = merge_template_changes(resolved['sections'], typed_template_sections(template))
         try:
             seen_item_keys = set()
@@ -612,7 +608,7 @@ class ProgramSessionPlanService:
             return None, str(exc), 400
 
         if stored is None:
-            stored = self._materialize(day, block, template, plan_date, merged, owner_id, resolved=resolved)
+            stored = self._materialize(day, program, template, plan_date, merged, owner_id, resolved=resolved)
         else:
             stored.plan_data = {'sections': merged}
         stored.source_template_revision = template.revision or 1  # pyright: ignore[reportAttributeAccessIssue] - legacy Column typing
@@ -621,7 +617,7 @@ class ProgramSessionPlanService:
         except IntegrityError:
             return self._conflict()
         self._emit(Events.PROGRAM_SESSION_PLAN_SAVED, root_id, stored, template)
-        return self._reload_entry(day, block, rule, plan_date, stored)
+        return self._reload_entry(day, program, rule, plan_date, stored)
 
     def _drop_invalid_prescriptions(self, root_id, sections):
         for section in sections:
@@ -633,9 +629,9 @@ class ProgramSessionPlanService:
                 except ValueError:
                     item.pop('prescription', None)
 
-    def _reload_entry(self, day, block, rule, plan_date, stored):
+    def _reload_entry(self, day, program, rule, plan_date, stored):
         template = rule['template']
-        resolved = self._resolve(day, block, template, plan_date, stored=stored)
+        resolved = self._resolve(day, program, template, plan_date, stored=stored)
         executed = self._executed_sessions([stored.id]) if stored else {}
         return self._serialize(
             template, rule, plan_date, resolved, executed.get(stored.id, []) if stored else [],
@@ -678,9 +674,8 @@ class ProgramSessionPlanService:
         days = (
             self.db_session.query(ProgramDay)
             .join(ProgramDayTemplate, ProgramDayTemplate.program_day_id == ProgramDay.id)
-            .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
-            .join(Program, Program.id == ProgramBlock.program_id)
-            .options(joinedload(ProgramDay.block).joinedload(ProgramBlock.program))
+            .join(Program, Program.id == ProgramDay.program_id)
+            .options(joinedload(ProgramDay.program))
             .filter(
                 Program.root_id == root_id,
                 ProgramDayTemplate.session_template_id == template_id,
@@ -689,7 +684,7 @@ class ProgramSessionPlanService:
         )
         today = []
         for day in days:
-            if program_day_scheduled_on(day, day.block, target_date):
+            if program_day_scheduled_on(day, day.program, target_date):
                 today.append((day, target_date, self._stored_plan(day.id, template_id, target_date)))
 
         lookback_start = target_date - timedelta(days=CANDIDATE_LOOKBACK_DAYS)
@@ -697,8 +692,7 @@ class ProgramSessionPlanService:
             self.db_session.query(ProgramSessionPlan)
             .options(
                 joinedload(ProgramSessionPlan.program_day)
-                .joinedload(ProgramDay.block)
-                .joinedload(ProgramBlock.program)
+                .joinedload(ProgramDay.program)
             )
             .filter(
                 ProgramSessionPlan.root_id == root_id,
@@ -720,14 +714,14 @@ class ProgramSessionPlanService:
         for plan in earlier:
             day = plan.program_day
             plan_date = date_part(plan.date)
-            if executed.get(plan.id) or not program_day_scheduled_on(day, day.block, plan_date):
+            if executed.get(plan.id) or not program_day_scheduled_on(day, day.program, plan_date):
                 continue
             candidates.append(self._candidate(day, plan_date, plan, is_today=False, executed=False))
         return {'template_id': template_id, 'date': target_date.isoformat(), 'candidates': candidates}, None, 200
 
     @staticmethod
     def _candidate(day, plan_date, stored, *, is_today, executed):
-        program = day.block.program
+        program = day.program
         return {
             'plan_id': stored.id if stored else None,
             'program_id': program.id,
@@ -762,28 +756,27 @@ class ProgramSessionPlanService:
         plan_date = _parse_date(ref.get('date'))
         day = (
             self.db_session.query(ProgramDay)
-            .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
-            .join(Program, Program.id == ProgramBlock.program_id)
+            .join(Program, Program.id == ProgramDay.program_id)
             .options(
-                joinedload(ProgramDay.block).joinedload(ProgramBlock.program),
+                joinedload(ProgramDay.program),
                 selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
             )
             .filter(ProgramDay.id == day_id, Program.root_id == root_id)
             .first()
         )
-        if not day or not program_day_scheduled_on(day, day.block, plan_date):
+        if not day or not program_day_scheduled_on(day, day.program, plan_date):
             raise ValueError('That program day does not occur on the planned date')
         if not self._template_rule(day, template.id):
             raise ValueError('That template is not part of this program day')
         stored = self._stored_plan(day.id, template.id, plan_date)
         if stored:
             return stored
-        resolved = self._resolve(day, day.block, template, plan_date)
+        resolved = self._resolve(day, day.program, template, plan_date)
         sections = resolved['sections']
         seen_item_keys = set()
         for section in sections:
             validate_section_items(section.get('items') or [], seen_item_keys)
-        plan = self._materialize(day, day.block, template, plan_date, sections, current_user_id, resolved=resolved)
+        plan = self._materialize(day, day.program, template, plan_date, sections, current_user_id, resolved=resolved)
         self.db_session.flush()
         return plan
 

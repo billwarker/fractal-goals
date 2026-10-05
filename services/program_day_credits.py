@@ -29,8 +29,7 @@ def program_template_ids(program):
     """Template IDs any program-day definition in ``program`` can schedule."""
     return {
         link.session_template_id
-        for block in program.blocks or []
-        for day in block.days or []
+        for day in program.days or []
         for link in day.template_links or []
         if link.session_template_id
     }
@@ -103,6 +102,8 @@ def credited_block_ids_by_session(day_facts):
     grouped = defaultdict(set)
     for fact in day_facts:
         for occurrence in fact["occurrences"]:
+            if occurrence["block"] is None:
+                continue
             for entry in occurrence["credits"]:
                 grouped[entry["session"].id].add(occurrence["block"].id)
     return grouped

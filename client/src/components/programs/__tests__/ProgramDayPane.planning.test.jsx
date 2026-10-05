@@ -16,10 +16,11 @@ const occurrence = {
     templates: [],
     credits: [],
 };
-const blocks = [{
-    id: 'block-1', name: 'Foundation', start_date: '2026-09-01', end_date: '2026-09-30',
-    days: [{ id: 'day-1', name: 'Strength day', date: null }, { id: 'day-2', name: 'Mobility', date: null }],
-}];
+const program = {
+    id: 'program-1', start_date: '2026-09-01', end_date: '2026-09-30',
+    blocks: [{ id: 'block-1', name: 'Foundation', start_date: '2026-09-01', end_date: '2026-09-30' }],
+    days: [{ id: 'day-1', name: 'Strength day' }, { id: 'day-2', name: 'Mobility' }],
+};
 const vacation = {
     id: 'p1', name: 'Lisbon', kind: 'vacation', start_date: '2026-09-01', end_date: '2026-09-07',
     protects_streaks: true, notes: null,
@@ -34,7 +35,7 @@ function renderPane({ date = '2026-09-05', today = '2026-09-02', detail = {}, da
     } };
     render(
         <MemoryRouter>
-            <ProgramDayPane rootId="root-1" date={date} today={today} query={query} program={{ id: 'program-1' }} blocks={blocks} {...props} />
+            <ProgramDayPane rootId="root-1" date={date} today={today} query={query} program={program} {...props} />
         </MemoryRouter>,
     );
 }
@@ -46,9 +47,9 @@ describe('ProgramDayPane planning and events', () => {
 
         // A date holds one program day, so a scheduled date offers no other definitions.
         expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Schedule Mobility · Foundation' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Schedule Mobility' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove from this date' }));
-        expect(onUnscheduleDay).toHaveBeenCalledWith('block-1', 'day-1', '2026-09-05');
+        expect(onUnscheduleDay).toHaveBeenCalledWith('day-1', '2026-09-05');
     });
 
     it('offers removal only for explicit schedules on future dates', () => {

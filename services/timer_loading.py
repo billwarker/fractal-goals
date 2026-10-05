@@ -8,7 +8,6 @@ from models import (
     CircuitRun,
     CircuitRound,
     MetricValue,
-    ProgramBlock,
     ProgramDay,
     Session,
 )
@@ -55,6 +54,5 @@ def session_query_options():
         .selectinload(CircuitRun.rounds)
         .selectinload(CircuitRound.members),
         selectinload(Session.program_day)
-        .selectinload(ProgramDay.block)
-        .selectinload(ProgramBlock.program),
+        .selectinload(ProgramDay.program),
     )

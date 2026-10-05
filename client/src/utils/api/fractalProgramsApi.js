@@ -29,24 +29,23 @@ export const fractalProgramsApi = {
         axios.put(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}`, data),
     deleteBlock: (rootId, programId, blockId) =>
         axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}`),
-    attachGoalToDay: (rootId, programId, blockId, dayId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/goals`, data),
-    addBlockDay: (rootId, programId, blockId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days`, data),
-    updateBlockDay: (rootId, programId, blockId, dayId, data) =>
-        axios.put(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`, data),
-    copyBlockDay: (rootId, programId, blockId, dayId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/copy`, data),
-    scheduleBlockDay: (rootId, programId, blockId, dayId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/schedule`, data),
-    unscheduleBlockDayOccurrence: (rootId, programId, blockId, dayId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}/unschedule`, data),
-    attachGoalToBlock: (rootId, programId, blockId, data) =>
-        axios.post(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/goals`, data),
+    // Program days belong to the program; weekdays repeat across its whole span.
+    attachGoalToDay: (rootId, programId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/goals`, data),
+    createProgramDay: (rootId, programId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days`, data),
+    updateProgramDay: (rootId, programId, dayId, data) =>
+        axios.put(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}`, data),
+    duplicateProgramDay: (rootId, programId, dayId) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/duplicate`),
+    scheduleProgramDay: (rootId, programId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/schedule`, data),
+    unscheduleProgramDayOccurrence: (rootId, programId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/unschedule`, data),
     setProgramGoalDeadline: (rootId, programId, data) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/goal-deadlines`, data),
-    deleteBlockDay: (rootId, programId, blockId, dayId) =>
-        axios.delete(`${API_BASE}/${rootId}/programs/${programId}/blocks/${blockId}/days/${dayId}`),
+    deleteProgramDay: (rootId, programId, dayId) =>
+        axios.delete(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}`),
     getProgramPlanOccurrences: (rootId, programId, params = {}) => axios.get(
         `${API_BASE}/${rootId}/programs/${programId}/plan-occurrences`, { params },
     ),

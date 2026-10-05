@@ -10,7 +10,6 @@ from validators import (
     ProgramUpdateSchema,
     ProgramDayCreateSchema,
     ProgramDayUpdateSchema,
-    ProgramDayCopySchema,
     ProgramDayScheduleSchema,
     ProgramDayOccurrenceUnscheduleSchema,
     ProgramDayStatusesUpdateSchema,
@@ -18,7 +17,6 @@ from validators import (
     ProgramGoalDeadlineSchema,
     ProgramBlockSchema,
     ProgramBlockUpdateSchema,
-    ProgramBlockGoalAttachSchema,
     ProgramDayGoalAttachSchema,
     validate_request
 )
@@ -157,8 +155,8 @@ def _calendar_read_model_response(label, build):
         if not timezone_name:
             return jsonify({"error": "Timezone is required."}), 400
         payload, error, status = build(session, timezone_name)
-        if error:
-            return jsonify({"error": error}), status
+        if error or payload is None:
+            return jsonify({"error": error or f"{label.capitalize()} is unavailable"}), status
         return payload
     except SQLAlchemyError:
         session.rollback()
@@ -450,140 +448,101 @@ def delete_block(current_user, root_id, program_id, block_id):
     finally:
         session.close()
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days', methods=['POST'])
+def _program_day_write(log_message, write, respond):
+    """Shared transaction boundary for program-day writes."""
+    session = get_db_session()
+    try:
+        return respond(write(session))
+    except ProgramServiceValidationError as e:
+        session.rollback()
+        return _program_service_error_response(e)
+    except ValueError as e:
+        session.rollback()
+        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception(log_message)
+        return internal_error(logger, "Program API request failed")
+    finally:
+        session.close()
+
+# Program days belong to the program; blocks only label the dates they cover.
+
+@programs_bp.route('/<root_id>/programs/<program_id>/days', methods=['POST'])
 @token_required
 @validate_request(ProgramDayCreateSchema)
-def add_block_day(current_user, root_id, program_id, block_id, validated_data):
-    """Add a configured day to a program block if owned by user."""
-    session = get_db_session()
-    try:
-        result = ProgramService.add_block_day(session, root_id, program_id, block_id, validated_data, current_user.id)
-        return jsonify(result), 201
-    except ProgramServiceValidationError as e:
-        session.rollback()
-        return _program_service_error_response(e)
-    except ValueError as e:
-         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error adding block day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+def create_program_day(current_user, root_id, program_id, validated_data):
+    """Create a program day; its weekdays repeat across the whole program."""
+    return _program_day_write(
+        "Error creating program day",
+        lambda session: ProgramService.create_program_day(
+            session, root_id, program_id, validated_data, current_user.id,
+        ),
+        lambda day: (jsonify(day), 201),
+    )
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['PUT'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>', methods=['PUT'])
 @token_required
 @validate_request(ProgramDayUpdateSchema)
-def update_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
-    """Update a specific program day."""
-    session = get_db_session()
-    try:
-        result = ProgramService.update_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
-        return jsonify(result)
-    except ProgramServiceValidationError as e:
-        session.rollback()
-        return _program_service_error_response(e)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error updating block day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+def update_program_day(current_user, root_id, program_id, day_id, validated_data):
+    """Update a program day."""
+    return _program_day_write(
+        "Error updating program day",
+        lambda session: ProgramService.update_program_day(
+            session, root_id, program_id, day_id, validated_data, current_user.id,
+        ),
+        jsonify,
+    )
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>', methods=['DELETE'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>', methods=['DELETE'])
 @token_required
-def delete_block_day(current_user, root_id, program_id, block_id, day_id):
+def delete_program_day(current_user, root_id, program_id, day_id):
     """Delete a program day."""
-    session = get_db_session()
-    try:
-        ProgramService.delete_block_day(session, root_id, program_id, block_id, day_id, current_user.id)
-        return jsonify({"message": "Day deleted"})
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error deleting block day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+    return _program_day_write(
+        "Error deleting program day",
+        lambda session: ProgramService.delete_program_day(
+            session, root_id, program_id, day_id, current_user.id,
+        ),
+        lambda _result: jsonify({"message": "Day deleted"}),
+    )
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/copy', methods=['POST'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/duplicate', methods=['POST'])
 @token_required
-@validate_request(ProgramDayCopySchema)
-def copy_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
-    """Copy a day to other blocks."""
-    session = get_db_session()
-    try:
-        result = ProgramService.copy_block_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
-        return jsonify(result)
-    except ProgramServiceValidationError as e:
-        session.rollback()
-        return _program_service_error_response(e)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error copying block day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+def duplicate_program_day(current_user, root_id, program_id, day_id):
+    """Copy a program day's definition as a new, unscheduled day."""
+    return _program_day_write(
+        "Error duplicating program day",
+        lambda session: ProgramService.duplicate_program_day(
+            session, root_id, program_id, day_id, current_user.id,
+        ),
+        lambda day: (jsonify(day), 201),
+    )
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/schedule', methods=['POST'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/schedule', methods=['POST'])
 @token_required
 @validate_request(ProgramDayScheduleSchema)
-def schedule_block_day(current_user, root_id, program_id, block_id, day_id, validated_data):
+def schedule_program_day(current_user, root_id, program_id, day_id, validated_data):
     """Schedule a reusable program day as an occurrence on one calendar date."""
-    session = get_db_session()
-    try:
-        occurrence = ProgramService.schedule_block_day(
-            session,
-            root_id,
-            program_id,
-            block_id,
-            day_id,
-            validated_data,
-            current_user.id,
-        )
-        return jsonify(occurrence), 201
-    except ProgramServiceValidationError as e:
-        session.rollback()
-        return _program_service_error_response(e)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error scheduling block day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+    return _program_day_write(
+        "Error scheduling program day",
+        lambda session: ProgramService.schedule_program_day(
+            session, root_id, program_id, day_id, validated_data, current_user.id,
+        ),
+        lambda occurrence: (jsonify(occurrence), 201),
+    )
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/unschedule', methods=['POST'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/unschedule', methods=['POST'])
 @token_required
 @validate_request(ProgramDayOccurrenceUnscheduleSchema)
-def unschedule_block_day_occurrence(current_user, root_id, program_id, block_id, day_id, validated_data):
+def unschedule_program_day_occurrence(current_user, root_id, program_id, day_id, validated_data):
     """Remove an explicitly scheduled program-day occurrence from a calendar date."""
-    session = get_db_session()
-    try:
-        result = ProgramService.unschedule_block_day_occurrence(
-            session,
-            root_id,
-            program_id,
-            block_id,
-            day_id,
-            validated_data,
-            current_user.id,
-        )
-        return jsonify(result)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error unscheduling block day occurrence")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+    return _program_day_write(
+        "Error unscheduling program day occurrence",
+        lambda session: ProgramService.unschedule_program_day_occurrence(
+            session, root_id, program_id, day_id, validated_data, current_user.id,
+        ),
+        jsonify,
+    )
 
 @programs_bp.route('/<root_id>/programs/day-options', methods=['GET'])
 @programs_bp.route('/<root_id>/programs/active-days', methods=['GET'])
@@ -616,43 +575,18 @@ def get_active_program_days(current_user, root_id):
     finally:
         session.close()
 
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/goals', methods=['POST'])
-@token_required
-@validate_request(ProgramBlockGoalAttachSchema)
-def attach_goal_to_block(current_user, root_id, program_id, block_id, validated_data):
-    """Attach a goal to a block and update its deadline."""
-    session = get_db_session()
-    try:
-        block_dict = ProgramService.attach_goal_to_block(session, root_id, program_id, block_id, validated_data, current_user.id)
-        return jsonify({"message": "Goal attached and updated", "block": block_dict})
-    except ProgramServiceValidationError as e:
-         return _program_service_error_response(e)
-    except ValueError as e:
-         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error attaching goal to block")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
-
-@programs_bp.route('/<root_id>/programs/<program_id>/blocks/<block_id>/days/<day_id>/goals', methods=['POST'])
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/goals', methods=['POST'])
 @token_required
 @validate_request(ProgramDayGoalAttachSchema)
-def attach_goal_to_day(current_user, root_id, program_id, block_id, day_id, validated_data):
-    """Attach a goal directly to a program day."""
-    session = get_db_session()
-    try:
-        day_dict = ProgramService.attach_goal_to_day(session, root_id, program_id, block_id, day_id, validated_data, current_user.id)
-        return jsonify({"message": "Goal attached to day", "day": day_dict}), 201
-    except ValueError as e:
-         return jsonify({"error": str(e)}), 404 if "not found" in str(e).lower() or "access denied" in str(e).lower() else 400
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error attaching goal to day")
-        return internal_error(logger, "Program API request failed")
-    finally:
-        session.close()
+def attach_goal_to_day(current_user, root_id, program_id, day_id, validated_data):
+    """Add a goal to a program day."""
+    return _program_day_write(
+        "Error attaching goal to day",
+        lambda session: ProgramService.attach_goal_to_day(
+            session, root_id, program_id, day_id, validated_data, current_user.id,
+        ),
+        lambda day_dict: (jsonify({"message": "Goal attached to day", "day": day_dict}), 201),
+    )
 
 @programs_bp.route('/<root_id>/programs/<program_id>/goal-deadlines', methods=['POST'])
 @token_required

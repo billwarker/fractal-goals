@@ -247,10 +247,9 @@ describe('api core auth refresh behavior', () => {
         };
 
         try {
-            const response = await fractalApi.updateBlockDay(
+            const response = await fractalApi.updateProgramDay(
                 'root-1',
                 'program-1',
-                'block-1',
                 'day-1',
                 { name: 'Daily Practice' },
             );
@@ -264,7 +263,7 @@ describe('api core auth refresh behavior', () => {
             undefined,
             'fresh-day-token',
         ]);
-        expect(calls.filter((call) => String(call.url).includes(`${API_BASE}/root-1/programs/program-1/blocks/block-1/days/day-1`))).toHaveLength(2);
+        expect(calls.filter((call) => String(call.url).includes(`${API_BASE}/root-1/programs/program-1/days/day-1`))).toHaveLength(2);
     });
 
     it('dispatches a session-expired event when stale CSRF recovery cannot authenticate', async () => {
@@ -422,15 +421,14 @@ describe('api core auth refresh behavior', () => {
             ['programs.createBlock', () => fractalProgramsApi.createBlock('root-1', 'program-1', { name: 'Block' })],
             ['programs.updateBlock', () => fractalProgramsApi.updateBlock('root-1', 'program-1', 'block-1', { name: 'Block' })],
             ['programs.deleteBlock', () => fractalProgramsApi.deleteBlock('root-1', 'program-1', 'block-1')],
-            ['programs.attachGoalToDay', () => fractalProgramsApi.attachGoalToDay('root-1', 'program-1', 'block-1', 'day-1', { goal_id: 'goal-1' })],
-            ['programs.addBlockDay', () => fractalProgramsApi.addBlockDay('root-1', 'program-1', 'block-1', { name: 'Day' })],
-            ['programs.updateBlockDay', () => fractalProgramsApi.updateBlockDay('root-1', 'program-1', 'block-1', 'day-1', { name: 'Day' })],
-            ['programs.copyBlockDay', () => fractalProgramsApi.copyBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.scheduleBlockDay', () => fractalProgramsApi.scheduleBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.unscheduleBlockDayOccurrence', () => fractalProgramsApi.unscheduleBlockDayOccurrence('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.attachGoalToBlock', () => fractalProgramsApi.attachGoalToBlock('root-1', 'program-1', 'block-1', { goal_id: 'goal-1' })],
+            ['programs.attachGoalToDay', () => fractalProgramsApi.attachGoalToDay('root-1', 'program-1', 'day-1', { goal_id: 'goal-1' })],
+            ['programs.createProgramDay', () => fractalProgramsApi.createProgramDay('root-1', 'program-1', { name: 'Day' })],
+            ['programs.updateProgramDay', () => fractalProgramsApi.updateProgramDay('root-1', 'program-1', 'day-1', { name: 'Day' })],
+            ['programs.duplicateProgramDay', () => fractalProgramsApi.duplicateProgramDay('root-1', 'program-1', 'day-1')],
+            ['programs.scheduleProgramDay', () => fractalProgramsApi.scheduleProgramDay('root-1', 'program-1', 'day-1', {})],
+            ['programs.unscheduleProgramDayOccurrence', () => fractalProgramsApi.unscheduleProgramDayOccurrence('root-1', 'program-1', 'day-1', {})],
             ['programs.setProgramGoalDeadline', () => fractalProgramsApi.setProgramGoalDeadline('root-1', 'program-1', { goal_id: 'goal-1' })],
-            ['programs.deleteBlockDay', () => fractalProgramsApi.deleteBlockDay('root-1', 'program-1', 'block-1', 'day-1')],
+            ['programs.deleteProgramDay', () => fractalProgramsApi.deleteProgramDay('root-1', 'program-1', 'day-1')],
             ['sessions.createSession', () => fractalSessionsApi.createSession('root-1', { name: 'Session' })],
             ['sessions.previewSessionGoalScope', () => fractalSessionsApi.previewSessionGoalScope('root-1', { template_id: 'template-1' })],
             ['sessions.completeQuickSession', () => fractalSessionsApi.completeQuickSession('root-1', { activities: [] })],
@@ -551,14 +549,13 @@ describe('api core auth refresh behavior', () => {
             ['programs.createBlock', 'post', '/root-1/programs/program-1/blocks', () => fractalProgramsApi.createBlock('root-1', 'program-1', { name: 'Block' })],
             ['programs.updateBlock', 'put', '/root-1/programs/program-1/blocks/block-1', () => fractalProgramsApi.updateBlock('root-1', 'program-1', 'block-1', { name: 'Block' })],
             ['programs.deleteBlock', 'delete', '/root-1/programs/program-1/blocks/block-1', () => fractalProgramsApi.deleteBlock('root-1', 'program-1', 'block-1')],
-            ['programs.addBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days', () => fractalProgramsApi.addBlockDay('root-1', 'program-1', 'block-1', { name: 'Day' })],
-            ['programs.updateBlockDay', 'put', '/root-1/programs/program-1/blocks/block-1/days/day-1', () => fractalProgramsApi.updateBlockDay('root-1', 'program-1', 'block-1', 'day-1', { name: 'Day' })],
-            ['programs.deleteBlockDay', 'delete', '/root-1/programs/program-1/blocks/block-1/days/day-1', () => fractalProgramsApi.deleteBlockDay('root-1', 'program-1', 'block-1', 'day-1')],
-            ['programs.copyBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/copy', () => fractalProgramsApi.copyBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.scheduleBlockDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/schedule', () => fractalProgramsApi.scheduleBlockDay('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.unscheduleBlockDayOccurrence', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/unschedule', () => fractalProgramsApi.unscheduleBlockDayOccurrence('root-1', 'program-1', 'block-1', 'day-1', {})],
-            ['programs.attachGoalToBlock', 'post', '/root-1/programs/program-1/blocks/block-1/goals', () => fractalProgramsApi.attachGoalToBlock('root-1', 'program-1', 'block-1', { goal_id: 'goal-1' })],
-            ['programs.attachGoalToDay', 'post', '/root-1/programs/program-1/blocks/block-1/days/day-1/goals', () => fractalProgramsApi.attachGoalToDay('root-1', 'program-1', 'block-1', 'day-1', { goal_id: 'goal-1' })],
+            ['programs.createProgramDay', 'post', '/root-1/programs/program-1/days', () => fractalProgramsApi.createProgramDay('root-1', 'program-1', { name: 'Day' })],
+            ['programs.updateProgramDay', 'put', '/root-1/programs/program-1/days/day-1', () => fractalProgramsApi.updateProgramDay('root-1', 'program-1', 'day-1', { name: 'Day' })],
+            ['programs.deleteProgramDay', 'delete', '/root-1/programs/program-1/days/day-1', () => fractalProgramsApi.deleteProgramDay('root-1', 'program-1', 'day-1')],
+            ['programs.duplicateProgramDay', 'post', '/root-1/programs/program-1/days/day-1/duplicate', () => fractalProgramsApi.duplicateProgramDay('root-1', 'program-1', 'day-1')],
+            ['programs.scheduleProgramDay', 'post', '/root-1/programs/program-1/days/day-1/schedule', () => fractalProgramsApi.scheduleProgramDay('root-1', 'program-1', 'day-1', {})],
+            ['programs.unscheduleProgramDayOccurrence', 'post', '/root-1/programs/program-1/days/day-1/unschedule', () => fractalProgramsApi.unscheduleProgramDayOccurrence('root-1', 'program-1', 'day-1', {})],
+            ['programs.attachGoalToDay', 'post', '/root-1/programs/program-1/days/day-1/goals', () => fractalProgramsApi.attachGoalToDay('root-1', 'program-1', 'day-1', { goal_id: 'goal-1' })],
             ['programs.setProgramGoalDeadline', 'post', '/root-1/programs/program-1/goal-deadlines', () => fractalProgramsApi.setProgramGoalDeadline('root-1', 'program-1', { goal_id: 'goal-1' })],
 
             ['sessions.createSession', 'post', '/root-1/sessions', () => fractalSessionsApi.createSession('root-1', { name: 'Session' })],

@@ -423,7 +423,7 @@ class TestSessionSummaryApi:
         )
         day = ProgramDay(
             id=str(uuid4()),
-            block_id=block.id,
+            program_id=block.program_id,
             day_number=1,
             name='Day 1',
         )

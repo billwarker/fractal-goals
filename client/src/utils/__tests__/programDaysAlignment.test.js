@@ -34,7 +34,7 @@ describe('plan column alignment', () => {
 });
 
 describe('Days tab column selection', () => {
-    const blocks = [{ id: 'b', start_date: '2026-09-01', end_date: '2026-10-31', days: [{ id: 'd', templates: [{ id: 't' }] }] }];
+    const days = [{ id: 'd', templates: [{ id: 't' }] }];
     const occurrence = (date, completed) => ({
         date, templates: [], closed: date < '2026-10-01', program_day_completed: completed,
         state: completed ? 'scheduled_met' : 'scheduled_missed',
@@ -44,12 +44,12 @@ describe('Days tab column selection', () => {
         occurrence('2026-10-05', false), occurrence('2026-10-12', false),
     ]]]);
     const resolve = (selection) => resolveDaysSelection({
-        blocks, occurrencesByDay, selection, today: '2026-10-01', compare: true,
+        days, occurrencesByDay, selection, today: '2026-10-01', compare: true,
     });
 
     it('shows only the next day unless comparing', () => {
         const single = resolveDaysSelection({
-            blocks, occurrencesByDay, selection: { dayId: 'd', compareDate: '2026-09-28' }, today: '2026-10-01',
+            days, occurrencesByDay, selection: { dayId: 'd', compareDate: '2026-09-28' }, today: '2026-10-01',
         });
         expect(single.columnDates).toEqual(['2026-10-05']);
         expect(single.compareDate).toBeNull();
@@ -73,7 +73,7 @@ describe('Days tab column selection', () => {
     it('shows one column for a day with a single date', () => {
         const single = new Map([['d', [occurrence('2026-10-05', false)]]]);
         expect(resolveDaysSelection({
-            blocks, occurrencesByDay: single, selection: null, today: '2026-10-01', compare: true,
+            days, occurrencesByDay: single, selection: null, today: '2026-10-01', compare: true,
         }).columnDates)
             .toEqual(['2026-10-05']);
     });

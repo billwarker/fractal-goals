@@ -1,0 +1,90 @@
+.blocks {
+    display: grid;
+    gap: 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.block {
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-bg-card) 92%, var(--color-bg-sidebar));
+}
+
+.block article {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+}
+
+.blockHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+.blockHeader h3 {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--block-color, var(--color-text-primary));
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.blockActions {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+    flex: none;
+}
+
+.iconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.iconButton:hover {
+    color: var(--color-text-primary);
+    background: var(--color-bg-card-hover);
+}
+
+.iconButtonDanger:hover {
+    border-color: var(--color-brand-danger);
+    color: var(--color-brand-danger);
+}
+
+.meta {
+    margin: -6px 0 0;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.state {
+    margin: 0;
+    padding: 12px 2px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+@media (max-width: 768px) {
+    .iconButton {
+        min-height: 40px;
+    }
+
+    .iconButton {
+        width: 40px;
+    }
+}

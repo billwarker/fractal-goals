@@ -125,9 +125,14 @@ describe('ProgramDayModal', () => {
     });
 
     describe('scheduling', () => {
-        const block = { id: 'block-1', start_date: '2026-09-01', end_date: '2026-09-30' };
+        // Program days belong to the program: dates and weekdays span the whole program.
+        const program = {
+            id: 'program-1', start_date: '2026-09-01', end_date: '2026-09-30',
+            blocks: [{ id: 'block-1', start_date: '2026-09-01', end_date: '2026-09-14' }],
+            days: [],
+        };
 
-        function renderModal(initialData, onSave = vi.fn(), modalBlock = block) {
+        function renderModal(initialData, onSave = vi.fn(), modalProgram = program, extraProps = {}) {
             getSessionTemplates.mockResolvedValue({ data: [] });
             getActivities.mockResolvedValue({ data: [] });
             getActivityGroups.mockResolvedValue({ data: [] });
@@ -138,8 +143,9 @@ describe('ProgramDayModal', () => {
                         onClose={vi.fn()}
                         onSave={onSave}
                         rootId="root-1"
-                        block={modalBlock}
+                        program={modalProgram}
                         initialData={initialData}
+                        {...extraProps}
                     />
                 </QueryClientProvider>
             );
@@ -162,7 +168,7 @@ describe('ProgramDayModal', () => {
             addDate('2026-09-26');
             expect(screen.getByText('2 dates · Sep 10 – Sep 26')).toBeInTheDocument();
 
-            fireEvent.click(screen.getByRole('button', { name: 'Add Day' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Create Day' }));
 
             const payload = onSave.mock.calls[0][0];
             expect(payload).toMatchObject({
@@ -173,7 +179,7 @@ describe('ProgramDayModal', () => {
             expect(payload).not.toHaveProperty('date');
         });
 
-        it('rejects dates outside the block and blocks saving with no dates', () => {
+        it('rejects dates outside the program and blocks saving with no dates', () => {
             renderModal({ id: 'day-1', name: 'Strength', scheduled_dates: ['2026-09-26'], day_of_week: [], templates: [] });
 
             fireEvent.change(screen.getByLabelText('Date to add'), { target: { value: '2026-10-02' } });
@@ -184,15 +190,25 @@ describe('ProgramDayModal', () => {
             expect(screen.getByText('Add at least one date to save a specific-dates day.')).toBeInTheDocument();
         });
 
-        it('converts a legacy fixed-date day into an editable specific date', () => {
-            const onSave = renderModal({ id: 'day-1', name: 'Legacy', date: '2026-09-26', day_of_week: [], templates: [] });
+        it('accepts dates anywhere in the program, beyond any one block', () => {
+            const onSave = renderModal({ id: 'day-1', name: 'Late', scheduled_dates: ['2026-09-03'], day_of_week: [], templates: [] });
 
-            expect(screen.getByRole('radio', { name: 'Specific dates' })).toHaveAttribute('aria-checked', 'true');
+            addDate('2026-09-28');
             fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
-            const payload = onSave.mock.calls[0][0];
-            expect(payload.scheduled_dates).toEqual(['2026-09-26']);
-            expect(payload).not.toHaveProperty('date');
+            expect(onSave.mock.calls[0][0].scheduled_dates).toEqual(['2026-09-03', '2026-09-28']);
+        });
+
+        it('duplicates an existing day and closes', async () => {
+            const onDuplicate = vi.fn().mockResolvedValue({ id: 'day-2' });
+            const onClose = vi.fn();
+            renderModal({ id: 'day-1', name: 'Legs', day_of_week: ['Monday'], templates: [] }, vi.fn(), program, { onDuplicate, onClose });
+
+            expect(screen.queryByText('Copy to Other Blocks')).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Duplicate day' }));
+
+            await waitFor(() => expect(onClose).toHaveBeenCalled());
+            expect(onDuplicate).toHaveBeenCalledWith('day-1');
         });
 
         it('keeps sidebar-planned dates on a weekly day and switches to weekly scheduling', () => {
@@ -204,7 +220,7 @@ describe('ProgramDayModal', () => {
             expect(screen.getByRole('list', { name: 'Also planned on' })).toBeInTheDocument();
             fireEvent.click(screen.getByRole('button', { name: 'Friday' }));
             expect(screen.getByRole('button', { name: 'Friday' })).toHaveAttribute('aria-pressed', 'true');
-            expect(screen.getByText('Every Monday and Friday in the block.')).toBeInTheDocument();
+            expect(screen.getByText('Every Monday and Friday in the program.')).toBeInTheDocument();
 
             fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
@@ -227,8 +243,8 @@ describe('ProgramDayModal', () => {
         });
 
         describe('one program day per date', () => {
-            const busyBlock = {
-                ...block,
+            const busyProgram = {
+                ...program,
                 days: [
                     { id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [] },
                     { id: 'test', name: 'Test Day', day_of_week: [], scheduled_dates: ['2026-09-17'] },
@@ -236,7 +252,7 @@ describe('ProgramDayModal', () => {
             };
 
             it('marks weekdays another day already holds as taken', () => {
-                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: [], templates: [] }, vi.fn(), busyBlock);
+                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: [], templates: [] }, vi.fn(), busyProgram);
 
                 expect(screen.getByRole('button', { name: 'Monday, taken by Leg Day' })).toBeDisabled();
                 expect(screen.getByRole('button', { name: 'Thursday, taken by Test Day' })).toBeDisabled();
@@ -244,25 +260,26 @@ describe('ProgramDayModal', () => {
             });
 
             it('ignores the day being edited when finding taken dates', () => {
-                renderModal({ id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [], templates: [] }, vi.fn(), busyBlock);
+                renderModal({ id: 'legs', name: 'Leg Day', day_of_week: ['Monday'], scheduled_dates: [], templates: [] }, vi.fn(), busyProgram);
 
                 expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'true');
                 expect(screen.getByRole('button', { name: 'Save Changes' })).toBeEnabled();
             });
 
-            it('refuses a specific date that another day already holds', () => {
-                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: ['2026-09-15'], templates: [] }, vi.fn(), busyBlock);
+            it('refuses a specific date that another day already holds, even outside every block', () => {
+                renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: ['2026-09-15'], templates: [] }, vi.fn(), busyProgram);
 
-                fireEvent.change(screen.getByLabelText('Date to add'), { target: { value: '2026-09-14' } });
+                // Sep 28 is after the only block, but Leg Day's Mondays repeat across the program.
+                fireEvent.change(screen.getByLabelText('Date to add'), { target: { value: '2026-09-28' } });
 
                 expect(screen.getByRole('button', { name: 'Add date' })).toBeDisabled();
-                expect(screen.getByText('Mon, Sep 14, 2026 already has Leg Day.')).toBeInTheDocument();
+                expect(screen.getByText('Mon, Sep 28, 2026 already has Leg Day.')).toBeInTheDocument();
             });
 
             it('blocks saving a planned date that collides with another day', () => {
-                renderModal({ name: 'Upper', day_of_week: ['Friday'], scheduled_dates: ['2026-09-21'], templates: [] }, vi.fn(), busyBlock);
+                renderModal({ name: 'Upper', day_of_week: ['Friday'], scheduled_dates: ['2026-09-21'], templates: [] }, vi.fn(), busyProgram);
 
-                expect(screen.getByRole('button', { name: 'Add Day' })).toBeDisabled();
+                expect(screen.getByRole('button', { name: 'Create Day' })).toBeDisabled();
                 expect(screen.getByText(/Mon, Sep 21 already has Leg Day/)).toBeInTheDocument();
             });
 
@@ -270,9 +287,9 @@ describe('ProgramDayModal', () => {
                 const onSave = vi.fn().mockRejectedValue({ response: { status: 409, data: {
                     code: 'program_day_date_conflict', error: 'Sep 19, 2026 would hold Upper and Other.',
                 } } });
-                renderModal({ name: 'Upper', day_of_week: ['Saturday'], scheduled_dates: [], templates: [] }, onSave, busyBlock);
+                renderModal({ name: 'Upper', day_of_week: ['Saturday'], scheduled_dates: [], templates: [] }, onSave, busyProgram);
 
-                fireEvent.click(screen.getByRole('button', { name: 'Add Day' }));
+                fireEvent.click(screen.getByRole('button', { name: 'Create Day' }));
 
                 expect(await screen.findByRole('alert')).toHaveTextContent('Sep 19, 2026 would hold Upper and Other.');
             });

@@ -32,6 +32,8 @@ from services.session_runtime import (
     get_template_session_type,
 )
 from services.program_scope import resolve_program_scope
+from services.program_focus import resolve_day_focus_scope
+from services.program_day_occurrences import block_for_date
 from services.prescriptions import (
     item_activity_id,
     iter_activity_items,
@@ -207,28 +209,37 @@ class _SessionCreationMixin:
             if program_context and 'day_id' in program_context:
                 requested_day_id = program_context['day_id']
                 p_day = self.db_session.query(models.ProgramDay).options(
-                    joinedload(models.ProgramDay.block).joinedload(models.ProgramBlock.program)
+                    joinedload(models.ProgramDay.program).selectinload(models.Program.blocks)
                 ).filter(
                     models.ProgramDay.id == requested_day_id
                 ).populate_existing().with_for_update(of=models.ProgramDay).first()
-                if p_day and p_day.block and p_day.block.program and p_day.block.program.root_id == root_id:
+                if p_day and p_day.program and p_day.program.root_id == root_id:
+                    program = p_day.program
                     draft.program_day_id = requested_day_id
                     new_session.program_day_id = draft.program_day_id
                     p_day.row_version += 1  # pyright: ignore[reportAttributeAccessIssue] - legacy Column typing
-                    new_session.program_id = p_day.block.program.id
-                    new_session.program_block_id = p_day.block.id
-                    program_context['program_id'] = p_day.block.program.id
-                    program_context['program_name'] = p_day.block.program.name
-                    program_context['program_color'] = p_day.block.program.color
-                    program_context['block_id'] = p_day.block.id
-                    program_context['block_name'] = p_day.block.name
-                    program_context['block_color'] = p_day.block.color or p_day.block.program.color
+                    new_session.program_id = program.id
+                    # A program day spans blocks; the session belongs to the block
+                    # the client named, else the one covering its start date.
+                    block = next(
+                        (candidate for candidate in (program.blocks or [])
+                         if candidate.id == program_context.get('block_id')),
+                        None,
+                    ) or block_for_date(
+                        program, (new_session.session_start or datetime.now(timezone.utc)).date(),
+                    )
+                    new_session.program_block_id = block.id if block else None
+                    program_context['program_id'] = program.id
+                    program_context['program_name'] = program.name
+                    program_context['program_color'] = program.color
+                    program_context['block_id'] = block.id if block else None
+                    program_context['block_name'] = block.name if block else None
+                    program_context['block_color'] = (block.color or program.color) if block else None
                     program_context['day_name'] = p_day.name
                     program_context['day_number'] = p_day.day_number
                     if goal_scope_enabled:
-                        draft.program_goal_ids = set(resolve_program_scope(
-                            self.db_session, root_id, p_day.block.program.id
-                        ).goal_ids)
+                        # The day's goals, falling back to the program's.
+                        draft.program_goal_ids = set(resolve_day_focus_scope(self.db_session, root_id, p_day))
                 else:
                     return "Invalid program day context for this fractal", 400
             elif program_context and program_context.get('program_id'):
@@ -563,7 +574,7 @@ class _SessionCreationMixin:
         return None
 
     def _link_session_goals(self, draft, *, is_quick_template) -> PhaseError:
-        """Link activity-derived, manual, and immediate goals, honouring program goal scope."""
+        """Link activity-derived, manual, and immediate goals, honouring the program goal scope."""
         new_session = draft.new_session
         root_id = draft.root_id
         data = draft.data
@@ -597,7 +608,7 @@ class _SessionCreationMixin:
             manual_ids.add(data.get('parent_id'))
 
         if program_goal_ids is not None and isinstance(session_data_dict.get('program_context'), dict):
-            session_data_dict['program_context']['off_program_goal_ids'] = sorted(manual_ids - program_goal_ids)
+            session_data_dict['program_context']['off_focus_goal_ids'] = sorted(manual_ids - program_goal_ids)
             new_session.attributes = copy.deepcopy(session_data_dict)
 
         linked_goal_ids = set()

@@ -230,7 +230,6 @@ class AgentRunsMixin:
             if expected_source_hash and expected_source_hash != self._program_day_state_hash(
                 locked_run.root_id,
                 input_data["program_id"],
-                input_data["block_id"],
                 input_data["day_id"],
                 operation=input_data,
                 for_update=True,
@@ -312,9 +311,9 @@ class AgentRunsMixin:
                     )
                     entity_id = input_data["block_id"]
                 else:
-                    entity = ProgramService.update_block_day(
+                    entity = ProgramService.update_program_day(
                         self.db_session, locked_run.root_id, input_data["program_id"],
-                        input_data["block_id"], input_data["day_id"], input_data["data"],
+                        input_data["day_id"], input_data["data"],
                         locked_run.user_id, commit=False, pending_events=pending_events,
                     )
                     entity_id = input_data["day_id"]
@@ -487,20 +486,17 @@ class AgentRunsMixin:
             from services.programs import ProgramService
 
             try:
-                created = ProgramService.add_block_day(
+                first_day = ProgramService.create_program_day(
                     self.db_session,
                     locked_run.root_id,
                     input_data["program_id"],
-                    input_data["block_id"],
                     input_data["data"],
                     locked_run.user_id,
                     commit=False,
                     pending_events=pending_events,
-                    create_only=True,
                 )
             except ValueError as exc:
                 raise harness_validation_error(exc) from exc
-            first_day = (created.get("days") or [{}])[0]
             result = {
                 "id": first_day.get("id"),
                 "name": first_day.get("name"),
@@ -512,11 +508,10 @@ class AgentRunsMixin:
 
             input_data.pop("expected_source_hash", None)
             try:
-                scheduled = ProgramService.schedule_block_day(
+                scheduled = ProgramService.schedule_program_day(
                     self.db_session,
                     locked_run.root_id,
                     input_data["program_id"],
-                    input_data["block_id"],
                     input_data["day_id"],
                     input_data["data"],
                     locked_run.user_id,

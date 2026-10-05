@@ -95,15 +95,12 @@ vi.mock('../../hooks/useProgramCalendarFeed', () => ({
 vi.mock('../../hooks/useProgramGoalSets', () => ({
     useProgramGoalSets: () => ({
         attachedGoalIds: [],
-        attachableBlockGoals: [],
         hierarchyGoalSeeds: [],
     }),
 }));
 vi.mock('../../hooks/useProgramDetailViewModel', () => ({
     useProgramDetailViewModel: () => ({
         sortedBlocks: [],
-        attachBlock: null,
-        blockGoalsByBlockId: {},
     }),
 }));
 vi.mock('../../hooks/useProgramDetailMutations', () => ({
@@ -114,7 +111,6 @@ vi.mock('../../hooks/useProgramDetailMutations', () => ({
         copyDay: vi.fn(),
         deleteDay: vi.fn(),
         scheduleDay: vi.fn(),
-        saveAttachedGoal: vi.fn(),
         updateGoal: vi.fn(),
         toggleGoalCompletion: vi.fn(),
         deleteGoal: vi.fn(),

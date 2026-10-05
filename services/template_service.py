@@ -4,7 +4,7 @@ import uuid
 import models
 
 from blueprints.api_utils import require_owned_root
-from models import Program, ProgramBlock, ProgramDay, Session, SessionTemplate, program_day_templates
+from models import Program, ProgramDay, Session, SessionTemplate, program_day_templates
 from sqlalchemy import distinct
 from sqlalchemy.orm import selectinload, with_loader_criteria
 from services.events import Event, Events, event_bus
@@ -82,8 +82,7 @@ class TemplateService:
         rows = (
             self.db_session.query(distinct(program_day_templates.c.session_template_id))
             .join(ProgramDay, ProgramDay.id == program_day_templates.c.program_day_id)
-            .join(ProgramBlock, ProgramBlock.id == ProgramDay.block_id)
-            .join(Program, Program.id == ProgramBlock.program_id)
+            .join(Program, Program.id == ProgramDay.program_id)
             .filter(
                 Program.root_id == root_id,
                 Program.start_date <= today,

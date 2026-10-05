@@ -23,11 +23,12 @@ const fallbackLandingExamples = [{
         blocks: [{
             id: 'demo-block-1', name: 'Fretboard map', color: '#3A86FF',
             start_date: '2026-01-05', end_date: '2026-01-18', goal_ids: ['demo-guitar-caged'],
-            days: [{
-                id: 'demo-day-1', name: 'Triad practice',
-                day_of_week: ['Monday', 'Wednesday', 'Friday'],
-                templates: [{ id: 'demo-template-1', name: 'Triad Session', is_required: true }],
-            }],
+            track_weeks: true, week_start_day: 0,
+        }],
+        days: [{
+            id: 'demo-day-1', name: 'Triad practice', day_number: 1,
+            day_of_week: ['Monday', 'Wednesday', 'Friday'], scheduled_dates: [],
+            templates: [{ id: 'demo-template-1', name: 'Triad Session', is_required: true }],
         }],
     }],
     sessions: [{

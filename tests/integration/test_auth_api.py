@@ -639,7 +639,7 @@ class TestPreferencesEndpoint:
             weekly_schedule={},
         )
         block = ProgramBlock(program=program, name='Foundation')
-        day = ProgramDay(block=block, name='Day 1')
+        day = ProgramDay(program=block.program, name='Day 1')
         override = ProgramDayStatusOverride(
             program=program,
             date=datetime.now(timezone.utc).date(),

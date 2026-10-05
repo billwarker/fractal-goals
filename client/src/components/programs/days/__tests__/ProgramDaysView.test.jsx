@@ -33,13 +33,18 @@ const bench = {
     id: 'bench', name: 'Bench Press', has_sets: true,
     metric_definitions: [{ id: 'w', name: 'Weight', unit: 'kg' }, { id: 'r', name: 'Reps', unit: 'reps' }],
 };
-const blocks = [{
-    id: 'block-1', name: 'Hypertrophy', start_date: '2026-09-01', end_date: '2026-10-31',
+// Program days belong to the program; the block only labels the dates it covers.
+const program = {
+    id: 'program', start_date: '2026-09-01', end_date: '2026-10-31',
+    blocks: [{
+        id: 'block-1', name: 'Hypertrophy', start_date: '2026-09-01', end_date: '2026-10-31',
+        track_weeks: true, week_start_day: 0,
+    }],
     days: [
-        { id: 'upper', name: 'Upper A', templates: [{ id: 'tmpl', name: 'Bench Day' }] },
-        { id: 'rest', name: 'Rest', templates: [] },
+        { id: 'upper', name: 'Upper A', day_number: 1, templates: [{ id: 'tmpl', name: 'Bench Day' }] },
+        { id: 'rest', name: 'Rest', day_number: 2, templates: [] },
     ],
-}];
+};
 
 function planEntry(overrides = {}) {
     return {
@@ -64,24 +69,24 @@ function planEntry(overrides = {}) {
 }
 
 /** The page's Days tab: the side-pane navigator (with date rails) beside the main columns. */
-function Harness({ timezone = 'UTC', showDateControls = false }) {
+function Harness({ timezone = 'UTC', showDateControls = false, onEditDay = vi.fn() }) {
     const tab = useProgramDaysTab({
         rootId: 'root',
-        programId: 'program',
-        blocks,
+        program,
         today: '2026-10-01',
         timezone,
         enabled: true,
         setViewMode: () => {},
         onLeavePane: () => {},
+        onEditDay,
     });
     return (
         <>
             <aside aria-label="Program side pane">{tab.navigator}</aside>
             <ProgramDaysView
                 rootId="root"
-                program={{ id: 'program' }}
-                blocks={blocks}
+                program={program}
+                days={tab.days}
                 activities={[bench]}
                 activityGroups={[]}
                 today="2026-10-01"
@@ -90,6 +95,7 @@ function Harness({ timezone = 'UTC', showDateControls = false }) {
                 occurrencesQuery={tab.occurrencesQuery}
                 focusTemplateId={tab.selection?.templateId || null}
                 onSelectionChange={tab.setSelection}
+                onEditDay={onEditDay}
                 showDateControls={showDateControls}
             />
         </>
@@ -147,7 +153,7 @@ beforeEach(() => {
 
 describe('Days view date selection', () => {
     it('defaults to the latest program day beside the next one', () => {
-        expect(pickDefaultDayId(blocks, '2026-10-01')).toBe('upper');
+        expect(pickDefaultDayId(program.days, null, '2026-10-01')).toBe('upper');
         const dates = ['2026-09-21', '2026-09-28', '2026-10-05', '2026-10-12'];
         expect(pickDefaultDate(dates, '2026-10-01')).toBe('2026-10-05');
         const asOccurrences = (values) => values.map((date) => ({ date, templates: [], closed: true }));
@@ -204,13 +210,28 @@ describe('ProgramDaysView', () => {
         expect(api.getProgramDayPlans).toHaveBeenCalledWith('root', 'program', 'upper', '2026-10-05', 'UTC');
     });
 
+    it('asks for a template, with an edit shortcut, when the selected day has none', async () => {
+        const onEditDay = vi.fn();
+        api.getProgramDayPlans.mockImplementation(plansFor());
+        renderView({ onEditDay });
+
+        fireEvent.click(within(pane()).getByRole('button', { name: /^Rest/ }));
+
+        expect(await screen.findByText('No sessions on this day yet')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Edit day' }));
+        expect(onEditDay).toHaveBeenCalledWith(program.days[1]);
+    });
+
     it('seeds the next day from the latest plan, with its values as placeholders', async () => {
         renderView();
 
         const card = await nextCard();
         expect(within(card).getByText('Starts from Mon, Sep 28')).toBeInTheDocument();
         expect(within(card).getByLabelText('Set 1 planned Weight')).toHaveAttribute('placeholder', '100');
-        expect(screen.queryByText('Rest')).not.toBeInTheDocument();
+        // A day without templates stays in the side pane, marked as needing one.
+        expect(within(pane()).getByText('Rest')).toBeInTheDocument();
+        // The column names the block its date falls in, with the tracked week.
+        expect(screen.getByText('Hypertrophy · Week 6')).toBeInTheDocument();
     });
 
     it('saves an edited value with the whole plan and no row version for a seed', async () => {

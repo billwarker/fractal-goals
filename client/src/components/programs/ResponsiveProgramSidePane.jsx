@@ -6,8 +6,8 @@ import ProgramSidePane from './ProgramSidePane';
 function ResponsiveProgramSidePane({ isMobile, isVisible, onClose, ...sidePaneProps }) {
     if (!isVisible) return null;
 
-    // Desktop keeps the pane open (like the session detail page); only the mobile sheet closes.
-    const sidePane = <ProgramSidePane {...sidePaneProps} onCollapse={isMobile ? onClose : undefined} />;
+    // Both layouts can collapse the pane: a docked column on desktop, a sheet on mobile.
+    const sidePane = <ProgramSidePane {...sidePaneProps} onCollapse={onClose} />;
     if (!isMobile) return sidePane;
 
     return (

@@ -55,6 +55,7 @@ export default function PlanDateColumn({
     dayId,
     occurrence,
     caption,
+    context = '',
     rail = null,
     today,
     timezone = 'UTC',
@@ -95,6 +96,7 @@ export default function PlanDateColumn({
     return (
         <section className={styles.column} aria-labelledby={headingId} data-align-column>
             {rail}
+            {context ? <p className={styles.columnContext}>{context}</p> : null}
             {/* The rail's highlighted chip already shows the date and its status, and logged
                 cards link their sessions; the header stays for screen readers and region names. */}
             <header className={styles.visuallyHidden}>

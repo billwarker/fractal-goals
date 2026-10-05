@@ -81,7 +81,7 @@ describe('ProgramDayPane day review', () => {
                 can_edit_credits: false,
                 sessions: [reviewSession()],
             } } },
-            blocks: [{ id: 'block-1', name: 'Foundation', days: [{ id: 'reusable', name: 'Reusable', date: null }] }],
+            program: { id: 'program-1', name: 'Program', days: [{ id: 'reusable', name: 'Reusable' }] },
         });
 
         expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
@@ -96,11 +96,10 @@ describe('ProgramDayPane day review', () => {
         renderPane({
             date: '2026-09-01',
             query: { data: { detail: { occurrences: [], scheduled: false, sessions: [] } } },
-            blocks: [{ id: 'block-1', name: 'Foundation', days: [] }],
         });
 
         expect(screen.getByText('No sessions logged on this day.')).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'New day in Foundation' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'New program day' })).not.toBeInTheDocument();
     });
 
     it('offers planning without an empty-history message for today and future dates', () => {
@@ -112,12 +111,11 @@ describe('ProgramDayPane day review', () => {
                         date={date}
                         today="2026-09-02"
                         query={{ data: { detail: { occurrences: [], scheduled: false, sessions: [] } } }}
-                        program={{ id: 'program-1' }}
-                        blocks={[{ id: 'block-1', name: 'Foundation', days: [] }]}
+                        program={{ id: 'program-1', days: [] }}
                     />
                 </MemoryRouter>,
             );
-            expect(screen.getByRole('button', { name: 'New day in Foundation' })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'New program day' })).toBeInTheDocument();
             expect(screen.queryByText('No sessions logged on this day.')).not.toBeInTheDocument();
             unmount();
         }

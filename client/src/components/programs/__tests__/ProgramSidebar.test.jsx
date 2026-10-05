@@ -34,8 +34,8 @@ describe('ProgramSidebar', () => {
             <ProgramSidebar
                 programMetrics={{
                     calculation_version: 'program_metrics_v1',
-                    adherence: { mode: 'scheduled', rate: 0.75, current_streak: 4 },
-                    alignment: { duration_seconds: { rate: 0.6 } },
+                    consistency: { mode: 'scheduled', rate: 0.75, current_streak: 4 },
+                    outcomes: { goals_completed_in_window: 1, goals_in_scope: 3 },
                     program: { progress: { rate: 0.25 } },
                     blocks: [],
                 }}
@@ -53,8 +53,9 @@ describe('ProgramSidebar', () => {
             }
         );
 
-        expect(screen.getByText('75% Adherence')).toBeInTheDocument();
-        expect(screen.getByText('Alignment:').closest('div')).toHaveTextContent('Alignment: 60%');
+        expect(screen.getByText('75% Consistency')).toBeInTheDocument();
+        expect(screen.getByText('Goals completed:').closest('div')).toHaveTextContent('Goals completed: 1 / 3');
+        expect(screen.queryByText('Alignment:')).not.toBeInTheDocument();
         expect(screen.getByText('Current streak:').closest('div')).toHaveTextContent('Current streak: 4 days');
         expect(screen.getByText('Program progress:').closest('div')).toHaveTextContent('Program progress: 25%');
     });

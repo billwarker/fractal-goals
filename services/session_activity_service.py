@@ -260,8 +260,7 @@ class SessionActivityService:
             raw_program_goals = self.db_session.execute(
                 text(
                     "SELECT goal_id FROM program_days "
-                    "JOIN program_blocks ON program_blocks.id = program_days.block_id "
-                    "JOIN programs ON programs.id = program_blocks.program_id "
+                    "JOIN programs ON programs.id = program_days.program_id "
                     "JOIN program_goals ON program_goals.program_id = programs.id "
                     "WHERE program_days.id = :day_id AND programs.root_id = :root_id"
                 ),

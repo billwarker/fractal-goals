@@ -10,7 +10,9 @@ from typing import List, Dict, Any
 
 from sqlalchemy.orm import selectinload
 
-from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, Goal, SessionTemplate, Target, validate_root_goal, program_goals, program_block_goals
+from models import Program, ProgramDay, ProgramDayTemplate, Goal, SessionTemplate, Target, validate_root_goal, program_goals
+from models.base import utc_now
+from models.goal import program_day_goals
 from services import event_bus
 from services.goal_service import GoalService, sync_goal_targets
 from services.program_scope import resolve_program_scope
@@ -22,11 +24,11 @@ from services.program_service_errors import ProgramServiceValidationError
 class _ProgramHelpersMixin:
     @classmethod
     def _program_serializer_load_options(cls):
-        day_load = selectinload(Program.blocks).selectinload(ProgramBlock.days)
+        day_load = selectinload(Program.days)
         template_goal_load = day_load.selectinload(ProgramDay.templates).selectinload(SessionTemplate.goals)
         return [
             selectinload(Program.goals),
-            selectinload(Program.blocks).selectinload(ProgramBlock.goals),
+            selectinload(Program.blocks),
             day_load.selectinload(ProgramDay.goals),
             day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
             template_goal_load.selectinload(Goal.level),
@@ -148,9 +150,9 @@ class _ProgramHelpersMixin:
         return value.date() if isinstance(value, datetime) else value
 
     @classmethod
-    def _program_day_scheduled_on(cls, day: ProgramDay, block: ProgramBlock, target_date: date) -> bool:
+    def _program_day_scheduled_on(cls, day: ProgramDay, program: Program, target_date: date) -> bool:
         from services.program_day_occurrences import program_day_scheduled_on
-        return program_day_scheduled_on(day, block, target_date)
+        return program_day_scheduled_on(day, program, target_date)
 
     @classmethod
     def _normalize_template_configs(cls, data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -291,33 +293,44 @@ class _ProgramHelpersMixin:
         return goals
 
     @classmethod
-    def _replace_block_goals(cls, session, block_id: str, goal_ids: List[str], root_id: str):
-        block = session.query(ProgramBlock).join(Program).filter(
-            ProgramBlock.id == block_id,
-            Program.root_id == root_id,
-        ).populate_existing().with_for_update(of=ProgramBlock).first()
-        if not block:
-            raise ValueError("Program block not found")
-        block.row_version += 1
+    def _replace_day_goals(cls, session, day: ProgramDay, goal_ids: List[str], root_id: str):
+        """Make ``day``'s active goals exactly ``goal_ids``; removed rows are soft-deleted."""
         goal_ids = list(dict.fromkeys(goal_ids or []))
-        goals = []
         if goal_ids:
-            goals = session.query(Goal).filter(
-                Goal.id.in_(goal_ids),
-                Goal.root_id == root_id,
-                Goal.deleted_at == None
-            ).all()
-            found_ids = {g.id for g in goals}
+            found_ids = {
+                goal_id for (goal_id,) in session.query(Goal.id).filter(
+                    Goal.id.in_(goal_ids),
+                    Goal.root_id == root_id,
+                    Goal.deleted_at == None,
+                ).all()
+            }
             missing_ids = [gid for gid in goal_ids if gid not in found_ids]
             if missing_ids:
                 raise ValueError(f"Goals not found in this fractal: {', '.join(missing_ids)}")
 
-        session.execute(
-            program_block_goals.delete().where(program_block_goals.c.program_block_id == block_id)
-        )
-        if goals:
+        rows = session.execute(
+            program_day_goals.select().where(program_day_goals.c.program_day_id == day.id)
+        ).mappings().all()
+        existing = {row['goal_id']: row for row in rows}
+        wanted = set(goal_ids)
+        now = utc_now()
+        retired = [goal_id for goal_id, row in existing.items() if row['deleted_at'] is None and goal_id not in wanted]
+        revived = [goal_id for goal_id in goal_ids if goal_id in existing and existing[goal_id]['deleted_at'] is not None]
+        added = [goal_id for goal_id in goal_ids if goal_id not in existing]
+        if retired:
+            session.execute(program_day_goals.update().where(
+                program_day_goals.c.program_day_id == day.id,
+                program_day_goals.c.goal_id.in_(retired),
+            ).values(deleted_at=now))
+        if revived:
+            session.execute(program_day_goals.update().where(
+                program_day_goals.c.program_day_id == day.id,
+                program_day_goals.c.goal_id.in_(revived),
+            ).values(deleted_at=None, created_at=now))
+        if added:
             session.execute(
-                program_block_goals.insert(),
-                [{'program_block_id': block_id, 'goal_id': g.id} for g in goals]
+                program_day_goals.insert(),
+                [{'program_day_id': day.id, 'goal_id': goal_id, 'created_at': now} for goal_id in added],
             )
-        return goals
+        if retired or revived or added:
+            session.expire(day, ['goals'])

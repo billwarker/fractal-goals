@@ -3,57 +3,86 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import ProgramDaysNavigator from '../ProgramDaysNavigator';
 
-const blocks = [
-    { id: 'b1', name: 'Month 1', color: '#3366ff', days: [
-        { id: 'd1', name: 'Planche Focus - Day 1', templates: [{ id: 't1', name: 'Planche Focus' }] },
-        { id: 'd2', name: 'Front Lever Focus - Day 2', templates: [
-            { id: 't2', name: 'Front Lever' }, { id: 't3', name: 'Mobility' },
-        ] },
-        { id: 'd3', name: 'Rest', templates: [] },
+// Program days belong to the program: each is listed once, whichever blocks its dates fall in.
+const days = [
+    { id: 'd1', name: 'Planche Focus - Day 1', day_of_week: ['Monday'], templates: [{ id: 't1', name: 'Planche Focus' }] },
+    { id: 'd2', name: 'Front Lever Focus - Day 2', day_of_week: [], scheduled_dates: ['2026-10-08'], templates: [
+        { id: 't2', name: 'Front Lever' }, { id: 't3', name: 'Mobility' },
     ] },
-    { id: 'b2', name: 'Deload', days: [] },
+    { id: 'd3', name: 'Rest', day_of_week: [], templates: [] },
 ];
+const occurrencesByDay = new Map([
+    ['d1', [{ date: '2026-09-28' }, { date: '2026-10-05' }, { date: '2026-10-12' }]],
+    ['d2', [{ date: '2026-10-08' }]],
+]);
+
+function renderNavigator(props = {}) {
+    return render(
+        <ProgramDaysNavigator
+            days={days}
+            occurrencesByDay={occurrencesByDay}
+            today="2026-10-05"
+            selectedDayId="d2"
+            onSelectDay={vi.fn()}
+            onSelectTemplate={vi.fn()}
+            {...props}
+        />,
+    );
+}
+
+const dayButton = (name) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
 
 describe('ProgramDaysNavigator', () => {
-    it('lists plannable days by block with their templates and marks the selection', () => {
-        render(<ProgramDaysNavigator blocks={blocks} selectedDayId="d2" onSelectDay={vi.fn()} onSelectTemplate={vi.fn()} />);
+    it('lists every program day once, with its schedule, templates, and the selection', () => {
+        renderNavigator();
 
-        expect(screen.getByRole('heading', { name: 'Month 1' })).toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: 'Deload' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Rest' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Front Lever Focus - Day 2' })).toHaveAttribute('aria-current', 'true');
+        expect(screen.queryByRole('heading')).not.toBeInTheDocument();
+        expect(dayButton('Front Lever Focus - Day 2')).toHaveAttribute('aria-current', 'true');
+        expect(dayButton('Planche Focus - Day 1')).toHaveTextContent('Mon · Next today');
+        expect(dayButton('Front Lever Focus - Day 2')).toHaveTextContent('Oct 8 · Next Thu, Oct 8');
         expect(screen.getByRole('list', { name: 'Front Lever Focus - Day 2 templates' }).children).toHaveLength(2);
+        // A day without templates stays listed, so a newly created day never disappears.
+        expect(dayButton('Rest')).toHaveTextContent('Not scheduled');
+        expect(screen.getByText('Add a session template to plan this day.')).toBeInTheDocument();
+    });
+
+    it('creates and edits program days from the side pane', () => {
+        const onCreateDay = vi.fn();
+        const onEditDay = vi.fn();
+        renderNavigator({ onCreateDay, onEditDay });
+
+        fireEvent.click(screen.getByRole('button', { name: 'New program day' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Edit Rest' }));
+
+        expect(onCreateDay).toHaveBeenCalledTimes(1);
+        expect(onEditDay).toHaveBeenCalledWith(days[2]);
     });
 
     it('selects a day, or a day and template to bring its plan into view', () => {
         const onSelectDay = vi.fn();
         const onSelectTemplate = vi.fn();
-        render(<ProgramDaysNavigator blocks={blocks} selectedDayId="d1" onSelectDay={onSelectDay} onSelectTemplate={onSelectTemplate} />);
+        renderNavigator({ selectedDayId: 'd1', onSelectDay, onSelectTemplate });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Front Lever Focus - Day 2' }));
+        fireEvent.click(dayButton('Front Lever Focus - Day 2'));
         fireEvent.click(screen.getByRole('button', { name: 'Plan Mobility for Front Lever Focus - Day 2' }));
 
         expect(onSelectDay).toHaveBeenCalledWith('d2');
         expect(onSelectTemplate).toHaveBeenCalledWith('d2', 't3');
     });
 
-    it('explains how to get started when nothing can be planned', () => {
-        render(<ProgramDaysNavigator blocks={[{ id: 'b', name: 'B', days: [] }]} selectedDayId={null} onSelectDay={vi.fn()} onSelectTemplate={vi.fn()} />);
+    it('explains program days and offers to create one when there are none', () => {
+        const onCreateDay = vi.fn();
+        renderNavigator({ days: [], selectedDayId: null, onCreateDay });
 
-        expect(screen.getByText(/Add a program day with a session template/)).toBeInTheDocument();
+        expect(screen.getByText(/repeats across the whole program/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'New program day' }));
+        expect(onCreateDay).toHaveBeenCalledTimes(1);
     });
 
     it('scopes a day from a click anywhere in its container without overriding its templates', () => {
         const onSelectDay = vi.fn();
         const onSelectTemplate = vi.fn();
-        render(
-            <ProgramDaysNavigator
-                blocks={blocks}
-                selectedDayId="d1"
-                onSelectDay={onSelectDay}
-                onSelectTemplate={onSelectTemplate}
-            />,
-        );
+        renderNavigator({ selectedDayId: 'd1', onSelectDay, onSelectTemplate });
 
         fireEvent.click(screen.getByRole('list', { name: 'Front Lever Focus - Day 2 templates' }));
         expect(onSelectDay).toHaveBeenCalledWith('d2');

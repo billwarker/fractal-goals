@@ -257,6 +257,14 @@ class _GoalCrudMixin:
             if monotonicity_error:
                 return None, monotonicity_error, 400
 
+            if parent_goal.deadline and deadline:
+                parent_deadline = parent_goal.deadline.date() if isinstance(parent_goal.deadline, datetime) else parent_goal.deadline
+                if deadline > parent_deadline:
+                    return None, {
+                        "error": "Child deadline cannot be later than parent deadline",
+                        "parent_deadline": parent_deadline.isoformat(),
+                    }, 400
+
         completed_via_children = resolve_completed_via_children(data, level_obj)
         goal_defaults = Goal(parent_id=parent_id)
         goal_defaults.level = level_obj

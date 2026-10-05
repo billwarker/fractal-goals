@@ -265,30 +265,44 @@ describe('ProgramDayPane', () => {
         expect(screen.getByTitle('Review')).toHaveStyle({ color: 'rgb(13, 189, 201)' });
     });
 
-    it('offers reusable and dated scheduling actions on an empty date', () => {
+    it('offers every program day and a new day on an empty date, whichever block it is in', () => {
         const onScheduleDay = vi.fn();
         const onCreateDay = vi.fn();
-        const reusable = { id: 'reusable-1', name: 'Reusable', date: null };
+        const later = { id: 'later', name: 'Later', day_number: 2 };
+        const reusable = { id: 'reusable-1', name: 'Reusable', day_number: 1 };
         renderPane({
             query: { data: { detail: { occurrences: [], sessions: [] } } },
-            blocks: [{ id: 'block-1', name: 'Foundation', days: [reusable] }],
+            program: { id: 'program-1', name: 'Program', days: [later, reusable] },
             onScheduleDay,
             onCreateDay,
         });
 
-        fireEvent.click(screen.getByRole('button', { name: 'Schedule Reusable · Foundation' }));
-        fireEvent.click(screen.getByRole('button', { name: 'New day in Foundation' }));
-        expect(onScheduleDay).toHaveBeenCalledWith('block-1', '2026-09-02', reusable);
-        expect(onCreateDay).toHaveBeenCalledWith('block-1', '2026-09-02');
+        expect(screen.getAllByRole('button', { name: /^Schedule / }).map((button) => button.textContent))
+            .toEqual(['Schedule Reusable', 'Schedule Later']);
+        fireEvent.click(screen.getByRole('button', { name: 'Schedule Reusable' }));
+        fireEvent.click(screen.getByRole('button', { name: 'New program day' }));
+        expect(onScheduleDay).toHaveBeenCalledWith('2026-09-02', reusable);
+        expect(onCreateDay).toHaveBeenCalledWith('2026-09-02');
+    });
+
+    it('names the block and tracked week of a program day, and nothing outside every block', () => {
+        const withWeek = { ...detail, occurrences: [{ ...detail.occurrences[0], block: { ...detail.occurrences[0].block, week_index: 2 } }] };
+        const { unmount } = render(<MemoryRouter><ProgramDayPane rootId="root-1" date="2026-09-02" today="2026-09-02" query={{ data: { detail: withWeek } }} program={{ id: 'program-1' }} /></MemoryRouter>);
+        expect(screen.getByText('Foundation · Week 2')).toBeInTheDocument();
+        unmount();
+
+        renderPane({ query: { data: { detail: { ...detail, occurrences: [{ ...detail.occurrences[0], block: null }] } } } });
+        expect(screen.getByRole('heading', { name: 'Strength day' })).toBeInTheDocument();
+        expect(screen.queryByText('Foundation')).not.toBeInTheDocument();
     });
 
     it('offers no planning actions on a date that already has its program day', () => {
         renderPane({
-            blocks: [{ id: 'block-1', name: 'Foundation', days: [{ id: 'reusable-1', name: 'Reusable', date: null }] }],
+            program: { id: 'program-1', name: 'Program', days: [{ id: 'reusable-1', name: 'Reusable' }] },
         });
 
         expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Schedule Reusable · Foundation' })).not.toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'New day in Foundation' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Schedule Reusable' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'New program day' })).not.toBeInTheDocument();
     });
 });

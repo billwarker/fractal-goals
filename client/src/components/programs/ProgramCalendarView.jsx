@@ -225,6 +225,8 @@ function ProgramCalendarView({
                 programId: label.programId,
                 blockId: label.blockId,
                 labelType: label.labelType || 'block',
+                weekChip: label.weekChip || null,
+                weekTitle: label.weekTitle || null,
             });
             labels.set(label.date, dateLabels);
         });
@@ -332,12 +334,43 @@ function ProgramCalendarView({
         }
 
         cellLabels.forEach((blockLabel, index) => {
+            if (blockLabel.labelType === 'week') {
+                // Decorative: the week also shows in the day pane, so screen readers get the
+                // full sentence once and the visible chip stays hidden from them.
+                const weekLabel = document.createElement('span');
+                weekLabel.className = `${styles.blockCellLabel} ${styles.weekCellLabel}`;
+                weekLabel.title = blockLabel.weekTitle;
+                weekLabel.setAttribute('data-program-block-label', 'week');
+                weekLabel.style.setProperty('--program-block-label-color', blockLabel.color);
+                weekLabel.style.setProperty('--program-label-offset', `${index * 16}px`);
+                const chip = document.createElement('span');
+                chip.className = styles.weekChip;
+                chip.textContent = blockLabel.title;
+                chip.setAttribute('aria-hidden', 'true');
+                const assistive = document.createElement('span');
+                assistive.className = styles.dayStatusAssistive;
+                assistive.textContent = blockLabel.weekTitle;
+                weekLabel.append(chip, assistive);
+                frame.appendChild(weekLabel);
+                return;
+            }
             const labelButton = document.createElement('button');
             labelButton.type = 'button';
             labelButton.className = styles.blockCellLabel;
             if (blockLabel.labelType === 'program') labelButton.classList.add(styles.programCellLabel);
             labelButton.textContent = blockLabel.title;
-            labelButton.title = blockLabel.title;
+            labelButton.title = blockLabel.weekTitle || blockLabel.title;
+            if (blockLabel.weekChip) {
+                labelButton.classList.add(styles.blockCellLabelWithWeek);
+                const chip = document.createElement('span');
+                chip.className = styles.weekChip;
+                chip.textContent = blockLabel.weekChip;
+                chip.setAttribute('aria-hidden', 'true');
+                const name = document.createElement('span');
+                name.className = styles.blockCellLabelName;
+                name.textContent = blockLabel.title;
+                labelButton.replaceChildren(chip, name);
+            }
             labelButton.setAttribute('aria-label', blockLabel.labelType === 'program'
                 ? `View ${blockLabel.title}`
                 : `Select ${blockLabel.title}`);
@@ -367,7 +400,7 @@ function ProgramCalendarView({
     };
 
     const getBlockLabelFromEvent = (event) => {
-        const labelElement = event.target?.closest?.('[data-program-block-label]');
+        const labelElement = event.target?.closest?.('[data-program-block-label="true"]');
         if (!labelElement) return null;
         const labels = blockLabelsByDate.get(labelElement.dataset.programBlockLabelDate) || [];
         return labels[Number(labelElement.dataset.programBlockLabelIndex)] || null;

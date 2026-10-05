@@ -56,18 +56,15 @@ describe('programViewModel calendar builders', () => {
     it('places reusable days on explicit schedule dates alongside weekday recurrences', () => {
         const scheduledProgram = {
             ...program,
-            blocks: [{
-                ...program.blocks[0],
-                days: [{
+            end_date: '2026-05-23',
+            days: [{
                     id: 'day-1',
                     name: 'Planche Focus',
-                    date: null,
-                    // 2026-05-19 is a Tuesday; the 21st duplicates it; the 24th is outside the block.
+                    // 2026-05-19 is a Tuesday; the 21st duplicates it; the 24th is outside the program.
                     day_of_week: ['Tuesday'],
                     scheduled_dates: ['2026-05-21', '2026-05-19', '2026-05-24'],
                     templates: [],
                 }],
-            }],
         };
 
         const dates = buildProgramDayOccurrences({ program: scheduledProgram }).map((row) => row.date);
@@ -78,10 +75,8 @@ describe('programViewModel calendar builders', () => {
     it('places a reusable day with only explicit schedules and no weekdays', () => {
         const scheduledProgram = {
             ...program,
-            blocks: [{
-                ...program.blocks[0],
-                days: [{ id: 'day-1', date: null, day_of_week: [], scheduled_dates: ['2026-05-23'], templates: [] }],
-            }],
+            end_date: '2026-05-23',
+            days: [{ id: 'day-1', day_of_week: [], scheduled_dates: ['2026-05-23'], templates: [] }],
         };
 
         expect(buildProgramDayOccurrences({ program: scheduledProgram }).map((row) => row.date))
@@ -101,6 +96,18 @@ describe('programViewModel calendar builders', () => {
                 blockColor: '#3A86FF',
             }),
         ]);
+    });
+
+    it('adds week chips for a block that tracks weeks', () => {
+        // May 17, 2026 is a Sunday; Monday weeks make Week 1 a single day.
+        const tracked = { ...program, blocks: [{ ...program.blocks[0], track_weeks: true, week_start_day: 0 }] };
+        const labels = buildProgramBlockLabels({ program: tracked });
+
+        expect(labels[0]).toMatchObject({ title: 'Block 1', weekChip: 'W1', weekTitle: 'Block 1, week 1 of 2' });
+        expect(labels.slice(1)).toEqual([expect.objectContaining({
+            labelType: 'week', title: 'W2', date: '2026-05-18', weekTitle: 'Block 1, week 2 of 2',
+        })]);
+        expect(buildProgramBlockLabels({ program })[0].weekChip).toBeNull();
     });
 
     it('builds program labels from summary fields without requiring block data', () => {
@@ -243,10 +250,8 @@ describe('programViewModel calendar builders', () => {
     it('expands recurring program days into scheduled calendar occurrences', () => {
         const recurringProgram = {
             ...program,
-            blocks: [
-                {
-                    ...program.blocks[0],
-                    days: [
+            end_date: '2026-05-23',
+            days: [
                         {
                             id: 'daily-day',
                             name: 'Daily Practice',
@@ -256,12 +261,10 @@ describe('programViewModel calendar builders', () => {
                         {
                             id: 'out-of-range',
                             name: 'Outside',
-                            date: '2026-05-31',
+                            scheduled_dates: ['2026-05-31'],
                             templates: [{ id: 'template-2', name: 'Outside' }],
                         },
                     ],
-                },
-            ],
         };
 
         const occurrences = buildProgramDayOccurrences({ program: recurringProgram });
@@ -281,10 +284,8 @@ describe('programViewModel calendar builders', () => {
     it('counts completed scheduled program days over total scheduled program days for program and block metrics', () => {
         const dailyProgram = {
             ...program,
-            blocks: [
-                {
-                    ...program.blocks[0],
-                    days: [
+            end_date: '2026-05-23',
+            days: [
                         {
                             id: 'daily-day',
                             name: 'Daily Practice',
@@ -292,8 +293,6 @@ describe('programViewModel calendar builders', () => {
                             templates: [{ id: 'template-1', name: 'Practice' }],
                         },
                     ],
-                },
-            ],
         };
         const sessions = [
             {
@@ -325,7 +324,7 @@ describe('programViewModel calendar builders', () => {
             },
         ];
         const programDaysMap = new Map([
-            ['daily-day', { ...dailyProgram.blocks[0].days[0], blockId: 'block-1' }],
+            ['daily-day', dailyProgram.days[0]],
         ]);
 
         const programMetrics = buildDemoProgramMetrics({
@@ -352,37 +351,34 @@ describe('programViewModel calendar builders', () => {
             scheduledSessions: 7,
             totalDuration: 2700,
         });
+        // The May 24 session falls after the block, so only the program counts its time.
         expect(blockMetrics).toMatchObject({
             completedProgramDays: 2,
             scheduledProgramDays: 7,
             completedSessions: 2,
             scheduledSessions: 7,
-            totalDuration: 2700,
+            totalDuration: 2100,
         });
     });
 
     it('requires every template on a scheduled program day before counting the day complete', () => {
         const multiTemplateProgram = {
             ...program,
-            blocks: [
-                {
-                    ...program.blocks[0],
-                    days: [
+            end_date: '2026-05-23',
+            days: [
                         {
                             id: 'stacked-day',
                             name: 'Stacked Day',
-                            date: '2026-05-18',
+                            scheduled_dates: ['2026-05-18'],
                             templates: [
                                 { id: 'template-1', name: 'Warmup' },
                                 { id: 'template-2', name: 'Repertoire' },
                             ],
                         },
                     ],
-                },
-            ],
         };
         const programDaysMap = new Map([
-            ['stacked-day', { ...multiTemplateProgram.blocks[0].days[0], blockId: 'block-1' }],
+            ['stacked-day', multiTemplateProgram.days[0]],
         ]);
 
         const partialMetrics = buildDemoProgramMetrics({
@@ -437,14 +433,12 @@ describe('programViewModel calendar builders', () => {
     it('allows optional templates to be missing and enforces minimum template thresholds', () => {
         const flexibleProgram = {
             ...program,
-            blocks: [
-                {
-                    ...program.blocks[0],
-                    days: [
+            end_date: '2026-05-23',
+            days: [
                         {
                             id: 'flex-day',
                             name: 'Flexible Day',
-                            date: '2026-05-18',
+                            scheduled_dates: ['2026-05-18'],
                             completion_min_templates: 2,
                             templates: [
                                 { id: 'template-1', name: 'Required', is_required: true },
@@ -453,11 +447,9 @@ describe('programViewModel calendar builders', () => {
                             ],
                         },
                     ],
-                },
-            ],
         };
         const programDaysMap = new Map([
-            ['flex-day', { ...flexibleProgram.blocks[0].days[0], blockId: 'block-1' }],
+            ['flex-day', flexibleProgram.days[0]],
         ]);
 
         const requiredOnlyMetrics = buildDemoProgramMetrics({
@@ -518,19 +510,19 @@ describe('program day schedule labels', () => {
         [{ day_of_week: [], scheduled_dates: ['2026-09-26'] }, 'Sep 26'],
         [{ day_of_week: [], scheduled_dates: ['2026-10-03', '2026-09-26'] }, 'Sep 26, Oct 3'],
         [{ day_of_week: [], scheduled_dates: ['2026-09-26', '2026-09-28', '2026-10-01', '2026-10-03'] }, 'Sep 26 +3 more'],
-        [{ date: '2026-09-26T00:00:00Z', day_of_week: [] }, 'Sep 26'],
+        [{ scheduled_dates: ['2026-09-26T00:00:00Z'], day_of_week: [] }, 'Sep 26'],
         [{ day_of_week: [] }, ''],
     ])('labels %o as %s', (day, expected) => {
         expect(getProgramDayScheduleLabel(day)).toBe(expected);
     });
 
-    it('merges legacy and explicit dates without duplicates', () => {
-        expect(getProgramDaySpecificDates({ date: '2026-09-26', scheduled_dates: ['2026-09-26T00:00:00Z', '2026-09-20'] }))
+    it('sorts explicit dates without duplicates', () => {
+        expect(getProgramDaySpecificDates({ scheduled_dates: ['2026-09-26T00:00:00Z', '2026-09-20', '2026-09-26'] }))
             .toEqual(['2026-09-20', '2026-09-26']);
     });
 
     it('summarizes weekly and specific-date schedules', () => {
-        expect(formatWeekdaySchedule(['Friday', 'Monday', 'Wednesday'])).toBe('Every Monday, Wednesday and Friday in the block.');
+        expect(formatWeekdaySchedule(['Friday', 'Monday', 'Wednesday'])).toBe('Every Monday, Wednesday and Friday in the program.');
         expect(formatSpecificDatesSummary(['2026-09-26'])).toBe('1 date · Sep 26');
         expect(formatSpecificDatesSummary(['2026-10-10', '2026-09-26'])).toBe('2 dates · Sep 26 – Oct 10');
     });

@@ -5,37 +5,36 @@ import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import { sortProgramDays } from '../../utils/programViewModel';
 import ProgramDayPeriodBanner from './ProgramDayPeriodBanner';
 import ProgramDayStatusMark from './ProgramDayStatusMark';
 import ProgramDaySessionRow from './ProgramDaySessionRow';
 import ProgramDayStatusMenu from './ProgramDayStatusMenu';
 import styles from './ProgramSidePane.module.css';
 
-function ProgramDayPlanCard({ date, blocks, onScheduleDay, onCreateDay }) {
-    const activeBlocks = blocks.filter((block) => (
-        (!block.start_date || date >= block.start_date)
-        && (!block.end_date || date <= block.end_date)
-    ));
+function ProgramDayPlanCard({ date, program, onScheduleDay, onCreateDay }) {
+    const days = sortProgramDays(program?.days || []);
     return (
         <section className={styles.card}>
             <h3>Plan this day</h3>
-            <p className={styles.explainer}>Add a dated definition or schedule one of this program’s reusable day definitions.</p>
+            <p className={styles.explainer}>Schedule one of this program’s days here, or create a new one on this date.</p>
             <div className={styles.actionList}>
-                {activeBlocks.flatMap((block) => (block.days || [])
-                    .filter((day) => !day.date)
-                    .map((day) => (
-                        <button key={`${block.id}:${day.id}`} type="button" onClick={() => onScheduleDay?.(block.id, date, day)}>
-                            Schedule {day.name} · {block.name}
-                        </button>
-                    )))}
-                {activeBlocks.map((block) => (
-                    <button key={`new:${block.id}`} type="button" onClick={() => onCreateDay?.(block.id, date)}>
-                        New day in {block.name}
+                {days.map((day) => (
+                    <button key={day.id} type="button" onClick={() => onScheduleDay?.(date, day)}>
+                        Schedule {day.name || 'program day'}
                     </button>
                 ))}
+                <button type="button" onClick={() => onCreateDay?.(date)}>
+                    New program day
+                </button>
             </div>
         </section>
     );
+}
+
+function occurrenceBlockLabel(block) {
+    if (!block) return null;
+    return block.week_index ? `${block.name} · Week ${block.week_index}` : block.name;
 }
 
 function StartActions({ rootId, program, occurrence, date, sessionsById }) {
@@ -67,7 +66,7 @@ function StartActions({ rootId, program, occurrence, date, sessionsById }) {
 }
 
 export default function ProgramDayPane({
-    rootId, date, today, query, program, blocks = [],
+    rootId, date, today, query, program,
     onScheduleDay, onUnscheduleDay, onCreateDay,
     goals = [], onGoalClick, getGoalIcon, getGoalColor, getGoalSecondaryColor,
     timezone = 'UTC',
@@ -130,7 +129,11 @@ export default function ProgramDayPane({
                     <section className={styles.card} key={occurrence.occurrence_key}>
                         <div className={styles.cardHeading}>
                             <div className={styles.cardTitle}>
-                                <small style={{ color: occurrence.block.color || undefined }}>{occurrence.block.name}</small>
+                                {occurrence.block ? (
+                                    <small style={{ color: occurrence.block.color || undefined }}>
+                                        {occurrenceBlockLabel(occurrence.block)}
+                                    </small>
+                                ) : null}
                                 <div className={styles.programDayTitleLine}>
                                     <h3>{occurrence.name}</h3>
                                     {index === 0 && detail.scheduled ? (
@@ -199,7 +202,7 @@ export default function ProgramDayPane({
                             <button
                                 type="button"
                                 className={styles.quietAction}
-                                onClick={() => onUnscheduleDay?.(occurrence.block.id, occurrence.program_day_id, date)}
+                                onClick={() => onUnscheduleDay?.(occurrence.program_day_id, date)}
                             >Remove from this date</button>
                         ) : null}
                         {occurrenceGoals.length ? (
@@ -236,7 +239,7 @@ export default function ProgramDayPane({
             {date >= today && !detail.occurrences.length ? (
                 <ProgramDayPlanCard
                     date={date}
-                    blocks={blocks}
+                    program={program}
                     onScheduleDay={onScheduleDay}
                     onCreateDay={onCreateDay}
                 />

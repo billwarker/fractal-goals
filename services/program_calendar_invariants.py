@@ -1,8 +1,9 @@
 """Program calendar invariants: blocks never overlap, and a date holds one program day.
 
-Every calendar write (block create/update, day create/update/copy/schedule,
+Every calendar write (block create/update, day create/update/duplicate/schedule,
 program date changes) calls these guards inside its transaction, after taking
-the program row lock, so two concurrent writes cannot both pass. Block overlap
+the program row lock, so two concurrent writes cannot both pass. Program days
+belong to the program, so block writes never change which days occur. Block overlap
 is also backed by a Postgres exclusion constraint; the one-day-per-date rule
 depends on weekday expansion and is enforced here only.
 """
@@ -19,6 +20,7 @@ from services.program_service_errors import ProgramServiceValidationError
 BLOCK_INVALID_DATES = 'program_block_invalid_dates'
 BLOCK_OVERLAP = 'program_block_overlap'
 DAY_DATE_CONFLICT = 'program_day_date_conflict'
+DAY_DATE_OUTSIDE_PROGRAM = 'program_day_date_outside_program'
 BLOCK_OVERLAP_CONSTRAINT = 'ex_program_blocks_no_overlap'
 MAX_REPORTED_CONFLICTS = 20
 
@@ -132,11 +134,9 @@ def _calendar_snapshot(session, program_id):
     block_rows = session.query(
         ProgramBlock.id, ProgramBlock.name, ProgramBlock.start_date, ProgramBlock.end_date,
     ).filter(ProgramBlock.program_id == program_id).all()
-    block_ids = [row.id for row in block_rows]
     day_rows = session.query(
-        ProgramDay.id, ProgramDay.block_id, ProgramDay.name, ProgramDay.day_number,
-        ProgramDay.date, ProgramDay.day_of_week,
-    ).filter(ProgramDay.block_id.in_(block_ids)).all() if block_ids else []
+        ProgramDay.id, ProgramDay.name, ProgramDay.day_number, ProgramDay.day_of_week,
+    ).filter(ProgramDay.program_id == program_id).all()
     day_ids = [row.id for row in day_rows]
     schedules_by_day = {}
     if day_ids:
@@ -144,19 +144,21 @@ def _calendar_snapshot(session, program_id):
             ProgramDayOccurrenceSchedule.program_day_id, ProgramDayOccurrenceSchedule.date,
         ).filter(ProgramDayOccurrenceSchedule.program_day_id.in_(day_ids)).all():
             schedules_by_day.setdefault(day_id, []).append(SimpleNamespace(date=scheduled))
-    days_by_block = {}
-    for row in day_rows:
-        days_by_block.setdefault(row.block_id, []).append(SimpleNamespace(
-            id=row.id, name=row.name, day_number=row.day_number, date=row.date,
-            day_of_week=row.day_of_week, occurrence_schedules=schedules_by_day.get(row.id, []),
-        ))
-    return program, SimpleNamespace(blocks=[
-        SimpleNamespace(
-            id=row.id, name=row.name, start_date=row.start_date, end_date=row.end_date,
-            days=days_by_block.get(row.id, []),
-        )
-        for row in block_rows
-    ])
+    return SimpleNamespace(
+        start_date=program.start_date,
+        end_date=program.end_date,
+        blocks=[
+            SimpleNamespace(id=row.id, name=row.name, start_date=row.start_date, end_date=row.end_date)
+            for row in block_rows
+        ],
+        days=[
+            SimpleNamespace(
+                id=row.id, name=row.name, day_number=row.day_number, day_of_week=row.day_of_week,
+                occurrence_schedules=schedules_by_day.get(row.id, []),
+            )
+            for row in day_rows
+        ],
+    )
 
 
 def find_program_day_date_conflicts(calendar, start, end):
@@ -173,29 +175,19 @@ def find_program_day_date_conflicts(calendar, start, end):
                 'date': occurrence_date.isoformat(),
                 'day_id': day.id,
                 'day_name': day.name or f"Day {day.day_number or ''}".strip(),
-                'block_id': entry['block'].id,
+                'block_id': entry['block'].id if entry['block'] is not None else None,
             })
     return conflicts
 
 
 def assert_single_program_day_per_date(session, program_id):
-    """Run after flushing a write: reject it when any date now holds two program days."""
+    """Run after flushing a day write: reject it when any date now holds two program days."""
     session.flush()
-    program, calendar = _calendar_snapshot(session, program_id)
-    block_dates = [
-        value
-        for block in calendar.blocks
-        for value in (date_part(block.start_date), date_part(block.end_date))
-        if value
-    ]
-    legacy_dates = [
-        date_part(day.date) for block in calendar.blocks for day in block.days if day.date
-    ]
-    bounds = [value for value in (date_part(program.start_date), date_part(program.end_date)) if value]
-    candidates = bounds + block_dates + legacy_dates
-    if not candidates:
+    calendar = _calendar_snapshot(session, program_id)
+    start, end = date_part(calendar.start_date), date_part(calendar.end_date)
+    if not start or not end:
         return
-    conflicts = find_program_day_date_conflicts(calendar, min(candidates), max(candidates))
+    conflicts = find_program_day_date_conflicts(calendar, start, end)
     if not conflicts:
         return
     first_date = conflicts[0]['date']
@@ -214,6 +206,22 @@ def assert_single_program_day_per_date(session, program_id):
         'conflict_count': len(conflict_dates),
         'conflicts': conflicts[:MAX_REPORTED_CONFLICTS],
     }, 409)
+
+
+def assert_dates_within_program(program, dates):
+    """Explicit program-day dates must fall inside the program's span."""
+    start, end = date_part(program.start_date), date_part(program.end_date)
+    outside = sorted(value for value in dates if not (start and end and start <= value <= end))
+    if outside:
+        raise ProgramServiceValidationError({
+            'error': (
+                f"{_format_day(outside[0])} is outside the program "
+                f"({_format_day(start)} – {_format_day(end)})."
+            ),
+            'code': DAY_DATE_OUTSIDE_PROGRAM,
+            'field': 'scheduled_dates',
+            'dates': [value.isoformat() for value in outside[:MAX_REPORTED_CONFLICTS]],
+        }, 400)
 
 
 def flush_block_dates(session, block):

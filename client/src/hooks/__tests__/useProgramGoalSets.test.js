@@ -65,7 +65,7 @@ describe('useProgramGoalSets', () => {
 
     const byId = Object.fromEntries(goals.map((goal) => [goal.id, goal]));
 
-    it('builds one canonical attached goal set across program and block associations', () => {
+    it('builds one canonical attached goal set from the program goals, ignoring legacy block goals', () => {
         const { result } = renderHook(() => useProgramGoalSets({
             program: {
                 goal_ids: ['program-root'],
@@ -78,12 +78,9 @@ describe('useProgramGoalSets', () => {
             getGoalDetails: (goalId) => byId[goalId] || null,
         }));
 
-        expect(result.current.directAssociatedGoalIds).toEqual(['program-root', 'shared-child', 'block-only']);
-        expect(Array.from(result.current.attachedGoalIds)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
-        expect(result.current.hierarchySeedIds).toEqual(['program-root', 'block-only']);
-        expect(result.current.attachableBlockGoalIds).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
-        expect(result.current.attachableBlockGoals.map((goal) => goal.id)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child', 'block-only']);
-        expect(result.current.blockGoalIds).toEqual(['shared-child', 'block-only']);
+        expect(result.current.directAssociatedGoalIds).toEqual(['program-root']);
+        expect(Array.from(result.current.attachedGoalIds)).toEqual(['program-root', 'shared-child', 'grandchild', 'sibling-child']);
+        expect(result.current.hierarchySeedIds).toEqual(['program-root']);
     });
 
     it('expands descendants for block-specific metrics and other consumers from one helper', () => {

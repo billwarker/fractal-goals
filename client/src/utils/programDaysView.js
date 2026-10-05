@@ -3,14 +3,25 @@ import { getProgramDayStatusSymbol } from './programDayState';
 // Selection defaults for the Programs page Days tab. Shared by the page (which owns the
 // side-pane navigator) and the lazily loaded Days view.
 
-/** First day with templates in the block covering today, else the first such day. */
-export function pickDefaultDayId(blocks, today) {
-    const plannable = (block) => (block.days || []).find((day) => (day.templates || []).length > 0);
-    const current = (blocks || []).find((block) => (
-        (!block.start_date || block.start_date <= today) && (!block.end_date || today <= block.end_date)
-    ));
-    const day = (current && plannable(current)) || (blocks || []).map(plannable).find(Boolean);
-    return day?.id || null;
+/** Whether a program day has a session template to plan. */
+export function isPlannableDay(day) {
+    return (day?.templates || []).length > 0;
+}
+
+/**
+ * The default program day: the plannable day whose next date (today or later) comes first,
+ * else the first plannable day, else the first day.
+ */
+export function pickDefaultDayId(days, occurrencesByDay, today) {
+    const plannable = (days || []).filter(isPlannableDay);
+    const nextDate = (day) => (occurrencesByDay?.get(String(day.id)) || [])
+        .map((occurrence) => occurrence.date)
+        .find((value) => value >= today);
+    const upcoming = plannable
+        .map((day) => ({ day, next: nextDate(day) }))
+        .filter((entry) => entry.next)
+        .sort((left, right) => left.next.localeCompare(right.next))[0]?.day;
+    return (upcoming || plannable[0] || (days || [])[0])?.id || null;
 }
 
 /**
@@ -62,12 +73,9 @@ export function describeOccurrenceDate(date, dates, today, { completed = false, 
     return date === dates.find((value) => value > today) ? 'Next' : 'Upcoming';
 }
 
-export function findProgramDay(blocks, dayId) {
-    for (const block of blocks || []) {
-        const day = (block.days || []).find((candidate) => String(candidate.id) === String(dayId));
-        if (day) return { block, day };
-    }
-    return null;
+export function findProgramDay(days, dayId) {
+    const day = (days || []).find((candidate) => String(candidate.id) === String(dayId));
+    return day ? { day } : null;
 }
 
 /** DOM id of a template's plan card on one date, so the navigator can bring it into view. */
@@ -82,9 +90,9 @@ export function planCardElementId(templateId, date) {
  * picked one (or, with nothing earlier, the next date). Without `compare`, or for a day
  * with a single date, only the right column shows.
  */
-export function resolveDaysSelection({ blocks, occurrencesByDay, selection, today, compare = false }) {
-    const dayId = selection?.dayId || pickDefaultDayId(blocks, today);
-    const found = dayId ? findProgramDay(blocks, dayId) : null;
+export function resolveDaysSelection({ days, occurrencesByDay, selection, today, compare = false }) {
+    const dayId = selection?.dayId || pickDefaultDayId(days, occurrencesByDay, today);
+    const found = (dayId ? findProgramDay(days, dayId) : null) || findProgramDay(days, pickDefaultDayId(days, occurrencesByDay, today));
     const occurrences = (found && occurrencesByDay?.get(String(found.day.id))) || [];
     const dates = occurrences.map((occurrence) => occurrence.date);
     const date = (selection?.date && dates.includes(selection.date) ? selection.date : null)

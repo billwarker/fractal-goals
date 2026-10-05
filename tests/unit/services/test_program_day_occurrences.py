@@ -6,9 +6,12 @@ import pytest
 
 from services.program_day_occurrences import (
     apply_chain_facts,
+    block_for_date,
     build_day_facts,
+    build_occurrences,
     effective_session_date,
     evaluate_occurrence,
+    program_day_scheduled_on,
     summarize_chain_facts,
 )
 
@@ -23,15 +26,23 @@ def template_rule(template_id, *, required=True, order=0):
     )
 
 
-def scheduled_program(day_value, rules, *, minimum=None):
-    day = SimpleNamespace(
-        id="day-1", date=day_value, day_of_week=[], template_links=rules,
+def on(*values):
+    return [SimpleNamespace(date=value) for value in values]
+
+
+def dated_day(identifier, day_value, rules, *, minimum=None):
+    return SimpleNamespace(
+        id=identifier, day_of_week=[], template_links=rules, occurrence_schedules=on(day_value),
         templates=[rule.template for rule in rules], completion_min_templates=minimum,
     )
-    block = SimpleNamespace(
-        id="block-1", start_date=day_value, end_date=day_value, days=[day],
-    )
-    return SimpleNamespace(id="program-1", blocks=[block]), day
+
+
+def scheduled_program(day_value, rules, *, minimum=None):
+    day = dated_day("day-1", day_value, rules, minimum=minimum)
+    block = SimpleNamespace(id="block-1", start_date=day_value, end_date=day_value)
+    return SimpleNamespace(
+        id="program-1", start_date=day_value, end_date=day_value, blocks=[block], days=[day],
+    ), day
 
 
 def completed_session(template_id, day_value, *, program_day_id="day-1"):
@@ -90,11 +101,8 @@ def test_date_is_met_only_when_every_scheduled_occurrence_is_met():
     zone = ZoneInfo("UTC")
     day_value = date(2026, 9, 1)
     program, first = scheduled_program(day_value, [template_rule("a")])
-    second = SimpleNamespace(
-        id="day-2", date=day_value, day_of_week=[],
-        template_links=[template_rule("b")], templates=[], completion_min_templates=None,
-    )
-    program.blocks[0].days.append(second)
+    second = dated_day("day-2", day_value, [template_rule("b")])
+    program.days.append(second)
 
     partial = build_day_facts(
         program, day_value, day_value,
@@ -122,18 +130,12 @@ def test_overlapping_occurrences_use_one_deduplicated_day_threshold():
         [template_rule("a", required=False), template_rule("b", required=False)],
         minimum=2,
     )
-    second = SimpleNamespace(
-        id="day-2",
-        date=day_value,
-        day_of_week=[],
-        template_links=[
-            template_rule("b", required=False),
-            template_rule("c", required=False),
-        ],
-        templates=[],
-        completion_min_templates=2,
+    second = dated_day(
+        "day-2", day_value,
+        [template_rule("b", required=False), template_rule("c", required=False)],
+        minimum=2,
     )
-    program.blocks[0].days.append(second)
+    program.days.append(second)
 
     fact = build_day_facts(
         program,
@@ -183,12 +185,10 @@ def test_effective_session_date_respects_iana_timezone_and_dst_boundaries():
 def test_rest_bridges_between_met_dates_without_incrementing_run():
     zone = ZoneInfo("UTC")
     first_program, first_day = scheduled_program(date(2026, 9, 1), [template_rule("a")])
-    second_day = SimpleNamespace(
-        id="day-2", date=date(2026, 9, 3), day_of_week=[],
-        template_links=[template_rule("a")], templates=[], completion_min_templates=None,
-    )
+    second_day = dated_day("day-2", date(2026, 9, 3), [template_rule("a")])
     first_program.blocks[0].end_date = date(2026, 9, 3)
-    first_program.blocks[0].days.append(second_day)
+    first_program.end_date = date(2026, 9, 3)
+    first_program.days.append(second_day)
     sessions = [
         completed_session("a", date(2026, 9, 1), program_day_id=first_day.id),
         completed_session("a", date(2026, 9, 3), program_day_id=second_day.id),
@@ -475,13 +475,13 @@ def period(identifier, start, end, *, protects=True, deleted=False):
 def range_program(start, end, rules):
     """A block covering start..end with one definition recurring every day."""
     day = SimpleNamespace(
-        id="day-1", date=None, day_of_week=[
+        id="day-1", day_of_week=[
             "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
         ], template_links=rules, templates=[rule.template for rule in rules],
         completion_min_templates=None, occurrence_schedules=[],
     )
-    block = SimpleNamespace(id="block-1", start_date=start, end_date=end, days=[day])
-    return SimpleNamespace(id="program-1", blocks=[block])
+    block = SimpleNamespace(id="block-1", start_date=start, end_date=end)
+    return SimpleNamespace(id="program-1", start_date=start, end_date=end, blocks=[block], days=[day])
 
 
 def period_facts(program, start, end, sessions=(), *, periods=(), overrides=(), today):
@@ -585,13 +585,14 @@ def test_overlapping_periods_union_coverage_and_explicit_schedules_create_occurr
     start, end = date(2026, 9, 1), date(2026, 9, 4)
     rules = [template_rule("a")]
     day = SimpleNamespace(
-        id="day-1", date=None, day_of_week=[], template_links=rules,
+        id="day-1", day_of_week=[], template_links=rules,
         templates=[rule.template for rule in rules], completion_min_templates=None,
-        occurrence_schedules=[SimpleNamespace(date=date(2026, 9, 3))],
+        occurrence_schedules=on(date(2026, 9, 3)),
     )
-    program = SimpleNamespace(id="program-1", blocks=[
-        SimpleNamespace(id="block-1", start_date=start, end_date=end, days=[day]),
-    ])
+    program = SimpleNamespace(
+        id="program-1", start_date=start, end_date=end,
+        blocks=[SimpleNamespace(id="block-1", start_date=start, end_date=end)], days=[day],
+    )
     facts = period_facts(
         program, start, end,
         periods=[period("a", start, date(2026, 9, 2)), period("b", date(2026, 9, 2), end)],
@@ -601,3 +602,23 @@ def test_overlapping_periods_union_coverage_and_explicit_schedules_create_occurr
     assert [fact["period_ids"] for fact in facts] == [["a"], ["a", "b"], ["b"], ["b"]]
     assert [fact["scheduled"] for fact in facts] == [False, False, True, False]
     assert facts[2]["state"] == "rest"
+
+
+def test_weekday_days_repeat_across_the_program_and_carry_the_covering_block():
+    start, end = date(2026, 9, 7), date(2026, 9, 27)  # three Monday-started weeks
+    day = SimpleNamespace(
+        id="day-1", day_of_week=["Monday"], template_links=[], templates=[],
+        completion_min_templates=None, occurrence_schedules=on(date(2026, 10, 5)),
+    )
+    first = SimpleNamespace(id="block-1", start_date=start, end_date=date(2026, 9, 13))
+    third = SimpleNamespace(id="block-3", start_date=date(2026, 9, 21), end_date=end)
+    program = SimpleNamespace(id="program-1", start_date=start, end_date=end, blocks=[first, third], days=[day])
+
+    grouped = build_occurrences(program, date(2026, 9, 1), date(2026, 10, 31))
+
+    # The middle Monday sits outside every block; the October date is outside the program.
+    assert {value: rows[0]["block"] for value, rows in grouped.items()} == {
+        date(2026, 9, 7): first, date(2026, 9, 14): None, date(2026, 9, 21): third,
+    }
+    assert block_for_date(program, date(2026, 9, 15)) is None
+    assert program_day_scheduled_on(day, program, date(2026, 10, 5)) is False

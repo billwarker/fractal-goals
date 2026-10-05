@@ -11,7 +11,7 @@ from datetime import date, datetime, timedelta
 
 from sqlalchemy.orm import selectinload
 
-from models import Program, ProgramBlock, ProgramDay, ProgramDayTemplate, validate_root_goal
+from models import Program, ProgramDay, ProgramDayTemplate, validate_root_goal
 from models.program import get_program_day_template_rules
 from services._serialize_common import format_utc
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
@@ -33,8 +33,9 @@ def _parse_date(value):
 
 def _feed_load_options():
     """Only what the occurrence evaluator and ribbons read; no serializer graph."""
-    day_load = selectinload(Program.blocks).selectinload(ProgramBlock.days)
+    day_load = selectinload(Program.days)
     return [
+        selectinload(Program.blocks),
         day_load.selectinload(ProgramDay.goals),
         day_load.selectinload(ProgramDay.occurrence_schedules),
         day_load.selectinload(ProgramDay.templates),
@@ -154,6 +155,8 @@ class ProgramCalendarFeedService:
             "color": block.color,
             "start_date": format_utc(block.start_date),
             "end_date": format_utc(block.end_date),
+            "track_weeks": bool(block.track_weeks),
+            "week_start_day": block.week_start_day,
         }
 
     @staticmethod
@@ -163,8 +166,8 @@ class ProgramCalendarFeedService:
         return {
             "program_day_id": day.id,
             "name": day.name,
-            "block_id": block.id,
-            "block_color": block.color,
+            "block_id": block.id if block is not None else None,
+            "block_color": block.color if block is not None else None,
             "requirements_met": bool(row["evaluation"]["requirements_met"]),
             "goal_ids": [goal.id for goal in day.goals or []],
             "templates": [

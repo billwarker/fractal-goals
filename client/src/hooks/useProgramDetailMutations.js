@@ -6,6 +6,7 @@ import notify from '../utils/notify';
 import { useProgramLogic } from './useProgramLogic';
 import { logError } from '../utils/logger';
 import { calendarConflictMessage } from '../utils/programCalendarConflicts';
+import { focusError } from '../utils/programFocus';
 
 function formatGoalTypeLabel(type) {
     if (!type) return 'Goal';
@@ -17,13 +18,10 @@ export function useProgramDetailMutations({
     program,
     refreshData,
     refreshers,
-    selectedBlockId,
     dayModalInitialData,
-    attachBlockId,
     onProgramSaved,
     onBlockSaved,
     onDaySaved,
-    onAttachGoalSaved,
     onScheduleDaySaved,
     onGoalEditorClosed,
 }) {
@@ -56,8 +54,8 @@ export function useProgramDetailMutations({
             onBlockSaved?.();
         } catch (error) {
             logError('Failed to save training block:', error);
-            // Calendar conflicts are shown inline by the modal, which stays open.
-            if (!calendarConflictMessage(error)) {
+            // Calendar and focus conflicts are shown inline by the modal, which stays open.
+            if (!calendarConflictMessage(error) && !focusError(error)) {
                 notify.error(`Failed to save training block: ${formatError(error)}`);
             }
             throw error;
@@ -77,55 +75,57 @@ export function useProgramDetailMutations({
     const saveDay = useCallback(async (dayData) => {
         try {
             const dayId = dayModalInitialData?.id ?? null;
-            await actions.saveDay(selectedBlockId, dayId, dayData);
-            notify.success('Day saved');
-            onDaySaved?.();
+            const saved = await actions.saveDay(dayId, dayData);
+            notify.success(dayId ? 'Day saved' : 'Program day created');
+            onDaySaved?.(saved);
+            return saved;
         } catch (error) {
             logError('Failed to save day:', error);
-            if (!calendarConflictMessage(error)) {
+            if (!calendarConflictMessage(error) && !focusError(error)) {
                 notify.error(`Failed to save day: ${formatError(error)}`);
             }
             throw error;
         }
-    }, [actions, dayModalInitialData, selectedBlockId, onDaySaved]);
+    }, [actions, dayModalInitialData, onDaySaved]);
 
-    const copyDay = useCallback(async (dayId, copyData) => {
+    const duplicateDay = useCallback(async (dayId) => {
         try {
-            const result = await actions.copyDay(selectedBlockId, dayId, copyData);
-            notify.success('Day copied');
-            return result;
+            const copy = await actions.duplicateDay(dayId);
+            notify.success(copy?.name ? `Created ${copy.name}` : 'Day duplicated');
+            onDaySaved?.(copy);
+            return copy;
         } catch (error) {
-            logError('Failed to copy day:', error);
-            notify.error(`Failed to copy day: ${formatError(error)}`);
+            logError('Failed to duplicate day:', error);
+            notify.error(`Failed to duplicate day: ${formatError(error)}`);
             throw error;
         }
-    }, [actions, selectedBlockId]);
+    }, [actions, onDaySaved]);
 
     const deleteDay = useCallback(async (dayId) => {
         try {
-            await actions.deleteDay(selectedBlockId, dayId);
+            await actions.deleteDay(dayId);
             notify.success('Day deleted');
-            onDaySaved?.();
+            onDaySaved?.(null);
         } catch (error) {
             logError('Failed to delete day:', error);
             notify.error(`Failed to delete day: ${formatError(error)}`);
         }
-    }, [actions, selectedBlockId, onDaySaved]);
+    }, [actions, onDaySaved]);
 
-    const scheduleDay = useCallback(async (blockId, date, templateDay) => {
+    const scheduleDay = useCallback(async (date, templateDay) => {
         try {
-            await actions.scheduleDay(blockId, date, templateDay);
+            await actions.scheduleDay(date, templateDay);
             notify.success('Day scheduled');
             onScheduleDaySaved?.();
         } catch (error) {
             logError('Failed to schedule day:', error);
-            notify.error(`Failed to schedule day: ${formatError(error)}`);
+            notify.error(calendarConflictMessage(error) || `Failed to schedule day: ${formatError(error)}`);
         }
     }, [actions, onScheduleDaySaved]);
 
-    const unscheduleDay = useCallback(async (blockId, dayId, date, timezone) => {
+    const unscheduleDay = useCallback(async (dayId, date, timezone) => {
         try {
-            await actions.unscheduleDay(blockId, dayId, date, timezone);
+            await actions.unscheduleDay(dayId, date, timezone);
             notify.success('Removed from this date');
         } catch (error) {
             logError('Failed to remove scheduled day:', error);
@@ -133,16 +133,6 @@ export function useProgramDetailMutations({
         }
     }, [actions]);
 
-    const saveAttachedGoal = useCallback(async ({ goal_id, deadline }) => {
-        try {
-            await actions.attachGoal(attachBlockId, { goal_id, deadline });
-            notify.success('Goal attached');
-            onAttachGoalSaved?.();
-        } catch (error) {
-            logError('Failed to attach goal:', error);
-            notify.error(`Failed to attach goal: ${formatError(error)}`);
-        }
-    }, [actions, attachBlockId, onAttachGoalSaved]);
 
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
@@ -204,11 +194,10 @@ export function useProgramDetailMutations({
         saveBlock,
         deleteBlock,
         saveDay,
-        copyDay,
+        duplicateDay,
         deleteDay,
         scheduleDay,
         unscheduleDay,
-        saveAttachedGoal,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,

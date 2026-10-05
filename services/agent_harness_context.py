@@ -1,9 +1,10 @@
 """Context operations for the delegated AI harness."""
 
 import datetime as dt
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from sqlalchemy import func
-from models import ActivityDefinition, AgentGrant, AgentOAuthClient, AgentTaskBrief, Goal, Program, ProgramBlock, ProgramDay, SessionTemplate, program_day_templates, utc_now, validate_root_goal
+from models import ActivityDefinition, AgentGrant, AgentOAuthClient, AgentTaskBrief, Goal, Program, ProgramBlock, ProgramDay, SessionTemplate, program_day_goals, program_day_templates, utc_now, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from validators.agent import AgentTaskBriefSchema
 
@@ -11,6 +12,7 @@ from services.agent_harness_common import AgentHarnessError, MAX_CONTEXT_ACTIVIT
 
 
 class AgentContextMixin:
+    db_session: Any  # provided by the composed AgentHarnessService
     def _root(self, root_id, user_id):
         root = validate_root_goal(self.db_session, root_id, owner_id=user_id)
         if not root:
@@ -111,7 +113,7 @@ class AgentContextMixin:
         detailed_programs = programs[:nested_program_limit]
         program_context = []
         block_rows = []
-        days_by_block = {}
+        days_by_program = {}
         template_counts = {}
         if detailed_programs:
             program_ids = [row.id for row in detailed_programs]
@@ -121,6 +123,8 @@ class AgentContextMixin:
                 ProgramBlock.name.label("name"),
                 ProgramBlock.start_date.label("start_date"),
                 ProgramBlock.end_date.label("end_date"),
+                ProgramBlock.track_weeks.label("track_weeks"),
+                ProgramBlock.week_start_day.label("week_start_day"),
                 func.row_number().over(
                     partition_by=ProgramBlock.program_id,
                     order_by=(ProgramBlock.start_date, ProgramBlock.id),
@@ -129,25 +133,21 @@ class AgentContextMixin:
             block_rows = self.db_session.query(ranked_blocks).filter(
                     ranked_blocks.c.rank <= nested_block_limit,
             ).order_by(ranked_blocks.c.program_id, ranked_blocks.c.rank).all()
-            block_ids = [row.id for row in block_rows]
 
-            day_rows = []
-            if block_ids:
-                ranked_days = self.db_session.query(
-                    ProgramDay.id.label("id"),
-                    ProgramDay.block_id.label("block_id"),
-                    ProgramDay.name.label("name"),
-                    ProgramDay.date.label("date"),
-                    ProgramDay.day_of_week.label("day_of_week"),
-                    ProgramDay.completion_min_templates.label("completion_min_templates"),
-                    func.row_number().over(
-                        partition_by=ProgramDay.block_id,
-                        order_by=(ProgramDay.day_number, ProgramDay.id),
-                    ).label("rank"),
-                ).filter(ProgramDay.block_id.in_(block_ids)).subquery()
-                day_rows = self.db_session.query(ranked_days).filter(
-                        ranked_days.c.rank <= nested_day_limit,
-                ).order_by(ranked_days.c.block_id, ranked_days.c.rank).all()
+            ranked_days = self.db_session.query(
+                ProgramDay.id.label("id"),
+                ProgramDay.program_id.label("program_id"),
+                ProgramDay.name.label("name"),
+                ProgramDay.day_of_week.label("day_of_week"),
+                ProgramDay.completion_min_templates.label("completion_min_templates"),
+                func.row_number().over(
+                    partition_by=ProgramDay.program_id,
+                    order_by=(ProgramDay.day_number, ProgramDay.id),
+                ).label("rank"),
+            ).filter(ProgramDay.program_id.in_(program_ids)).subquery()
+            day_rows = self.db_session.query(ranked_days).filter(
+                    ranked_days.c.rank <= nested_day_limit + 1,
+            ).order_by(ranked_days.c.program_id, ranked_days.c.rank).all()
 
             day_ids = [row.id for row in day_rows]
             templates_by_day = {}
@@ -182,30 +182,39 @@ class AgentContextMixin:
                     program_day_templates.c.program_day_id.in_(day_ids),
                 ).group_by(program_day_templates.c.program_day_id).all())
 
+            day_goal_ids = {}
+            if day_ids:
+                for day_id, goal_id in self.db_session.query(
+                    program_day_goals.c.program_day_id, program_day_goals.c.goal_id,
+                ).filter(
+                    program_day_goals.c.program_day_id.in_(day_ids),
+                    program_day_goals.c.deleted_at.is_(None),
+                ).order_by(program_day_goals.c.program_day_id, program_day_goals.c.goal_id).all():
+                    day_goal_ids.setdefault(day_id, []).append(goal_id)
             for day in day_rows:
-                days_by_block.setdefault(day.block_id, []).append({
+                days_by_program.setdefault(day.program_id, []).append({
                     "id": day.id,
                     "name": day.name,
-                    "date": _iso(day.date),
                     "day_of_week": day.day_of_week or [],
                     "completion_min_templates": day.completion_min_templates,
+                    "goal_ids": day_goal_ids.get(day.id, []),
                     "templates": templates_by_day.get(day.id, []),
                         "templates_truncated": template_counts.get(day.id, 0) > nested_template_limit,
                 })
             blocks_by_program = {}
             for block in block_rows:
-                days = days_by_block.get(block.id, [])
                 blocks_by_program.setdefault(block.program_id, []).append({
                     "id": block.id,
                     "name": block.name,
                     "start_date": _iso(block.start_date),
                     "end_date": _iso(block.end_date),
-                    "days": days[:nested_day_limit],
-                    "days_truncated": len(days) > nested_day_limit,
+                    "track_weeks": bool(block.track_weeks),
+                    "week_start_day": block.week_start_day,
                 })
 
             for program in detailed_programs:
                 blocks = blocks_by_program.get(program.id, [])
+                days = days_by_program.get(program.id, [])
                 program_context.append({
                     "id": program.id,
                     "name": program.name,
@@ -213,6 +222,8 @@ class AgentContextMixin:
                     "end_date": _iso(program.end_date),
                     "blocks": blocks[:nested_block_limit],
                     "blocks_truncated": len(blocks) > nested_block_limit,
+                    "days": days[:nested_day_limit],
+                    "days_truncated": len(days) > nested_day_limit,
                 })
         return {
             "root": {"id": root_id, "name": root.name},
@@ -244,7 +255,7 @@ class AgentContextMixin:
                 "truncated": len(programs) > program_page_limit,
                 "details_truncated": len(programs) > nested_program_limit
                 or any(len(blocks_by_program.get(row.id, [])) > nested_block_limit for row in detailed_programs)
-                or any(len(days_by_block.get(block.id, [])) > nested_day_limit for block in block_rows)
+                or any(len(days_by_program.get(row.id, [])) > nested_day_limit for row in detailed_programs)
                 or any(count > 5 for count in template_counts.values()),
             },
             "templates": {
@@ -312,44 +323,49 @@ class AgentContextMixin:
         blocks = blocks_query.offset(max(0, int(block_offset or 0))).limit(page_size + 1).all()
         has_more_blocks = len(blocks) > page_size
         blocks = blocks[:page_size]
+        days_query = self.db_session.query(ProgramDay).filter_by(
+            program_id=program.id,
+        ).order_by(ProgramDay.day_number, ProgramDay.id)
+        selected_day = None
+        if day_id:
+            selected_day = days_query.filter(ProgramDay.id == day_id).first()
+            if not selected_day:
+                raise AgentHarnessError("Day is not available in this program", 404, "not_found")
+        days = days_query.offset(max(0, int(day_offset or 0))).limit(page_size + 1).all()
+        has_more_days = len(days) > page_size
+        days = days[:page_size]
         selected = {
             "program": program_item(program),
             "blocks": {
                 "items": [{
                     "id": row.id, "name": row.name,
                     "start_date": _iso(row.start_date), "end_date": _iso(row.end_date),
+                    "track_weeks": bool(row.track_weeks), "week_start_day": row.week_start_day,
                 } for row in blocks],
                 "offset": max(0, int(block_offset or 0)),
                 "next_offset": max(0, int(block_offset or 0)) + len(blocks) if has_more_blocks else None,
             },
-        }
-        result["selected"] = selected
-        if not block_id:
-            return result
-
-        days_query = self.db_session.query(ProgramDay).filter_by(
-            block_id=selected_block.id,
-        ).order_by(ProgramDay.day_number, ProgramDay.id)
-        selected_day = None
-        if day_id:
-            selected_day = days_query.filter(ProgramDay.id == day_id).first()
-            if not selected_day:
-                raise AgentHarnessError("Day is not available in this block", 404, "not_found")
-        days = days_query.offset(max(0, int(day_offset or 0))).limit(page_size + 1).all()
-        has_more_days = len(days) > page_size
-        days = days[:page_size]
-        selected["block"] = {
-            "id": selected_block.id,
-            "name": selected_block.name,
+            # Program days belong to the program; weekdays repeat across its whole span.
             "days": {
                 "items": [{
                     "id": row.id, "name": row.name, "day_number": row.day_number,
-                    "date": _iso(row.date), "day_of_week": row.day_of_week or [],
+                    "day_of_week": row.day_of_week or [],
+                    "scheduled_dates": [_iso(item.date) for item in row.occurrence_schedules or []],
                 } for row in days],
                 "offset": max(0, int(day_offset or 0)),
                 "next_offset": max(0, int(day_offset or 0)) + len(days) if has_more_days else None,
             },
         }
+        if selected_block is not None:
+            selected["block"] = {
+                "id": selected_block.id,
+                "name": selected_block.name,
+                "start_date": _iso(selected_block.start_date),
+                "end_date": _iso(selected_block.end_date),
+                "track_weeks": bool(selected_block.track_weeks),
+                "week_start_day": selected_block.week_start_day,
+            }
+        result["selected"] = selected
         if not day_id:
             return result
 
@@ -374,7 +390,6 @@ class AgentContextMixin:
             "id": selected_day.id,
             "name": selected_day.name,
             "day_number": selected_day.day_number,
-            "date": _iso(selected_day.date),
             "templates": {
                 "items": [{
                     "id": row.id, "name": row.name, "description": row.description,

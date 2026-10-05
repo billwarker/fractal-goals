@@ -15,6 +15,7 @@ from services.owned_entity_queries import get_owned_program
 from services.quota_service import QuotaService
 from services.serializers import serialize_program, serialize_program_block
 from services.program_scope import resolve_program_scope, resolve_program_scopes
+from services.program_focus import guard_program_goal_change, resolve_focus_scopes
 from services._serialize_common import format_utc
 from services.program_calendar_invariants import (
     assert_block_dates_valid,
@@ -25,11 +26,19 @@ from services.program_calendar_invariants import (
     lock_program_calendar,
 )
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # Mixins resolve shared helpers through the composed ProgramService.
+    from services._program_helpers import _ProgramHelpersMixin as _ProgramMixinBase
+else:
+    _ProgramMixinBase = object
+
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
 
 
-class _ProgramCrudMixin:
+class _ProgramCrudMixin(_ProgramMixinBase):
     @classmethod
     def get_program_summaries(cls, session, root_id: str, current_user_id: str | None = None) -> List[Dict]:
         """Return every program's lightweight metadata; the calendar feed owns dated content."""
@@ -96,13 +105,11 @@ class _ProgramCrudMixin:
             name=data['name'],
             start_date=start_date_val,
             end_date=end_date_val,
-            color=data.get('color')
+            color=data.get('color'),
+            **cls._block_week_fields(data, None),
         )
         session.add(new_block)
         flush_block_dates(session, new_block)
-
-        if data.get('goal_ids'):
-            cls._replace_block_goals(session, new_block.id, data['goal_ids'], root_id)
 
         cls._commit(session, new_block, commit=commit)
         event = Event(Events.PROGRAM_BLOCK_CREATED, {
@@ -131,7 +138,9 @@ class _ProgramCrudMixin:
             block.name = data['name']
         if 'color' in data:
             block.color = data['color']
-            
+        for key, value in cls._block_week_fields(data, block).items():
+            setattr(block, key, value)
+
         changes_dates = any(key in data for key in ('start_date', 'startDate', 'end_date', 'endDate'))
         if changes_dates:
             # Validate before assigning so autoflush never sends a conflicting range.
@@ -147,12 +156,6 @@ class _ProgramCrudMixin:
             assert_no_block_overlap(session, program.id, next_start, next_end, exclude_block_id=block.id)
             block.start_date, block.end_date = next_start, next_end
             flush_block_dates(session, block)
-            # Moving a block re-expands its weekday days and dormant explicit dates.
-            assert_single_program_day_per_date(session, program.id)
-
-        if 'goal_ids' in data:
-            cls._replace_block_goals(session, block.id, data['goal_ids'], root_id)
-            session.expire(block, ['goals'])
 
         cls._commit(session, block, commit=commit)
         event = Event(Events.PROGRAM_BLOCK_UPDATED, {
@@ -221,7 +224,7 @@ class _ProgramCrudMixin:
 
         session.add(new_program)
         session.flush()
-        cls._replace_program_goals(session, new_program.id, goal_ids, root_id)
+        cls._replace_program_goals(session, str(new_program.id), goal_ids, root_id)
         
         cls._commit(session, new_program, commit=commit)
 
@@ -279,9 +282,16 @@ class _ProgramCrudMixin:
             program.start_date = next_start_date
         if 'end_date' in validated_data:
             program.end_date = next_end_date
+        if changes_dates:
+            # Weekday days follow the program span, so a longer program repeats them further.
+            assert_single_program_day_per_date(session, program.id)
         if 'selectedGoals' in validated_data:
             goal_ids = validated_data['selectedGoals']
-            cls._replace_program_goals(session, program.id, goal_ids, root_id)
+            before = resolve_focus_scopes(session, root_id, program.id)
+            cls._replace_program_goals(session, str(program.id), goal_ids, root_id)
+            guard_program_goal_change(
+                session, root_id, program.id, before, prune=bool(validated_data.get('prune_day_goals')),
+            )
         
         cls._commit(session, program, commit=commit)
 
@@ -306,10 +316,7 @@ class _ProgramCrudMixin:
             raise ValueError("Program not found")
         
         # Count sessions
-        affected_sessions_count = 0
-        for block in program.blocks:
-            for day in block.days:
-                affected_sessions_count += len([s for s in day.completed_sessions if not s.deleted_at])
+        affected_sessions_count = cls._count_program_day_sessions(program)
         
         program_name = program.name
         session.delete(program)
@@ -330,8 +337,34 @@ class _ProgramCrudMixin:
         if not program:
              raise ValueError("Program not found")
         
-        count = 0
-        for block in program.blocks:
-            for day in block.days:
-                count += len([s for s in day.completed_sessions if not s.deleted_at])
-        return count
+        return cls._count_program_day_sessions(program)
+
+    @staticmethod
+    def _count_program_day_sessions(program) -> int:
+        return sum(
+            1
+            for day in program.days
+            for linked in day.completed_sessions
+            if not linked.deleted_at
+        )
+
+    @staticmethod
+    def _block_week_fields(data: Dict, block) -> Dict:
+        """Resolve track_weeks/week_start_day from a create (block=None) or partial update."""
+        if 'track_weeks' not in data and 'week_start_day' not in data:
+            return {} if block is not None else {'track_weeks': False, 'week_start_day': None}
+        track = bool(data['track_weeks']) if 'track_weeks' in data else bool(getattr(block, 'track_weeks', False))
+        start_day = data['week_start_day'] if 'week_start_day' in data else getattr(block, 'week_start_day', None)
+        if track and start_day is None:
+            raise ProgramServiceValidationError({
+                'error': 'Choose the weekday that weeks start on.',
+                'code': 'program_block_week_start_required',
+                'field': 'week_start_day',
+            }, 400)
+        if start_day is not None and not (isinstance(start_day, int) and 0 <= start_day <= 6):
+            raise ProgramServiceValidationError({
+                'error': 'Weeks must start on a weekday from Monday (0) to Sunday (6).',
+                'code': 'program_block_week_start_invalid',
+                'field': 'week_start_day',
+            }, 400)
+        return {'track_weeks': track, 'week_start_day': start_day}

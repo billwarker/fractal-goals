@@ -56,7 +56,7 @@ def _program(db_session, root_id, name, start, end, template, weekdays):
     block = ProgramBlock(program_id=program.id, name=f"{name} block", start_date=start, end_date=end, color="#abcdef")
     db_session.add(block)
     db_session.flush()
-    day = ProgramDay(block_id=block.id, name=f"{name} day", day_of_week=weekdays)
+    day = ProgramDay(program_id=block.program_id, name=f"{name} day", day_of_week=weekdays)
     db_session.add(day)
     db_session.flush()
     db_session.add(ProgramDayTemplate(program_day_id=day.id, session_template_id=template.id, is_required=True, order=0))

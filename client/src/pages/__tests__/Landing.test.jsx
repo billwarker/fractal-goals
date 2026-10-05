@@ -97,13 +97,6 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
         </div>
     ),
 }));
-vi.mock('../../components/programs/ProgramBlockView', () => ({
-    default: ({ blocks }) => (
-        <div data-testid="showcase-program-blocks" data-block-count={blocks.length}>
-            Program blocks
-        </div>
-    ),
-}));
 vi.mock('../../components/analytics/ProfileWindowLayout', () => ({
     GRID_COLUMNS: 96,
     GRID_ROWS: 48,
@@ -532,9 +525,8 @@ describe('Landing', () => {
         fireEvent.click(screen.getByRole('tab', { name: landingContent.features.items.programs.label }));
         expect(screen.getByRole('tab', { name: landingContent.features.items.programs.label })).toHaveAttribute('aria-selected', 'true');
         expect(await screen.findByTestId('showcase-calendar', {}, LAZY_PREVIEW_WAIT)).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Blocks' }));
-        expect(screen.getByTestId('showcase-program-blocks')).toBeInTheDocument();
-        expect(screen.queryByTestId('showcase-calendar')).not.toBeInTheDocument();
+        // The Programs page has no Blocks view; the preview shows the calendar only.
+        expect(screen.queryByRole('button', { name: 'Blocks' })).not.toBeInTheDocument();
         expect(screen.getByLabelText('Program side pane preview')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Hide Sidebar' }));
         expect(screen.queryByLabelText('Program side pane preview')).not.toBeInTheDocument();

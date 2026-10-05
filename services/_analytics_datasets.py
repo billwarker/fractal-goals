@@ -370,17 +370,16 @@ def _datasets() -> dict[str, AnalyticsDataset]:
         ),
         _model_dataset(
             ProgramDay,
-            joins=((ProgramBlock, ProgramDay.block_id == ProgramBlock.id), (Program, ProgramBlock.program_id == Program.id)),
+            joins=((Program, ProgramDay.program_id == Program.id),),
             tenant_policy=_root_policy(Program.root_id),
-            default_sort=(("date", "desc"), ("day_number", "asc")),
+            default_sort=(("day_number", "asc"),),
             chart_families=("table", "bar"),
         ),
         _model_dataset(
             ProgramDaySession,
             joins=(
                 (ProgramDay, ProgramDaySession.program_day_id == ProgramDay.id),
-                (ProgramBlock, ProgramDay.block_id == ProgramBlock.id),
-                (Program, ProgramBlock.program_id == Program.id),
+                (Program, ProgramDay.program_id == Program.id),
             ),
             tenant_policy=_root_policy(Program.root_id),
             default_sort=(("created_at", "desc"),),
@@ -500,8 +499,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
             models.program_day_goals,
             joins=(
                 (ProgramDay, models.program_day_goals.c.program_day_id == ProgramDay.id),
-                (ProgramBlock, ProgramDay.block_id == ProgramBlock.id),
-                (Program, ProgramBlock.program_id == Program.id),
+                (Program, ProgramDay.program_id == Program.id),
             ),
             tenant_policy=_root_policy(Program.root_id),
             soft_delete_field=models.program_day_goals.c.deleted_at,
@@ -511,8 +509,7 @@ def _datasets() -> dict[str, AnalyticsDataset]:
             models.program_day_templates,
             joins=(
                 (ProgramDay, models.program_day_templates.c.program_day_id == ProgramDay.id),
-                (ProgramBlock, ProgramDay.block_id == ProgramBlock.id),
-                (Program, ProgramBlock.program_id == Program.id),
+                (Program, ProgramDay.program_id == Program.id),
             ),
             tenant_policy=_root_policy(Program.root_id),
         ),

@@ -79,11 +79,10 @@ describe('useProgramDetailController', () => {
         const { result } = renderHook(() => useProgramDetailController({ goals: [] }));
 
         act(() => {
-            result.current.handleCreateDayForDate('block-1', '2026-03-09');
+            result.current.handleCreateDayForDate('2026-03-09');
         });
 
         expect(result.current.showDayModal).toBe(true);
-        expect(result.current.selectedBlockId).toBe('block-1');
         expect(result.current.dayModalInitialData).toMatchObject({
             scheduled_dates: ['2026-03-09'],
             day_of_week: [],

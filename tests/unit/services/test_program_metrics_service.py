@@ -1,6 +1,7 @@
+from unittest.mock import ANY
 from datetime import date, datetime, timedelta, timezone
 
-from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramDayTemplate, Session, activity_goal_associations
+from models import ActivityInstance, Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayStatusOverride, ProgramDayTemplate, Session, activity_goal_associations
 from models.program import program_goals
 from services.program_metrics_service import ProgramMetricsService
 from services.program_scope import resolve_program_scope, resolve_program_scopes
@@ -60,9 +61,9 @@ def test_metrics_future_dates_are_upcoming_and_rates_are_nullable(
     db_session.add(block)
     db_session.flush()
     db_session.add(ProgramDay(
-        block_id=block.id,
+        program_id=block.program_id,
         name="Opening day",
-        date=start,
+        occurrence_schedules=[ProgramDayOccurrenceSchedule(date=start)],
         day_number=1,
     ))
     db_session.execute(program_goals.insert().values(
@@ -83,8 +84,8 @@ def test_metrics_future_dates_are_upcoming_and_rates_are_nullable(
     assert payload["program"]["status"] == "upcoming"
     assert payload["window"]["observed_days"] == 0
     assert {day["state"] for day in payload["days"]} == {"upcoming", "scheduled_pending"}
-    assert payload["adherence"]["rate"] is None
-    assert payload["alignment"]["duration_seconds"]["rate"] is None
+    assert payload["consistency"]["rate"] is None
+    assert "alignment" not in payload
     assert payload["semantics"]["data_layer"] == "analytics_engine"
 
 
@@ -135,7 +136,7 @@ def test_metrics_exact_dates_exclude_unselected_days_and_validate_selection(
     for day_value, status in ((3, "complete"), (4, "complete"), (9, "rest")):
         occurrence_date = date(2026, 9, day_value)
         db_session.add(ProgramDay(
-            block_id=block.id, name="Practice", date=occurrence_date, day_number=day_value,
+            program_id=block.program_id, name="Practice", occurrence_schedules=[ProgramDayOccurrenceSchedule(date=occurrence_date)], day_number=day_value,
         ))
         db_session.add(ProgramDayStatusOverride(
             program_id=program.id, date=occurrence_date, status=status,
@@ -172,12 +173,11 @@ def test_metrics_exact_dates_exclude_unselected_days_and_validate_selection(
     assert payload["window"]["dates"] == ["2026-09-03", "2026-09-09"]
     assert (payload["window"]["total_days"], payload["window"]["observed_days"]) == (2, 2)
     assert [item["date"] for item in payload["days"]] == ["2026-09-03", "2026-09-09"]
-    assert payload["adherence"]["met_days"] == 1
-    assert payload["adherence"]["scheduled_days_observed"] == 1
-    assert payload["adherence"]["manual_rest_days"] == 1
-    assert payload["adherence"]["current_streak"] == 0
+    assert payload["consistency"]["met_days"] == 1
+    assert payload["consistency"]["scheduled_days_observed"] == 1
+    assert payload["consistency"]["manual_rest_days"] == 1
+    assert payload["consistency"]["current_streak"] == 0
     assert payload["blocks"][0]["program_days"][0]["scheduled_occurrences"] == 1
-    assert payload["alignment"]["instances"]["total"] == 0
     assert payload["execution"]["linked_sessions"] == 0
     assert payload["blocks"][0]["linked_sessions"] == 0
 
@@ -186,8 +186,7 @@ def test_metrics_exact_dates_exclude_unselected_days_and_validate_selection(
         range_start="2026-09-03", range_end="2026-09-09", as_of=date(2026, 9, 10),
     )
     assert (error, status) == (None, 200)
-    assert bounded["adherence"]["met_days"] == 2
-    assert bounded["alignment"]["instances"]["total"] == 1
+    assert bounded["consistency"]["met_days"] == 2
     assert bounded["execution"]["linked_sessions"] == 1
 
     future_scope, error, status = service.get_program_metrics(
@@ -227,7 +226,7 @@ def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_ef
     )
     db_session.add(block)
     db_session.flush()
-    day = ProgramDay(block_id=block.id, name="Today", date=now.date())
+    day = ProgramDay(program_id=block.program_id, name="Today", occurrence_schedules=[ProgramDayOccurrenceSchedule(date=now.date())])
     db_session.add(day)
     db_session.execute(program_goals.insert().values(
         program_id=program.id, goal_id=sample_goal_hierarchy["mid_term"].id,
@@ -261,17 +260,17 @@ def test_metrics_counts_completed_instances_in_unfinished_sessions_and_splits_ef
     )
 
     assert (error, status) == (None, 200)
-    assert payload["adherence"]["met_days"] == 0
+    assert payload["consistency"]["met_days"] == 0
     assert next(day for day in payload["days"] if day["date"] == now.date().isoformat())["state"] == "scheduled_pending"
-    assert payload["alignment"]["instances"] == {"aligned": 1, "total": 1, "rate": 1.0}
     assert payload["execution"]["linked_sessions"] == 0
-    assert payload["blocks"][0]["aligned_instances"] == 0
+    assert payload["blocks"][0]["linked_sessions"] == 0
     assert payload["blocks"][0]["program_days"] == [{
         "program_day_id": day.id,
         "name": "Today",
         "day_number": None,
         "scheduled_occurrences": 1,
         "completed_occurrences": 0,
+        "consistency": ANY,
     }]
     shares = {row["goal_id"]: row["effort_share"] for row in payload["goal_coverage"]}
     assert shares[sample_goal_hierarchy["mid_term"].id] == 0.5
@@ -305,7 +304,7 @@ def test_comparison_uses_exact_occurrence_completion_not_aligned_goal_evidence(
     )
     db_session.add(block)
     db_session.flush()
-    day = ProgramDay(block_id=block.id, name="Only day", date=scheduled_date)
+    day = ProgramDay(program_id=block.program_id, name="Only day", occurrence_schedules=[ProgramDayOccurrenceSchedule(date=scheduled_date)])
     db_session.add(day)
     db_session.flush()
     db_session.add(ProgramDayTemplate(
@@ -345,7 +344,7 @@ def test_comparison_uses_exact_occurrence_completion_not_aligned_goal_evidence(
     assert (error, status) == (None, 200)
     assert payload["programs"][0]["scheduled_days_observed"] == 1
     assert payload["programs"][0]["met_days"] == 0
-    assert payload["programs"][0]["alignment_rate"] == 1.0
+    assert "effort_alignment_rate" not in payload["programs"][0]
 
     db_session.add(Session(
         owner_id=test_user.id, root_id=root.id, name="Exact execution",
@@ -365,6 +364,7 @@ def test_comparison_uses_exact_occurrence_completion_not_aligned_goal_evidence(
         "day_number": None,
         "scheduled_occurrences": 1,
         "completed_occurrences": 1,
+        "consistency": ANY,
     }]
 
     completed, error, status = ProgramMetricsService(db_session).get_program_comparison(

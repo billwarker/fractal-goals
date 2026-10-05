@@ -1,11 +1,12 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
 import EmptyState from '../components/common/EmptyState';
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
-import ProgramBlockView from '../components/programs/ProgramBlockView';
+import ProgramBlocksPanel from '../components/programs/ProgramBlocksPanel';
+import ProgramStatusBadge from '../components/programs/ProgramStatusBadge';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import CalendarPeriodModal from '../components/programs/CalendarPeriodModal';
 import ProgramDayStatusBulkBar from '../components/programs/ProgramDayStatusBulkBar';
@@ -22,7 +23,10 @@ import { useProgramDetailController } from '../hooks/useProgramDetailController'
 import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
+import { programFocusScope } from '../utils/programFocus';
+import { duplicateProgramStructure, shiftDatePart } from '../utils/programDuplication';
 import { useProgramMetrics } from '../hooks/useProgramMetrics';
+import { buildBlockCards } from '../utils/programBlocksViewModel';
 import { useProgramCalendarSelection } from '../hooks/useProgramCalendarSelection';
 import { useProgramStatusSelection } from '../hooks/useProgramStatusSelection';
 import {
@@ -51,43 +55,12 @@ const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/Progr
 // Per-viewer convenience: whether the calendar scrolls weeks continuously.
 const CONTINUOUS_CALENDAR_PREFERENCE_KEY = 'program-calendar-continuous';
 const ProgramDayModal = lazyWithRetry(() => import('../components/modals/ProgramDayModal'), 'components/modals/ProgramDayModal');
-const AttachGoalModal = lazyWithRetry(() => import('../components/modals/AttachGoalModal'), 'components/modals/AttachGoalModal');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 const ProgramDaysView = lazyWithRetry(() => import('../components/programs/days/ProgramDaysView'), 'components/programs/days/ProgramDaysView');
-const PROGRAM_VIEW_ITEMS = ['calendar', 'blocks', 'days'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
+const PROGRAM_VIEW_ITEMS = ['calendar', 'days'].map((value) => ({ value, label: `${value[0].toUpperCase()}${value.slice(1)}` }));
 function getDatePart(dateValue) {
     if (!dateValue) return null;
     return String(dateValue).split('T')[0];
-}
-
-function getStatusBadgeClass(status) {
-    if (status === 'active') return 'statusBadgeActive';
-    if (status === 'upcoming') return 'statusBadgeUpcoming';
-    if (status === 'completed') return 'statusBadgeCompleted';
-    return 'statusBadgeInactive';
-}
-
-function getStatusLabel(status) {
-    if (status === 'completed') return 'Completed';
-    if (status === 'upcoming') return 'Upcoming';
-    if (status === 'active') return 'Active';
-    return 'Inactive';
-}
-
-function getDayOffset(startDate, nextStartDate) {
-    const source = new Date(`${getDatePart(startDate)}T00:00:00`);
-    const target = new Date(`${getDatePart(nextStartDate)}T00:00:00`);
-    if (Number.isNaN(source.getTime()) || Number.isNaN(target.getTime())) return 0;
-    return Math.round((target.getTime() - source.getTime()) / 86400000);
-}
-
-function shiftDatePart(dateValue, dayOffset) {
-    const datePart = getDatePart(dateValue);
-    if (!datePart) return null;
-    const shifted = new Date(`${datePart}T00:00:00`);
-    if (Number.isNaN(shifted.getTime())) return null;
-    shifted.setDate(shifted.getDate() + dayOffset);
-    return shifted.toISOString().slice(0, 10);
 }
 
 /** The six-week month grid around `dateValue`: the first rows in view on load, in either mode. */
@@ -133,10 +106,19 @@ function ProgramCalendarPage() {
         setIsCalendarContinuous(enabled);
         writeLocalStorageValue(CONTINUOUS_CALENDAR_PREFERENCE_KEY, String(enabled));
     }, []);
-    const [viewMode, setViewMode] = useState(programId ? 'blocks' : 'calendar');
+    const [viewMode, setViewMode] = useState('calendar');
+    // Desktop remembers whether the side pane is open (per fractal), like the Notes filters pane;
+    // the mobile sheet always starts closed.
+    const sidePaneStorageKey = `programs-side-pane-open:${rootId || 'default'}`;
     const [isSidePaneVisible, setIsSidePaneVisible] = useState(() => {
-        return !getIsMobileViewport();
+        if (getIsMobileViewport()) return false;
+        try {
+            return window.localStorage.getItem(sidePaneStorageKey) !== 'false';
+        } catch {
+            return true;
+        }
     });
+    const [sidePaneView, setSidePaneView] = useState('details');
     const [isProgramOptionsOpen, setIsProgramOptionsOpen] = useState(false);
     const [programOptionsView, setProgramOptionsView] = useState('actions');
     const [programPickerQuery, setProgramPickerQuery] = useState('');
@@ -226,7 +208,6 @@ function ProgramCalendarPage() {
 
     const {
         attachedGoalIds,
-        attachableBlockGoals,
         hierarchyGoalSeeds,
     } = useProgramGoalSets({
         program: displayProgram,
@@ -238,10 +219,7 @@ function ProgramCalendarPage() {
         showBlockModal,
         blockModalData,
         showDayModal,
-        selectedBlockId,
         dayModalInitialData,
-        showAttachModal,
-        attachBlockId,
         showGoalModal,
         selectedGoal,
         modalMode,
@@ -259,11 +237,9 @@ function ProgramCalendarPage() {
         handleEditDay,
         closeDayModal,
         handleDaySaveSuccess,
-        handleAttachGoalClick,
-        closeAttachModal,
-        handleAttachGoalSaveSuccess,
         handleAddChildGoal,
     } = useProgramDetailController({ goals: displayGoals });
+    const showSavedDayRef = useRef(null);
     const {
         updateRangeContext: updateCalendarRangeContext,
         programForDate,
@@ -302,10 +278,19 @@ function ProgramCalendarPage() {
     const overviewMetricsQuery = useProgramMetrics(
         rootId, displayProgram?.id, timezone, overviewMetricsRange,
     );
-    // The Blocks view always summarizes the whole program, whatever the calendar has selected.
+    // The calendar pane's Blocks section always summarizes the whole program, whatever is selected.
     const blockMetricsQuery = useProgramMetrics(
-        rootId, viewMode === 'blocks' ? displayProgram?.id : null, timezone,
+        rootId, viewMode === 'calendar' ? displayProgram?.id : null, timezone,
     );
+
+    useEffect(() => {
+        if (isMobile) return;
+        try {
+            window.localStorage.setItem(sidePaneStorageKey, String(isSidePaneVisible));
+        } catch {
+            // Storage can be unavailable (private windows); the pane still toggles for this visit.
+        }
+    }, [isMobile, isSidePaneVisible, sidePaneStorageKey]);
 
     /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses the desktop side pane on mobile. */
     useEffect(() => {
@@ -316,8 +301,6 @@ function ProgramCalendarPage() {
 
     const {
         sortedBlocks,
-        attachBlock,
-        blockGoalsByBlockId,
     } = useProgramDetailViewModel({
         program: displayProgram,
         goals: displayGoals,
@@ -325,20 +308,22 @@ function ProgramCalendarPage() {
         timezone,
         getGoalColor,
         getGoalTextColor,
-        getGoalDetails,
-        attachBlockId,
         attachedGoalIds,
         hierarchyGoalSeeds,
     });
+    const blockCards = useMemo(() => buildBlockCards({
+        blocks: sortedBlocks,
+        metrics: blockMetricsQuery.data,
+        today: todayInTimezone,
+    }), [blockMetricsQuery.data, sortedBlocks, todayInTimezone]);
     const {
         saveBlock,
         deleteBlock,
         saveDay,
-        copyDay,
+        duplicateDay,
         deleteDay,
         scheduleDay,
         unscheduleDay,
-        saveAttachedGoal,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,
@@ -349,12 +334,9 @@ function ProgramCalendarPage() {
         refreshData,
         refreshers,
         sessions,
-        selectedBlockId,
         dayModalInitialData,
-        attachBlockId,
         onBlockSaved: handleProgramBlockSaveSuccess,
-        onDaySaved: handleDaySaveSuccess,
-        onAttachGoalSaved: handleAttachGoalSaveSuccess,
+        onDaySaved: handleProgramDaySaved,
         onGoalEditorClosed: closeGoalModal,
     });
 
@@ -427,9 +409,7 @@ function ProgramCalendarPage() {
         <span className={styles.headerMetaRow}>
             <span>{formatLiteralDate(displayProgram.start_date)} - {formatLiteralDate(displayProgram.end_date)}</span>
             {displayProgramStatus ? (
-                <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(displayProgramStatus)]}`}>
-                    {getStatusLabel(displayProgramStatus)}
-                </span>
+                <ProgramStatusBadge status={displayProgramStatus} />
             ) : null}
             {selectedTimeframeLabel ? <span>{selectedTimeframeLabel}</span>
                 : selectedRangeText ? <span>Selected {selectedRangeText}</span> : null}
@@ -638,6 +618,12 @@ function ProgramCalendarPage() {
         onboarding?.refresh();
     }
 
+    // A created or duplicated day becomes the Days tab's selection (the tab is set up below).
+    function handleProgramDaySaved(savedDay) {
+        handleDaySaveSuccess();
+        if (savedDay?.id) showSavedDayRef.current?.(savedDay.id);
+    }
+
     const handleSaveProgram = async (programData) => {
         const duplicateSource = builderState.mode === 'duplicate' ? builderState.duplicateSource : null;
         const apiData = {
@@ -647,6 +633,7 @@ function ProgramCalendarPage() {
             start_date: programData.startDate,
             end_date: programData.endDate,
             selectedGoals: programData.selectedGoals,
+            ...(programData.pruneDayGoals ? { prune_day_goals: true } : {}),
         };
 
         if (builderState.mode === 'edit' && displayProgram) {
@@ -657,33 +644,13 @@ function ProgramCalendarPage() {
             const newProgramId = res.data.id;
 
             if (duplicateSource) {
-                const dayOffset = getDayOffset(duplicateSource.start_date, programData.startDate);
-                for (const sourceBlock of duplicateSource.blocks || duplicateSource.weekly_schedule || []) {
-                    const blockRes = await fractalApi.createBlock(rootId, newProgramId, {
-                        name: sourceBlock.name,
-                        start_date: shiftDatePart(sourceBlock.start_date, dayOffset),
-                        end_date: shiftDatePart(sourceBlock.end_date, dayOffset),
-                        color: sourceBlock.color,
-                        goal_ids: sourceBlock.goal_ids || [],
-                    });
-                    const newBlockId = blockRes.data.id;
-
-                    for (const sourceDay of sourceBlock.days || []) {
-                        await fractalApi.addBlockDay(rootId, newProgramId, newBlockId, {
-                            name: sourceDay.name,
-                            date: shiftDatePart(sourceDay.date, dayOffset),
-                            day_number: sourceDay.day_number,
-                            day_of_week: sourceDay.day_of_week || [],
-                            template_ids: (sourceDay.templates || []).map((template) => template.id).filter(Boolean),
-                            template_configs: (sourceDay.templates || []).map((template, index) => ({
-                                template_id: template.id,
-                                is_required: template.is_required !== false,
-                                order: template.order ?? index,
-                            })).filter((config) => Boolean(config.template_id)),
-                            completion_min_templates: sourceDay.completion_min_templates || null,
-                        });
-                    }
-                }
+                await duplicateProgramStructure({
+                    rootId,
+                    programId: newProgramId,
+                    source: duplicateSource,
+                    startDate: programData.startDate,
+                    programGoalIds: programData.selectedGoals || [],
+                });
             }
 
             dispatchCalendarContext({
@@ -801,28 +768,30 @@ function ProgramCalendarPage() {
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
-            {isMobile ? (
-                <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
-                    {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-                </HeaderButton>
-            ) : null}
+            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
+                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+            </HeaderButton>
         </>
     );
 
     const daysTab = useProgramDaysTab({
         rootId,
-        programId: displayProgram?.id,
-        blocks: sortedBlocks,
+        program: displayProgram,
         today: todayInTimezone,
         timezone: timezone || 'UTC',
         enabled: viewMode === 'days',
         setViewMode,
         onLeavePane: () => { if (isMobile) setIsSidePaneVisible(false); },
+        onCreateDay: handleAddDayClick,
+        onEditDay: handleEditDay,
+    });
+    useEffect(() => {
+        showSavedDayRef.current = daysTab.showDay;
     });
 
     return (
         <div className={`${styles.container} page-reveal`}>
-            <div className={`${styles.workspace} ${isMobile && !isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
+            <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
                 <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
                         className={styles.compactHeader}
@@ -894,7 +863,7 @@ function ProgramCalendarPage() {
                                     <ProgramDaysView
                                         rootId={rootId}
                                         program={displayProgram}
-                                        blocks={sortedBlocks}
+                                        days={daysTab.days}
                                         activities={activities}
                                         activityGroups={activityGroups}
                                         today={todayInTimezone}
@@ -903,28 +872,15 @@ function ProgramCalendarPage() {
                                         occurrencesQuery={daysTab.occurrencesQuery}
                                         focusTemplateId={daysTab.selection?.templateId || null}
                                         onSelectionChange={daysTab.setSelection}
+                                        onEditDay={handleEditDay}
                                         showDateControls={isMobile}
                                     />
                                 </Suspense>
                             </div>
-                        ) : displayProgram ? (
-                            <div className={styles.blocksPanel}>
-                                <ProgramBlockView
-                                    blocks={sortedBlocks}
-                                    blockGoalsByBlockId={blockGoalsByBlockId}
-                                    onEditDay={handleEditDay}
-                                    onAttachGoal={handleAttachGoalClick}
-                                    onEditBlock={handleEditBlockClick}
-                                    onDeleteBlock={deleteBlock}
-                                    onAddDay={handleAddDayClick}
-                                    onGoalClick={openGoalModal}
-                                    onAddBlock={handleAddBlockClick}
-                                />
-                            </div>
                         ) : (
                             <div className={styles.emptyBlocksPanel}>
                                 <h2>No Program Active</h2>
-                                <p>Select a program on the calendar or create a new one to manage blocks.</p>
+                                <p>Select a program on the calendar or create a new one to plan its days.</p>
                             </div>
                         )}
                     </div>
@@ -932,19 +888,26 @@ function ProgramCalendarPage() {
 
                 <ResponsiveProgramSidePane
                     isMobile={isMobile}
-                    isVisible={!isMobile || isSidePaneVisible}
+                    isVisible={isSidePaneVisible}
                     onClose={() => setIsSidePaneVisible(false)}
                     viewToggle={isMobile ? null : viewToggle}
-                    mode={viewMode === 'blocks' ? 'blocks' : 'calendar'}
+                    view={sidePaneView}
+                    onViewChange={setSidePaneView}
                     program={displayProgram}
                     goals={displayGoals}
                     onCreate={() => openCreateProgram()}
                     programMetrics={overviewMetricsQuery.data}
                     programMetricsLoading={overviewMetricsQuery.isLoading}
                     programMetricsError={overviewMetricsQuery.error}
-                    blockMetrics={blockMetricsQuery.data}
-                    blockMetricsLoading={blockMetricsQuery.isLoading}
-                    blockMetricsError={blockMetricsQuery.error}
+                    blocksPanel={displayProgram ? (
+                        <ProgramBlocksPanel
+                            cards={blockCards}
+                            loading={blockMetricsQuery.isLoading}
+                            error={blockMetricsQuery.error}
+                            onEditBlock={handleEditBlockClick}
+                            onDeleteBlock={deleteBlock}
+                        />
+                    ) : null}
                     programGoalSeeds={hierarchyGoalSeeds}
                     onGoalClick={openGoalModal}
                     rootId={rootId}
@@ -958,7 +921,7 @@ function ProgramCalendarPage() {
                     today={todayInTimezone}
                     blocks={sortedBlocks}
                     onScheduleDay={scheduleDay}
-                    onUnscheduleDay={(blockId, dayId, date) => unscheduleDay(blockId, dayId, date, timezone || 'UTC')}
+                    onUnscheduleDay={(dayId, date) => unscheduleDay(dayId, date, timezone || 'UTC')}
                     onCreateDay={handleCreateDayForDate}
                     getGoalIcon={getGoalIcon}
                     getGoalColor={getGoalColor}
@@ -1062,9 +1025,7 @@ function ProgramCalendarPage() {
                                                                     {formatLiteralDate(program.start_date)} - {formatLiteralDate(program.end_date)}
                                                                 </span>
                                                             </span>
-                                                            <span className={`${styles.statusBadge} ${styles[getStatusBadgeClass(status)]}`}>
-                                                                {getStatusLabel(status)}
-                                                            </span>
+                                                            <ProgramStatusBadge status={status} />
                                                         </button>
                                                     );
                                                 })}
@@ -1132,8 +1093,9 @@ function ProgramCalendarPage() {
                         <button
                             className={styles.optionButton}
                             onClick={() => {
-                                // Goals sit under the calendar's program overview.
+                                // Goals are the calendar pane's program-scope Goals view.
                                 setViewMode('calendar');
+                                setSidePaneView('goals');
                                 dispatchCalendarContext({ type: 'focus_program', programId: displayProgram?.id });
                                 setIsSidePaneVisible(true);
                                 closeProgramOptions();
@@ -1179,24 +1141,13 @@ function ProgramCalendarPage() {
                         isOpen={showDayModal}
                         onClose={closeDayModal}
                         onSave={saveDay}
-                        onCopy={copyDay}
+                        onDuplicate={duplicateDay}
                         onDelete={deleteDay}
                         rootId={rootId}
-                        blockId={selectedBlockId}
-                        block={displayProgram?.blocks?.find((entry) => entry.id === selectedBlockId) || null}
+                        program={displayProgram}
                         initialData={dayModalInitialData}
-                    />
-                </Suspense>
-            )}
-            {showAttachModal && (
-                <Suspense fallback={null}>
-                    <AttachGoalModal
-                        isOpen={showAttachModal}
-                        onClose={closeAttachModal}
-                        onSave={saveAttachedGoal}
-                        goals={attachableBlockGoals}
-                        block={attachBlock}
-                        associatedGoalIds={(blockGoalsByBlockId.get(attachBlock?.id) || []).map((goal) => goal.id)}
+                        goals={displayGoals}
+                        focusScope={programFocusScope(displayGoals, displayProgram)}
                     />
                 </Suspense>
             )}

@@ -520,22 +520,16 @@ class AdminService(_AdminBetaSignupsMixin):
             row[0] for row in self.db_session.query(Program.id).filter(Program.root_id.in_(root_ids)).all()
         ]
         if program_ids:
-            block_ids = [
-                row[0] for row in self.db_session.query(ProgramBlock.id).filter(
-                    ProgramBlock.program_id.in_(program_ids)
+            day_ids = [
+                row[0] for row in self.db_session.query(ProgramDay.id).filter(
+                    ProgramDay.program_id.in_(program_ids)
                 ).all()
             ]
-            if block_ids:
-                day_ids = [
-                    row[0] for row in self.db_session.query(ProgramDay.id).filter(
-                        ProgramDay.block_id.in_(block_ids)
-                    ).all()
-                ]
-                if day_ids:
-                    self.db_session.execute(delete(ProgramDaySession).where(ProgramDaySession.program_day_id.in_(day_ids)))
-                    self.db_session.execute(delete(program_day_templates).where(program_day_templates.c.program_day_id.in_(day_ids)))
-                    self.db_session.execute(delete(ProgramDay).where(ProgramDay.id.in_(day_ids)))
-                self.db_session.execute(delete(ProgramBlock).where(ProgramBlock.id.in_(block_ids)))
+            if day_ids:
+                self.db_session.execute(delete(ProgramDaySession).where(ProgramDaySession.program_day_id.in_(day_ids)))
+                self.db_session.execute(delete(program_day_templates).where(program_day_templates.c.program_day_id.in_(day_ids)))
+                self.db_session.execute(delete(ProgramDay).where(ProgramDay.id.in_(day_ids)))
+            self.db_session.execute(delete(ProgramBlock).where(ProgramBlock.program_id.in_(program_ids)))
             self.db_session.execute(delete(Program).where(Program.id.in_(program_ids)))
 
         self._delete_for_roots(MetricDefinition, root_ids)

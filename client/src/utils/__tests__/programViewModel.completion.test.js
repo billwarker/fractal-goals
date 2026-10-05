@@ -8,25 +8,21 @@ describe('program calendar occurrence completion', () => {
             id: 'program-1',
             start_date: '2026-05-17',
             end_date: '2026-05-30',
-            blocks: [{
-                id: 'block-1',
-                start_date: '2026-05-17',
-                end_date: '2026-05-23',
-                days: [
+            blocks: [{ id: 'block-1', start_date: '2026-05-17', end_date: '2026-05-23' }],
+            days: [
                     {
                         id: 'complete-day',
                         name: 'Daily practice',
-                        date: '2026-05-17',
+                        scheduled_dates: ['2026-05-17'],
                         templates: [{ id: 'template-1', name: 'Practice' }],
                     },
                     {
                         id: 'incomplete-day',
                         name: 'Daily practice',
-                        date: '2026-05-17',
+                        scheduled_dates: ['2026-05-17'],
                         templates: [{ id: 'template-2', name: 'Review' }],
                     },
-                ],
-            }],
+            ],
         };
         const events = buildProgramCalendarEvents({
             program,

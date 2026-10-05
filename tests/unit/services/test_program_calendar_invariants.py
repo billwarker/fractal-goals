@@ -10,6 +10,7 @@ from services.program_calendar_invariants import (
     BLOCK_INVALID_DATES,
     BLOCK_OVERLAP,
     DAY_DATE_CONFLICT,
+    DAY_DATE_OUTSIDE_PROGRAM,
     find_program_day_date_conflicts,
 )
 from services.program_service_errors import ProgramServiceValidationError
@@ -153,56 +154,74 @@ def test_database_rejects_overlapping_blocks_even_without_the_service(db_session
 
 # ---------------------------------------------------------------- program days
 
-def _add_day(db_session, program, block, **data):
-    return ProgramService.add_block_day(db_session, _root(program), program.id, block.id, data)['days'][0]
+def _add_day(db_session, program, **data):
+    return ProgramService.create_program_day(db_session, _root(program), program.id, data)
 
 
 def test_two_weekly_days_cannot_share_a_weekday(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
 
     with pytest.raises(ProgramServiceValidationError) as excinfo:
-        _add_day(db_session, program, block, name='Lower', day_of_week=['Monday', 'Thursday'])
+        _add_day(db_session, program, name='Lower', day_of_week=['Monday', 'Thursday'])
 
     payload, status = _error(excinfo)
     assert status == 409
     assert payload['code'] == DAY_DATE_CONFLICT
     assert payload['conflicts'][0]['date'] == START.isoformat()
     assert {row['day_name'] for row in payload['conflicts']} == {'Upper', 'Lower'}
-    assert payload['conflict_count'] == 2
+    # Weekdays repeat across the whole four-week program.
+    assert payload['conflict_count'] == 4
     assert 'Upper and Lower' in payload['error']
     db_session.rollback()
-    assert db_session.query(ProgramDay).filter_by(block_id=block.id).count() == 1
+    assert db_session.query(ProgramDay).filter_by(program_id=program.id).count() == 1
+
+
+def test_weekly_days_repeat_across_blocks_and_outside_them(db_session, program):
+    _block(db_session, program, 0, 7, name='Week 1')
+    _block(db_session, program, 14, 7, name='Week 3')
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+
+    with pytest.raises(ProgramServiceValidationError) as excinfo:
+        # Week 2 has no block; its Monday still belongs to Upper.
+        _add_day(db_session, program, name='Extra', scheduled_dates=[(START + timedelta(days=7)).isoformat()])
+
+    assert _error(excinfo)[0]['conflicts'][0]['block_id'] is None
 
 
 def test_weekly_day_conflicts_with_another_days_specific_date(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    _add_day(db_session, program, block, name='Test Day', scheduled_dates=[(START + timedelta(days=2)).isoformat()])
+    _add_day(db_session, program, name='Test Day', scheduled_dates=[(START + timedelta(days=2)).isoformat()])
 
     with pytest.raises(ProgramServiceValidationError, match='only one program day'):
-        _add_day(db_session, program, block, name='Wednesday', day_of_week=['Wednesday'])
+        _add_day(db_session, program, name='Wednesday', day_of_week=['Wednesday'])
+
+
+def test_specific_dates_must_fall_inside_the_program(db_session, program):
+    with pytest.raises(ProgramServiceValidationError) as excinfo:
+        _add_day(db_session, program, name='Late', scheduled_dates=[(START + timedelta(days=40)).isoformat()])
+
+    payload, status = _error(excinfo)
+    assert status == 400
+    assert payload['code'] == DAY_DATE_OUTSIDE_PROGRAM
 
 
 def test_update_day_scheduled_dates_cannot_land_on_an_occupied_date(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
-    other = _add_day(db_session, program, block, name='Extra')
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    other = _add_day(db_session, program, name='Extra')
 
     with pytest.raises(ProgramServiceValidationError) as excinfo:
-        ProgramService.update_block_day(db_session, _root(program), program.id, block.id, other['id'], {
+        ProgramService.update_program_day(db_session, _root(program), program.id, other['id'], {
             'scheduled_dates': [(START + timedelta(days=7)).isoformat()],
         })
 
     assert _error(excinfo)[0]['code'] == DAY_DATE_CONFLICT
 
 
-def test_schedule_block_day_rejects_a_date_another_day_owns(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
-    reusable = _add_day(db_session, program, block, name='Reusable')
+def test_schedule_program_day_rejects_a_date_another_day_owns(db_session, program):
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    reusable = _add_day(db_session, program, name='Reusable')
 
     with pytest.raises(ProgramServiceValidationError):
-        ProgramService.schedule_block_day(db_session, _root(program), program.id, block.id, reusable['id'], {
+        ProgramService.schedule_program_day(db_session, _root(program), program.id, reusable['id'], {
             'date': START.isoformat(),
         })
 
@@ -210,72 +229,73 @@ def test_schedule_block_day_rejects_a_date_another_day_owns(db_session, program)
     assert db_session.query(ProgramDayOccurrenceSchedule).filter_by(program_day_id=reusable['id']).count() == 0
 
 
-def test_schedule_block_day_allows_a_free_date(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
-    reusable = _add_day(db_session, program, block, name='Reusable')
+def test_schedule_program_day_allows_a_free_date(db_session, program):
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    reusable = _add_day(db_session, program, name='Reusable')
 
-    scheduled = ProgramService.schedule_block_day(db_session, _root(program), program.id, block.id, reusable['id'], {
+    scheduled = ProgramService.schedule_program_day(db_session, _root(program), program.id, reusable['id'], {
         'date': (START + timedelta(days=1)).isoformat(),
     })
 
     assert scheduled['date'] == (START + timedelta(days=1)).isoformat()
 
 
-def test_cascade_conflict_in_a_later_block_rolls_back_the_whole_write(db_session, program):
-    first = _block(db_session, program, 0, 7, name='Week 1')
-    second = _block(db_session, program, 7, 7, name='Week 2')
-    _add_day(db_session, program, second, name='Existing Monday', day_of_week=['Monday'])
+def test_duplicate_starts_unscheduled_so_it_never_conflicts(db_session, program):
+    upper = _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
 
-    with pytest.raises(ProgramServiceValidationError):
-        ProgramService.add_block_day(db_session, _root(program), program.id, first.id, {
-            'name': 'Cascaded Monday', 'day_of_week': ['Monday'], 'cascade': True,
-        })
+    copy = ProgramService.duplicate_program_day(db_session, _root(program), program.id, upper['id'])
 
-    db_session.rollback()
-    assert db_session.query(ProgramDay).filter_by(name='Cascaded Monday').count() == 0
+    assert copy['name'] == 'Upper (copy)'
+    assert copy['day_of_week'] == []
+    assert copy['scheduled_dates'] == []
+    assert copy['day_number'] == upper['day_number'] + 1
 
 
-def test_copy_block_day_onto_an_occupied_weekday_is_rejected(db_session, program):
-    first = _block(db_session, program, 0, 7, name='Week 1')
-    second = _block(db_session, program, 7, 7, name='Week 2')
-    source = _add_day(db_session, program, first, name='Upper', day_of_week=['Monday'])
-    # Copy overwrites the target block's day with the same day_number (the filler).
-    _add_day(db_session, program, second, name='Filler')
-    _add_day(db_session, program, second, name='Other', day_of_week=['Monday'])
+def test_moving_a_block_never_changes_which_days_occur(db_session, program):
+    block = _block(db_session, program, 0, 7)
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    _add_day(db_session, program, name='Extra', scheduled_dates=[(START + timedelta(days=15)).isoformat()])
 
-    with pytest.raises(ProgramServiceValidationError):
-        ProgramService.copy_block_day(db_session, _root(program), program.id, first.id, source['id'], {
-            'target_mode': 'all',
-        })
+    updated = ProgramService.update_block(db_session, _root(program), program.id, block.id, {
+        'start_date': (START + timedelta(days=14)).isoformat(),
+        'end_date': (START + timedelta(days=20)).isoformat(),
+    })
+
+    assert updated['start_date'].startswith((START + timedelta(days=14)).isoformat())
 
 
-def test_extending_a_block_reactivates_dormant_dates_and_is_checked(db_session, program):
-    block = _block(db_session, program, 0, 21)
-    _add_day(db_session, program, block, name='Extra', scheduled_dates=[(START + timedelta(days=14)).isoformat()])
-    ProgramService.update_block(db_session, _root(program), program.id, block.id, {
+def test_deleting_a_block_keeps_its_days(db_session, program):
+    block = _block(db_session, program, 0, 7)
+    upper = _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+
+    ProgramService.delete_block(db_session, _root(program), program.id, block.id)
+
+    assert db_session.query(ProgramDay).filter_by(id=upper['id']).count() == 1
+
+
+def test_lengthening_the_program_rechecks_weekday_days(db_session, program):
+    _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    ProgramService.update_program(db_session, _root(program), program.id, {
         'end_date': (START + timedelta(days=13)).isoformat(),
     })
-    # The Extra date (a Monday) is now outside the block and dormant, so Mondays are free.
-    _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
+    late = _add_day(db_session, program, name='Late')
+    # A dormant date left outside the shortened program (a Monday in week 4).
+    db_session.add(ProgramDayOccurrenceSchedule(program_day_id=late['id'], date=START + timedelta(days=21)))
+    db_session.commit()
 
     with pytest.raises(ProgramServiceValidationError) as excinfo:
-        ProgramService.update_block(db_session, _root(program), program.id, block.id, {
-            'end_date': (START + timedelta(days=20)).isoformat(),
+        ProgramService.update_program(db_session, _root(program), program.id, {
+            'end_date': (START + timedelta(days=27)).isoformat(),
         })
 
-    payload, status = _error(excinfo)
-    assert status == 409
-    assert payload['code'] == DAY_DATE_CONFLICT
-    assert payload['conflicts'][0]['date'] == (START + timedelta(days=14)).isoformat()
+    assert _error(excinfo)[0]['code'] == DAY_DATE_CONFLICT
 
 
 def test_unrelated_edits_still_save(db_session, program):
-    block = _block(db_session, program, 0, 14)
-    upper = _add_day(db_session, program, block, name='Upper', day_of_week=['Monday'])
-    _add_day(db_session, program, block, name='Lower', day_of_week=['Thursday'])
+    upper = _add_day(db_session, program, name='Upper', day_of_week=['Monday'])
+    _add_day(db_session, program, name='Lower', day_of_week=['Thursday'])
 
-    updated = ProgramService.update_block_day(db_session, _root(program), program.id, block.id, upper['id'], {
+    updated = ProgramService.update_program_day(db_session, _root(program), program.id, upper['id'], {
         'name': 'Upper A',
     })
 
@@ -285,15 +305,17 @@ def test_unrelated_edits_still_save(db_session, program):
 # ---------------------------------------------------------------- pure
 
 def _calendar(*days, start=START, length=14):
-    return SimpleNamespace(blocks=[SimpleNamespace(
-        id='block', name='Block', start_date=start, end_date=start + timedelta(days=length - 1),
-        days=list(days),
-    )])
-
-
-def _day(day_id, *, day_of_week=None, dates=(), legacy=None):
+    end = start + timedelta(days=length - 1)
     return SimpleNamespace(
-        id=day_id, name=day_id, day_number=None, date=legacy, day_of_week=day_of_week,
+        start_date=start, end_date=end,
+        blocks=[SimpleNamespace(id='block', name='Block', start_date=start, end_date=end)],
+        days=list(days),
+    )
+
+
+def _day(day_id, *, day_of_week=None, dates=()):
+    return SimpleNamespace(
+        id=day_id, name=day_id, day_number=None, day_of_week=day_of_week,
         occurrence_schedules=[SimpleNamespace(date=value) for value in dates],
     )
 

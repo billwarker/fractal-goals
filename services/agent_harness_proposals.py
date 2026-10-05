@@ -3,7 +3,7 @@
 import datetime as dt
 import secrets
 from urllib.parse import quote
-from models import AgentApproval, AgentOperation, AgentProposal, AgentRun, AgentTaskBrief, Goal, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, program_day_templates, utc_now
+from models import AgentApproval, AgentOperation, AgentProposal, AgentRun, AgentTaskBrief, Goal, Program, ProgramDay, Session, SessionTemplate, program_day_templates, utc_now
 from validators.agent import AgentProposalSchema
 
 from services.agent_harness_common import AgentHarnessError, PROPOSAL_TTL_HOURS, _aware, _digest, _iso, _model_data
@@ -157,12 +157,11 @@ class AgentProposalsMixin:
                     resolved["_expected_state_hash"] = operation["_expected_state_hash"]
                 if operation["type"] == "schedule_program_day" and not any(
                     str(operation[field]).startswith("$ref:")
-                    for field in ("program_id", "block_id", "day_id")
+                    for field in ("program_id", "day_id")
                 ):
                     operation["expected_source_hash"] = self._program_day_state_hash(
                         task.root_id,
                         resolved["program_id"],
-                        resolved["block_id"],
                         resolved["day_id"],
                         operation=resolved,
                     )
@@ -317,7 +316,7 @@ class AgentProposalsMixin:
             task.status = "queued"
         self.db_session.commit()
         return self.serialize_run(run)
-    def _program_day_state_hash(self, root_id, program_id, block_id, day_id, *, operation=None, for_update=False):
+    def _program_day_state_hash(self, root_id, program_id, day_id, *, operation=None, for_update=False):
         program_query = self.db_session.query(Program).filter_by(
             id=program_id,
             root_id=root_id,
@@ -325,21 +324,14 @@ class AgentProposalsMixin:
         if for_update:
             program_query = program_query.with_for_update()
         program = program_query.first()
-        block_query = self.db_session.query(ProgramBlock).filter_by(
-            id=block_id,
-            program_id=program_id,
-        ).populate_existing()
-        if for_update:
-            block_query = block_query.with_for_update()
-        block = block_query.first()
         day_query = self.db_session.query(ProgramDay).filter_by(
             id=day_id,
-            block_id=block_id,
+            program_id=program_id,
         ).populate_existing()
         if for_update:
             day_query = day_query.with_for_update()
         day = day_query.first()
-        if not program or not block or not day:
+        if not program or not day:
             raise AgentHarnessError("The program day changed or is no longer available", 409, "stale_context")
         template_query = self.db_session.query(
             program_day_templates.c.order,
@@ -370,20 +362,16 @@ class AgentProposalsMixin:
                 "name": program.name,
                 "color": program.color,
                 "goals": sorted(goal.id for goal in (program.goals or [])),
-            },
-            "block": {
-                "name": block.name,
-                "start_date": _iso(block.start_date),
-                "end_date": _iso(block.end_date),
-                "color": block.color,
-                "goals": sorted(goal.id for goal in (block.goals or [])),
+                # Weekdays repeat across the program span, so its dates shape the schedule.
+                "start_date": _iso(program.start_date),
+                "end_date": _iso(program.end_date),
             },
             "day": {
                 "name": day.name,
                 "day_number": day.day_number,
-                "date": _iso(day.date),
                 "day_of_week": day.day_of_week or [],
                 "completion_min_templates": day.completion_min_templates,
+                "goals": sorted(goal.id for goal in (day.goals or [])),
                 "templates": [
                     {
                         "order": row.order,

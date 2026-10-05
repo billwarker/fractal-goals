@@ -38,6 +38,7 @@ def _seed_planning_fractal(db, suffix, user, level, today):
         ProgramDay,
         ProgramDayTemplate,
         SessionTemplate,
+        program_goals,
     )
 
     root_id = f"browser-plan-root-{suffix}"
@@ -80,6 +81,8 @@ def _seed_planning_fractal(db, suffix, user, level, today):
         start_date=today - timedelta(days=7), end_date=today + timedelta(days=21),
     ))
     db.flush()
+    # The program's goals bound block focus; Block 1 starts unfocused, as legacy blocks do.
+    db.execute(program_goals.insert().values(program_id=f"browser-plan-program-{suffix}", goal_id=root_id))
     db.add(ProgramDay(
         id=f"browser-plan-day-{suffix}", block_id=f"browser-plan-block-{suffix}", name="Upper A",
         day_of_week=[today.strftime("%A")],

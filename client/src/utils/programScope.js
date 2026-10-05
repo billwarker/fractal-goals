@@ -25,7 +25,6 @@ export function getProgramMetricScopeGoalIds(programOrContext, treeData = null) 
     const childrenById = buildProgramGoalChildrenMap(goals);
     const legacyContextSeeds = [
         ...(programOrContext?.program_goal_ids || []),
-        ...(programOrContext?.block_goal_ids || []),
         ...(programOrContext?.day_goal_ids || []),
     ];
     return new Set(expandProgramGoalIds([

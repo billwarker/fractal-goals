@@ -18,7 +18,7 @@ const {
             saveBlock: vi.fn(),
             deleteBlock: vi.fn(),
             saveDay: vi.fn(),
-            copyDay: vi.fn(),
+            duplicateDay: vi.fn(),
             deleteDay: vi.fn(),
             scheduleDay: vi.fn(),
             attachGoal: vi.fn(),
@@ -86,7 +86,6 @@ describe('useProgramDetailMutations', () => {
             program: { id: 'program-1', blocks: [], goal_ids: [] },
             refreshData,
             refreshers,
-            selectedBlockId: 'block-1',
             dayModalInitialData: { id: 'day-1' },
             attachBlockId: 'block-2',
             ...callbacks,
@@ -94,16 +93,29 @@ describe('useProgramDetailMutations', () => {
         }));
     }
 
-    it('saves a day with the selected block/day context and closes the editor on success', async () => {
+    it('saves the edited program day and hands the saved day to the caller', async () => {
+        mockActions.saveDay.mockResolvedValueOnce({ id: 'day-1', name: 'Intervals' });
         const { result } = renderMutations();
 
         await act(async () => {
             await result.current.saveDay({ name: 'Intervals' });
         });
 
-        expect(mockActions.saveDay).toHaveBeenCalledWith('block-1', 'day-1', { name: 'Intervals' });
-        expect(callbacks.onDaySaved).toHaveBeenCalledTimes(1);
+        expect(mockActions.saveDay).toHaveBeenCalledWith('day-1', { name: 'Intervals' });
+        expect(callbacks.onDaySaved).toHaveBeenCalledWith({ id: 'day-1', name: 'Intervals' });
         expect(notify.success).toHaveBeenCalledWith('Day saved');
+    });
+
+    it('creates a new program day when no day is being edited', async () => {
+        mockActions.saveDay.mockResolvedValueOnce({ id: 'day-9', name: 'Legs' });
+        const { result } = renderMutations({ dayModalInitialData: null });
+
+        await act(async () => {
+            await result.current.saveDay({ name: 'Legs' });
+        });
+
+        expect(mockActions.saveDay).toHaveBeenCalledWith(null, { name: 'Legs' });
+        expect(notify.success).toHaveBeenCalledWith('Program day created');
     });
 
     it('returns updated goals and leaves edit-save success toast ownership to the caller', async () => {
