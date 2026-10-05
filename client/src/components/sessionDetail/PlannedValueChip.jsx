@@ -8,7 +8,10 @@ const STATE_TEXT = {
     [PLAN_STATE_UNDER]: 'under plan',
 };
 
-/** "plan 105" beside a metric input; coloured once a value is entered. */
+/**
+ * "(plan 105)" beside a metric input, styled like the "(last 100)" progress hint; coloured
+ * once a value is entered.
+ */
 export default function PlannedValueChip({ label, state }) {
     const stateClassName = state === PLAN_STATE_MET
         ? styles.plannedValueMet
@@ -21,7 +24,7 @@ export default function PlannedValueChip({ label, state }) {
             className={`${styles.plannedValue} ${stateClassName}`}
             title={stateText ? `Planned ${label} · ${stateText}` : `Planned ${label}`}
         >
-            plan {label}
+            (plan {label})
             {stateText && <span className={styles.visuallyHidden}>, {stateText}</span>}
         </span>
     );

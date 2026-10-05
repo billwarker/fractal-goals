@@ -80,7 +80,7 @@ describe('CircuitMemberMetrics planned values', () => {
                 onSave={vi.fn()}
             />,
         );
-        expect(screen.getByTitle('Planned 12')).toHaveTextContent('plan 12');
+        expect(screen.getByTitle('Planned 12')).toHaveTextContent('(plan 12)');
 
         rerender(
             <CircuitMemberMetrics
@@ -97,6 +97,6 @@ describe('CircuitMemberMetrics planned values', () => {
 
     it('shows no plan chip for an unplanned circuit', () => {
         render(<CircuitMemberMetrics memberId="m" rootId="root" definition={definition} metrics={[]} onSave={vi.fn()} />);
-        expect(screen.queryByText(/^plan /)).not.toBeInTheDocument();
+        expect(screen.queryByText(/\(plan /)).not.toBeInTheDocument();
     });
 });

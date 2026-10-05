@@ -92,8 +92,8 @@ Planned set activities start with one empty `planned` set per planned set; plans
 so metric defaults are not auto-filled for them. Plan editors (`components/prescriptions/`) scope
 like the session page: click an item, then optionally a set or round; the scoped target gets the
 note composer (`PlanNoteComposer`) and tag picker (`PlanTagEditor`, `ActivityTagEditor` in controlled
-mode). Plan section helpers live in `services/plan_sections.py`. The session card shows a "plan" chip beside the
-progress indicator, coloured met/under by `utils/sessionPrescription.js`. Plans never feed targets.
+mode). Plan section helpers live in `services/plan_sections.py`. The session card shows a "(plan 100)" hint beside the
+"(last …)" progress hint, in the same style, coloured met/under by `utils/sessionPrescription.js`. Plans never feed targets.
 
 Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a

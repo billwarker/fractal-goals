@@ -1249,30 +1249,26 @@
 /* Planned values (prescriptions) are reference-only guidance beside progress. */
 .plannedValue {
     margin-left: 4px;
-    padding: 0 5px;
     font-size: 11px;
-    line-height: 16px;
     color: var(--color-text-secondary);
-    border: 1px dashed var(--color-border);
-    border-radius: 8px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
 
 .metricMetaLarge .plannedValue {
-    font-size: 12px;
+    font-size: 13px;
+    line-height: 1;
 }
 
+/* Once a value is entered the hint reads like a progress result. */
 .plannedValueMet {
     color: var(--color-brand-success);
-    border-color: var(--color-brand-success-muted);
-    border-style: solid;
+    font-weight: 600;
 }
 
 .plannedValueUnder {
     color: var(--color-brand-warning);
-    border-color: var(--color-brand-warning-muted);
-    border-style: solid;
+    font-weight: 600;
 }
 
 .planNote {

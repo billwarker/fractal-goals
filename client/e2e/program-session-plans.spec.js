@@ -81,7 +81,7 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
     );
     await page.getByRole('button', { name: 'Create Session' }).first().click();
     await expect(page).toHaveURL(new RegExp(`/${rootId}/session/`));
-    const planChips = page.getByText('plan 100', { exact: true });
+    const planChips = page.getByText('(plan 100)', { exact: true });
     await expect(planChips).toHaveCount(2);
 
     const weightInput = page.locator('input[inputmode="decimal"]').first();
