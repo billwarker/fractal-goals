@@ -92,7 +92,7 @@ export default function SessionPlanCard({
         { onError: handleFailure },
     );
     const reset = () => {
-        if (!window.confirm(`Discard the plan for ${entry.template.name} on this date? It will start again from ${entry.previous ? 'the previous plan' : 'the template'}.`)) return;
+        if (!window.confirm(`Discard the plan for ${entry.template.name} on this date? It will start again from the template.`)) return;
         mutations.reset.mutate({ templateId }, { onError: handleFailure });
     };
     // An optional template is on the day because its plan is stored; removing deletes it.
@@ -117,7 +117,7 @@ export default function SessionPlanCard({
                 <SessionTemplateNameBadge name={entry.template.name} color={entry.template.color} wrap />
                 <span className={styles.planSource}>
                     {!entry.is_required ? <Badge size="sm">Optional</Badge> : null}
-                    {describePlanSource(entry, formatShortDate)}
+                    {describePlanSource(entry)}
                 </span>
             </header>
 
@@ -191,7 +191,6 @@ export default function SessionPlanCard({
                                     <span className={styles.planItemName}>
                                         {name}
                                         {item.type === 'circuit' ? <Badge size="sm">Circuit</Badge> : null}
-                                        {item.added_in_plan ? <Badge size="sm" variant="info">Added</Badge> : null}
                                     </span>
                                     {!readOnly ? (
                                         <span className={styles.planItemActions}>

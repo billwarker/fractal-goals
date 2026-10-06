@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 // Uses the "Browser Planning" fractal: a weekly "Upper A" day on today's weekday with a
 // set-based "Bench Day" template, and no active session.
-test('program a dated plan, seed the next week from it, and see it in the session', async ({ page }, testInfo) => {
+test('program a dated plan, see it as next week\'s hints, and see it in the session', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const rootId = `browser-plan-root-${suffix}`;
     const today = new Date().toISOString().slice(0, 10);
@@ -56,13 +56,16 @@ test('program a dated plan, seed the next week from it, and see it in the sessio
     await card.getByRole('button', { name: 'Save plan' }).click();
     await expect(card).toContainText('Planned');
 
-    // Next week, in the neighbouring column, now starts from week 1 with its values as placeholders.
+    // Next week, in the neighbouring column, is still the template; week 1 is only a reference.
     const nextCard = cards.nth(1);
-    await expect(nextCard).toContainText('Starts from');
-    await expect(nextCard.locator(benchKey).getByLabel('Set 2 planned Weight')).toHaveAttribute('placeholder', '100');
+    await expect(nextCard).toContainText('Template default');
+    await expect(nextCard.locator(benchKey).getByLabel('Set 1 planned Weight')).toHaveCount(0);
+    // A set added next week shows week 1's value as a placeholder hint.
+    await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
+    await expect(nextCard.locator(benchKey).getByLabel('Set 1 planned Weight')).toHaveAttribute('placeholder', '100');
 
     if (suffix === 'desktop') {
-        // A third set on next week's Bench Press makes that card taller; the Barbell Row rows
+        // Another set on next week's Bench Press makes that card taller; the Barbell Row rows
         // below still line up side by side.
         await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
         const rowKey = `[data-align-key*="|a:browser-plan-row-${suffix}#0"]`;

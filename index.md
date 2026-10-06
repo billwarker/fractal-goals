@@ -269,10 +269,11 @@ evaluates all days in a single evaluator pass.
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
 holds one dated plan per program day, template, and date: an independent snapshot of the template's
 sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.
-Plans are virtual until first saved: an unplanned occurrence is seeded from the latest earlier plan
-still on an occurrence date, else the template. Saves use `row_version` (409 on conflict); template
+Plans are virtual until first saved: an unplanned occurrence **is the template**, so edits to one date
+never reach another. The latest earlier plan still on an occurrence date is reference only (`previous`):
+its values show as placeholders by `item_key`, never copied. Saves use `row_version` (409 on conflict); template
 edits never rewrite plans, which report `template_changed` and offer an explicit pull that keeps
-planned values by `item_key` and plan-added items. Plans off the schedule are dormant, never seeds.
+planned values by `item_key` and plan-added items. Plans off the schedule are dormant and never supply placeholders.
 Create Session offers today's occurrence plan, then unexecuted plans from the previous 14 days; a
 chosen virtual plan is materialized in the session's transaction and linked by
 `sessions.program_session_plan_id`. Agent proposals keep the base session contract without plans.

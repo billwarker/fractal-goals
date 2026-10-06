@@ -64,8 +64,7 @@ export function indexPrescriptionsByItemKey(sections) {
     return index;
 }
 
-export function describePlanSource(entry, formatDate) {
-    if (entry.source === 'plan') return 'Planned';
-    if (entry.source === 'previous_plan') return `Starts from ${formatDate(entry.seeded_from_date)}`;
-    return 'Template default';
+/** A saved plan is "Planned"; an unsaved date is the template (earlier plans are only hints). */
+export function describePlanSource(entry) {
+    return entry.source === 'plan' ? 'Planned' : 'Template default';
 }

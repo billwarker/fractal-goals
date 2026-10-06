@@ -2,8 +2,9 @@
 
 A plan is an independent snapshot of a template's sections whose activity items may
 carry planned values and notes (``prescription``). Plans are *virtual* until first
-saved: reading an unplanned occurrence returns a seed built from the latest earlier
-visible plan of the same day and template, else from the template itself. Template
+saved: an unplanned occurrence is the template itself, so edits to one date never
+reach another. The latest earlier visible plan of the same day and template is
+reference only (``previous``): its values show as placeholders, never copied. Template
 edits never rewrite plans; ``template_changed`` offers an explicit pull instead.
 
 Plans are reference-only programming. They never create targets, credit program
@@ -51,7 +52,6 @@ MAX_PLAN_ITEMS = 200
 SEED_SCAN_LIMIT = 30
 
 SOURCE_PLAN = 'plan'
-SOURCE_PREVIOUS_PLAN = 'previous_plan'
 SOURCE_TEMPLATE = 'template'
 
 
@@ -241,16 +241,15 @@ class ProgramSessionPlanService:
         return executed
 
     def _resolve(self, day, program, template, plan_date, *, stored=None):
-        """The effective plan state for one template occurrence, stored or virtual."""
+        """The effective plan state for one template occurrence: its stored plan, else the template.
+
+        ``previous`` (the latest earlier plan) is reference only, for placeholder values.
+        """
         previous = self._previous_plan(day, program, template.id, plan_date)
         if stored is not None:
             source = SOURCE_PLAN
             sections = _plan_sections(stored)
             source_revision = stored.source_template_revision
-        elif previous is not None:
-            source = SOURCE_PREVIOUS_PLAN
-            sections = _plan_sections(previous)
-            source_revision = previous.source_template_revision
         else:
             source = SOURCE_TEMPLATE
             sections = typed_template_sections(template)
@@ -281,7 +280,8 @@ class ProgramSessionPlanService:
             'plan_id': stored.id if stored else None,
             'row_version': stored.row_version if stored else None,
             'source': resolved['source'],
-            'seeded_from_date': previous.date.isoformat() if previous and not stored else None,
+            # Plans are never copied from another date; kept for payload compatibility.
+            'seeded_from_date': None,
             'template_changed': resolved['source_revision'] < (template.revision or 1),
             'sections': resolved['sections'],
             # The previous plan's values show as placeholders so the user sees the step.
@@ -464,7 +464,6 @@ class ProgramSessionPlanService:
 
     def _materialize(self, day, program, template, plan_date, sections, current_user_id, *, resolved):
         """Stage a new stored plan; the caller owns the transaction."""
-        previous = resolved['previous']
         plan = ProgramSessionPlan(
             root_id=program.root_id,
             program_id=program.id,
@@ -473,7 +472,8 @@ class ProgramSessionPlanService:
             date=plan_date,
             plan_data={'sections': sections},
             source_template_revision=resolved['source_revision'],
-            seeded_from_plan_id=previous.id if previous and resolved['source'] == SOURCE_PREVIOUS_PLAN else None,
+            # A new plan starts from the template, never from another date's plan.
+            seeded_from_plan_id=None,
             created_by_user_id=current_user_id,
         )
         self.db_session.add(plan)

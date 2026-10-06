@@ -41,9 +41,8 @@ describe('sessionPlanDraft', () => {
 
     it('indexes the previous plan by item key and describes the source', () => {
         expect([...indexPrescriptionsByItemKey(sections).keys()]).toEqual(['k2']);
-        const format = (value) => `on ${value}`;
-        expect(describePlanSource({ source: 'plan' }, format)).toBe('Planned');
-        expect(describePlanSource({ source: 'previous_plan', seeded_from_date: 'd' }, format)).toBe('Starts from on d');
-        expect(describePlanSource({ source: 'template' }, format)).toBe('Template default');
+        expect(describePlanSource({ source: 'plan' })).toBe('Planned');
+        // Unsaved dates are the template; an earlier plan only supplies placeholder values.
+        expect(describePlanSource({ source: 'template', previous: { date: 'd' } })).toBe('Template default');
     });
 });

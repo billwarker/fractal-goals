@@ -130,20 +130,54 @@ def test_unplanned_occurrence_is_seeded_from_template_without_storing(authed_cli
     assert db_session.query(ProgramSessionPlan).count() == 0
 
 
-def test_week_two_seeds_from_week_one_and_keeps_week_one_as_ghost_values(authed_client, plan_world):
+def _with_added_item(sections, world, *values):
+    """Week 1's edits: planned values on the template item, plus an item added in the plan."""
+    updated = _with_values(sections, world, *values)
+    added = dict(updated[0]['items'][0], item_key='plan-only', added_in_plan=True)
+    updated[0]['items'].append(added)
+    return updated
+
+
+def test_unsaved_dates_start_from_the_template_with_earlier_values_as_hints(authed_client, plan_world):
     week1, week2, week3 = plan_world['mondays'][:3]
     seed = _day_plans(authed_client, plan_world, week1)
-    saved = _save(authed_client, plan_world, week1, _with_values(seed['sections'], plan_world, (105, 5), (105, 5)))
+    saved = _save(authed_client, plan_world, week1, _with_added_item(seed['sections'], plan_world, (105, 5), (105, 5)))
     assert saved.status_code == 200, saved.get_json()
 
     entry = _day_plans(authed_client, plan_world, week2)
-    assert entry['source'] == 'previous_plan'
-    assert entry['seeded_from_date'] == week1.isoformat()
-    assert len(entry['sections'][0]['items'][0]['prescription']['sets']) == 2
+    # The template, not week 1's edits: no added item, the template's single planned set.
+    assert entry['source'] == 'template'
+    assert entry['plan_id'] is None
+    assert entry['seeded_from_date'] is None
+    assert [item['item_key'] for item in entry['sections'][0]['items']] == ['bench']
+    assert [s['metrics'][0]['value'] for s in entry['sections'][0]['items'][0]['prescription']['sets']] == [100]
+    # Week 1 stays available as reference values only.
     assert entry['previous']['date'] == week1.isoformat()
+    assert [item['item_key'] for item in entry['previous']['sections'][0]['items']] == ['bench', 'plan-only']
 
-    # Seeding skips the unplanned week in between and uses the latest stored plan.
-    assert _day_plans(authed_client, plan_world, week3)['seeded_from_date'] == week1.isoformat()
+    # Later unsaved weeks are the template too, with the latest saved plan as reference.
+    later = _day_plans(authed_client, plan_world, week3)
+    assert later['source'] == 'template'
+    assert later['previous']['date'] == week1.isoformat()
+
+
+def test_session_from_an_unsaved_date_executes_the_template_not_an_earlier_plan(
+    authed_client, db_session, plan_world,
+):
+    week1, week2 = plan_world['mondays'][:2]
+    seed = _day_plans(authed_client, plan_world, week1)
+    _save(authed_client, plan_world, week1, _with_added_item(seed['sections'], plan_world, (105, 5), (105, 5)))
+
+    created = authed_client.post(f"/api/{plan_world['root'].id}/sessions", json={
+        'name': 'Bench Day', 'template_id': plan_world['template'].id,
+        'plan_ref': {'program_day_id': plan_world['day'].id, 'date': week2.isoformat()},
+    })
+
+    assert created.status_code == 201, created.get_json()
+    instance = db_session.query(ActivityInstance).filter_by(session_id=created.get_json()['id']).one()
+    assert [s['metrics'][0]['value'] for s in instance.prescription['sets']] == [100]
+    plan = db_session.query(ProgramSessionPlan).filter_by(date=week2).one()
+    assert plan.seeded_from_plan_id is None
 
 
 def test_save_uses_optimistic_concurrency(authed_client, plan_world):
@@ -540,6 +574,23 @@ def test_loading_an_optional_template_stores_its_seed_idempotently(authed_client
         session_template_id=optional_world['template'].id, deleted_at=None,
     ).count() == 1
     assert _all_day_plans(authed_client, optional_world, monday)[optional_world['template'].id]['is_loaded'] is True
+
+
+def test_loading_an_optional_template_stores_the_template_not_an_earlier_plan(authed_client, optional_world):
+    week1, week2 = optional_world['mondays'][:2]
+    authed_client.post(_plan_url(optional_world, week1, '/load'))
+    week1_sections = _all_day_plans(authed_client, optional_world, week1)[optional_world['template'].id]['sections']
+    edited = json.loads(json.dumps(week1_sections))
+    edited[0]['items'].append(dict(edited[0]['items'][0], item_key='plan-only', added_in_plan=True))
+    entry = _all_day_plans(authed_client, optional_world, week1)[optional_world['template'].id]
+    assert authed_client.put(_plan_url(optional_world, week1), json={
+        'sections': edited, 'row_version': entry['row_version'],
+    }).status_code == 200
+
+    loaded = authed_client.post(_plan_url(optional_world, week2, '/load')).get_json()
+
+    assert [item['item_key'] for item in loaded['sections'][0]['items']] == ['curls']
+    assert loaded['previous']['date'] == week1.isoformat()
 
 
 def test_removing_a_loaded_optional_template_unloads_it(authed_client, optional_world):

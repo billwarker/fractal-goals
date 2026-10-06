@@ -53,8 +53,8 @@ function planEntry(overrides = {}) {
         date: '2026-10-05',
         plan_id: null,
         row_version: null,
-        source: 'previous_plan',
-        seeded_from_date: '2026-09-28',
+        source: 'template',
+        seeded_from_date: null,
         template_changed: false,
         sections: [{ name: 'Main', items: [{
             type: 'activity', activity_definition_id: 'bench', name: 'Bench Press', item_key: 'k1',
@@ -223,11 +223,13 @@ describe('ProgramDaysView', () => {
         expect(onEditDay).toHaveBeenCalledWith(program.days[1]);
     });
 
-    it('seeds the next day from the latest plan, with its values as placeholders', async () => {
+    it('starts the next day from the template, with the latest plan\'s values as placeholders', async () => {
         renderView();
 
         const card = await nextCard();
-        expect(within(card).getByText('Starts from Mon, Sep 28')).toBeInTheDocument();
+        expect(within(card).getByText('Template default')).toBeInTheDocument();
+        // Plan items carry no "Added" badge.
+        expect(within(card).queryByText('Added')).not.toBeInTheDocument();
         expect(within(card).getByLabelText('Set 1 planned Weight')).toHaveAttribute('placeholder', '100');
         // A day without templates stays in the side pane, marked as needing one.
         expect(within(pane()).getByText('Rest')).toBeInTheDocument();
