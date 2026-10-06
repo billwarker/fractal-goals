@@ -60,7 +60,7 @@ export default function ProgramBlocksPanel({
 
     if (error) return <p className={styles.state} role="alert">Block results could not be loaded. Try again shortly.</p>;
     if (loading && !cards.length) return <p className={styles.state} aria-busy="true">Loading blocks…</p>;
-    if (!cards.length) return <p className={styles.state}>This program has no blocks yet. Select dates on the calendar to add one.</p>;
+    if (!cards.length) return <p className={styles.state}>This program has no blocks yet. Use New block below, or select dates on the calendar.</p>;
 
     return (
         <>

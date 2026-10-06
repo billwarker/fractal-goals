@@ -613,6 +613,22 @@ function ProgramCalendarPage() {
         handleAddBlockClick(pendingBlockSelection);
     };
 
+    // The side pane's footer: a selected timeframe seeds the dates; otherwise a new block
+    // picks up the day after the last block ends.
+    const handleCreateBlockFromPane = () => {
+        if (selectedTimeframeDates.length) {
+            const sorted = [...selectedTimeframeDates].sort();
+            handleAddBlockClick({ startDate: sorted[0], endDate: sorted[sorted.length - 1] });
+            return;
+        }
+        const lastEnd = sortedBlocks.reduce((latest, block) => (
+            block.end_date && (!latest || block.end_date > latest) ? block.end_date : latest
+        ), null);
+        const nextStart = lastEnd ? addDaysToDateString(lastEnd, 1) : null;
+        const programEnd = displayProgram?.end_date?.slice(0, 10);
+        handleAddBlockClick(nextStart && (!programEnd || nextStart <= programEnd) ? { startDate: nextStart } : null);
+    };
+
     function handleProgramBlockSaveSuccess() {
         dispatchCalendarContext({ type: 'clear_pending_block_selection' });
         handleBlockSaveSuccess();
@@ -932,6 +948,8 @@ function ProgramCalendarPage() {
                     onSetDayStatus={(status) => updateDayStatuses([contextDate], status)}
                     dayStatusUpdating={dayStatusMutation.isPending}
                     onEditPeriod={periodEditor.openEdit}
+                    onCreateBlock={handleCreateBlockFromPane}
+                    onCreateEvent={() => periodEditor.openCreate(selectedTimeframeDates)}
                     onEditPlan={daysTab.openDayPlan}
                     daysNavigator={viewMode === 'days' && displayProgram ? daysTab.navigator : null}
                     onSetSessionCredit={updateSessionCredit}

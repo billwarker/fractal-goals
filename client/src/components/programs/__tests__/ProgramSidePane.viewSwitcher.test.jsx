@@ -86,6 +86,22 @@ describe('ProgramSidePane view switcher', () => {
         expect(screen.queryByRole('list', { name: 'Blocks' })).not.toBeInTheDocument();
     });
 
+    it('offers New block and New event in the Details footer only', () => {
+        const onCreateBlock = vi.fn();
+        const onCreateEvent = vi.fn();
+        const { unmount } = renderPane({ scope: 'program', viewToggle, onCreateBlock, onCreateEvent });
+
+        screen.getByRole('button', { name: 'New block' }).click();
+        screen.getByRole('button', { name: 'New event' }).click();
+        expect(onCreateBlock).toHaveBeenCalledTimes(1);
+        expect(onCreateEvent).toHaveBeenCalledTimes(1);
+        unmount();
+
+        renderPane({ scope: 'program', view: 'goals', viewToggle, onCreateBlock, onCreateEvent });
+        expect(screen.queryByRole('button', { name: 'New block' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'New event' })).not.toBeInTheDocument();
+    });
+
     it('keeps the day review heading under the toggle without a collapse control on desktop', () => {
         renderPane({
             scope: 'day',

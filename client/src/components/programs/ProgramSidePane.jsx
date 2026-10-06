@@ -11,6 +11,7 @@ import { blockForDate } from '../../utils/programViewModel';
 import ProgramSidebar from './ProgramSidebar';
 import ProgramDayPane from './ProgramDayPane';
 import ProgramOverview from './ProgramOverview';
+import { ProgramPlusIcon } from './ProgramSvgIcons';
 import styles from './ProgramSidePane.module.css';
 
 export default function ProgramSidePane({
@@ -46,6 +47,8 @@ export default function ProgramSidePane({
     onSetSessionCredit,
     sessionCreditUpdating = false,
     onEditPeriod,
+    onCreateBlock = null,
+    onCreateEvent = null,
     onEditPlan,
     daysNavigator = null,
     viewToggle = null,
@@ -175,6 +178,23 @@ export default function ProgramSidePane({
                         blocks={scope === 'program' ? blocksPanel : null}
                     />
                 </div>
+            ) : null}
+
+            {program && scope !== 'day' && activeView === 'details' && (onCreateBlock || onCreateEvent) ? (
+                <footer className={styles.detailsFooter}>
+                    {onCreateBlock ? (
+                        <button type="button" className={styles.createButton} onClick={onCreateBlock}>
+                            <ProgramPlusIcon size={14} />
+                            New block
+                        </button>
+                    ) : null}
+                    {onCreateEvent ? (
+                        <button type="button" className={styles.createButton} onClick={onCreateEvent}>
+                            <ProgramPlusIcon size={14} />
+                            New event
+                        </button>
+                    ) : null}
+                </footer>
             ) : null}
 
             {program && activeView === 'goals' ? (
