@@ -15,6 +15,7 @@ const {
     deleteFractal,
     notify,
     mockAuthState,
+    mockThemeState,
     authModalProps,
 } = vi.hoisted(() => ({
     mockNavigate: vi.fn(),
@@ -26,6 +27,7 @@ const {
     mockAuthState: {
         user: { id: 'user-1', username: 'will' },
     },
+    mockThemeState: { animatedIcons: true },
     authModalProps: [],
     notify: {
         success: vi.fn(),
@@ -68,6 +70,10 @@ vi.mock('../../contexts/GoalLevelsContext', () => ({
     }),
 }));
 
+vi.mock('../../contexts/ThemeContext', () => ({
+    useTheme: () => ({ animatedIcons: mockThemeState.animatedIcons }),
+}));
+
 vi.mock('../../hooks/useIsMobile', () => ({
     default: () => false,
 }));
@@ -95,6 +101,10 @@ vi.mock('../../components/modals/AuthModal', () => ({
 
 vi.mock('../../components/atoms/GoalIcon', () => ({
     default: () => <div data-testid="goal-icon" />,
+}));
+
+vi.mock('../../components/atoms/AnimatedGoalIcon', () => ({
+    default: (props) => <div data-testid="animated-goal-icon" data-is-smart={String(props.isSmart)} />,
 }));
 
 vi.mock('../../components/modals/DeleteConfirmModal', () => ({
@@ -159,7 +169,51 @@ describe('Selection', () => {
         });
         localStorageMock.clear();
         mockAuthState.user = { id: 'user-1', username: 'will' };
+        mockThemeState.animatedIcons = true;
         authModalProps.length = 0;
+    });
+
+    const headerRoot = (overrides = {}) => ({
+        id: 'root-1',
+        name: 'Root 1',
+        type: 'UltimateGoal',
+        is_smart: true,
+        created_at: '2026-03-01T00:00:00Z',
+        display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'twelvePointStar' },
+        ...overrides,
+    });
+
+    it('animates the header root icon when the root is SMART and animated icons are on', async () => {
+        getAllFractals.mockResolvedValueOnce({ data: [headerRoot()] });
+
+        renderSelection(createQueryClient());
+
+        await waitFor(() => {
+            expect(screen.getByTestId('animated-goal-icon')).toHaveAttribute('data-is-smart', 'true');
+        });
+    });
+
+    it('keeps the header root icon static when the root is not SMART', async () => {
+        getAllFractals.mockResolvedValueOnce({ data: [headerRoot({ is_smart: false })] });
+
+        renderSelection(createQueryClient());
+
+        await waitFor(() => {
+            expect(screen.getByText('Root 1')).toBeInTheDocument();
+        });
+        expect(screen.queryByTestId('animated-goal-icon')).not.toBeInTheDocument();
+    });
+
+    it('keeps the header root icon static when animated icons are disabled', async () => {
+        mockThemeState.animatedIcons = false;
+        getAllFractals.mockResolvedValueOnce({ data: [headerRoot()] });
+
+        renderSelection(createQueryClient());
+
+        await waitFor(() => {
+            expect(screen.getByText('Root 1')).toBeInTheDocument();
+        });
+        expect(screen.queryByTestId('animated-goal-icon')).not.toBeInTheDocument();
     });
 
     it('stores fractals under user-scoped query keys without per-root level fetches', async () => {

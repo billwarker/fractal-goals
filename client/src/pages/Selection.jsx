@@ -8,10 +8,13 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AuthModal from '../components/modals/AuthModal';
 import CloseIcon from '../components/atoms/CloseIcon';
 import GoalIcon from '../components/atoms/GoalIcon';
+import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { queryKeys } from '../hooks/queryKeys';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
+import { useTheme } from '../contexts/ThemeContext';
+import { isSMART } from '../utils/smartHelpers';
 import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
@@ -34,6 +37,7 @@ function Selection() {
 
     const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    const { animatedIcons } = useTheme();
     const isMobile = useIsMobile();
     const userId = user?.id || null;
     const inviteKeyFromUrl = new URLSearchParams(location.search || '').get('invite_key');
@@ -202,7 +206,7 @@ function Selection() {
 
     const topRoot = getHighestPriorityRoot();
     const headerType = topRoot ? topRoot.type : 'UltimateGoal';
-    const isHeaderSmart = topRoot ? topRoot.is_smart : false;
+    const isHeaderSmart = topRoot ? Boolean(isSMART(topRoot)) : false;
     const recentLevel = topRoot?.display_level || null;
 
     const headerColor = recentLevel?.color || getGoalColor(headerType);
@@ -222,6 +226,8 @@ function Selection() {
     })();
     const isDarkText = headerTextColor === '#1a1a1a';
     const headerLogoSize = isMobile ? 200 : 280;
+    // Same gate as goal tree nodes: animate only SMART goals, and only when animated icons are enabled.
+    const HeaderIcon = animatedIcons && isHeaderSmart ? AnimatedGoalIcon : GoalIcon;
 
     if (authLoading || fractalsQuery.isLoading) {
         return <div className={styles.loadingContainer}>Loading fractals...</div>;
@@ -241,12 +247,13 @@ function Selection() {
             {/* Top Center Display */}
             <div className={styles.headerContainer}>
                 <div className={styles.headerLogoWrapper}>
-                    <GoalIcon
+                    <HeaderIcon
                         shape={headerShape}
                         color={headerColor}
                         secondaryColor={headerSecondaryColor}
                         isSmart={isHeaderSmart}
                         size={headerLogoSize}
+                        reduced
                     />
                     <h1
                         className={styles.titleOverlay}
