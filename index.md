@@ -77,7 +77,10 @@ Details keeps the goal header and Details/Activities/Notes tabs fixed. Goal name
 overflowing names pan between both ends with reading pauses and pause on hover/focus. Reduced-motion
 users can scroll the title manually. The goal-level icon and
 close control stay fixed outside the title viewport; the metadata row omits the redundant goal-level
-badge before the SMART indicator. Description and targets
+badge before the SMART indicator. The SMART wrapper uses flex alignment so the chip shares the
+vertical center of the status and date metadata without inline baseline spacing. SMART and status
+chips share 76px width and 12px text; their height matches the metadata text line using the base
+line-height token. Description and targets
 scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
 legend and summary) sticks directly below the measured goal header while events continue beneath.
 The sticky block uses the containing detail surface background, matching both modal and panel themes.

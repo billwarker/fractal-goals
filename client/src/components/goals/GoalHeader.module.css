@@ -127,23 +127,38 @@
     gap: 10px;
 }
 
+.smartBadgeTarget {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    line-height: 1;
+}
+
 .createLabel {
     color: var(--color-brand-success, #4caf50);
     font-size: 13px;
     font-weight: 700;
 }
 
+.smartBadgeTarget > span,
+.statusBadge {
+    box-sizing: border-box;
+    flex: 0 0 auto;
+    width: 76px;
+    height: calc(1em * var(--line-height-base));
+    min-height: 0;
+    padding: 0 8px;
+    font-size: 12px;
+}
+
 .statusBadge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-height: 22px;
-    padding: 0 8px;
     border: 1px solid var(--goal-status-border);
     border-radius: 999px;
     background: var(--goal-status-bg);
     color: var(--goal-status-color);
-    font-size: 11px;
     font-weight: 700;
     line-height: 1;
     white-space: nowrap;
@@ -167,6 +182,7 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
+    line-height: var(--line-height-base);
     min-width: 0;
     white-space: nowrap;
 }
