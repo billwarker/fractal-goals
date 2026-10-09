@@ -18,6 +18,7 @@ from validators import (
     FractalCreateSchema,
 )
 from blueprints.auth_api import token_required
+from blueprints.goal_history_api import register_goal_history_routes
 from blueprints.api_utils import (
     get_db_session,
     internal_error,
@@ -517,38 +518,6 @@ def get_fractal_goal(current_user, root_id, goal_id):
         db_session.close()
 
 
-@goals_bp.route('/<root_id>/goals/<goal_id>/timeline', methods=['GET'])
-@token_required
-def get_goal_timeline(current_user, root_id, goal_id):
-    """Get a normalized timeline of goal progress and related events."""
-    db_session = get_db_session()
-    try:
-        has_types_filter = 'types' in request.args
-        raw_types = request.args.get('types', '')
-        types = [item.strip() for item in raw_types.split(',') if item.strip()]
-        include_children = request.args.get('include_children', 'true').lower() not in {'0', 'false', 'no'}
-        limit = request.args.get('limit', 50, type=int)
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.get_goal_timeline(
-            root_id,
-            goal_id,
-            current_user.id,
-            types=types if has_types_filter else None,
-            include_children=include_children,
-            limit=limit,
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error fetching goal timeline")
-        return internal_error(logger, "Error fetching goal timeline")
-    finally:
-        db_session.close()
-
-
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['DELETE'])
 @token_required
 def delete_fractal_goal(current_user, root_id, goal_id):
@@ -824,3 +793,7 @@ def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, valida
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
+
+
+# History routes share this blueprint while keeping the mutation module bounded.
+register_goal_history_routes(goals_bp)

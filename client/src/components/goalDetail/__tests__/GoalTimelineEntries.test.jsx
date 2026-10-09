@@ -2,19 +2,10 @@ import React from 'react';
 import { screen, within } from '@testing-library/react';
 
 import { renderWithProviders } from '../../../test/test-utils';
-import GoalTimelineView from '../GoalTimelineView';
+import { GoalTimelineEntries } from '../GoalTimelineEntries';
 
 const { mockEntries } = vi.hoisted(() => ({
     mockEntries: [],
-}));
-
-vi.mock('../../../hooks/useGoalTimeline', () => ({
-    DEFAULT_GOAL_TIMELINE_TYPES: ['activity', 'target', 'goal_lifecycle'],
-    useGoalTimeline: () => ({
-        entries: mockEntries,
-        isLoading: false,
-        error: null,
-    }),
 }));
 
 vi.mock('../../atoms/GoalIcon', () => ({
@@ -67,7 +58,7 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
     }),
 }));
 
-describe('GoalTimelineView', () => {
+describe('GoalTimelineEntries', () => {
     beforeEach(() => {
         mockEntries.splice(0, mockEntries.length, ...[
             {
@@ -275,7 +266,7 @@ describe('GoalTimelineView', () => {
 
     it('renders all timeline event types as consistent cards with subtle inherited context', () => {
         renderWithProviders(
-            <GoalTimelineView
+            <GoalTimelineEntries entries={mockEntries} timezone="UTC"
                 rootId="root-1"
                 goalId="goal-1"
                 currentGoal={{
@@ -318,7 +309,7 @@ describe('GoalTimelineView', () => {
         expect(screen.queryByText('via child goal')).not.toBeInTheDocument();
         expect(screen.queryByText('Child contribution')).not.toBeInTheDocument();
         expect(screen.queryByText('Child Goal')).not.toBeInTheDocument();
-        expect(screen.queryByText('Goal Events')).toBeInTheDocument();
+        expect(screen.queryByText('Goal Events')).not.toBeInTheDocument();
         expect(screen.queryByText('Goal created')).not.toBeInTheDocument();
         expect(screen.queryByText('Goal completed')).not.toBeInTheDocument();
 

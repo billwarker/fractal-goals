@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 const VIEW_VISIT_KEYS = {
-    'goal-timeline': 'goal_timeline',
+    timeline: 'goal_timeline',
     'goal-activities': 'goal_activities',
     'goal-notes': 'goal_notes',
 };

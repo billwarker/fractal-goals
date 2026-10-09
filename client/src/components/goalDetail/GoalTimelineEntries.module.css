@@ -1,84 +1,3 @@
-.container {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.summary {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    padding: 0 0 12px;
-    border-bottom: 1px solid var(--color-border);
-}
-
-.summaryItem,
-.summaryItemButton {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 0;
-    min-height: 34px;
-    padding: 6px 10px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    background: var(--color-bg-card-alt);
-    color: var(--color-text-primary);
-    font: inherit;
-}
-
-.summaryItemButton {
-    cursor: pointer;
-}
-
-.summaryItemButton:hover:not(:disabled) {
-    border-color: var(--color-border-hover);
-}
-
-.summaryItemButton:disabled {
-    cursor: default;
-}
-
-.summaryLabel,
-.summaryValue {
-    font-size: 12px;
-    font-weight: 700;
-    line-height: 1.2;
-    white-space: nowrap;
-}
-
-.summaryItemButton .summaryLabel {
-    text-decoration: underline;
-}
-
-.filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 14px;
-    padding: 4px 0;
-}
-
-.filterLabel {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    cursor: pointer;
-    user-select: none;
-}
-
-.filterLabelActive {
-    color: var(--color-text-primary);
-}
-
-.checkbox {
-    cursor: pointer;
-    accent-color: var(--color-brand-primary);
-    color-scheme: inherit;
-}
-
 .timeline {
     position: relative;
     display: flex;
@@ -187,26 +106,7 @@
     font-size: 11px;
 }
 
-.state {
-    padding: 18px 12px;
-    border: 1px dashed var(--color-border);
-    border-radius: var(--border-radius-md);
-    color: var(--color-text-secondary);
-    text-align: center;
-    font-size: 13px;
-}
-
 @media (max-width: 560px) {
-    .summary {
-        grid-template-columns: 1fr;
-    }
-
-    .cardHeader {
-        flex-wrap: wrap;
-    }
-
-    .time {
-        align-items: center;
-        text-align: left;
-    }
+    .cardHeader { flex-wrap: wrap; }
+    .time { align-items: center; text-align: left; }
 }

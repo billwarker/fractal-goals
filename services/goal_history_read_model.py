@@ -4,7 +4,7 @@ A publisher can preload one owned root and reuse the same timeline evaluator for
 all goals. No data survives the request or crosses a root boundary.
 """
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload, selectinload
 from models import (
     ActivityDefinition,
@@ -124,17 +124,19 @@ class GoalHistoryReadModel:
             .all()
         )
 
-    def instances(self, activity_ids):
+    def instances(self, activity_ids, *, summary_only=False, occurred_range=None, instance_ids=None):
+        if instance_ids is not None and not instance_ids:
+            return []
         if "instances" in self._rows:
             rows = [
                 row
                 for row in self._rows["instances"]
-                if row.activity_definition_id in activity_ids
+                if row.activity_definition_id in activity_ids and (instance_ids is None or row.id in instance_ids)
             ]
             return rows
-        return (
+        query = (
             self.db_session.query(ActivityInstance)
-            .options(
+            .options(*([joinedload(ActivityInstance.definition)] if summary_only else [
                 selectinload(ActivityInstance.sets)
                 .joinedload(ActivitySet.metric_values)
                 .joinedload(MetricValue.definition),
@@ -157,15 +159,20 @@ class GoalHistoryReadModel:
                     MetricValue.split
                 ),
                 joinedload(ActivityInstance.session).joinedload(Session.template),
-            )
+            ]))
             .filter(
                 ActivityInstance.root_id == self.root_id,
                 ActivityInstance.activity_definition_id.in_(activity_ids),
                 ActivityInstance.completed.is_(True),
                 ActivityInstance.deleted_at.is_(None),
             )
-            .all()
         )
+        if occurred_range is not None:
+            occurred_at = func.coalesce(ActivityInstance.time_stop, ActivityInstance.time_start, ActivityInstance.created_at)
+            query = query.filter(occurred_at >= occurred_range[0], occurred_at <= occurred_range[1])
+        if instance_ids is not None:
+            query = query.filter(ActivityInstance.id.in_(instance_ids))
+        return query.all()
 
     def association_events(self, goal_ids, limit=None):
         if "association_events" in self._rows:
@@ -194,23 +201,27 @@ class GoalHistoryReadModel:
             .all()
         )
 
-    def targets(self, goal_ids):
+    def targets(self, goal_ids, *, summary_only=False, target_ids=None):
+        if target_ids is not None and not target_ids:
+            return []
         if "targets" in self._rows:
-            rows = [row for row in self._rows["targets"] if row.goal_id in goal_ids]
+            rows = [row for row in self._rows["targets"] if row.goal_id in goal_ids and (target_ids is None or row.id in target_ids)]
             return rows
-        return (
+        query = (
             self.db_session.query(Target)
-            .options(
+            .options(*([] if summary_only else [
                 joinedload(Target.completed_session),
                 joinedload(Target.metric_conditions),
-            )
+            ]))
             .filter(
                 Target.root_id == self.root_id,
                 Target.goal_id.in_(goal_ids),
                 Target.deleted_at.is_(None),
             )
-            .all()
         )
+        if target_ids is not None:
+            query = query.filter(Target.id.in_(target_ids))
+        return query.all()
 
     def pause_intervals(self, goal_ids):
         if "pause_intervals" in self._rows:

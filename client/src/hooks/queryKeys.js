@@ -74,14 +74,12 @@ export const queryKeys = {
     goalActivityGroups: (rootId, goalId) => ['goalActivityGroups', rootId, goalId],
     goalActivityGroupsRoot: (rootId) => ['goalActivityGroups', rootId],
     goalLevels: (rootId, userId = null) => userId ? ['goalLevels', rootId, userId] : ['goalLevels', rootId],
-    goalDailyDurations: (goalId) => ['goalDailyDurations', goalId],
-    goalTimeline: (rootId, goalId, types = [], includeChildren = true, limit = 50) => [
-        'goalTimeline',
-        rootId,
-        goalId,
-        [...types].sort(),
-        includeChildren,
-        limit,
+    // Share the timeline invalidation root: both are projections of the same evidence.
+    goalActivityHeatmap: (rootId, goalId, includeChildren, timezone, date = null, calendarDate = null) => [
+        'goalTimeline', rootId, goalId, 'heatmap', includeChildren, timezone, date, calendarDate,
+    ],
+    goalTimelinePages: (rootId, goalId, includeChildren, timezone, metric, date, calendarDate) => [
+        'goalTimeline', rootId, goalId, 'pages', includeChildren, timezone, metric, date, calendarDate,
     ],
     goalTimelineRoot: (rootId, goalId) => ['goalTimeline', rootId, goalId],
     goalTimelinesRoot: (rootId) => ['goalTimeline', rootId],

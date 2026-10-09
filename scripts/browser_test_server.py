@@ -94,6 +94,44 @@ def _seed_planning_fractal(db, suffix, user, level, today):
     ))
 
 
+def _seed_goal_heatmap(db, suffix, user, now):
+    """A multi-year goal with timed, untimed and milestone evidence for browser checks."""
+    from datetime import timedelta
+    from models import Goal, GoalLevel, Session, ActivityDefinition, ActivityInstance, Target, EventLog, activity_goal_associations
+
+    root_id = f"browser-root-{suffix}"
+    goal_id = f"browser-heatmap-goal-{suffix}"
+    level_id = f"browser-long-level-{suffix}"
+    db.add(GoalLevel(id=level_id, name='Long Term Goal', rank=1, color='#ff9800', owner_id=user.id, root_id=root_id))
+    db.flush()
+    db.add(Goal(id=goal_id, root_id=root_id, parent_id=root_id, owner_id=user.id, level_id=level_id,
+                name=f'Heatmap Guitar {suffix}', created_at=now - timedelta(days=500),
+                description='Build a steady guitar practice habit.', relevance_statement='Develop confident playing.'))
+    db.add(ActivityDefinition(id=f'browser-heatmap-activity-{suffix}', root_id=root_id,
+                              name='Guitar practice', has_metrics=False, has_sets=False))
+    db.flush()
+    db.execute(activity_goal_associations.insert().values(goal_id=goal_id, activity_id=f'browser-heatmap-activity-{suffix}'))
+    # Isolate these completed sessions from the active-session production workflow.
+    for index, days_ago in enumerate([400, 40, 2, 1]):
+        occurred = now - timedelta(days=days_ago)
+        session_id = f'browser-heatmap-session-{suffix}-{index}'
+        db.add(Session(id=session_id, root_id=root_id, owner_id=user.id, name='Guitar session',
+                       session_start=occurred, completed=True, completed_at=occurred))
+        db.flush()
+        db.add(ActivityInstance(id=f'browser-heatmap-instance-{suffix}-{index}', root_id=root_id,
+            session_id=session_id, activity_definition_id=f'browser-heatmap-activity-{suffix}',
+            completed=True, created_at=occurred, time_start=occurred, time_stop=occurred,
+            duration_seconds=None if index == 3 else 1800, data={}))
+    db.add(Target(id=f'browser-heatmap-target-{suffix}', root_id=root_id, goal_id=goal_id,
+                  activity_id=f'browser-heatmap-activity-{suffix}', name='First clean performance',
+                  created_at=now - timedelta(days=40), completed=True, completed_at=now - timedelta(days=2)))
+    for index in range(25):
+        db.add(EventLog(id=f'browser-heatmap-event-{suffix}-{index}', root_id=root_id,
+            event_type='activity.associated', entity_type='activity_definition', entity_id=f'archived-{index}',
+            timestamp=now - timedelta(days=40),
+            payload={'goal_id': goal_id, 'activity_name': f'Practice plan {index}'}))
+
+
 def main():
     source = make_url(config.get_database_url())
     if source.host not in ("localhost", "127.0.0.1", "::1"):
@@ -294,6 +332,7 @@ def main():
                         data={},
                     )
                 )
+                _seed_goal_heatmap(db, suffix, user, now)
                 _seed_planning_fractal(db, suffix, user, ultimate_level, today)
             db.commit()
         from app import app

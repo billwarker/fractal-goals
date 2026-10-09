@@ -28,7 +28,8 @@
     "src/utils/dateRange.js",
     "src/utils/sessionTime.js",
     "src/utils/durationStats.js",
-    "src/utils/progressAggregations.js"
+    "src/utils/progressAggregations.js",
+    "src/components/common/calendarHeatmapModel.js"
   ],
   "exclude": [
     "**/__tests__/**",

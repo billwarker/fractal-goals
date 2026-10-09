@@ -15,18 +15,15 @@ import GoalHeader from '../goals/GoalHeader';
 import GoalUncompletionModal from '../goals/GoalUncompletionModal';
 import GoalViewMode from '../goals/GoalViewMode';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
-import GraphProfileLoadingFallback from './GraphProfileLoadingFallback';
 import GoalDetailModalPortal from './GoalDetailModalPortal';
 import styles from '../GoalDetailModal.module.css';
 
 const TargetManager = lazyWithRetry(() => import('./TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 const InlineActivityBuilder = lazyWithRetry(() => import('./InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
-const GraphProfileModal = lazyWithRetry(() => import('../analytics/graphs/GraphProfileModal'), 'components/analytics/graphs/GraphProfileModal');
 const TargetAnalyticsModal = lazyWithRetry(() => import('./TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
 const GoalOptionsView = lazyWithRetry(() => import('../goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./GoalNotesView'), 'components/goalDetail/GoalNotesView');
-const GoalTimelineView = lazyWithRetry(() => import('./GoalTimelineView'), 'components/goalDetail/GoalTimelineView');
 function GoalDetailModalRenderSurface({
     activeAnalyticsTarget,
     activitiesAssociateAction,
@@ -48,16 +45,13 @@ function GoalDetailModalRenderSurface({
     completedViaChildren,
     completionFooterState,
     contentScrollRef,
-    dailyDurationsData,
     deadline,
-    depGoalId,
     description,
     displayGoalColor,
     displayGoalSecondaryColor,
     displayMode,
     displayTextColor,
     errors,
-    fetchedMetrics,
     goal,
     goalColor,
     goalCompletionNote,
@@ -82,6 +76,7 @@ function GoalDetailModalRenderSurface({
     handleCreateActivityFromActivities,
     handleEditDetails,
     handleGoalViewNavigation,
+    onTimelineExplore,
     handleQuickGoalNote,
     handleSave,
     handleSelectTargetActivity,
@@ -90,13 +85,9 @@ function GoalDetailModalRenderSurface({
     isActivitiesAssociationMode,
     isActivityBuilderOpen,
     isCompleted,
-    isDailyDurationsError,
-    isDailyDurationsFetching,
-    isDailyDurationsLoading,
     isEditing,
     isPaused,
     isTargetSelectionMode,
-    isTimeGraphOpen,
     levelConfig,
     localCompletedAt,
     mode,
@@ -144,7 +135,6 @@ function GoalDetailModalRenderSurface({
     setIsActivitiesAssociationMode,
     setIsActivityBuilderOpen,
     setIsEditing,
-    setIsTimeGraphOpen,
     setName,
     setRelevanceStatement,
     setSelectedChildType,
@@ -322,6 +312,8 @@ function GoalDetailModalRenderSurface({
                         deadline={deadline}
                         relevanceStatement={relevanceStatement}
                         goalCompletionNote={goalCompletionNote}
+                        onTimelineExplore={onTimelineExplore}
+                        readOnlyTimelineEntries={readOnlyTimelineEntries}
                         setViewState={setViewState}
                         onClose={handleClose}
                         onGoalSelect={onGoalSelect}
@@ -337,7 +329,7 @@ function GoalDetailModalRenderSurface({
         );
     };
 
-    const READ_ONLY_VIEW_STATES = ['goal', 'goal-timeline', 'goal-activities', 'goal-notes', 'target-manager'];
+    const READ_ONLY_VIEW_STATES = ['goal', 'goal-activities', 'goal-notes', 'target-manager'];
     let content;
     if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
         content = renderGoalContent();
@@ -535,33 +527,19 @@ function GoalDetailModalRenderSurface({
                 />
             </Suspense>
         );
-    } else if (viewState === 'goal-timeline') {
-        content = (
-            <Suspense fallback={null}>
-                <GoalTimelineView
-                    rootId={rootId}
-                    goalId={goalId}
-                    currentGoal={goal}
-                    metrics={fetchedMetrics}
-                    onTimeSpentClick={readOnly ? undefined : () => setIsTimeGraphOpen(true)}
-                    readOnlyEntries={readOnlyTimelineEntries}
-                />
-            </Suspense>
-        );
     } else if (needsLevelPicker && selectedChildType === null) {
         content = renderLevelPicker();
     } else {
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (
             <ViewToggleTabs
                 items={[
                     { value: 'goal', label: 'Details' },
-                    { value: 'goal-timeline', label: 'Timeline' },
                     { value: 'goal-activities', label: 'Activities' },
                     { value: 'goal-notes', label: 'Notes' },
                 ]}
@@ -680,34 +658,6 @@ function GoalDetailModalRenderSurface({
         />
     );
 
-    const timeGraphModal = isTimeGraphOpen ? (
-        <Suspense fallback={
-            <GraphProfileLoadingFallback
-                title={name || goal?.name || 'Time Spent'}
-                color={displayGoalColor}
-                onClose={() => setIsTimeGraphOpen(false)}
-            />
-        }>
-            <GraphProfileModal
-                profileId="goalDuration"
-                title={name || goal?.name || 'Time Spent'}
-                onClose={() => setIsTimeGraphOpen(false)}
-                data={{
-                    goal: {
-                        id: depGoalId,
-                        name: name || goal?.name,
-                        type: goalType,
-                        color: displayGoalColor,
-                    },
-                    points: dailyDurationsData?.points || [],
-                    metrics: fetchedMetrics,
-                }}
-                isLoading={isDailyDurationsLoading || isDailyDurationsFetching}
-                isError={isDailyDurationsError}
-            />
-        </Suspense>
-    ) : null;
-
     const activityBuilderModal = isActivityBuilderOpen ? (
         <Suspense fallback={null}>
             <InlineActivityBuilder
@@ -799,7 +749,6 @@ function GoalDetailModalRenderSurface({
                         </div>
                     )}
                 </div>
-                {timeGraphModal}
                 {activityBuilderModal}
                 {targetAnalyticsModal}
                 {targetBuilderModal}
@@ -833,7 +782,6 @@ function GoalDetailModalRenderSurface({
     return (
         <>
             <GoalDetailModalPortal portalTarget={portalTarget}>{modalMarkup}</GoalDetailModalPortal>
-            {timeGraphModal}
             {targetAnalyticsModal}
             {targetBuilderModal}
         </>

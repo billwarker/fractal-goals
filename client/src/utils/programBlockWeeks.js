@@ -64,7 +64,7 @@ export function blockWeeks(start, end, weekStartDay = null) {
             index: weeks.length + 1,
             start: format(weekStart),
             end: weekEnd,
-            partial: (parse(weekEnd) - weekStart) / 86_400_000 + 1 < DAYS_PER_WEEK,
+            partial: (parse(weekEnd).getTime() - weekStart.getTime()) / 86_400_000 + 1 < DAYS_PER_WEEK,
         });
         weekStart = nextStart;
         nextStart = addDays(nextStart, DAYS_PER_WEEK);

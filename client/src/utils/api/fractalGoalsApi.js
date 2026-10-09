@@ -29,22 +29,11 @@ export const fractalGoalsApi = {
     getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
-    getGoalTimeline: (rootId, goalId, params = {}) => {
-        const query = new URLSearchParams();
-        if (Array.isArray(params.types)) {
-            query.set('types', params.types.join(','));
-        }
-        if (params.includeChildren != null) {
-            query.set('include_children', params.includeChildren ? 'true' : 'false');
-        }
-        if (params.limit != null) {
-            query.set('limit', params.limit);
-        }
-        const qs = query.toString();
-        return axios.get(`${API_BASE}/${rootId}/goals/${goalId}/timeline${qs ? '?' + qs : ''}`);
-    },
+    getGoalActivityHeatmap: (rootId, goalId, { includeChildren = true, timezone = 'UTC', date = null, view = 'calendar', metric = 'activities', cursor = null, limit = 20 } = {}) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-heatmap`, {
+            params: { include_children: includeChildren, timezone, ...(date ? { date } : {}), ...(view === 'entries' ? { view, metric, limit, ...(cursor ? { cursor } : {}) } : {}) },
+        }),
     getGoalMetrics: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics`),
-    getGoalDailyDurations: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics/daily-durations`),
     linkGoalActivityGroup: (rootId, goalId, groupId) =>
         axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     unlinkGoalActivityGroup: (rootId, goalId, groupId) =>

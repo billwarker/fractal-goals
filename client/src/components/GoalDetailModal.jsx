@@ -6,19 +6,17 @@ import { useGoalForm } from '../hooks/useGoalForm';
 import useGoalDetailOnboardingVisits from '../hooks/useGoalDetailOnboardingVisits';
 import useInitialGoalDetailView from '../hooks/useInitialGoalDetailView';
 import { useGoalNotes } from '../hooks/useGoalNotes';
-import { useGoalAssociations, useGoalDailyDurations, useGoalMetrics } from '../hooks/useGoalQueries';
+import { useGoalAssociations } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType, getValidChildTypes } from '../utils/goalHelpers';
 import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
-import { importWithRetry } from '../utils/lazyWithRetry';
 import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../utils/activityBuilder';
 import { buildLiveSmartGoal, getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 import { logError } from '../utils/logger';
-const loadGraphProfileModal = () => import('./analytics/graphs/GraphProfileModal');
 /**
  * GoalDetailModal Component
  * 
@@ -114,7 +112,6 @@ function GoalDetailModal({
     const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
     const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
     const [activeAnalyticsTarget, setActiveAnalyticsTarget] = useState(null);
-    const [isTimeGraphOpen, setIsTimeGraphOpen] = useState(false);
     // Builder modal config: null = closed; otherwise { target, activityId, lock }.
     const [builderConfig, setBuilderConfig] = useState(null);
     const goalHeaderRef = React.useRef(null);
@@ -216,22 +213,6 @@ function GoalDetailModal({
     const displayGoalColor = mode !== 'create' && isCompleted ? completedColor : goalColor;
     const displayGoalSecondaryColor = mode !== 'create' && isCompleted ? completedSecondaryColor : goalSecondaryColor;
     const displayTextColor = mode !== 'create' && isCompleted ? completedTextColor : textColor;
-    const shouldPreloadTimeGraph = viewState === 'goal-timeline' && !readOnly;
-    const shouldLoadTimeGraph = isTimeGraphOpen || shouldPreloadTimeGraph;
-    const {
-        data: dailyDurationsData,
-        isLoading: isDailyDurationsLoading,
-        isFetching: isDailyDurationsFetching,
-        isError: isDailyDurationsError,
-    } = useGoalDailyDurations(depGoalId, shouldLoadTimeGraph);
-
-    React.useEffect(() => {
-        if (!shouldPreloadTimeGraph) {
-            return;
-        }
-        importWithRetry(loadGraphProfileModal, 'components/analytics/graphs/GraphProfileModal').catch(() => {});
-    }, [shouldPreloadTimeGraph]);
-
     React.useEffect(() => {
         const handleNavigationIntent = () => {
             if (displayMode === 'modal' && !isOpen) return;
@@ -250,9 +231,6 @@ function GoalDetailModal({
         groups: fetchedGroups,
     } = useGoalAssociations(queryRootId, mode === 'create' ? null : queryGoalId);
 
-    const {
-        metrics: fetchedMetrics,
-    } = useGoalMetrics(mode === 'create' ? null : queryGoalId);
     const {
         activityGroups,
         setActivityGroups,
@@ -416,7 +394,7 @@ function GoalDetailModal({
         }
 
         const updateOffset = () => {
-            setGoalHeaderStickyOffset(Math.max(0, Math.round(headerElement.offsetHeight - 24)));
+            setGoalHeaderStickyOffset(Math.max(0, Math.round(headerElement.offsetHeight + (parseFloat(getComputedStyle(headerElement).top) || 0))));
         };
 
         updateOffset();
@@ -639,16 +617,13 @@ function GoalDetailModal({
             completedViaChildren={completedViaChildren}
             completionFooterState={completionFooterState}
             contentScrollRef={contentScrollRef}
-            dailyDurationsData={dailyDurationsData}
             deadline={deadline}
-            depGoalId={depGoalId}
             description={description}
             displayGoalColor={displayGoalColor}
             displayGoalSecondaryColor={displayGoalSecondaryColor}
             displayMode={displayMode}
             displayTextColor={displayTextColor}
             errors={errors}
-            fetchedMetrics={fetchedMetrics}
             goal={goal}
             goalColor={goalColor}
             goalCompletionNote={goalCompletionNote}
@@ -673,6 +648,7 @@ function GoalDetailModal({
             handleCreateActivityFromActivities={handleCreateActivityFromActivities}
             handleEditDetails={handleEditDetails}
             handleGoalViewNavigation={handleGoalViewNavigation}
+            onTimelineExplore={() => markOnboardingView('timeline')}
             handleQuickGoalNote={handleQuickGoalNote}
             handleSave={handleSave}
             handleSelectTargetActivity={handleSelectTargetActivity}
@@ -681,13 +657,9 @@ function GoalDetailModal({
             isActivitiesAssociationMode={isActivitiesAssociationMode}
             isActivityBuilderOpen={isActivityBuilderOpen}
             isCompleted={isCompleted}
-            isDailyDurationsError={isDailyDurationsError}
-            isDailyDurationsFetching={isDailyDurationsFetching}
-            isDailyDurationsLoading={isDailyDurationsLoading}
             isEditing={isEditing}
             isPaused={isPaused}
             isTargetSelectionMode={isTargetSelectionMode}
-            isTimeGraphOpen={isTimeGraphOpen}
             levelConfig={levelConfig}
             localCompletedAt={localCompletedAt}
             mode={mode}
@@ -734,7 +706,6 @@ function GoalDetailModal({
             setIsActivitiesAssociationMode={setIsActivitiesAssociationMode}
             setIsActivityBuilderOpen={setIsActivityBuilderOpen}
             setIsEditing={setIsEditing}
-            setIsTimeGraphOpen={setIsTimeGraphOpen}
             setName={setName}
             setRelevanceStatement={setRelevanceStatement}
             setSelectedChildType={setSelectedChildType}
@@ -756,7 +727,7 @@ function GoalDetailModal({
 }
 
 function shouldMeasureStickyHeader(viewState) {
-    return viewState === 'goal-activities';
+    return viewState === 'goal' || viewState === 'goal-activities';
 }
 
 export default GoalDetailModal;

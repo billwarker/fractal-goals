@@ -64,6 +64,7 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
             notify.success('Goal created');
         },
@@ -79,6 +80,7 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         },
         onError: (error) => {
@@ -93,6 +95,7 @@ export function GoalsProvider({ children }) {
         },
         onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionNotesRoot(variables.rootId) });
@@ -118,6 +121,7 @@ export function GoalsProvider({ children }) {
                 String(getGoalId(previous)) === String(getGoalId(data)) ? mergeGoalRecord(previous, data) : previous
             ));
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goals(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.rootGoal(variables.rootId) });

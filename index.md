@@ -67,6 +67,32 @@ association inheritance, target evaluation, and timeline projections are service
 Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_target_service.py`,
 `blueprints/goals_api.py`, `client/src/components/goals/`, and `client/src/pages/Goals.jsx`.
 
+Goal Details has one Timeline section beneath targets, combining a lifetime calendar with
+cursor-paginated event cards. There is no separate Timeline tab. Cell intensity always uses
+completed-activity counts. A compact intensity/marker legend sits on one line below the calendar,
+followed by a summary showing hovered/focused or selected day details, otherwise lifetime work
+totals. The date-range/timezone line is omitted; aggregation still uses the selected timezone.
+Include children remains in the Timeline header. The event list retains all canonical evidence, and child scope applies to both views. Selecting a date filters the same list;
+Details keeps the goal header and Details/Activities/Notes tabs fixed. Description and targets
+scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
+legend and summary) sticks directly below the measured goal header while events continue beneath.
+Scrolling back reveals the overview without changing selection or loaded pages. The original header owns the sole close control. There are no Expand/Restore
+buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
+
+`blueprints/goal_history_api.py` registers history reads. `services/goal_timeline_service.py` owns the
+shared evidence projection, `services/goal_activity_heatmap.py` daily aggregation, and
+`services/goal_timeline_page.py` stable mode filtering/cursors. Calendar summaries use complete
+evidence; pages have 20 entries by default and no total-history cap. Rich activity/target data loads
+only for the selected page. Dates use the user's timezone; shared activity instances count once.
+Goal-level colours and one continuous calendar span all years. `components/common/CalendarHeatmap.jsx`
+serves both goal and session calendars; `GoalTimelineFeed.jsx` and `GoalTimelineEntries.jsx` own the
+list and canonical cards. All queries share the `goalTimeline` invalidation root.
+
+Goal detail content retains 24px horizontal insets (16px in narrow panels), with horizontal panning
+contained within the calendar and vertical scrolling owned by the modal/panel body. Published landing
+snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
+See [Goal Timeline](planning/goal-activity-heatmap.md).
+
 ### Sessions, activities, and progress
 
 Sessions are the execution container. Activity definitions and instances, metrics, sets,

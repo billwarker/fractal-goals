@@ -1,4 +1,8 @@
+from datetime import datetime, timezone
 from services.goal_history_read_model import GoalHistoryReadModel
+from services.goal_activity_heatmap import (
+    aggregate_goal_days, local_day_bounds, parse_heatmap_options, utc_datetime,
+)
 
 from models import Goal, GoalLevel, validate_root_goal
 from services.goal_loading import load_fractal_goals_for_serialization
@@ -6,6 +10,7 @@ from services.goal_type_utils import get_canonical_goal_type
 from services.serializers import (
     calculate_smart_status,
     format_utc,
+    format_utc_precise,
     serialize_activity_instance,
     serialize_metric_definition,
     serialize_split_definition,
@@ -72,7 +77,86 @@ class GoalTimelineService:
             levels_by_name[level.name] = level
         return levels_by_name
 
-    def get_goal_timeline(
+    def get_goal_timeline(self, root_id, goal_id, current_user_id, *, limit=50, **kwargs):
+        """Bounded display timeline; lifetime summaries use the same projection privately."""
+        return self._project_timeline(
+            root_id, goal_id, current_user_id,
+            limit=max(1, min(int(limit or 50), 200)), **kwargs,
+        )
+
+    def get_goal_activity_heatmap(
+        self, root_id, goal_id, current_user_id, *,
+        include_children=True, timezone_name='UTC', day=None,
+        page_size=None, cursor=None, metric='events',
+    ) -> ServiceResult[JsonDict]:
+        root, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+        zone, selected_day, error = parse_heatmap_options(timezone_name, day)
+        if error:
+            return None, error, 400
+        goals = load_fractal_goals_for_serialization(self.db_session, root_id)
+        goal = goals.get(goal_id)
+        if not goal or goal.deleted_at:
+            return None, "Goal not found", 404
+        now = datetime.now(timezone.utc)
+        start = utc_datetime(goal.created_at)
+        end = min(utc_datetime(goal.completed_at), now) if goal.completed and goal.completed_at else now
+        # Imported goals with future creation dates still have a valid one-day calendar.
+        end = max(start, end)
+        if selected_day and not start.astimezone(zone).date() <= selected_day <= end.astimezone(zone).date():
+            return None, "Date outside goal lifetime", 400
+
+        def in_range(timestamp):
+            occurred = utc_datetime(timestamp)
+            return start <= occurred <= end and (
+                selected_day is None or occurred.astimezone(zone).date() == selected_day
+            )
+
+        activity_range = (start, end)
+        if selected_day is not None:
+            day_start, day_end = local_day_bounds(selected_day, zone)
+            activity_range = (max(start, day_start), min(end, day_end))
+        payload, error, status = self._project_timeline(
+            root_id, goal_id, current_user_id,
+            types=['activity', 'target', 'goal_lifecycle'],
+            include_children=include_children, validated_root=root,
+            preloaded_goals_by_id=goals, summary_only=page_size is not None or selected_day is None,
+            entry_filter=in_range, activity_range=activity_range,
+        )
+        if error:
+            return None, error, status
+        if payload is None:
+            return None, "Goal history unavailable", 500
+        if page_size is not None:
+            from services.goal_timeline_page import timeline_page
+            try:
+                page, pagination = timeline_page(payload['entries'], metric, page_size, cursor)
+            except (ValueError, TypeError):
+                return None, "Provide a valid timeline mode, cursor and page size (1–100)", 400
+            if not page:
+                return {'entries': [], 'pagination': pagination}, None, 200
+            selected_ids = {entry['id'] for entry in page}
+            instance_ids = {entry['entity_id'] for entry in page if entry['event_type'] == 'activity.completed'}
+            rich, error, status = self._project_timeline(
+                root_id, goal_id, current_user_id, types=['activity', 'target', 'goal_lifecycle'],
+                include_children=include_children, validated_root=root, preloaded_goals_by_id=goals,
+                entry_filter=in_range, activity_range=activity_range,
+                selected_entry_ids=selected_ids, activity_instance_ids=instance_ids,
+                target_ids={entry['entity_id'] for entry in page if entry['entity_type'] == 'target'},
+            )
+            if error:
+                return None, error, status
+            if rich is None:
+                return None, "Goal history unavailable", 500
+            by_id = {entry['id']: entry for entry in rich['entries']}
+            return {'entries': [by_id[entry['id']] for entry in page if entry['id'] in by_id],
+                    'pagination': pagination}, None, 200
+        if selected_day:
+            return {'date': selected_day.isoformat(), 'entries': payload['entries']}, None, 200
+        return aggregate_goal_days(payload['entries'], start, end, zone), None, 200
+
+    def _project_timeline(
         self,
         root_id,
         goal_id,
@@ -80,7 +164,13 @@ class GoalTimelineService:
         *,
         types=None,
         include_children=True,
-        limit=50,
+        limit=None,
+        summary_only=False,
+        entry_filter=None,
+        activity_range=None,
+        selected_entry_ids=None,
+        activity_instance_ids=None,
+        target_ids=None,
         validated_root=None,
         preloaded_goals_by_id=None,
         preloaded_levels_by_name=None,
@@ -104,13 +194,12 @@ class GoalTimelineService:
         goal = goals_by_id.get(goal_id)
         if not goal:
             return None, "Goal not found", 404
-        effective_levels_by_name = preloaded_levels_by_name
-        if effective_levels_by_name is None:
+        effective_levels_by_name = preloaded_levels_by_name or {}
+        if preloaded_levels_by_name is None and not summary_only:
             effective_levels_by_name = self._get_effective_levels_by_name(
                 current_user_id, root_id,
             )
 
-        limit = max(1, min(int(limit or 50), 200))
         if types is None:
             requested_types = set(GOAL_TIMELINE_TYPES)
         else:
@@ -135,12 +224,16 @@ class GoalTimelineService:
                          relationship=None, payload=None):
             if not timestamp or category not in requested_types:
                 return
+            if selected_entry_ids is not None and entry_id not in selected_entry_ids:
+                return
+            if entry_filter and not entry_filter(timestamp):
+                return
             entries.append({
                 'id': entry_id,
                 'type': category,
                 'category': category,
                 'event_type': entry_type,
-                'timestamp': format_utc(timestamp),
+                'timestamp': format_utc_precise(timestamp),
                 'title': title,
                 'subtitle': subtitle,
                 'entity_id': entity_id,
@@ -157,11 +250,13 @@ class GoalTimelineService:
                 return False
             if source_goal.created_at and occurred_at < source_goal.created_at:
                 return False
-            if source_goal.completed_at and occurred_at >= source_goal.completed_at:
+            if source_goal.completed and source_goal.completed_at and occurred_at >= source_goal.completed_at:
                 return False
             return True
 
         def serialize_timeline_goal(goal_item):
+            if summary_only:
+                return {'goal_id': goal_item.id}
             level = getattr(goal_item, 'level', None)
             level_name = getattr(level, 'name', None)
             effective_level = effective_levels_by_name.get(level_name) if level_name else None
@@ -235,7 +330,7 @@ class GoalTimelineService:
                 activity_contexts.setdefault(activity.id, []).append((source_goal, associated_at))
 
         if 'activity' in requested_types and activity_contexts:
-            instances = history.instances(list(activity_contexts.keys()))
+            instances = history.instances(list(activity_contexts.keys()), summary_only=summary_only, occurred_range=activity_range, instance_ids=activity_instance_ids)
             for instance in instances:
                 source_goal = next(
                     (
@@ -247,8 +342,14 @@ class GoalTimelineService:
                 )
                 if not source_goal:
                     continue
-                serialized = serialize_activity_instance(instance)
-                session = instance.session
+                event_at = instance.time_stop or instance.time_start or instance.created_at
+                if entry_filter and not entry_filter(event_at):
+                    continue
+                serialized = ({
+                    'name': instance.definition.name if instance.definition else 'activity',
+                    'duration_seconds': instance.duration_seconds,
+                } if summary_only else serialize_activity_instance(instance))
+                session = None if summary_only else instance.session
                 session_template_name = None
                 session_template_color = None
                 if session:
@@ -266,7 +367,7 @@ class GoalTimelineService:
                     source_goal=source_goal,
                     payload={
                         **serialized,
-                        'activity_definition': serialize_timeline_activity_definition(instance.definition),
+                        'activity_definition': None if summary_only else serialize_timeline_activity_definition(instance.definition),
                         'session_name': session.name if session else None,
                         'session_template_name': session_template_name or (session.name if session else None),
                         'session_template_color': session_template_color,
@@ -301,7 +402,7 @@ class GoalTimelineService:
                 )
 
         if 'target' in requested_types:
-            targets = history.targets(timeline_goal_ids)
+            targets = history.targets(timeline_goal_ids, summary_only=summary_only, target_ids=target_ids)
             for target in targets:
                 source_goal = goals_by_id.get(target.goal_id, goal)
                 append_entry(
@@ -313,7 +414,7 @@ class GoalTimelineService:
                     entity_id=target.id,
                     entity_type='target',
                     source_goal=source_goal,
-                    payload=serialize_target(target),
+                    payload={} if summary_only else serialize_target(target),
                 )
                 if not target.completed or not target.completed_at:
                     continue
@@ -323,11 +424,11 @@ class GoalTimelineService:
                     target.completed_at,
                     f"Achieved target: {target.name}",
                     category='target',
-                    subtitle=target.completed_session.name if target.completed_session else None,
+                    subtitle=target.completed_session.name if not summary_only and target.completed_session else None,
                     entity_id=target.id,
                     entity_type='target',
                     source_goal=source_goal,
-                    payload=serialize_target(target),
+                    payload={} if summary_only else serialize_target(target),
                 )
 
         def append_goal_lifecycle_entries(goal_item, *, category, relationship):
@@ -429,8 +530,9 @@ class GoalTimelineService:
                     relationship='descendant',
                 )
 
-        entries.sort(key=lambda item: item['timestamp'] or '', reverse=True)
-        sliced = entries[:limit]
+        if not summary_only:
+            entries.sort(key=lambda item: item['timestamp'] or '', reverse=True)
+        sliced = entries[:limit] if limit is not None else entries
         return {
             'entries': sliced,
             'available_types': sorted(GOAL_TIMELINE_TYPES),
@@ -439,6 +541,6 @@ class GoalTimelineService:
                 'limit': limit,
                 'count': len(sliced),
                 'total': len(entries),
-                'has_more': len(entries) > limit,
+                'has_more': limit is not None and len(entries) > limit,
             },
         }, None, 200

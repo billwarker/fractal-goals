@@ -34,15 +34,18 @@ describe('circuitQueryCache', () => {
         const runKey = queryKeys.sessionCircuitRuns('root', 'session');
         const circuitKey = queryKeys.circuits('root');
         const sessionsKey = queryKeys.sessions('root');
+        const heatmapKey = queryKeys.goalActivityHeatmap('root', 'goal', true, 'UTC');
         client.setQueryData(runKey, [{ id: 'run-1' }]);
         client.setQueryData(circuitKey, [{ id: 'definition-1' }]);
         client.setQueryData(sessionsKey, [{ id: 'session' }]);
+        client.setQueryData(heatmapKey, { total_activities: 1 });
 
         await refreshCircuitSessionConsumers(client, 'root', 'session', 'completeRun');
 
         expect(client.getQueryState(runKey)?.isInvalidated).toBe(true);
         expect(client.getQueryState(circuitKey)?.isInvalidated).toBe(true);
         expect(client.getQueryState(sessionsKey)?.isInvalidated).toBe(true);
+        expect(client.getQueryState(heatmapKey)?.isInvalidated).toBe(true);
     });
 
     it('keeps an authoritative member-metric run response fresh while refreshing dependents', async () => {

@@ -5,7 +5,7 @@ const info = (id, title, description) => ({ id, title, description, kind: 'info'
 export const ONBOARDING_SUBSTEPS = {
     break_it_down: [
         tracked('goal_detail_modal_opened', 'Open the Goal Detail Modal', 'The Goal Detail Modal is the home for all information about your goals. You can edit their attributes using the Edit or Options buttons in the footer.'),
-        tracked('goal_timeline_viewed', 'Visit your Goal Timeline', 'The timelines pane will show all work you put towards your goals: completing activities, associating activities, creating targets and achieving targets, and more'),
+        tracked('goal_timeline_viewed', 'Explore your Goal Timeline', 'In Goal Details, explore the Timeline calendar and events. Select a day to inspect its evidence, use Load more for earlier entries, or scroll through the events to keep Timeline at the top.'),
         tracked('goal_activities_viewed', "Visit your Goal's Activities", "Once you create activities to define how you'll progress towards your goals, you can associate them to your goals. You can then create targets against those activities, giving your goal real conditions for success. You can create and associate activities from this modal, or by visiting Sessions > Manage Activities."),
         tracked('goal_notes_viewed', "Visit your Goal's Notes", 'You can keep track of any thoughts or notes about your goal here. Notes made on activities associated to your goals will also show up here too. Great for collecting links and online videos.'),
         tracked('child_goal_created', 'Create a Child Goal', 'Break your goal down into smaller pieces, giving you a path towards completing your {level} goal.'),

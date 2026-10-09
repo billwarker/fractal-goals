@@ -10,7 +10,6 @@ const {
     mockNotify,
     mockGoalAssociations,
     mockGoalMetrics,
-    mockGoalDurations,
     mockCreateGoalNote,
     mockDeleteGoalCompletionNotes,
 } = vi.hoisted(() => ({
@@ -26,12 +25,6 @@ const {
     },
     mockGoalMetrics: {
         metrics: null,
-    },
-    mockGoalDurations: {
-        data: null,
-        isSuccess: false,
-        isLoading: false,
-        isFetching: false,
     },
     mockCreateGoalNote: vi.fn(() => Promise.resolve()),
     mockDeleteGoalCompletionNotes: vi.fn(() => Promise.resolve()),
@@ -68,7 +61,6 @@ vi.mock('../../hooks/useGoalForm', () => ({
 vi.mock('../../hooks/useGoalQueries', () => ({
     useGoalAssociations: () => mockGoalAssociations,
     useGoalMetrics: () => mockGoalMetrics,
-    useGoalDailyDurations: () => mockGoalDurations,
 }));
 
 vi.mock('../../hooks/useGoalNotes', () => ({
@@ -141,16 +133,7 @@ vi.mock('../goals/GoalViewMode', () => ({
             <div>view:{name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
             <button onClick={() => setViewState('goal-options')}>open options</button>
-            <button onClick={() => setViewState('goal-timeline')}>open timeline</button>
-        </div>
-    ),
-}));
-
-vi.mock('../goalDetail/GoalTimelineView', () => ({
-    default: ({ onTimeSpentClick }) => (
-        <div>
             <div>goal timeline view</div>
-            <button onClick={onTimeSpentClick}>time spent</button>
         </div>
     ),
 }));
@@ -269,17 +252,6 @@ vi.mock('../goalDetail/TargetManager', () => ({
     ),
 }));
 
-vi.mock('../analytics/graphs/GraphProfileModal', () => ({
-    default: ({ profileId, data }) => (
-        <div>
-            <div>graph profile modal</div>
-            <div>graph-profile:{profileId}</div>
-            <div>graph-goal:{data.goal?.name}</div>
-            <div>graph-duration:{data.points?.[0]?.activity_duration}</div>
-        </div>
-    ),
-}));
-
 vi.mock('../goals/GoalEditForm', () => ({
     default: ({ name, handleSave, handleCancel }) => (
         <div>
@@ -314,10 +286,6 @@ describe('GoalDetailModal smoke coverage', () => {
             errors: {},
             validateForm: vi.fn(() => true),
         });
-        mockGoalDurations.data = null;
-        mockGoalDurations.isSuccess = false;
-        mockGoalDurations.isLoading = false;
-        mockGoalDurations.isFetching = false;
         mockGoalMetrics.metrics = null;
     });
 
@@ -570,7 +538,7 @@ describe('GoalDetailModal smoke coverage', () => {
         });
     });
 
-    it('keeps the shared header visible when switching to timeline view', async () => {
+    it('keeps goal information and timeline in the same scrolling content', async () => {
         render(
             <GoalDetailModal
                 isOpen={true}
@@ -593,115 +561,14 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        fireEvent.click(screen.getByText('open timeline'));
+        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
 
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
             expect(screen.getByText('goal timeline view')).toBeInTheDocument();
         }, { timeout: 5000 });
-    });
-
-    it('opens the time spent graph as a registered graph profile for the current goal', async () => {
-        mockGoalDurations.data = {
-            points: [
-                { date: '2026-06-25', activity_duration: 7320, session_duration: 9000 },
-            ],
-        };
-        mockGoalDurations.isSuccess = true;
-        mockGoalMetrics.metrics = {
-            recursive: {
-                sessions_count: 4,
-                activities_duration_seconds: 7320,
-            },
-        };
-
-        render(
-            <GoalDetailModal
-                isOpen={true}
-                onClose={vi.fn()}
-                goal={{
-                    id: 'goal-1',
-                    name: 'Deep Work',
-                    attributes: {
-                        id: 'goal-1',
-                        name: 'Deep Work',
-                        type: 'ShortTermGoal',
-                        created_at: '2026-06-17T10:00:00Z',
-                    },
-                }}
-                onUpdate={vi.fn()}
-                onToggleCompletion={vi.fn()}
-                onDelete={vi.fn()}
-                rootId="root-1"
-                treeData={{
-                    id: 'root-1',
-                    name: 'Root',
-                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
-                    children: [],
-                }}
-            />
-        );
-
-        fireEvent.click(screen.getByText('open timeline'));
-        await waitFor(() => {
-            expect(screen.getByText('goal timeline view')).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText('time spent'));
-
-        await waitFor(() => {
-            expect(screen.getByText('graph profile modal')).toBeInTheDocument();
-            expect(screen.getByText('graph-profile:goalDuration')).toBeInTheDocument();
-            expect(screen.getByText('graph-goal:Deep Work')).toBeInTheDocument();
-            expect(screen.getByText('graph-duration:7320')).toBeInTheDocument();
-        }, { timeout: 5000 });
-    });
-
-    it('opens the time spent graph from the panel timeline shell', async () => {
-        mockGoalDurations.data = {
-            points: [
-                { date: '2026-06-25', activity_duration: 7320, session_duration: 9000 },
-            ],
-        };
-
-        render(
-            <GoalDetailModal
-                isOpen={true}
-                displayMode="panel"
-                onClose={vi.fn()}
-                goal={{
-                    id: 'goal-1',
-                    name: 'Deep Work',
-                    attributes: {
-                        id: 'goal-1',
-                        name: 'Deep Work',
-                        type: 'ShortTermGoal',
-                    },
-                }}
-                onUpdate={vi.fn()}
-                onToggleCompletion={vi.fn()}
-                onDelete={vi.fn()}
-                rootId="root-1"
-                treeData={{
-                    id: 'root-1',
-                    name: 'Root',
-                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
-                    children: [],
-                }}
-            />
-        );
-
-        fireEvent.click(screen.getByText('open timeline'));
-        await waitFor(() => {
-            expect(screen.getByText('goal timeline view')).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText('time spent'));
-
-        await waitFor(() => {
-            expect(screen.getByText('graph profile modal')).toBeInTheDocument();
-            expect(screen.getByText('graph-profile:goalDuration')).toBeInTheDocument();
-        }, { timeout: 5000 });
+        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Edit', exact: true })).toBeInTheDocument();
     });
 
     it('shows activities as a tab and moves associate action into the footer', async () => {
@@ -1017,9 +884,9 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        // All four navigation tabs remain available in read-only.
+        // Timeline is integrated into Details, including published snapshots.
         expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Timeline' })).toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Activities' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
 

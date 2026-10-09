@@ -39,6 +39,7 @@ export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, a
         queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
         queryClient.invalidateQueries({ queryKey: ['activity-progress-timeline', rootId] }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsEvidenceGoalsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.sessionsFlowtreeMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),

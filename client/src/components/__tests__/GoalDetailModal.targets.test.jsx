@@ -30,7 +30,6 @@ vi.mock('../../contexts/GoalLevelsContext', () => ({
 vi.mock('../../hooks/useGoalQueries', () => ({
     useGoalAssociations: () => ({ activities: [], groups: [] }),
     useGoalMetrics: () => ({ metrics: null }),
-    useGoalDailyDurations: () => ({ data: null, isSuccess: false }),
 }));
 
 vi.mock('../../hooks/useGoalNotes', () => ({
@@ -95,9 +94,6 @@ vi.mock('../goals/GoalUncompletionModal', () => ({
     default: () => <div>uncompletion modal</div>,
 }));
 
-vi.mock('../goalDetail/GoalTimelineView', () => ({
-    default: () => <div>goal timeline view</div>,
-}));
 
 vi.mock('../goalDetail/ActivityAssociator', () => ({
     default: () => <div>activity associator</div>,

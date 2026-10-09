@@ -22,7 +22,7 @@ describe('useGoalDetailOnboardingVisits', () => {
         }));
         expect(markVisited).toHaveBeenCalledWith('goal_detail_modal');
 
-        act(() => result.current('goal-timeline'));
+        act(() => result.current('timeline'));
         act(() => result.current('goal-activities'));
         act(() => result.current('goal-notes'));
         expect(markVisited.mock.calls.slice(1).map(([key]) => key)).toEqual([
@@ -41,7 +41,7 @@ describe('useGoalDetailOnboardingVisits', () => {
         const { result } = renderHook(() => useGoalDetailOnboardingVisits({
             displayMode: 'modal', goalId: null, isOpen: true, mode: 'create', readOnly: true, rootId: 'root-1',
         }));
-        act(() => result.current('goal-timeline'));
+        act(() => result.current('timeline'));
         expect(markVisited).not.toHaveBeenCalled();
     });
 });

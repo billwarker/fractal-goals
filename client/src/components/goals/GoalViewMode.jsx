@@ -6,6 +6,8 @@ import NoteCard from '../notes/NoteCard';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
+const GoalActivityHeatmap = lazyWithRetry(() => import('../goalDetail/GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
+
 const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
 
 function GoalViewMode({
@@ -37,6 +39,8 @@ function GoalViewMode({
     onTargetClick,
     onRequestTargetBuilder,
     readOnly = false,
+    readOnlyTimelineEntries = null,
+    onTimelineExplore,
 }) {
     const navigate = useNavigate();
     const hasTargets = Array.isArray(targets) && targets.length > 0;
@@ -44,6 +48,7 @@ function GoalViewMode({
 
     return (
         <div className={styles.viewContainer}>
+            <div className={styles.goalOverview}>
             {goalCompletionNote && (
                 <section className={styles.goalCompletionNoteSection}>
                     <label className={styles.label}>
@@ -130,6 +135,12 @@ function GoalViewMode({
                         onRequestBuilder={readOnly ? undefined : onRequestTargetBuilder}
                         readOnly={readOnly}
                     />
+                </Suspense>
+            )}
+            </div>
+            {goalId && mode !== 'create' && (!readOnly || Array.isArray(readOnlyTimelineEntries)) && (
+                <Suspense fallback={<p role="status">Loading timeline...</p>}>
+                    <GoalActivityHeatmap key={goalId} rootId={rootId} goalId={goalId} goal={goal} snapshotEntries={readOnly ? readOnlyTimelineEntries : null} onExplore={onTimelineExplore} />
                 </Suspense>
             )}
         </div>
