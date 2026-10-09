@@ -35,7 +35,6 @@ function renderHeader(overrides = {}) {
             }}
             goalType="ImmediateGoal"
             goalColor="#ffcc00"
-            textColor="#111827"
             goalStatus="active"
             {...overrides.props}
         />,
@@ -105,5 +104,16 @@ describe('GoalHeader', () => {
 
         expect(screen.getByText('SMART')).toBeInTheDocument();
         expect(screen.getByText('SMART').closest('[data-onboarding-target="smart-badge"]')).toBeInTheDocument();
+    });
+
+    it('places the configured goal icon before and outside the panning name', () => {
+        const { container } = renderHeader({ props: { goalIcon: 'square' } });
+        const icon = container.querySelector('svg');
+        const name = screen.getByText('Performance Piece');
+
+        expect(icon.querySelector('rect')).toBeInTheDocument();
+        expect(icon.parentElement).toHaveAttribute('aria-hidden', 'true');
+        expect(icon.parentElement.nextElementSibling).toBe(name.parentElement);
+        expect(name.parentElement).not.toContainElement(icon);
     });
 });

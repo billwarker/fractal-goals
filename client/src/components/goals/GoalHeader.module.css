@@ -18,21 +18,65 @@
 
 .topRow {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
     gap: 10px;
 }
 
+.titleIcon {
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
 .title {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
     color: var(--goal-header-color);
     font-size: 24px;
     font-weight: 700;
     line-height: 1.2;
-    white-space: normal;
+    white-space: nowrap;
+}
+
+.titleText {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.title[data-overflow='true'] .titleText {
+    animation: goalTitlePan var(--goal-title-pan-duration) linear infinite;
+}
+
+.title:hover .titleText,
+.title:focus .titleText {
+    animation-play-state: paused;
+}
+
+@keyframes goalTitlePan {
+    0%, 15%, 100% { transform: translateX(0); }
+    50%, 65% { transform: translateX(var(--goal-title-pan-distance)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .title {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .title::-webkit-scrollbar {
+        display: none;
+    }
+
+    .title[data-overflow='true'] .titleText {
+        animation: none;
+    }
 }
 
 .actions {
     display: flex;
+    flex: 0 0 auto;
     align-items: center;
     gap: 6px;
 }
@@ -87,17 +131,6 @@
     color: var(--color-brand-success, #4caf50);
     font-size: 13px;
     font-weight: 700;
-}
-
-.levelBadge {
-    padding: 4px 10px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    background: var(--goal-header-color);
-    color: var(--goal-header-text-color);
-    font-size: 12px;
-    font-weight: 700;
-    white-space: nowrap;
 }
 
 .statusBadge {

@@ -1,11 +1,12 @@
 import React from 'react';
-import { getTypeDisplayName } from '../../utils/goalHelpers';
 import SMARTIndicator from '../SMARTIndicator';
 import { ChevronDownIcon } from '../atoms/AppIcons';
 import CloseButton from '../atoms/CloseButton';
+import GoalIcon from '../atoms/GoalIcon';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone, formatLiteralDate } from '../../utils/dateUtils';
 import { getAgeLabel } from '../../utils/goalTiming';
+import GoalHeaderTitle from './GoalHeaderTitle';
 import styles from './GoalHeader.module.css';
 
 function GoalHeader({
@@ -14,7 +15,9 @@ function GoalHeader({
     goal,
     goalType,
     goalColor,
-    textColor,
+    goalSecondaryColor,
+    goalIcon = 'circle',
+    goalIsSmart = false,
     parentGoal,
     onClose, // Callback to close modal when navigating
     onCollapse, // Mobile panel collapse toggle
@@ -99,7 +102,6 @@ function GoalHeader({
             className={`${styles.header} ${headerTabs ? styles.headerWithTabs : ''}`}
             style={{
                 '--goal-header-color': goalColor,
-                '--goal-header-text-color': textColor,
                 '--goal-status-border': statusConfig.borderColor,
                 '--goal-status-bg': statusConfig.background,
                 '--goal-status-color': statusConfig.color,
@@ -107,9 +109,16 @@ function GoalHeader({
         >
             {/* Top Row: Name and Close Button */}
             <div className={styles.topRow}>
-                <div className={styles.title}>
-                    {mode === 'create' ? (name || 'New Goal') : (name || goal.name)}
-                </div>
+                <span className={styles.titleIcon} aria-hidden="true">
+                    <GoalIcon
+                        shape={goalIcon}
+                        color={goalColor}
+                        secondaryColor={goalSecondaryColor || 'var(--color-bg-surface)'}
+                        isSmart={goalIsSmart}
+                        size={28}
+                    />
+                </span>
+                <GoalHeaderTitle name={mode === 'create' ? (name || 'New Goal') : (name || goal.name)} />
                 <div className={styles.actions}>
                     {onCollapse && (
                         <button
@@ -141,10 +150,6 @@ function GoalHeader({
                                 + Create
                             </span>
                         )}
-                        <div className={styles.levelBadge}>
-                            {getTypeDisplayName(goalType)}
-                        </div>
-
                         <span className={styles.smartBadgeTarget} data-onboarding-target="smart-badge">
                             <SMARTIndicator
                                 goal={goal}

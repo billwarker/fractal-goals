@@ -562,7 +562,8 @@ function GoalDetailModalRenderSurface({
                     goalType={goalType}
                     goalColor={displayGoalColor}
                     goalSecondaryColor={mode !== 'create' && (isCompleted || goalIsSmart) ? displayGoalSecondaryColor : null}
-                    textColor={displayTextColor}
+                    goalIcon={getGoalIcon(goalType)}
+                    goalIsSmart={mode !== 'create' && goalIsSmart}
                     parentGoal={parentGoal}
                     onClose={handleClose}
                     onCollapse={onMobileCollapse}

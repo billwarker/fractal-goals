@@ -73,7 +73,11 @@ completed-activity counts. A compact intensity/marker legend sits on one line be
 followed by a summary showing hovered/focused or selected day details, otherwise lifetime work
 totals. The date-range/timezone line is omitted; aggregation still uses the selected timezone.
 Include children remains in the Timeline header. The event list retains all canonical evidence, and child scope applies to both views. Selecting a date filters the same list;
-Details keeps the goal header and Details/Activities/Notes tabs fixed. Description and targets
+Details keeps the goal header and Details/Activities/Notes tabs fixed. Goal names stay on one line;
+overflowing names pan between both ends with reading pauses and pause on hover/focus. Reduced-motion
+users can scroll the title manually. The goal-level icon and
+close control stay fixed outside the title viewport; the metadata row omits the redundant goal-level
+badge before the SMART indicator. Description and targets
 scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
 legend and summary) sticks directly below the measured goal header while events continue beneath.
 The sticky block uses the containing detail surface background, matching both modal and panel themes.
