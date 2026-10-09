@@ -201,7 +201,7 @@ function GoalDetailModalFooter({
         </div>
     ) : showDetailFooter ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterMulti}`}>
+            <div className={`${styles.completionFooterActions} ${styles.completionFooterMulti}`} role="group" aria-label="Goal actions">
                 <button
                     type="button"
                     onClick={handleEditDetails}

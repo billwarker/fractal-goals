@@ -5,7 +5,7 @@ import styles from './CalendarHeatmap.module.css';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function CalendarHeatmap({ days = [], accentColor, showYears = false, showPreview = true, getLevel, getLabel, onSelectDay, onPreviewDayChange, selectedDate, scrollToLatest }) {
+export default function CalendarHeatmap({ days = [], accentColor, showYears = false, showPreview = true, compactTouchTargets = false, getLevel, getLabel, onSelectDay, onPreviewDayChange, selectedDate, scrollToLatest }) {
     const { columns, months, years } = useMemo(() => buildHeatmapCalendar(days), [days]);
     const ordered = useMemo(() => columns.flat().filter((day) => day.inRange), [columns]);
     const scrollRef = useRef(null);
@@ -38,7 +38,7 @@ export default function CalendarHeatmap({ days = [], accentColor, showYears = fa
     };
 
     return (
-        <section className={`${styles.container} ${styles.palette} ${accentColor ? styles.accentPalette : ''}`} style={accentColor ? { '--heatmap-accent': accentColor } : undefined} aria-label="Activity calendar">
+        <section className={`${styles.container} ${styles.palette} ${compactTouchTargets ? styles.compactTouch : ''} ${accentColor ? styles.accentPalette : ''}`} style={accentColor ? { '--heatmap-accent': accentColor } : undefined} aria-label="Activity calendar">
             <div className={styles.shell} style={{ '--heatmap-heading-height': showYears ? '44px' : '24px' }}>
                 <div className={styles.axis} aria-hidden="true">
                     {WEEKDAYS.map((day) => <span key={day}>{day}</span>)}

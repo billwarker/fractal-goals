@@ -109,8 +109,8 @@ const checks = [
   {
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
-      /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterPrimaryActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
-      /@media\s*\(max-width:\s*560px\)[\s\S]*?\.activitiesFooterSelectionActions\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[^}]*\}[\s\S]*?\.activitiesFooterSelectionActions \.activitiesFooterConfirmButton\s*\{[^}]*grid-column:\s*1 \/ -1;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.completionFooterActions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-x:\s*contain;/,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.completionFooterActions > button\s*\{[^}]*flex:\s*0 0 auto;[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/,
     ],
   },
   {

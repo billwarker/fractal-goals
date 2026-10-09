@@ -18,6 +18,15 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await page.getByText(`Heatmap Guitar ${suffix}`, { exact: true }).click();
     const heatmap = page.getByRole('region', { name: 'Timeline', exact: true });
     await expect(heatmap).toBeVisible();
+    const expectMatchingBackground = async () => {
+        expect(await heatmap.evaluate((element) => {
+            const block = element.querySelector('[class*="_stickyCalendar_"]');
+            let parent = element.closest('[class*="_panelContent_"], [class*="_modalScrollArea_"]');
+            while (parent && getComputedStyle(parent).backgroundColor === 'rgba(0, 0, 0, 0)') parent = parent.parentElement;
+            return parent && getComputedStyle(block).backgroundColor === getComputedStyle(parent).backgroundColor;
+        })).toBe(true);
+    };
+    await expectMatchingBackground();
     await expect(heatmap.getByText(/recorded minutes/)).toHaveCount(0);
     await heatmap.getByRole('heading', { name: 'Timeline', exact: true }).hover();
     await expect(heatmap.getByText(/4 days with recorded work · 4 completed activities/)).toBeVisible();
@@ -35,6 +44,22 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         probe.remove();
         return matches;
     })).toBe(true);
+    if (suffix === 'mobile') {
+        const actions = page.getByRole('group', { name: 'Goal actions' });
+        const sizes = await actions.getByRole('button').evaluateAll((buttons) => buttons.map((button) => {
+            const bounds = button.getBoundingClientRect();
+            return { top: bounds.top, height: bounds.height };
+        }));
+        expect(new Set(sizes.map((size) => size.top)).size).toBe(1);
+        expect(sizes.every((size) => size.height >= 44)).toBe(true);
+        expect(await actions.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath('mobile-footer.png') });
+        const before = await actions.boundingBox();
+        await actions.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+        await expect(actions.getByRole('button').last()).toBeInViewport({ ratio: 1 });
+        expect((await actions.boundingBox()).x).toBe(before.x);
+        await actions.evaluate((element) => { element.scrollLeft = 0; });
+    }
     const cells = heatmap.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} ·/ });
     await expect(cells).toHaveCount(501);
     // Only the calendar may pan; its modal/panel ancestors retain their margins.
@@ -85,7 +110,18 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await expect(dailySummary).toContainText('4 days with recorded work');
     await workDay.focus();
     await expect(dailySummary).toContainText('1 completed activity');
-    await workDay.press('Enter');
+    if (suffix === 'mobile') {
+        const bounds = await workDay.boundingBox();
+        expect(bounds.width).toBe(20);
+        expect(bounds.height).toBe(20);
+        expect(await workDay.evaluate((element) => {
+            const bounds = element.getBoundingClientRect();
+            return document.elementFromPoint(bounds.right + 1, bounds.top + bounds.height / 2)?.closest('button') === element;
+        })).toBe(true);
+        await page.touchscreen.tap(bounds.x + bounds.width + 1, bounds.y + bounds.height / 2);
+    } else {
+        await workDay.press('Enter');
+    }
     await expect(heatmap.getByRole('button', { name: 'Close day' })).toBeVisible();
     await expect(heatmap.getByText('Completed activity: Guitar practice', { exact: true })).toBeVisible();
     const dayHeading = heatmap.getByRole('heading', { name: /^\d{4}-\d{2}-\d{2}$/ });
@@ -134,6 +170,7 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         probe.remove();
         return color;
     }));
+    await expectMatchingBackground();
     await page.screenshot({ path: testInfo.outputPath('goal-heatmap-light.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
     expect(errors).toEqual([]);

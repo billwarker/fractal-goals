@@ -1,7 +1,7 @@
 .container { min-width: 0; padding-top: 18px; border-top: 1px solid var(--color-border); }
 .heading { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .controls { margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
-.stickyCalendar { container-type: inline-size; position: sticky; top: var(--goal-detail-sticky-offset, 0px); z-index: 10; padding: 8px 0; background: var(--color-bg-surface); }
+.stickyCalendar { container-type: inline-size; position: sticky; top: var(--goal-detail-sticky-offset, 0px); z-index: 10; padding: 8px 0; background: var(--goal-detail-content-bg, var(--color-bg-surface)); }
 .heading h3, .heading h4 { margin: 0; font-size: var(--font-size-sm); color: var(--color-text-primary); }
 .scope { display: flex; gap: 6px; align-items: center; color: var(--color-text-secondary); font-size: var(--font-size-xs); }
 .scope input { accent-color: var(--color-primary); }

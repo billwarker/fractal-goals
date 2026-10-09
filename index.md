@@ -76,8 +76,13 @@ Include children remains in the Timeline header. The event list retains all cano
 Details keeps the goal header and Details/Activities/Notes tabs fixed. Description and targets
 scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
 legend and summary) sticks directly below the measured goal header while events continue beneath.
+The sticky block uses the containing detail surface background, matching both modal and panel themes.
 Scrolling back reveals the overview without changing selection or loaded pages. The original header owns the sole close control. There are no Expand/Restore
 buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
+The goal modal subtracts the navigation overlap from its visual-viewport height to keep its footer
+inside the screen, including when the keyboard changes the visible viewport. On mobile, footer actions form a single horizontally pannable row with 44px-high buttons. Goal calendar
+cells use 20px visuals on touch devices, with 24px hit areas covering the gaps; session calendars
+retain their existing sizing.
 
 `blueprints/goal_history_api.py` registers history reads. `services/goal_timeline_service.py` owns the
 shared evidence projection, `services/goal_activity_heatmap.py` daily aggregation, and

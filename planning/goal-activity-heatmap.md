@@ -42,7 +42,9 @@ activity to its completion day rather than distributing its duration across midn
 - `CalendarHeatmap` is the shared calendar renderer, replacing the session-specific grid.
   Goal calendars run continuously across all years, with month/year labels along one horizontal axis.
   Nearby year labels combine to avoid collisions. The calendar initially shows its latest dates,
-  scrolls back through its entire lifetime, and retains readable cells and 24px touch targets.
+  scrolls back through its entire lifetime, and retains readable cells. Goal touch calendars use
+  20px visual cells with non-overlapping 24px hit areas across their 4px gaps; session calendars
+  retain their existing 24px visual touch cells.
   There is no day/event maximum. Session summaries keep their existing count/time logic.
   The modal/panel keeps fixed horizontal margins: its content scrolls vertically, while only the
   calendar scrolls horizontally. Calendar overscroll is contained so it cannot pan an ancestor.
@@ -57,8 +59,13 @@ activity to its completion day rather than distributing its duration across midn
   unreachable frontend time-graph loader/query are retired; backend duration APIs remain compatible.
 - Details uses its existing single vertical scroll container. The goal header and tabs remain sticky; description and
   targets scroll away. The complete Timeline calendar block (heading, child scope, chart, legend and
-  summary) sticks directly beneath the measured header while events scroll underneath. Its measured
-  height also supplies scroll margins so day headings and event controls remain reachable. The original header owns the only close control. Scrolling back reveals the overview. No Expand/Restore
+  summary) sticks directly beneath the measured header while events scroll underneath. Its opaque
+  background inherits the modal/panel content background, so it does not create a differently shaded
+  block in standalone modals and still masks scrolled event cards. Its measured
+  height also supplies scroll margins so day headings and event controls remain reachable. The original header owns the only close control. Mobile footer actions stay in one horizontally
+  pannable row, with 44px-high buttons and contained overscroll; the fixed footer never wraps. The
+  modal height subtracts navigation overlap from the visual viewport, preventing the bottom actions
+  from extending below the screen and preserving viewport tracking when the keyboard opens. Scrolling back reveals the overview. No Expand/Restore
   control, separate collapse state, nested event scroller or scroll-triggered focus jump remains.
   Header resize and mobile inset changes update the Timeline offset; other tabs and edit flows retain
   their existing sticky header. Event wheel/touch/keyboard
@@ -88,9 +95,14 @@ for existing callers and landing snapshot projection.
 
 Verification passed: production build, frontend lint/types, 1,533 full-suite frontend tests before
 the final UI refinements, 36 focused calendar/feed/modal/header tests for sticky scrolling, followed by 27 focused tests
-after the full-calendar sticky refinement, and
+after the full-calendar sticky refinement, then 46 focused regressions for the mobile footer/grid
+refinement, and
 41 goal history/heatmap backend regressions plus 26 landing/query-budget regressions. All four desktop/mobile goal-timeline and production smoke browser checks pass after the final
-full-calendar sticky refinement. Browser coverage validates the combined section, fixed margins, pagination and sticky scrolling.
+mobile footer/grid refinement. Browser coverage validates footer panning and complete visibility,
+20px cells and taps within their expanded 24px hit areas, fixed margins, pagination and sticky scrolling.
+Browser assertions also verify the sticky calendar matches its containing modal/panel background
+in both dark and light themes. The responsive audit now enforces the requested one-row scrollable mobile action layout instead of
+the retired two-row layout.
 
 The feature audit found no remaining implementation blocker. Repository-wide S+ release quality
 still requires the pre-existing 20 backend type errors and frontend maintainability diagnostics

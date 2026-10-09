@@ -60,7 +60,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
                     ) : data ? (
                         <>
                             {!data.total_activities && <p className={styles.empty}>No work recorded yet. Timeline events appear as markers.</p>}
-                            <CalendarHeatmap days={data.days} accentColor={goalColor} showYears showPreview={false} scrollToLatest getLevel={level} getLabel={dayLabel} selectedDate={selectedDate} onPreviewDayChange={setPreviewDay} onSelectDay={(day) => setSelectedDate(day.date)} />
+                            <CalendarHeatmap days={data.days} accentColor={goalColor} showYears showPreview={false} compactTouchTargets scrollToLatest getLevel={level} getLabel={dayLabel} selectedDate={selectedDate} onPreviewDayChange={setPreviewDay} onSelectDay={(day) => setSelectedDate(day.date)} />
                             <div className={styles.legendGroup}>
                                 <div className={styles.legend} role="group" aria-label="Completed activities per day" title="Completed activities per day">
                                     <span className={styles.legendTitle}>Activities/day</span>
