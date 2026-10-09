@@ -109,13 +109,17 @@ const checks = [
   {
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
-      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.completionFooterActions\s*\{[^}]*display:\s*flex;[^}]*flex-wrap:\s*nowrap;[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-x:\s*contain;/,
-      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.completionFooterActions > button\s*\{[^}]*flex:\s*0 0 auto;[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/,
+      /\.completionFooterActions\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-x:\s*contain;/,
+      /\.completionFooterActionRow\s*\{[^}]*display:\s*grid;[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*1fr;[^}]*width:\s*max-content;[^}]*margin-inline:\s*auto;/,
+      /\.completionFooterButton\s*\{[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/,
     ],
   },
   {
     file: 'src/components/goalDetail/GoalDetailModalFooter.jsx',
-    patterns: [/completionFooterSplit[^`]*activitiesFooterPrimaryActions/],
+    patterns: [
+      /function FooterActions[\s\S]*?className=\{styles\.completionFooterActions\}[\s\S]*?className=\{styles\.completionFooterActionRow\}/,
+      /<FooterActions role="group" aria-label="Goal actions">/,
+    ],
   },
   {
     file: 'src/components/goals/GoalHeader.module.css',

@@ -84,7 +84,9 @@ The sticky block uses the containing detail surface background, matching both mo
 Scrolling back reveals the overview without changing selection or loaded pages. The original header owns the sole close control. There are no Expand/Restore
 buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
 The goal modal subtracts the navigation overlap from its visual-viewport height to keep its footer
-inside the screen, including when the keyboard changes the visible viewport. On mobile, footer actions form a single horizontally pannable row with 44px-high buttons. Goal calendar
+inside the screen, including when the keyboard changes the visible viewport. Footer actions use one
+centered row of equal-width buttons sized for the longest visible label, with 44px minimum height.
+The row pans horizontally when it overflows on either modal or panel surfaces. Goal calendar
 cells use 20px visuals on touch devices, with 24px hit areas covering the gaps; session calendars
 retain their existing sizing.
 

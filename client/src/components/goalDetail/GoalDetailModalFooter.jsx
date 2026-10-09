@@ -1,6 +1,14 @@
 import SidePaneNotePanel from '../common/SidePaneNotePanel';
 import styles from '../GoalDetailModal.module.css';
 
+function FooterActions({ children, ...props }) {
+    return (
+        <div className={styles.completionFooterActions}>
+            <div className={styles.completionFooterActionRow} {...props}>{children}</div>
+        </div>
+    );
+}
+
 function GoalDetailModalFooter({
     showGoalNoteComposer,
     handleQuickGoalNote,
@@ -51,7 +59,7 @@ function GoalDetailModalFooter({
         />
     ) : (showCreateFooter || showEditFooter) ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+            <FooterActions>
                 <button
                     type="button"
                     onClick={handleCancel}
@@ -74,11 +82,11 @@ function GoalDetailModalFooter({
                 >
                     {showCreateFooter ? 'Create' : 'Save'}
                 </button>
-            </div>
+            </FooterActions>
         </div>
     ) : showCompletionConfirmFooter ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit}`}>
+            <FooterActions>
                 <button
                     type="button"
                     onClick={onCancelCompletionConfirm}
@@ -101,7 +109,7 @@ function GoalDetailModalFooter({
                 >
                     {isUncompletionConfirm ? 'Mark Incomplete' : 'Complete Goal'}
                 </button>
-            </div>
+            </FooterActions>
         </div>
     ) : showActivitiesFooter ? (
         <div className={styles.completionFooter}>
@@ -115,7 +123,7 @@ function GoalDetailModalFooter({
                 </div>
             )}
             {isAssociationFlowActive && activityPickerFooterActions ? (
-                <div className={`${styles.completionFooterActions} ${styles.activitiesFooterSelectionActions}`}>
+                <FooterActions>
                     <button
                         type="button"
                         onClick={activityPickerFooterActions.onCancel}
@@ -153,9 +161,9 @@ function GoalDetailModalFooter({
                     >
                         {activityPickerFooterActions.confirmLabel}
                     </button>
-                </div>
+                </FooterActions>
             ) : (
-                <div className={`${styles.completionFooterActions} ${styles.completionFooterSplit} ${styles.activitiesFooterPrimaryActions}`}>
+                <FooterActions>
                     <button
                         type="button"
                         onClick={isTargetFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}
@@ -180,12 +188,12 @@ function GoalDetailModalFooter({
                     >
                         {isAssociationFlowActive ? 'Cancel' : '+ Add Target'}
                     </button>
-                </div>
+                </FooterActions>
             )}
         </div>
     ) : showOptionsFooter ? (
         <div className={styles.completionFooter}>
-            <div className={styles.completionFooterActions}>
+            <FooterActions>
                 <button
                     type="button"
                     onClick={onCancelOptions}
@@ -197,11 +205,11 @@ function GoalDetailModalFooter({
                 >
                     Cancel
                 </button>
-            </div>
+            </FooterActions>
         </div>
     ) : showDetailFooter ? (
         <div className={styles.completionFooter}>
-            <div className={`${styles.completionFooterActions} ${styles.completionFooterMulti}`} role="group" aria-label="Goal actions">
+            <FooterActions role="group" aria-label="Goal actions">
                 <button
                     type="button"
                     onClick={handleEditDetails}
@@ -252,7 +260,7 @@ function GoalDetailModalFooter({
                         {completionFooterState.label}
                     </button>
                 )}
-            </div>
+            </FooterActions>
         </div>
     ) : null;
 }
