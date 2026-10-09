@@ -394,7 +394,7 @@ function GoalDetailModal({
         }
 
         const updateOffset = () => {
-            setGoalHeaderStickyOffset(Math.max(0, Math.round(headerElement.offsetHeight + (parseFloat(getComputedStyle(headerElement).top) || 0))));
+            setGoalHeaderStickyOffset(Math.max(0, headerElement.getBoundingClientRect().height + (parseFloat(getComputedStyle(headerElement).top) || 0)));
         };
 
         updateOffset();

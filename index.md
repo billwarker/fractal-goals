@@ -81,6 +81,8 @@ badge before the SMART indicator. Description and targets
 scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
 legend and summary) sticks directly below the measured goal header while events continue beneath.
 The sticky block uses the containing detail surface background, matching both modal and panel themes.
+Its opaque background overlaps the header by 1px; the header offset retains fractional precision
+to prevent underlying content showing through a seam at the sticky boundary.
 Scrolling back reveals the overview without changing selection or loaded pages. The original header owns the sole close control. There are no Expand/Restore
 buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
 The goal modal subtracts the navigation overlap from its visual-viewport height to keep its footer

@@ -143,6 +143,15 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         const goalHeader = body.querySelector('[class*="_header_"]');
         return Math.abs(element.parentElement.parentElement.getBoundingClientRect().top - goalHeader.getBoundingClientRect().bottom);
     })).toBeLessThan(2);
+    expect(await timelineHeading.evaluate((element) => {
+        const block = element.parentElement.parentElement;
+        const body = element.closest('[class*="_panelContent_"], [class*="_modalScrollArea_"]');
+        const header = body.querySelector('[class*="_header_"]');
+        const headerBottom = header.getBoundingClientRect().bottom;
+        const bounds = block.getBoundingClientRect();
+        const coveringElement = document.elementFromPoint(bounds.left + bounds.width / 2, headerBottom + 0.25);
+        return bounds.top <= headerBottom && block.contains(coveringElement);
+    })).toBe(true);
     await expect(calendar).toBeInViewport({ ratio: 1 });
     await expect(intensityLegend).toBeInViewport({ ratio: 1 });
     await expect(heatmap.getByRole('img', { name: 'Outline: goal paused on this day' })).toBeInViewport({ ratio: 1 });
