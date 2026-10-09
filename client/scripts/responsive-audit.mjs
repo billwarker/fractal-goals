@@ -110,7 +110,7 @@ const checks = [
     file: 'src/components/GoalDetailModal.module.css',
     patterns: [
       /\.completionFooterActions\s*\{[^}]*min-width:\s*0;[^}]*width:\s*100%;[^}]*overflow-x:\s*auto;[^}]*overscroll-behavior-x:\s*contain;/,
-      /\.completionFooterActionRow\s*\{[^}]*display:\s*grid;[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*1fr;[^}]*width:\s*max-content;[^}]*margin-inline:\s*auto;/,
+      /\.completionFooterActionRow\s*\{[^}]*display:\s*grid;[^}]*grid-auto-flow:\s*column;[^}]*grid-auto-columns:\s*1fr;[^}]*min-width:\s*100%;[^}]*width:\s*max-content;[^}]*margin-inline:\s*auto;/,
       /\.completionFooterButton\s*\{[^}]*min-height:\s*44px;[^}]*white-space:\s*nowrap;/,
     ],
   },

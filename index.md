@@ -85,7 +85,8 @@ Scrolling back reveals the overview without changing selection or loaded pages. 
 buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
 The goal modal subtracts the navigation overlap from its visual-viewport height to keep its footer
 inside the screen, including when the keyboard changes the visible viewport. Footer actions use one
-centered row of equal-width buttons sized for the longest visible label, with 44px minimum height.
+row of equal-width buttons filling the available horizontal space, with 44px minimum height.
+The longest visible label sets the minimum width shared by all buttons.
 The row pans horizontally when it overflows on either modal or panel surfaces. Goal calendar
 cells use 20px visuals on touch devices, with 24px hit areas covering the gaps; session calendars
 retain their existing sizing.
