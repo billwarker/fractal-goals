@@ -375,6 +375,7 @@ class AgentProposalPreviewMixin:
                 "action": "Create program day",
                 "name": first_day.get("name"),
                 "day_of_week": first_day.get("day_of_week"),
+                "repeat_every_weeks": first_day.get("repeat_every_weeks", 1),
                 "templates": [
                     {"id": item["id"], "name": item["name"]}
                     for item in (first_day.get("templates") or [])[:10]

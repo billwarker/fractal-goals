@@ -44,9 +44,10 @@ function joinWithAnd(parts) {
 const formatShortDate = (value) => formatLiteralDate(value, { year: undefined });
 
 /** "Every Monday, Wednesday and Friday in the program." */
-export function formatWeekdaySchedule(weekdays = []) {
+export function formatWeekdaySchedule(weekdays = [], repeatEveryWeeks = 1) {
     const ordered = WEEKDAY_NAMES.filter((name) => weekdays.includes(name));
     if (!ordered.length) return '';
+    if (repeatEveryWeeks > 1) return `${ordered.length === 7 ? 'Every day' : joinWithAnd(ordered)} every ${repeatEveryWeeks} weeks.`;
     if (ordered.length === 7) return 'Every day in the program.';
     return `Every ${joinWithAnd(ordered)} in the program.`;
 }
@@ -68,7 +69,8 @@ export function getProgramDayScheduleLabel(day) {
     const dates = getProgramDaySpecificDates(day);
     if (weekdays.length) {
         const weekdayLabel = weekdays.length === 7 ? 'Daily' : weekdays.map((name) => name.slice(0, 3)).join(' · ');
-        return dates.length ? `${weekdayLabel} · +${dates.length} date${dates.length === 1 ? '' : 's'}` : weekdayLabel;
+        const cadence = day.repeat_every_weeks > 1 ? `${weekdayLabel} · every ${day.repeat_every_weeks} weeks` : weekdayLabel;
+        return dates.length ? `${cadence} · +${dates.length} date${dates.length === 1 ? '' : 's'}` : cadence;
     }
     if (!dates.length) return '';
     if (dates.length <= 2) return dates.map(formatShortDate).join(', ');
@@ -92,8 +94,15 @@ export function getProgramDayScheduledDates(day, program) {
         ? getRecurringDatesWithinRange(programStart, programEnd, activeDays)
         : [];
 
+    // Monday-start calendar weeks; week zero is the week containing programStart.
+    const start = new Date(`${programStart}T00:00:00Z`);
+    const monday = start.getTime() - ((start.getUTCDay() + 6) % 7) * 86_400_000;
+    const interval = day?.repeat_every_weeks || 1;
+    const intervalDates = recurringDates.filter((value) => (
+        Math.floor((new Date(`${value}T00:00:00Z`).getTime() - monday) / (7 * 86_400_000)) % interval === 0
+    ));
+
     const excluded = new Set((day?.excluded_dates || []).map(getDatePart));
-    return [...new Set([...explicitScheduleDates, ...recurringDates])]
+    return [...new Set([...explicitScheduleDates, ...intervalDates])]
         .filter((date) => !excluded.has(date)).sort();
 }
-

@@ -102,6 +102,7 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             name=data.get('name'),
             notes=data.get('notes'),
             day_of_week=cls._weekday_list(data.get('day_of_week')),
+            repeat_every_weeks=data.get('repeat_every_weeks', 1),
             completion_min_templates=data.get('completion_min_templates'),
         )
         session.add(day)
@@ -152,6 +153,8 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             day.completion_min_templates = data.get('completion_min_templates')
         if 'day_of_week' in data:
             day.day_of_week = cls._weekday_list(data['day_of_week'])
+        if 'repeat_every_weeks' in data:
+            day.repeat_every_weeks = data['repeat_every_weeks']
         if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
             cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
         cls._validate_program_day_completion_min(day)

@@ -135,7 +135,7 @@ def _calendar_snapshot(session, program_id):
         ProgramBlock.id, ProgramBlock.name, ProgramBlock.start_date, ProgramBlock.end_date,
     ).filter(ProgramBlock.program_id == program_id).all()
     day_rows = session.query(
-        ProgramDay.id, ProgramDay.name, ProgramDay.day_number, ProgramDay.day_of_week,
+        ProgramDay.id, ProgramDay.name, ProgramDay.day_number, ProgramDay.day_of_week, ProgramDay.repeat_every_weeks,
     ).filter(ProgramDay.program_id == program_id).all()
     day_ids = [row.id for row in day_rows]
     schedules_by_day = {}
@@ -160,6 +160,7 @@ def _calendar_snapshot(session, program_id):
         days=[
             SimpleNamespace(
                 id=row.id, name=row.name, day_number=row.day_number, day_of_week=row.day_of_week,
+                repeat_every_weeks=row.repeat_every_weeks,
                 occurrence_schedules=schedules_by_day.get(row.id, []),
                 occurrence_exclusions=exclusions_by_day.get(row.id, []),
             )

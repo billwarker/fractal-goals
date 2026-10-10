@@ -44,6 +44,26 @@ describe('ProgramDayModal', () => {
         getCircuits.mockResolvedValue({ data: [] });
     });
 
+    it.each([false, true])('uses the draft name as the accessible heading (editing: %s)', async (editing) => {
+        const queryClient = createQueryClient();
+        queryClient.setQueryData(queryKeys.sessionTemplates('root-1'), []);
+        queryClient.setQueryData(queryKeys.activities('root-1'), []);
+        queryClient.setQueryData(queryKeys.activityGroups('root-1'), []);
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ProgramDayModal isOpen onClose={vi.fn()} onSave={vi.fn()} rootId="root-1"
+                    initialData={editing ? { id: 'day-1', name: 'Leg Day' } : undefined} />
+            </QueryClientProvider>
+        );
+        const fallback = editing ? 'Edit Program Day' : 'New Program Day';
+        expect(screen.getByRole('dialog', { name: editing ? 'Leg Day' : fallback })).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Day Name *'), { target: { value: 'Upper Body' } });
+        expect(screen.getByRole('heading', { name: 'Upper Body' })).toBeInTheDocument();
+        expect(screen.getByRole('dialog', { name: 'Upper Body' })).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Day Name *'), { target: { value: '   ' } });
+        expect(screen.getByRole('dialog', { name: fallback })).toBeInTheDocument();
+    });
+
     it('reads template/activity datasets from shared query keys', async () => {
         const queryClient = createQueryClient();
         getSessionTemplates.mockResolvedValueOnce({ data: [{ id: 'template-1', name: 'Warmup' }] });
@@ -243,6 +263,39 @@ describe('ProgramDayModal', () => {
         });
 
         describe('one program day per date', () => {
+            it('defaults to weekly, saves an interval, and treats an empty interval as one', () => {
+                const onSave = renderModal({ name: 'Strength', day_of_week: ['Tuesday'] });
+                const interval = screen.getByLabelText('Repeat every (weeks)');
+                expect(interval).toHaveValue(1);
+                fireEvent.change(interval, { target: { value: '3' } });
+                fireEvent.click(screen.getByRole('button', { name: 'Create Day' }));
+                expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ repeat_every_weeks: 3 }));
+                fireEvent.change(interval, { target: { value: '' } });
+                fireEvent.click(screen.getByRole('button', { name: 'Create Day' }));
+                expect(onSave).toHaveBeenLastCalledWith(expect.objectContaining({ repeat_every_weeks: 1 }));
+            });
+
+            it('loads saved cadence and rejects zero or fractional intervals', () => {
+                renderModal({ id: 'day-1', name: 'Strength', day_of_week: ['Tuesday'], repeat_every_weeks: 2 });
+                const interval = screen.getByLabelText('Repeat every (weeks)');
+                expect(interval).toHaveValue(2);
+                for (const value of ['0', '1.5']) {
+                    fireEvent.change(interval, { target: { value } });
+                    expect(screen.getByRole('button', { name: 'Save Changes' })).toBeDisabled();
+                }
+                fireEvent.click(screen.getByRole('radio', { name: 'Specific dates' }));
+                expect(screen.queryByLabelText('Repeat every (weeks)')).not.toBeInTheDocument();
+            });
+
+            it('enables a weekday when its occupied dates fall outside the chosen cadence', () => {
+                const otherProgram = { ...program, days: [{ id: 'other', name: 'Test', scheduled_dates: ['2026-09-08'] }] };
+                renderModal({ name: 'Strength', day_of_week: [] }, vi.fn(), otherProgram);
+                expect(screen.getByRole('button', { name: 'Tuesday, taken by Test' })).toHaveAttribute('aria-disabled', 'true');
+                fireEvent.change(screen.getByLabelText('Repeat every (weeks)'), { target: { value: '2' } });
+                fireEvent.click(screen.getByRole('button', { name: 'Tuesday' }));
+                expect(screen.getByRole('button', { name: 'Create Day' })).toBeEnabled();
+            });
+
             const busyProgram = {
                 ...program,
                 days: [
@@ -254,8 +307,14 @@ describe('ProgramDayModal', () => {
             it('marks weekdays another day already holds as taken', () => {
                 renderModal({ name: 'Upper', day_of_week: [], scheduled_dates: [], templates: [] }, vi.fn(), busyProgram);
 
-                expect(screen.getByRole('button', { name: 'Monday, taken by Leg Day' })).toBeDisabled();
-                expect(screen.getByRole('button', { name: 'Thursday, taken by Test Day' })).toBeDisabled();
+                const monday = screen.getByRole('button', { name: 'Monday, taken by Leg Day' });
+                expect(monday).toHaveAttribute('aria-disabled', 'true');
+                expect(screen.getByRole('button', { name: 'Thursday, taken by Test Day' })).toHaveAttribute('aria-disabled', 'true');
+                fireEvent.click(monday);
+                expect(monday).toHaveAttribute('aria-pressed', 'false');
+                fireEvent.focus(monday);
+                expect(screen.getByRole('tooltip')).toHaveTextContent('Taken by Leg Day');
+                expect(screen.queryByText(/already have their days/)).not.toBeInTheDocument();
                 expect(screen.getByRole('button', { name: 'Friday' })).toBeEnabled();
             });
 

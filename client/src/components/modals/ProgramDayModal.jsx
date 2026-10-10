@@ -9,7 +9,7 @@ import { formatLiteralDate, getDatePart } from '../../utils/dateUtils';
 import TemplateBuilderModal from './TemplateBuilderModal';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
-import ModalFooter from '../atoms/ModalFooter';
+import ProgramDayEditorFooter from './ProgramDayEditorFooter';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
@@ -39,6 +39,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
     const [name, setName] = useState(initialState.name);
     const [selectedTemplates, setSelectedTemplates] = useState(initialState.selectedTemplates);
     const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState(initialState.selectedDaysOfWeek);
+    const [repeatEveryWeeks, setRepeatEveryWeeks] = useState(initialState.repeatEveryWeeks);
     const [scheduleMode, setScheduleMode] = useState(initialState.scheduleMode);
     const [specificDates, setSpecificDates] = useState(initialState.specificDates);
 
@@ -61,14 +62,19 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
         () => occupiedProgramDates(program, { excludeDayId: initialData?.id }),
         [program, initialData?.id],
     );
-    const weekdayOwners = useMemo(() => takenWeekdays(occupiedDates), [occupiedDates]);
+    const weekdayOwners = useMemo(() => takenWeekdays(occupiedDates, program, {
+        repeatEveryWeeks: Number(repeatEveryWeeks || 1), excludedDates: initialData?.excluded_dates || [],
+    }), [occupiedDates, program, repeatEveryWeeks, initialData?.excluded_dates]);
     const [firstConflict] = findDraftDayConflicts(program, occupiedDates, {
         weekdays: isDatesMode ? [] : selectedDaysOfWeek,
         dates: specificDates,
         excludedDates: initialData?.excluded_dates || [],
+        repeatEveryWeeks: Number(repeatEveryWeeks || 1),
     });
     const saveBlockedReason = !name.trim()
         ? 'Give the day a name to save it.'
+        : !isDatesMode && (!Number.isInteger(Number(repeatEveryWeeks || 1)) || Number(repeatEveryWeeks || 1) < 1 || Number(repeatEveryWeeks || 1) > 2147483647)
+            ? 'Enter a whole number of weeks, at least 1.'
         : isDatesMode && !specificDates.length
             ? 'Add at least one date to save a specific-dates day.'
             : firstConflict
@@ -128,6 +134,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                 template_configs: templateConfigs,
                 // Weekdays repeat across the whole program; specific dates are explicit rows.
                 day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
+                repeat_every_weeks: isDatesMode ? 1 : Number(repeatEveryWeeks || 1),
                 scheduled_dates: specificDates,
                 completion_min_templates: parsedMinTemplates,
                 goal_ids: goalIds,
@@ -230,10 +237,12 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
             <Modal
                 isOpen={true}
                 onClose={onClose}
-                title={isEdit ? 'Edit Program Day' : 'New Program Day'}
+                title={name.trim() || (isEdit ? 'Edit Program Day' : 'New Program Day')}
                 size="md"
+                className={styles.modal}
+                bodyClassName={styles.modalLayout}
             >
-                <ModalBody>
+                <ModalBody className={styles.scrollBody}>
                     <div className={styles.content}>
                         <Input
                             label="Day Name *"
@@ -258,6 +267,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                             mode={scheduleMode}
                             onModeChange={setScheduleMode}
                             weekdays={selectedDaysOfWeek}
+                            repeatEveryWeeks={repeatEveryWeeks}
+                            onRepeatEveryWeeksChange={setRepeatEveryWeeks}
                             onToggleWeekday={handleToggleDay}
                             dates={specificDates}
                             onAddDate={handleAddDate}
@@ -376,32 +387,8 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                     </div>
                 </ModalBody>
 
-                <ModalFooter>
-                    {isEdit ? (
-                        <Button variant="danger" onClick={handleDelete}>
-                            Delete Day
-                        </Button>
-                    ) : <div />}
-
-                    <div className={styles.rightActions} style={{ display: 'flex', gap: '8px' }}>
-                        {saveBlockedReason ? (
-                            <span id="program-day-save-blocked" className={styles.saveBlockedReason}>{saveBlockedReason}</span>
-                        ) : serverError ? (
-                            <span className={styles.saveBlockedReason} role="alert">{serverError}</span>
-                        ) : null}
-                        <Button variant="secondary" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="primary"
-                            onClick={handleSave}
-                            disabled={Boolean(saveBlockedReason)}
-                            aria-describedby={saveBlockedReason ? 'program-day-save-blocked' : undefined}
-                        >
-                            {isEdit ? 'Save Changes' : 'Create Day'}
-                        </Button>
-                    </div>
-                </ModalFooter>
+                <ProgramDayEditorFooter isEdit={isEdit} onDelete={handleDelete} onClose={onClose}
+                    onSave={handleSave} blockedReason={saveBlockedReason} serverError={serverError} />
             </Modal>
 
             <TemplateBuilderModal

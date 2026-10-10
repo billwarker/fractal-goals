@@ -198,6 +198,9 @@ def main():
                     "ai_agent_embedded_anthropic": False,
                 },
             ))
+            # Desktop/mobile specs create independent programs under the fixture account.
+            # Keep production quota enforcement active without exhausting its free-tier default.
+            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50}}))
             for suffix in ("desktop", "mobile"):
                 root_id = f"browser-root-{suffix}"
                 db.add(

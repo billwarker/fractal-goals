@@ -37,6 +37,59 @@ def occurrences(client, base, value):
 
 
 @pytest.mark.integration
+def test_weekly_interval_read_models_explicit_dates_and_adjustments(authed_client, schedule_world, sample_session_template):
+    root, program, base, create = schedule_world
+    day = create('Fortnight', day_of_week=['Tuesday'], repeat_every_weeks=2,
+                 template_ids=[sample_session_template.id], scheduled_dates=['2026-09-08'])
+    saved = next(row for row in authed_client.get(base).get_json()['days'] if row['id'] == day)
+    assert saved['repeat_every_weeks'] == 2
+    feed = authed_client.get(f'/api/{root}/programs/calendar-feed?range_start=2026-09-01&range_end=2026-09-30&timezone=UTC').get_json()
+    assert [row['date'] for row in feed['program_days'] if row['scheduled']] == [
+        '2026-09-01', '2026-09-08', '2026-09-15', '2026-09-29',
+    ]
+    metrics = authed_client.get(f'{base}/metrics?timezone=UTC').get_json()
+    assert metrics['consistency']['scheduled_days_total'] == 4
+    for value, expected in [('2026-09-15', True), ('2026-09-22', False)]:
+        assert bool(occurrences(authed_client, base, value)) == expected
+        assert bool(authed_client.get(f'/api/{root}/programs/day-options?date={value}&timezone=UTC').get_json()) == expected
+    response = authed_client.post(f'{base}/days/{day}/move', json={'source_date': '2026-09-15', 'target_date': '2026-09-22'})
+    assert response.status_code == 200
+    assert occurrences(authed_client, base, '2026-09-15') == []
+    assert occurrences(authed_client, base, '2026-09-22')[0]['program_day_id'] == day
+    assert occurrences(authed_client, base, '2026-09-29')[0]['program_day_id'] == day
+    # Changing unrelated fields preserves cadence and its ad hoc exceptions.
+    response = authed_client.put(f'{base}/days/{day}', json={'name': 'Renamed'})
+    assert response.status_code == 200
+    assert response.get_json()['repeat_every_weeks'] == 2
+    assert response.get_json()['excluded_dates'] == ['2026-09-15']
+
+
+@pytest.mark.integration
+def test_weekly_interval_conflicts_are_atomic(authed_client, schedule_world):
+    _root, _program, base, create = schedule_world
+    day = create('Fortnight', day_of_week=['Tuesday'], repeat_every_weeks=2)
+    create('Off week', scheduled_dates=['2026-09-08'])
+    response = authed_client.put(f'{base}/days/{day}', json={'repeat_every_weeks': 1})
+    assert response.status_code == 409, response.get_json()
+    saved = next(row for row in authed_client.get(base).get_json()['days'] if row['id'] == day)
+    assert saved['repeat_every_weeks'] == 2
+    response = authed_client.put(f'{base}/days/{day}', json={'repeat_every_weeks': 3})
+    assert response.status_code == 200
+    assert bool(occurrences(authed_client, base, '2026-09-22'))
+    assert occurrences(authed_client, base, '2026-09-15') == []
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize('interval', [0, -1, 1.5, True, '2', None, 2147483648])
+def test_weekly_interval_rejects_invalid_values(authed_client, schedule_world, interval):
+    _root, _program, base, create = schedule_world
+    day = create('Weekly', day_of_week=['Tuesday'])
+    assert authed_client.post(f'{base}/days', json={'name': 'Invalid', 'repeat_every_weeks': interval}).status_code == 400
+    assert authed_client.put(f'{base}/days/{day}', json={'repeat_every_weeks': interval}).status_code == 400
+
+
+
+@pytest.mark.integration
 @pytest.mark.parametrize('source_recurs', [False, True])
 @pytest.mark.parametrize('target_recurs', [False, True])
 def test_move_replaces_one_occurrence_and_preserves_other_dates(

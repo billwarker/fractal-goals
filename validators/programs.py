@@ -214,6 +214,7 @@ class ProgramDayCreateBaseSchema(BaseModel):
     name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     day_of_week: Optional[List[str]] = None
+    repeat_every_weeks: int = Field(1, strict=True, ge=1, le=2147483647)
     template_id: Optional[str] = None
     template_ids: Optional[List[str]] = None
     template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
@@ -255,6 +256,7 @@ class ProgramDayUpdateBaseSchema(BaseModel):
     name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     day_of_week: Optional[List[str]] = None
+    repeat_every_weeks: int = Field(1, strict=True, ge=1, le=2147483647)
     template_ids: Optional[List[str]] = None
     template_configs: Optional[List[ProgramDayTemplateConfigSchema]] = None
     completion_min_templates: Optional[int] = Field(None, ge=1)

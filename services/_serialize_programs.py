@@ -84,6 +84,7 @@ def serialize_program_day(day):
         "name": day.name,
         "notes": day.notes,
         "day_of_week": day.day_of_week or [],
+        "repeat_every_weeks": day.repeat_every_weeks,
         "templates": serialized_templates,
         "goal_ids": [g.id for g in (day.goals or [])],
         "completion_min_templates": getattr(day, 'completion_min_templates', None),

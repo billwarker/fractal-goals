@@ -370,6 +370,7 @@ class AgentProposalsMixin:
                 "name": day.name,
                 "day_number": day.day_number,
                 "day_of_week": day.day_of_week or [],
+                "repeat_every_weeks": day.repeat_every_weeks,
                 "completion_min_templates": day.completion_min_templates,
                 "goals": sorted(goal.id for goal in (day.goals or [])),
                 "templates": [

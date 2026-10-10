@@ -152,6 +152,8 @@ class ProgramDay(Base):
     is_completed = Column(Boolean, default=False)
     
     day_of_week = Column(JSON_TYPE)
+    repeat_every_weeks = Column(Integer, nullable=False, default=1, server_default='1')
+    __table_args__ = (CheckConstraint('repeat_every_weeks >= 1', name='ck_program_days_repeat_every_weeks_positive'),)
     completion_min_templates = Column(Integer, nullable=True)
     row_version = Column(Integer, nullable=False, default=1, server_default='1')
     __mapper_args__ = {'version_id_col': row_version}

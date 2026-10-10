@@ -139,6 +139,7 @@ class AgentContextMixin:
                 ProgramDay.program_id.label("program_id"),
                 ProgramDay.name.label("name"),
                 ProgramDay.day_of_week.label("day_of_week"),
+                ProgramDay.repeat_every_weeks.label("repeat_every_weeks"),
                 ProgramDay.completion_min_templates.label("completion_min_templates"),
                 func.row_number().over(
                     partition_by=ProgramDay.program_id,
@@ -196,6 +197,7 @@ class AgentContextMixin:
                     "id": day.id,
                     "name": day.name,
                     "day_of_week": day.day_of_week or [],
+                    "repeat_every_weeks": day.repeat_every_weeks,
                     "completion_min_templates": day.completion_min_templates,
                     "goal_ids": day_goal_ids.get(day.id, []),
                     "templates": templates_by_day.get(day.id, []),
@@ -350,6 +352,7 @@ class AgentContextMixin:
                 "items": [{
                     "id": row.id, "name": row.name, "day_number": row.day_number,
                     "day_of_week": row.day_of_week or [],
+                    "repeat_every_weeks": row.repeat_every_weeks,
                     "scheduled_dates": [_iso(item.date) for item in row.occurrence_schedules or []],
                     "excluded_dates": [_iso(item.date) for item in row.occurrence_exclusions or []],
                 } for row in days],

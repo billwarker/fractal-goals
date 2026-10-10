@@ -171,6 +171,9 @@ Button/Input atoms. A move draft lives in the calendar-context reducer: users ca
 or pick a date in the calendar without leaving the source review. On mobile, users collapse the sidebar
 to access the calendar; selecting a date reopens it for confirmation. Picking never mutates schedules;
 normal scope navigation clears the draft.
+The program-day editor uses the current day name as its heading (falling back to Edit/New Program Day
+when blank). Its fields scroll independently while the shared action footer stays visible and wraps
+on narrow screens.
 `POST …/days/<day>/move` atomically removes the source occurrence, replaces the destination,
 and moves saved source plans, under program-first locking. Conflicting destination plans for the
 same definition/template are soft-deleted; displaced definitions' plans remain dormant.
@@ -282,7 +285,16 @@ Streaks are drawn from the server's `chain_role`/`run_length_at_date` (never rec
 client): a thin green line on the date row starts mid-cell on a run's first day, crosses member days,
 is dashed across bridging rest/event days, and ends in a compact length ("3d", full text in the
 tooltip and assistive text) on the run's last day (`utils/programCalendarStreaks.js`).
-A definition is scheduled weekly (`day_of_week`) and/or on specific dates. Specific dates are only
+A definition is scheduled on weekdays (`day_of_week`) every `repeat_every_weeks` weeks (a positive
+integer, default 1) and/or on specific dates. Week zero is the Monday–Sunday week containing the
+program start; only weeks whose index is divisible by the interval recur. The program bounds still
+clip the first and last week. Explicit dates remain independent of the interval, and exclusions
+suppress either kind of occurrence. The editor shows an optional interval field to the right of the
+Weekly / Specific dates toggle in Weekly mode, wrapping below it on narrow screens
+(blank means 1), and occupied weekdays show owners in hover/focus tooltips instead of a paragraph.
+Weekday availability and save conflicts use the same actual cadence and exception projection.
+Program copies preserve the interval, anchored to the copied program's start week.
+Specific dates are only
 ever written as `program_day_occurrence_schedules` rows: the Program Day modal sends a replace-all
 `scheduled_dates` set (app schemas only; agent proposals keep the base contract and schedule one date
 at a time). The legacy fixed `program_days.date` column is gone (migration `b8d4f2a6c1e3` moved it

@@ -51,6 +51,7 @@ export async function duplicateProgramStructure({ rootId, programId, source, sta
         await fractalApi.createProgramDay(rootId, programId, {
             name: sourceDay.name,
             day_of_week: sourceDay.day_of_week || [],
+            repeat_every_weeks: sourceDay.repeat_every_weeks || 1,
             scheduled_dates: (sourceDay.scheduled_dates || [])
                 .map((value) => shiftDatePart(value, dayOffset))
                 .filter(Boolean),

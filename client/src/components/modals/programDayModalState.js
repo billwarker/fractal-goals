@@ -32,6 +32,7 @@ export function buildInitialProgramDayState(initialData) {
         name: initialData?.name || '',
         selectedTemplates,
         selectedDaysOfWeek,
+        repeatEveryWeeks: initialData?.repeat_every_weeks || 1,
         specificDates,
         // A day with dates and no weekdays (including a new day opened from a
         // calendar date) edits as a specific-dates day.

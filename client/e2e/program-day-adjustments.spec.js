@@ -88,4 +88,71 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     }, { root, program: created.id, token });
     expect(saved.days.find((day) => day.id === days[0].id).excluded_dates).toContain(today);
     expect(saved.days.find((day) => day.id === days[1].id).excluded_dates).toContain(later);
+
+    // The definition editor keeps its actions outside the scrolling fields.
+    const hintDate = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
+    await page.evaluate(async ({ root, program, token, date }) => {
+        const response = await fetch(`/api/${root}/programs/${program}/days`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: 'Tooltip practice', scheduled_dates: [date] }),
+        });
+        if (!response.ok) throw new Error(`Tooltip day create failed: ${response.status}`);
+    }, { root, program: created.id, token, date: hintDate });
+    await page.reload();
+    if (suffix === 'mobile' && await page.getByRole('button', { name: 'Collapse', exact: true }).isVisible()) {
+        await page.getByRole('button', { name: 'Collapse', exact: true }).click();
+    }
+    await page.getByRole('tab', { name: 'Days', exact: true }).click();
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Move Practice', exact: true }).click();
+    const editor = page.getByRole('dialog', { name: 'Move Practice', exact: true });
+    const interval = editor.getByLabel('Repeat every (weeks)');
+    await expect(interval).toHaveValue('1');
+    const occupiedWeekday = editor.getByRole('button', { name: /taken by Tooltip practice/ });
+    await occupiedWeekday.focus();
+    await expect(page.getByRole('tooltip')).toContainText('Tooltip practice');
+    await occupiedWeekday.hover();
+    await expect(page.getByRole('tooltip')).toBeVisible();
+    await interval.fill('2');
+    if (suffix === 'desktop') {
+        const toggle = await editor.getByRole('radiogroup', { name: 'Schedule type' }).boundingBox();
+        const intervalBox = await interval.boundingBox();
+        expect(intervalBox.x).toBeGreaterThan(toggle.x + toggle.width);
+        expect(intervalBox.y).toBeCloseTo(toggle.y, 0);
+        expect(intervalBox.height).toBeCloseTo(toggle.height, 0);
+        const weekday = await editor.getByRole('button', { name: 'Saturday', exact: true }).boundingBox();
+        expect(weekday.y - (toggle.y + toggle.height)).toBeGreaterThanOrEqual(12);
+    }
+    await editor.getByRole('radio', { name: 'Specific dates', exact: true }).click();
+    await expect(interval).toHaveCount(0);
+    await editor.getByRole('radio', { name: 'Weekly', exact: true }).click();
+    await expect(interval).toHaveValue('2');
+    await page.screenshot({ path: testInfo.outputPath('weekly-cadence-controls.png') });
+    await editor.getByLabel('Day Name *').fill('Updated practice day');
+    await expect(page.getByRole('dialog', { name: 'Updated practice day', exact: true })).toBeVisible();
+    await page.setViewportSize({ width: page.viewportSize().width, height: 520 });
+    const updatedEditor = page.getByRole('dialog', { name: 'Updated practice day', exact: true });
+    const save = updatedEditor.getByRole('button', { name: 'Save Changes', exact: true });
+    const before = await save.boundingBox();
+    expect(before.y + before.height).toBeLessThanOrEqual(520);
+    const scrolled = await updatedEditor.getByLabel('Day Name *').evaluate((input) => {
+        let parent = input.parentElement;
+        while (parent && getComputedStyle(parent).overflowY !== 'auto') parent = parent.parentElement;
+        if (!parent) return false;
+        parent.scrollTop = parent.scrollHeight;
+        return parent.scrollTop > 0;
+    });
+    expect(scrolled).toBe(true);
+    expect((await save.boundingBox()).y).toBeCloseTo(before.y, 0);
+    const footer = await save.locator('..').locator('..').boundingBox();
+    expect(footer.x).toBeGreaterThanOrEqual(0);
+    expect(footer.x + footer.width).toBeLessThanOrEqual(page.viewportSize().width);
+    await page.screenshot({ path: testInfo.outputPath('weekly-cadence-editor.png') });
+    await save.click();
+    await expect(updatedEditor).toHaveCount(0);
+    await page.reload();
+    await page.getByRole('tab', { name: 'Days', exact: true }).click();
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Updated practice day', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Updated practice day', exact: true }).getByLabel('Repeat every (weeks)')).toHaveValue('2');
 });

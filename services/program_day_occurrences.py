@@ -77,7 +77,7 @@ def weekday_names(day):
 
 
 def program_day_scheduled_on(day, program, target_date):
-    """A program day occurs on its explicit dates and its weekdays, anywhere in the program."""
+    """Explicit dates plus weekdays every N weeks, anchored to the program's first Monday week."""
     if not _within_program(program, target_date):
         return False
     if target_date in {row.date for row in getattr(day, "occurrence_exclusions", None) or []}:
@@ -85,7 +85,13 @@ def program_day_scheduled_on(day, program, target_date):
     if target_date in explicit_schedule_dates(day):
         return True
     names = weekday_names(day)
-    return bool(names and target_date.strftime("%A") in names)
+    start, _end = program_span(program)
+    if not start:
+        return False
+    first_monday = start - timedelta(days=start.weekday())
+    interval = getattr(day, "repeat_every_weeks", None) or 1
+    week_index = (target_date - first_monday).days // 7
+    return bool(names and target_date.strftime("%A") in names and week_index % interval == 0)
 
 
 def program_day_explicitly_scheduled_on(day, program, target_date):

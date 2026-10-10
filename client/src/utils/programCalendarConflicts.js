@@ -57,18 +57,23 @@ export function occupiedProgramDates(program, { excludeDayId = null } = {}) {
 }
 
 /** Weekdays on which another day already occupies at least one date, mapped to its name. */
-export function takenWeekdays(owners) {
+export function takenWeekdays(owners, program = null, { repeatEveryWeeks = 1, excludedDates = [] } = {}) {
     const taken = new Map();
+    const candidates = program ? programDayDates({ day_of_week: WEEKDAY_NAMES,
+        repeat_every_weeks: repeatEveryWeeks, excluded_dates: excludedDates }, program) : null;
     owners.forEach((dayName, value) => {
+        if (candidates && !candidates.has(value)) return;
         const weekday = weekdayOf(value);
-        if (!taken.has(weekday)) taken.set(weekday, dayName);
+        const existing = taken.get(weekday);
+        if (!existing) taken.set(weekday, dayName);
+        else if (!existing.split(', ').includes(dayName)) taken.set(weekday, `${existing}, ${dayName}`);
     });
     return taken;
 }
 
 /** The draft definition's dates that another day already holds, earliest first. */
-export function findDraftDayConflicts(program, owners, { weekdays = [], dates = [], excludedDates = [] }) {
-    const draftDates = programDayDates({ day_of_week: weekdays, scheduled_dates: dates, excluded_dates: excludedDates.filter((date) => !dates.includes(date)) }, program);
+export function findDraftDayConflicts(program, owners, { weekdays = [], dates = [], excludedDates = [], repeatEveryWeeks = 1 }) {
+    const draftDates = programDayDates({ day_of_week: weekdays, repeat_every_weeks: repeatEveryWeeks, scheduled_dates: dates, excluded_dates: excludedDates.filter((date) => !dates.includes(date)) }, program);
     return [...draftDates]
         .filter((value) => owners.has(value))
         .sort()

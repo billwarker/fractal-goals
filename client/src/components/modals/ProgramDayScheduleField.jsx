@@ -8,6 +8,8 @@ import {
     WEEKDAY_NAMES,
 } from '../../utils/programViewModel';
 import styles from './ProgramDayModal.module.css';
+import Input from '../atoms/Input';
+import Tooltip from '../atoms/Tooltip';
 
 export const SCHEDULE_MODES = { weekly: 'weekly', dates: 'dates' };
 
@@ -39,6 +41,7 @@ function DateChips({ dates, onRemove, label }) {
 export default function ProgramDayScheduleField({
     mode, onModeChange, weekdays, onToggleWeekday, dates, onAddDate, onRemoveDate, minDate, maxDate,
     takenWeekdays = new Map(), occupiedDates = new Map(),
+    repeatEveryWeeks = 1, onRepeatEveryWeeksChange,
 }) {
     const [draftDate, setDraftDate] = useState('');
     const groupId = useId();
@@ -57,8 +60,10 @@ export default function ProgramDayScheduleField({
 
     return (
         <div className={styles.field} role="group" aria-labelledby={`${groupId}-label`}>
-            <span id={`${groupId}-label`} className={styles.label}>Schedule</span>
-            <div className={styles.segmented} role="radiogroup" aria-label="Schedule type">
+            <div className={styles.scheduleRow}>
+              <div className={styles.scheduleToggle}>
+                <span id={`${groupId}-label`} className={styles.label}>Schedule</span>
+                <div className={styles.segmented} role="radiogroup" aria-label="Schedule type">
                 {[
                     [SCHEDULE_MODES.weekly, 'Weekly'],
                     [SCHEDULE_MODES.dates, 'Specific dates'],
@@ -72,6 +77,13 @@ export default function ProgramDayScheduleField({
                         onClick={() => onModeChange(value)}
                     >{text}</button>
                 ))}
+                </div>
+              </div>
+              {mode === SCHEDULE_MODES.weekly ? (
+                  <Input label="Repeat every (weeks)" type="number" min="1" max="2147483647" step="1"
+                      value={repeatEveryWeeks} placeholder="1" className={styles.intervalField}
+                      onChange={(event) => onRepeatEveryWeeksChange?.(event.target.value)} />
+              ) : null}
             </div>
 
             {mode === SCHEDULE_MODES.weekly ? (
@@ -83,30 +95,25 @@ export default function ProgramDayScheduleField({
                             const owner = takenWeekdays.get(name);
                             const taken = Boolean(owner) && !selected;
                             return (
-                                <button
-                                    key={name}
+                                <Tooltip key={name} portal label={owner ? `Taken by ${owner}` : null}>
+                                  <button
                                     type="button"
                                     aria-pressed={selected}
                                     aria-label={owner ? `${name}, taken by ${owner}` : name}
-                                    title={owner ? `Taken by ${owner}` : undefined}
-                                    disabled={taken}
-                                    onClick={() => onToggleWeekday(name)}
+                                    aria-disabled={taken}
+                                    onClick={() => { if (!taken) onToggleWeekday(name); }}
                                     className={`${styles.dayBtn} ${selected ? styles.dayBtnSelected : ''} ${owner ? styles.dayBtnTaken : ''}`}
-                                >{name.slice(0, 3)}</button>
+                                  >{name.slice(0, 3)}</button>
+                                </Tooltip>
                             );
                         })}
                     </div>
-                    {takenWeekdays.size ? (
-                        <div className={styles.hint}>
-                            {[...takenWeekdays].map(([weekday, owner]) => `${weekday.slice(0, 3)}: ${owner}`).join(' · ')}
-                            {' '}already {takenWeekdays.size === 1 ? 'has its day' : 'have their days'}.
-                        </div>
-                    ) : null}
                     <div className={styles.hint}>
                         {weekdays.length
-                            ? formatWeekdaySchedule(weekdays)
+                            ? formatWeekdaySchedule(weekdays, Number(repeatEveryWeeks || 1))
                             : 'No repeating days. Plan it on individual dates from the calendar.'}
                     </div>
+                    {Number(repeatEveryWeeks) > 1 ? <div className={styles.hint}>Repeats from the program’s first week (Monday–Sunday).</div> : null}
                     {dates.length ? (
                         <div className={styles.alsoPlanned}>
                             <span className={styles.label}>Also planned on</span>
@@ -169,4 +176,6 @@ ProgramDayScheduleField.propTypes = {
     takenWeekdays: PropTypes.instanceOf(Map),
     /** ISO date -> the other program day that already holds it. */
     occupiedDates: PropTypes.instanceOf(Map),
+    repeatEveryWeeks: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    onRepeatEveryWeeksChange: PropTypes.func,
 };
