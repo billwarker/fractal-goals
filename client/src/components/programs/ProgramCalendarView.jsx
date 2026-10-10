@@ -85,6 +85,7 @@ function ProgramCalendarView({
     onVisibleRangeChange,
     loadingMonths = null,
     selectedDate,
+    dayMoveMode = false,
     selectedRange,
     selectedRangeLabel,
     showAddBlockButton = true,
@@ -325,10 +326,10 @@ function ProgramCalendarView({
 
         applyStreakDecoration(dayEl, frame, dayState, STREAK_CLASS_NAMES);
 
-        if (blockCreationMode && selectableDateSet.has(dateStr)) {
-            const selected = selectedStatusDateSet.has(dateStr) || dragPreviewDates.has(dateStr);
+        if ((blockCreationMode || dayMoveMode) && selectableDateSet.has(dateStr)) {
+            const selected = dayMoveMode ? selectedDate === dateStr : selectedStatusDateSet.has(dateStr) || dragPreviewDates.has(dateStr);
             dayEl.setAttribute('aria-selected', selected ? 'true' : 'false');
-            dayEl.setAttribute('aria-label', `${dateStr}, ${dayState?.scheduled ? 'scheduled program day' : 'program date'}, ${selected ? 'selected' : 'not selected'}`);
+            dayEl.setAttribute('aria-label', dayMoveMode ? `Move destination ${dateStr}, ${selected ? 'selected' : 'not selected'}` : `${dateStr}, ${dayState?.scheduled ? 'scheduled program day' : 'program date'}, ${selected ? 'selected' : 'not selected'}`);
             dayEl.setAttribute('tabindex', '0');
             dayEl.setAttribute('data-program-selectable-date', dateStr);
         }
@@ -381,7 +382,7 @@ function ProgramCalendarView({
             labelButton.style.setProperty('--program-label-offset', `${index * 16}px`);
             frame.appendChild(labelButton);
         });
-    }, [blockCreationMode, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, loadingMonths, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
+    }, [blockCreationMode, dayMoveMode, selectedDate, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, loadingMonths, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
 
     const clearBlockLabelForCell = (dayEl) => {
         const frame = dayEl.querySelector('.fc-daygrid-day-frame');
@@ -422,7 +423,7 @@ function ProgramCalendarView({
 
     const activateSelectableDay = (event) => {
         const cell = event.target?.closest?.('[data-program-selectable-date]');
-        if (!blockCreationMode || !cell || cell !== event.target
+        if ((!blockCreationMode && !dayMoveMode) || !cell || cell !== event.target
             || (event.key !== 'Enter' && event.key !== ' ')) return;
         event.preventDefault();
         event.stopPropagation();
@@ -641,7 +642,7 @@ function ProgramCalendarView({
         <div
             ref={calendarContainerRef}
             className={`${styles.calendarContainer} ${compact ? styles.calendarContainerCompact : ''} ${continuous ? styles.calendarContainerContinuous : ''} ${blockCreationMode ? styles.calendarContainerSelecting : ''}`}
-            data-selection-mode={blockCreationMode ? 'multiple' : undefined}
+            data-selection-mode={dayMoveMode ? 'move' : blockCreationMode ? 'multiple' : undefined}
             onClick={readOnly ? undefined : onCalendarBackgroundClick}
             onClickCapture={readOnly ? undefined : activateBlockLabel}
             onKeyDownCapture={readOnly ? undefined : (event) => { activateSelectableDay(event); activateBlockLabel(event); }}

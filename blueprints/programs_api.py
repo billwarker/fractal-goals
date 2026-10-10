@@ -13,6 +13,7 @@ from validators import (
     ProgramDayOrderSchema,
     ProgramDayScheduleSchema,
     ProgramDayOccurrenceUnscheduleSchema,
+    ProgramDayOccurrenceMoveSchema,
     ProgramDayStatusesUpdateSchema,
     ProgramDaySessionCreditSchema,
     ProgramGoalDeadlineSchema,
@@ -545,11 +546,25 @@ def schedule_program_day(current_user, root_id, program_id, day_id, validated_da
         lambda occurrence: (jsonify(occurrence), 201),
     )
 
+@programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/move', methods=['POST'])
+@token_required
+@validate_request(ProgramDayOccurrenceMoveSchema)
+def move_program_day_occurrence(current_user, root_id, program_id, day_id, validated_data):
+    """Atomically move a scheduled day and its plans to another date."""
+    return _program_day_write(
+        "Error moving program day occurrence",
+        lambda session: ProgramService.move_program_day_occurrence(
+            session, root_id, program_id, day_id, validated_data, current_user.id,
+        ),
+        jsonify,
+    )
+
+
 @programs_bp.route('/<root_id>/programs/<program_id>/days/<day_id>/unschedule', methods=['POST'])
 @token_required
 @validate_request(ProgramDayOccurrenceUnscheduleSchema)
 def unschedule_program_day_occurrence(current_user, root_id, program_id, day_id, validated_data):
-    """Remove an explicitly scheduled program-day occurrence from a calendar date."""
+    """Remove a scheduled program-day occurrence from a calendar date."""
     return _program_day_write(
         "Error unscheduling program day occurrence",
         lambda session: ProgramService.unschedule_program_day_occurrence(

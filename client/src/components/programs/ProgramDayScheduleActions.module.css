@@ -1,0 +1,33 @@
+.container {
+    margin-top: var(--spacing-md);
+    padding-top: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+    min-width: 0;
+}
+.actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+}
+.actions > button {
+    max-width: 100%;
+    white-space: normal;
+}
+.actions .removeAction { color: var(--color-brand-danger); }
+.actions .removeAction:hover:not(:disabled) {
+    color: var(--color-brand-danger);
+    background: color-mix(in srgb, var(--color-brand-danger) 10%, transparent);
+}
+.form input {
+    box-sizing: border-box;
+    min-width: 0;
+    min-height: 44px;
+}
+.form p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: var(--line-height-relaxed);
+}
+.form .error { color: var(--color-brand-danger); }
+

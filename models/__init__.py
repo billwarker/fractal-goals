@@ -26,7 +26,7 @@ from .session import (
 )
 from .program import (
     Program, ProgramBlock, ProgramDay, ProgramDayTemplate, ProgramDaySession,
-    ProgramDayStatusOverride, ProgramDaySessionCredit, ProgramDayOccurrenceSchedule, ProgramSessionPlan,
+    ProgramDayStatusOverride, ProgramDaySessionCredit, ProgramDayOccurrenceSchedule, ProgramDayOccurrenceExclusion, ProgramSessionPlan,
     program_day_templates, program_goals, program_block_goals
 )
 from .calendar_period import CalendarPeriod, CALENDAR_PERIOD_KINDS

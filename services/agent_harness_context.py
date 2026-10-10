@@ -351,6 +351,7 @@ class AgentContextMixin:
                     "id": row.id, "name": row.name, "day_number": row.day_number,
                     "day_of_week": row.day_of_week or [],
                     "scheduled_dates": [_iso(item.date) for item in row.occurrence_schedules or []],
+                    "excluded_dates": [_iso(item.date) for item in row.occurrence_exclusions or []],
                 } for row in days],
                 "offset": max(0, int(day_offset or 0)),
                 "next_offset": max(0, int(day_offset or 0)) + len(days) if has_more_days else None,

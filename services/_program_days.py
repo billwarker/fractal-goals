@@ -12,8 +12,9 @@ from typing import List, Dict, Any
 from sqlalchemy import func
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from models import Program, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate, Goal, Session, _safe_load_json
+from models import Program, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayOccurrenceExclusion, ProgramDayStatusOverride, ProgramSessionPlan, ProgramDayTemplate, Goal, Session, _safe_load_json
 from services import event_bus, Event, Events
+from services.program_service_errors import ProgramServiceValidationError
 from services.owned_entity_queries import get_owned_program
 from services.serializers import format_utc, serialize_program_day, serialize_goal
 from services.session_runtime import get_template_color
@@ -26,6 +27,7 @@ from services.program_day_occurrences import (
     evaluate_occurrence,
     program_day_scheduled_on,
     resolve_occurrence_credits,
+    weekday_names,
 )
 from services.program_status_override_queries import load_program_status_overrides
 from services.program_focus import assert_day_goals_valid, resolve_focus_scopes
@@ -108,6 +110,13 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
         cls._validate_program_day_completion_min(day)
         cls._replace_day_goals(session, day, day_goal_ids, root_id)
+        if data.get('excluded_dates'):
+            excluded = {value if isinstance(value, date) else date.fromisoformat(str(value))
+                        for value in data['excluded_dates']}
+            assert_dates_within_program(program, excluded)
+            day.occurrence_exclusions = [ProgramDayOccurrenceExclusion(
+                date=value, created_by_user_id=current_user_id,
+            ) for value in excluded]
         if 'scheduled_dates' in data:
             cls._sync_occurrence_schedules(day, program, data.get('scheduled_dates') or [], current_user_id)
 
@@ -275,6 +284,7 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         for value in removed:
             day.occurrence_schedules.remove(existing[value])
         for value in added:
+            _ProgramDaysMixin._clear_occurrence_exclusion(day, value)
             day.occurrence_schedules.append(ProgramDayOccurrenceSchedule(
                 date=value, created_by_user_id=current_user_id,
             ))
@@ -309,6 +319,7 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         if program_day_scheduled_on(day, program, scheduled_date):
             raise ValueError("This program day already occurs on that date")
 
+        cls._clear_occurrence_exclusion(day, scheduled_date)
         schedule_row = ProgramDayOccurrenceSchedule(
             program_day_id=day.id,
             date=scheduled_date,
@@ -353,81 +364,120 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             raise ValueError("Invalid session_start format")
         return normalized.date()
 
+    @staticmethod
+    def _remove_occurrence(day, target_date, current_user_id):
+        rows = [row for row in day.occurrence_schedules if row.date == target_date]
+        for row in rows:
+            day.occurrence_schedules.remove(row)
+        if target_date.strftime('%A') in weekday_names(day):
+            if not any(row.date == target_date for row in day.occurrence_exclusions):
+                day.occurrence_exclusions.append(ProgramDayOccurrenceExclusion(
+                    date=target_date, created_by_user_id=current_user_id,
+                ))
+        day.row_version += 1
+        return len(rows)
+
+    @staticmethod
+    def _clear_occurrence_exclusion(day, target_date):
+        for row in list(day.occurrence_exclusions):
+            if row.date == target_date:
+                day.occurrence_exclusions.remove(row)
+
+    @staticmethod
+    def _clear_date_statuses(session, program_id, dates):
+        session.query(ProgramDayStatusOverride).filter(
+            ProgramDayStatusOverride.program_id == program_id,
+            ProgramDayStatusOverride.date.in_(dates),
+        ).delete(synchronize_session='fetch')
+
     @classmethod
     def unschedule_program_day_occurrence(cls, session, root_id: str, program_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
         cls._require_root_access(session, root_id, current_user_id)
-
-        if not lock_program_calendar(session, program_id, root_id):
+        program = lock_program_calendar(session, program_id, root_id)
+        if not program:
             raise ValueError("Program not found")
         day = cls._get_program_day(session, program_id, day_id, lock=True)
-
         target_date = cls._parse_required_date(data.get('date'), 'date')
-        timezone_name = data.get('timezone') or 'UTC'
-        try:
-            zone = ZoneInfo(timezone_name)
-        except ZoneInfoNotFoundError:
-            raise ValueError("Invalid timezone")
-
-        schedule_rows = session.query(ProgramDayOccurrenceSchedule).filter(
-            ProgramDayOccurrenceSchedule.program_day_id == day_id,
-            ProgramDayOccurrenceSchedule.date == target_date,
-        ).all()
-        for row in schedule_rows:
-            session.delete(row)
-
-        # Legacy placeholder sessions from the retired session-based scheduling:
-        # incomplete, activity-free sessions linked to this exact day and date.
-        candidate_sessions = session.query(Session).filter(
-            Session.root_id == root_id,
-            Session.program_day_id == day_id,
-            Session.deleted_at.is_(None),
-            Session.completed.is_(False),
-            ~Session.activity_instances.any(),
-        ).all()
-        removed_session_ids: List[str] = []
-        removed_session_names: Dict[str, str] = {}
-        for scheduled_session in candidate_sessions:
-            session_dt = scheduled_session.session_start or scheduled_session.created_at
-            if session_dt is None:
-                continue
-            if session_dt.tzinfo is None:
-                session_dt = session_dt.replace(tzinfo=timezone.utc)
-            if session_dt.astimezone(zone).date() != target_date:
-                continue
-            scheduled_session.deleted_at = datetime.now(timezone.utc)
-            removed_session_ids.append(scheduled_session.id)
-            removed_session_names[scheduled_session.id] = scheduled_session.name
-
-        changed = bool(schedule_rows or removed_session_ids)
+        assert_dates_within_program(program, [target_date])
+        changed = program_day_scheduled_on(day, program, target_date)
+        removed_count = cls._remove_occurrence(day, target_date, current_user_id) if changed else 0
         if changed:
-            day.row_version += 1
+            cls._clear_date_statuses(session, program_id, [target_date])
+        assert_single_program_day_per_date(session, program_id)
         cls._commit(session, day)
-
-        for session_id in removed_session_ids:
-            event_bus.emit(Event(Events.SESSION_DELETED, {
-                'session_id': session_id,
-                'session_name': removed_session_names.get(session_id),
-                'root_id': root_id
-            }, source='cls.unschedule_program_day_occurrence'))
-
         if changed:
             event_bus.emit(Event(Events.PROGRAM_DAY_UNSCHEDULED, {
-                'day_id': day.id,
-                'day_name': day.name,
-                'program_id': program_id,
-                'root_id': root_id,
-                'date': target_date.isoformat(),
-                'removed_schedule_count': len(schedule_rows),
-                'removed_session_ids': removed_session_ids,
-                'removed_count': len(removed_session_ids),
+                'day_id': day.id, 'day_name': day.name, 'program_id': program_id,
+                'root_id': root_id, 'date': target_date.isoformat(),
+                'removed_schedule_count': removed_count,
+                'removed_session_ids': [], 'removed_count': 0,
             }, source='cls.unschedule_program_day_occurrence'))
-
         return {
-            "day": serialize_program_day(day),
-            "removed_schedule_count": len(schedule_rows),
-            "removed_session_ids": removed_session_ids,
-            "removed_count": len(removed_session_ids),
+            'day': serialize_program_day(day), 'removed_schedule_count': removed_count,
+            'removed_session_ids': [], 'removed_count': 0,
         }
+
+    @classmethod
+    def move_program_day_occurrence(cls, session, root_id: str, program_id: str, day_id: str, data: Dict, current_user_id: str | None = None) -> Dict[str, Any]:
+        cls._require_root_access(session, root_id, current_user_id)
+        program = lock_program_calendar(session, program_id, root_id)
+        if not program:
+            raise ValueError("Program not found")
+        source = cls._parse_required_date(data.get('source_date'), 'source_date')
+        target = cls._parse_required_date(data.get('target_date'), 'target_date')
+        assert_dates_within_program(program, [source, target])
+        if source == target:
+            raise ValueError("Choose a different destination date")
+        # Lock in stable order, also serializing dated plan writes on affected days.
+        days = session.query(ProgramDay).filter_by(program_id=program_id).order_by(
+            ProgramDay.id,
+        ).populate_existing().with_for_update().all()
+        day = next((entry for entry in days if entry.id == day_id), None)
+        if not day:
+            raise ValueError("Day not found")
+        if not program_day_scheduled_on(day, program, source):
+            raise ProgramServiceValidationError({
+                'error': 'This program day no longer occurs on the source date.',
+                'code': 'program_day_source_missing',
+            }, 409)
+        displaced = next((entry for entry in days if program_day_scheduled_on(entry, program, target)), None)
+        cls._remove_occurrence(day, source, current_user_id)
+        if displaced:
+            cls._remove_occurrence(displaced, target, current_user_id)
+        cls._clear_occurrence_exclusion(day, target)
+        session.flush()  # Delete a same-definition destination row before reusing its unique key.
+        day.occurrence_schedules.append(ProgramDayOccurrenceSchedule(
+            date=target, created_by_user_id=current_user_id,
+        ))
+        plans = session.query(ProgramSessionPlan).filter(
+            ProgramSessionPlan.program_day_id == day_id,
+            ProgramSessionPlan.date == source,
+            ProgramSessionPlan.deleted_at.is_(None),
+        ).order_by(ProgramSessionPlan.id).with_for_update().all()
+        if plans:
+            conflicts = session.query(ProgramSessionPlan).filter(
+                ProgramSessionPlan.program_day_id == day_id,
+                ProgramSessionPlan.date == target,
+                ProgramSessionPlan.session_template_id.in_([plan.session_template_id for plan in plans]),
+                ProgramSessionPlan.deleted_at.is_(None),
+            ).with_for_update().all()
+            for conflict in conflicts:
+                conflict.deleted_at = datetime.now(timezone.utc)
+            session.flush()  # Release destination unique keys before moving source plans.
+            for plan in plans:
+                plan.date = target
+        cls._clear_date_statuses(session, program_id, [source, target])
+        assert_single_program_day_per_date(session, program_id)
+        cls._commit(session, day)
+        result = {
+            'program_day_id': day_id, 'program_id': program_id,
+            'source_date': source.isoformat(), 'target_date': target.isoformat(),
+            'displaced_day_id': displaced.id if displaced else None,
+        }
+        event_bus.emit(Event(Events.PROGRAM_DAY_MOVED, {
+            **result, 'root_id': root_id, 'day_name': day.name,
+        }, source='cls.move_program_day_occurrence'))
+        return result
 
     @classmethod
     def set_goal_deadline_for_program_date(cls, session, root_id: str, program_id: str, data: Dict, current_user_id: str | None = None) -> Dict:

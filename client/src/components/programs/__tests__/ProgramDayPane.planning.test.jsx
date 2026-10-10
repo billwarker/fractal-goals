@@ -49,12 +49,15 @@ describe('ProgramDayPane planning and events', () => {
         expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Schedule Mobility' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Remove from this date' }));
+        expect(onUnscheduleDay).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove day', exact: true }));
         expect(onUnscheduleDay).toHaveBeenCalledWith('day-1', '2026-09-05');
     });
 
-    it('offers removal only for explicit schedules on future dates', () => {
-        renderPane({ detail: { occurrences: [{ ...occurrence, scheduled_explicitly: false }] } });
-        expect(screen.queryByRole('button', { name: 'Remove from this date' })).not.toBeInTheDocument();
+    it.each(['2026-09-01', '2026-09-02', '2026-09-05'])('offers recurring day adjustments on %s', (date) => {
+        renderPane({ date, onUnscheduleDay: vi.fn(), onMoveDay: vi.fn(), detail: { occurrences: [{ ...occurrence, scheduled_explicitly: false }] } });
+        expect(screen.getByRole('button', { name: 'Remove from this date' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move day' })).toBeInTheDocument();
     });
 
     it('explains an excused day and labels the status menu with the event', () => {

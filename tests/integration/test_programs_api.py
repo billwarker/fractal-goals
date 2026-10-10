@@ -784,7 +784,7 @@ class TestProgramStructure:
         assert legacy.status_code == 201
         assert legacy.get_json()['date'] == next_date
 
-    def test_unschedule_program_day_occurrence_removes_schedule_and_legacy_placeholder(
+    def test_unschedule_program_day_occurrence_preserves_legacy_placeholder(
         self, authed_client, db_session, test_user, sample_ultimate_goal, sample_program,
     ):
         root_id = sample_ultimate_goal.id
@@ -807,7 +807,9 @@ class TestProgramStructure:
         assert response.status_code == 200
         payload = response.get_json()
         assert payload['removed_schedule_count'] == 1
-        assert payload['removed_session_ids'] == [placeholder.id]
+        assert payload['removed_session_ids'] == []
+        db_session.refresh(placeholder)
+        assert placeholder.deleted_at is None
         assert self._detail_occurrences(authed_client, root_id, program_id, scheduled_date) == []
 
     def test_create_program_day_with_scheduled_dates_creates_explicit_occurrences(

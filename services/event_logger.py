@@ -222,6 +222,10 @@ def _get_event_description(event: Event):
         Events.PROGRAM_SESSION_PLAN_RESET: (
             f"Reset plan for {event.data.get('template_name', 'session')} on {event.data.get('date', 'a program day')}"
         ),
+        Events.PROGRAM_DAY_MOVED: (
+            f"Moved program day: {event.data.get('day_name', 'Unknown')} "
+            f"from {event.data.get('source_date')} to {event.data.get('target_date')}"
+        ),
         Events.PROGRAM_DAY_UNSCHEDULED: (
             f"Unscheduled program day: {event.data.get('day_name', 'Unknown')}"
             + (f" on {event.data.get('date')}" if event.data.get('date') else "")

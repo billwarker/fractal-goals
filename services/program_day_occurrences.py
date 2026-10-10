@@ -80,6 +80,8 @@ def program_day_scheduled_on(day, program, target_date):
     """A program day occurs on its explicit dates and its weekdays, anywhere in the program."""
     if not _within_program(program, target_date):
         return False
+    if target_date in {row.date for row in getattr(day, "occurrence_exclusions", None) or []}:
+        return False
     if target_date in explicit_schedule_dates(day):
         return True
     names = weekday_names(day)

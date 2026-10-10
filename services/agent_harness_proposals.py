@@ -382,6 +382,7 @@ class AgentProposalsMixin:
                     for row in template_links
                 ],
             },
+            "occurrence_exclusions": sorted(_iso(row.date) for row in day.occurrence_exclusions or []),
             "occurrence_schedules": sorted(
                 _iso(row.date) for row in (day.occurrence_schedules or [])
             ),

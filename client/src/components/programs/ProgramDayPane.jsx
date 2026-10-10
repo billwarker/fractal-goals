@@ -6,6 +6,7 @@ import GoalIcon from '../atoms/GoalIcon';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { sortProgramDays } from '../../utils/programViewModel';
+import ProgramDayScheduleActions from './ProgramDayScheduleActions';
 import ProgramDayPeriodBanner from './ProgramDayPeriodBanner';
 import ProgramDayStatusMark from './ProgramDayStatusMark';
 import ProgramDaySessionRow from './ProgramDaySessionRow';
@@ -67,7 +68,8 @@ function StartActions({ rootId, program, occurrence, date, sessionsById }) {
 
 export default function ProgramDayPane({
     rootId, date, today, query, program,
-    onScheduleDay, onUnscheduleDay, onCreateDay,
+    onScheduleDay, onUnscheduleDay, onMoveDay, onCreateDay,
+    moveDraft, onMoveDraftChange,
     goals = [], onGoalClick, getGoalIcon, getGoalColor, getGoalSecondaryColor,
     timezone = 'UTC',
     onSetDayStatus,
@@ -198,13 +200,16 @@ export default function ProgramDayPane({
                             >{date < today ? 'View plan' : 'Edit plan'}</button>
                         ) : null}
                         {occurrence.definition_note ? <p className={styles.note}><strong>Schedule note:</strong> {occurrence.definition_note}</p> : null}
-                        {occurrence.scheduled_explicitly && date > today ? (
-                            <button
-                                type="button"
-                                className={styles.quietAction}
-                                onClick={() => onUnscheduleDay?.(occurrence.program_day_id, date)}
-                            >Remove from this date</button>
-                        ) : null}
+                        <ProgramDayScheduleActions
+                            key={`${program.id}:${occurrence.program_day_id}:${date}`}
+                            program={program}
+                            dayId={occurrence.program_day_id}
+                            date={date}
+                            onMoveDay={onMoveDay}
+                            moveDraft={moveDraft}
+                            onMoveDraftChange={onMoveDraftChange}
+                            onUnscheduleDay={onUnscheduleDay}
+                        />
                         {occurrenceGoals.length ? (
                             <div className={styles.goalList} aria-label="Goals for this day">
                                 {occurrenceGoals.map((goal) => {

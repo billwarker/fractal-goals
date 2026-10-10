@@ -239,8 +239,9 @@ class ProgramDayCreateSchema(ProgramDayCreateBaseSchema):
     so their reviewed contract is unchanged and they schedule dates one at a time.
     """
     scheduled_dates: Optional[List[CalendarDate]] = None
+    excluded_dates: Optional[List[CalendarDate]] = None
 
-    @field_validator('scheduled_dates', mode='before')
+    @field_validator('scheduled_dates', 'excluded_dates', mode='before')
     @classmethod
     def validate_scheduled_dates(cls, v):
         return _normalize_scheduled_dates(v)
@@ -334,6 +335,18 @@ class ProgramDayScheduleSchema(BaseModel):
         if not self.date and not self.session_start:
             raise ValueError('date is required')
         return self
+
+
+class ProgramDayOccurrenceMoveSchema(BaseModel):
+    """Move one occurrence, replacing any occurrence at its destination."""
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    source_date: str = Field(..., min_length=10, max_length=10)
+    target_date: str = Field(..., min_length=10, max_length=10)
+
+    @field_validator('source_date', 'target_date')
+    @classmethod
+    def validate_dates(cls, value: str) -> str:
+        return ProgramDayScheduleSchema.validate_date(value) or value
 
 
 class ProgramDayOccurrenceUnscheduleSchema(BaseModel):

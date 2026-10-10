@@ -164,8 +164,21 @@ Programs contain dated blocks and reusable program-day definitions. **Program da
 program** (`program_days.program_id`), not to a block: a day's weekdays repeat across the whole
 program span and its explicit dates may fall anywhere in it. Blocks only label and group the dates
 they cover (`block_for_date`; an occurrence's `block` is null outside every block), so moving,
-resizing, or deleting a block never changes which days occur. Days are managed program-scoped at
-`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/goals]]`, and
+resizing, or deleting a block never changes which days occur. Ad hoc adjustments use `program_day_occurrence_exclusions` to suppress one date without
+changing recurring weekdays. The canonical evaluator and client conflict previews subtract these
+exceptions; `utils/programDaySchedule.js` owns the client schedule projection. The day-review card offers Move day and Remove from this date for any program date, using shared
+Button/Input atoms. A move draft lives in the calendar-context reducer: users can type a destination
+or pick a date in the calendar without leaving the source review. On mobile, users collapse the sidebar
+to access the calendar; selecting a date reopens it for confirmation. Picking never mutates schedules;
+normal scope navigation clears the draft.
+`POST …/days/<day>/move` atomically removes the source occurrence, replaces the destination,
+and moves saved source plans, under program-first locking. Conflicting destination plans for the
+same definition/template are soft-deleted; displaced definitions' plans remain dormant.
+Move and unschedule clear affected manual date statuses and preserve sessions and session credits
+on their original dates. Explicit scheduling clears that date's exclusion. Program duplication shifts and preserves
+exclusions through the day-create `excluded_dates` field.
+Days are managed program-scoped at
+`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/move|/goals]]`, and
 `PUT …/days/order` sets their side-pane order (`day_number`) from the full list of day ids; **Duplicate**
 copies templates, goals, and notes without a schedule. Blocks can **track weeks**
 (`track_weeks`, `week_start_day` 0 = Monday): Week 1 starts on the block's start date and each
@@ -276,8 +289,10 @@ at a time). The legacy fixed `program_days.date` column is gone (migration `b8d4
 into schedule rows, merged identical per-block copies, and pinned every calendar to its old dates).
 Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
 (`schedule_program_day` writes a row, never a placeholder session); the evaluator treats those dates
-as occurrences, and the day pane keeps "Plan this day" available for today and future dates, with
-"Remove from this date" for explicit schedules. Calendar events (`calendar_periods`,
+as occurrences, and the day pane keeps "Plan this day" available for today and future dates.
+Scheduled occurrences on past, present, and future dates offer "Move day" and "Remove from this date";
+recurring occurrences use persistent date exclusions rather than changing weekday rules.
+Calendar events (`calendar_periods`,
 `services/calendar_periods.py`, `/api/<root_id>/calendar-periods`) are fractal-wide, named spans such
 as vacations. Precedence for a scheduled date is manual override, then a streak-protecting event
 (only when the date would not otherwise be met; it becomes rest with `status_source: "period"`),

@@ -42,6 +42,8 @@ export const fractalProgramsApi = {
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/duplicate`),
     scheduleProgramDay: (rootId, programId, dayId, data) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/schedule`, data),
+    moveProgramDayOccurrence: (rootId, programId, dayId, data) =>
+        axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/move`, data),
     unscheduleProgramDayOccurrence: (rootId, programId, dayId, data) =>
         axios.post(`${API_BASE}/${rootId}/programs/${programId}/days/${dayId}/unschedule`, data),
     setProgramGoalDeadline: (rootId, programId, data) =>

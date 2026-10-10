@@ -133,16 +133,17 @@ export function useProgramDetailMutations({
         }
     }, [actions, onScheduleDaySaved]);
 
+    // Propagate failures so inline schedule controls retain their state and show errors.
     const unscheduleDay = useCallback(async (dayId, date, timezone) => {
-        try {
-            await actions.unscheduleDay(dayId, date, timezone);
-            notify.success('Removed from this date');
-        } catch (error) {
-            logError('Failed to remove scheduled day:', error);
-            notify.error(`Failed to remove scheduled day: ${formatError(error)}`);
-        }
+        await actions.unscheduleDay(dayId, date, timezone);
+        notify.success('Removed from this date');
     }, [actions]);
 
+    const moveDay = useCallback(async (dayId, sourceDate, targetDate) => {
+        const result = await actions.moveDay(dayId, sourceDate, targetDate);
+        notify.success('Program day moved');
+        return result;
+    }, [actions]);
 
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
@@ -209,6 +210,7 @@ export function useProgramDetailMutations({
         deleteDay,
         scheduleDay,
         unscheduleDay,
+        moveDay,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,

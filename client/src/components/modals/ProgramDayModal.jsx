@@ -65,6 +65,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
     const [firstConflict] = findDraftDayConflicts(program, occupiedDates, {
         weekdays: isDatesMode ? [] : selectedDaysOfWeek,
         dates: specificDates,
+        excludedDates: initialData?.excluded_dates || [],
     });
     const saveBlockedReason = !name.trim()
         ? 'Give the day a name to save it.'

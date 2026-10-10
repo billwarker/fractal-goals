@@ -334,6 +334,9 @@ def main():
                 )
                 _seed_goal_heatmap(db, suffix, user, now)
                 _seed_planning_fractal(db, suffix, user, ultimate_level, today)
+                adjustments_root = f"browser-adjustments-root-{suffix}"
+                db.add(Goal(id=adjustments_root, root_id=adjustments_root, owner_id=user.id,
+                            level_id=ultimate_level.id, name=f"Browser Adjustments {suffix}"))
             db.commit()
         from app import app
         from extensions import limiter

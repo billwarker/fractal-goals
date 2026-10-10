@@ -4,7 +4,7 @@
  * authoritative; these mirror it so editors can explain a conflict before saving.
  */
 import { getDatePart } from './dateUtils';
-import { getProgramDaySpecificDates, getProgramDayWeekdays, WEEKDAY_NAMES } from './programViewModel';
+import { getProgramDayScheduledDates, WEEKDAY_NAMES } from './programViewModel';
 
 export const BLOCK_OVERLAP = 'program_block_overlap';
 export const DAY_DATE_CONFLICT = 'program_day_date_conflict';
@@ -19,18 +19,8 @@ function parseIsoDate(value) {
     return new Date(Date.UTC(year, month - 1, day));
 }
 
-function isoDate(date) {
-    return date.toISOString().slice(0, 10);
-}
-
 export function weekdayOf(value) {
     return WEEKDAY_NAMES[(parseIsoDate(value).getUTCDay() + 6) % 7];
-}
-
-function eachDate(start, end, visit) {
-    for (let cursor = parseIsoDate(start); isoDate(cursor) <= end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-        visit(isoDate(cursor));
-    }
 }
 
 /** The first other dated block whose inclusive range meets ``draft``, if any. */
@@ -51,20 +41,7 @@ export function findBlockOverlap(blocks, draft) {
  * them: its explicit dates plus every date on its weekdays, across the whole program span.
  */
 export function programDayDates(day, program) {
-    const programStart = getDatePart(program?.start_date);
-    const programEnd = getDatePart(program?.end_date);
-    const occupied = new Set();
-    if (!programStart || !programEnd) return occupied;
-    getProgramDaySpecificDates(day)
-        .filter((value) => value >= programStart && value <= programEnd)
-        .forEach((value) => occupied.add(value));
-    const weekdays = getProgramDayWeekdays(day);
-    if (weekdays.length) {
-        eachDate(programStart, programEnd, (value) => {
-            if (weekdays.includes(weekdayOf(value))) occupied.add(value);
-        });
-    }
-    return occupied;
+    return new Set(getProgramDayScheduledDates(day, program));
 }
 
 /** Every date the program's other days occupy, mapped to the day's name. */
@@ -90,8 +67,8 @@ export function takenWeekdays(owners) {
 }
 
 /** The draft definition's dates that another day already holds, earliest first. */
-export function findDraftDayConflicts(program, owners, { weekdays = [], dates = [] }) {
-    const draftDates = programDayDates({ day_of_week: weekdays, scheduled_dates: dates }, program);
+export function findDraftDayConflicts(program, owners, { weekdays = [], dates = [], excludedDates = [] }) {
+    const draftDates = programDayDates({ day_of_week: weekdays, scheduled_dates: dates, excluded_dates: excludedDates.filter((date) => !dates.includes(date)) }, program);
     return [...draftDates]
         .filter((value) => owners.has(value))
         .sort()

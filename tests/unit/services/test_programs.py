@@ -355,7 +355,8 @@ def test_unschedule_program_day_occurrence_emits_program_day_unscheduled_event(d
     db_session.add(block)
     db_session.flush()
 
-    day = ProgramDay(program_id=block.program_id, name='Unsched Day', day_number=1)
+    day = ProgramDay(program_id=block.program_id, name='Unsched Day', day_number=1,
+                     occurrence_schedules=[ProgramDayOccurrenceSchedule(date=date.today())])
     db_session.add(day)
     db_session.flush()
 
@@ -382,10 +383,12 @@ def test_unschedule_program_day_occurrence_emits_program_day_unscheduled_event(d
         {'date': scheduled_session.session_start.date().isoformat(), 'timezone': 'UTC'},
     )
 
-    assert result['removed_count'] == 1
-    assert result['removed_session_ids'] == [scheduled_session.id]
-    assert [event.name for event in emitted] == [Events.SESSION_DELETED, Events.PROGRAM_DAY_UNSCHEDULED]
-    assert emitted[1].data['removed_count'] == 1
+    assert result['removed_schedule_count'] == 1
+    assert result['removed_count'] == 0
+    assert result['removed_session_ids'] == []
+    assert scheduled_session.deleted_at is None
+    assert [event.name for event in emitted] == [Events.PROGRAM_DAY_UNSCHEDULED]
+    assert emitted[0].data['removed_count'] == 0
 
 
 def test_unschedule_program_day_occurrence_skips_unscheduled_event_when_nothing_matches(db_session, sample_program, sample_goal_hierarchy, monkeypatch):

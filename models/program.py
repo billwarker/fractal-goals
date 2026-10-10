@@ -182,6 +182,12 @@ class ProgramDay(Base):
         order_by="ProgramDayOccurrenceSchedule.date",
     )
     
+    occurrence_exclusions = relationship(
+        "ProgramDayOccurrenceExclusion", back_populates="program_day",
+        cascade="all, delete-orphan", passive_deletes=True, lazy="selectin",
+        order_by="ProgramDayOccurrenceExclusion.date",
+    )
+
     goals = relationship(
         "Goal",
         secondary="program_day_goals",
@@ -272,6 +278,20 @@ class ProgramDayOccurrenceSchedule(Base):
     created_at = Column(DateTime, nullable=False, default=utc_now)
 
     program_day = relationship('ProgramDay', back_populates='occurrence_schedules')
+
+
+class ProgramDayOccurrenceExclusion(Base):
+    """Suppress one occurrence without changing the reusable weekday schedule."""
+    __tablename__ = 'program_day_occurrence_exclusions'
+    __table_args__ = (
+        UniqueConstraint('program_day_id', 'date', name='uq_program_day_occurrence_exclusion_day_date'),
+    )
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_day_id = Column(String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=False, index=True)
+    date = Column(Date, nullable=False)
+    created_by_user_id = Column(String, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utc_now)
+    program_day = relationship('ProgramDay', back_populates='occurrence_exclusions')
 
 
 class ProgramDaySessionCredit(Base):

@@ -88,5 +88,6 @@ def serialize_program_day(day):
         "goal_ids": [g.id for g in (day.goals or [])],
         "completion_min_templates": getattr(day, 'completion_min_templates', None),
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
+        "excluded_dates": [row.date.isoformat() for row in (day.occurrence_exclusions or [])],
         "scheduled_dates": [format_utc(row.date) for row in (day.occurrence_schedules or [])],
     }

@@ -28,6 +28,7 @@ import { programFocusScope } from '../utils/programFocus';
 import { duplicateProgramStructure, shiftDatePart } from '../utils/programDuplication';
 import { useProgramMetrics } from '../hooks/useProgramMetrics';
 import { buildBlockCards } from '../utils/programBlocksViewModel';
+import { useProgramDayMovePicker } from '../hooks/useProgramDayMovePicker';
 import { useProgramCalendarSelection } from '../hooks/useProgramCalendarSelection';
 import { useProgramStatusSelection } from '../hooks/useProgramStatusSelection';
 import {
@@ -271,6 +272,10 @@ function ProgramCalendarPage() {
         toggleStatusDate,
         selectStatusRange,
     } = useProgramStatusSelection(selectableDayStates, blockCreationMode, setBlockCreationModeForCalendar);
+    const movePicker = useProgramDayMovePicker({
+        calendarContext, dispatchCalendarContext, program: displayProgram,
+        setIsSidePaneVisible,
+    });
     const selectedTimeframeDates = blockCreationMode ? selectedStatusDates : [];
     const selectedTimeframeLabel = formatProgramCalendarSelection(selectedTimeframeDates);
     const overviewMetricsRange = selectedTimeframeDates.length
@@ -326,6 +331,7 @@ function ProgramCalendarPage() {
         deleteDay,
         scheduleDay,
         unscheduleDay,
+        moveDay,
         updateGoal,
         toggleGoalCompletion,
         deleteGoal,
@@ -509,6 +515,7 @@ function ProgramCalendarPage() {
 
     const handleDateClick = (info) => {
         const clickedDate = info.dateStr;
+        if (movePicker.pickDate(clickedDate, info.jsEvent)) return;
         const program = programForDate(clickedDate);
 
         if (blockCreationMode) {
@@ -526,6 +533,7 @@ function ProgramCalendarPage() {
     };
 
     const handleProgramLabelClick = (label) => {
+        if (movePicker.pickDate(label?.date)) return;
         if (blockCreationMode || !label?.date) return;
         const program = programs.find((candidate) => String(candidate.id) === String(label.programId)) || null;
         updateCalendarRangeContext({ startDate: label.date, program });
@@ -534,6 +542,7 @@ function ProgramCalendarPage() {
     };
 
     const handleEventClick = (info) => {
+        if (movePicker.pickDate(info.event.startStr, info.jsEvent)) return;
         const eventType = info.event.extendedProps?.type;
 
         if (blockCreationMode && eventType !== 'block_background' && eventType !== 'program_background') {
@@ -835,7 +844,8 @@ function ProgramCalendarPage() {
                                 blockCreationMode={blockCreationMode}
                                 setBlockCreationMode={setMultiDaySelectionMode}
                                 onAddBlockClick={handleAddSelectedBlock}
-                                showBlockControls
+                                showBlockControls={!movePicker.draft}
+                                dayMoveMode={Boolean(movePicker.draft)}
                                 selectedRangeLabel={selectedTimeframeLabel || (selectedCalendarRange ? `${selectedCalendarRange.startDate} - ${selectedCalendarRange.endDate}` : '')}
                                 showAddBlockButton={Boolean(pendingBlockSelection)}
                                 onDateClick={handleDateClick}
@@ -848,11 +858,11 @@ function ProgramCalendarPage() {
                                 }}
                                 initialDate={todayInTimezone}
                                 isMobile={isMobile}
-                                selectedDate={calendarScope === 'day' ? contextDate : null}
+                                selectedDate={movePicker.draft?.targetDate || (calendarScope === 'day' ? contextDate : null)}
                                 selectedRange={selectedTimeframeDates.length ? null : selectedCalendarRange}
                                 onCalendarBackgroundClick={handleCalendarBackgroundClick}
-                                onTodayClick={() => { resetCalendarContextToToday(); clearStatusSelection(); }}
-                                onBlockLabelClick={handleBlockLabelClick}
+                                onTodayClick={() => { if (!movePicker.draft) resetCalendarContextToToday(); clearStatusSelection(); }}
+                                onBlockLabelClick={(label) => { if (!movePicker.pickDate(label.date)) handleBlockLabelClick(label); }}
                                 onProgramLabelClick={handleProgramLabelClick}
                                 programLabels={programLabels}
                                 onVisibleRangeChange={handleCalendarVisibleRangeChange}
@@ -865,7 +875,7 @@ function ProgramCalendarPage() {
                                 selectedStatusDates={selectedStatusDates}
                                 selectableDates={selectableDayStates}
                                 selectionModeButtonRef={selectionModeButtonRef}
-                                statusActions={blockCreationMode && selectedStatusDates.length ? (
+                                statusActions={!movePicker.draft && blockCreationMode && selectedStatusDates.length ? (
                                     <ProgramDayStatusBulkBar
                                         dates={selectedStatusDates}
                                         scheduledDates={selectedScheduledDates}
@@ -939,8 +949,14 @@ function ProgramCalendarPage() {
                     onNextDay={() => moveScopedDay(1)}
                     today={todayInTimezone}
                     blocks={sortedBlocks}
+                    moveDraft={movePicker.draft}
+                    onMoveDraftChange={movePicker.changeDraft}
                     onScheduleDay={scheduleDay}
                     onUnscheduleDay={(dayId, date) => unscheduleDay(dayId, date, timezone || 'UTC')}
+                    onMoveDay={async (dayId, sourceDate, targetDate) => {
+                        await moveDay(dayId, sourceDate, targetDate);
+                        dispatchCalendarContext({ type: 'focus_day', date: targetDate, programId: displayProgram.id });
+                    }}
                     onCreateDay={handleCreateDayForDate}
                     getGoalIcon={getGoalIcon}
                     getGoalColor={getGoalColor}

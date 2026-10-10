@@ -1008,3 +1008,9 @@
         outline: 1px solid CanvasText;
     }
 }
+
+.calendarContainer[data-selection-mode="move"] :global(.fc-daygrid-day) { cursor: crosshair; }
+.calendarContainer[data-selection-mode="move"] :global(.fc-daygrid-day):focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: -2px;
+}

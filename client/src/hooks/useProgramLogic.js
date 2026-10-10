@@ -118,6 +118,14 @@ export function useProgramLogic(rootId, program, refreshers) {
         await Promise.all([invalidateProgram(), invalidateScheduling()]);
     }, [invalidateProgram, invalidateScheduling, rootId, programId]);
 
+    const moveDay = useCallback(async (dayId, sourceDate, targetDate) => {
+        const response = await fractalApi.moveProgramDayOccurrence(rootId, programId, dayId, {
+            source_date: sourceDate, target_date: targetDate,
+        });
+        await invalidateScheduling();
+        return response.data;
+    }, [invalidateScheduling, rootId, programId]);
+
     const unscheduleDay = useCallback(async (dayId, date, timezone) => {
         await fractalApi.unscheduleProgramDayOccurrence(rootId, programId, dayId, {
             date,
@@ -136,5 +144,6 @@ export function useProgramLogic(rootId, program, refreshers) {
         deleteDay,
         scheduleDay,
         unscheduleDay,
+        moveDay,
     };
 }

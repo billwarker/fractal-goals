@@ -54,6 +54,7 @@ export async function duplicateProgramStructure({ rootId, programId, source, sta
             scheduled_dates: (sourceDay.scheduled_dates || [])
                 .map((value) => shiftDatePart(value, dayOffset))
                 .filter(Boolean),
+            excluded_dates: (sourceDay.excluded_dates || []).map((value) => shiftDatePart(value, dayOffset)).filter(Boolean),
             template_ids: templateConfigs.map((config) => config.template_id),
             template_configs: templateConfigs,
             completion_min_templates: sourceDay.completion_min_templates || null,

@@ -13,7 +13,7 @@ from __future__ import annotations
 from datetime import date
 from types import SimpleNamespace
 
-from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule
+from models import Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayOccurrenceExclusion
 from services.program_day_occurrences import build_occurrences, date_part
 from services.program_service_errors import ProgramServiceValidationError
 
@@ -144,6 +144,12 @@ def _calendar_snapshot(session, program_id):
             ProgramDayOccurrenceSchedule.program_day_id, ProgramDayOccurrenceSchedule.date,
         ).filter(ProgramDayOccurrenceSchedule.program_day_id.in_(day_ids)).all():
             schedules_by_day.setdefault(day_id, []).append(SimpleNamespace(date=scheduled))
+    exclusions_by_day = {}
+    if day_ids:
+        for row in session.query(ProgramDayOccurrenceExclusion).filter(
+            ProgramDayOccurrenceExclusion.program_day_id.in_(day_ids),
+        ).all():
+            exclusions_by_day.setdefault(row.program_day_id, []).append(SimpleNamespace(date=row.date))
     return SimpleNamespace(
         start_date=program.start_date,
         end_date=program.end_date,
@@ -155,6 +161,7 @@ def _calendar_snapshot(session, program_id):
             SimpleNamespace(
                 id=row.id, name=row.name, day_number=row.day_number, day_of_week=row.day_of_week,
                 occurrence_schedules=schedules_by_day.get(row.id, []),
+                occurrence_exclusions=exclusions_by_day.get(row.id, []),
             )
             for row in day_rows
         ],

@@ -51,6 +51,8 @@ export function getNextMultiDayRange({ scope, selectedRange }, clickedDate) {
 
 export function programCalendarContextReducer(state, action) {
     switch (action.type) {
+        case 'set_day_move':
+            return { ...state, dayMove: action.draft };
         case 'focus_program':
             return {
                 scope: 'program',

@@ -37,6 +37,8 @@ export default function ProgramSidePane({
     blocks,
     onScheduleDay,
     onUnscheduleDay,
+    onMoveDay,
+    moveDraft, onMoveDraftChange,
     onCreateDay,
     getGoalIcon,
     getGoalColor,
@@ -151,6 +153,9 @@ export default function ProgramSidePane({
                     program={program}
                     onScheduleDay={onScheduleDay}
                     onUnscheduleDay={onUnscheduleDay}
+                    onMoveDay={onMoveDay}
+                    moveDraft={moveDraft}
+                    onMoveDraftChange={onMoveDraftChange}
                     onCreateDay={onCreateDay}
                     goals={goals}
                     onGoalClick={onGoalClick}

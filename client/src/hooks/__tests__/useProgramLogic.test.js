@@ -9,6 +9,7 @@ const api = {
     duplicateProgramDay: vi.fn(),
     reorderProgramDays: vi.fn(),
     scheduleProgramDay: vi.fn(),
+    moveProgramDayOccurrence: vi.fn().mockResolvedValue({ data: { target_date: '2026-03-17' } }),
     updateBlock: vi.fn(),
     createBlock: vi.fn(),
 };
@@ -41,6 +42,16 @@ describe('useProgramLogic', () => {
 
         expect(api.scheduleProgramDay).toHaveBeenCalledWith('root-1', 'program-1', 'day-1', { date: '2026-03-16' });
         expect(refreshData).toHaveBeenCalled();
+    });
+
+    it('moves an occurrence and refreshes scheduling read models', async () => {
+        const refresh = vi.fn().mockResolvedValue(undefined);
+        const { result } = renderHook(() => useProgramLogic('root-1', program, refresh));
+        await act(async () => result.current.moveDay('day-1', '2026-03-16', '2026-03-17'));
+        expect(api.moveProgramDayOccurrence).toHaveBeenCalledWith('root-1', 'program-1', 'day-1', {
+            source_date: '2026-03-16', target_date: '2026-03-17',
+        });
+        expect(refresh).toHaveBeenCalled();
     });
 
     it('creates program days on the program and returns the saved day', async () => {
