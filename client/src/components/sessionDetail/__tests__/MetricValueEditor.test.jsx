@@ -7,6 +7,23 @@ import useMetricDrafts from '../useMetricDrafts';
 
 
 describe('MetricValueEditor draft performance', () => {
+    it.each([false, true])('updates existing values when format changes (readOnly=%s)', (readOnly) => {
+        const onCommit = vi.fn();
+        const props = { value: 12.75, readOnly, onDraftChange: vi.fn(), onCommit };
+        const { rerender } = render(<MetricValueEditor {...props} metricDef={{ input_type: 'number', precision: 2 }} />);
+        const input = screen.getByRole('textbox');
+        expect(input).toHaveValue('12.75');
+
+        rerender(<MetricValueEditor {...props} metricDef={{ input_type: 'integer', precision: 0 }} />);
+        expect(input).toHaveValue('12');
+        expect(input).toHaveAttribute('inputmode', 'numeric');
+
+        rerender(<MetricValueEditor {...props} metricDef={{ input_type: 'number', precision: 3 }} />);
+        expect(input).toHaveValue('12.750');
+        expect(input).toHaveAttribute('inputmode', 'decimal');
+        expect(onCommit).not.toHaveBeenCalled();
+    });
+
     it('keeps keystroke rendering local while preserving the draft for commit', () => {
         const updateExercise = vi.fn();
         const onActivityOwnerRender = vi.fn();

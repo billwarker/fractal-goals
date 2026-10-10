@@ -9,6 +9,7 @@ export const queryKeys = {
     aiEmbeddedConversations: (rootId) => ['ai-agent', 'embedded-conversations', rootId],
     aiEmbeddedConversation: (conversationId) => ['ai-agent', 'embedded-conversation', conversationId],
     activities: (rootId) => ['activities', rootId],
+    circuitsRoot: (rootId) => ['circuits', rootId],
     circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
     circuit: (rootId, circuitId) => ['circuit', rootId, circuitId],
     sessionCircuitRuns: (rootId, sessionId) => ['circuit-runs', rootId, sessionId],

@@ -106,12 +106,18 @@ export function useUpdateFractalMetric(rootId) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: ({ metricId, ...payload }) => fractalApi.updateFractalMetric(rootId, metricId, payload),
-        onSuccess: (response) => {
+        onSuccess: async (response) => {
             queryClient.setQueryData(
                 queryKeys.fractalMetrics(rootId),
                 (current = []) => upsertFractalMetric(current, response?.data)
             );
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalMetrics(rootId), refetchType: 'inactive' });
+            // Sessions and prescriptions read the shared activity definitions;
+            // circuit definitions also embed their members' metric definitions.
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.circuitsRoot(rootId) }),
+            ]);
         },
     });
 }

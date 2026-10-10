@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import {
     evaluateArithmeticExpression,
+    formatAllowedMetricValueLabel,
     formatMetricValueForInput,
     getMetricInputProps,
     normalizeMetricValueForStorage,
 } from '../sessionActivityMetrics';
 
 describe('sessionActivityMetrics arithmetic normalization', () => {
+    it.each([12.75, -12.75, 0, '12.75'])('formats existing value %s using the current metric type', (value) => {
+        const integer = { input_type: 'integer', precision: 0 };
+        const decimal = { input_type: 'number', precision: 2 };
+        expect(formatMetricValueForInput(integer, value)).toBe(String(Math.trunc(Number(value))));
+        expect(formatAllowedMetricValueLabel(integer, value)).toBe(String(Math.trunc(Number(value))));
+        expect(formatMetricValueForInput(decimal, value)).toBe(Number(value).toFixed(2));
+    });
+
     it('evaluates simple arithmetic expressions', () => {
         expect(evaluateArithmeticExpression('5-2')).toBe(3);
         expect(evaluateArithmeticExpression('2 * (3 + 4)')).toBe(14);

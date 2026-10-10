@@ -1,7 +1,6 @@
 /**
- * Pure metric/duration formatting + parsing helpers for session activity items.
- * Extracted verbatim from SessionActivityItem.jsx (audit P1-5) — no behavior
- * change. These are stateless and safe to unit-test in isolation.
+ * Shared metric/duration formatting and parsing for sessions, circuits, and plans.
+ * Display uses the current metric definition without rewriting stored values.
  */
 
 export function formatDuration(seconds) {
@@ -232,6 +231,9 @@ export function formatMetricValueForInput(metricDef, value) {
     if (metricDef?.input_type === 'duration') {
         return formatDurationMetricValue(value, getMetricPrecision(metricDef));
     }
+    if (metricDef?.input_type === 'integer' && Number.isFinite(Number(value))) {
+        return String(Math.trunc(Number(value)));
+    }
     if (metricDef?.input_type === 'number' && Number.isFinite(Number(value))) {
         return Number(value).toFixed(getMetricPrecision(metricDef));
     }
@@ -239,13 +241,7 @@ export function formatMetricValueForInput(metricDef, value) {
 }
 
 export function formatAllowedMetricValueLabel(metricDef, value) {
-    if (metricDef?.input_type === 'duration') {
-        return formatDurationMetricValue(value, getMetricPrecision(metricDef));
-    }
-    if (metricDef?.input_type === 'number' && Number.isFinite(Number(value))) {
-        return Number(value).toFixed(getMetricPrecision(metricDef));
-    }
-    return String(value);
+    return formatMetricValueForInput(metricDef, value);
 }
 
 export function getAllowedMetricValues(metricDef) {
