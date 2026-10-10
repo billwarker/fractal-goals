@@ -1,10 +1,18 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import { CircuitRoundTagControl, CircuitRunTagControl } from '../CircuitTagControls';
+import styles from '../../sessionDetail/ActivityTagEditor.module.css';
 
 
 describe('circuit scope tag controls', () => {
     afterEach(() => vi.unstubAllGlobals());
+
+    it('uses the activity chip style for assigned circuit tags', () => {
+        render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', name: 'Strength', color: '#FF0000' }] }} availableTags={[]} onPerform={vi.fn()} />);
+        const chip = screen.getByText('Strength').closest('label');
+        expect(chip).toHaveClass(styles.choice, styles.selected);
+        expect(chip).toHaveStyle({ '--tag-color': '#FF0000' });
+    });
 
     it('selects an existing logical tag for the whole circuit', async () => {
         const onPerform = vi.fn().mockResolvedValue(true);
@@ -25,6 +33,18 @@ describe('circuit scope tag controls', () => {
             value: { name: 'Competition', color: null, assigned: true },
             inlineError: true,
         }));
+    });
+
+    it('assigns catalog identity and retains distinct same-name options', async () => {
+        const onPerform = vi.fn().mockResolvedValue(true);
+        render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', definition_id: 'catalog-a', name: 'Shared' }] }} availableTags={[{ id: 'catalog-a', definition_id: 'catalog-a', name: 'Shared' }, { id: 'catalog-b', definition_id: 'catalog-b', name: 'Shared' }]} onPerform={onPerform} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Add circuit tags' }));
+        const options = within(screen.getByRole('dialog')).getAllByRole('checkbox');
+        expect(options).toHaveLength(2);
+        expect(options[0]).toBeChecked();
+        expect(options[1]).not.toBeChecked();
+        fireEvent.click(options[1]);
+        await waitFor(() => expect(onPerform).toHaveBeenCalledWith({ action: 'updateRunTag', value: { name: 'Shared', color: null, assigned: true, definition_id: 'catalog-b' }, inlineError: true }));
     });
 
     it('creates a logical tag for one round', async () => {

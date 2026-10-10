@@ -48,6 +48,14 @@ describe('circuitQueryCache', () => {
         expect(client.getQueryState(heatmapKey)?.isInvalidated).toBe(true);
     });
 
+    it.each(['updateRunTag', 'updateRoundTag'])('refreshes the shared catalog after %s', async (action) => {
+        const client = new QueryClient();
+        const catalogKey = queryKeys.activityTagCatalog('root');
+        client.setQueryData(catalogKey, { tags: [] });
+        await refreshCircuitSessionConsumers(client, 'root', 'session', action);
+        expect(client.getQueryState(catalogKey)?.isInvalidated).toBe(true);
+    });
+
     it('keeps an authoritative member-metric run response fresh while refreshing dependents', async () => {
         const client = new QueryClient();
         const runKey = queryKeys.sessionCircuitRuns('root', 'session');

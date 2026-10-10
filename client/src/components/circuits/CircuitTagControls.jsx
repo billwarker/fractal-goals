@@ -2,13 +2,6 @@ import ActivityTagEditor from '../sessionDetail/ActivityTagEditor';
 import CircuitScopeTagEditor from './CircuitScopeTagEditor';
 
 
-export function collectCircuitAvailableTags(activityDefinitions, slots) {
-    const activityIds = new Set((slots || []).map((slot) => slot.activity_definition_id));
-    return (activityDefinitions || [])
-        .filter((definition) => activityIds.has(definition.id))
-        .flatMap((definition) => definition.tags || []);
-}
-
 export function CircuitRunTagControl({ className = '', run, availableTags, disabled, editable = true, onPerform }) {
     return (
         <CircuitScopeTagEditor

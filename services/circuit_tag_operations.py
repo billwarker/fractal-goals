@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
@@ -115,29 +117,37 @@ class CircuitTagOperations:
         color,
         *,
         scope_storage_values,
+        catalog_definition_id=None,
     ):
         definition_ids = sorted({definition_id for _, definition_id in targets})
         normalized_name = self._normalized_name(name)
-        by_definition = self._tags_by_definition(root_id, definition_ids, normalized_name)
-        archived = [
-            tag for tag in by_definition.values()
-            if tag.deleted_at is not None or tag.definition.deleted_at is not None
-        ]
-        if archived:
+        catalog_query = self.db.query(ActivityTagDefinition).filter(
+            ActivityTagDefinition.root_id == root_id,
+        )
+        canonical: Any
+        if catalog_definition_id:
+            canonical = catalog_query.filter(ActivityTagDefinition.id == catalog_definition_id).with_for_update().first()
+            if canonical is None:
+                return None, [], "Tag not found", 404
+        else:
+            candidates = catalog_query.filter(
+                func.lower(ActivityTagDefinition.name) == normalized_name,
+            ).with_for_update().all()
+            if len(candidates) > 1:
+                return None, [], "Choose a tag from the catalog to resolve duplicate names", 409
+            canonical = candidates[0] if candidates else None
+
+        if canonical and canonical.deleted_at is not None:
             return None, [], "An archived tag with this name must be restored before it can be assigned", 409
 
-        catalog_definitions = {tag.definition for tag in by_definition.values()}
-        if catalog_definitions:
-            canonical = sorted(
-                catalog_definitions,
-                key=lambda item: (-sum(tag.definition_id == item.id for tag in by_definition.values()), item.id),
-            )[0]
-            for tag in by_definition.values():
-                tag.definition = canonical
-            for candidate in catalog_definitions - {canonical}:
-                if not candidate.bindings:
-                    self.db.delete(candidate)
-        else:
+        existing = self._tags_by_definition(root_id, definition_ids, normalized_name)
+        if any(tag.deleted_at is not None or tag.definition.deleted_at is not None for tag in existing.values()):
+            return None, [], "An archived tag with this name must be restored before it can be assigned", 409
+        if canonical and any(tag.definition_id != canonical.id for tag in existing.values()):
+            return None, [], "A different tag with this name is available to a circuit activity; merge the tags first", 409
+
+        existing_definition = canonical is not None
+        if canonical is None:
             maximum = self.db.query(func.max(ActivityTagDefinition.sort_order)).filter(
                 ActivityTagDefinition.root_id == root_id,
                 ActivityTagDefinition.deleted_at.is_(None),
@@ -150,6 +160,11 @@ class CircuitTagOperations:
                 sort_order=(maximum if maximum is not None else -1) + 1,
             )
             self.db.add(canonical)
+        by_definition = self._tags_by_definition(
+            root_id, definition_ids, catalog_definition_id=canonical.id,
+        ) if canonical.id else {}
+        if any(tag.deleted_at is not None for tag in by_definition.values()):
+            return None, [], "An archived tag with this name must be restored before it can be assigned", 409
 
         missing = [definition_id for definition_id in definition_ids if definition_id not in by_definition]
         quota = QuotaService(self.db)
@@ -160,6 +175,8 @@ class CircuitTagOperations:
         if error:
             return None, [], error, status
         if missing:
+            if existing_definition:
+                canonical.version += 1
             created = []
             for definition_id in missing:
                 tag = ActivityTag(
@@ -276,10 +293,22 @@ class CircuitTagOperations:
                 return None, "Circuit round not found", 404
 
         name = " ".join(data["name"].strip().split())
+        color = data.get("color")
+        catalog_definition_id = data.get("definition_id")
+        if catalog_definition_id:
+            definition = self.db.query(ActivityTagDefinition).filter(
+                ActivityTagDefinition.id == catalog_definition_id,
+                ActivityTagDefinition.root_id == root_id,
+            ).first()
+            if definition is None:
+                return None, "Tag not found", 404
+            name, color = definition.name, definition.color
         normalized_name = self._normalized_name(name)
         scope = next((
             row for row in run.scope_tags
-            if row.circuit_round_id == round_id and self._normalized_name(row.name) == normalized_name
+            if row.circuit_round_id == round_id
+            and (row.activity_tag_definition_id == catalog_definition_id if catalog_definition_id
+                 else self._normalized_name(row.name) == normalized_name)
         ), None)
         raw_targets = self._round_targets(circuit_round) if circuit_round else self._run_targets(run)
         if not raw_targets or any(target is None for target, _ in raw_targets):
@@ -294,11 +323,14 @@ class CircuitTagOperations:
                 user_id,
                 targets,
                 name,
-                data.get("color"),
-                scope_storage_values=(run.id, round_id, name, data.get("color")),
+                color,
+                scope_storage_values=(run.id, round_id, name, color),
+                catalog_definition_id=catalog_definition_id,
             )
-            if error:
-                return None, error, status
+            if not by_definition:
+                return None, error or "Circuit tag targets are incomplete", status if error else 409
+            canonical = next(iter(by_definition.values())).definition
+            name, color = canonical.name, canonical.color
             sort_order = max(
                 (row.sort_order for row in run.scope_tags if row.circuit_round_id == round_id),
                 default=-1,
@@ -308,7 +340,7 @@ class CircuitTagOperations:
                 circuit_run_id=run.id,
                 circuit_round_id=round_id,
                 name=name,
-                color=data.get("color"),
+                color=color,
                 sort_order=sort_order,
                 activity_tag_definition_id=next(iter(by_definition.values())).definition_id,
                 preserved_target_keys=[

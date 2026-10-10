@@ -11,6 +11,7 @@ from models import (
     ActivitySet,
     ActivityTag, ActivityTagDefinition,
     CircuitRun,
+    Goal,
     MetricDefinition,
     MetricValue,
     Note,
@@ -61,6 +62,92 @@ def _create_definition(client, root, set_activity, non_set_activity):
     })
     assert response.status_code == 201, response.get_json()
     return response.get_json()
+
+
+@pytest.mark.parametrize("use_identity", [False, True])
+def test_circuit_tags_reuse_catalog_tags_outside_their_member_activities(
+    authed_client, db_session, test_user, sample_ultimate_goal, sample_activity_definition,
+    use_identity,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    member_activity = _non_set_activity(db_session, sample_ultimate_goal)
+    unrelated = _non_set_activity(db_session, sample_ultimate_goal)
+    catalog = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags", json={
+        "name": "Shared", "color": "#123ABC", "scope": "selected", "activity_ids": [unrelated.id],
+    })
+    assert catalog.status_code == 201, catalog.get_json()
+    tag = catalog.get_json()
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, member_activity)
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags"
+    payload = {"name": "Shared", "color": "#FF0000"}
+    if use_identity:
+        payload.update(definition_id=tag["id"], name="Stale client label")
+    response = authed_client.patch(url, json=payload)
+    assert response.status_code == 200, response.get_json()
+    scope = response.get_json()["tags"][0]
+    assert scope["definition_id"] == tag["id"]
+    assert (scope["name"], scope["color"]) == ("Shared", "#123ABC")
+    assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 1
+    bindings = db_session.query(ActivityTag).filter_by(definition_id=tag["id"]).all()
+    assert {row.activity_definition_id for row in bindings} == {
+        unrelated.id, sample_activity_definition.id, member_activity.id,
+    }
+    removed = authed_client.patch(url, json={"definition_id": tag["id"], "name": "Shared", "assigned": False})
+    assert removed.status_code == 200, removed.get_json()
+    assert removed.get_json()["tags"] == []
+    assert db_session.query(ActivityTag).filter_by(definition_id=tag["id"]).count() == 3
+
+
+def test_circuit_catalog_identity_rejects_unavailable_and_conflicting_tags(
+    authed_client, db_session, test_user, sample_ultimate_goal, sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    member_activity = _non_set_activity(db_session, sample_ultimate_goal)
+    unrelated = _non_set_activity(db_session, sample_ultimate_goal)
+    tags = []
+    for activity_id in [unrelated.id, member_activity.id]:
+        response = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags", json={
+            "name": "Duplicate", "scope": "selected", "activity_ids": [activity_id],
+        })
+        assert response.status_code == 201, response.get_json()
+        tags.append(response.get_json())
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, member_activity)
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    other_root = Goal(
+        id=str(uuid.uuid4()), name="Other fractal", owner_id=test_user.id,
+        level_id=sample_ultimate_goal.level_id,
+    )
+    other_root.root_id = other_root.id
+    db_session.add(other_root)
+    db_session.flush()
+    foreign_tag = ActivityTagDefinition(root_id=other_root.id, name="Foreign", scope="selected")
+    db_session.add(foreign_tag)
+    db_session.commit()
+    url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags"
+    for payload, status in [
+        ({"name": "Duplicate"}, 409),
+        ({"name": "Duplicate", "definition_id": tags[0]["id"]}, 409),
+        ({"name": "Duplicate", "definition_id": str(uuid.uuid4())}, 404),
+        ({"name": "Foreign", "definition_id": foreign_tag.id}, 404),
+    ]:
+        response = authed_client.patch(url, json=payload)
+        assert response.status_code == status, response.get_json()
+    assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 2
+    assert db_session.query(ActivityTag).filter_by(root_id=sample_ultimate_goal.id).count() == 2
+    archived = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{tags[0]['id']}/archive",
+        json={"version": tags[0]["version"]},
+    )
+    assert archived.status_code == 200, archived.get_json()
+    response = authed_client.patch(url, json={"name": "Duplicate", "definition_id": tags[0]["id"]})
+    assert response.status_code == 409, response.get_json()
 
 
 def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_rounds(

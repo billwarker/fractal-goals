@@ -243,6 +243,7 @@ def serialize_circuit_run(run):
     def serialize_scope_tag(tag):
         return {
             "id": tag.id,
+            "definition_id": tag.activity_tag_definition_id,
             "name": tag.name,
             "color": tag.color,
             "sort_order": tag.sort_order,

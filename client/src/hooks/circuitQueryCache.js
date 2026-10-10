@@ -45,6 +45,11 @@ export function refreshCircuitSessionConsumers(queryClient, rootId, sessionId, a
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId) }),
     ];
+    if (action === 'updateRunTag' || action === 'updateRoundTag') {
+        invalidations.push(
+            queryClient.invalidateQueries({ queryKey: queryKeys.activityTagCatalog(rootId) }),
+        );
+    }
     if (action !== 'updateMemberMetrics') {
         invalidations.push(
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionCircuitRuns(rootId, sessionId) }),

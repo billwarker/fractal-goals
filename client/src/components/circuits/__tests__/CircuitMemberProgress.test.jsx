@@ -11,7 +11,10 @@ vi.mock('../CircuitTagControls', () => ({
     CircuitMemberTagEditor: () => null,
     CircuitRoundTagControl: () => null,
     CircuitRunTagControl: () => null,
-    collectCircuitAvailableTags: () => [],
+}));
+
+vi.mock('../../../hooks/useActivityProgressViews', () => ({
+    useActivityTagCatalog: () => ({ data: { tags: [] } }),
 }));
 
 import CircuitRunCard from '../CircuitRunCard';

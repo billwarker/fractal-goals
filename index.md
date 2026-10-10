@@ -125,6 +125,12 @@ See [Goal Timeline](planning/goal-activity-heatmap.md).
 Sessions are the execution container. Activity definitions and instances, metrics, sets,
 circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
 calculated from canonical result data; obsolete snapshot progress is not a competing source.
+Activities, circuit runs, and rounds use one fractal-owned tag catalog (`ActivityTagDefinition`).
+Circuit pickers read the full catalog and assign its identity, extending activity bindings to
+members as needed; they never silently merge same-name definitions. Activity availability controls
+remain catalog-owned. Circuit scopes materialize canonical instance/set links and preserve prior
+or overlapping assignments on removal. All session tag editors share the activity chip styling.
+See [Shared circuit tags audit](planning/shared-circuit-tags-audit.md).
 Metric input type and precision are live settings of the shared fractal metric, including for
 existing active/completed sessions and template prescriptions. Saving a metric refreshes activity
 and circuit definition caches; formatting changes preserve recorded and planned numeric values.

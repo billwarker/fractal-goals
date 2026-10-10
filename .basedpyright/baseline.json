@@ -8196,24 +8196,6 @@
                 }
             }
         ],
-        "./services/circuit_tag_operations.py": [
-            {
-                "code": "reportOptionalMemberAccess",
-                "range": {
-                    "startColumn": 67,
-                    "endColumn": 73,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalSubscript",
-                "range": {
-                    "startColumn": 37,
-                    "endColumn": 50,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./services/completion_handlers.py": [
             {
                 "code": "reportGeneralTypeIssues",

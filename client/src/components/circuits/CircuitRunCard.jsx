@@ -29,7 +29,6 @@ import useCircuitRunDerivedState from './useCircuitRunDerivedState';
 import styles from './CircuitRunCard.module.css';
 
 const INITIAL_VISIBLE_ROUNDS = 10;
-
 export default function CircuitRunCard({
     rootId,
     sessionId,
@@ -58,6 +57,7 @@ export default function CircuitRunCard({
     const [visibleRoundCount, setVisibleRoundCount] = useState(INITIAL_VISIBLE_ROUNDS);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const derived = useCircuitRunDerivedState({
+        rootId,
         run,
         activityInstances,
         activityDefinitions,

@@ -35,16 +35,16 @@ function CircuitScopeTagEditor({
         [tags],
     );
     const logicalTags = useMemo(() => {
-        const byName = new Map();
+        const byDefinition = new Map();
         availableTags.forEach((tag) => {
-            const key = tag.name.toLocaleLowerCase();
-            if (!tag.archived && !byName.has(key)) byName.set(key, tag);
+            const key = tag.definition_id || tag.name.toLocaleLowerCase();
+            if (!tag.archived && !byDefinition.has(key)) byDefinition.set(key, tag);
         });
         tags.forEach((tag) => {
-            const key = tag.name.toLocaleLowerCase();
-            if (!byName.has(key)) byName.set(key, tag);
+            const key = tag.definition_id || tag.name.toLocaleLowerCase();
+            if (!byDefinition.has(key)) byDefinition.set(key, tag);
         });
-        return [...byName.values()].sort((left, right) => left.name.localeCompare(right.name));
+        return [...byDefinition.values()].sort((left, right) => left.name.localeCompare(right.name));
     }, [availableTags, tags]);
     const filtered = logicalTags.filter((tag) => tag.name.toLocaleLowerCase().includes(
         search.trim().toLocaleLowerCase(),
@@ -104,10 +104,10 @@ function CircuitScopeTagEditor({
         };
     }, [close, isOpen]);
 
-    const persist = async (tagName, assigned, tagColor = null) => {
+    const persist = async (tagName, assigned, tagColor = null, definitionId = null) => {
         setIsSaving(true);
         try {
-            const result = await onChange({ name: tagName, color: tagColor, assigned });
+            const result = await onChange({ name: tagName, color: tagColor, assigned, ...(definitionId ? { definition_id: definitionId } : {}) });
             if (result?.error) throw new Error(result.error);
             setName('');
             setColor(DEFAULT_TAG_COLOR);
@@ -148,7 +148,7 @@ function CircuitScopeTagEditor({
                     {tags.map((tag) => (
                         <span
                             key={`measure-${tag.id || tag.name}`}
-                            className={`${styles.tag} ${styles.selected} ${styles.measureItem}`}
+                            className={`${styles.choice} ${styles.selected} ${styles.measureItem}`}
                             data-tag-label={tag.name}
                         />
                     ))}
@@ -156,7 +156,7 @@ function CircuitScopeTagEditor({
                 {tagOverflow.isSummaryVisible && tags.length > 0 ? (
                     <Badge
                         size="sm"
-                        className={`${styles.tag} ${styles.selected} ${styles.summary}`}
+                        className={`${styles.choice} ${styles.selected} ${styles.summary}`}
                         aria-label={`${tagOverflow.countLabel} assigned`}
                         title={tags.map((tag) => tag.name).join(', ')}
                     >
@@ -164,15 +164,16 @@ function CircuitScopeTagEditor({
                     </Badge>
                 ) : tags.map((tag) => (
                     <label
-                        key={tag.id || tag.name}
-                        className={`${styles.tag} ${styles.selected}`}
+                        key={tag.definition_id || tag.id || tag.name}
+                        className={`${styles.choice} ${styles.selected}`}
+                        title={tag.name}
                         style={tag.color ? { '--tag-color': tag.color } : undefined}
                     >
                         <input
                             type="checkbox"
                             checked
                             disabled={disabled || isSaving || !editable}
-                            onChange={() => void persist(tag.name, false, tag.color)}
+                            onChange={() => void persist(tag.name, false, tag.color, tag.definition_id)}
                         />
                         {tag.name}
                     </label>
@@ -188,7 +189,7 @@ function CircuitScopeTagEditor({
                     aria-label={`Choose ${scopeLabel.toLocaleLowerCase()}`}
                 >
                     <div className={styles.pickerHeader}>
-                        <span>{scopeLabel}</span>
+                        <span>Choose tags</span>
                         <CloseButton
                             size={14}
                             buttonSize="sm"
@@ -209,10 +210,12 @@ function CircuitScopeTagEditor({
                     )}
                     <div className={styles.pickerOptions}>
                         {filtered.length ? filtered.map((tag) => {
-                            const selected = selectedNames.has(tag.name.toLocaleLowerCase());
+                            const selected = tag.definition_id
+                                ? tags.some((assigned) => assigned.definition_id === tag.definition_id)
+                                : selectedNames.has(tag.name.toLocaleLowerCase());
                             return (
                                 <label
-                                    key={tag.id || tag.name}
+                                    key={tag.definition_id || tag.id || tag.name}
                                     className={styles.pickerOption}
                                     style={tag.color ? { '--tag-color': tag.color } : undefined}
                                 >
@@ -220,7 +223,7 @@ function CircuitScopeTagEditor({
                                         type="checkbox"
                                         checked={selected}
                                         disabled={disabled || isSaving}
-                                        onChange={() => void persist(tag.name, !selected, tag.color)}
+                                        onChange={() => void persist(tag.name, !selected, tag.color, tag.definition_id)}
                                     />
                                     <span className={styles.pickerOptionDot} aria-hidden="true" />
                                     <span>{tag.name}</span>

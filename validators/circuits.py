@@ -78,6 +78,7 @@ class CircuitScopeTagMutationSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     color: Optional[str] = Field(None, max_length=7)
     assigned: bool = True
+    definition_id: Optional[str] = Field(None, min_length=1)
 
     @field_validator("name")
     @classmethod
