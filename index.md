@@ -308,6 +308,10 @@ Block summary cards use one layout in `programs/blocks/BlockHeaderStats`: status
 separate row, followed by three metric columns on desktop. On mobile, the metrics become full-width
 label/value rows with horizontal dividers, and values wrap to keep large counts visible.
 
+The Days workspace selects program days through the sidebar on every screen size. Mobile opens
+it with Show Sidebar; the duplicate day dropdown is removed. The selected day's centered heading and
+block, week, and date rails remain visible in the workspace.
+
 The Programs page has **Calendar** and **Days** views. On desktop the side pane leads with the view toggle and a Collapse control; the header's Show/Hide Sidebar button reopens it, and its open state is remembered per fractal. At program scope a Details | Goals toggle sits beneath the pane's header: Details shows headline metrics, events, then the program's blocks (whole-program results; block name in its colour, status counts, and one row of Consistency, Goals completed/due, and Longest streak), and Goals shows the goal hierarchy. A selected timeframe shows Details only, and a scoped date shows the day review;
 mobile keeps Calendar/Days in the header and places Show Sidebar in a fixed, full-width footer using the shared secondary HeaderButton styling and Session Detail's spacing, with safe-area spacing and reserved content space; bulk calendar actions sit above it. The footer is available even without a selected program, portalled outside the page animation, and stays beneath modal sheets. The pane remains a closable sheet. Days (`components/programs/days/`) programs
 one program day's occurrence dates in two columns: a focused date (by default the next program day)

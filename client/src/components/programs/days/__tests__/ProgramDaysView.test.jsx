@@ -69,7 +69,7 @@ function planEntry(overrides = {}) {
 }
 
 /** The page's Days tab: the side-pane navigator (with date rails) beside the main columns. */
-function Harness({ timezone = 'UTC', showDateControls = false, onEditDay = vi.fn() }) {
+function Harness({ timezone = 'UTC', showDayHeading = false, onEditDay = vi.fn() }) {
     const tab = useProgramDaysTab({
         rootId: 'root',
         program,
@@ -86,7 +86,6 @@ function Harness({ timezone = 'UTC', showDateControls = false, onEditDay = vi.fn
             <ProgramDaysView
                 rootId="root"
                 program={program}
-                days={tab.days}
                 activities={[bench]}
                 activityGroups={[]}
                 today="2026-10-01"
@@ -96,7 +95,7 @@ function Harness({ timezone = 'UTC', showDateControls = false, onEditDay = vi.fn
                 focusTemplateId={tab.selection?.templateId || null}
                 onSelectionChange={tab.setSelection}
                 onEditDay={onEditDay}
-                showDateControls={showDateControls}
+                showDayHeading={showDayHeading}
             />
         </>
     );
@@ -385,10 +384,11 @@ describe('ProgramDaysView', () => {
         expect(within(past).queryByRole('button', { name: /Remove planned round/ })).not.toBeInTheDocument();
     });
 
-    it('offers a day select in the main area on narrow screens', async () => {
-        renderView({ showDateControls: true });
+    it('keeps the day heading and date rail on mobile without a duplicate day selector', async () => {
+        renderView({ showDayHeading: true });
 
-        expect(await screen.findByLabelText('Program day')).toHaveValue('upper');
+        expect(await screen.findByRole('heading', { name: 'Upper A', level: 2 })).toBeInTheDocument();
+        expect(screen.queryByRole('combobox', { name: 'Program day' })).not.toBeInTheDocument();
         expect(await screen.findByRole('list', { name: 'Program day dates' })).toBeInTheDocument();
     });
 

@@ -883,7 +883,6 @@ function ProgramCalendarPage() {
                                     <ProgramDaysView
                                         rootId={rootId}
                                         program={displayProgram}
-                                        days={daysTab.days}
                                         activities={activities}
                                         activityGroups={activityGroups}
                                         today={todayInTimezone}
@@ -893,7 +892,7 @@ function ProgramCalendarPage() {
                                         focusTemplateId={daysTab.selection?.templateId || null}
                                         onSelectionChange={daysTab.setSelection}
                                         onEditDay={handleEditDay}
-                                        showDateControls={isMobile}
+                                        showDayHeading={isMobile}
                                     />
                                 </Suspense>
                             </div>
