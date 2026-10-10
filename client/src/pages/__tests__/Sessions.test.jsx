@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test/test-utils';
 import Sessions from '../Sessions';
 
@@ -60,7 +60,11 @@ vi.mock('../../hooks/useGoalQueries', () => ({
 }));
 
 vi.mock('../../components/sessions', () => ({
-    SessionsQuerySidebar: () => <div data-testid="sessions-query-sidebar" />,
+    SessionsQuerySidebar: ({ onToggleCollapse }) => (
+        <div data-testid="sessions-query-sidebar">
+            <button type="button" onClick={onToggleCollapse}>Close filters</button>
+        </div>
+    ),
     SessionCard: ({ session }) => <div>summary:{session.id}</div>,
     SessionCardExpanded: ({ session, sessionActivityInstances = [] }) => (
         <div>expanded:{session.id}:instances:{sessionActivityInstances.length}</div>
@@ -133,6 +137,7 @@ describe('Sessions page data loading', () => {
         expect(await screen.findByRole('alert')).toHaveTextContent('Sessions could not be loaded');
         expect(screen.queryByText(/No sessions found/)).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+        expect(screen.queryByRole('contentinfo', { name: 'Session filter controls' })).not.toBeInTheDocument();
     });
 
     it('renders session cards while activity reference data is still loading', async () => {
@@ -240,7 +245,18 @@ describe('Sessions page data loading', () => {
         });
 
         expect(screen.queryByTestId('sessions-query-sidebar')).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
+        const footer = screen.getByRole('contentinfo', { name: 'Session filter controls' });
+        expect(footer.parentElement).toBe(document.body);
+        const button = within(footer).getByRole('button', { name: 'Show Filters' });
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.getAllByRole('button', { name: 'Show Filters' })).toHaveLength(1);
+
+        fireEvent.click(button);
+        expect(screen.getByTestId('sessions-query-sidebar').parentElement.parentElement).toBe(document.body);
+        expect(button).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Close filters' }));
+        expect(screen.queryByTestId('sessions-query-sidebar')).not.toBeInTheDocument();
+        expect(button).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('renders quick sessions in a sessions-page modal when quickSessionId is present in the route', async () => {

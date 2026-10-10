@@ -511,4 +511,12 @@
         min-height: 38px;
     }
 
+    .containerWithMobileDock {
+        padding-bottom: var(--mobile-page-footer-height);
+    }
+
+    .containerWithMobileDock .dayStatusBulkBar {
+        bottom: calc(var(--mobile-page-footer-height) + 8px);
+    }
+
 }

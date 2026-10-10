@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
@@ -30,6 +31,7 @@ import '../App.css';
 import notify from '../utils/notify';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import MobilePageFooter from '../components/layout/MobilePageFooter';
 import AnalyticsOnboardingState from '../components/onboarding/AnalyticsOnboardingState';
 import styles from './Analytics.module.css';
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
@@ -467,6 +469,26 @@ function Analytics() {
         windowStates,
     ]);
 
+    const filtersPane = (
+        <div className={`${styles.rightPanel} ${isMobile ? 'mobile-sheet-enter' : ''}`}>
+            <AnalyticsFiltersSidebar
+                filters={globalFilters}
+                dateRange={globalDateRange}
+                goals={goalAnalytics?.goals || []}
+                activities={activities}
+                activityGroups={activityGroups}
+                activityInstances={activityInstances}
+                selectedWindowState={selectedWindowId ? windowStates[selectedWindowId] || getDefaultWindowState() : getDefaultWindowState()}
+                onUpdateSelectedWindowState={selectedWindowId ? createWindowStateUpdater(selectedWindowId) : () => {}}
+                onChange={handleGlobalFiltersChange}
+                onDateRangeChange={handleDateRangeChange}
+                onReset={handleResetGlobalFilters}
+                onToggleCollapse={() => setIsFiltersPaneOpen(false)}
+                isMobile={isMobile}
+            />
+        </div>
+    );
+
     if (loading && !isHydrated) {
         return (
             <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
@@ -477,7 +499,7 @@ function Analytics() {
 
     return (
         <div className={styles.pageContainer}>
-            <div className={styles.leftPanel}>
+            <div className={`${styles.leftPanel} ${isMobile && activeMode === 'dashboard' ? styles.leftPanelWithMobileFooter : ''}`}>
                 <AnalyticsTopBar
                     currentViewName={currentViewName}
                     activeMode={activeMode}
@@ -487,6 +509,7 @@ function Analytics() {
                     isFiltersPaneOpen={isFiltersPaneOpen}
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                     showQueryConsole={showSqlExplorer}
+                    showFiltersToggle={!isMobile}
                 />
 
                 <AnalyticsOnboardingState rootId={rootId} />
@@ -513,34 +536,26 @@ function Analytics() {
                 )}
             </div>
 
-            {activeMode === 'dashboard' && isFiltersPaneOpen && isMobile && (
+            {isMobile && activeMode === 'dashboard' ? (
+                <MobilePageFooter
+                    ariaLabel="Analytics sidebar controls"
+                    label={isFiltersPaneOpen ? 'Hide Sidebar' : 'Show Sidebar'}
+                    expanded={isFiltersPaneOpen}
+                    onToggle={() => setIsFiltersPaneOpen((current) => !current)}
+                />
+            ) : null}
+
+            {activeMode === 'dashboard' && isFiltersPaneOpen && isMobile && createPortal(
                 <ModalBackdrop
-                    className={styles.sheetBackdrop} constrainToVisualViewport={false}
+                    className={`${styles.sheetBackdrop} mobile-sheet-backdrop-enter`} constrainToVisualViewport={false}
                     onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
-                />
+                />,
+                document.body,
             )}
-            {activeMode === 'dashboard' && isFiltersPaneOpen && (
-                <div className={styles.rightPanel}>
-                    <AnalyticsFiltersSidebar
-                        filters={globalFilters}
-                        dateRange={globalDateRange}
-                        goals={goalAnalytics?.goals || []}
-                        activities={activities}
-                        activityGroups={activityGroups}
-                        activityInstances={activityInstances}
-                        selectedWindowState={selectedWindowId ? windowStates[selectedWindowId] || getDefaultWindowState() : getDefaultWindowState()}
-                        onUpdateSelectedWindowState={selectedWindowId ? createWindowStateUpdater(selectedWindowId) : () => {}}
-                        onChange={handleGlobalFiltersChange}
-                        onDateRangeChange={handleDateRangeChange}
-                        onReset={handleResetGlobalFilters}
-                        onToggleCollapse={() => setIsFiltersPaneOpen(false)}
-                        isMobile={isMobile}
-                    />
-                </div>
-            )}
+            {activeMode === 'dashboard' && isFiltersPaneOpen && (isMobile ? createPortal(filtersPane, document.body) : filtersPane)}
 
-            {isViewsModalOpen && (
+            {isViewsModalOpen && createPortal(
                 <Suspense fallback={null}>
                     <AnalyticsViewsModal
                         views={analyticsViews}
@@ -549,10 +564,11 @@ function Analytics() {
                         onDeleteView={handleDeleteView}
                         onClose={() => setIsViewsModalOpen(false)}
                     />
-                </Suspense>
+                </Suspense>,
+                document.body,
             )}
 
-            {isSaveModalOpen && (
+            {isSaveModalOpen && createPortal(
                 <Suspense fallback={null}>
                     <AnalyticsViewNameModal
                         initialName=""
@@ -560,7 +576,8 @@ function Analytics() {
                         onConfirm={handleCreateView}
                         onClose={() => setIsSaveModalOpen(false)}
                     />
-                </Suspense>
+                </Suspense>,
+                document.body,
             )}
         </div>
     );

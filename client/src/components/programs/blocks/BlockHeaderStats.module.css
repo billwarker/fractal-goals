@@ -1,31 +1,29 @@
 .stats {
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px 20px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
     min-width: 0;
 }
 
-/* Layout hook for the shared status counts. */
 .statuses {
     min-width: 0;
+    flex-wrap: wrap;
+    justify-content: space-between;
 }
 
 .metrics {
-    display: flex;
-    align-items: stretch;
-    gap: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     margin: 0;
-    padding-left: 20px;
-    border-left: 1px solid var(--color-border);
 }
 
 .metric {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 0 16px;
+    min-width: 0;
+    padding: 0 8px;
 }
 
 .metric:first-child {
@@ -40,20 +38,20 @@
     color: var(--color-text-secondary);
     font-size: 11px;
     font-weight: 600;
-    white-space: nowrap;
 }
 
 .metric dd {
     display: flex;
     align-items: baseline;
-    gap: 6px;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    min-width: 0;
     margin: 0;
-    white-space: nowrap;
 }
 
 .value {
     color: var(--color-text-primary);
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
 }
@@ -64,56 +62,40 @@
     font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 900px) {
-    .stats {
-        justify-content: flex-start;
+@media (max-width: 768px) {
+    .statuses {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
     }
-}
 
-@media (max-width: 600px) {
+    .statuses > li {
+        justify-content: center;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+
     .metrics {
-        flex-basis: 100%;
-        padding-left: 0;
-        border-left: none;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
     }
 
     .metric {
-        flex: 1;
-        padding: 0 10px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: baseline;
+        gap: 12px;
+        padding: 0;
     }
-}
 
-/* Side pane: status marks on one row, the three figures side by side beneath. */
-.compact {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 10px;
-}
+    .metric + .metric {
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+        padding-top: 8px;
+    }
 
-.compact .statuses {
-    justify-content: space-between;
-}
-
-.compact .metrics {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    padding-left: 0;
-    border-left: none;
-}
-
-.compact .metric {
-    min-width: 0;
-    padding: 0 8px;
-}
-
-.compact .metric:first-child {
-    padding-left: 0;
-}
-
-.compact .metric dt {
-    white-space: normal;
-}
-
-.compact .value {
-    font-size: 15px;
+    .metric dd {
+        justify-content: flex-end;
+        text-align: right;
+    }
 }

@@ -56,6 +56,16 @@ Remote records live in TanStack Query. Components do not mirror API collections 
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
 affected read models.
 
+Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx`: a fixed,
+full-width secondary HeaderButton, portalled outside page animations with safe-area spacing.
+`--mobile-page-footer-height` is the shared content-clearance token. Programs opens its sidebar;
+Sessions and Notes open filters; Analytics opens its sidebar in Dashboard mode. Notes switches the footer to Show Associator while composing.
+Mobile openers leave the header; desktop retains header controls. Sheets sit above the footer.
+Mobile sidebars across Programs, Sessions, Notes, Analytics, Session Detail, and Create Session's
+goals panel use `--mobile-sidebar-height`: 82% of the dynamic viewport, capped at 760px and the
+space below navigation. Sheets use border-box sizing so borders and safe-area padding stay
+inside that height, and share the slide-up/backdrop entrance with reduced-motion support.
+
 ## Core domains
 
 ### Goals and targets
@@ -294,8 +304,12 @@ expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provi
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
 
+Block summary cards use one layout in `programs/blocks/BlockHeaderStats`: status counts on a
+separate row, followed by three metric columns on desktop. On mobile, the metrics become full-width
+label/value rows with horizontal dividers, and values wrap to keep large counts visible.
+
 The Programs page has **Calendar** and **Days** views. On desktop the side pane leads with the view toggle and a Collapse control; the header's Show/Hide Sidebar button reopens it, and its open state is remembered per fractal. At program scope a Details | Goals toggle sits beneath the pane's header: Details shows headline metrics, events, then the program's blocks (whole-program results; block name in its colour, status counts, and one row of Consistency, Goals completed/due, and Longest streak), and Goals shows the goal hierarchy. A selected timeframe shows Details only, and a scoped date shows the day review;
-mobile keeps the toggle in the header and the pane as a closable sheet. Days (`components/programs/days/`) programs
+mobile keeps Calendar/Days in the header and places Show Sidebar in a fixed, full-width footer using the shared secondary HeaderButton styling and Session Detail's spacing, with safe-area spacing and reserved content space; bulk calendar actions sit above it. The footer is available even without a selected program, portalled outside the page animation, and stays beneath modal sheets. The pane remains a closable sheet. Days (`components/programs/days/`) programs
 one program day's occurrence dates in two columns: a focused date (by default the next program day)
 beside the latest completed occurrence before it (else the previous one), each with its canonical
 status mark and credited sessions. A template completed on a date shows its session in the plan card

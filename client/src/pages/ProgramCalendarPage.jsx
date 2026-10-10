@@ -14,6 +14,7 @@ import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramS
 import Modal from '../components/atoms/Modal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
+import MobilePageFooter from '../components/layout/MobilePageFooter';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import { useGoals } from '../contexts/GoalsContext';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -776,8 +777,7 @@ function ProgramCalendarPage() {
             ariaLabel="Program view"
         />
     ) : null;
-    // Desktop: the view toggle leads the always-open side pane. Mobile: the pane is a sheet,
-    // so the toggle stays in the header beside the button that opens it.
+    // Mobile keeps the view toggle in the header and opens the sidebar from its footer.
     const viewActions = (
         <>
             {isMobile ? viewToggle : null}
@@ -785,9 +785,11 @@ function ProgramCalendarPage() {
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
-            <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
-                {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
-            </HeaderButton>
+            {!isMobile ? (
+                <HeaderButton variant="secondary" onClick={() => setIsSidePaneVisible((visible) => !visible)}>
+                    {isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+                </HeaderButton>
+            ) : null}
         </>
     );
 
@@ -808,7 +810,7 @@ function ProgramCalendarPage() {
     });
 
     return (
-        <div className={`${styles.container} page-reveal`}>
+        <div className={`${styles.container} ${isMobile ? styles.containerWithMobileDock : ''} page-reveal`}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
                 <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
                     <PageHeader
@@ -956,6 +958,15 @@ function ProgramCalendarPage() {
                     sessionCreditUpdating={sessionCreditMutation.isPending}
                 />
             </div>
+
+            {isMobile ? (
+                <MobilePageFooter
+                    ariaLabel="Program sidebar controls"
+                    label={isSidePaneVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+                    expanded={isSidePaneVisible}
+                    onToggle={() => setIsSidePaneVisible((visible) => !visible)}
+                />
+            ) : null}
 
             <CalendarPeriodModal {...periodEditor.modalProps} />
             <ProgramBuilder

@@ -40,7 +40,7 @@ function BlockSummary({ card, readOnly, onEditBlock, onDeleteBlock }) {
                     {weekText}
                 </p>
 
-                <BlockHeaderStats card={card} compact />
+                <BlockHeaderStats card={card} />
 
             </article>
         </li>

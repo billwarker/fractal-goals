@@ -1,0 +1,29 @@
+.footer {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .footer {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 40;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        box-sizing: border-box;
+        height: var(--mobile-page-footer-height);
+        padding-top: 8px;
+        padding-right: max(var(--spacing-md), env(safe-area-inset-right, 0px));
+        padding-bottom: calc(var(--spacing-md) + env(safe-area-inset-bottom, 0px));
+        padding-left: max(var(--spacing-md), env(safe-area-inset-left, 0px));
+        background: var(--color-bg-elevated);
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -8px 24px color-mix(in srgb, var(--color-bg-app) 45%, transparent);
+    }
+
+    .button:focus-visible {
+        outline: 2px solid var(--color-brand-primary);
+        outline-offset: 2px;
+    }
+}

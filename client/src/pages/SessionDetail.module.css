@@ -113,9 +113,10 @@
     border-top-right-radius: var(--border-radius-xl);
     border: 1px solid var(--color-border);
     border-bottom: none;
-    height: 82vh;
-    height: 82dvh;
-    max-height: 82vh;
+    height: var(--mobile-sidebar-height);
+    max-height: var(--mobile-sidebar-height);
+    min-height: 0;
+    box-sizing: border-box;
     overflow: hidden;
     box-shadow: var(--shadow-lg);
     display: flex;

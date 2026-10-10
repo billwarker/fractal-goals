@@ -1,4 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -19,6 +20,7 @@ import LoadingState from '../components/common/LoadingState';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
+import MobilePageFooter from '../components/layout/MobilePageFooter';
 import { flattenGoals } from '../utils/goalHelpers';
 import { formatSessionCardDate } from '../utils/sessionCardDates';
 import { fractalApi } from '../utils/api';
@@ -307,6 +309,28 @@ function Sessions() {
         }
     }, [queryClient, rootId, sessionToDelete]);
 
+    const filtersPane = (
+        <div className={`${styles.rightPanel} mobile-sheet-enter`}>
+            <SessionsQuerySidebar
+                filters={filters}
+                visibleSessionsCount={visibleSessions.length}
+                totalSessionsCount={totalSessions}
+                activities={activities}
+                activityGroups={activityGroups}
+                goalOptions={goalOptions}
+                heatmap={heatmap}
+                isHeatmapLoading={heatmapLoading && !heatmap}
+                isActivityFilterLoading={activitiesLoading || activityGroupsLoading}
+                isGoalFilterLoading={goalsLoading && !goalTree}
+                hasActiveFilters={hasActiveFilters}
+                onUpdateFilters={updateFilters}
+                onResetFilters={resetFilters}
+                onToggleCollapse={() => setIsFiltersPaneOpen(false)}
+                isMobile={isMobile}
+            />
+        </div>
+    );
+
     return (
         <div className={`${styles.pageContainer} page-reveal`}>
             <div className={styles.leftPanel}>
@@ -322,13 +346,12 @@ function Sessions() {
                             <HeaderButton variant="secondary" onClick={() => navigate(`/${rootId}/manage-activities`)}>
                                 Manage Activities
                             </HeaderButton>
-                            <HeaderButton
+                            {!isMobile ? <HeaderButton
                                 variant="secondary"
                                 onClick={() => setIsFiltersPaneOpen((prev) => !prev)}
-                                className={styles.notesToggleButton}
                             >
                                 {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
-                            </HeaderButton>
+                            </HeaderButton> : null}
                         </>
                     )}
                 />
@@ -401,34 +424,24 @@ function Sessions() {
                 </div>
             </div>
 
-            {isFiltersPaneOpen && isMobile && (
+            {isMobile ? (
+                <MobilePageFooter
+                    ariaLabel="Session filter controls"
+                    label={isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
+                    expanded={isFiltersPaneOpen}
+                    onToggle={() => setIsFiltersPaneOpen((prev) => !prev)}
+                />
+            ) : null}
+
+            {isFiltersPaneOpen && isMobile && createPortal(
                 <ModalBackdrop
                     className={`${styles.sheetBackdrop} mobile-sheet-backdrop-enter`}
                     onClose={() => setIsFiltersPaneOpen(false)}
                     aria-hidden="true"
-                />
+                />,
+                document.body,
             )}
-            {isFiltersPaneOpen && (
-                <div className={`${styles.rightPanel} mobile-sheet-enter`}>
-                    <SessionsQuerySidebar
-                        filters={filters}
-                        visibleSessionsCount={visibleSessions.length}
-                        totalSessionsCount={totalSessions}
-                        activities={activities}
-                        activityGroups={activityGroups}
-                        goalOptions={goalOptions}
-                        heatmap={heatmap}
-                        isHeatmapLoading={heatmapLoading && !heatmap}
-                        isActivityFilterLoading={activitiesLoading || activityGroupsLoading}
-                        isGoalFilterLoading={goalsLoading && !goalTree}
-                        hasActiveFilters={hasActiveFilters}
-                        onUpdateFilters={updateFilters}
-                        onResetFilters={resetFilters}
-                        onToggleCollapse={() => setIsFiltersPaneOpen(false)}
-                        isMobile={isMobile}
-                    />
-                </div>
-            )}
+            {isFiltersPaneOpen && (isMobile ? createPortal(filtersPane, document.body) : filtersPane)}
 
             <DeleteConfirmModal
                 isOpen={Boolean(sessionToDelete)}
@@ -457,7 +470,7 @@ function Sessions() {
                 </Suspense>
             )}
 
-            {activeQuickSession && isQuickSession(activeQuickSession) && (
+            {activeQuickSession && isQuickSession(activeQuickSession) && createPortal(
                 <ModalBackdrop
                     className={styles.quickSessionModalOverlay}
                     onClose={handleCloseQuickSessionModal}
@@ -482,7 +495,8 @@ function Sessions() {
                             <QuickSessionWorkspace />
                         </ActiveSessionProvider>
                     </div>
-                </ModalBackdrop>
+                </ModalBackdrop>,
+                document.body,
             )}
         </div>
     );

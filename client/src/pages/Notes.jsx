@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { NoteTimeline, NoteComposer } from '../components/notes';
 import { ComposeLinkPanel } from '../components/notes/NoteComposer';
@@ -26,6 +27,7 @@ import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
+import MobilePageFooter from '../components/layout/MobilePageFooter';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
 
@@ -235,17 +237,13 @@ function Notes() {
                         >
                             + Write Note
                         </HeaderButton>
-                        {isMobile ? (
-                            <HeaderButton variant="secondary" onClick={() => setMobilePanelOpen((value) => !value)}>
-                                {mobilePanelLabel}
-                            </HeaderButton>
-                        ) : (
+                        {!isMobile ? (
                             <HeaderButton variant="secondary" onClick={() => setIsFiltersPaneOpen(v => !v)}>
                                 {isFiltersPaneOpen
                                     ? (composing ? 'Hide Associator' : 'Hide Filters')
                                     : (composing ? 'Show Associator' : 'Show Filters')}
                             </HeaderButton>
-                        )}
+                        ) : null}
                     </>
                 )}
             />
@@ -437,15 +435,25 @@ function Notes() {
             {leftColumn}
             {rightColumn}
 
-            {goalPickerOpen && (
+            {isMobile ? (
+                <MobilePageFooter
+                    ariaLabel="Note filter controls"
+                    label={mobilePanelLabel}
+                    expanded={mobilePanelOpen}
+                    onToggle={() => setMobilePanelOpen((value) => !value)}
+                />
+            ) : null}
+
+            {goalPickerOpen && createPortal(
                 <GoalPickerModal
                     rootId={rootId}
                     selectedGoalId={filterGoalId}
                     onSelect={handleGoalFilterSelect}
                     onClose={() => setGoalPickerOpen(false)}
-                />
+                />,
+                document.body,
             )}
-            {activityPickerOpen && (
+            {activityPickerOpen && createPortal(
                 <ActivityFilterModal
                     title="Filter by Activity"
                     activities={activities}
@@ -454,12 +462,13 @@ function Notes() {
                     initialGroupIds={filterGroupIds}
                     onConfirm={handleActivityFilterConfirm}
                     onClose={() => setActivityPickerOpen(false)}
-                />
+                />,
+                document.body,
             )}
 
-            {isMobile && mobilePanelOpen && (
-                <ModalBackdrop className={styles.bottomSheet} onClose={() => setMobilePanelOpen(false)}>
-                    <div className={styles.bottomSheetCard} onClick={e => e.stopPropagation()}>
+            {isMobile && mobilePanelOpen && createPortal(
+                <ModalBackdrop className={`${styles.bottomSheet} mobile-sheet-backdrop-enter`} onClose={() => setMobilePanelOpen(false)}>
+                    <div className={`${styles.bottomSheetCard} mobile-sheet-enter`} onClick={e => e.stopPropagation()}>
                         <div className={styles.bottomSheetHandle} />
                         <div className={styles.bottomSheetHeader}>
                             <div className={styles.bottomSheetHeaderCopy}>
@@ -492,7 +501,8 @@ function Notes() {
                             {composing ? composeLinkPanelBody : filterPanelBody}
                         </div>
                     </div>
-                </ModalBackdrop>
+                </ModalBackdrop>,
+                document.body,
             )}
         </div>
     );

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import Analytics from '../Analytics';
 
@@ -110,6 +110,7 @@ describe('Analytics page', () => {
         render(<Analytics />);
 
         expect(screen.getByText('Empty Analytics View')).toBeInTheDocument();
+        expect(screen.queryByRole('contentinfo', { name: 'Analytics sidebar controls' })).not.toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -160,7 +161,7 @@ describe('Analytics page', () => {
         });
     });
 
-    it('keeps filters collapsed on mobile even when stored open', () => {
+    it('opens the mobile sidebar from the footer with shared sheet motion, even when stored open', () => {
         Object.defineProperty(window, 'matchMedia', {
             value: vi.fn(() => ({
                 matches: true,
@@ -179,8 +180,26 @@ describe('Analytics page', () => {
 
         render(<Analytics />);
 
-        expect(screen.getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Hide Filters' })).not.toBeInTheDocument();
+        const footer = screen.getByRole('contentinfo', { name: 'Analytics sidebar controls' });
+        expect(footer.parentElement).toBe(document.body);
+        const button = within(footer).getByRole('button', { name: 'Show Sidebar' });
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('button', { name: 'Show Filters' })).not.toBeInTheDocument();
+
+        fireEvent.click(button);
+        expect(button).toHaveAttribute('aria-expanded', 'true');
+        const closeButton = screen.getByRole('button', { name: 'Collapse filters panel' });
+        const sheet = closeButton.closest('.sessions-query-sidebar').parentElement;
+        expect(sheet.parentElement).toBe(document.body);
+        expect(sheet).toHaveClass('mobile-sheet-enter');
+        expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
+        fireEvent.click(closeButton);
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Query Console' }));
+        expect(screen.queryByRole('contentinfo', { name: 'Analytics sidebar controls' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Dashboard' }));
+        expect(screen.getByRole('contentinfo', { name: 'Analytics sidebar controls' })).toBeInTheDocument();
     });
 
     it('opens the query console from the analytics header mode switch', async () => {

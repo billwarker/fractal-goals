@@ -12,6 +12,7 @@ function AnalyticsTopBar({
     isFiltersPaneOpen = false,
     onToggleFiltersPane,
     showQueryConsole = true,
+    showFiltersToggle = true,
 }) {
     return (
         <div className={styles.topBar}>
@@ -54,7 +55,7 @@ function AnalyticsTopBar({
                         </button>
                     </div>
                 )}
-                {activeMode === 'dashboard' && (
+                {activeMode === 'dashboard' && showFiltersToggle && (
                     <Button variant="secondary" size="sm" onClick={onToggleFiltersPane}>
                         {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
                     </Button>

@@ -17,7 +17,7 @@ export function consistencyFigure(consistency) {
  * the calendar), then consistency, how many of the program goals due in the block are
  * done, and the longest streak inside the block.
  */
-export default function BlockHeaderStats({ card, compact = false }) {
+export default function BlockHeaderStats({ card }) {
     if (!card.statusCounts) return null;
     const consistency = consistencyFigure(card.consistency);
     const streak = card.longestStreak ?? 0;
@@ -27,7 +27,7 @@ export default function BlockHeaderStats({ card, compact = false }) {
         ['Longest streak', `${streak} ${streak === 1 ? 'day' : 'days'}`, ''],
     ];
     return (
-        <div className={`${styles.stats} ${compact ? styles.compact : ''}`}>
+        <div className={styles.stats}>
             <ProgramDayStatusCounts
                 counts={card.statusCounts}
                 label={`${card.name} program days by status`}
@@ -56,5 +56,4 @@ BlockHeaderStats.propTypes = {
         goals: PropTypes.shape({ due: PropTypes.number, completed: PropTypes.number }),
         longestStreak: PropTypes.number,
     }).isRequired,
-    compact: PropTypes.bool,
 };

@@ -1,12 +1,13 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import ProgramCalendarPage from '../ProgramCalendarPage';
 
-const { mutateStatuses, programDataCalls } = vi.hoisted(() => ({
+const { mutateStatuses, programDataCalls, viewport } = vi.hoisted(() => ({
     mutateStatuses: vi.fn().mockResolvedValue({}),
     programDataCalls: [],
+    viewport: { isMobile: false },
 }));
 
 const program = {
@@ -41,8 +42,8 @@ vi.mock('../../contexts/OnboardingContext', () => ({
     useOptionalOnboarding: () => null,
 }));
 vi.mock('../../hooks/useIsMobile', () => ({
-    default: () => false,
-    getIsMobileViewport: () => false,
+    default: () => viewport.isMobile,
+    getIsMobileViewport: () => viewport.isMobile,
 }));
 vi.mock('../../hooks/useProgramsCalendarData', () => ({
     useProgramsCalendarData: () => ({
@@ -146,8 +147,8 @@ vi.mock('../../hooks/useCalendarPeriods', () => ({
 vi.mock('../../components/layout/PageHeader', () => ({
     default: ({ title, subtitle, actions }) => <header>{title}{subtitle}{actions}</header>,
 }));
-vi.mock('../../components/common/ViewToggleTabs', () => ({
-    default: () => null,
+vi.mock('../../components/programs/days/ProgramDaysView', () => ({
+    default: () => <div>Program days workspace</div>,
 }));
 vi.mock('../../components/layout/HeaderButton', () => ({
     default: ({ children, ...props }) => <button type="button" {...props}>{children}</button>,
@@ -220,8 +221,9 @@ vi.mock('../../components/programs/ProgramCalendarView', () => ({
     ),
 }));
 vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
-    default: ({ scope, selectedRange, selectionLabel, programMetrics }) => (
-        <aside>
+    default: ({ scope, selectedRange, selectionLabel, programMetrics, isVisible, onClose }) => isVisible ? (
+        <aside aria-label="Program sidebar">
+            <button type="button" onClick={onClose}>Close sidebar</button>
             <output data-testid="pane-scope">{scope}</output>
             <output data-testid="pane-selection-label">{selectionLabel || 'none'}</output>
             <output data-testid="pane-range">
@@ -234,12 +236,67 @@ vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
                     : 'whole-program'}
             </output>
         </aside>
-    ),
+    ) : null,
 }));
 
 describe('ProgramCalendarPage multi-day selection', () => {
     beforeEach(() => {
         programDataCalls.length = 0;
+        viewport.isMobile = false;
+    });
+
+    it('opens the mobile sidebar from the footer and keeps view switching in the header', async () => {
+        viewport.isMobile = true;
+        const { container } = render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+
+        const footer = screen.getByRole('contentinfo', { name: 'Program sidebar controls' });
+        expect(footer.parentElement).toBe(document.body);
+        const header = container.querySelector('header');
+        expect(header).not.toContainElement(footer);
+        expect(within(header).queryByRole('button', { name: 'Show Sidebar' })).not.toBeInTheDocument();
+        const sidebarButton = within(footer).getByRole('button', { name: 'Show Sidebar' });
+        expect(sidebarButton).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByRole('complementary', { name: 'Program sidebar' })).not.toBeInTheDocument();
+
+        fireEvent.click(sidebarButton);
+        expect(screen.getByRole('complementary', { name: 'Program sidebar' })).toBeInTheDocument();
+        expect(sidebarButton).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Close sidebar' }));
+        expect(sidebarButton).toHaveAttribute('aria-expanded', 'false');
+        expect(sidebarButton).toHaveTextContent('Show Sidebar');
+        expect(screen.queryByRole('complementary', { name: 'Program sidebar' })).not.toBeInTheDocument();
+
+        const calendar = within(header).getByRole('tab', { name: 'Calendar' });
+        const days = within(header).getByRole('tab', { name: 'Days' });
+        expect(calendar).toHaveAttribute('aria-selected', 'true');
+        expect(days).toHaveAttribute('aria-selected', 'false');
+
+        fireEvent.click(days);
+        expect(await screen.findByText('Program days workspace')).toBeInTheDocument();
+        expect(days).toHaveAttribute('aria-selected', 'true');
+        expect(calendar).toHaveAttribute('aria-selected', 'false');
+
+        fireEvent.click(calendar);
+        await waitFor(() => expect(screen.queryByText('Program days workspace')).not.toBeInTheDocument());
+        expect(calendar).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('keeps the mobile footer out of the desktop layout', () => {
+        render(
+            <MemoryRouter initialEntries={['/root-1/programs']}>
+                <Routes>
+                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        expect(screen.queryByRole('contentinfo', { name: 'Program sidebar controls' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
     });
 
     it('scopes directly to a past program when its calendar label is selected', () => {

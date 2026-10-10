@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import Notes from '../Notes';
 
@@ -83,14 +83,33 @@ describe('Notes mobile compose shell', () => {
         });
     });
 
-    it('switches the mobile secondary action to the associator toggle during compose mode', async () => {
+    it('opens and closes mobile filters from a single secondary footer action', () => {
+        render(<Notes />);
+        const footer = screen.getByRole('contentinfo', { name: 'Note filter controls' });
+        expect(footer.parentElement).toBe(document.body);
+        const button = within(footer).getByRole('button', { name: 'Show Filters' });
+        expect(screen.getAllByRole('button', { name: 'Show Filters' })).toHaveLength(1);
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+
+        fireEvent.click(button);
+        expect(screen.getByText('Filters')).toBeInTheDocument();
+        expect(document.querySelector('.mobile-sheet-enter')).toBeInTheDocument();
+        expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
+        expect(button).toHaveAttribute('aria-expanded', 'true');
+        fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));
+        expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+        expect(button).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('switches the mobile footer action to the associator toggle during compose mode', async () => {
         render(<Notes />);
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: '+ Write Note' }));
         });
 
-        expect(screen.getByRole('button', { name: 'Show Associator' })).toBeInTheDocument();
+        const footer = screen.getByRole('contentinfo', { name: 'Note filter controls' });
+        expect(within(footer).getByRole('button', { name: 'Show Associator' })).toBeInTheDocument();
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Show Associator' }));
@@ -99,5 +118,8 @@ describe('Notes mobile compose shell', () => {
         expect(screen.getByText('Associator')).toBeInTheDocument();
         expect(screen.getByText('Associator panel')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Hide Associator' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel composer' }));
+        expect(within(footer).getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
     });
 });

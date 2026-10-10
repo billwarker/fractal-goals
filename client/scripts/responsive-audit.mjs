@@ -197,7 +197,7 @@ const checks = [
     file: 'src/components/programs/ProgramSidePane.module.css',
     patterns: [
       /@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.mobileSidePaneBackdrop\s*\{[^}]*position:\s*fixed;[^}]*z-index:\s*calc\(var\(--z-sheet\) \+ 1\);/s,
-      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.mobileSidePaneSheet\s*\{[^}]*height:\s*min\(82dvh, 760px\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom, 0px\);/s,
+      /@media\s*\(max-width:\s*768px\)[\s\S]*?\.mobileSidePaneSheet\s*\{[^}]*height:\s*var\(--mobile-sidebar-height\);[^}]*padding-bottom:\s*env\(safe-area-inset-bottom, 0px\);/s,
     ],
   },
   {

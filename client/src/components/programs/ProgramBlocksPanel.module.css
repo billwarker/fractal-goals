@@ -1,4 +1,5 @@
 .blocks {
+    min-width: 0;
     display: grid;
     gap: 10px;
     margin: 0;
@@ -7,6 +8,7 @@
 }
 
 .block {
+    min-width: 0;
     padding: 12px;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius-md);
@@ -15,6 +17,7 @@
 
 .block article {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     min-width: 0;
 }
@@ -82,9 +85,6 @@
 @media (max-width: 768px) {
     .iconButton {
         min-height: 40px;
-    }
-
-    .iconButton {
         width: 40px;
     }
 }

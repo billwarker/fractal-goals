@@ -112,6 +112,7 @@
   --goal-gradient-inner-weight: 24%;
 
   /* Spacing */
+  --mobile-page-footer-height: calc(68px + env(safe-area-inset-bottom, 0px));
   --spacing-2xs: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -151,6 +152,7 @@
   --panel-width-details: 390px;
   --surface-grid-size: 20px;
   --sheet-radius: var(--border-radius-xl);
+  --mobile-sidebar-height: min(82dvh, 760px, calc(var(--app-viewport-height, 100dvh) - var(--app-nav-height, 0px)));
 
   --text-shadow-default: 0 1px 3px rgba(0, 0, 0, 0.8);
 
