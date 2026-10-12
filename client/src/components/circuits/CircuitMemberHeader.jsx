@@ -3,7 +3,7 @@ import InstanceGoalLinkControl from '../sessionDetail/InstanceGoalLinkControl';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 import styles from './CircuitRunCard.module.css';
 
-export default function CircuitMemberHeader({ rootId, sessionId, instance, scope, member, round, slot, tagEditor }) {
+export default function CircuitMemberHeader({ rootId, sessionId, instance, scope, isSelected, member, round, slot, tagEditor }) {
     return <>
         <SessionItemHeader className={styles.memberHeader}>
             <SessionItemHeaderLeft>
@@ -15,9 +15,9 @@ export default function CircuitMemberHeader({ rootId, sessionId, instance, scope
                     </span>
                 </div>
             </SessionItemHeaderLeft>
-            {tagEditor || (instance && scope) ? (
+            {tagEditor || (isSelected && instance && scope) ? (
                 <SessionItemHeaderRight>
-                    {instance && scope && <InstanceGoalLinkControl rootId={rootId} sessionId={sessionId} instance={instance} scope={scope} />}
+                    {isSelected && instance && scope && <InstanceGoalLinkControl rootId={rootId} sessionId={sessionId} instance={instance} scope={scope} />}
                     {tagEditor}
                 </SessionItemHeaderRight>
             ) : null}

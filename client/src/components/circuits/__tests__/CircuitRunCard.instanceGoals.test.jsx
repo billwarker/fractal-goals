@@ -10,7 +10,7 @@ vi.mock('../../../hooks/useRootProgressSettings', () => ({
 }));
 vi.mock('../../../utils/api', () => ({ fractalApi: {} }));
 
-it('offers one-off links only for the two actual member instances', () => {
+it('offers one-off links only for the selected member instance while goal-scoped', () => {
     const client = new QueryClient();
     const run = { id: 'run', name: 'Circuit', status: 'completed', round_count: 1,
         slots: [
@@ -22,11 +22,22 @@ it('offers one-off links only for the two actual member instances', () => {
             { id: 'member-b', circuit_run_slot_id: 'slot-b', activity_instance_id: 'two', sort_order: 1 },
         ] }],
     };
-    render(<QueryClientProvider client={client}>
+    const view = (selection, scoped = true) => <QueryClientProvider client={client}>
         <CircuitRunCard rootId="root" sessionId="session" run={run}
+            selectedCircuitItem={selection}
             activityInstances={[{ id: 'one', associated_goal_ids: ['goal'] }, { id: 'two', associated_goal_ids: [] }]}
-            activityGoalScope={{ goal: { id: 'goal', name: 'Practice' }, activityIds: [] }} />
-    </QueryClientProvider>);
-    expect(screen.getAllByRole('button', { name: 'Remove instance association with Practice' })).toHaveLength(1);
-    expect(screen.getAllByRole('button', { name: 'Associate with Practice' })).toHaveLength(1);
+            activityGoalScope={scoped ? { goal: { id: 'goal', name: 'Practice' }, activityIds: [] } : null} />
+    </QueryClientProvider>;
+    const { rerender } = render(view(null));
+    expect(screen.queryByRole('button', { name: /instance association|Associate with/ })).not.toBeInTheDocument();
+    rerender(view({ type: 'run', runId: 'run' }));
+    expect(screen.queryByRole('button', { name: /instance association|Associate with/ })).not.toBeInTheDocument();
+    rerender(view({ type: 'member', runId: 'run', id: 'member-a' }));
+    expect(screen.getByRole('button', { name: 'Remove instance association with Practice' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Associate with Practice' })).not.toBeInTheDocument();
+    rerender(view({ type: 'member', runId: 'run', id: 'member-b' }));
+    expect(screen.queryByRole('button', { name: 'Remove instance association with Practice' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Associate with Practice' })).toBeInTheDocument();
+    rerender(view({ type: 'member', runId: 'run', id: 'member-b' }, false));
+    expect(screen.queryByRole('button', { name: /instance association|Associate with/ })).not.toBeInTheDocument();
 });

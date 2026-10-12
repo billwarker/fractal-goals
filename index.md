@@ -134,8 +134,9 @@ only direct links as `associated_goal_ids`, projected with instance reads rather
 Session Detail captures its goal-icon scope when opening create/copy definition drafts; copied
 selections and the captured scoped goal are merged and remain editable. Existing-definition editing
 keeps its current associations. Actual activity instances, including circuit members and completed
-sessions, expose reversible one-off links through the scoped goal's icon while scoped. Action and
-association explanations appear in a hover/focus tooltip. The icon shows the hierarchy's scoped
+sessions, expose reversible one-off links through the scoped goal's icon only when that instance
+is selected and a goal is scoped. Circuit run/round selection does not expose member link buttons.
+Action and association explanations appear in a hover/focus tooltip. The icon shows the hierarchy's scoped
 ring only when the instance is directly associated with the current scoped goal. It sits in the
 activity header beside the pencil/options controls, sharing their 28px button and 14px symbol
 sizing. Circuit member controls also live in their headers. Linked buttons retain the neutral

@@ -39,7 +39,9 @@ test('scoped instance links persist independently and builder receives the scope
     await page.goto(`/${root}/session/${session.id}`);
     await openScope();
     const associate = page.getByRole('button', { name: `Associate with ${goalName}`, exact: true });
-    await expect(associate).toHaveCount(2);
+    await expect(associate).toHaveCount(0);
+    await page.getByText('One-off exercise', { exact: true }).first().click();
+    await expect(associate).toHaveCount(1);
     await expect(associate.first()).toHaveText('');
     await expect(associate.first().locator('svg')).toBeVisible();
     const hasAssociationRing = (button) => button.locator('span[aria-hidden="true"]').evaluate(
@@ -62,8 +64,11 @@ test('scoped instance links persist independently and builder receives the scope
     await page.screenshot({ path: testInfo.outputPath('scoped-goal-icon-tooltip.png') });
     await associate.first().click();
     await expect(page.getByRole('button', { name: `Remove instance association with ${goalName}` })).toHaveCount(1);
-    await expect(associate).toHaveCount(1);
+    await expect(associate).toHaveCount(0);
     expect(await hasAssociationRing(page.getByRole('button', { name: `Remove instance association with ${goalName}` }))).toBe(true);
+    await page.getByText('One-off exercise', { exact: true }).nth(1).click();
+    await expect(page.getByRole('button', { name: `Remove instance association with ${goalName}` })).toHaveCount(0);
+    await expect(associate).toHaveCount(1);
     expect(await hasAssociationRing(associate.first())).toBe(false);
     const completed = await page.request.put(`/api/${root}/sessions/${session.id}`, {
         headers: { Authorization: `Bearer ${token}` }, data: { completed: true },
@@ -71,9 +76,10 @@ test('scoped instance links persist independently and builder receives the scope
     expect(completed.ok()).toBeTruthy();
     await page.reload();
     await openScope();
+    await page.getByText('One-off exercise', { exact: true }).first().click();
     await expect(page.getByRole('button', { name: `Remove instance association with ${goalName}` })).toHaveCount(1);
     await page.getByRole('button', { name: `Remove instance association with ${goalName}` }).click();
-    await expect(associate).toHaveCount(2);
+    await expect(associate).toHaveCount(1);
     expect(await hasAssociationRing(associate.first())).toBe(false);
     const definitions = await page.request.get(`/api/${root}/activities`, { headers: { Authorization: `Bearer ${token}` } });
     const original = (await definitions.json()).find((row) => row.id === definition.id);

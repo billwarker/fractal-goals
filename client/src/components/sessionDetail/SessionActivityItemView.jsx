@@ -223,7 +223,7 @@ function SessionActivityItemView({
                                         {def.name}
                                         {!activityDefinition && <DeletedBadge />}
                                     </span>
-                                    {(goalAssociationControl || isSelected || (exercise.tags || []).length > 0) && (
+                                    {(isSelected || (exercise.tags || []).length > 0) && (
                                         <div className={styles.activityHeaderActions}>
                                             {isSelected && onOpenActivityBuilder && activityDefinition?.id && (
                                                 <button

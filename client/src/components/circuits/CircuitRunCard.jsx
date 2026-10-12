@@ -356,7 +356,7 @@ export default function CircuitRunCard({
                                             data-circuit-member-id={member.id}
                                         >
                                             <CircuitMemberHeader
-                                                rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope}
+                                                rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope} isSelected={isMemberSelected}
                                                 member={member} round={round} slot={slot} tagEditor={!activitySet ? tagEditor : null}
                                             />
                                             {slot?.has_metrics && definition && (

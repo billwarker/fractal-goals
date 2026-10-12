@@ -196,3 +196,25 @@ Rating: S+ for this small styling adjustment; no remaining implementation gap id
 scope. Existing repository-wide quality-gate debt is unchanged.
 
 Commit message: `Keep associated goal buttons neutral`
+
+
+## Selected-instance visibility — 2026-10-11
+
+Before: every instance showed a goal link button while goal-scoped, even when inactive in the
+selection UI. After: standalone instances mount the control only when selected and goal-scoped;
+circuit members use their existing member selection state under the same scope condition.
+Selecting a circuit run or round does not expose member link controls. Completed-session
+selection still permits corrections. The prior always-visible header condition was removed;
+no separate active state or competing association implementation was added.
+
+Verification: 13 focused control, header-action, and circuit tests passed. Circuit coverage
+checks no selection, run selection, each member selection, and clearing goal scope. Both
+desktop/mobile production-browser checks passed, including hiding inactive-instance controls,
+switching between linked/unlinked instances, ring state, equal header-control sizing, and
+completed-session removal. Production build, scoped ESLint, and `git diff --check` passed.
+`index.md` records the selected-and-scoped visibility invariant.
+
+Rating: S+ for this visibility adjustment, with no remaining scope-specific gap identified.
+Existing repository-wide quality-gate debt remains as documented above.
+
+Commit message: `Show goal association controls only on selected scoped instances`

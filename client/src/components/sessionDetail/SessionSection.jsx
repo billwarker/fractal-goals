@@ -349,7 +349,7 @@ const SessionSection = ({
                             sectionIndex={sectionIndex} setDraggedItem={setDraggedItem} isDragging={isDragging}
                         >
                             <SessionActivityItem
-                                goalAssociationControl={activityGoalScope ? <InstanceGoalLinkControl
+                                goalAssociationControl={activityGoalScope && selectedActivityId === instanceId ? <InstanceGoalLinkControl
                                     rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope}
                                 /> : null}
                                 exercise={instance}
