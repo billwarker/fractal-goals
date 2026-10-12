@@ -19,6 +19,9 @@ export const fractalActivitiesApi = {
     createActivity: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activities`, data),
     updateActivity: (rootId, activityId, data) => axios.put(`${API_BASE}/${rootId}/activities/${activityId}`, data),
     deleteActivity: (rootId, activityId) => axios.delete(`${API_BASE}/${rootId}/activities/${activityId}`),
+    getActivityInstanceGoals: (rootId, instanceId) => axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/goals`),
+    associateActivityInstanceGoal: (rootId, instanceId, goalId) => axios.post(`${API_BASE}/${rootId}/activity-instances/${instanceId}/goals`, { goal_id: goalId }),
+    removeActivityInstanceGoal: (rootId, instanceId, goalId) => axios.delete(`${API_BASE}/${rootId}/activity-instances/${instanceId}/goals/${goalId}`),
     getActivityGoals: (rootId, activityId) => axios.get(`${API_BASE}/${rootId}/activities/${activityId}/goals`),
     setActivityGoals: (rootId, activityId, goalIds) =>
         axios.post(`${API_BASE}/${rootId}/activities/${activityId}/goals`, { goal_ids: goalIds }),

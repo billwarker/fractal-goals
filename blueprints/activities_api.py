@@ -22,7 +22,7 @@ from validators import (
     ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, internal_error
+from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, internal_error, service_response as _service_response
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition,
     serialize_fractal_metric,
@@ -34,6 +34,7 @@ from services.activity_service import (
     ActivityService,
 )
 from services.progress_service import ProgressService
+from blueprints.activity_instance_goals_api import instance_goals_bp
 from services.activity_progress_view_service import ActivityProgressViewService
 from services.activity_tag_catalog_service import ActivityTagCatalogService
 from services.ops_log import log_ops_event
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
+activities_bp.register_blueprint(instance_goals_bp)
 
 def _format_validation_errors(exc):
     errors = []
@@ -98,15 +100,6 @@ def _parse_activity_payload(schema_class):
             }),
             400,
         )
-
-
-def _service_response(payload, error, status):
-    if error:
-        body = {"error": error}
-        if payload is not None:
-            body["details"] = payload
-        return jsonify(body), status
-    return jsonify(payload), status
 
 
 # ============================================================================

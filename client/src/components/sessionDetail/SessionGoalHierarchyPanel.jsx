@@ -86,7 +86,7 @@ function SessionGoalHierarchyPanel({
         return {
             id: selectedDefId,
             name: selectedActivity.name || selectedActivity.definition_name || 'Activity',
-            associated_goal_ids: selectedActivity.associated_goal_ids || [],
+            associated_goal_ids: [],
         };
     }, [selectedActivity, activityDefinitions]);
 

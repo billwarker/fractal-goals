@@ -57,6 +57,7 @@ function SessionDetailContent() {
         setShowDeleteConfirm,
         showBuilder,
         builderActivity,
+        builderInitialGoalIds,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -165,6 +166,7 @@ function SessionDetailContent() {
                     onConfirmDelete={handleConfirmDelete}
                     showBuilder={showBuilder}
                     builderActivity={builderActivity}
+                builderInitialGoalIds={builderInitialGoalIds}
                     onCloseBuilder={handleCloseActivityBuilder}
                     onActivityCreated={handleActivityCreated}
                     selectedGoal={selectedGoal}
@@ -253,6 +255,7 @@ function SessionDetailContent() {
                 onConfirmDelete={handleConfirmDelete}
                 showBuilder={showBuilder}
                 builderActivity={builderActivity}
+                builderInitialGoalIds={builderInitialGoalIds}
                 onCloseBuilder={handleCloseActivityBuilder}
                 onActivityCreated={handleActivityCreated}
                 selectedGoal={selectedGoal}

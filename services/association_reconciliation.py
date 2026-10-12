@@ -25,13 +25,14 @@ def append_goal_association_event(
     association_name,
     action,
     occurred_at=None,
+    event_id=None,
 ):
     """Append an immutable, transaction-bound association history event."""
     event_type = f"{association_kind}.{action}"
     label = (
         "activity group"
         if association_kind == "activity_group"
-        else "activity"
+        else "activity instance" if association_kind == "activity_instance" else "activity"
     )
     action_label = (
         "Associated" if action == "associated" else "Disassociated"
@@ -44,11 +45,12 @@ def append_goal_association_event(
     id_key = (
         "activity_group_id"
         if association_kind == "activity_group"
-        else "activity_definition_id"
+        else "activity_instance_id" if association_kind == "activity_instance" else "activity_definition_id"
     )
     db_session.add(EventLog(
         root_id=root_id,
         event_type=event_type,
+        event_id=event_id,
         entity_type=association_kind,
         entity_id=association_id,
         description=f"{action_label} {label}: {association_name}",

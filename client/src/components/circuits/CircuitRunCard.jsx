@@ -16,6 +16,7 @@ import {
 } from '../sessionDetail/SessionItemCardPrimitives';
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 import CircuitMemberMetrics from './CircuitMemberMetrics';
+import CircuitMemberHeader from './CircuitMemberHeader';
 import {
     CircuitMemberTagEditor,
     CircuitRoundTagControl,
@@ -35,6 +36,7 @@ export default function CircuitRunCard({
     run,
     itemNumber,
     activityInstances,
+    activityGoalScope = null,
     activityDefinitions,
     onFocusActivity,
     selectedCircuitItem,
@@ -353,22 +355,10 @@ export default function CircuitRunCard({
                                             aria-current={isMemberSelected ? 'true' : undefined}
                                             data-circuit-member-id={member.id}
                                         >
-                                            <SessionItemHeader className={styles.memberHeader}>
-                                                <SessionItemHeaderLeft>
-                                                    <SessionItemOrderRail sessionIndex={`${round.round_number}.${member.sort_order + 1}`} />
-                                                    <div
-                                                        className={`${activityStyles.activityNameContainer} ${styles.memberIdentity}`}
-                                                    >
-                                                        <span className={`${activityStyles.activityName} ${styles.memberName}`}>
-                                                            <span>{slot?.activity_name || 'Activity'}</span>
-                                                            {instance?.progress_comparison?.included === false ? <span className={styles.memberExcluded}>Excluded</span> : null}
-                                                        </span>
-                                                    </div>
-                                                </SessionItemHeaderLeft>
-                                                {!activitySet && tagEditor ? (
-                                                    <SessionItemHeaderRight>{tagEditor}</SessionItemHeaderRight>
-                                                ) : null}
-                                            </SessionItemHeader>
+                                            <CircuitMemberHeader
+                                                rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope}
+                                                member={member} round={round} slot={slot} tagEditor={!activitySet ? tagEditor : null}
+                                            />
                                             {slot?.has_metrics && definition && (
                                                 <CircuitMemberMetrics
                                                     memberId={member.id}

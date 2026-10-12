@@ -346,6 +346,7 @@ def test_schedule_program_day_emits_program_day_scheduled_event(db_session, samp
 
 def test_unschedule_program_day_occurrence_emits_program_day_unscheduled_event(db_session, sample_program, sample_goal_hierarchy, monkeypatch):
     root_id = sample_goal_hierarchy['ultimate'].id
+    occurrence_date = datetime.now(timezone.utc).date()
     block = ProgramBlock(
         program_id=sample_program.id,
         name='Unsched Block',
@@ -356,7 +357,7 @@ def test_unschedule_program_day_occurrence_emits_program_day_unscheduled_event(d
     db_session.flush()
 
     day = ProgramDay(program_id=block.program_id, name='Unsched Day', day_number=1,
-                     occurrence_schedules=[ProgramDayOccurrenceSchedule(date=date.today())])
+                     occurrence_schedules=[ProgramDayOccurrenceSchedule(date=occurrence_date)])
     db_session.add(day)
     db_session.flush()
 

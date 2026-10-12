@@ -120,6 +120,30 @@ contained within the calendar and vertical scrolling owned by the modal/panel bo
 snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
 See [Goal Timeline](planning/goal-activity-heatmap.md).
 
+Goal evidence is resolved per activity instance: active direct instance links are unioned with
+existing definition/group sources, and each instance counts once across overlapping sources and
+ancestor rollups. One-off links roll upward, never inherit downward or add a definition to a
+reusable activity catalog. Occurrence dates retain goal lifetime, pause/completion exclusions,
+and target windows. `services/instance_goal_evidence.py` owns that attribution invariant;
+`activity_instance_goal_service.py` owns authenticated, reversible association mutations, and
+`instance_goal_target_reconciliation.py` applies existing target lifecycle rules in the same
+transaction. The additive `activity_instance_goal_associations` table preserves creation history
+on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
+only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
+
+Session Detail captures its goal-icon scope when opening create/copy definition drafts; copied
+selections and the captured scoped goal are merged and remain editable. Existing-definition editing
+keeps its current associations. Actual activity instances, including circuit members and completed
+sessions, expose reversible one-off links through the scoped goal's icon while scoped. Action and
+association explanations appear in a hover/focus tooltip. The icon shows the hierarchy's scoped
+ring only when the instance is directly associated with the current scoped goal. It sits in the
+activity header beside the pencil/options controls, sharing their 28px button and 14px symbol
+sizing. Circuit member controls also live in their headers. Linked buttons retain the neutral
+background/border styling and expose their association through the ring and accessible pressed state.
+`useActivityInstanceGoalAssociation` owns
+cache updates and evidence invalidation. Duplication starts with no one-off links.
+See [Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md).
+
 ### Sessions, activities, and progress
 
 Sessions are the execution container. Activity definitions and instances, metrics, sets,

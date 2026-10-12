@@ -10,6 +10,7 @@ from models import ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Se
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.effective_goal_activities import resolve_effective_goals_by_activity
+from services.instance_goal_evidence import resolve_instance_goals
 from services.goal_contribution import resolve_contribution_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
@@ -77,7 +78,7 @@ class ProgramMetricsService:
         return (
             joinedload(Program.blocks),
             days.selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
-            days.selectinload(ProgramDay.templates),
+            days.joinedload(ProgramDay.templates),
         )
 
     def load_resolved_evidence(
@@ -431,6 +432,7 @@ class ProgramMetricsService:
             ActivityInstance.session_id,
             ActivityInstance.activity_definition_id,
             ActivityInstance.duration_seconds,
+            ActivityInstance.associated_goal_ids.label("instance_goal_ids"),
             effective_at.label("effective_at"),
             Session.program_id,
             Session.program_block_id,
@@ -462,9 +464,10 @@ class ProgramMetricsService:
     def _resolve_evidence(self, rows, effective_goals, goals_by_id, scope_ids, zone):
         scope_ids = set(scope_ids)
         resolved = []
+        direct_links = {row.id: set(getattr(row, "instance_goal_ids", None) or []) for row in rows}
         for row in rows:
             goals = []
-            for goal in effective_goals.get(str(row.activity_definition_id), []):
+            for goal in resolve_instance_goals(row.id, effective_goals.get(str(row.activity_definition_id), []), direct_links, goals_by_id, row.effective_at):
                 contribution = resolve_contribution_goal(goal, row.effective_at, goals_by_id)
                 if contribution and contribution.id not in {item.id for item in goals}:
                     goals.append(contribution)

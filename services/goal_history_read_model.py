@@ -4,7 +4,8 @@ A publisher can preload one owned root and reuse the same timeline evaluator for
 all goals. No data survives the request or crosses a root boundary.
 """
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
+from services.instance_goal_evidence import load_instance_goal_ids
 from sqlalchemy.orm import joinedload, selectinload
 from models import (
     ActivityDefinition,
@@ -16,7 +17,7 @@ from models import (
     MetricValue,
     Session,
     Target,
-    activity_goal_associations,
+    activity_goal_associations, activity_instance_goal_associations,
     goal_activity_group_associations,
 )
 
@@ -38,7 +39,8 @@ class GoalHistoryReadModel:
         )
         activity_ids = {row.activity_id for row in self._rows["direct_activities"]}
         activity_ids.update((row.id for row in self._rows["group_activities"]))
-        self._rows["instances"] = self.instances(activity_ids) if activity_ids else []
+        self._rows["instances"] = self.instances(activity_ids, linked_goal_ids=goal_ids)
+        self._rows["instance_links"] = {row.id: set(row.associated_goal_ids or []) & set(goal_ids) for row in self._rows["instances"] if row.associated_goal_ids}
         self._rows["association_events"] = self.association_events(goal_ids)
         if goals_by_id is None:
             self._rows["targets"] = self.targets(goal_ids)
@@ -124,14 +126,19 @@ class GoalHistoryReadModel:
             .all()
         )
 
-    def instances(self, activity_ids, *, summary_only=False, occurred_range=None, instance_ids=None):
+    def instance_links(self, goal_ids):
+        if "instance_links" in self._rows:
+            return {key: values & set(goal_ids) for key, values in self._rows["instance_links"].items() if values & set(goal_ids)}
+        return load_instance_goal_ids(self.db_session, self.root_id, goal_ids=goal_ids)
+
+    def instances(self, activity_ids, *, summary_only=False, occurred_range=None, instance_ids=None, linked_instance_ids=None, linked_goal_ids=None):
         if instance_ids is not None and not instance_ids:
             return []
         if "instances" in self._rows:
             rows = [
                 row
                 for row in self._rows["instances"]
-                if row.activity_definition_id in activity_ids and (instance_ids is None or row.id in instance_ids)
+                if (row.activity_definition_id in activity_ids or row.id in (linked_instance_ids or set())) and (instance_ids is None or row.id in instance_ids)
             ]
             return rows
         query = (
@@ -162,7 +169,12 @@ class GoalHistoryReadModel:
             ]))
             .filter(
                 ActivityInstance.root_id == self.root_id,
-                ActivityInstance.activity_definition_id.in_(activity_ids),
+                ActivityInstance.session_id.is_(None) | ActivityInstance.session.has(Session.deleted_at.is_(None)),
+                or_(ActivityInstance.activity_definition_id.in_(activity_ids), ActivityInstance.id.in_(linked_instance_ids or set()), select(activity_instance_goal_associations.c.activity_instance_id).where(
+                    activity_instance_goal_associations.c.activity_instance_id == ActivityInstance.id,
+                    activity_instance_goal_associations.c.goal_id.in_(linked_goal_ids or set()),
+                    activity_instance_goal_associations.c.deleted_at.is_(None),
+                ).exists()),
                 ActivityInstance.completed.is_(True),
                 ActivityInstance.deleted_at.is_(None),
             )
@@ -190,6 +202,8 @@ class GoalHistoryReadModel:
                     {
                         "activity.associated",
                         "activity.disassociated",
+                        "activity_instance.associated",
+                        "activity_instance.disassociated",
                         "activity_group.associated",
                         "activity_group.disassociated",
                     }

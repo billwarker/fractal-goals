@@ -15,6 +15,8 @@ from services.service_types import JsonDict, ServiceResult
 from services.session_filters import normalize_id_list, session_duration_seconds_from_row
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.goal_contribution import as_utc_datetime, resolve_contribution_goal
+from services.instance_goal_evidence import resolve_instance_goals
+from services.goal_loading import load_fractal_goals_for_serialization
 from services.progress_service import ProgressService
 
 
@@ -377,6 +379,8 @@ class SessionAnalyticsService:
                 goal_ids.add(str(contribution_goal.id))
 
         recent_instance_rows = self.db_session.query(
+                ActivityInstance.id,
+                ActivityInstance.associated_goal_ids.label('instance_goal_ids'),
                 ActivityInstance.activity_definition_id,
                 ActivityInstance.time_stop,
                 ActivityInstance.updated_at,
@@ -394,16 +398,18 @@ class SessionAnalyticsService:
             ).all()
         recent_activity_ids = sorted({
             activity_definition_id
-            for activity_definition_id, *_ in recent_instance_rows
+            for _, _, activity_definition_id, *_ in recent_instance_rows
             if activity_definition_id
         })
 
         effective_goals_by_activity = self._get_effective_activity_goals(root_id, recent_activity_ids)
-        for activity_definition_id, time_stop, updated_at, created_at in recent_instance_rows:
+        links = {row.id: set(row.instance_goal_ids or []) for row in recent_instance_rows if row.instance_goal_ids}
+        goal_graph = load_fractal_goals_for_serialization(self.db_session, root_id) if links else {}
+        for instance_id, _, activity_definition_id, time_stop, updated_at, created_at in recent_instance_rows:
             if not activity_definition_id:
                 continue
             instance_timestamp = time_stop or updated_at or created_at
-            for goal in effective_goals_by_activity.get(str(activity_definition_id), []):
+            for goal in resolve_instance_goals(instance_id, effective_goals_by_activity.get(str(activity_definition_id), []), links, goal_graph, instance_timestamp):
                 contribution_goal = resolve_contribution_goal(goal, instance_timestamp)
                 if contribution_goal:
                     goal_ids.add(str(contribution_goal.id))
@@ -449,8 +455,10 @@ class SessionAnalyticsService:
         ]
         effective_goals_by_activity = self._get_effective_activity_goals(root_id, activity_ids)
 
-        def activity_instance_contributes(activity_id, timestamp):
-            for goal in effective_goals_by_activity.get(activity_id, []):
+        direct_links = {}
+
+        def activity_instance_contributes(instance_id, activity_id, timestamp):
+            for goal in resolve_instance_goals(instance_id, effective_goals_by_activity.get(activity_id, []), direct_links, goals_by_id, timestamp):
                 contribution_goal = resolve_contribution_goal(goal, timestamp, goals_by_id)
                 if contribution_goal and str(contribution_goal.id) in target_goal_ids:
                     return True
@@ -460,6 +468,8 @@ class SessionAnalyticsService:
 
         if activity_ids:
             activity_session_rows = self.db_session.query(
+                    ActivityInstance.id,
+                    ActivityInstance.associated_goal_ids.label('instance_goal_ids'),
                     ActivityInstance.session_id,
                     ActivityInstance.activity_definition_id,
                     ActivityInstance.time_stop,
@@ -475,10 +485,11 @@ class SessionAnalyticsService:
                     ActivityInstance.deleted_at == None,
                     ActivityInstance.activity_definition_id.in_(activity_ids),
                 ).all()
-            for session_id, activity_id, time_stop, updated_at, created_at in activity_session_rows:
+            for instance_id, instance_goal_ids, session_id, activity_id, time_stop, updated_at, created_at in activity_session_rows:
+                direct_links[instance_id] = set(instance_goal_ids or [])
                 if not session_id:
                     continue
-                if activity_instance_contributes(activity_id, time_stop or updated_at or created_at):
+                if activity_instance_contributes(instance_id, activity_id, time_stop or updated_at or created_at):
                     relevant_session_ids.add(session_id)
 
         session_goal_rows = self.db_session.query(
@@ -557,6 +568,7 @@ class SessionAnalyticsService:
             return summary, None, 200
 
         instances = self.db_session.query(
+            ActivityInstance.id,
             ActivityInstance.activity_definition_id,
             ActivityInstance.duration_seconds,
             ActivityInstance.completed,
@@ -575,11 +587,11 @@ class SessionAnalyticsService:
             ActivityInstance.session_id.in_(relevant_session_ids),
         ).all()
 
-        for activity_id, duration_seconds, completed, time_stop, updated_at, created_at in instances:
+        for instance_id, activity_id, duration_seconds, completed, time_stop, updated_at, created_at in instances:
             if not completed:
                 continue
             completed_timestamp = _as_utc_datetime(time_stop or updated_at or created_at)
-            if not activity_instance_contributes(activity_id, completed_timestamp):
+            if not activity_instance_contributes(instance_id, activity_id, completed_timestamp):
                 continue
 
             summary["completed_instances_count"] += 1

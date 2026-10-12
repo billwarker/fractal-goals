@@ -8,6 +8,8 @@ import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } fro
 import useIsMobile from '../../hooks/useIsMobile';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import CircuitRunCard from '../circuits/CircuitRunCard';
+import InstanceGoalLinkControl from './InstanceGoalLinkControl';
+import SessionActivityDragCard from './SessionActivityDragCard';
 import SessionAddActivityButton from './SessionAddActivityButton';
 import SessionCircuitDefinitionBuilderModal from './SessionCircuitDefinitionBuilderModal';
 import SessionSectionActivitySelector from './SessionSectionActivitySelector';
@@ -290,6 +292,7 @@ const SessionSection = ({
                         return (
                             <CircuitRunCard
                                 key={`circuit:${run.id}`}
+                                activityGoalScope={activityGoalScope}
                                 rootId={rootId}
                                 sessionId={sessionId}
                                 run={run}
@@ -341,25 +344,14 @@ const SessionSection = ({
                     const previousMatchingInstanceId = previousMatchingInstanceById.get(instanceId) || null;
 
                     return (
-                        <div
-                            key={instanceId}
-                            data-session-activity-card="true"
-                            data-session-activity-instance-id={instanceId}
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.effectAllowed = 'move';
-                                setDraggedItem({
-                                    instanceId,
-                                    sourceSectionIndex: sectionIndex,
-                                    activityName: definition?.name || 'Activity'
-                                });
-                            }}
-                            onDragEnd={() => {
-                                setDraggedItem(null);
-                            }}
-                            className={`${styles.draggableActivity} ${isDragging ? styles.draggableActivityDragging : ''}`}
+                        <SessionActivityDragCard
+                            key={instanceId} instance={instance} definition={definition}
+                            sectionIndex={sectionIndex} setDraggedItem={setDraggedItem} isDragging={isDragging}
                         >
                             <SessionActivityItem
+                                goalAssociationControl={activityGoalScope ? <InstanceGoalLinkControl
+                                    rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope}
+                                /> : null}
                                 exercise={instance}
                                 onDelete={() => removeActivity(instanceId)}
                                 onFocus={(instance, setIndex) => {
@@ -388,7 +380,7 @@ const SessionSection = ({
                                 activityNotes={notesByInstanceId.get(instanceId) || []}
                                 onOpenActivityBuilder={(activityDefinitionToEdit) => openActivityBuilder(activityDefinitionToEdit, { mode: 'edit' })}
                             />
-                        </div>
+                        </SessionActivityDragCard>
                     );
                 })}
 

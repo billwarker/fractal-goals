@@ -1,12 +1,11 @@
 import logging
+from sqlalchemy import or_, select
+from sqlalchemy.orm import joinedload
 from models import (
     Goal,
     Session,
     ActivityInstance,
-    ActivityDefinition,
-    session_goals,
-    activity_goal_associations,
-    goal_activity_group_associations,
+    session_goals, activity_instance_goal_associations,
 )
 from services.session_filters import session_duration_seconds_from_row
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 class GoalMetricsService:
     def __init__(self, db_session):
         self.db_session = db_session
+        self._goals_by_root = {}
 
     def get_metrics_for_goal(self, goal_id: str):
         """
@@ -91,96 +91,43 @@ class GoalMetricsService:
             context_ids.add(goal.parent_id)
         return context_ids
 
-    def _activity_contexts_for_scope(self, goal, scope_goal_ids):
-        context_goal_ids = self._context_goal_ids(goal, scope_goal_ids)
-        goals = self.db_session.query(Goal).filter(
-            Goal.id.in_(context_goal_ids),
-            Goal.deleted_at == None,
-        ).all()
-        goals_by_id = {item.id: item for item in goals}
-
-        contexts = {}
-        direct_rows = self.db_session.query(
-            activity_goal_associations.c.activity_id,
-            activity_goal_associations.c.goal_id,
-        ).filter(
-            activity_goal_associations.c.goal_id.in_(context_goal_ids),
-            activity_goal_associations.c.deleted_at == None,
-        ).all()
-        for activity_id, source_goal_id in direct_rows:
-            source_goal = goals_by_id.get(source_goal_id)
-            if source_goal:
-                contexts.setdefault(activity_id, []).append(source_goal)
-
-        group_rows = self.db_session.query(
-            goal_activity_group_associations.c.activity_group_id,
-            goal_activity_group_associations.c.goal_id,
-        ).filter(
-            goal_activity_group_associations.c.goal_id.in_(context_goal_ids),
-            goal_activity_group_associations.c.deleted_at == None,
-        ).all()
-        group_ids = {row.activity_group_id for row in group_rows}
-        activities_by_group = {}
-        if group_ids:
-            group_activities = self.db_session.query(
-                ActivityDefinition.id,
-                ActivityDefinition.group_id,
-            ).filter(
-                ActivityDefinition.root_id == goal.root_id,
-                ActivityDefinition.group_id.in_(group_ids),
-                ActivityDefinition.deleted_at == None,
-            ).all()
-            for activity_id, group_id in group_activities:
-                activities_by_group.setdefault(group_id, []).append(activity_id)
-
-        for group_id, source_goal_id in group_rows:
-            source_goal = goals_by_id.get(source_goal_id)
-            if not source_goal:
-                continue
-            for activity_id in activities_by_group.get(group_id, []):
-                contexts.setdefault(activity_id, []).append(source_goal)
-
-        return contexts
-
-    def _occurred_while_goal_active(self, instance, source_goal):
-        occurred_at = instance.time_start or instance.created_at
-        if not occurred_at:
-            return False
-        if source_goal.created_at and occurred_at < source_goal.created_at:
-            return False
-        if source_goal.completed_at and occurred_at >= source_goal.completed_at:
-            return False
-        return True
-
     def _activity_instances_for_scope(self, goal, scope_goal_ids):
-        activity_contexts = self._activity_contexts_for_scope(goal, scope_goal_ids)
-        if not activity_contexts:
-            return [], set()
+        from services.goal_history_read_model import GoalHistoryReadModel
+        from services.instance_goal_evidence import instance_source_goal_ids, instance_contributes_to_goal
 
+        history = GoalHistoryReadModel(self.db_session, goal.root_id)
+        if goal.root_id not in self._goals_by_root:
+            self._goals_by_root[goal.root_id] = {row.id: row for row in self.db_session.query(Goal).options(
+                joinedload(Goal.pause_intervals),
+            ).filter(Goal.root_id == goal.root_id, Goal.deleted_at.is_(None)).all()}
+        goals_by_id = self._goals_by_root[goal.root_id]
+        contexts = {}
+        context_ids = self._context_goal_ids(goal, scope_goal_ids)
+        for activity_id, source_goal_id, _ in history.direct_activities(context_ids):
+            contexts.setdefault(activity_id, set()).add(source_goal_id)
+        groups = history.group_associations(context_ids)
+        activities = history.group_activities({row.activity_group_id for row in groups}) if groups else []
+        for row in groups:
+            for activity in activities:
+                if activity.group_id == row.activity_group_id:
+                    contexts.setdefault(activity.id, set()).add(row.goal_id)
+        table = activity_instance_goal_associations
+        linked = select(table.c.goal_id).where(
+            table.c.activity_instance_id == ActivityInstance.id,
+            table.c.goal_id.in_(scope_goal_ids), table.c.deleted_at.is_(None),
+        ).exists()
         instances = self.db_session.query(ActivityInstance).filter(
-            ActivityInstance.root_id == goal.root_id,
-            ActivityInstance.activity_definition_id.in_(list(activity_contexts.keys())),
-            ActivityInstance.completed == True,
-            ActivityInstance.deleted_at == None,
-        ).all()
-
-        contributing = []
-        seen_ids = set()
-        for instance in instances:
-            source_goal = next(
-                (
-                    candidate_goal
-                    for candidate_goal in activity_contexts.get(instance.activity_definition_id, [])
-                    if self._occurred_while_goal_active(instance, candidate_goal)
-                ),
-                None,
-            )
-            if not source_goal or instance.id in seen_ids:
-                continue
-            contributing.append(instance)
-            seen_ids.add(instance.id)
-
-        return contributing, set(activity_contexts.keys())
+            ActivityInstance.root_id == goal.root_id, ActivityInstance.deleted_at.is_(None),
+            ActivityInstance.session_id.is_(None) | ActivityInstance.session.has(Session.deleted_at.is_(None)),
+            ActivityInstance.completed.is_(True),
+            or_(ActivityInstance.activity_definition_id.in_(set(contexts)), linked),
+        ).populate_existing().all()
+        links = {row.id: set(row.associated_goal_ids or []) for row in instances}
+        contributing = [instance for instance in instances if any(
+            instance_contributes_to_goal(instance, goals_by_id.get(goal_id))
+            for goal_id in instance_source_goal_ids(instance.id, contexts.get(instance.activity_definition_id, set()), links, scope_goal_ids)
+        )]
+        return contributing, {instance.activity_definition_id for instance in contributing}
 
     def _manual_sessions_for_scope(self, goal, scope_goal_ids):
         rows = self.db_session.query(

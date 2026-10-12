@@ -65,18 +65,18 @@ def seeded_usage_data(db_session, test_user):
             user_id=test_user.id,
             event_name="page_view",
             path="/:rootId/goals",
-            created_at=now - datetime.timedelta(hours=2),
+            created_at=now,
         ),
         ProductEvent(
             user_id=test_user.id,
             event_name="page_view",
             path="/:rootId/analytics",
-            created_at=now - datetime.timedelta(hours=1),
+            created_at=now,
         ),
         ProductEvent(
             user_id=test_user.id,
             event_name="settings_opened",
-            created_at=now - datetime.timedelta(hours=1),
+            created_at=now,
         ),
         # Outside any window we query in these tests.
         ProductEvent(

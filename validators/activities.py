@@ -424,6 +424,18 @@ class ActivityDefinitionUpdateSchema(BaseModel):
         return candidate
 
 
+class ActivityInstanceGoalSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    goal_id: str = Field(..., min_length=1, max_length=MAX_ENTITY_ID_LENGTH)
+
+    @field_validator('goal_id')
+    @classmethod
+    def validate_goal_id(cls, value):
+        if any(character.isspace() for character in value):
+            raise ValueError('goal_id must be an identifier')
+        return value
+
+
 class ActivityGoalsSetSchema(BaseModel):
     """Schema for setting goals associated with an activity."""
     goal_ids: List[str] = Field(default_factory=list)

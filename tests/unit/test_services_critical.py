@@ -384,7 +384,7 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
+            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
         )
 
         handle_activity_instance_updated(
@@ -407,7 +407,7 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
+            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
         )
 
         handle_activity_instance_updated(
@@ -430,7 +430,7 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_run_evaluation_for_instance",
-            lambda _db, inst, session_id, root_id, pending_events=None: evaluated.append((inst, session_id, root_id)),
+            lambda _db, inst, session_id, root_id, pending_events=None, canonical_goal_ids=None: evaluated.append((inst, session_id, root_id)),
         )
 
         handle_activity_instance_updated(
@@ -461,12 +461,12 @@ class TestCompletionHandlerPublicFlow:
         monkeypatch.setattr(
             completion_handlers,
             "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None: reverted.append(instance_id),
+            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
         )
         monkeypatch.setattr(
             completion_handlers,
             "_run_evaluation_for_instance",
-            lambda _db, inst, session_id, root_id, pending_events=None: evaluated.append((inst, session_id, root_id)),
+            lambda _db, inst, session_id, root_id, pending_events=None, canonical_goal_ids=None: evaluated.append((inst, session_id, root_id)),
         )
 
         handle_activity_metrics_updated(

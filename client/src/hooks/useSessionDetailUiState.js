@@ -4,6 +4,7 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
     const [builderActivity, setBuilderActivity] = useState(null);
+    const [builderInitialGoalIds, setBuilderInitialGoalIds] = useState([]);
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -41,6 +42,7 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         const editingExistingDefinition = options.mode === 'edit' && activityDefinition?.id;
         setSectionForNewActivity(editingExistingDefinition ? null : sectionIndex);
         setBuilderActivity(activityDefinition);
+        setBuilderInitialGoalIds(!editingExistingDefinition && scopedGoal?.id ? [String(scopedGoal.id)] : []);
         setShowBuilder(true);
     };
 
@@ -85,6 +87,7 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         setShowDeleteConfirm,
         showBuilder,
         builderActivity,
+        builderInitialGoalIds,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,

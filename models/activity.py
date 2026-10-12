@@ -1,6 +1,7 @@
 import sqlalchemy as sa
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Float
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, column_property
+from .goal import Goal, activity_instance_goal_associations
 import uuid
 from .base import Base, utc_now, JSON_TYPE
 
@@ -382,6 +383,18 @@ class ActivityInstance(Base):
         "ActivityTag",
         secondary="activity_instance_tags",
         lazy="selectin",
+    )
+    # Project only IDs in the instance query: no full goal hydration or N+1 reads.
+    associated_goal_ids = column_property(
+        sa.select(sa.func.array_agg(activity_instance_goal_associations.c.goal_id))
+        .join(Goal, Goal.id == activity_instance_goal_associations.c.goal_id)
+        .where(
+            activity_instance_goal_associations.c.activity_instance_id == id,
+            activity_instance_goal_associations.c.deleted_at.is_(None),
+            Goal.deleted_at.is_(None), Goal.root_id == root_id,
+        )
+        .correlate_except(activity_instance_goal_associations, Goal)
+        .scalar_subquery(), expire_on_flush=False
     )
     completed = Column(Boolean, default=False)
     notes = Column(String, nullable=True)

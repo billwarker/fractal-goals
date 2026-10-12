@@ -51,3 +51,12 @@ def parse_optional_pagination(req, *, max_limit: int = 200):
     limit_val = max(1, min(limit_val, max_limit))
     offset_val = max(0, offset_val)
     return limit_val, offset_val
+
+
+def service_response(payload, error, status):
+    if error:
+        body = {"error": error}
+        if payload is not None:
+            body["details"] = payload
+        return jsonify(body), status
+    return jsonify(payload), status

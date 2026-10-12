@@ -103,10 +103,10 @@ export function useSessionGoalsViewModel({
     const selectedActivityGoalIds = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession) return new Set();
         return new Set(
-            (activityGoalIdsByActivity[String(activeActivityDefId)] || [])
+            [...(activityGoalIdsByActivity[String(activeActivityDefId)] || []), ...(selectedActivity?.associated_goal_ids || [])]
                 .map((goalId) => String(goalId))
         );
-    }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession]);
+    }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession, selectedActivity]);
 
     const selectedActivityAncestorIds = useMemo(() => {
         if (!activeActivityDefId || normalizedTree.length === 0) return new Set();
@@ -135,8 +135,11 @@ export function useSessionGoalsViewModel({
         currentSessionActivityDefIds.forEach((activityDefId) => {
             (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => direct.add(String(goalId)));
         });
+        (activityInstances || []).filter((instance) => !instance.deleted_at).forEach((instance) => {
+            (instance.associated_goal_ids || []).forEach((goalId) => direct.add(String(goalId)));
+        });
         return collectIdsWithAncestors(direct, parentMap);
-    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, parentMap]);
+    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, parentMap, activityInstances]);
     const completedEvidenceGoalIds = useMemo(() => {
         const completedDefinitionIds = new Set(
             (activityInstances || [])
@@ -147,6 +150,9 @@ export function useSessionGoalsViewModel({
         const direct = new Set();
         completedDefinitionIds.forEach((activityDefId) => {
             (activityGoalIdsByActivity[activityDefId] || []).forEach((goalId) => direct.add(String(goalId)));
+        });
+        (activityInstances || []).filter((instance) => instance.completed && !instance.deleted_at).forEach((instance) => {
+            (instance.associated_goal_ids || []).forEach((goalId) => direct.add(String(goalId)));
         });
         return collectIdsWithAncestors(direct, parentMap);
     }, [activityGoalIdsByActivity, activityInstances, parentMap]);
@@ -179,9 +185,7 @@ export function useSessionGoalsViewModel({
     const activityHierarchy = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession || normalizedTree.length === 0) return [];
 
-        const associatedGoalIds = new Set(
-            activityGoalIdsByActivity[String(activeActivityDefId)] || []
-        );
+        const associatedGoalIds = selectedActivityGoalIds;
         const nodeById = new Map(normalizedTree.map((node) => [String(node.id), node]));
         const activeAssociatedGoalIds = Array.from(associatedGoalIds)
             .map((goalId) => String(goalId))
@@ -201,7 +205,7 @@ export function useSessionGoalsViewModel({
                 status: getGoalStatus(node, targetAchievements, achievedTargetIds)
             }));
 
-    }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
+    }, [activeActivityDefId, selectedActivityGoalIds, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
 
     // 4. Build Target Cards
     const targetCards = useMemo(() => {

@@ -5,7 +5,7 @@ from .base import (
 from .user import User, SignupInviteKey, BetaSignupRequest, PasswordResetToken, EmailDeliveryEvent, EmailWebhookEvent, AdminAuditEvent
 from .goal import (
     GoalLevel, Goal, GoalPauseInterval, TargetTemplate, Target, TargetMetricCondition, TargetContributionLedger,
-    session_goals, activity_goal_associations, goal_activity_group_associations,
+    session_goals, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations,
     session_template_goals, program_day_goals,
     get_all_root_goals, get_goal_by_id, get_root_id_for_goal, 
     validate_root_goal, delete_goal_recursive

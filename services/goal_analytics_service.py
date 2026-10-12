@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import joinedload
+from services.instance_goal_evidence import load_instance_goal_ids, resolve_instance_goals, instance_contributes_to_goal
+from services.goal_loading import load_fractal_goals_for_serialization
 
 from models import ActivityInstance, ActivityDefinition, Goal, Session, validate_root_goal
 from services.view_serializers import (
@@ -90,6 +92,27 @@ class GoalAnalyticsService:
         for instance in all_activity_instances:
             session_activity_map.setdefault(instance.session_id, []).append(instance)
 
+        explicit_instances_by_goal = {}
+        direct_links = load_instance_goal_ids(self.db_session, root_id, instance_ids={row.id for row in all_activity_instances})
+        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id) if direct_links else {}
+        for instance in all_activity_instances:
+            if not instance.completed:
+                continue
+            for goal in resolve_instance_goals(instance.id, [], direct_links, goals_by_id):
+                if not instance_contributes_to_goal(instance, goal):
+                    continue
+                explicit_instances_by_goal.setdefault(goal.id, []).append(instance)
+        for goal_id, instances in explicit_instances_by_goal.items():
+            known = {row['session_id'] for row in goal_session_map.get(goal_id, [])}
+            durations = {}
+            for instance in instances:
+                if instance.session_id not in known:
+                    durations[instance.session_id] = durations.get(instance.session_id, 0) + (instance.duration_seconds or 0)
+            for session_id, duration in durations.items():
+                row = session_row_by_id.get(session_id)
+                if row:
+                    goal_session_map.setdefault(goal_id, []).append({**row, 'duration_seconds': duration, 'instance_scoped': True})
+
         total_duration_completed = 0
         completed_goals_with_sessions = 0
         for goal in completed_goals:
@@ -114,7 +137,9 @@ class GoalAnalyticsService:
             activity_breakdown = {}
             goal_activity_instances = []
             for session in sessions_for_goal:
-                goal_activity_instances.extend(session_activity_map.get(session["session_id"], []))
+                if not session.get('instance_scoped'):
+                    goal_activity_instances.extend(session_activity_map.get(session["session_id"], []))
+            goal_activity_instances = list({row.id: row for row in [*goal_activity_instances, *explicit_instances_by_goal.get(goal.id, [])]}.values())
 
             for instance in goal_activity_instances:
                 activity_name = instance.definition.name if instance.definition else "Unknown"

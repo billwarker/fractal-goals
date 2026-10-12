@@ -137,6 +137,7 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "id": instance.id,
         "session_id": instance.session_id,
         "activity_definition_id": instance.activity_definition_id,
+        "associated_goal_ids": sorted(getattr(instance, "associated_goal_ids", None) or []),
 
         "name": instance.definition.name if instance.definition else "Unknown",
         "definition_name": instance.definition.name if instance.definition else "Unknown",
@@ -181,6 +182,7 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         "id": instance.id,
         "session_id": instance.session_id,
         "activity_definition_id": instance.activity_definition_id,
+        "associated_goal_ids": sorted(getattr(instance, "associated_goal_ids", None) or []),
         "session_name": session_name,
         "session_date": format_utc(session_date) if session_date else None,
         "created_at": format_utc(instance.created_at),

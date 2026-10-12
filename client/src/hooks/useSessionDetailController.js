@@ -39,9 +39,10 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setShowDeleteConfirm,
         showBuilder,
         builderActivity,
+        builderInitialGoalIds,
         selectedGoal,
         setSelectedGoal,
-        selectedActivity,
+        selectedActivity: selectedActivityDraft,
         selectedSetIndex,
         showAssociationModal,
         setShowAssociationModal,
@@ -66,6 +67,8 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         addActivity,
         setSidePaneMode: setSidePaneModeUi,
     });
+
+    const selectedActivity = activityInstances.find((instance) => instance.id === selectedActivityDraft?.id) || selectedActivityDraft;
 
     const {
         data: scopedGoalActivities = [],
@@ -182,6 +185,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setShowDeleteConfirm,
         showBuilder,
         builderActivity,
+        builderInitialGoalIds,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,

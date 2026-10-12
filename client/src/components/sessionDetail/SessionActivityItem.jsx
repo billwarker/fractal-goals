@@ -43,6 +43,7 @@ import {
  */
 function SessionActivityItem({
     exercise,
+    goalAssociationControl = null,
     onFocus, // Called with (instance, setIndex) to update context
     isSelected,
     onReorder,
@@ -704,6 +705,7 @@ function SessionActivityItem({
 
     return (
         <SessionActivityItemView
+            goalAssociationControl={goalAssociationControl}
             rootId={rootId}
             handleActivityCardClick={handleActivityCardClick}
             isSelected={isSelected}

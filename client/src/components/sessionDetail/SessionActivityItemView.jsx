@@ -33,6 +33,7 @@ import styles from './SessionActivityItem.module.css';
 
 function SessionActivityItemView({
     rootId,
+    goalAssociationControl = null,
     handleActivityCardClick,
     isSelected,
     isDragging,
@@ -222,7 +223,7 @@ function SessionActivityItemView({
                                         {def.name}
                                         {!activityDefinition && <DeletedBadge />}
                                     </span>
-                                    {(isSelected || (exercise.tags || []).length > 0) && (
+                                    {(goalAssociationControl || isSelected || (exercise.tags || []).length > 0) && (
                                         <div className={styles.activityHeaderActions}>
                                             {isSelected && onOpenActivityBuilder && activityDefinition?.id && (
                                                 <button
@@ -295,7 +296,8 @@ function SessionActivityItemView({
                                                     )}
                                                 </div>
                                             )}
-                                            {!quickMode && activityDefinition?.id && (
+                                            {goalAssociationControl}
+                                            {(isSelected || (exercise.tags || []).length > 0) && !quickMode && activityDefinition?.id && (
                                                 <ActivityTagEditor
                                                     className={styles.headerScopeControl}
                                                     rootId={rootId}

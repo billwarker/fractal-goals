@@ -1853,6 +1853,13 @@
           "default": null,
           "title": "Notes"
         },
+        "repeat_every_weeks": {
+          "default": 1,
+          "maximum": 2147483647,
+          "minimum": 1,
+          "title": "Repeat Every Weeks",
+          "type": "integer"
+        },
         "template_configs": {
           "anyOf": [
             {
@@ -2042,6 +2049,13 @@
           ],
           "default": null,
           "title": "Notes"
+        },
+        "repeat_every_weeks": {
+          "default": 1,
+          "maximum": 2147483647,
+          "minimum": 1,
+          "title": "Repeat Every Weeks",
+          "type": "integer"
         },
         "template_configs": {
           "anyOf": [

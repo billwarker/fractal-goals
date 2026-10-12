@@ -1,0 +1,14 @@
+.control {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+.button > span {
+    display: inline-flex;
+    position: relative;
+}
+.error {
+    color: var(--color-danger, #ef4444);
+    flex-basis: 100%;
+}

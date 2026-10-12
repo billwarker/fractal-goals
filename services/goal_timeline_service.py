@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from services.goal_history_read_model import GoalHistoryReadModel
+from services.instance_goal_evidence import instance_source_goal_ids, instance_contributes_to_goal
 from services.goal_activity_heatmap import (
     aggregate_goal_days, local_day_bounds, parse_heatmap_options, utc_datetime,
 )
@@ -244,16 +245,6 @@ class GoalTimelineService:
                 'payload': payload or {},
             })
 
-        def occurred_while_goal_active(instance, source_goal):
-            occurred_at = instance.time_start or instance.created_at
-            if not occurred_at:
-                return False
-            if source_goal.created_at and occurred_at < source_goal.created_at:
-                return False
-            if source_goal.completed and source_goal.completed_at and occurred_at >= source_goal.completed_at:
-                return False
-            return True
-
         def serialize_timeline_goal(goal_item):
             if summary_only:
                 return {'goal_id': goal_item.id}
@@ -329,14 +320,21 @@ class GoalTimelineService:
             for activity in activities_by_group.get(group_id, []):
                 activity_contexts.setdefault(activity.id, []).append((source_goal, associated_at))
 
-        if 'activity' in requested_types and activity_contexts:
-            instances = history.instances(list(activity_contexts.keys()), summary_only=summary_only, occurred_range=activity_range, instance_ids=activity_instance_ids)
+        instance_links = history.instance_links(timeline_goal_ids)
+        if 'activity' in requested_types and (activity_contexts or instance_links):
+            instances = history.instances(list(activity_contexts.keys()), summary_only=summary_only, occurred_range=activity_range, instance_ids=activity_instance_ids, linked_instance_ids=set(instance_links))
             for instance in instances:
                 source_goal = next(
                     (
                         candidate_goal
-                        for candidate_goal, _ in activity_contexts.get(instance.activity_definition_id, [])
-                        if occurred_while_goal_active(instance, candidate_goal)
+                        for candidate_goal in (
+                            goals_by_id[goal_id] for goal_id in sorted(instance_source_goal_ids(
+                                instance.id,
+                                [item.id for item, _ in activity_contexts.get(instance.activity_definition_id, [])],
+                                instance_links, timeline_goal_ids,
+                            )) if goal_id in goals_by_id
+                        )
+                        if instance_contributes_to_goal(instance, candidate_goal)
                     ),
                     None,
                 )
@@ -388,7 +386,7 @@ class GoalTimelineService:
                 name_key = 'activity_group_name' if is_group else 'activity_name'
                 association_name = event_payload.get(name_key) or 'Unknown'
                 action_label = 'Associated' if is_associated else 'Disassociated'
-                entity_label = 'activity group' if is_group else 'activity'
+                entity_label = 'activity group' if is_group else 'activity instance' if association_event.event_type.startswith('activity_instance.') else 'activity'
                 append_entry(
                     f"association_event:{association_event.id}",
                     association_event.event_type,

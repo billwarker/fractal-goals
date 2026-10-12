@@ -13,6 +13,7 @@ import logging
 
 from services.events import event_bus, Event, Events
 from services.progress_service import ProgressService
+from services.instance_goal_target_reconciliation import recalculate_linked_instance_targets
 from services.goal_domain_rules import (
     goal_uses_child_completion,
 )
@@ -115,6 +116,15 @@ def handle_session_completed(event: Event):
                 pending_events=pending_events,
             )
 
+        from services.instance_goal_evidence import load_instance_goal_ids
+        from services.goal_loading import load_fractal_goals_for_serialization
+        from services.instance_goal_target_reconciliation import recalculate_instance_goal_targets
+        links = load_instance_goal_ids(db_session, root_id, instance_ids={row.id for row in activity_instances})
+        if links:
+            goals = load_fractal_goals_for_serialization(db_session, root_id)
+            for instance in activity_instances:
+                if instance.id in links:
+                    recalculate_instance_goal_targets(db_session, instance, links[instance.id], goals, pending_events)
         db_session.commit()
         _emit_pending_events(pending_events)
 
@@ -138,7 +148,7 @@ def handle_activity_instance_updated(event: Event):
     root_id = event.data.get('root_id')
     updated_fields = event.data.get('updated_fields', [])
 
-    if not instance_id or 'completed' not in updated_fields:
+    if not instance_id or not ({'completed', 'metric_values', 'metrics', 'sets'} & set(updated_fields)):
         return
 
     db_session, owns_session = _resolve_db_session(event)
@@ -150,7 +160,8 @@ def handle_activity_instance_updated(event: Event):
 
         # If instance was explicitly marked incomplete, revert its achievements.
         if not instance.completed:
-            _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
+            affected = recalculate_linked_instance_targets(db_session, instance, pending_events)
+            _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
             db_session.commit()
         # If instance was JUST marked complete, evaluate targets
         elif instance.completed:
@@ -195,13 +206,14 @@ def handle_activity_metrics_updated(event: Event):
         if not instance or not instance.completed:
             return
 
-        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
+        affected = recalculate_linked_instance_targets(db_session, instance, pending_events)
+        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
         _run_evaluation_for_instance(
             db_session,
             instance,
             session_id,
             root_id,
-            pending_events=pending_events,
+            pending_events=pending_events, canonical_goal_ids=affected,
         )
         comparison = None
         try:
@@ -267,7 +279,9 @@ def handle_activity_instance_deleted(event: Event):
     db_session, owns_session = _resolve_db_session(event)
     pending_events = []
     try:
-        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events)
+        instance = db_session.get(ActivityInstance, instance_id)
+        affected = recalculate_linked_instance_targets(db_session, instance, pending_events) if instance else set()
+        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
         db_session.commit()
         _emit_pending_events(pending_events)
     # Handler boundary: roll back and log; a failed cascade must not fail the emitter.

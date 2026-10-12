@@ -16,7 +16,7 @@ def goal_serializer_relationship_loaders():
         selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),
-        selectinload(Goal.pause_intervals),
+        joinedload(Goal.pause_intervals),
     ]
 
 

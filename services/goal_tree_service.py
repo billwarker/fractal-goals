@@ -8,6 +8,7 @@ from services.serializers import serialize_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.view_serializers import serialize_session_goals_view_payload
 from services.goal_contribution import resolve_contribution_goal
+from services.instance_goal_evidence import load_instance_goal_ids
 
 logger = logging.getLogger(__name__)
 
@@ -147,6 +148,10 @@ class GoalTreeService:
             for goal_ids in activity_goal_ids_by_activity.values()
             for goal_id in goal_ids
         }
+        instance_goal_ids = load_instance_goal_ids(
+            self.db_session, root_id, instance_ids={item.id for item in session_activity_instances},
+        )
+        automatic_goal_ids.update(goal_id for ids in instance_goal_ids.values() for goal_id in ids)
         structural_goal_ids = set(manual_goal_ids) | automatic_goal_ids
         visible_goal_ids = self._collect_goal_ids_with_ancestors(
             structural_goal_ids,

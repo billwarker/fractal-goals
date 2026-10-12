@@ -17,6 +17,7 @@ function SessionDetailModals({
     onConfirmDelete,
     showBuilder,
     builderActivity,
+    builderInitialGoalIds = [],
     onCloseBuilder,
     onActivityCreated,
     selectedGoal,
@@ -58,6 +59,7 @@ function SessionDetailModals({
                         isOpen={showBuilder}
                         onClose={onCloseBuilder}
                         editingActivity={builderActivity}
+                        initialSelectedGoalIds={builderInitialGoalIds}
                         rootId={rootId}
                         onSave={onActivityCreated}
                     />

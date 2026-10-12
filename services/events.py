@@ -254,6 +254,8 @@ class Events:
     ACTIVITY_INSTANCE_CREATED = 'activity_instance.created'
     ACTIVITY_INSTANCE_DELETED = 'activity_instance.deleted'
     ACTIVITY_INSTANCE_UPDATED = 'activity_instance.updated'
+    ACTIVITY_INSTANCE_ASSOCIATED = 'activity_instance.associated'
+    ACTIVITY_INSTANCE_DISASSOCIATED = 'activity_instance.disassociated'
     ACTIVITY_INSTANCE_COMPLETED = 'activity_instance.completed'
     ACTIVITY_METRICS_UPDATED = 'activity_instance.metrics_updated'
     EVENT_HANDLER_FAILED = 'event.handler_failed'

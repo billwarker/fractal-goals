@@ -1,7 +1,9 @@
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from sqlalchemy import or_
 from models import ActivityDefinition, ActivityInstance, Session
+from services.instance_goal_evidence import load_instance_goal_ids
 from services.service_types import JsonDict
 
 
@@ -215,13 +217,14 @@ class SessionFilterService:
 
         if filters["goal_ids"]:
             matching_activity_ids = self.get_activity_definition_ids_for_goal_filter(root_id, filters["goal_ids"])
-            if not matching_activity_ids:
+            direct_links = load_instance_goal_ids(self.db_session, root_id, goal_ids=filters["goal_ids"], include_descendants=True)
+            if not matching_activity_ids and not direct_links:
                 return query.filter(Session.id == None)
 
             goal_session_ids = self.db_session.query(ActivityInstance.session_id).filter(
                 ActivityInstance.root_id == root_id,
                 ActivityInstance.deleted_at == None,
-                ActivityInstance.activity_definition_id.in_(matching_activity_ids),
+                or_(ActivityInstance.activity_definition_id.in_(matching_activity_ids), ActivityInstance.id.in_(set(direct_links))),
             )
             query = query.filter(Session.id.in_(goal_session_ids))
 

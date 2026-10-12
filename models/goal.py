@@ -28,6 +28,16 @@ activity_goal_associations = Table(
     sa.Index('ix_activity_goal_associations_goal_id', 'goal_id')
 )
 
+# Explicit links credit only the selected execution, never its definition.
+activity_instance_goal_associations = Table(
+    'activity_instance_goal_associations', Base.metadata,
+    Column('activity_instance_id', String, ForeignKey('activity_instances.id', ondelete='CASCADE'), primary_key=True),
+    Column('goal_id', String, ForeignKey('goals.id', ondelete='CASCADE'), primary_key=True),
+    Column('created_at', DateTime, nullable=False, default=utc_now, server_default=sa.func.now()),
+    Column('deleted_at', DateTime, nullable=True),
+    sa.Index('ix_activity_instance_goal_associations_goal_id', 'goal_id', 'activity_instance_id'),
+)
+
 # Junction table for linking Activity GROUPS to Goals
 goal_activity_group_associations = Table(
     'goal_activity_group_associations', Base.metadata,

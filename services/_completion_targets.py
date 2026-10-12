@@ -248,7 +248,7 @@ def _evaluate_threshold_targets_for_activity(
         }, db_session))
 
 
-def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, session_id: str, pending_events=None):
+def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, session_id: str, pending_events=None, evidence_by_target=None):
     """
     Evaluate all targets for a goal against activity instances.
     
@@ -266,6 +266,9 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
         if target.completed:
             continue
             
+        if evidence_by_target is not None and target.id not in evidence_by_target:
+            continue
+        target_instances = evidence_by_target[target.id] if evidence_by_target is not None else instances_by_activity
         target_type = target.type or 'threshold'
         target_achieved = False
         matching_instance = None
@@ -291,7 +294,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
             # Completion target: achieved if any completed instance matches the activity
             activity_id = target.activity_id
             if activity_id:
-                instances = instances_by_activity.get(activity_id, [])
+                instances = target_instances.get(activity_id, [])
                 target_instance_id = getattr(target, 'activity_instance_id', None)
                 if target_instance_id:
                     instances = [inst for inst in instances if inst.get('id') == target_instance_id]
@@ -299,11 +302,11 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
                 target_achieved = bool(matching_instances)
         elif target_type == 'threshold':
             # Classic logic: Check if CURRENT session meets criteria
-            matching_instance = _find_threshold_target_achieving_instance(target_dict, instances_by_activity)
+            matching_instance = _find_threshold_target_achieving_instance(target_dict, target_instances)
             target_achieved = matching_instance is not None
         elif target_type in ('sum', 'frequency'):
             # Complex logic: Check if aggregated history meets criteria
-            target_achieved = _evaluate_complex_target(db_session, target_dict, goal, session_id)
+            target_achieved = _evaluate_complex_target(db_session, target_dict, goal, session_id, instance_ids={row["id"] for rows in target_instances.values() for row in rows} if evidence_by_target is not None else None)
             
         if target_achieved:
             target.completed = True
@@ -348,7 +351,7 @@ def _evaluate_goal_targets(db_session, goal: Goal, instances_by_activity: dict, 
         }, db_session))
 
 
-def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pending_events=None):
+def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pending_events=None, canonical_goal_ids=None):
     """Refactored core evaluation logic to be reused between event handlers."""
     activity_id = instance.activity_definition_id
     completed_at = instance.time_stop or datetime.now(timezone.utc)
@@ -356,6 +359,12 @@ def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pend
     # 1. Clear achievement context
     clear_achievement_context()
     
+    from services.instance_goal_target_reconciliation import recalculate_linked_instance_targets
+    if canonical_goal_ids is None:
+        canonical_goal_ids = recalculate_linked_instance_targets(
+            db_session, instance, pending_events if pending_events is not None else [],
+        )
+
     # 2. Get the session
     session = db_session.query(Session).filter_by(id=session_id).first()
     if not session:
@@ -367,14 +376,14 @@ def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pend
     for g in session_goals:
         goals_to_check.add(g.id)
         
-    from sqlalchemy import text
-    activity_goal_result = db_session.execute(text('''
-        SELECT goal_id FROM activity_goal_associations 
-        WHERE activity_id = :activity_id
-    '''), {'activity_id': activity_id})
-    for row in activity_goal_result.fetchall():
-        goals_to_check.add(row[0])
-        
+    from sqlalchemy import select
+    from models import activity_goal_associations
+    goals_to_check.update(db_session.execute(select(activity_goal_associations.c.goal_id).where(
+        activity_goal_associations.c.activity_id == activity_id,
+        activity_goal_associations.c.deleted_at.is_(None),
+    )).scalars())
+    goals_to_check.difference_update(canonical_goal_ids)
+
     if not goals_to_check:
         return
         
@@ -391,12 +400,12 @@ def _run_evaluation_for_instance(db_session, instance, session_id, root_id, pend
         )
 
 
-def _revert_achievements_for_instance(db_session, instance_id: str, pending_events=None):
+def _revert_achievements_for_instance(db_session, instance_id: str, pending_events=None, exclude_goal_ids=()):
     """Internal helper to find and revert targets tied to an instance."""
     targets = db_session.query(Target).filter_by(
         completed_instance_id=instance_id,
         completed=True
-    ).all()
+    ).filter(Target.goal_id.notin_(exclude_goal_ids)).all()
     
     for target in targets:
         logger.info(f"[REVERSION] Reverting target '{target.name}' (id={target.id}) achieved by instance {instance_id}")
@@ -472,7 +481,7 @@ def _evaluate_threshold_target(target, instances_by_activity):
     return _find_threshold_target_achieving_instance(target, instances_by_activity) is not None
 
 
-def _evaluate_complex_target(db_session, target, goal, current_session_id):
+def _evaluate_complex_target(db_session, target, goal, current_session_id, instance_ids=None):
     """Evaluate accumulation (sum) or frequency targets over a time range."""
     start_date, end_date = _get_target_date_range(db_session, target)
     
@@ -487,9 +496,11 @@ def _evaluate_complex_target(db_session, target, goal, current_session_id):
         ActivityInstance.deleted_at == None
     )
     
-    if start_date:
+    if instance_ids is not None:
+        query = query.filter(ActivityInstance.id.in_(instance_ids), ActivityInstance.root_id == goal.root_id, ActivityInstance.completed.is_(True))
+    if instance_ids is None and start_date:
         query = query.filter(ActivityInstance.created_at >= start_date)
-    if end_date:
+    if instance_ids is None and end_date:
         query = query.filter(ActivityInstance.created_at <= end_date)
         
     instances = query.all()
@@ -518,8 +529,8 @@ def _get_target_date_range(db_session, target):
         start = target.get('start_date')
         end = target.get('end_date')
         return (
-            datetime.fromisoformat(start) if start else None,
-            datetime.fromisoformat(end) if end else None
+            start if isinstance(start, datetime) else datetime.fromisoformat(start) if start else None,
+            end if isinstance(end, datetime) else datetime.fromisoformat(end) if end else None
         )
         
     elif time_scope == 'program_block':
@@ -561,6 +572,8 @@ def _evaluate_sum_target(target, instances):
         # Add instance level metrics (serialized or DB objects?)
         if inst.metric_values:
             for mv in inst.metric_values:
+                if getattr(mv, 'activity_set_id', None) is not None:
+                    continue
                 all_metrics.append({'metric_id': mv.metric_definition_id, 'value': mv.value})
         
         # Sum them up

@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 from models import (
     ActivityDefinition,
     ActivityInstance,
-    Goal,
+    Goal, Session,
     MetricDefinition,
     MetricValue,
     Target,
@@ -21,7 +21,7 @@ from models import (
     validate_root_goal,
 )
 from services.events import Event, Events, event_bus
-from services.goal_contribution import resolve_contribution_goal
+from services.instance_goal_evidence import load_instance_goal_ids, instance_source_goal_ids, instance_contributes_to_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_target_rules import check_metric_value, check_metrics_meet_target
 from services.goal_target_helpers import as_utc
@@ -402,7 +402,9 @@ class GoalTargetService:
             history.associated_goal_ids(activity_id, effective_goal_ids)
             if history is not None else self._activity_associated_goal_ids(root_id, activity_id, effective_goal_ids)
         )
-        if not associated_goal_ids:
+        instance_links = (history.instance_links(subtree_ids) if history is not None else
+                          load_instance_goal_ids(self.db_session, root_id, goal_ids=subtree_ids))
+        if not associated_goal_ids and not instance_links:
             return []
 
         occurred_at_expr = func.coalesce(
@@ -416,6 +418,7 @@ class GoalTargetService:
             selectinload(ActivityInstance.session),
         ).filter(
             ActivityInstance.root_id == root_id,
+            ActivityInstance.session_id.is_(None) | ActivityInstance.session.has(Session.deleted_at.is_(None)),
             ActivityInstance.activity_definition_id == activity_id,
             ActivityInstance.completed.is_(True),
             ActivityInstance.deleted_at.is_(None),
@@ -425,16 +428,18 @@ class GoalTargetService:
         if effective_end:
             query = query.filter(occurred_at_expr <= effective_end)
 
-        instances = history.instances({activity_id}) if history is not None else query.all()
+        instances = history.instances({activity_id}, linked_instance_ids=set(instance_links)) if history is not None else query.all()
 
         serialized_instances = []
         for instance in instances:
+            if instance.activity_definition_id != activity_id:
+                continue
             occurred_at = as_utc(instance.time_stop or instance.time_start or instance.created_at)
             if not occurred_at or (effective_start and occurred_at < effective_start) or (effective_end and occurred_at > effective_end):
                 continue
             contributes = any(
-                resolve_contribution_goal(goals_by_id.get(gid), occurred_at) is not None
-                for gid in associated_goal_ids
+                instance_contributes_to_goal(instance, goals_by_id.get(gid))
+                for gid in instance_source_goal_ids(instance.id, associated_goal_ids, instance_links, subtree_ids)
             )
             if not contributes:
                 continue
@@ -518,15 +523,13 @@ class GoalTargetService:
         if not goal:
             return None, "Goal not found", 404
 
-        # Effective window: explicit start_date, else the target creation date.
-        # `since='all'` removes the lower bound so the full history is returned.
+        # `since='all'` removes the target's effective start bound.
         effective_start = None if since == 'all' else as_utc(target.start_date or target.created_at)
         effective_end = as_utc(target.end_date)
 
         activity_def = history.activity_definition(target.activity_id) if history is not None else self._load_activity_definition(root_id, target.activity_id)
 
         activity_definition_payload = self._serialize_activity_definition_payload(activity_def)
-
         serialized_instances = self._collect_goal_activity_instances(
             root_id, goal, goals_by_id, target.activity_id, effective_start, effective_end, history
         )
