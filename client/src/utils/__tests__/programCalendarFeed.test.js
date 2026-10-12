@@ -1,4 +1,3 @@
-import { nestContributingSessionsInProgramDays } from '../programDayState';
 import { attachFeedBlocks, buildCalendarFeedEvents, mergeCalendarFeedChunks } from '../programCalendarFeed';
 
 const program = { id: 'p1', name: 'Base', color: '#112233', start_date: '2026-08-20', end_date: '2026-10-05' };
@@ -57,11 +56,9 @@ describe('programCalendarFeed', () => {
         ]);
     });
 
-    it('builds the event shapes the calendar consumes and nests credited sessions', () => {
+    it('builds the event shapes the calendar consumes with credited sessions alongside their day', () => {
         const feed = mergeCalendarFeedChunks([august, september]);
-        const events = nestContributingSessionsInProgramDays(
-            buildCalendarFeedEvents({ feed, programs: [program], selectedProgramId: 'p1' }),
-        );
+        const events = buildCalendarFeedEvents({ feed, programs: [program], selectedProgramId: 'p1' });
         const byType = (type) => events.filter((event) => event.extendedProps?.type === type);
 
         expect(byType('program_background')).toEqual([expect.objectContaining({
@@ -76,8 +73,8 @@ describe('programCalendarFeed', () => {
             programId: 'p1', pDayId: 'd1', blockColor: '#445566', isCompleted: true,
             dayState: expect.objectContaining({ date: '2026-09-01', state: 'scheduled_met' }),
         }));
-        expect(ribbons[1].extendedProps.contributingSessions).toHaveLength(1);
-        expect(byType('completed_session')).toEqual([]);
+        expect(ribbons[1].extendedProps.contributingSessions).toBeUndefined();
+        expect(byType('completed_session')).toEqual([expect.objectContaining({ start: '2026-09-01' })]);
         expect(byType('calendar_period')).toHaveLength(1);
     });
 

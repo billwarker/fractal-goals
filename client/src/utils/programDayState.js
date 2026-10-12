@@ -117,45 +117,6 @@ export function buildCompletedSessionEvents(days = [], programId = null) {
     });
 }
 
-/** Place credited sessions inside their matching program-day ribbon. */
-export function nestContributingSessionsInProgramDays(events = []) {
-    const ribbonIndexes = new Map();
-    events.forEach((event, index) => {
-        if (event.extendedProps?.type !== 'program_day') return;
-        const key = `${event.start}:${event.extendedProps.pDayId}`;
-        if (!ribbonIndexes.has(key)) ribbonIndexes.set(key, index);
-    });
-
-    const nestedByIndex = new Map();
-    const standalone = [];
-    events.forEach((event) => {
-        if (event.extendedProps?.type !== 'completed_session') {
-            standalone.push(event);
-            return;
-        }
-        const matchingIndexes = [...new Set((event.extendedProps.programDayIds || [])
-            .map((dayId) => ribbonIndexes.get(`${event.start}:${dayId}`))
-            .filter((index) => index !== undefined))];
-        if (matchingIndexes.length === 0) {
-            standalone.push(event);
-            return;
-        }
-        matchingIndexes.forEach((index) => {
-            if (!nestedByIndex.has(index)) nestedByIndex.set(index, []);
-            nestedByIndex.get(index).push(event);
-        });
-    });
-
-    return standalone.map((event) => {
-        const index = events.indexOf(event);
-        const sessions = nestedByIndex.get(index);
-        return sessions ? {
-            ...event,
-            extendedProps: { ...event.extendedProps, contributingSessions: sessions },
-        } : event;
-    });
-}
-
 export const CALENDAR_PERIOD_KIND_LABELS = {
     vacation: 'Vacation',
     travel: 'Travel',

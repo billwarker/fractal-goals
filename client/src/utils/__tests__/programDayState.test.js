@@ -1,7 +1,6 @@
 import {
     buildCalendarPeriodEvents,
     buildCompletedSessionEvents,
-    nestContributingSessionsInProgramDays,
     getProgramDayStateMeta,
     getProgramDayStatusSymbol,
     indexProgramDayStates,
@@ -58,28 +57,6 @@ describe('buildCompletedSessionEvents', () => {
 
     it('returns no events without read-model days', () => {
         expect(buildCompletedSessionEvents(undefined, 'program-1')).toEqual([]);
-    });
-
-    it('nests credited sessions under their matching program-day occurrence', () => {
-        const ribbon = {
-            id: 'pday-program-1-2026-09-01-day-1',
-            start: '2026-09-01',
-            extendedProps: { type: 'program_day', pDayId: 'day-1' },
-        };
-        const session = {
-            id: 'completed-session-s1',
-            start: '2026-09-01',
-            title: 'Planche',
-            extendedProps: { type: 'completed_session', programDayIds: ['day-1'] },
-        };
-
-        expect(nestContributingSessionsInProgramDays([ribbon, session])).toEqual([{
-            ...ribbon,
-            extendedProps: { ...ribbon.extendedProps, contributingSessions: [session] },
-        }]);
-        expect(nestContributingSessionsInProgramDays([ribbon, {
-            ...session, extendedProps: { type: 'completed_session', programDayIds: [] },
-        }])).toHaveLength(2);
     });
 });
 

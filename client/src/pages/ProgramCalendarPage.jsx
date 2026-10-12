@@ -44,7 +44,6 @@ import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { addDaysToDateString, formatLiteralDate, getISOYMDInTimezone, subtractDaysToDateString } from '../utils/dateUtils';
 import { fractalApi } from '../utils/api';
 import notify from '../utils/notify';
-import { nestContributingSessionsInProgramDays } from '../utils/programDayState';
 import { attachFeedBlocks, buildCalendarFeedEvents } from '../utils/programCalendarFeed';
 import { useCalendarPeriodEditor } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
@@ -198,14 +197,15 @@ function ProgramCalendarPage() {
     const dayStatusMutation = useUpdateProgramDayStatuses(rootId, displayProgram?.id);
     const sessionCreditMutation = useSetProgramDaySessionCredit(rootId, displayProgram?.id, timezone);
     const periodEditor = useCalendarPeriodEditor(rootId);
-    const calendarEventsWithSessions = useMemo(() => nestContributingSessionsInProgramDays([
+    const displayProgramId = displayProgram?.id || null;
+    const calendarEventsWithSessions = useMemo(() => [
         ...buildCalendarFeedEvents({
             feed: calendarFeed,
             programs: calendarPrograms,
-            selectedProgramId: displayProgram?.id || null,
+            selectedProgramId: displayProgramId,
         }),
         ...goalDeadlineEvents,
-    ]), [calendarFeed, calendarPrograms, displayProgram?.id, goalDeadlineEvents]);
+    ], [calendarFeed, calendarPrograms, displayProgramId, goalDeadlineEvents]);
     const displayGoals = detailGoals?.length ? detailGoals : goals;
 
     const {

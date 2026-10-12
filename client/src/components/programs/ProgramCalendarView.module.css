@@ -479,24 +479,9 @@
     color: var(--color-text-primary);
 }
 
-.programDaySessions {
-    display: flex;
-    flex: 1 0 100%;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    padding: 0 3px 2px;
-}
-
-.eventPillNestedSession {
-    min-height: 18px;
-    padding: 0;
-    overflow: hidden;
-    cursor: default;
-}
-
-.calendarContainerCompact .eventPillNestedSession {
-    min-height: 16px;
+.eventPillProgramDayMarkOnly {
+    justify-content: center;
+    padding-right: 0;
 }
 
 .eventPillProgramDay .eventPillText {

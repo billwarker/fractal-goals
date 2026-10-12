@@ -173,7 +173,8 @@ function ProgramCalendarView({
         eventInfo,
         readOnly ? undefined : (clickInfo) => onEventClickRef.current?.(clickInfo),
         dayStatesByDate.get(normalizeCalendarEventDate(eventInfo.event.start)),
-    ), [dayStatesByDate, readOnly]);
+        { markOnly: isMobile },
+    ), [dayStatesByDate, readOnly, isMobile]);
 
     const getDayCellClassNames = (dayInfo) => {
         const dateStr = dayInfo.dateStr || formatCalendarCellDate(dayInfo.date);

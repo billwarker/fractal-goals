@@ -19,6 +19,21 @@ describe('renderProgramCalendarEventContent', () => {
         expect(screen.queryByText(/completed session/i)).not.toBeInTheDocument();
     });
 
+    it('shows only the status mark in mark-only (mobile) mode while keeping the name accessible', () => {
+        const { container } = render(renderProgramCalendarEventContent(
+            { event: { title: 'Upper Body', extendedProps: { type: 'program_day' } } },
+            undefined,
+            { state: 'scheduled_missed', scheduled: true, closed: true },
+            { markOnly: true },
+        ));
+
+        expect(container.querySelector('[data-program-day-status]')).toHaveAttribute(
+            'data-program-day-status', 'missed',
+        );
+        expect(container.querySelector('[class*="eventPillText"]')).toBeNull();
+        expect(screen.getByText(/Upper Body:/).className).toContain('dayStatusAssistive');
+    });
+
     it('shows the same date status on each program-day container', () => {
         const { container } = render(renderProgramCalendarEventContent(
             { event: { title: 'Other program day', extendedProps: { type: 'program_day' } } },

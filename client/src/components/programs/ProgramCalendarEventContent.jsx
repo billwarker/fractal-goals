@@ -13,10 +13,10 @@ function activateGoalEvent(eventInfo, onGoalActivate, jsEvent) {
     onGoalActivate({ ...eventInfo, jsEvent: jsEvent.nativeEvent || jsEvent });
 }
 
-function renderCompletedSession(title, props, nested = false) {
+function renderCompletedSession(title, props) {
     const { templateName, templateColor, count = 1 } = props;
     return (
-        <div className={`${styles.eventPill} ${styles.eventPillCompletedSession} ${nested ? styles.eventPillNestedSession : ''}`}>
+        <div className={`${styles.eventPill} ${styles.eventPillCompletedSession}`}>
             {templateName ? (
                 <span className={styles.completedSessionBadgeGroup}>
                     <SessionTemplateNameBadge
@@ -44,7 +44,7 @@ function renderCompletedSession(title, props, nested = false) {
     );
 }
 
-export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, selectedDayState) {
+export default function renderProgramCalendarEventContent(eventInfo, onGoalActivate, selectedDayState, { markOnly = false } = {}) {
     const {
         type, blockColor, isCompleted, goalIcon,
     } = eventInfo.event.extendedProps;
@@ -94,10 +94,11 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
         else statusLabel = getProgramDayStateMeta(dayState?.state)?.label;
         return (
             <div
-                className={`${styles.eventPill} ${styles.eventPillProgramDay}`}
+                className={`${styles.eventPill} ${styles.eventPillProgramDay} ${markOnly ? styles.eventPillProgramDayMarkOnly : ''}`}
                 style={{ '--program-day-pill-bg': `color-mix(in srgb, ${color} 13%, var(--color-bg-card))` }}
+                title={markOnly ? title : undefined}
             >
-                <span className={styles.eventPillText}>{title}</span>
+                {markOnly ? null : <span className={styles.eventPillText}>{title}</span>}
                 {dayState?.status_source === 'period' ? (
                     <span className={styles.dayStatusAssistive}>(protected by an event)</span>
                 ) : null}
@@ -114,16 +115,8 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
                         className={styles.ribbonStatusMark}
                     />
                 ) : null}
-                {eventInfo.event.extendedProps.contributingSessions?.length ? (
-                    <div className={styles.programDaySessions}>
-                        {eventInfo.event.extendedProps.contributingSessions.map((session) => (
-                            <React.Fragment key={session.id}>
-                                {renderCompletedSession(session.title, session.extendedProps, true)}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                ) : null}
                 {statusLabel ? <span className={styles.dayStatusAssistive}>{title}: {statusLabel}</span> : null}
+                {!statusLabel && markOnly ? <span className={styles.dayStatusAssistive}>{title}</span> : null}
             </div>
         );
     }
