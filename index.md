@@ -459,6 +459,9 @@ Auth, quotas, admin tooling, feature flags, telemetry, email delivery, landing p
 data export, and account deletion form the account boundary. Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
+The Logs page reads owner-scoped event history; only admins can clear a fractal's complete
+log history, after explicit confirmation regardless of filters. `useLogsData` owns that mutation
+and invalidates paginated and infinite history through the shared `logsRoot` query key.
 
 Session tokens carry the session audience, `users.session_version`, and the original login
 time. Password change/reset, admin resets, suspension, and "Sign out of all devices" increment

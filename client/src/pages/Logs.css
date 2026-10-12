@@ -74,8 +74,13 @@
     color: white;
 }
 
-.clear-logs-btn:hover {
+.clear-logs-btn:hover:not(:disabled) {
     background: var(--color-brand-danger);
+}
+
+.logs-header-actions button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Filters */

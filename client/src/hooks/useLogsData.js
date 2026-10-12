@@ -25,10 +25,7 @@ export function useLogsData(rootId, { page, pageSize, eventType, startDate, endD
 
     const clearLogsMutation = useMutation({
         mutationFn: async () => fractalApi.clearLogs(rootId),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.logs(rootId) });
-            queryClient.removeQueries({ queryKey: queryKeys.logsInfiniteRoot(rootId) });
-        }
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.logsRoot(rootId) }),
     });
 
     return {

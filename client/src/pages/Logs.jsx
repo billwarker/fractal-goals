@@ -5,16 +5,22 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateInTimezone } from '../utils/dateUtils';
 import { useLogsData } from '../hooks/useLogsData';
 import useIsMobile from '../hooks/useIsMobile';
+import { useAuth } from '../contexts/AuthContext';
+import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import Button from '../components/atoms/Button';
+import notify from '../utils/notify';
 import './Logs.css';
 
 /**
- * Logs Page - read-only admin view for application event logs.
+ * Application event history with admin-only retention controls.
  */
 function Logs() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
     const isMobile = useIsMobile();
+    const { user } = useAuth();
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     const [page, setPage] = useState(1);
     const pageSize = 50;
@@ -36,9 +42,23 @@ function Logs() {
         eventTypes,
         isLoading: loading,
         refetch,
+        clearLogs,
+        isClearing,
     } = useLogsData(rootId, { page, pageSize, eventType, startDate, endDate });
 
     const totalPages = Math.ceil(total / pageSize);
+
+    const handleClearLogs = async () => {
+        if (isClearing || !user?.is_admin) return;
+        setShowClearConfirm(false);
+        try {
+            await clearLogs();
+            setPage(1);
+            notify.success('Logs cleared');
+        } catch (error) {
+            notify.error('Failed to clear logs: ' + (error.response?.data?.error || error.message));
+        }
+    };
 
     return (
         <div className="logs-page-container">
@@ -69,7 +89,12 @@ function Logs() {
                     </div>
                 </div>
                 <div className="logs-header-actions">
-                    <button className="refresh-logs-btn" onClick={() => refetch()}>REFRESH</button>
+                    <Button unstyled className="refresh-logs-btn" disabled={isClearing} onClick={() => refetch()}>REFRESH</Button>
+                    {user?.is_admin && (
+                        <Button unstyled className="clear-logs-btn" disabled={isClearing} onClick={() => setShowClearConfirm(true)}>
+                            {isClearing ? 'CLEARING…' : 'CLEAR LOGS'}
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -142,6 +167,14 @@ function Logs() {
                     </div>
                 )}
             </div>
+            <DeleteConfirmModal
+                isOpen={showClearConfirm}
+                onClose={() => setShowClearConfirm(false)}
+                onConfirm={handleClearLogs}
+                title="Clear all logs?"
+                message="Permanently delete all application event logs for this fractal, including events outside the current filters. Your goals, sessions, and activities will remain unchanged."
+                confirmText="Clear all logs"
+            />
         </div>
     );
 }

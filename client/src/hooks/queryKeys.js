@@ -98,6 +98,7 @@ export const queryKeys = {
     goals: (rootId) => ['goals', rootId],
     goalsForSelection: (rootId) => ['goalsForSelection', rootId],
     goalsTree: (rootId) => ['goals-tree', rootId],
+    logsRoot: (rootId) => ['logs', rootId],
     logs: (rootId, page = 1, pageSize = 50, eventType = 'all', startDate = '', endDate = '') => [
         'logs',
         rootId,
@@ -109,7 +110,6 @@ export const queryKeys = {
     ],
     landingExamples: () => ['public', 'landing-examples'],
     logsInfinite: (rootId, pageSize = 50) => ['logs', rootId, 'infinite', pageSize],
-    logsInfiniteRoot: (rootId) => ['logs', rootId, 'infinite'],
     program: (rootId, programId, timezone = null) => timezone
         ? ['program', rootId, programId, { timezone }]
         : ['program', rootId, programId],
