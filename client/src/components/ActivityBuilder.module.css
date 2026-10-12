@@ -1,6 +1,5 @@
 /* ActivityBuilder.module.css */
 
-
 .errorMessage {
     padding: 10px;
     background: rgba(255, 0, 0, 0.1);
@@ -102,15 +101,6 @@
     flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 8px;
-}
-
-.selectedGoalTag {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
 }
 
 .removeGoalBtn {
@@ -251,7 +241,6 @@
     /* Atom handles layout and color */
     margin-bottom: 0;
 }
-
 
 /* .addMetricBtn removed */
 

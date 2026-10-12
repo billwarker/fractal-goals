@@ -23,6 +23,7 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
+    ProgramDayTemplate,
     ProgramDayOccurrenceSchedule,
     ProgramSessionPlan,
     SessionTemplate,
@@ -163,7 +164,7 @@ def power_account_dataset(db_session, test_user):
                 if (block_start + timedelta(days=offset)).strftime("%A") in {"Monday", "Wednesday", "Friday"}
             ],
         )
-        day.templates.append(template)
+        day.template_links.append(ProgramDayTemplate(template=template))
         db_session.add(day)
         program_days.append((block, day))
 

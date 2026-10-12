@@ -93,17 +93,6 @@
     background: var(--color-brand-success-hover);
 }
 
-/* Metadata Badges */
-.type-badge {
-    background: var(--color-bg-card-hover);
-    padding: 4px 8px;
-    border-radius: var(--border-radius-sm);
-    font-size: 0.8em;
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
 .header-meta {
     margin-bottom: 10px;
 }
@@ -154,22 +143,6 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--spacing-sm);
-}
-
-.achieved-target-pill {
-    padding: 6px 12px;
-    background: color-mix(in srgb, var(--color-brand-success) 20%, var(--color-bg-card));
-    border-radius: var(--border-radius-sm);
-    font-size: var(--font-size-xs);
-    color: var(--color-brand-success);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.target-pill-subtext {
-    font-size: 10px;
-    opacity: 0.8;
 }
 
 /* Completion Button States */

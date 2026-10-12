@@ -210,20 +210,20 @@ def test_get_active_program_days_filters_to_days_scheduled_today(db_session, sam
         day_number=1,
         day_of_week=[today.strftime('%A')],
     )
-    today_day.templates.append(sample_session_template)
+    today_day.template_links.append(models.ProgramDayTemplate(template=sample_session_template))
     future_day = ProgramDay(
         program_id=block.program_id,
         name='Future Practice',
         day_number=2,
         day_of_week=[tomorrow.strftime('%A')],
     )
-    future_day.templates.append(sample_session_template)
+    future_day.template_links.append(models.ProgramDayTemplate(template=sample_session_template))
     unscheduled_day = ProgramDay(
         program_id=block.program_id,
         name='Unscheduled Practice',
         day_number=3,
     )
-    unscheduled_day.templates.append(sample_session_template)
+    unscheduled_day.template_links.append(models.ProgramDayTemplate(template=sample_session_template))
     db_session.add_all([today_day, future_day, unscheduled_day])
     db_session.commit()
 

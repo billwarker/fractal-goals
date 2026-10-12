@@ -1,17 +1,16 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 
-import EmptyState from '../components/common/EmptyState';
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlocksPanel from '../components/programs/ProgramBlocksPanel';
+import ProgramOptionsModal from '../components/programs/ProgramOptionsModal';
 import ProgramStatusBadge from '../components/programs/ProgramStatusBadge';
 import ProgramCalendarView from '../components/programs/ProgramCalendarView';
 import CalendarPeriodModal from '../components/programs/CalendarPeriodModal';
 import ProgramDayStatusBulkBar from '../components/programs/ProgramDayStatusBulkBar';
 import ResponsiveProgramSidePane from '../components/programs/ResponsiveProgramSidePane';
-import Modal from '../components/atoms/Modal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
@@ -121,9 +120,6 @@ function ProgramCalendarPage() {
     });
     const [sidePaneView, setSidePaneView] = useState('details');
     const [isProgramOptionsOpen, setIsProgramOptionsOpen] = useState(false);
-    const [programOptionsView, setProgramOptionsView] = useState('actions');
-    const [programPickerQuery, setProgramPickerQuery] = useState('');
-    const [programPickerFilter, setProgramPickerFilter] = useState('all');
     const [builderState, setBuilderState] = useState({ open: false, mode: 'create', startDate: '', duplicateSource: null });
     const [programToDelete, setProgramToDelete] = useState(null);
     const [deleteSessionCount, setDeleteSessionCount] = useState(0);
@@ -350,33 +346,6 @@ function ProgramCalendarPage() {
 
     const displayProgramStatus = displayProgram ? getProgramStatus(displayProgram, todayInTimezone) : null;
     const displayProgramColor = displayProgram ? getProgramColor(displayProgram) : null;
-    const groupedPrograms = useMemo(() => {
-        const normalizedQuery = programPickerQuery.trim().toLowerCase();
-        const groups = {
-            active: [],
-            upcoming: [],
-            completed: [],
-        };
-
-        programs.forEach((program) => {
-            const bucket = getProgramStatus(program, todayInTimezone);
-            const matchesQuery = !normalizedQuery
-                || program.name.toLowerCase().includes(normalizedQuery)
-                || `${formatLiteralDate(program.start_date)} ${formatLiteralDate(program.end_date)}`.toLowerCase().includes(normalizedQuery);
-            const matchesFilter = programPickerFilter === 'all' || programPickerFilter === bucket;
-
-            if (matchesQuery && matchesFilter) {
-                groups[bucket].push(program);
-            }
-        });
-
-        groups.active.sort((a, b) => (getDatePart(a.start_date) || '').localeCompare(getDatePart(b.start_date) || ''));
-        groups.upcoming.sort((a, b) => (getDatePart(a.start_date) || '').localeCompare(getDatePart(b.start_date) || ''));
-        groups.completed.sort((a, b) => (getDatePart(b.end_date) || '').localeCompare(getDatePart(a.end_date) || ''));
-
-        return groups;
-    }, [programPickerFilter, programPickerQuery, programs, todayInTimezone]);
-    const filteredProgramCount = groupedPrograms.active.length + groupedPrograms.upcoming.length + groupedPrograms.completed.length;
 
     const selectedRangeText = selectedCalendarRange
         ? `${formatLiteralDate(selectedCalendarRange.startDate)} - ${formatLiteralDate(selectedCalendarRange.endDate)}`
@@ -724,35 +693,11 @@ function ProgramCalendarPage() {
     };
 
     const handleEditProgramOption = () => {
-        if (!displayProgram) return;
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
         setBuilderState({ open: true, mode: 'edit', startDate: '', duplicateSource: null });
     };
 
-    const handleDeleteProgramOption = () => {
-        if (!displayProgram) return;
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
-        requestDeleteProgram(displayProgram);
-    };
-
-    const handleCreateProgramOption = () => {
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
-        openCreateProgram();
-    };
-
     const handleDuplicateProgramOption = () => {
-        if (!displayProgram) return;
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
-        setBuilderState({
-            open: true,
-            mode: 'duplicate',
-            startDate: '',
-            duplicateSource: displayProgram,
-        });
+        setBuilderState({ open: true, mode: 'duplicate', startDate: '', duplicateSource: displayProgram });
     };
 
     const handleSelectProgramOption = (program) => {
@@ -761,21 +706,7 @@ function ProgramCalendarPage() {
             date: getDatePart(program.start_date) || contextDate,
             programId: program.id,
         });
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
     };
-
-    const closeProgramOptions = () => {
-        setIsProgramOptionsOpen(false);
-        setProgramOptionsView('actions');
-        setProgramPickerQuery('');
-        setProgramPickerFilter('all');
-    };
-
-    const programOptionsTitle = {
-        actions: 'Program Options',
-        programs: 'Other Programs',
-    }[programOptionsView] || 'Program Options';
 
     const viewToggle = displayProgram ? (
         <ViewToggleTabs
@@ -1000,168 +931,26 @@ function ProgramCalendarPage() {
                 submitLabel={builderState.mode === 'duplicate' ? 'Duplicate Program' : undefined}
             />
 
-            <Modal
+            <ProgramOptionsModal
                 isOpen={isProgramOptionsOpen}
-                onClose={closeProgramOptions}
-                title={programOptionsTitle}
-                size={programOptionsView === 'actions' ? 'sm' : 'md'}
-            >
-                {programOptionsView === 'programs' ? (
-                    <div className={styles.programPicker}>
-                        <button
-                            className={styles.backButton}
-                            onClick={() => setProgramOptionsView('actions')}
-                        >
-                            Back to Options
-                        </button>
-
-                        {programs.length === 0 ? (
-                            <EmptyState title="Turn intent into a schedule" description="Programs connect goals, templates, and dates into a practice rhythm you can follow." actionLabel="Create a new program" onAction={handleCreateProgramOption} />
-                        ) : (
-                            <>
-                                <div className={styles.programPickerControls}>
-                                    <input
-                                        className={styles.programPickerSearch}
-                                        type="search"
-                                        value={programPickerQuery}
-                                        onChange={(event) => setProgramPickerQuery(event.target.value)}
-                                        placeholder="Search programs"
-                                        aria-label="Search programs"
-                                    />
-                                    <div className={styles.programPickerFilters} aria-label="Filter programs">
-                                        {[
-                                            ['all', 'All'],
-                                            ['active', 'Active'],
-                                            ['upcoming', 'Upcoming'],
-                                            ['completed', 'Completed'],
-                                        ].map(([value, label]) => (
-                                            <button
-                                                key={value}
-                                                className={`${styles.programPickerFilterButton} ${programPickerFilter === value ? styles.programPickerFilterButtonActive : ''}`}
-                                                onClick={() => setProgramPickerFilter(value)}
-                                            >
-                                                {label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {filteredProgramCount === 0 ? (
-                                    <div className={styles.programPickerEmpty}>
-                                        <p>No programs match your filters.</p>
-                                    </div>
-                                ) : null}
-
-                                {[
-                                    ['Active Program', groupedPrograms.active],
-                                    ['Upcoming', groupedPrograms.upcoming],
-                                    ['Completed', groupedPrograms.completed],
-                                ].map(([label, group]) => (
-                                    group.length ? (
-                                        <section className={styles.programPickerGroup} key={label}>
-                                            <h3 className={styles.programPickerGroupTitle}>{label}</h3>
-                                            <div className={styles.programPickerList}>
-                                                {group.map((program) => {
-                                                    const status = getProgramStatus(program, todayInTimezone);
-                                                    const isSelected = program.id === displayProgram?.id;
-
-                                                    return (
-                                                        <button
-                                                            key={program.id}
-                                                            className={`${styles.programPickerRow} ${isSelected ? styles.programPickerRowSelected : ''}`}
-                                                            onClick={() => handleSelectProgramOption(program)}
-                                                        >
-                                                            <span className={styles.programPickerMain}>
-                                                                <span className={styles.programPickerName}>{program.name}</span>
-                                                                <span className={styles.programPickerDates}>
-                                                                    {formatLiteralDate(program.start_date)} - {formatLiteralDate(program.end_date)}
-                                                                </span>
-                                                            </span>
-                                                            <ProgramStatusBadge status={status} />
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
-                                        </section>
-                                    ) : null
-                                ))}
-                            </>
-                        )}
-                    </div>
-                ) : (
-                    <div className={styles.optionsModalBody}>
-                        <button
-                            className={styles.optionButton}
-                            onClick={handleEditProgramOption}
-                            disabled={!displayProgram}
-                        >
-                            <span className={styles.optionTitle}>Edit Program</span>
-                            <span className={styles.optionDescription}>
-                                Update the name, dates, description, and attached goals.
-                            </span>
-                        </button>
-                        <button
-                            className={`${styles.optionButton} ${styles.optionButtonDanger}`}
-                            onClick={handleDeleteProgramOption}
-                            disabled={!displayProgram}
-                        >
-                            <span className={styles.optionTitle}>Delete Program</span>
-                            <span className={styles.optionDescription}>
-                                Remove this program and clear its session associations.
-                            </span>
-                        </button>
-                        <button
-                            className={styles.optionButton}
-                            onClick={handleDuplicateProgramOption}
-                            disabled={!displayProgram}
-                        >
-                            <span className={styles.optionTitle}>Duplicate Program</span>
-                            <span className={styles.optionDescription}>
-                                Copy this program's goals, blocks, and planned days into a new date range.
-                            </span>
-                        </button>
-                        <button className={styles.optionButton} onClick={() => { closeProgramOptions(); setViewMode('calendar'); setMultiDaySelectionMode(true, { restoreFocus: false }); }} disabled={!displayProgram}>
-                            <span className={styles.optionTitle}>Plan an Event</span>
-                            <span className={styles.optionDescription}>Select days on the calendar, then choose Plan event (e.g. a vacation that protects streaks).</span>
-                        </button>
-                        <button
-                            className={styles.optionButton}
-                            onClick={handleCreateProgramOption}
-                        >
-                            <span className={styles.optionTitle}>Create a New Program</span>
-                            <span className={styles.optionDescription}>
-                                Start another program with its own date range and goals.
-                            </span>
-                        </button>
-                        <button
-                            className={styles.optionButton}
-                            onClick={() => setProgramOptionsView('programs')}
-                        >
-                            <span className={styles.optionTitle}>View Other Programs</span>
-                            <span className={styles.optionDescription}>
-                                Browse active, upcoming, and completed programs.
-                            </span>
-                        </button>
-                        <button
-                            className={styles.optionButton}
-                            onClick={() => {
-                                // Goals are the calendar pane's program-scope Goals view.
-                                setViewMode('calendar');
-                                setSidePaneView('goals');
-                                dispatchCalendarContext({ type: 'focus_program', programId: displayProgram?.id });
-                                setIsSidePaneVisible(true);
-                                closeProgramOptions();
-                            }}
-                            disabled={!displayProgram}
-                        >
-                            <span className={styles.optionTitle}>Program Goals</span>
-                            <span className={styles.optionDescription}>
-                                View the goals associated with this program and track progress.
-                            </span>
-                        </button>
-                    </div>
-                )}
-            </Modal>
+                onClose={() => setIsProgramOptionsOpen(false)}
+                programs={programs}
+                displayProgram={displayProgram}
+                today={todayInTimezone}
+                onEdit={handleEditProgramOption}
+                onDelete={() => requestDeleteProgram(displayProgram)}
+                onDuplicate={handleDuplicateProgramOption}
+                onPlanEvent={() => { setViewMode('calendar'); setMultiDaySelectionMode(true, { restoreFocus: false }); }}
+                onCreate={() => openCreateProgram()}
+                onSelectProgram={handleSelectProgramOption}
+                onShowGoals={() => {
+                    // Goals are the calendar pane's program-scope Goals view.
+                    setViewMode('calendar');
+                    setSidePaneView('goals');
+                    dispatchCalendarContext({ type: 'focus_program', programId: displayProgram?.id });
+                    setIsSidePaneVisible(true);
+                }}
+            />
 
             <DeleteProgramModal
                 isOpen={Boolean(programToDelete)}

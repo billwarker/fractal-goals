@@ -9,17 +9,6 @@
     min-width: 0;
 }
 
-.metricUnitBadge {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-    padding: 4px 8px;
-    background: color-mix(in srgb, var(--color-brand-primary) 15%, transparent);
-    border-radius: 4px;
-    white-space: nowrap;
-    flex-shrink: 0;
-}
-
 .metricMeta {
     display: flex;
     flex-wrap: wrap;

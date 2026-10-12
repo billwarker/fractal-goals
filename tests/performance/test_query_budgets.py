@@ -19,7 +19,7 @@ from models import (
     PracticeSession,
     Program,
     ProgramBlock,
-    ProgramDay, ProgramDayOccurrenceSchedule,
+    ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate,
     SessionTemplate,
     Target,
     User,
@@ -94,7 +94,7 @@ def sample_program_tree(db_session, sample_ultimate_goal, sample_session_templat
             occurrence_schedules=[ProgramDayOccurrenceSchedule(date=(datetime.now(timezone.utc) + timedelta(days=index)).date())],
             day_of_week=[],
         )
-        day.templates.append(sample_session_template)
+        day.template_links.append(ProgramDayTemplate(template=sample_session_template))
         db_session.add(day)
 
     db_session.commit()

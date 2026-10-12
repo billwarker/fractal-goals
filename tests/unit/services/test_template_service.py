@@ -122,7 +122,7 @@ def test_list_templates_marks_archived_template_used_by_active_program(
         day_number=1,
         day_of_week=[today.strftime('%A')],
     )
-    day.templates.append(sample_session_template)
+    day.template_links.append(models.ProgramDayTemplate(template=sample_session_template))
     db_session.add(day)
     db_session.commit()
 

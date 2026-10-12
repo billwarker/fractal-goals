@@ -247,6 +247,14 @@ vi.mock('../../components/programs/ResponsiveProgramSidePane', () => ({
     ) : null,
 }));
 
+const renderPage = () => render(
+    <MemoryRouter initialEntries={['/root-1/programs']}>
+        <Routes>
+            <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
+        </Routes>
+    </MemoryRouter>,
+);
+
 describe('ProgramCalendarPage multi-day selection', () => {
     beforeEach(() => {
         programDataCalls.length = 0;
@@ -255,13 +263,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
 
     it('opens the mobile sidebar from the footer and keeps view switching in the header', async () => {
         viewport.isMobile = true;
-        const { container } = render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        const { container } = renderPage();
 
         const footer = screen.getByRole('contentinfo', { name: 'Program sidebar controls' });
         expect(footer.parentElement).toBe(document.body);
@@ -296,25 +298,13 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('keeps the mobile footer out of the desktop layout', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
         expect(screen.queryByRole('contentinfo', { name: 'Program sidebar controls' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
     });
 
     it('scopes directly to a past program when its calendar label is selected', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Select past program label' }));
         expect(programDataCalls.at(-1)).toBe(pastProgram.id);
@@ -322,13 +312,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('scopes directly to a past program when one of its dates is selected', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Select past program date' }));
         expect(programDataCalls.at(-1)).toBe(pastProgram.id);
@@ -336,13 +320,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('survives the click/select callback pair and extends through event-filled cells', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Select September 2' }));
@@ -364,13 +342,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('scopes the pane and metrics to a September 1–3 drag selection', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Drag September 1 through 3' }));
@@ -383,13 +355,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('bulk marks arbitrary scheduled dates complete through one mutation', async () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
@@ -405,13 +371,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('bulk marks noncontiguous days as rest from the same multi-day mode', async () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
@@ -428,13 +388,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('restores focus to the selection toggle after Escape', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));
@@ -445,13 +399,7 @@ describe('ProgramCalendarPage multi-day selection', () => {
     });
 
     it('keeps multi-day selection active after the background click emitted by a drag', () => {
-        render(
-            <MemoryRouter initialEntries={['/root-1/programs']}>
-                <Routes>
-                    <Route path="/:rootId/programs" element={<ProgramCalendarPage />} />
-                </Routes>
-            </MemoryRouter>,
-        );
+        renderPage();
 
         fireEvent.click(screen.getByRole('button', { name: 'Toggle multi-select' }));
         fireEvent.click(screen.getByRole('button', { name: 'Toggle status day' }));

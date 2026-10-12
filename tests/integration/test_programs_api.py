@@ -620,6 +620,40 @@ class TestProgramCRUD:
             program_id=program_id
         ).count() == 0
 
+    def test_delete_program_cascades_days_with_templates_and_history(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template,
+    ):
+        """The ORM cascade into program days removes each template link exactly once."""
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        today = datetime.now(timezone.utc).date()
+        day_ids = []
+        for name in ('Day A', 'Day B'):
+            created = authed_client.post(f'/api/{root_id}/programs/{program_id}/days', json={
+                'name': name, 'template_ids': [sample_session_template.id],
+            })
+            assert created.status_code == 201
+            day_ids.append(created.get_json()['id'])
+        logged = Session(
+            owner_id=sample_ultimate_goal.owner_id, root_id=root_id, name='Logged work', completed=True,
+            template_id=sample_session_template.id, program_id=program_id, program_day_id=day_ids[0],
+            session_start=datetime.combine(today, datetime.min.time(), tzinfo=timezone.utc),
+        )
+        db_session.add(logged)
+        db_session.commit()
+        logged_id = logged.id
+
+        response = authed_client.delete(f'/api/{root_id}/programs/{program_id}')
+
+        assert response.status_code == 200
+        db_session.expire_all()
+        assert db_session.query(ProgramDay).filter(ProgramDay.id.in_(day_ids)).count() == 0
+        assert db_session.query(ProgramDayTemplate).filter(
+            ProgramDayTemplate.program_day_id.in_(day_ids)
+        ).count() == 0
+        session = db_session.get(Session, logged_id)
+        assert session is not None and session.program_day_id is None
+
 @pytest.mark.integration
 class TestProgramStructure:
     """Test Program Blocks, Days, and Sessions."""
@@ -1079,6 +1113,27 @@ class TestProgramStructure:
         assert session is not None and session.program_day_id is None
         assert db_session.query(ProgramDaySession).filter_by(program_day_id=day_id).count() == 0
         assert db_session.query(ProgramSessionPlan).filter_by(program_day_id=day_id).count() == 0
+
+    def test_clearing_and_replacing_day_templates_keeps_one_link_per_template(
+        self, authed_client, db_session, sample_ultimate_goal, sample_program, sample_session_template,
+    ):
+        root_id = sample_ultimate_goal.id
+        program_id = sample_program['id']
+        created = authed_client.post(f'/api/{root_id}/programs/{program_id}/days', json={
+            'name': 'Edited Day', 'template_ids': [sample_session_template.id],
+        })
+        assert created.status_code == 201
+        day_id = created.get_json()['id']
+        url = f'/api/{root_id}/programs/{program_id}/days/{day_id}'
+
+        cleared = authed_client.put(url, json={'template_ids': []})
+        assert cleared.status_code == 200
+        assert cleared.get_json()['templates'] == []
+        restored = authed_client.put(url, json={'template_ids': [sample_session_template.id]})
+        assert restored.status_code == 200
+        assert [t['id'] for t in restored.get_json()['templates']] == [sample_session_template.id]
+        db_session.expire_all()
+        assert db_session.query(ProgramDayTemplate).filter_by(program_day_id=day_id).count() == 1
 
 
 class TestProgramCalendarInvariantsApi:

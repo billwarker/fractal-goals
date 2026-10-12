@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import ActivityPickerHeader from './ActivityPickerHeader';
+import { ActivityPickerActivityRow, ActivityPickerGroupCard } from './ActivityPickerRows';
 import {
     ROOT_KEY,
     buildActivityPickerModel,
@@ -262,84 +263,43 @@ function ActivityPicker({
         ? model.getBreadcrumb(currentGroup.id).slice(0, -1).map((group) => group.name).join(' / ')
         : null;
 
-    const renderCountBadge = (count) => {
-        if (!Number.isFinite(count) || count <= 0) return null;
-        return <span className={styles.countBadge}>{count}</span>;
-    };
-
     const renderActivity = (activity) => {
         if (isCopyMode && canCopyActivity?.(activity) === false) return null;
-        const isSelected = pendingActivityIds.has(activity.id);
-        const groupBreadcrumb = activity.group_id
-            ? model.getBreadcrumb(activity.group_id).map((item) => item.name).join(' / ')
-            : '';
-        const activityActionLabel = isCopyMode
-            ? `Copy ${activity.name}`
-            : `${isSelected ? 'Deselect' : 'Select'} ${activity.name}`;
+        const showBreadcrumb = (isSearching || flatActivityList) && activity.group_id;
         return (
-            <button
-                type="button"
+            <ActivityPickerActivityRow
                 key={activity.id}
-                className={`${styles.activityRow} ${isSelected ? styles.activityRowSelected : ''}`}
-                aria-label={activityActionLabel}
-                onClick={() => toggleActivity(activity)}
-            >
-                <span className={`${styles.selectionControl} ${isSingleSelect ? styles.radioControl : ''}`}>
-                    {isSelected ? '✓' : ''}
-                </span>
-                <div className={styles.activityContent}>
-                    <span className={styles.activityName}>{isCopyMode ? `Copy ${activity.name}` : activity.name}</span>
-                    {((isSearching || flatActivityList) && groupBreadcrumb) || activity.type ? (
-                        <span className={styles.activityMeta}>
-                            {(isSearching || flatActivityList) && groupBreadcrumb
-                                ? `${groupBreadcrumb}${activity.type ? ' / ' : ''}`
-                                : ''}
-                            {activity.type || ''}
-                        </span>
-                    ) : null}
-                    {renderActivityDetails?.(activity)}
-                </div>
-                {renderCountBadge(counts.activitiesById?.[activity.id] ?? counts.activityCounts?.[activity.id]) || <span />}
-            </button>
+                activity={activity}
+                isSelected={pendingActivityIds.has(activity.id)}
+                isCopyMode={isCopyMode}
+                isSingleSelect={isSingleSelect}
+                breadcrumb={showBreadcrumb ? model.getBreadcrumb(activity.group_id).map((item) => item.name).join(' / ') : ''}
+                count={counts.activitiesById?.[activity.id] ?? counts.activityCounts?.[activity.id]}
+                details={renderActivityDetails?.(activity)}
+                onToggle={toggleActivity}
+            />
         );
     };
 
     const renderGroup = (group) => {
-        const hasChildren = (model.childGroupsByParent[group.id] || []).length > 0;
         const count = model.recursiveActivityCounts[group.id] || 0;
-        const selectedCount = model.getActivityIdsForGroup(group.id)
-            .filter((activityId) => pendingActivityIds.has(activityId)).length;
-        const isLinked = pendingGroupIds.has(group.id);
-
         if (count === 0) return null;
-
         return (
-            <div
+            <ActivityPickerGroupCard
                 key={group.id}
-                className={`${styles.groupCard} ${isLinked || selectedCount > 0 ? styles.groupCardSelected : ''}`}
-            >
-                <button
-                    type="button"
-                    aria-label={group.name}
-                    className={styles.groupBrowseButton}
-                    onClick={() => setManualBrowseGroupId(group.id)}
-                >
-                    <span className={styles.groupName}>{group.name} {hasChildren ? '›' : ''}</span>
-                    <span className={styles.groupMeta}>
-                        {count} {count === 1 ? itemLabelSingular : itemLabelPlural}
-                        {selectedCount > 0 && <span>{selectedCount} selected</span>}
-                    </span>
-                </button>
-                {allowGroupSelection && (
-                    <button
-                        type="button"
-                        className={`${styles.groupSelectButton} ${isLinked ? styles.groupSelectButtonActive : ''}`}
-                        onClick={() => toggleGroup(group)}
-                    >
-                        {isLinked ? `✓ ${groupSelectedLabel}` : groupSelectionLabel}
-                    </button>
-                )}
-            </div>
+                group={group}
+                hasChildren={(model.childGroupsByParent[group.id] || []).length > 0}
+                count={count}
+                selectedCount={model.getActivityIdsForGroup(group.id).filter((activityId) => pendingActivityIds.has(activityId)).length}
+                isLinked={pendingGroupIds.has(group.id)}
+                itemLabelSingular={itemLabelSingular}
+                itemLabelPlural={itemLabelPlural}
+                allowGroupSelection={allowGroupSelection}
+                groupSelectedLabel={groupSelectedLabel}
+                groupSelectionLabel={groupSelectionLabel}
+                onBrowse={setManualBrowseGroupId}
+                onToggle={toggleGroup}
+            />
         );
     };
 

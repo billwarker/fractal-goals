@@ -9,7 +9,8 @@ import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQueries';
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
-import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import useIsMobile from '../hooks/useIsMobile';
+import usePersistedPaneOpen from '../hooks/usePersistedPaneOpen';
 import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
 import { QuickSessionWorkspace } from '../components/sessionDetail';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
@@ -21,6 +22,7 @@ import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
+import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
 import { flattenGoals } from '../utils/goalHelpers';
 import { formatSessionCardDate } from '../utils/sessionCardDates';
 import { fractalApi } from '../utils/api';
@@ -56,12 +58,10 @@ function Sessions() {
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [sessionToDelete, setSessionToDelete] = useState(null);
-    const filtersPaneStorageKey = `sessions-query-pane-open:${rootId || 'default'}`;
-    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        const stored = window.localStorage.getItem(`sessions-query-pane-open:${rootId || 'default'}`);
-        return getIsMobileViewport() ? false : (stored == null ? true : stored === 'true');
-    });
+    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = usePersistedPaneOpen(
+        `sessions-query-pane-open:${rootId || 'default'}`,
+        { isMobile, resetKey: rootId },
+    );
     const [hiddenSessionIds, setHiddenSessionIds] = useState(() => {
         const deletedId = location.state?.deletedSessionId;
         return deletedId ? new Set([deletedId]) : new Set();
@@ -122,28 +122,7 @@ function Sessions() {
     }, [location.state]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    /* eslint-disable react-hooks/set-state-in-effect -- Changing roots loads that root's persisted pane preference. */
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        const stored = window.localStorage.getItem(filtersPaneStorageKey);
-        setIsFiltersPaneOpen(getIsMobileViewport() ? false : (stored == null ? true : stored === 'true'));
-    }, [filtersPaneStorageKey]);
-    /* eslint-enable react-hooks/set-state-in-effect */
-
-    /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation closes a desktop-only pane. */
-    useEffect(() => {
-        if (isMobile) {
-            setIsFiltersPaneOpen(false);
-        }
-    }, [isMobile, rootId]);
-    /* eslint-enable react-hooks/set-state-in-effect */
-
     /* eslint-disable react-hooks/set-state-in-effect -- Filtering can invalidate the currently expanded session card. */
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-        window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
-    }, [filtersPaneStorageKey, isFiltersPaneOpen]);
-
     const visibleSessions = useMemo(
         () => sessions.filter((session) => !hiddenSessionIds.has(session.id)),
         [sessions, hiddenSessionIds]
@@ -310,7 +289,13 @@ function Sessions() {
     }, [queryClient, rootId, sessionToDelete]);
 
     const filtersPane = (
-        <div className={`${styles.rightPanel} mobile-sheet-enter`}>
+        <ResponsiveSidePane
+            open={isFiltersPaneOpen}
+            isMobile={isMobile}
+            onClose={() => setIsFiltersPaneOpen(false)}
+            panelClassName={styles.rightPanel}
+            backdropClassName={styles.sheetBackdrop}
+        >
             <SessionsQuerySidebar
                 filters={filters}
                 visibleSessionsCount={visibleSessions.length}
@@ -328,7 +313,7 @@ function Sessions() {
                 onToggleCollapse={() => setIsFiltersPaneOpen(false)}
                 isMobile={isMobile}
             />
-        </div>
+        </ResponsiveSidePane>
     );
 
     return (
@@ -433,15 +418,7 @@ function Sessions() {
                 />
             ) : null}
 
-            {isFiltersPaneOpen && isMobile && createPortal(
-                <ModalBackdrop
-                    className={`${styles.sheetBackdrop} mobile-sheet-backdrop-enter`}
-                    onClose={() => setIsFiltersPaneOpen(false)}
-                    aria-hidden="true"
-                />,
-                document.body,
-            )}
-            {isFiltersPaneOpen && (isMobile ? createPortal(filtersPane, document.body) : filtersPane)}
+            {filtersPane}
 
             <DeleteConfirmModal
                 isOpen={Boolean(sessionToDelete)}

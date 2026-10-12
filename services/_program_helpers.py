@@ -204,7 +204,7 @@ class _ProgramHelpersMixin:
         session.flush()
 
         if not template_configs:
-            day.templates = []
+            session.expire(day, ['templates', 'template_links'])
             return
 
         template_ids = [config['template_id'] for config in template_configs]

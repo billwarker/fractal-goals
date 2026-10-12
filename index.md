@@ -56,15 +56,12 @@ Remote records live in TanStack Query. Components do not mirror API collections 
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
 affected read models.
 
-Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx`: a fixed,
-full-width secondary HeaderButton, portalled outside page animations with safe-area spacing.
-`--mobile-page-footer-height` is the shared content-clearance token. Programs opens its sidebar;
-Sessions and Notes open filters; Analytics opens its sidebar in Dashboard mode. Notes switches the footer to Show Associator while composing.
-Mobile openers leave the header; desktop retains header controls. Sheets sit above the footer.
-Mobile sidebars across Programs, Sessions, Notes, Analytics, Session Detail, and Create Session's
-goals panel use `--mobile-sidebar-height`: 82% of the dynamic viewport, capped at 760px and the
-space below navigation. Sheets use border-box sizing so borders and safe-area padding stay
-inside that height, and share the slide-up/backdrop entrance with reduced-motion support.
+Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx` (a fixed,
+portalled full-width footer button) and the `--mobile-page-footer-height` / `--mobile-sidebar-height`
+tokens. Mobile openers leave the header; sheets sit above the footer. Page filter panes compose
+`layout/ResponsiveSidePane.jsx` (inline on desktop, portalled sheet on mobile) with
+`hooks/usePersistedPaneOpen.js`; `layout/BodyPortal.jsx` portals page-level modals. Detailed layout contracts:
+[UI behaviour contracts](planning/ui-contracts-reference.md#mobile-page-footer-and-sidebars).
 
 ## Core domains
 
@@ -77,47 +74,19 @@ association inheritance, target evaluation, and timeline projections are service
 Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_target_service.py`,
 `blueprints/goals_api.py`, `client/src/components/goals/`, and `client/src/pages/Goals.jsx`.
 
-Goal Details has one Timeline section beneath targets, combining a lifetime calendar with
-cursor-paginated event cards. There is no separate Timeline tab. Cell intensity always uses
-completed-activity counts. A compact intensity/marker legend sits on one line below the calendar,
-followed by a summary showing hovered/focused or selected day details, otherwise lifetime work
-totals. The date-range/timezone line is omitted; aggregation still uses the selected timezone.
-Include children remains in the Timeline header. The event list retains all canonical evidence, and child scope applies to both views. Selecting a date filters the same list;
-Details keeps the goal header and Details/Activities/Notes tabs fixed. Goal names stay on one line;
-overflowing names pan between both ends with reading pauses and pause on hover/focus. Reduced-motion
-users can scroll the title manually. The goal-level icon and
-close control stay fixed outside the title viewport; the metadata row omits the redundant goal-level
-badge before the SMART indicator. The SMART wrapper uses flex alignment so the chip shares the
-vertical center of the status and date metadata without inline baseline spacing. SMART and status
-chips share 76px width and 12px text; their height matches the metadata text line using the base
-line-height token. Description and targets
-scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
-legend and summary) sticks directly below the measured goal header while events continue beneath.
-The sticky block uses the containing detail surface background, matching both modal and panel themes.
-Its opaque background overlaps the header by 1px; the header offset retains fractional precision
-to prevent underlying content showing through a seam at the sticky boundary.
-Scrolling back reveals the overview without changing selection or loaded pages. The original header owns the sole close control. There are no Expand/Restore
-buttons or separate collapse state. The footer remains available; summaries omit recorded minutes.
-The goal modal subtracts the navigation overlap from its visual-viewport height to keep its footer
-inside the screen, including when the keyboard changes the visible viewport. Footer actions use one
-row of equal-width buttons filling the available horizontal space, with 44px minimum height.
-The longest visible label sets the minimum width shared by all buttons.
-The row pans horizontally when it overflows on either modal or panel surfaces. Goal calendar
-cells use 20px visuals on touch devices, with 24px hit areas covering the gaps; session calendars
-retain their existing sizing.
+Goal Details has one Timeline section beneath targets: a lifetime calendar heatmap (intensity =
+completed-activity counts, user timezone, optional child scope) above cursor-paginated evidence
+cards; selecting a date filters the list. Header, sticky calendar, footer and responsive sizing
+contracts live in [UI behaviour contracts](planning/ui-contracts-reference.md#goal-details-and-timeline).
 
 `blueprints/goal_history_api.py` registers history reads. `services/goal_timeline_service.py` owns the
 shared evidence projection, `services/goal_activity_heatmap.py` daily aggregation, and
 `services/goal_timeline_page.py` stable mode filtering/cursors. Calendar summaries use complete
-evidence; pages have 20 entries by default and no total-history cap. Rich activity/target data loads
-only for the selected page. Dates use the user's timezone; shared activity instances count once.
-Goal-level colours and one continuous calendar span all years. `components/common/CalendarHeatmap.jsx`
-serves both goal and session calendars; `GoalTimelineFeed.jsx` and `GoalTimelineEntries.jsx` own the
-list and canonical cards. All queries share the `goalTimeline` invalidation root.
-
-Goal detail content retains 24px horizontal insets (16px in narrow panels), with horizontal panning
-contained within the calendar and vertical scrolling owned by the modal/panel body. Published landing
-snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
+evidence; pages default to 20 entries with no total-history cap, and rich activity/target data loads
+only for the selected page. Shared activity instances count once. `components/common/CalendarHeatmap.jsx`
+serves goal and session calendars; `GoalTimelineFeed.jsx` and `GoalTimelineEntries.jsx` own the list
+and canonical cards. All queries share the `goalTimeline` invalidation root. Published landing
+snapshots reuse the list without authenticated fetches or a heatmap.
 See [Goal Timeline](planning/goal-activity-heatmap.md).
 
 Goal evidence is resolved per activity instance: active direct instance links are unioned with
@@ -131,19 +100,12 @@ transaction. The additive `activity_instance_goal_associations` table preserves 
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
-Session Detail captures its goal-icon scope when opening create/copy definition drafts; copied
-selections and the captured scoped goal are merged and remain editable. Existing-definition editing
-keeps its current associations. Actual activity instances, including circuit members and completed
-sessions, expose reversible one-off links through the scoped goal's icon only when that instance
-is selected and a goal is scoped. Circuit run/round selection does not expose member link buttons.
-Action and association explanations appear in a hover/focus tooltip. The icon shows the hierarchy's scoped
-ring only when the instance is directly associated with the current scoped goal. It sits in the
-activity header beside the pencil/options controls, sharing their 28px button and 14px symbol
-sizing. Circuit member controls also live in their headers. Linked buttons retain the neutral
-background/border styling and expose their association through the ring and accessible pressed state.
-`useActivityInstanceGoalAssociation` owns
-cache updates and evidence invalidation. Duplication starts with no one-off links.
-See [Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md).
+Session Detail exposes reversible one-off links on actual activity instances (including circuit
+members and completed sessions) through the scoped goal's icon, only when that instance is selected
+and a goal is scoped. `useActivityInstanceGoalAssociation` owns cache updates and evidence
+invalidation; duplication starts with no one-off links. Interaction details:
+[UI behaviour contracts](planning/ui-contracts-reference.md#session-detail-one-off-goal-links) and
+[Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md).
 
 ### Sessions, activities, and progress
 
@@ -175,12 +137,10 @@ applied to the new instance and its planned sets at session creation, like tags 
 `activity_instances.prescription`, looked up by `item_key`; client-sent planned values are ignored.
 Circuit items may plan rounds and per-round slot values; the run starts with the planned rounds and
 snapshots the plan on `circuit_runs.prescription`.
-Planned set activities start with one empty `planned` set per planned set; plans are reference-only,
-so metric defaults are not auto-filled for them. Plan editors (`components/prescriptions/`) scope
-like the session page: click an item, then optionally a set or round; the scoped target gets the
-note composer (`PlanNoteComposer`) and tag picker (`PlanTagEditor`, `ActivityTagEditor` in controlled
-mode). Plan section helpers live in `services/plan_sections.py`. The session card shows a "(plan 100)" hint beside the
-"(last …)" progress hint, in the same style, coloured met/under by `utils/sessionPrescription.js`. Plans never feed targets.
+Planned set activities start with one empty `planned` set per planned set and are reference-only
+(no metric defaults). Plan editors live in `components/prescriptions/`, plan section helpers in
+`services/plan_sections.py`, and the session card's "(plan …)" hint in `utils/sessionPrescription.js`.
+Plans never feed targets.
 
 Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a
@@ -194,229 +154,67 @@ inside the same SQLAlchemy transaction or savepoint.
 
 ### Programs
 
-Programs contain dated blocks and reusable program-day definitions. **Program days belong to the
-program** (`program_days.program_id`), not to a block: a day's weekdays repeat across the whole
-program span and its explicit dates may fall anywhere in it. Blocks only label and group the dates
-they cover (`block_for_date`; an occurrence's `block` is null outside every block), so moving,
-resizing, or deleting a block never changes which days occur. Ad hoc adjustments use `program_day_occurrence_exclusions` to suppress one date without
-changing recurring weekdays. The canonical evaluator and client conflict previews subtract these
-exceptions; `utils/programDaySchedule.js` owns the client schedule projection. The day-review card offers Move day and Remove from this date for any program date, using shared
-Button/Input atoms. A move draft lives in the calendar-context reducer: users can type a destination
-or pick a date in the calendar without leaving the source review. On mobile, users collapse the sidebar
-to access the calendar; selecting a date reopens it for confirmation. Picking never mutates schedules;
-normal scope navigation clears the draft.
-The program-day editor uses the current day name as its heading (falling back to Edit/New Program Day
-when blank). Its fields scroll independently while the shared action footer stays visible and wraps
-on narrow screens.
-`POST …/days/<day>/move` atomically removes the source occurrence, replaces the destination,
-and moves saved source plans, under program-first locking. Conflicting destination plans for the
-same definition/template are soft-deleted; displaced definitions' plans remain dormant.
-Move and unschedule clear affected manual date statuses and preserve sessions and session credits
-on their original dates. Explicit scheduling clears that date's exclusion. Program duplication shifts and preserves
-exclusions through the day-create `excluded_dates` field.
-Days are managed program-scoped at
-`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/move|/goals]]`, and
-`PUT …/days/order` sets their side-pane order (`day_number`) from the full list of day ids; **Duplicate**
-copies templates, goals, and notes without a schedule. Blocks can **track weeks**
-(`track_weeks`, `week_start_day` 0 = Monday): Week 1 starts on the block's start date and each
-later week on the chosen weekday. `services/program_rollups.block_weeks` and
-`client/src/utils/programBlockWeeks.js` share one definition, tested against
-`tests/fixtures/block_weeks_cases.json`; the calendar shows W1, W2… chips, the day pane shows "Block · Week n",
-and the Days tab's rails sit under block and week buckets. See [Program-level days and block weeks](planning/program-level-days-and-block-weeks.md).
-Program scope is resolved by `services/program_scope.py`; execution metrics use bounded read models
-rather than client recomputation.
+Programs contain dated blocks and reusable program-day definitions. The complete domain and UI
+description is in [Programs — domain and UI reference](planning/programs-domain-reference.md).
 
-Program-day goals are optional and bounded by the program's goals and their descendants
-(`services/program_focus.py`), on every write path. Narrowing a program's goals so existing day
-goals fall outside returns 409 `program_day_goal_out_of_scope` with a `conflicts` list until resent
-with `prune_day_goals`; pre-existing violations never block unrelated edits. Sessions started from a
-program day are scoped to the day's goals, else the program's. Blocks carry no goals of their own:
-`program_block_goals` is retained legacy data that nothing reads or writes. The calendar pane's
-Blocks section (`components/programs/ProgramBlocksPanel.jsx`, program scope only) shows one summary
-per block from `buildBlockCards` (`utils/programBlocksViewModel.js`) over metrics v9: program days by
-status symbol, consistency, goals completed and goals due (program goals and descendants with a
-deadline inside the block), and longest streak, with edit and delete controls. See
-[Goal-focused program blocks](planning/program-blocks-goal-focus.md).
+**Ownership and scheduling.** Program days belong to the program (`program_days.program_id`), not a
+block. A day recurs on weekdays (`day_of_week`) every `repeat_every_weeks` weeks (week zero is the
+Monday–Sunday week containing the program start) and/or on explicit dates stored only as
+`program_day_occurrence_schedules` rows. `program_day_occurrence_exclusions` suppress single dates.
+Blocks only label the dates they cover (`block_for_date`) and can track weeks (`track_weeks`,
+`week_start_day`); `services/program_rollups.block_weeks` and `client/src/utils/programBlockWeeks.js`
+share one definition tested against `tests/fixtures/block_weeks_cases.json`. Days are managed at
+`/api/<root>/programs/<program>/days[/<day>[/duplicate|/schedule|/unschedule|/move|/goals]]` and
+ordered by `PUT …/days/order`. `utils/programDaySchedule.js` owns the client schedule projection.
 
-Two calendar invariants hold on every write path (UI, API, agent proposals):
-`services/program_calendar_invariants.py` rejects overlapping blocks (inclusive ranges, inside
-the program's dates; backed by the `ex_program_blocks_no_overlap` exclusion constraint) and any
-date holding more than one program day (checked after flush through `build_occurrences` across
-the whole program, so weekday and explicit dates count alike; explicit dates outside the program are
-400 `program_day_date_outside_program`). Every calendar write takes the program row lock
-first. Violations are `ProgramServiceValidationError`s with `program_block_overlap` /
-`program_day_date_conflict` codes (409) and a `conflicts` list; `utils/programCalendarConflicts.js`
-mirrors them as editor hints (taken weekdays and dates, sibling-block overlap), and the block and
-day modals show server conflicts inline.
-Migration `f1b3d5a7c9e2` repairs pre-existing violations at startup before adding the constraints:
-an overlapping block with fewer logged sessions is undated (kept, off the calendar), and on a
-double-booked date the day with more sessions keeps it while the other loses only that schedule
-row, weekday, or legacy date. Each repair is logged.
+**Calendar invariants** (every write path: UI, API, agent proposals). `services/program_calendar_invariants.py`
+rejects overlapping blocks (backed by the `ex_program_blocks_no_overlap` exclusion constraint) and any
+date holding more than one program day. Every calendar write takes the program row lock first.
+Violations are 409 `ProgramServiceValidationError`s (`program_block_overlap`,
+`program_day_date_conflict`) with a `conflicts` list; `utils/programCalendarConflicts.js` mirrors them
+as editor hints. Program-day goals are bounded by the program's goals and descendants
+(`services/program_focus.py`); narrowing returns 409 `program_day_goal_out_of_scope` until resent with
+`prune_day_goals`. `program_block_goals` is retained legacy data.
 
-`services/program_day_occurrences.py` is the canonical calendar evaluator. It owns the seven
-day states, stable chain roles, and per-calendar-day completion semantics. When definitions
-overlap, required/completed templates are deduplicated and the strongest configured
-`completion_min_templates` threshold applies once for that date. Scheduled completion credits
-completed, non-deleted sessions on the occurrence's local date from one of three sources: an exact
-program-day link, a template match (an unlinked or same-program session using a scheduled template),
-or a manual credit mapping the session to a scheduled template. Stored exclusions remove automatic
-credit. `program_day_session_credits` holds manual credits/exclusions per program/date/session; rows
-are dormant when the session's local date or the schedule no longer matches. Every evaluator caller
-loads candidates through `services/program_day_credits.py`, so calendar, metrics,
-day review, and Create Session day options attribute sessions identically.
+**Evaluation.** `services/program_day_occurrences.py` is the canonical calendar evaluator (seven day
+states, chain roles, per-date completion). Every caller loads candidate sessions through
+`services/program_day_credits.py`, so calendar, metrics, day review, and Create Session attribute
+sessions identically. Manual Complete/Rest statuses and fractal-wide calendar events
+(`services/calendar_periods.py`) resolve in that evaluator: manual override, then a streak-protecting
+event, then automatic evaluation. Streaks are drawn from server `chain_role`/`run_length_at_date`, never
+recomputed in the client.
 
-Manual Complete and Rest statuses are stored once per program/calendar date and resolved by the
-same evaluator. Complete changes adherence and chain success without fabricating session evidence;
-Rest removes the scheduled date from adherence and bridges chains. Clearing a status restores
-automatic evaluation. Definition-level completion flags are legacy compatibility data and are not
-written or used by calendar, metrics, onboarding, create-session day options, or session-completion workflows.
-The day-review pane places one clickable effective-status icon beside the first scheduled day
-name: a blue circle while scheduled, a check when met, a moon for rest (manual or event-protected),
-or an X when missed. Its dropdown options carry the same symbols and mark the current manual status. Its dropdown escapes
-the pane's scroll clipping; when definitions overlap, its actions apply to every definition on
-that date. The calendar has one multi-day selection mode for block ranges, bulk statuses, and
-calendar events. Any date inside the selected program is selectable; `useCalendarDragSelection` owns
-the gestures (press-and-drag selects the range between cells, including over event ribbons, with a
-live preview; a press without movement toggles one date; Shift extends), so FullCalendar's own
-selection and clicks stand down in that mode. Status actions apply only to the scheduled subset;
-**Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
-The client expects program metrics calculation v9 and day read model schema v7 (occurrence `block`
-may be null and carries `week_index` for tracked blocks).
-Metrics v9 reports **consistency** (met scheduled program days over observed ones; rest and
-event-protected days excluded). `services/program_rollups.py` holds the pure date records, block
-weeks (Week 1 from block start; later weeks from the tracked start weekday, else every 7 days; short weeks are partial), consistency rollups, status counts,
-and longest streak; `services/program_block_metrics.py` builds the block, week, program-day,
-`current_block`, and schedule-outlook rows plus each block's `goals: {due, completed}`.
-Calendar day ribbons use the same status symbol as the day-review pane (check, X, or blue circle from
-`getProgramDayStatusSymbol` and `ProgramDayStatusMark`; the day read model is authoritative for
-completion when available, including manually credited sessions. The date streak advances only when
-all scheduled program days on that date are met. Symbols are decorative beside each ribbon's
-assistive state text.
-The page calendar has one toolbar on desktop and mobile (‹ › Today, a **Continuous** checkbox, title,
-multi-day actions); compact calendars keep FullCalendar's header. Calendar content comes from one
-root-scoped feed, `GET /api/<root_id>/programs/calendar-feed` (`ProgramCalendarFeedService`, schema
-v1, at most 62 days), loaded by `useProgramCalendarFeed` in calendar-month chunks for the rows
-actually on screen (the month grid, or the scrolled continuous rows) plus one month of idle-time
-overscan. Each chunk carries overlapping programs and blocks, every program's canonical date facts
-(built by the same `build_range_facts` path as the day read model) with light occurrence ribbons,
-completed sessions once (credits unioned across programs), and calendar periods. Chunks are cached
-under stable keys nested in the day-read-model root, so root-level read-model invalidation refreshes
-them; they revalidate with a weak ETag (`304` when unchanged), and a loading month shimmers only its
-own cells. `/programs/calendar` returns only every program's name, color, and span. Full program
-detail loads only for the scoped program's side pane and editors. Clicking a date or program-day label within a
-program immediately scopes the sidepane to that program. Every program keeps its color across its
-date range and its name appears in its first date cell. Empty-space clicks
-preserve a selected completed program's context; that context is page-local, so reloading or returning
-to the Programs page starts with the active program. Unscheduled past dates do not offer program
-creation.
-Continuous mode (a per-viewer
-localStorage preference) renders one unbroken stream of weeks as a custom `dayGrid` view with a weeks
-duration; `utils/programCalendarContinuous.js` owns its window: 52 weeks (the day read model allows
-366 days) centred on today, re-centred on a context date or navigation target that cannot scroll to
-the top row within it. The 1st of each month shows a small month caption beside its number. The
-title is the month of the top row's Thursday; ‹ › scroll to a month's first Thursday.
-Streaks are drawn from the server's `chain_role`/`run_length_at_date` (never recomputed in the
-client): a thin green line on the date row starts mid-cell on a run's first day, crosses member days,
-is dashed across bridging rest/event days, and ends in a compact length ("3d", full text in the
-tooltip and assistive text) on the run's last day (`utils/programCalendarStreaks.js`).
-A definition is scheduled on weekdays (`day_of_week`) every `repeat_every_weeks` weeks (a positive
-integer, default 1) and/or on specific dates. Week zero is the Monday–Sunday week containing the
-program start; only weeks whose index is divisible by the interval recur. The program bounds still
-clip the first and last week. Explicit dates remain independent of the interval, and exclusions
-suppress either kind of occurrence. The editor shows an optional interval field to the right of the
-Weekly / Specific dates toggle in Weekly mode, wrapping below it on narrow screens
-(blank means 1), and occupied weekdays show owners in hover/focus tooltips instead of a paragraph.
-Weekday availability and save conflicts use the same actual cadence and exception projection.
-Program copies preserve the interval, anchored to the copied program's start week.
-Specific dates are only
-ever written as `program_day_occurrence_schedules` rows: the Program Day modal sends a replace-all
-`scheduled_dates` set (app schemas only; agent proposals keep the base contract and schedule one date
-at a time). The legacy fixed `program_days.date` column is gone (migration `b8d4f2a6c1e3` moved it
-into schedule rows, merged identical per-block copies, and pinned every calendar to its old dates).
-Reusable definitions are scheduled onto dates through `program_day_occurrence_schedules`
-(`schedule_program_day` writes a row, never a placeholder session); the evaluator treats those dates
-as occurrences, and the day pane keeps "Plan this day" available for today and future dates.
-Scheduled occurrences on past, present, and future dates offer "Move day" and "Remove from this date";
-recurring occurrences use persistent date exclusions rather than changing weekday rules.
-Calendar events (`calendar_periods`,
-`services/calendar_periods.py`, `/api/<root_id>/calendar-periods`) are fractal-wide, named spans such
-as vacations. Precedence for a scheduled date is manual override, then a streak-protecting event
-(only when the date would not otherwise be met; it becomes rest with `status_source: "period"`),
-then automatic evaluation. Events render as hatched spanning bars, as a banner in the day pane, and
-as a protected-day count in the overview.
-In multi-day mode, the sidebar requests metrics for the exact selected scheduled dates, excluding
-gaps from adherence, evidence, and block totals. Non-contiguous selections use a compact
-"N selected days" heading rather than displaying the misleading first-to-last date range.
+**Read models.** The client expects metrics calculation v9 (`services/program_metrics_service.py`,
+`program_rollups.py`, `program_block_metrics.py`), day read model schema v7
+(`ProgramDayReadModelService`, IANA timezone required, bounded window, cursor-paged detail), and the
+root-scoped calendar feed schema v1 (`GET /api/<root_id>/programs/calendar-feed`,
+`ProgramCalendarFeedService`, ≤62 days, weak ETag, month chunks nested under the day read-model query
+root). `services/program_scope.py` resolves program scope; execution metrics are bounded server read
+models, not client recomputation. The Days workspace reads one evaluator pass from
+`GET …/plan-occurrences`.
 
-The day-review pane is review-first: its one session list covers every session on the date, labelled
-credited (with source), off-plan, or other program, with per-session goal alignment (the same
-equal-split allocation as program metrics, via `services/program_day_summary.py`) and server-provided
-credit options. Off-plan sessions sit inside the first program-day card; planning actions appear only
-for today and future unscheduled dates. Range summaries list each observed date's completed sessions
-(any program, with session and template names plus template color); the calendar shows those sessions
-on scheduled and unscheduled dates, using the shared session-template badge when available. Scheduled
-program-day ribbons and their status symbols remain visible alongside the session badges; the legacy
-program-payload session events are not rendered on the Programs page. Multiple completed sessions
-using the same template on one date are represented by one badge with a count (for example, “×4”).
-Sessions credited to a specific program-day occurrence render inside that ribbon on a line below it.
+**Dated session plans.** `program_session_plans` (`services/program_session_plans.py`) holds one plan per
+program day, template, and date. Plans are virtual until saved (an unplanned occurrence *is* the
+template), save with `row_version` (409 on conflict), never get rewritten by template edits, and are
+materialized into a session's transaction when chosen in Create Session
+(`sessions.program_session_plan_id`).
 
-`ProgramDayReadModelService` emits schema v6, requires an IANA timezone, caps the complete
-expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provides cursor-paged
-day detail. The client rejects unsupported schema versions. FullCalendar block labels are
-reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.
+**UI ownership.** `pages/ProgramCalendarPage.jsx` composes the Calendar and Days views;
+`components/programs/` owns the calendar, side pane, blocks panel, and `ProgramOptionsModal`;
+`components/programs/days/` owns the Days workspace. Within the calendar, `ProgramCalendarView` wires
+FullCalendar, `programCalendarCellDecorations.js` owns imperative day-cell decoration,
+`useContinuousCalendarScroll` owns month tracking/continuous scrolling, and `useCalendarDragSelection`
+owns multi-day gestures; `utils/programCalendarContinuous.js` and `utils/programCalendarStreaks.js`
+own continuous-mode windows and streak drawing.
 
-Block summary cards use one layout in `programs/blocks/BlockHeaderStats`: status counts on a
-separate row, followed by three metric columns on desktop. On mobile, the metrics become full-width
-label/value rows with horizontal dividers, and values wrap to keep large counts visible.
-
-The Days workspace selects program days through the sidebar on every screen size. Mobile opens
-it with Show Sidebar; the duplicate day dropdown is removed. The selected day's centered heading and
-block, week, and date rails remain visible in the workspace.
-
-The Programs page has **Calendar** and **Days** views. On desktop the side pane leads with the view toggle and a Collapse control; the header's Show/Hide Sidebar button reopens it, and its open state is remembered per fractal. At program scope a Details | Goals toggle sits beneath the pane's header: Details shows headline metrics, events, then the program's blocks (whole-program results; block name in its colour, status counts, and one row of Consistency, Goals completed/due, and Longest streak), and Goals shows the goal hierarchy. A selected timeframe shows Details only, and a scoped date shows the day review;
-mobile keeps Calendar/Days in the header and places Show Sidebar in a fixed, full-width footer using the shared secondary HeaderButton styling and Session Detail's spacing, with safe-area spacing and reserved content space; bulk calendar actions sit above it. The footer is available even without a selected program, portalled outside the page animation, and stays beneath modal sheets. The pane remains a closable sheet. Days (`components/programs/days/`) programs
-one program day's occurrence dates in two columns: a focused date (by default the next program day)
-beside the latest completed occurrence before it (else the previous one), each with its canonical
-status mark and credited sessions. A template completed on a date shows its session in the plan card
-layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every program day once (schedule summary, next date, its dates by
-status with consistency (`programDayStats`, the block rollups' rules), templates,
-and an Edit button; days without templates are listed and prompt for one) between a **Compare two
-days** toggle at the top and a pinned **New program day** footer, and each column has its own date rail (canonical status marks; A picks the comparison, B
-the date being planned). Above each rail, a ruler of **block** and **week** buckets (`utils/programDayBuckets.js`,
-`PlanBucketRows.jsx`): block names in the block's colour, the selected block's weeks beneath it.
-The selected date marks its block and week; picking a bucket jumps the rail to the first date in
-that period (the rail keeps every date). Weeks follow the block's tracked start day, or 7-day steps
-from its start when untracked; buckets without this day's dates are dimmed. One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
-evaluates all days in a single evaluator pass.
-Compared columns line up row by row: cards, sections, items, and (through each editor's `alignKey`,
-`planRowAlignKey`) set rows and circuit rounds and their activities, keyed by activity so logged runs
-pair with plans. "+ Add activity" (`days/PlanItemPicker.jsx`) is the session page's full picker:
-search, create or copy activities and circuits (create-from-search included); new definitions join
-the unsaved draft and default to the scoped goal, else the day's goals. The Days side pane has the
-same Details | Goals toggle: Goals (`days/PlanGoalHierarchyPanel.jsx`) is the session page's goal
-hierarchy for the active plan card (last clicked; default the planning column's first), built by
-`utils/planGoalsView.js` in the server's session goals view shape (day goals, else program goals, plus
-activity and group goals, with ancestors) and rendered through `useSessionGoalsViewModel` and the
-shared `useGoalHierarchyHighlights`. A logged session card uses that session's own goals view and
-instances. A goal's icon scopes the active card's picker; scope clears on day change, on leaving
-Days, or when the active card's hierarchy lacks the goal. Past cards highlight goals but never scope.
-Within a circuit, each round's activities are selectable (item → round → member, as on the session
-page); a member stands for its activity in the Goals pane. Clicking a card's empty space deselects.
-See [Days alignment, picker, and goals](planning/program-days-alignment-picker-goals.md).
-`program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
-holds one dated plan per program day, template, and date: an independent snapshot of the template's
-sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.
-Plans are virtual until first saved: an unplanned occurrence **is the template**, so edits to one date
-never reach another. The latest earlier plan still on an occurrence date is reference only (`previous`):
-its values show as placeholders by `item_key`, never copied. Saves use `row_version` (409 on conflict); template
-edits never rewrite plans, which report `template_changed` and offer an explicit pull that keeps
-planned values by `item_key` and plan-added items. Plans off the schedule are dormant and never supply placeholders.
-Create Session offers today's occurrence plan, then unexecuted plans from the previous 14 days; a
-chosen virtual plan is materialized in the session's transaction and linked by
-`sessions.program_session_plan_id`. Agent proposals keep the base session contract without plans.
+**ORM note.** `ProgramDay.template_links` is the only writable path to `program_day_templates`;
+`ProgramDay.templates` is `viewonly`, so ORM cascades delete each link once.
 
 Detailed design:
 
+- [Programs — domain and UI reference](planning/programs-domain-reference.md)
+- [Program-level days and block weeks](planning/program-level-days-and-block-weeks.md)
+- [Days alignment, picker, and goals](planning/program-days-alignment-picker-goals.md)
 - [Program days and dated session plans](planning/program-days-session-plans.md)
 - [Program calendar and chain read model](planning/programs-scoped-sidepane-chain-calendar.md)
 - [Program metrics](planning/program-metrics-insights.md)
@@ -529,6 +327,10 @@ Frontend CI gates its production dependency audit, zero-warning lint, all-source
 coverage, production build, responsive source checks, maintainability budgets, and
 desktop/mobile Chromium workflows against the real Flask app and a disposable
 PostgreSQL database.
+
+Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
+`test/programs/` for the FullCalendar mock and Days fixtures; test files register them with
+`vi.mock(path, () => import(helper))`.
 
 Backend tests build the schema once per pytest session and clear ORM rows in dependency
 order between tests, preserving real commit and independent-connection semantics. Frontend tests use

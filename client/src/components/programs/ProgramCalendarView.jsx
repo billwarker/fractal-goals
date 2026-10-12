@@ -3,70 +3,40 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import useCalendarDragSelection from '../../hooks/useCalendarDragSelection';
+import useContinuousCalendarScroll from '../../hooks/useContinuousCalendarScroll';
 import { addDaysToDateString } from '../../utils/dateUtils';
-import { applyStreakDecoration, clearStreakDecoration } from '../../utils/programCalendarStreaks';
 import {
     CONTINUOUS_FIRST_DAY,
     formatMonthTitle,
     getContinuousCellMarkers,
-    canScrollWithin,
-    getContinuousWindow,
     getMonthScrollTarget,
     getMonthStartLabel,
-    getWeekRowMonth,
     shiftMonth,
 } from '../../utils/programCalendarContinuous';
-import { getProgramDayStateMeta, indexProgramDayStates } from '../../utils/programDayState';
+import { indexProgramDayStates } from '../../utils/programDayState';
 import renderProgramCalendarEventContent from './ProgramCalendarEventContent';
+import ProgramCalendarToolbar, { ProgramCalendarBlockControls } from './ProgramCalendarToolbar';
+import {
+    buildBackgroundRanges,
+    clearCellDecoration,
+    decorateCalendarCell,
+    formatCalendarCellDate,
+    indexCalendarLabelsByDate,
+    normalizeCalendarEventDate,
+} from './programCalendarCellDecorations';
 import styles from './ProgramCalendarView.module.css';
 
-const STREAK_CLASS_NAMES = { label: styles.streakLength, line: styles.streakLine, assistive: styles.dayStatusAssistive };
+const CELL_CLASS_NAMES = {
+    blockCellLabel: styles.blockCellLabel,
+    weekCellLabel: styles.weekCellLabel,
+    programCellLabel: styles.programCellLabel,
+    blockCellLabelWithWeek: styles.blockCellLabelWithWeek,
+    blockCellLabelName: styles.blockCellLabelName,
+    weekChip: styles.weekChip,
+    dayStatusAssistive: styles.dayStatusAssistive,
+    streak: { label: styles.streakLength, line: styles.streakLine, assistive: styles.dayStatusAssistive },
+};
 const CONTINUOUS_VIEW = 'dayGridContinuous';
-// A row counts as "in view" once this much of it is below the scroller's top edge.
-const TITLE_ROW_THRESHOLD = 24;
-const MAX_READY_FRAMES = 30;
-// Trailing delay before a scrolled viewport range is reported for data loading.
-const VISIBLE_RANGE_SETTLE_MS = 120;
-
-function prefersReducedMotion() {
-    return typeof window !== 'undefined'
-        && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
-}
-
-/** Run `callback(el)` once FullCalendar has rendered the element `find` looks for. */
-function whenRendered(find, callback) {
-    let frames = 0;
-    let handle = null;
-    const attempt = () => {
-        const el = find();
-        if (el) {
-            callback(el);
-            return;
-        }
-        frames += 1;
-        if (frames < MAX_READY_FRAMES) handle = requestAnimationFrame(attempt);
-    };
-    attempt();
-    return () => { if (handle !== null) cancelAnimationFrame(handle); };
-}
-
-function formatCalendarCellDate(date) {
-    if (!(date instanceof Date)) {
-        return '';
-    }
-
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
-
-function normalizeCalendarEventDate(date) {
-    if (typeof date === 'string') {
-        return date.slice(0, 10);
-    }
-    return formatCalendarCellDate(date);
-}
 
 function ProgramCalendarView({
     calendarEvents,
@@ -109,28 +79,24 @@ function ProgramCalendarView({
     const calendarRef = React.useRef(null);
     const calendarContainerRef = React.useRef(null);
     const initialDateStr = normalizeCalendarEventDate(initialDate) || formatCalendarCellDate(new Date());
-    // `YYYY-MM-01` of the month in view: month mode reads it from FullCalendar,
-    // continuous mode from the week row at the top of the scroller.
-    const [visibleMonth, setVisibleMonth] = React.useState(() => `${initialDateStr.slice(0, 7)}-01`);
     const [monthTitle, setMonthTitle] = React.useState('');
-    // Continuous mode shows a year centred on today; a context date or navigation
-    // target beyond it re-centres the year there.
-    const [windowAnchor, setWindowAnchor] = React.useState(() => initialDateStr);
-    const pendingScrollRef = React.useRef(continuous ? { date: initialDateStr, smooth: false } : null);
-    const continuousWindow = React.useMemo(
-        () => (continuous ? getContinuousWindow(windowAnchor) : null),
-        [continuous, windowAnchor],
-    );
-    const calendarKey = continuousWindow ? `continuous:${continuousWindow.start}:${continuousWindow.weeks}` : 'month';
-    const getScroller = React.useCallback(
-        () => {
-            const dayGrid = calendarContainerRef.current?.querySelector('.fc-daygrid-body');
-            return dayGrid?.closest('.fc-scroller')
-                || calendarContainerRef.current?.querySelector('.fc-scrollgrid-section-body .fc-scroller')
-                || null;
-        },
-        [],
-    );
+    const {
+        visibleMonth,
+        setVisibleMonth,
+        continuousWindow,
+        calendarKey,
+        getScroller,
+        navigateTo: navigateContinuousTo,
+        recenter,
+        flushPendingScroll,
+        reportVisibleRange,
+    } = useContinuousCalendarScroll({
+        continuous,
+        initialDateStr,
+        containerRef: calendarContainerRef,
+        onVisibleMonthChange,
+        onVisibleRangeChange,
+    });
     const onEventClickRef = React.useRef(onEventClick);
     const onBlockLabelClickRef = React.useRef(onBlockLabelClick);
     const onProgramLabelClickRef = React.useRef(onProgramLabelClick);
@@ -213,193 +179,26 @@ function ProgramCalendarView({
         );
     };
 
-    const blockLabelsByDate = React.useMemo(() => {
-        const labels = new Map();
-        [...programLabels, ...blockLabels].forEach((label) => {
-            if (!label?.date) return;
-            const dateLabels = labels.get(label.date) || [];
-            dateLabels.push({
-                title: label.title,
-                date: label.date,
-                color: label.color || 'var(--color-text-primary)',
-                startDate: label.startDate || label.date,
-                endDate: label.endDate || label.date,
-                programId: label.programId,
-                blockId: label.blockId,
-                labelType: label.labelType || 'block',
-                weekChip: label.weekChip || null,
-                weekTitle: label.weekTitle || null,
-            });
-            labels.set(label.date, dateLabels);
-        });
-        return labels;
-    }, [blockLabels, programLabels]);
+    const blockLabelsByDate = React.useMemo(
+        () => indexCalendarLabelsByDate([programLabels, blockLabels]),
+        [blockLabels, programLabels],
+    );
+    const backgroundRanges = React.useMemo(() => buildBackgroundRanges(calendarEvents), [calendarEvents]);
 
-    const backgroundRanges = React.useMemo(() => {
-        return (calendarEvents || [])
-            .filter((event) => event?.display === 'background')
-            .map((event) => {
-                const eventType = event.extendedProps?.type;
-                if (eventType !== 'program_background' && eventType !== 'block_background') {
-                    return null;
-                }
-
-                const start = normalizeCalendarEventDate(event.start);
-                const end = normalizeCalendarEventDate(event.end);
-                if (!start || !end) return null;
-
-                return {
-                    start,
-                    end,
-                    color: event.backgroundColor || event.borderColor || 'var(--color-brand-primary)',
-                    sortOrder: event.extendedProps?.sortOrder ?? (eventType === 'block_background' ? -10 : -20),
-                    type: eventType,
-                };
-            })
-            .filter(Boolean);
-    }, [calendarEvents]);
-
-    const getCellBackgrounds = React.useCallback((dateStr) => {
-        const selectedRanges = {
-            program: null,
-            block: null,
-        };
-
-        backgroundRanges.forEach((range) => {
-            if (dateStr < range.start || dateStr >= range.end) return;
-
-            const key = range.type === 'block_background' ? 'block' : 'program';
-            if (!selectedRanges[key] || range.sortOrder >= selectedRanges[key].sortOrder) {
-                selectedRanges[key] = range;
-            }
-        });
-
-        return selectedRanges;
-    }, [backgroundRanges]);
-
-    const syncBlockLabelForCell = React.useCallback((dayEl) => {
-        const dateStr = dayEl.getAttribute('data-date');
-        if (!dateStr) return;
-
-        const cellLabels = blockLabelsByDate.get(dateStr) || [];
-        const frame = dayEl.querySelector('.fc-daygrid-day-frame');
-
-        if (!frame) return;
-
-        dayEl.style.removeProperty('--program-calendar-cell-color');
-        dayEl.removeAttribute('data-calendar-background');
-        dayEl.removeAttribute('data-day-state');
-        dayEl.removeAttribute('aria-selected');
-        dayEl.removeAttribute('aria-label');
-        dayEl.removeAttribute('tabindex');
-        dayEl.removeAttribute('data-program-selectable-date');
-        frame.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
-            .forEach((label) => label.remove());
-        frame.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
-        clearStreakDecoration(dayEl, frame);
-        if (loadingMonths?.has(dateStr.slice(0, 7))) dayEl.setAttribute('data-loading', 'true');
-        else dayEl.removeAttribute('data-loading');
-        frame.removeAttribute('data-block-label');
-        frame.style.removeProperty('--program-block-label-color');
-
-        const cellBackgrounds = getCellBackgrounds(dateStr);
-        const effectiveBackground = cellBackgrounds.block || cellBackgrounds.program;
-        if (effectiveBackground) {
-            dayEl.style.setProperty('--program-calendar-cell-color', effectiveBackground.color);
-            dayEl.setAttribute('data-calendar-background', cellBackgrounds.block ? 'block' : 'program');
-        }
-
-        const dayState = dayStatesByDate.get(dateStr);
-        const stateMeta = getProgramDayStateMeta(dayState?.state);
-        if (dayState && stateMeta) {
-            dayEl.setAttribute('data-day-state', dayState.state);
-            const usesRibbon = programDayRibbonDates.has(dateStr);
-            if (!usesRibbon) {
-                const status = document.createElement('span');
-                status.className = styles.dayStatusAssistive;
-                status.textContent = `${selectedProgramName || 'Selected program'}: ${stateMeta.label}`;
-                // Only nodes this decorator injected carry this attribute; React-owned
-                // ribbon content (e.g. ProgramDayStatusMark) must never be removed here.
-                status.setAttribute('data-program-cell-assistive', 'true');
-                frame.appendChild(status);
-            }
-        }
-
-        applyStreakDecoration(dayEl, frame, dayState, STREAK_CLASS_NAMES);
-
-        if ((blockCreationMode || dayMoveMode) && selectableDateSet.has(dateStr)) {
-            const selected = dayMoveMode ? selectedDate === dateStr : selectedStatusDateSet.has(dateStr) || dragPreviewDates.has(dateStr);
-            dayEl.setAttribute('aria-selected', selected ? 'true' : 'false');
-            dayEl.setAttribute('aria-label', dayMoveMode ? `Move destination ${dateStr}, ${selected ? 'selected' : 'not selected'}` : `${dateStr}, ${dayState?.scheduled ? 'scheduled program day' : 'program date'}, ${selected ? 'selected' : 'not selected'}`);
-            dayEl.setAttribute('tabindex', '0');
-            dayEl.setAttribute('data-program-selectable-date', dateStr);
-        }
-
-        cellLabels.forEach((blockLabel, index) => {
-            if (blockLabel.labelType === 'week') {
-                // Decorative: the week also shows in the day pane, so screen readers get the
-                // full sentence once and the visible chip stays hidden from them.
-                const weekLabel = document.createElement('span');
-                weekLabel.className = `${styles.blockCellLabel} ${styles.weekCellLabel}`;
-                weekLabel.title = blockLabel.weekTitle;
-                weekLabel.setAttribute('data-program-block-label', 'week');
-                weekLabel.style.setProperty('--program-block-label-color', blockLabel.color);
-                weekLabel.style.setProperty('--program-label-offset', `${index * 16}px`);
-                const chip = document.createElement('span');
-                chip.className = styles.weekChip;
-                chip.textContent = blockLabel.title;
-                chip.setAttribute('aria-hidden', 'true');
-                const assistive = document.createElement('span');
-                assistive.className = styles.dayStatusAssistive;
-                assistive.textContent = blockLabel.weekTitle;
-                weekLabel.append(chip, assistive);
-                frame.appendChild(weekLabel);
-                return;
-            }
-            const labelButton = document.createElement('button');
-            labelButton.type = 'button';
-            labelButton.className = styles.blockCellLabel;
-            if (blockLabel.labelType === 'program') labelButton.classList.add(styles.programCellLabel);
-            labelButton.textContent = blockLabel.title;
-            labelButton.title = blockLabel.weekTitle || blockLabel.title;
-            if (blockLabel.weekChip) {
-                labelButton.classList.add(styles.blockCellLabelWithWeek);
-                const chip = document.createElement('span');
-                chip.className = styles.weekChip;
-                chip.textContent = blockLabel.weekChip;
-                chip.setAttribute('aria-hidden', 'true');
-                const name = document.createElement('span');
-                name.className = styles.blockCellLabelName;
-                name.textContent = blockLabel.title;
-                labelButton.replaceChildren(chip, name);
-            }
-            labelButton.setAttribute('aria-label', blockLabel.labelType === 'program'
-                ? `View ${blockLabel.title}`
-                : `Select ${blockLabel.title}`);
-            labelButton.setAttribute('data-program-block-label', 'true');
-            labelButton.setAttribute('data-program-block-label-date', dateStr);
-            labelButton.setAttribute('data-program-block-label-index', String(index));
-            labelButton.style.setProperty('--program-block-label-color', blockLabel.color);
-            labelButton.style.setProperty('--program-label-offset', `${index * 16}px`);
-            frame.appendChild(labelButton);
-        });
-    }, [blockCreationMode, dayMoveMode, selectedDate, blockLabelsByDate, dayStatesByDate, dragPreviewDates, getCellBackgrounds, loadingMonths, programDayRibbonDates, selectableDateSet, selectedProgramName, selectedStatusDateSet]);
-
-    const clearBlockLabelForCell = (dayEl) => {
-        const frame = dayEl.querySelector('.fc-daygrid-day-frame');
-        dayEl.style.removeProperty('--program-calendar-cell-color');
-        dayEl.removeAttribute('data-calendar-background');
-        dayEl.removeAttribute('data-day-state');
-        dayEl.removeAttribute('aria-selected');
-        dayEl.removeAttribute('aria-label');
-        dayEl.removeAttribute('tabindex');
-        dayEl.removeAttribute('data-program-selectable-date');
-        dayEl.removeAttribute('data-loading');
-        frame?.querySelectorAll(`[data-program-block-label], .${styles.blockCellLabel}`)
-            .forEach((label) => label.remove());
-        frame?.querySelectorAll('[data-program-cell-assistive]').forEach((status) => status.remove());
-        clearStreakDecoration(dayEl, frame);
-    };
+    const syncBlockLabelForCell = React.useCallback((dayEl) => decorateCalendarCell(dayEl, {
+        labelsByDate: blockLabelsByDate,
+        backgroundRanges,
+        dayStatesByDate,
+        programDayRibbonDates,
+        loadingMonths,
+        selectedProgramName,
+        multiSelect: Boolean(blockCreationMode),
+        moveMode: dayMoveMode,
+        selectableDateSet,
+        selectedDate,
+        selectedStatusDateSet,
+        dragPreviewDates,
+    }, CELL_CLASS_NAMES), [backgroundRanges, blockCreationMode, blockLabelsByDate, dayMoveMode, dayStatesByDate, dragPreviewDates, loadingMonths, programDayRibbonDates, selectableDateSet, selectedDate, selectedProgramName, selectedStatusDateSet]);
 
     const getBlockLabelFromEvent = (event) => {
         const labelElement = event.target?.closest?.('[data-program-block-label="true"]');
@@ -437,128 +236,8 @@ function ProgramCalendarView({
             .forEach(syncBlockLabelForCell);
     }, [syncBlockLabelForCell]);
 
-    const scrollToDate = React.useCallback((dateStr, { smooth = true } = {}) => {
-        const row = calendarContainerRef.current
-            ?.querySelector(`.fc-daygrid-day[data-date="${dateStr}"]`)
-            ?.closest('tr');
-        const scroller = row?.closest('.fc-scroller') || getScroller();
-        if (!scroller || !row) return false;
-        const top = scroller.scrollTop + row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
-        if (typeof scroller.scrollTo === 'function') {
-            scroller.scrollTo({ top, behavior: smooth && !prefersReducedMotion() ? 'smooth' : 'auto' });
-        } else {
-            scroller.scrollTop = top;
-        }
-        return true;
-    }, [getScroller]);
-
-    /** Scroll to a date, re-centring (and remounting) the window when it cannot reach it. */
-    const navigateContinuousTo = (dateStr) => {
-        if (canScrollWithin(dateStr, continuousWindow)) {
-            scrollToDate(dateStr);
-            return;
-        }
-        pendingScrollRef.current = { date: dateStr, smooth: false };
-        setWindowAnchor(dateStr);
-    };
-
-    const onVisibleRangeChangeRef = React.useRef(onVisibleRangeChange);
-    onVisibleRangeChangeRef.current = onVisibleRangeChange;
-    const reportedRangeRef = React.useRef('');
-    const reportVisibleRange = React.useCallback((range) => {
-        const key = range ? `${range.start}:${range.end}` : '';
-        if (!range || key === reportedRangeRef.current) return;
-        reportedRangeRef.current = key;
-        onVisibleRangeChangeRef.current?.(range);
-    }, []);
-
-    // Continuous mode: the month title follows the week row at the top of the
-    // scroller, and the rows actually on screen (top to bottom) drive data loading.
-    React.useEffect(() => {
-        if (!continuous) return undefined;
-        let scroller = null;
-        let frame = null;
-        let initialScrollFrame = null;
-        let settleTimer = null;
-        const rowDates = (row) => [...(row?.querySelectorAll('.fc-daygrid-day[data-date]') || [])]
-            .map((cell) => cell.getAttribute('data-date'));
-        const syncTitle = () => {
-            frame = null;
-            if (!scroller) return;
-            const bounds = scroller.getBoundingClientRect();
-            const top = bounds.top + TITLE_ROW_THRESHOLD;
-            const rows = [...scroller.querySelectorAll('.fc-daygrid-body tr')];
-            const row = rows.find((candidate) => candidate.getBoundingClientRect().bottom > top);
-            const month = getWeekRowMonth(rowDates(row));
-            if (month) {
-                setVisibleMonth((current) => (current === month ? current : month));
-                onVisibleMonthChange?.(month);
-            }
-            const visibleRows = rows.filter((candidate) => {
-                const rect = candidate.getBoundingClientRect();
-                return rect.bottom > bounds.top && rect.top < bounds.bottom;
-            });
-            const firstDates = rowDates(visibleRows[0]).sort();
-            const lastDates = rowDates(visibleRows[visibleRows.length - 1]).sort();
-            if (firstDates.length && lastDates.length) {
-                const range = { start: firstDates[0], end: lastDates[lastDates.length - 1] };
-                if (settleTimer !== null) window.clearTimeout(settleTimer);
-                settleTimer = window.setTimeout(() => {
-                    settleTimer = null;
-                    reportVisibleRange(range);
-                }, reportedRangeRef.current ? VISIBLE_RANGE_SETTLE_MS : 0);
-            }
-        };
-        const onScroll = () => {
-            if (frame === null) frame = requestAnimationFrame(syncTitle);
-        };
-        const findReadyScroller = () => {
-            const el = getScroller();
-            const pendingDate = pendingScrollRef.current?.date;
-            if (!el || (pendingDate && !calendarContainerRef.current?.querySelector(
-                `.fc-daygrid-day[data-date="${pendingDate}"]`,
-            ))) return null;
-            return el;
-        };
-        const cancelReady = whenRendered(findReadyScroller, (el) => {
-            scroller = el;
-            const pending = pendingScrollRef.current;
-            scroller.addEventListener('scroll', onScroll, { passive: true });
-            if (pending) {
-                // Anchor to the actual scroller containing the target row after
-                // FullCalendar finishes laying out the complete week grid.
-                initialScrollFrame = requestAnimationFrame(() => {
-                    initialScrollFrame = requestAnimationFrame(() => {
-                        initialScrollFrame = null;
-                        if (scrollToDate(pending.date, { smooth: pending.smooth })) {
-                            pendingScrollRef.current = null;
-                        }
-                        syncTitle();
-                    });
-                });
-            } else {
-                syncTitle();
-            }
-        });
-        return () => {
-            cancelReady();
-            if (frame !== null) cancelAnimationFrame(frame);
-            if (initialScrollFrame !== null) cancelAnimationFrame(initialScrollFrame);
-            if (settleTimer !== null) window.clearTimeout(settleTimer);
-            scroller?.removeEventListener('scroll', onScroll);
-        };
-    }, [calendarKey, continuous, getScroller, onVisibleMonthChange, reportVisibleRange, scrollToDate]);
-
     const handleDatesSet = (info) => {
-        if (continuous && pendingScrollRef.current) {
-            const pending = pendingScrollRef.current;
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                if (pendingScrollRef.current !== pending) return;
-                if (scrollToDate(pending.date, { smooth: pending.smooth })) {
-                    pendingScrollRef.current = null;
-                }
-            }));
-        }
+        flushPendingScroll();
         if (!continuous && info?.view) {
             if (info.startStr && info.endStr) {
                 reportVisibleRange({
@@ -578,10 +257,7 @@ function ProgramCalendarView({
 
     const handleContinuousToggle = (event) => {
         const enable = event.target.checked;
-        if (enable) {
-            pendingScrollRef.current = { date: initialDateStr, smooth: false };
-            setWindowAnchor(initialDateStr);
-        }
+        if (enable) recenter();
         onContinuousChange?.(enable);
     };
 
@@ -611,29 +287,15 @@ function ProgramCalendarView({
     };
 
     const blockControls = showBlockControls && !readOnly ? (
-        <div className={styles.headerActions}>
-            <button
-                type="button"
-                ref={selectionModeButtonRef}
-                onClick={() => setBlockCreationMode(!blockCreationMode)}
-                className={`${styles.customBtn} ${styles.createModeBtn} ${blockCreationMode ? styles.createModeBtnActive : ''}`}
-                aria-pressed={blockCreationMode}
-            >
-                {blockCreationMode ? 'Selecting Multiple Days' : (isMobile ? 'Select Days' : 'Select Multiple Days')}
-            </button>
-            {selectedRangeLabel ? (
-                <span className={styles.selectionLabel}>{selectedRangeLabel}</span>
-            ) : null}
-            {showAddBlockButton ? (
-                <button
-                    type="button"
-                    onClick={onAddBlockClick}
-                    className={`${styles.customBtn} ${styles.addBlockBtn}`}
-                >
-                    + Add Block
-                </button>
-            ) : null}
-        </div>
+        <ProgramCalendarBlockControls
+            selectionModeButtonRef={selectionModeButtonRef}
+            blockCreationMode={blockCreationMode}
+            setBlockCreationMode={setBlockCreationMode}
+            isMobile={isMobile}
+            selectedRangeLabel={selectedRangeLabel}
+            showAddBlockButton={showAddBlockButton}
+            onAddBlockClick={onAddBlockClick}
+        />
     ) : null;
 
     const usePageToolbar = !compact;
@@ -655,41 +317,15 @@ function ProgramCalendarView({
             {...dragSelection.handlers}
         >
             {usePageToolbar ? (
-                <div className={styles.pageToolbar}>
-                    <div className={styles.toolbarNavigation} aria-label="Calendar navigation" role="group">
-                        <button
-                            type="button"
-                            className={styles.toolbarButton}
-                            aria-label="Previous month"
-                            onClick={handlePreviousClick}
-                        >
-                            ‹
-                        </button>
-                        <button
-                            type="button"
-                            className={styles.toolbarButton}
-                            aria-label="Next month"
-                            onClick={handleNextClick}
-                        >
-                            ›
-                        </button>
-                        <button type="button" className={styles.toolbarButton} onClick={handleTodayClick}>
-                            Today
-                        </button>
-                        {onContinuousChange ? (
-                            <label className={styles.continuousToggle}>
-                                <input
-                                    type="checkbox"
-                                    checked={continuous}
-                                    onChange={handleContinuousToggle}
-                                />
-                                <span>Continuous</span>
-                            </label>
-                        ) : null}
-                    </div>
-                    <h2 className={styles.toolbarTitle} aria-live="polite">{title}</h2>
-                    {blockControls}
-                </div>
+                <ProgramCalendarToolbar
+                    title={title}
+                    continuous={continuous}
+                    onPrevious={handlePreviousClick}
+                    onNext={handleNextClick}
+                    onToday={handleTodayClick}
+                    onContinuousToggle={onContinuousChange ? handleContinuousToggle : null}
+                    actions={blockControls}
+                />
             ) : null}
 
             {statusActions}
@@ -738,7 +374,7 @@ function ProgramCalendarView({
                 dayCellContent={continuous ? renderContinuousDayNumber : undefined}
                 dayCellClassNames={readOnly && !continuous ? undefined : getDayCellClassNames}
                 dayCellDidMount={(dayInfo) => syncBlockLabelForCell(dayInfo.el)}
-                dayCellWillUnmount={(dayInfo) => clearBlockLabelForCell(dayInfo.el)}
+                dayCellWillUnmount={(dayInfo) => clearCellDecoration(dayInfo.el, CELL_CLASS_NAMES)}
             />
             </div>
         </div>

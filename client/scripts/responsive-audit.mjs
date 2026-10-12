@@ -144,6 +144,10 @@ const checks = [
   },
   {
     file: 'src/pages/Sessions.jsx',
+    patterns: [/<ResponsiveSidePane\b/],
+  },
+  {
+    file: 'src/components/layout/ResponsiveSidePane.jsx',
     patterns: [/mobile-sheet-enter/, /mobile-sheet-backdrop-enter/],
   },
   {

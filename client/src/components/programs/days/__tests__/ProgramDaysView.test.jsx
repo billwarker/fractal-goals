@@ -1,19 +1,24 @@
 import React from 'react';
-import { fireEvent, render as testingLibraryRender, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const api = {
-    getSession: vi.fn(),
-    getProgramPlanOccurrences: vi.fn(),
-    getProgramDayPlans: vi.fn(),
-    saveProgramSessionPlan: vi.fn(),
-    resetProgramSessionPlan: vi.fn(),
-    loadProgramSessionPlan: vi.fn(),
-    pullProgramSessionPlanTemplate: vi.fn(),
-    getActivityTagCatalog: vi.fn(),
-};
-vi.mock('../../../../utils/api', () => ({ fractalApi: new Proxy({}, { get: (_, key) => api[key] }) }));
+import {
+    WEEK_ONE,
+    planEntry,
+    plansFor,
+    program,
+    programDaysApi as api,
+    resetProgramDaysApi,
+} from '../../../../test/programs/programDaysFixtures';
+import { nextCard, pane, renderView, renderViewWithClient } from '../../../../test/programs/renderProgramDaysView';
+import {
+    describeOccurrenceDate,
+    pickComparisonDates,
+    pickDefaultDate,
+    pickDefaultDayId,
+} from '../../../../utils/programDaysView';
+
+vi.mock('../../../../utils/api', () => import('../../../../test/programs/programDaysFixtures'));
 vi.mock('../../../../contexts/GoalLevelsContext', () => ({ useGoalLevels: () => ({ getGoalColor: () => '#336699' }) }));
 vi.mock('../../../../hooks/useCircuitQueries', () => ({
     useCircuits: () => ({ data: [{
@@ -23,135 +28,7 @@ vi.mock('../../../../hooks/useCircuitQueries', () => ({
     useCircuitDefinitionMutations: () => ({ createMutation: { mutateAsync: vi.fn(), isPending: false } }),
 }));
 
-import ProgramDaysView from '../ProgramDaysView';
-import useProgramDaysTab from '../../../../hooks/useProgramDaysTab';
-import {
-    describeOccurrenceDate,
-    pickComparisonDates,
-    pickDefaultDate,
-    pickDefaultDayId,
-} from '../../../../utils/programDaysView';
-
-const bench = {
-    id: 'bench', name: 'Bench Press', has_sets: true,
-    metric_definitions: [{ id: 'w', name: 'Weight', unit: 'kg' }, { id: 'r', name: 'Reps', unit: 'reps' }],
-};
-// Program days belong to the program; the block only labels the dates it covers.
-const program = {
-    id: 'program', start_date: '2026-09-01', end_date: '2026-10-31',
-    blocks: [{
-        id: 'block-1', name: 'Hypertrophy', start_date: '2026-09-01', end_date: '2026-10-31',
-        track_weeks: true, week_start_day: 0,
-    }],
-    days: [
-        { id: 'upper', name: 'Upper A', day_number: 1, templates: [{ id: 'tmpl', name: 'Bench Day' }] },
-        { id: 'rest', name: 'Rest', day_number: 2, templates: [] },
-    ],
-};
-
-function planEntry(overrides = {}) {
-    return {
-        template: { id: 'tmpl', name: 'Bench Day', color: '#336699', revision: 1 },
-        is_required: true,
-        date: '2026-10-05',
-        plan_id: null,
-        row_version: null,
-        source: 'template',
-        seeded_from_date: null,
-        template_changed: false,
-        sections: [{ name: 'Main', items: [{
-            type: 'activity', activity_definition_id: 'bench', name: 'Bench Press', item_key: 'k1',
-            prescription: { schema: 1, sets: [{ metrics: [{ metric_id: 'w', split_id: null, value: 100 }] }] },
-        }] }],
-        previous: { date: '2026-09-28', sections: [{ name: 'Main', items: [{
-            item_key: 'k1', prescription: { schema: 1, sets: [{ metrics: [{ metric_id: 'w', split_id: null, value: 100 }] }] },
-        }] }] },
-        executed_sessions: [],
-        ...overrides,
-    };
-}
-
-/** The page's Days tab: the side-pane navigator (with date rails) beside the main columns. */
-function Harness({ timezone = 'UTC', showDayHeading = false, onEditDay = vi.fn() }) {
-    const tab = useProgramDaysTab({
-        rootId: 'root',
-        program,
-        today: '2026-10-01',
-        timezone,
-        enabled: true,
-        setViewMode: () => {},
-        onLeavePane: () => {},
-        onEditDay,
-    });
-    return (
-        <>
-            <aside aria-label="Program side pane">{tab.navigator}</aside>
-            <ProgramDaysView
-                rootId="root"
-                program={program}
-                activities={[bench]}
-                activityGroups={[]}
-                today="2026-10-01"
-                timezone={timezone}
-                resolved={tab.resolved}
-                occurrencesQuery={tab.occurrencesQuery}
-                focusTemplateId={tab.selection?.templateId || null}
-                onSelectionChange={tab.setSelection}
-                onEditDay={onEditDay}
-                showDayHeading={showDayHeading}
-            />
-        </>
-    );
-}
-
-function renderView(props = {}) {
-    return renderViewWithClient(props);
-}
-
-function renderViewWithClient({ compare = false, ...props } = {}) {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-    testingLibraryRender(
-        <QueryClientProvider client={queryClient}>
-            <MemoryRouter>
-                <Harness {...props} />
-            </MemoryRouter>
-        </QueryClientProvider>,
-    );
-    if (compare) fireEvent.click(within(pane()).getByRole('button', { name: 'Compare two days' }));
-    return { queryClient };
-}
-
-const pane = () => screen.getByRole('complementary', { name: 'Program side pane' });
-
-const WEEK_ONE = planEntry({
-    date: '2026-09-28', plan_id: 'p0', row_version: 1, source: 'plan', seeded_from_date: null, previous: null,
-});
-
-function plansFor(overridesByDate = {}) {
-    return (_root, _program, _day, date) => Promise.resolve({ data: { date, plans: [
-        overridesByDate[date] || (date === '2026-09-28' ? WEEK_ONE : planEntry()),
-    ] } });
-}
-
-const nextCard = () => screen.findByRole('article', { name: 'Bench Day plan, Mon, Oct 5' });
-
-beforeEach(() => {
-    Object.values(api).forEach((fn) => fn.mockReset());
-    api.getActivityTagCatalog.mockResolvedValue({ data: { tags: [] } });
-    api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
-        {
-            date: '2026-09-28', templates: [{ template_id: 'tmpl', state: 'planned', plan_id: 'p0' }],
-            state: 'scheduled_met', manual_status: null, closed: true, program_day_completed: true,
-            sessions: [{ id: 'sess-1', name: 'Bench Day', completed: true }],
-        },
-        {
-            date: '2026-10-05', templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
-            state: 'scheduled_pending', manual_status: null, closed: false, program_day_completed: false,
-            sessions: [],
-        },
-    ] }] } });
-    api.getProgramDayPlans.mockImplementation(plansFor());
-});
+beforeEach(resetProgramDaysApi);
 
 describe('Days view date selection', () => {
     it('defaults to the latest program day beside the next one', () => {
@@ -521,136 +398,5 @@ describe('ProgramDaysView', () => {
         expect(session.querySelector('[data-align-key="tmpl|c:circ#0"]')).not.toBeNull();
         expect(screen.queryByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).not.toBeInTheDocument();
         expect(await nextCard()).toBeInTheDocument();
-    });
-});
-
-
-describe('Block and week buckets', () => {
-    const occurrence = (date, state = 'scheduled_pending') => ({
-        date, templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
-        state, manual_status: null, closed: state !== 'scheduled_pending',
-        program_day_completed: state === 'scheduled_met', sessions: [],
-    });
-
-    beforeEach(() => {
-        // Mon/Thu in weeks 5 and 6, nothing in week 7, then week 8.
-        api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
-            occurrence('2026-09-28', 'scheduled_met'), occurrence('2026-10-01', 'scheduled_met'),
-            occurrence('2026-10-05'), occurrence('2026-10-08'),
-            occurrence('2026-10-19'), occurrence('2026-10-22'),
-        ] }] } });
-    });
-
-    const weeks = () => screen.getByRole('group', { name: 'Program day dates: weeks of Hypertrophy' });
-    const railDates = () => within(screen.getByRole('list', { name: 'Program day dates' })).getAllByRole('button');
-
-    it('keeps every date on the rail and marks the selected date\'s block and week', async () => {
-        renderView();
-
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
-        expect(railDates()).toHaveLength(6);
-        expect(within(weeks()).getAllByRole('button')).toHaveLength(9);
-        expect(within(weeks()).getByRole('button', { name: /^Week 6,/ })).toHaveAttribute('aria-pressed', 'true');
-        expect(within(weeks()).getByRole('button', { name: /^Week 5,.*2 dates, 2 done/ })).toBeInTheDocument();
-    });
-
-    it('jumps to the start of a picked week, and ignores weeks without dates', async () => {
-        renderView();
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
-
-        const empty = within(weeks()).getByRole('button', { name: /^Week 7,.*no dates for this day/ });
-        expect(empty).toHaveAttribute('aria-disabled', 'true');
-        fireEvent.click(empty);
-        expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
-
-        fireEvent.click(within(weeks()).getByRole('button', { name: /^Week 8,/ }));
-        expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
-
-        // Mid-week, picking the current week returns to its first date.
-        fireEvent.click(screen.getByRole('button', { name: 'Program day dates: next date' }));
-        expect(await screen.findByRole('region', { name: 'Thursday, Oct 22' })).toBeInTheDocument();
-        fireEvent.click(within(weeks()).getByRole('button', { name: /^Week 8,/ }));
-        expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
-    });
-
-    it('jumps to the start of a picked block', async () => {
-        renderView();
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
-
-        fireEvent.click(screen.getByRole('button', { name: /^Hypertrophy,/ }));
-        expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
-        expect(within(weeks()).getByRole('button', { name: /^Week 5,/ })).toHaveAttribute('aria-pressed', 'true');
-    });
-});
-
-describe('Optional session templates', () => {
-    const accessories = (overrides = {}) => planEntry({
-        template: { id: 'acc', name: 'Accessories', color: '#aa5500', revision: 1 },
-        is_required: false,
-        is_loaded: false,
-        source: 'template',
-        seeded_from_date: null,
-        previous: null,
-        sections: [{ name: 'Main', items: [
-            { type: 'activity', activity_definition_id: 'bench', name: 'Curls', item_key: 'c1' },
-            { type: 'activity', activity_definition_id: 'bench', name: 'Rows', item_key: 'c2' },
-        ] }],
-        ...overrides,
-    });
-    const withOptional = (optional) => (_root, _program, _day, date) => Promise.resolve({ data: { date, plans: [
-        date === '2026-09-28' ? WEEK_ONE : planEntry({ is_loaded: true }),
-        { ...optional, date },
-    ] } });
-    const selector = () => screen.findByRole('region', { name: 'Optional sessions' });
-
-    it('opens required templates and lists optional ones in a selector', async () => {
-        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
-        renderView();
-
-        expect(await nextCard()).toBeInTheDocument();
-        const list = await selector();
-        expect(within(list).getByText('Accessories')).toBeInTheDocument();
-        expect(within(list).getByText('2 activities')).toBeInTheDocument();
-        expect(screen.queryByRole('article', { name: 'Accessories plan, Mon, Oct 5' })).not.toBeInTheDocument();
-    });
-
-    it('adds an optional template to the day as an editable plan card', async () => {
-        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
-        api.loadProgramSessionPlan.mockResolvedValue({ data: accessories({
-            date: '2026-10-05', is_loaded: true, plan_id: 'pa', row_version: 1, source: 'plan',
-        }) });
-        renderView();
-
-        fireEvent.click(within(await selector()).getByRole('button', { name: 'Add Accessories to this day' }));
-
-        const card = await screen.findByRole('article', { name: 'Accessories plan, Mon, Oct 5' });
-        expect(api.loadProgramSessionPlan).toHaveBeenCalledWith('root', 'program', 'upper', 'acc', '2026-10-05', 'UTC');
-        expect(within(card).getByText('Optional')).toBeInTheDocument();
-        expect(within(card).getByRole('button', { name: 'Remove from day' })).toBeInTheDocument();
-        await waitFor(() => expect(card).toHaveFocus());
-        expect(screen.queryByRole('region', { name: 'Optional sessions' })).not.toBeInTheDocument();
-    });
-
-    it('removes a loaded optional template back into the selector', async () => {
-        api.getProgramDayPlans.mockImplementation(withOptional(accessories({
-            is_loaded: true, plan_id: 'pa', row_version: 1, source: 'plan',
-        })));
-        api.resetProgramSessionPlan.mockResolvedValue({ data: accessories({ date: '2026-10-05' }) });
-        renderView();
-
-        const card = await screen.findByRole('article', { name: 'Accessories plan, Mon, Oct 5' });
-        fireEvent.click(within(card).getByRole('button', { name: 'Remove from day' }));
-
-        const list = await selector();
-        expect(api.resetProgramSessionPlan).toHaveBeenCalledWith('root', 'program', 'upper', 'acc', '2026-10-05', 'UTC');
-        expect(within(list).getByText('Accessories')).toBeInTheDocument();
-    });
-
-    it('shows no selector on a past program day', async () => {
-        api.getProgramDayPlans.mockImplementation(withOptional(accessories()));
-        renderView({ compare: true });
-
-        expect(await screen.findByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).toBeInTheDocument();
-        await waitFor(() => expect(screen.getAllByRole('region', { name: 'Optional sessions' })).toHaveLength(1));
     });
 });

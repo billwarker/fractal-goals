@@ -36,21 +36,7 @@ const {
     },
     sessionDataState: {
         activityInstances: [],
-        activities: [
-            {
-                id: 'activity-1',
-                name: 'Scale Practice',
-                description: 'Ascending pattern',
-                group_id: 'group-1',
-                has_sets: false,
-                has_metrics: true,
-                metrics_multiplicative: false,
-                has_splits: false,
-                associated_goal_ids: ['goal-1'],
-                metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
-                split_definitions: [],
-            },
-        ],
+        activities: [],
         activityGroups: [
             { id: 'group-1', name: 'Technique', parent_id: null },
         ],
@@ -115,6 +101,23 @@ vi.mock('../SessionActivityItem', () => ({
     ),
 }));
 
+const sectionElement = (overrides = {}) => (
+    <SessionSection
+        section={{ name: 'Main Practice', activity_ids: [], estimated_duration_minutes: 10 }}
+        sectionIndex={0}
+        onFocusActivity={vi.fn()}
+        selectedActivityId={null}
+        onOpenActivityBuilder={vi.fn()}
+        onNoteCreated={vi.fn()}
+        allNotes={[]}
+        onAddNote={vi.fn()}
+        onUpdateNote={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onOpenGoals={vi.fn()}
+        {...overrides}
+    />
+);
+
 describe('SessionSection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -122,21 +125,19 @@ describe('SessionSection', () => {
         circuitDefinitionsState.definitions = [];
         sessionDataState.activityInstances = [];
         sessionDataState.localSessionData = null;
-        sessionDataState.activities = [
-            {
-                id: 'activity-1',
-                name: 'Scale Practice',
-                description: 'Ascending pattern',
-                group_id: 'group-1',
-                has_sets: false,
-                has_metrics: true,
-                metrics_multiplicative: false,
-                has_splits: false,
-                associated_goal_ids: ['goal-1'],
-                metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
-                split_definitions: [],
-            },
-        ];
+        sessionDataState.activities = [{
+            id: 'activity-1',
+            name: 'Scale Practice',
+            description: 'Ascending pattern',
+            group_id: 'group-1',
+            has_sets: false,
+            has_metrics: true,
+            metrics_multiplicative: false,
+            has_splits: false,
+            associated_goal_ids: ['goal-1'],
+            metric_definitions: [{ id: 'metric-1', name: 'Speed', unit: 'bpm' }],
+            split_definitions: [],
+        }];
         sessionDataState.groupedActivities = {
             'group-1': [sessionDataState.activities[0]],
         };
@@ -151,26 +152,11 @@ describe('SessionSection', () => {
             group_id: 'group-1',
         }];
 
-        const renderSection = () => (
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: [], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId={null}
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
-        const { rerender } = render(renderSection());
+        const { rerender } = render(sectionElement());
 
         expect(screen.queryByRole('button', { name: '+ Add Circuit' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
-        rerender(renderSection());
+        rerender(sectionElement());
         expect(screen.queryByRole('button', { name: 'Select Technique Circuit' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('tab', { name: 'Activity Circuits' }));
         fireEvent.click(screen.getByRole('button', { name: /Technique/ }));
@@ -184,19 +170,9 @@ describe('SessionSection', () => {
     });
 
     it('names and highlights the add action for the active goal scope', () => {
-        render(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: [] }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId={null}
-                onOpenActivityBuilder={vi.fn()}
-                activityGoalScope={{
-                    goal: { id: 'goal-1', name: 'Technique Goal' },
-                    activityIds: ['activity-1'],
-                }}
-            />
-        );
+        render(sectionElement({
+            activityGoalScope: { goal: { id: 'goal-1', name: 'Technique Goal' }, activityIds: ['activity-1'] },
+        }));
 
         const button = screen.getByRole('button', {
             name: '+ Add Activity associated to Technique Goal',
@@ -207,38 +183,10 @@ describe('SessionSection', () => {
     it('opens copy mode and passes a duplicated activity definition into the builder flow', () => {
         const onOpenActivityBuilder = vi.fn();
 
-        const { rerender } = render(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: [], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId={null}
-                onOpenActivityBuilder={onOpenActivityBuilder}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        const { rerender } = render(sectionElement({ onOpenActivityBuilder }));
 
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
-        rerender(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: [], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId={null}
-                onOpenActivityBuilder={onOpenActivityBuilder}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        rerender(sectionElement({ onOpenActivityBuilder }));
 
         fireEvent.click(screen.getByRole('button', { name: '+ Copy Existing Activity Definition' }));
         expect(screen.getByText('Copy mode: select an existing activity definition to duplicate into a new one.')).toBeInTheDocument();
@@ -263,15 +211,7 @@ describe('SessionSection', () => {
 
     it('opens the builder with an unmatched search term as the new activity name', () => {
         const onOpenActivityBuilder = vi.fn();
-        const renderSection = () => (
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: [] }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId={null}
-                onOpenActivityBuilder={onOpenActivityBuilder}
-            />
-        );
+        const renderSection = () => (sectionElement({ section: { name: 'Main Practice', activity_ids: [] }, onOpenActivityBuilder }));
         const { rerender } = render(renderSection());
 
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
@@ -296,21 +236,7 @@ describe('SessionSection', () => {
             },
         ];
 
-        const { container } = render(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={onFocusActivity}
-                selectedActivityId="instance-1"
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        const { container } = render(sectionElement({ section: { name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }, onFocusActivity, selectedActivityId: 'instance-1' }));
 
         fireEvent.click(screen.getByText('session activity item'));
         expect(onFocusActivity).toHaveBeenCalledWith(
@@ -332,21 +258,7 @@ describe('SessionSection', () => {
             },
         ];
 
-        render(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={onFocusActivity}
-                selectedActivityId="instance-1"
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        render(sectionElement({ section: { name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }, onFocusActivity, selectedActivityId: 'instance-1' }));
 
         fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
         expect(onFocusActivity).not.toHaveBeenCalled();
@@ -360,21 +272,7 @@ describe('SessionSection', () => {
             },
         ];
 
-        render(
-            <SessionSection
-                section={{ name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }}
-                sectionIndex={0}
-                onFocusActivity={vi.fn()}
-                selectedActivityId="instance-1"
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        render(sectionElement({ section: { name: 'Main Practice', activity_ids: ['instance-1'], estimated_duration_minutes: 10 }, selectedActivityId: 'instance-1' }));
 
         expect(screen.getByText('index 1')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'duplicate item' }));
@@ -402,21 +300,7 @@ describe('SessionSection', () => {
             ],
         };
 
-        render(
-            <SessionSection
-                section={{ name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }}
-                sectionIndex={1}
-                onFocusActivity={vi.fn()}
-                selectedActivityId="instance-2"
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        render(sectionElement({ section: { name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }, sectionIndex: 1, selectedActivityId: 'instance-2' }));
 
         expect(screen.getByText('index 2')).toBeInTheDocument();
     });
@@ -439,21 +323,7 @@ describe('SessionSection', () => {
             ],
         };
 
-        render(
-            <SessionSection
-                section={{ name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }}
-                sectionIndex={1}
-                onFocusActivity={vi.fn()}
-                selectedActivityId="instance-2"
-                onOpenActivityBuilder={vi.fn()}
-                onNoteCreated={vi.fn()}
-                allNotes={[]}
-                onAddNote={vi.fn()}
-                onUpdateNote={vi.fn()}
-                onDeleteNote={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />
-        );
+        render(sectionElement({ section: { name: 'Second Practice', activity_ids: ['instance-2'], estimated_duration_minutes: 10 }, sectionIndex: 1, selectedActivityId: 'instance-2' }));
 
         fireEvent.click(screen.getByRole('button', { name: 'copy previous values' }));
 

@@ -30,7 +30,6 @@ const sizeExceptions = new Map([
   ['src/components/GoalDetailModal.jsx', 777],
   ['src/components/GoalDetailModal.module.css', 850],
   ['src/components/__tests__/GoalDetailModal.test.jsx', 1081],
-  ['src/components/activityPicker/ActivityPicker.jsx', 453],
   ['src/components/analytics/AnalyticsQueryConsole.jsx', 831],
   ['src/components/analytics/AnalyticsFiltersSidebar.jsx', 510],
   ['src/components/analytics/LineGraph.jsx', 775],
@@ -50,7 +49,7 @@ const sizeExceptions = new Map([
   ['src/components/modals/DayViewModal.jsx', 699],
   ['src/components/modals/ManageMetricsModal.jsx', 506],
   ['src/components/modals/SettingsModal.jsx', 650],
-  ['src/components/modals/TemplateBuilderModal.jsx', 905],
+  ['src/components/modals/TemplateBuilderModal.jsx', 880],
   ['src/components/modals/TemplateBuilderModal.module.css', 675],
   ['src/components/notes/NoteCard.jsx', 510],
   ['src/components/notes/NoteComposer.jsx', 500],
@@ -69,15 +68,15 @@ const sizeExceptions = new Map([
   ['src/hooks/__tests__/useSessionDetailMutations.test.jsx', 713],
   ['src/hooks/useSessionDetailMutations.js', 799],
   ['src/pages/CreateSession.jsx', 625],
-  ['src/pages/Analytics.jsx', 570],
+  ['src/pages/Analytics.jsx', 560],
   ['src/pages/FractalGoals.jsx', 1030],
   ['src/pages/__tests__/FractalGoalsSearch.test.jsx', 556],
   ['src/pages/ManageActivities.jsx', 650],
-  ['src/pages/Notes.jsx', 502],
-  ['src/pages/Sessions.jsx', 506],
+  ['src/pages/Notes.jsx', 483],
+  ['src/pages/Sessions.jsx', 483],
   ['src/pages/Admin.jsx', 1303],
   ['src/pages/Landing.jsx', 1061],
-  ['src/pages/ProgramCalendarPage.jsx', 1124],
+  ['src/pages/ProgramCalendarPage.jsx', 1023],
   ['src/pages/__tests__/Admin.test.jsx', 707],
   ['src/pages/__tests__/Landing.test.jsx', 1016],
   ['src/utils/dateUtils.js', 559],
@@ -171,7 +170,7 @@ const checks = [
   {
     type: 'require-substring',
     file: 'src/hooks/useProgramsCalendarData.js',
-    substrings: ['useQuery', 'queryKeys.programs(', 'useFractalTree('],
+    substrings: ['useQuery', 'queryKeys.programCalendar(', 'useFractalTree('],
     reason: 'Programs calendar data hook should remain React Query based.',
   },
   {
@@ -200,10 +199,10 @@ const globalNoImportPatterns = [
 
 const INLINE_STYLE_GLOBAL_BUDGET = 356;
 const RAW_CLOSE_GLYPH_BUDGET = 3;
-const RAW_BUTTON_CLASS_DRIFT_BUDGET = 137;
-// The audited tag-progress worktree contains 201 legacy selectors. This is a
-// no-growth ratchet; feature work must use Badge while page migrations reduce it.
-const BESPOKE_BADGE_SELECTOR_BUDGET = 201;
+const RAW_BUTTON_CLASS_DRIFT_BUDGET = 131;
+// No-growth ratchet over legacy selectors (184 after the October 2026 dead-CSS
+// sweep); feature work must use Badge while page migrations reduce it.
+const BESPOKE_BADGE_SELECTOR_BUDGET = 184;
 const GLOBAL_TOKEN_PREFIX = /^--(?:color|spacing|border-radius|shadow|font|line-height|duration|ease|z|panel|surface|sheet)-/;
 const BESPOKE_OVERLAY_FILE_BUDGET = 9;
 const RAW_MOTION_LITERAL_BUDGET = 664;

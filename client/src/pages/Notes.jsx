@@ -9,7 +9,6 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { NoteTimeline, NoteComposer } from '../components/notes';
 import { ComposeLinkPanel } from '../components/notes/NoteComposer';
@@ -28,6 +27,8 @@ import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
+import BodyPortal from '../components/layout/BodyPortal';
+import NotesMobileSheet from '../components/notes/NotesMobileSheet';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
 
@@ -444,16 +445,15 @@ function Notes() {
                 />
             ) : null}
 
-            {goalPickerOpen && createPortal(
+            <BodyPortal when={goalPickerOpen}>
                 <GoalPickerModal
                     rootId={rootId}
                     selectedGoalId={filterGoalId}
                     onSelect={handleGoalFilterSelect}
                     onClose={() => setGoalPickerOpen(false)}
-                />,
-                document.body,
-            )}
-            {activityPickerOpen && createPortal(
+                />
+            </BodyPortal>
+            <BodyPortal when={activityPickerOpen}>
                 <ActivityFilterModal
                     title="Filter by Activity"
                     activities={activities}
@@ -462,48 +462,19 @@ function Notes() {
                     initialGroupIds={filterGroupIds}
                     onConfirm={handleActivityFilterConfirm}
                     onClose={() => setActivityPickerOpen(false)}
-                />,
-                document.body,
-            )}
+                />
+            </BodyPortal>
 
-            {isMobile && mobilePanelOpen && createPortal(
-                <ModalBackdrop className={`${styles.bottomSheet} mobile-sheet-backdrop-enter`} onClose={() => setMobilePanelOpen(false)}>
-                    <div className={`${styles.bottomSheetCard} mobile-sheet-enter`} onClick={e => e.stopPropagation()}>
-                        <div className={styles.bottomSheetHandle} />
-                        <div className={styles.bottomSheetHeader}>
-                            <div className={styles.bottomSheetHeaderCopy}>
-                                <div className={styles.bottomSheetTitle}>
-                                    {composing ? 'Associator' : 'Filters'}
-                                </div>
-                                <div className={styles.bottomSheetSubtitle}>
-                                    {composing ? 'Link this note to a goal or activity.' : `${total} note${total !== 1 ? 's' : ''} shown`}
-                                </div>
-                            </div>
-                            <div className={styles.bottomSheetActions}>
-                                {!composing ? (
-                                    <button
-                                        className={styles.bottomSheetActionButton}
-                                        onClick={clearFilters}
-                                        disabled={!hasActiveFilters}
-                                    >
-                                        Reset
-                                    </button>
-                                ) : null}
-                                <button
-                                    className={styles.bottomSheetActionButton}
-                                    onClick={() => setMobilePanelOpen(false)}
-                                >
-                                    Hide
-                                </button>
-                            </div>
-                        </div>
-                        <div className={styles.bottomSheetBody}>
-                            {composing ? composeLinkPanelBody : filterPanelBody}
-                        </div>
-                    </div>
-                </ModalBackdrop>,
-                document.body,
-            )}
+            <NotesMobileSheet
+                open={isMobile && mobilePanelOpen}
+                composing={composing}
+                total={total}
+                hasActiveFilters={hasActiveFilters}
+                onReset={clearFilters}
+                onClose={() => setMobilePanelOpen(false)}
+            >
+                {composing ? composeLinkPanelBody : filterPanelBody}
+            </NotesMobileSheet>
         </div>
     );
 }

@@ -159,18 +159,19 @@ class ProgramDay(Base):
     __mapper_args__ = {'version_id_col': row_version}
 
     program = relationship("Program", back_populates="days")
+    # template_links is the only writable path to program_day_templates; templates is a
+    # read projection of it, so a delete never removes the same association rows twice.
     template_links = relationship(
         "ProgramDayTemplate",
         back_populates="program_day",
         cascade="all, delete-orphan",
         order_by=program_day_templates.c.order,
-        overlaps="templates"
     )
     templates = relationship(
         "SessionTemplate",
         secondary=program_day_templates,
         order_by="program_day_templates.c.order",
-        overlaps="program_day,template,template_links"
+        viewonly=True,
     )
     completed_sessions = relationship("Session", back_populates="program_day")
     # Explicit dates a reusable definition was scheduled on; always batch-loaded
@@ -201,15 +202,8 @@ class ProgramDay(Base):
 class ProgramDayTemplate(Base):
     __table__ = program_day_templates
 
-    program_day = relationship(
-        "ProgramDay",
-        back_populates="template_links",
-        overlaps="templates"
-    )
-    template = relationship(
-        "SessionTemplate",
-        overlaps="program_day,templates,template_links"
-    )
+    program_day = relationship("ProgramDay", back_populates="template_links")
+    template = relationship("SessionTemplate")
 
 class ProgramDaySession(Base):
     """Historical ledger retained for analytics compatibility, never day-status authority."""

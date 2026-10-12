@@ -1,5 +1,4 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate, useParams } from 'react-router-dom';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
@@ -29,9 +28,11 @@ import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFe
 import { useDebug } from '../contexts/DebugContext';
 import '../App.css';
 import notify from '../utils/notify';
-import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
-import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import useIsMobile from '../hooks/useIsMobile';
+import usePersistedPaneOpen from '../hooks/usePersistedPaneOpen';
+import BodyPortal from '../components/layout/BodyPortal';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
+import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
 import AnalyticsOnboardingState from '../components/onboarding/AnalyticsOnboardingState';
 import styles from './Analytics.module.css';
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
@@ -59,14 +60,6 @@ const formatDuration = (seconds) => {
         return `${hours}h ${minutes}m`;
     }
     return `${minutes}m`;
-};
-
-const getStoredBoolean = (key, fallback) => {
-    if (typeof window === 'undefined' || typeof window.localStorage?.getItem !== 'function') {
-        return fallback;
-    }
-    const stored = window.localStorage.getItem(key);
-    return stored == null ? fallback : stored === 'true';
 };
 
 let windowIdCounter = 1;
@@ -101,12 +94,10 @@ function Analytics() {
     const [currentViewName, setCurrentViewName] = useState(EMPTY_VIEW_NAME);
     const [globalDateRange, setGlobalDateRange] = useState({ start: null, end: null });
     const [globalFilters, setGlobalFilters] = useState(getDefaultGlobalFilters());
-    const filtersPaneStorageKey = `analytics-filter-pane-open:${rootId || 'default'}`;
-    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = useState(() => {
-        return getIsMobileViewport()
-            ? false
-            : getStoredBoolean(`analytics-filter-pane-open:${rootId || 'default'}`, false);
-    });
+    const [isFiltersPaneOpen, setIsFiltersPaneOpen] = usePersistedPaneOpen(
+        `analytics-filter-pane-open:${rootId || 'default'}`,
+        { defaultOpen: false, isMobile, resetKey: rootId },
+    );
     const [isHydrated, setIsHydrated] = useState(false);
     const [isViewsModalOpen, setIsViewsModalOpen] = useState(false);
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
@@ -186,21 +177,6 @@ function Analytics() {
             navigate('/');
         }
     }, [navigate, rootId]);
-
-    useEffect(() => {
-        setIsFiltersPaneOpen(getIsMobileViewport() ? false : getStoredBoolean(filtersPaneStorageKey, false));
-    }, [filtersPaneStorageKey]);
-
-    useEffect(() => {
-        if (isMobile) {
-            setIsFiltersPaneOpen(false);
-        }
-    }, [isMobile, rootId]);
-
-    useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.localStorage?.setItem !== 'function') return;
-        window.localStorage.setItem(filtersPaneStorageKey, String(isFiltersPaneOpen));
-    }, [filtersPaneStorageKey, isFiltersPaneOpen]);
 
     useEffect(() => {
         if (!rootId) {
@@ -470,7 +446,14 @@ function Analytics() {
     ]);
 
     const filtersPane = (
-        <div className={`${styles.rightPanel} ${isMobile ? 'mobile-sheet-enter' : ''}`}>
+        <ResponsiveSidePane
+            open={activeMode === 'dashboard' && isFiltersPaneOpen}
+            isMobile={isMobile}
+            onClose={() => setIsFiltersPaneOpen(false)}
+            panelClassName={styles.rightPanel}
+            backdropClassName={styles.sheetBackdrop}
+            constrainToVisualViewport={false}
+        >
             <AnalyticsFiltersSidebar
                 filters={globalFilters}
                 dateRange={globalDateRange}
@@ -486,7 +469,7 @@ function Analytics() {
                 onToggleCollapse={() => setIsFiltersPaneOpen(false)}
                 isMobile={isMobile}
             />
-        </div>
+        </ResponsiveSidePane>
     );
 
     if (loading && !isHydrated) {
@@ -545,17 +528,9 @@ function Analytics() {
                 />
             ) : null}
 
-            {activeMode === 'dashboard' && isFiltersPaneOpen && isMobile && createPortal(
-                <ModalBackdrop
-                    className={`${styles.sheetBackdrop} mobile-sheet-backdrop-enter`} constrainToVisualViewport={false}
-                    onClose={() => setIsFiltersPaneOpen(false)}
-                    aria-hidden="true"
-                />,
-                document.body,
-            )}
-            {activeMode === 'dashboard' && isFiltersPaneOpen && (isMobile ? createPortal(filtersPane, document.body) : filtersPane)}
+            {filtersPane}
 
-            {isViewsModalOpen && createPortal(
+            <BodyPortal when={isViewsModalOpen}>
                 <Suspense fallback={null}>
                     <AnalyticsViewsModal
                         views={analyticsViews}
@@ -564,11 +539,10 @@ function Analytics() {
                         onDeleteView={handleDeleteView}
                         onClose={() => setIsViewsModalOpen(false)}
                     />
-                </Suspense>,
-                document.body,
-            )}
+                </Suspense>
+            </BodyPortal>
 
-            {isSaveModalOpen && createPortal(
+            <BodyPortal when={isSaveModalOpen}>
                 <Suspense fallback={null}>
                     <AnalyticsViewNameModal
                         initialName=""
@@ -576,9 +550,8 @@ function Analytics() {
                         onConfirm={handleCreateView}
                         onClose={() => setIsSaveModalOpen(false)}
                     />
-                </Suspense>,
-                document.body,
-            )}
+                </Suspense>
+            </BodyPortal>
         </div>
     );
 }

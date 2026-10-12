@@ -38,8 +38,18 @@ import {
     createSectionId,
     getTemplateItemKey,
     isTemplateCircuitItem,
-    serializeTemplateItem,
 } from './templateBuilderItems';
+import {
+    buildTemplateData,
+    moveQuickActivity,
+    moveSection,
+    moveSectionItem,
+    removeQuickActivity,
+    removeSection,
+    removeSectionItem,
+    validateSectionDraft,
+    validateTemplate,
+} from './templateBuilderState';
 
 function TemplateBuilderModalContent({
     onClose,
@@ -119,14 +129,9 @@ function TemplateBuilderModalContent({
     const closeAlertModal = () => setAlertModal((previous) => ({ ...previous, show: false }));
 
     const handleAddSection = () => {
-        if (!newSection.name.trim()) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Section name is required' });
-            return;
-        }
-
-        const duration = parseInt(newSection.duration_minutes, 10) || 10;
-        if (duration < 1) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Duration must be at least 1 minute' });
+        const { error, duration } = validateSectionDraft(newSection);
+        if (error) {
+            setAlertModal({ show: true, title: 'Validation Error', message: error });
             return;
         }
 
@@ -163,14 +168,9 @@ function TemplateBuilderModalContent({
     };
 
     const handleUpdateSection = () => {
-        if (!newSection.name.trim()) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Section name is required' });
-            return;
-        }
-
-        const duration = parseInt(newSection.duration_minutes, 10) || 10;
-        if (duration < 1 || editingSectionIndex === null) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Duration must be at least 1 minute' });
+        const { error, duration } = validateSectionDraft(newSection);
+        if (error || editingSectionIndex === null) {
+            setAlertModal({ show: true, title: 'Validation Error', message: error || 'Unable to edit this section.' });
             return;
         }
 
@@ -303,137 +303,33 @@ function TemplateBuilderModalContent({
         resetActivityPicker();
     };
 
-    const handleRemoveSection = (index) => {
-        setCurrentTemplate((previous) => ({
-            ...previous,
-            sections: previous.sections.filter((_, currentIndex) => currentIndex !== index),
-        }));
-    };
-
-    const handleRemoveActivity = (sectionIndex, activityIndex) => {
-        setCurrentTemplate((previous) => {
-            const updatedSections = [...previous.sections];
-            const targetSection = updatedSections[sectionIndex];
-            if (!targetSection) {
-                return previous;
-            }
-
-            updatedSections[sectionIndex] = {
-                ...targetSection,
-                activities: (targetSection.activities || []).filter(
-                (_, currentIndex) => currentIndex !== activityIndex
-                ),
-            };
-            return {
-                ...previous,
-                sections: updatedSections,
-            };
-        });
-    };
-
-    const handleRemoveQuickActivity = (activityIndex) => {
-        setCurrentTemplate((previous) => ({
-            ...previous,
-            quickActivities: previous.quickActivities.filter((_, currentIndex) => currentIndex !== activityIndex),
-        }));
-    };
-
-    const handleMoveSection = (index, direction) => {
-        setCurrentTemplate((previous) => {
-            const newSections = [...previous.sections];
-            const newIndex = direction === 'up' ? index - 1 : index + 1;
-
-            if (newIndex < 0 || newIndex >= newSections.length) {
-                return previous;
-            }
-
-            [newSections[index], newSections[newIndex]] = [newSections[newIndex], newSections[index]];
-            return {
-                ...previous,
-                sections: newSections,
-            };
-        });
-    };
-
-    const handleMoveActivity = (sectionIndex, activityIndex, direction) => {
-        setCurrentTemplate((previous) => {
-            const updatedSections = [...previous.sections];
-            const section = updatedSections[sectionIndex];
-            const newActivities = [...section.activities];
-            const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
-
-            if (newIndex < 0 || newIndex >= newActivities.length) {
-                return previous;
-            }
-
-            [newActivities[activityIndex], newActivities[newIndex]] = [newActivities[newIndex], newActivities[activityIndex]];
-            updatedSections[sectionIndex] = { ...section, activities: newActivities };
-            return {
-                ...previous,
-                sections: updatedSections,
-            };
-        });
-    };
-
-    const handleMoveQuickActivity = (activityIndex, direction) => {
-        setCurrentTemplate((previous) => {
-            const nextActivities = [...previous.quickActivities];
-            const newIndex = direction === 'up' ? activityIndex - 1 : activityIndex + 1;
-            if (newIndex < 0 || newIndex >= nextActivities.length) {
-                return previous;
-            }
-
-            [nextActivities[activityIndex], nextActivities[newIndex]] = [nextActivities[newIndex], nextActivities[activityIndex]];
-            return {
-                ...previous,
-                quickActivities: nextActivities,
-            };
-        });
-    };
+    const handleRemoveSection = (index) => setCurrentTemplate((previous) => removeSection(previous, index));
+    const handleRemoveActivity = (sectionIndex, activityIndex) => setCurrentTemplate(
+        (previous) => removeSectionItem(previous, sectionIndex, activityIndex),
+    );
+    const handleRemoveQuickActivity = (activityIndex) => setCurrentTemplate(
+        (previous) => removeQuickActivity(previous, activityIndex),
+    );
+    const handleMoveSection = (index, direction) => setCurrentTemplate(
+        (previous) => moveSection(previous, index, direction),
+    );
+    const handleMoveActivity = (sectionIndex, activityIndex, direction) => setCurrentTemplate(
+        (previous) => moveSectionItem(previous, sectionIndex, activityIndex, direction),
+    );
+    const handleMoveQuickActivity = (activityIndex, direction) => setCurrentTemplate(
+        (previous) => moveQuickActivity(previous, activityIndex, direction),
+    );
 
     const handleSave = () => {
-        if (!currentTemplate.name.trim()) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Template name is required' });
+        const error = validateTemplate(currentTemplate, { isQuick: isQuickTemplate });
+        if (error) {
+            setAlertModal({ show: true, title: 'Validation Error', message: error });
             return;
         }
-
-        if (isQuickTemplate) {
-            if (currentTemplate.quickActivities.length === 0) {
-                setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions must include at least one activity.' });
-                return;
-            }
-            if (currentTemplate.quickActivities.length > 5) {
-                setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions are limited to 5 activities.' });
-                return;
-            }
-        } else if (currentTemplate.sections.length === 0) {
-            setAlertModal({ show: true, title: 'Validation Error', message: 'Add at least one section to the template.' });
-            return;
-        }
-
-        const templateData = isQuickTemplate
-            ? {
-                session_type: SESSION_TYPE_QUICK,
-                template_color: currentTemplate.templateColor,
-                activities: currentTemplate.quickActivities,
-            }
-            : {
-                session_type: SESSION_TYPE_NORMAL,
-                template_color: currentTemplate.templateColor,
-                sections: currentTemplate.sections.map((section) => {
-                    const { activities: sectionItems = [], ...sectionFields } = section;
-                    return {
-                        ...sectionFields,
-                        items: sectionItems.map(serializeTemplateItem),
-                    };
-                }),
-                total_duration_minutes: totalDuration,
-            };
-
         onSave({
             name: currentTemplate.name,
             description: currentTemplate.description,
-            template_data: templateData,
+            template_data: buildTemplateData(currentTemplate, { isQuick: isQuickTemplate, totalDuration }),
         }, editingTemplate?.id);
     };
 
