@@ -64,7 +64,7 @@ Decisions confirmed (originally):
   - Weeks show "W1", "W2", …; the title is "Week 2 · Oct 6 – Oct 12 · 2 of 3 done".
 - Selected bucket: brand-soft background with a brand border, matching `.stripDate[aria-pressed='true']`.
 - Today's bucket: a small dot.
-- Done count: each bucket shows a subtle progress underline (completed ÷ dates in the bucket for this day), using `occurrenceStatus`.
+- Done count: each bucket's tooltip and accessible label give completed ÷ dates in the bucket for this day, using `occurrenceStatus`. (The progress underline was removed on 2026-10-12.)
 - Scrolling: each row scrolls horizontally on overflow (`scrollbar-width: none`) and scrolls its selected bucket into view, like the rail.
 - The text line "Month 1 · Week 3" under the rail (`columnContext`) is **removed**, because the buckets now show it.
 

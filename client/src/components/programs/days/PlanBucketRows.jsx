@@ -45,13 +45,6 @@ function Bucket({ label, title, ariaLabel, grow, color, selected, current, bucke
             >
                 <span className={styles.bucketLabel}>{label}</span>
                 {current ? <span className={styles.bucketToday} aria-hidden="true" /> : null}
-                {bucket.dates.length ? (
-                    <span
-                        className={styles.bucketProgress}
-                        style={{ '--bucket-done': `${(bucket.completed / bucket.dates.length) * 100}%` }}
-                        aria-hidden="true"
-                    />
-                ) : null}
             </button>
         </li>
     );

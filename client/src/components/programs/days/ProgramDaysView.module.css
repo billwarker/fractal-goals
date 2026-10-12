@@ -585,16 +585,6 @@
     background: currentColor;
 }
 
-/* The share of this day's dates in the bucket that are done. */
-.bucketProgress {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    width: var(--bucket-done);
-    height: 2px;
-    background: var(--color-brand-success);
-}
-
 @media (max-width: 768px) {
     .buckets {
         margin: 0;
