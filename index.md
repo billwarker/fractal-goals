@@ -388,6 +388,21 @@ The selected date marks its block and week; picking a bucket jumps the rail to t
 that period (the rail keeps every date). Weeks follow the block's tracked start day, or 7-day steps
 from its start when untracked; buckets without this day's dates are dimmed. One program-wide request, `GET /api/<root>/programs/<program>/plan-occurrences`,
 evaluates all days in a single evaluator pass.
+Compared columns line up row by row: cards, sections, items, and (through each editor's `alignKey`,
+`planRowAlignKey`) set rows and circuit rounds and their activities, keyed by activity so logged runs
+pair with plans. "+ Add activity" (`days/PlanItemPicker.jsx`) is the session page's full picker:
+search, create or copy activities and circuits (create-from-search included); new definitions join
+the unsaved draft and default to the scoped goal, else the day's goals. The Days side pane has the
+same Details | Goals toggle: Goals (`days/PlanGoalHierarchyPanel.jsx`) is the session page's goal
+hierarchy for the active plan card (last clicked; default the planning column's first), built by
+`utils/planGoalsView.js` in the server's session goals view shape (day goals, else program goals, plus
+activity and group goals, with ancestors) and rendered through `useSessionGoalsViewModel` and the
+shared `useGoalHierarchyHighlights`. A logged session card uses that session's own goals view and
+instances. A goal's icon scopes the active card's picker; scope clears on day change, on leaving
+Days, or when the active card's hierarchy lacks the goal. Past cards highlight goals but never scope.
+Within a circuit, each round's activities are selectable (item → round → member, as on the session
+page); a member stands for its activity in the Goals pane. Clicking a card's empty space deselects.
+See [Days alignment, picker, and goals](planning/program-days-alignment-picker-goals.md).
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
 holds one dated plan per program day, template, and date: an independent snapshot of the template's
 sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.

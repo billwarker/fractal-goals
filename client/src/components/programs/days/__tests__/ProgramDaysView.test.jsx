@@ -15,10 +15,13 @@ const api = {
 };
 vi.mock('../../../../utils/api', () => ({ fractalApi: new Proxy({}, { get: (_, key) => api[key] }) }));
 vi.mock('../../../../contexts/GoalLevelsContext', () => ({ useGoalLevels: () => ({ getGoalColor: () => '#336699' }) }));
-vi.mock('../../../../hooks/useCircuitQueries', () => ({ useCircuits: () => ({ data: [{
-    id: 'circ', name: 'Core Finisher',
-    slots: [{ id: 's1', activity_definition_id: 'bench', activity: { name: 'Hollow Hold' } }],
-}] }) }));
+vi.mock('../../../../hooks/useCircuitQueries', () => ({
+    useCircuits: () => ({ data: [{
+        id: 'circ', name: 'Core Finisher',
+        slots: [{ id: 's1', activity_definition_id: 'bench', activity: { name: 'Hollow Hold' } }],
+    }] }),
+    useCircuitDefinitionMutations: () => ({ createMutation: { mutateAsync: vi.fn(), isPending: false } }),
+}));
 
 import ProgramDaysView from '../ProgramDaysView';
 import useProgramDaysTab from '../../../../hooks/useProgramDaysTab';

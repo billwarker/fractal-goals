@@ -63,6 +63,7 @@ export default function PlanDateColumn({
     activities,
     circuits,
     activityGroups,
+    planFocus = null,
 }) {
     const { date } = occurrence;
     const isEmptyPast = date < today && !(occurrence.sessions || []).length;
@@ -74,6 +75,16 @@ export default function PlanDateColumn({
     // Older payloads have no is_loaded: every template stays open, as before.
     const dayEntries = entries.filter((entry) => entry.is_loaded ?? true);
     const unloadedOptional = readOnly ? [] : entries.filter((entry) => !(entry.is_loaded ?? true));
+    // The card the Goals side pane follows: the chosen template on this date, else the first.
+    const activeKey = planFocus?.activeKey;
+    const activeTemplateId = activeKey?.date === date
+        ? (dayEntries.find((entry) => entry.template.id === activeKey.templateId) || dayEntries[0])?.template.id ?? null
+        : null;
+    const focusProps = (entry) => (planFocus ? {
+        isActive: entry.template.id === activeTemplateId,
+        onActivate: () => planFocus.onActivate({ date, templateId: entry.template.id }),
+        onReport: planFocus.onReport,
+    } : {});
 
     // Move focus to a card after it is added, and back to the selector after a removal. The
     // write updates the cached plans, so the render that shows the target runs this effect.
@@ -130,6 +141,9 @@ export default function PlanDateColumn({
                         sessionId={session.id}
                         template={entry.template}
                         activities={activities}
+                        date={date}
+                        // Only the first logged session stands for the template in the Goals pane.
+                        {...(index === 0 ? focusProps(entry) : {})}
                     />
                 ))
                 : (
@@ -147,6 +161,9 @@ export default function PlanDateColumn({
                         // Past program days keep the plan they had; only upcoming ones are edited.
                         readOnly={readOnly}
                         onRemoved={() => setFocusTarget('selector')}
+                        activityGoalScope={planFocus?.activityGoalScope || null}
+                        dayGoalIds={planFocus?.dayGoalIds || []}
+                        {...focusProps(entry)}
                     />
                 )))}
             <OptionalTemplateSelector

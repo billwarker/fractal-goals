@@ -82,6 +82,8 @@
 
 .pickerHeaderLeadingScoped {
     flex: 1 1 auto;
+    /* In a narrow picker the scope banner takes its own line rather than running under Close. */
+    flex-wrap: wrap;
 }
 
 .scopeBanner {

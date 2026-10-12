@@ -1,15 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import Badge from '../../atoms/Badge';
 import Button from '../../atoms/Button';
 import CloseIcon from '../../atoms/CloseIcon';
-import ActivitySelectorPanel from '../../common/ActivitySelectorPanel';
 import SessionTemplateNameBadge from '../../common/SessionTemplateNameBadge';
 import PlanTagEditor from '../../prescriptions/PlanTagEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
-import { isItemSurfaceClick, shouldScopeOnFocus } from '../../prescriptions/usePlanRowSelection';
+import { isCardBackgroundClick, isItemSurfaceClick, shouldScopeOnFocus } from '../../prescriptions/usePlanRowSelection';
 import { formatLiteralDate } from '../../../utils/dateUtils';
+import { planSectionActivityIds } from '../../../utils/planGoalsView';
 import { withPrescriptionTags } from '../../../utils/prescriptionModel';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import {
@@ -21,11 +21,14 @@ import {
     setPlanItemPrescription,
 } from '../../../utils/sessionPlanDraft';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
+import PlanItemPicker from './PlanItemPicker';
 import styles from './ProgramDaysView.module.css';
 
 function errorMessage(error) {
     return error?.response?.data?.error || error?.message || 'Something went wrong.';
 }
+
+const NO_SCOPE = { itemKey: null, rowIndex: null, slotId: null };
 
 function formatShortDate(value) {
     return formatLiteralDate(value, { weekday: 'short', month: 'short', day: 'numeric', year: undefined });
@@ -47,18 +50,23 @@ export default function SessionPlanCard({
     mutations,
     readOnly = false,
     onRemoved,
+    activityGoalScope = null,
+    dayGoalIds = [],
+    isActive = false,
+    onActivate = null,
+    onReport = null,
 }) {
     // Only unsaved edits are local. An untouched card always shows the latest server plan,
     // so a seed refreshes when the plan it comes from is saved in the neighbouring column.
     const [draftSections, setDraftSections] = useState(null);
     const isDirty = draftSections !== null;
     const sections = draftSections ?? entry.sections;
-    const [pickerSectionIndex, setPickerSectionIndex] = useState(null);
     // What is scoped, as on the session page: an item, optionally narrowed to one of its
-    // sets or rounds. The note composer and tag pickers follow it.
-    const [scope, setScope] = useState({ itemKey: null, rowIndex: null });
+    // sets or rounds, and within a circuit round to one of its activities (`slotId`). The note
+    // composer and tag pickers follow it; clicking the card's empty space clears it.
+    const [scope, setScope] = useState(NO_SCOPE);
     const scopeItem = (itemKey) => setScope((current) => (
-        current.itemKey === itemKey ? current : { itemKey, rowIndex: null }
+        current.itemKey === itemKey ? current : { ...NO_SCOPE, itemKey }
     ));
     const [conflict, setConflict] = useState(false);
     const [error, setError] = useState('');
@@ -73,6 +81,33 @@ export default function SessionPlanCard({
     const isPendingHere = (mutation) => mutation.isPending && mutation.variables?.templateId === templateId;
     const isSaving = isPendingHere(mutations.save);
     const isBusy = isSaving || isPendingHere(mutations.reset) || isPendingHere(mutations.pullTemplate);
+
+    // The active card tells the Goals side pane what it plans, unsaved edits included, and
+    // which activity is scoped, so the hierarchy follows the card as the session page's does.
+    const activityIds = planSectionActivityIds(sections, circuitById);
+    const scopedItem = scope.itemKey
+        ? sections.flatMap((section) => section.items || []).find((item) => item.item_key === scope.itemKey)
+        : null;
+    // A circuit's selected member stands for the circuit in the Goals pane.
+    const scopedMemberId = scopedItem?.type === 'circuit' && scope.slotId
+        ? circuitById.get(scopedItem.circuit_definition_id)?.slots
+            ?.find((slot) => slot.id === scope.slotId)?.activity_definition_id
+        : null;
+    const selectedActivityId = scopedItem?.type === 'activity'
+        ? String(scopedItem.activity_definition_id || scopedItem.activity_id || '') || null
+        : (scopedMemberId ? String(scopedMemberId) : null);
+    const activityIdsKey = activityIds.join(',');
+    useEffect(() => {
+        if (!isActive || !onReport) return;
+        onReport({
+            date: entry.date,
+            templateId,
+            templateName: entry.template.name,
+            readOnly,
+            activityIds: activityIdsKey ? activityIdsKey.split(',') : [],
+            selectedActivityId,
+        });
+    }, [activityIdsKey, entry.date, entry.template.name, isActive, onReport, readOnly, selectedActivityId, templateId]);
 
     const edit = (updater) => {
         setDraftSections((current) => updater(current ?? entry.sections));
@@ -110,8 +145,12 @@ export default function SessionPlanCard({
             id={elementId}
             data-align-key={alignKeys.card}
             tabIndex={-1}
-            className={styles.planCard}
+            className={`${styles.planCard} ${isActive ? styles.planCardActive : ''}`.trim()}
+            data-active={isActive ? 'true' : undefined}
             aria-label={`${entry.template.name} plan, ${formatShortDate(entry.date)}`}
+            onClickCapture={onActivate || undefined}
+            onFocusCapture={onActivate || undefined}
+            onClick={(event) => { if (isCardBackgroundClick(event)) setScope(NO_SCOPE); }}
         >
             <header className={styles.planCardHeader}>
                 <SessionTemplateNameBadge name={entry.template.name} color={entry.template.color} wrap />
@@ -165,24 +204,27 @@ export default function SessionPlanCard({
                         const name = item.name || definition?.name || circuit?.name
                             || (item.type === 'circuit' ? 'Circuit' : 'Activity');
                         const itemKey = item.item_key || `${sectionIndex}:${itemIndex}`;
-                        const isSelected = !readOnly && scope.itemKey === itemKey;
+                        // A past plan's item is selectable too, only to show its goals in the Goals pane.
+                        const isHighlighted = scope.itemKey === itemKey;
+                        const isSelected = !readOnly && isHighlighted;
                         const rowScope = {
                             selectedIndex: isSelected ? scope.rowIndex : null,
-                            onSelect: (rowIndex) => setScope({ itemKey, rowIndex }),
+                            onSelect: (rowIndex) => setScope({ ...NO_SCOPE, itemKey, rowIndex }),
                         };
                         return (
                             <div
                                 key={itemKey}
                                 className={[
                                     styles.planItem,
-                                    readOnly ? '' : styles.planItemSelectable,
-                                    isSelected ? styles.planItemSelected : '',
+                                    styles.planItemSelectable,
+                                    isHighlighted ? styles.planItemSelected : '',
                                 ].filter(Boolean).join(' ')}
                                 data-align-key={alignKeys.items[sectionIndex][itemIndex]}
-                                data-selected={isSelected ? 'true' : undefined}
-                                onClick={readOnly ? undefined : (event) => {
+                                data-plan-item
+                                data-selected={isHighlighted ? 'true' : undefined}
+                                onClick={readOnly ? () => scopeItem(itemKey) : (event) => {
                                     // A click on the item itself (not a set or a control) scopes back to the whole item.
-                                    if (isItemSurfaceClick(event)) setScope({ itemKey, rowIndex: null });
+                                    if (isItemSurfaceClick(event)) setScope({ ...NO_SCOPE, itemKey });
                                     else scopeItem(itemKey);
                                 }}
                                 onFocus={readOnly ? undefined : (event) => { if (shouldScopeOnFocus(event)) scopeItem(itemKey); }}
@@ -224,7 +266,7 @@ export default function SessionPlanCard({
                                                 type="button"
                                                 onClick={(event) => {
                                                     event.stopPropagation();
-                                                    setScope({ itemKey: null, rowIndex: null });
+                                                    setScope(NO_SCOPE);
                                                     edit((current) => removePlanItem(current, sectionIndex, itemIndex));
                                                 }}
                                                 aria-label={`Remove ${name} from this plan`}
@@ -248,6 +290,7 @@ export default function SessionPlanCard({
                                         previous={previousByKey.get(item.item_key) || null}
                                         idPrefix={`plan-${templateId}-${item.item_key || itemIndex}`}
                                         disabled={isBusy}
+                                        alignKey={alignKeys.items[sectionIndex][itemIndex]}
                                         onChange={(prescription) => edit((current) => (
                                             setPlanItemPrescription(current, sectionIndex, itemIndex, prescription)
                                         ))}
@@ -260,11 +303,16 @@ export default function SessionPlanCard({
                                         readOnly={readOnly}
                                         selectedRoundIndex={rowScope.selectedIndex}
                                         onSelectRound={rowScope.onSelect}
+                                        selectedSlot={isHighlighted && scope.slotId
+                                            ? { roundIndex: scope.rowIndex, slotId: scope.slotId }
+                                            : null}
+                                        onSelectSlot={(roundIndex, slotId) => setScope({ itemKey, rowIndex: roundIndex, slotId })}
                                         activityById={activityById}
                                         value={item.prescription || null}
                                         previous={previousByKey.get(item.item_key) || null}
                                         idPrefix={`plan-${templateId}-${item.item_key || itemIndex}`}
                                         disabled={isBusy}
+                                        alignKey={alignKeys.items[sectionIndex][itemIndex]}
                                         onChange={(prescription) => edit((current) => (
                                             setPlanItemPrescription(current, sectionIndex, itemIndex, prescription)
                                         ))}
@@ -272,9 +320,25 @@ export default function SessionPlanCard({
                                 ) : null}
                                 {circuit?.slots?.length && readOnly && !item.prescription?.rounds?.length ? (
                                     <ol className={styles.circuitMembers} aria-label={`${name} activities`}>
-                                        {circuit.slots.map((slot) => (
-                                            <li key={slot.id}>{slot.activity?.name || activityName(slot.activity_definition_id)}</li>
-                                        ))}
+                                        {circuit.slots.map((slot) => {
+                                            const memberName = slot.activity?.name || activityName(slot.activity_definition_id);
+                                            const memberSelected = isHighlighted && scope.rowIndex == null && scope.slotId === slot.id;
+                                            return (
+                                                <li key={slot.id}>
+                                                    <Button
+                                                        unstyled
+                                                        className={`${styles.circuitMember} ${memberSelected ? styles.circuitMemberSelected : ''}`.trim()}
+                                                        aria-pressed={memberSelected}
+                                                        onClick={(event) => {
+                                                            event.stopPropagation();
+                                                            setScope(memberSelected
+                                                                ? { ...NO_SCOPE, itemKey }
+                                                                : { itemKey, rowIndex: null, slotId: slot.id });
+                                                        }}
+                                                    >{memberName}</Button>
+                                                </li>
+                                            );
+                                        })}
                                     </ol>
                                 ) : null}
                                 {item.type === 'activity' && !definition ? (
@@ -283,35 +347,18 @@ export default function SessionPlanCard({
                             </div>
                         );
                     })}
-                    {!readOnly && pickerSectionIndex === sectionIndex ? (
-                        <div className={styles.planPicker}>
-                            <ActivitySelectorPanel
-                                activities={activities}
-                                circuits={circuits}
-                                activityGroups={activityGroups}
-                                showTypeToggle
-                                closeOnSelect
-                                onClose={() => setPickerSectionIndex(null)}
-                                onSelectActivity={(activity) => {
-                                    edit((current) => addPlanItem(current, sectionIndex, activity));
-                                    setPickerSectionIndex(null);
-                                }}
-                                onSelectCircuit={(circuit) => {
-                                    edit((current) => addPlanItem(current, sectionIndex, {
-                                        circuit_definition_id: circuit.id,
-                                        name: circuit.name,
-                                    }));
-                                    setPickerSectionIndex(null);
-                                }}
-                            />
-                        </div>
-                    ) : null}
-                    {!readOnly && pickerSectionIndex !== sectionIndex ? (
-                        <button
-                            type="button"
-                            className={styles.addPlanItem}
-                            onClick={() => setPickerSectionIndex(sectionIndex)}
-                        >+ Add activity</button>
+                    {!readOnly ? (
+                        <PlanItemPicker
+                            rootId={rootId}
+                            section={section}
+                            activities={activities}
+                            circuits={circuits}
+                            activityGroups={activityGroups}
+                            // The Goals pane's scope applies to the card it follows.
+                            activityGoalScope={isActive ? activityGoalScope : null}
+                            defaultGoalIds={dayGoalIds}
+                            onAdd={(selection) => edit((current) => addPlanItem(current, sectionIndex, selection))}
+                        />
                     ) : null}
                 </section>
             ))}

@@ -215,6 +215,33 @@
     border-radius: 10px;
 }
 
+/* The card the Goals side pane follows. */
+.planCardActive {
+    border-color: color-mix(in srgb, var(--color-brand-primary) 45%, var(--color-border-card));
+}
+
+.planGoalsPanel {
+    padding: 0;
+}
+
+.planGoalsContext {
+    margin: 0 0 12px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.planGoalsContext strong {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.planGoalsHint {
+    margin: 0 0 12px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
 
 .planCardHeader {
     display: flex;
@@ -410,6 +437,28 @@
 
 .circuitMembers li + li {
     margin-top: 4px;
+}
+
+.circuitMember {
+    padding: 2px 6px;
+    margin-left: -6px;
+    border: 0;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.circuitMember:hover {
+    color: var(--color-text-primary);
+}
+
+.circuitMemberSelected {
+    background: color-mix(in srgb, var(--color-brand-success) 12%, transparent);
+    box-shadow: inset 2px 0 0 var(--color-brand-success);
+    color: var(--color-text-primary);
 }
 
 @media (max-width: 768px) {

@@ -166,6 +166,15 @@ export function planAlignmentKeys(templateId, sections) {
 }
 
 /**
+ * A row inside an aligned item (a set table header, a set, a flat value row, a circuit round,
+ * or one activity within a round), so compared plans line up row by row, not just by item.
+ * Undefined without an item key, so the row takes no part in alignment.
+ */
+export function planRowAlignKey(itemAlignKey, kind, index = 0) {
+    return itemAlignKey ? `${itemAlignKey}|${kind}#${index}` : undefined;
+}
+
+/**
  * Pairs rows of two columns that share a key, preserving order in both (a greedy common
  * subsequence), so a reordered item never produces crossed pairs. Returns index pairs.
  */

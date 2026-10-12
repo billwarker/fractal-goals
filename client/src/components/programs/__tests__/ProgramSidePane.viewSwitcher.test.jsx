@@ -146,4 +146,27 @@ describe('ProgramSidePane view switcher', () => {
         expect(screen.getAllByRole('tablist').map((list) => list.getAttribute('aria-label'))).toEqual(['Program side pane views']);
         expect(screen.getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
     });
+
+    it('splits the Days pane into Details (the day selector) and Goals (the active plan hierarchy)', () => {
+        const onViewChange = vi.fn();
+        const navigator = <nav aria-label="Program days">Days list</nav>;
+        const goals = <div>Plan goals</div>;
+        const { rerender } = renderPane({ scope: 'program', viewToggle, daysNavigator: navigator, daysGoals: goals, onViewChange });
+
+        expect(screen.getByRole('navigation', { name: 'Program days' })).toBeInTheDocument();
+        expect(screen.queryByText('Plan goals')).not.toBeInTheDocument();
+        screen.getByRole('tab', { name: 'Goals' }).click();
+        expect(onViewChange).toHaveBeenCalledWith('goals');
+
+        rerender(
+            <MemoryRouter>
+                <ProgramSidePane
+                    program={{ id: 'program-1', name: 'Strong Finish' }} goals={[]} blocks={[]} programMetricsLoading
+                    scope="program" view="goals" viewToggle={viewToggle} daysNavigator={navigator} daysGoals={goals}
+                />
+            </MemoryRouter>,
+        );
+        expect(screen.getByText('Plan goals')).toBeInTheDocument();
+        expect(screen.queryByRole('navigation', { name: 'Program days' })).not.toBeInTheDocument();
+    });
 });

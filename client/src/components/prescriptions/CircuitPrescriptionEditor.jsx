@@ -16,6 +16,7 @@ import {
     withRemovedRound,
     withRoundNotes,
 } from '../../utils/prescriptionModel';
+import { planRowAlignKey } from '../../utils/programDaysView';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import { formatPlannedValue } from '../../utils/sessionPrescription';
 import PlanNoteComposer from './PlanNoteComposer';
@@ -27,6 +28,20 @@ function columnLabel(column) {
 }
 
 /**
+ * Alignment kinds for a round's activity rows, by activity (not slot id: a logged run's slots
+ * have their own ids), counting repeats so an activity listed twice keeps two rows.
+ */
+function slotAlignKinds(slots) {
+    const counts = new Map();
+    return slots.map((slot) => {
+        const activityId = slot.activity_definition_id || slot.definition?.id || slot.id;
+        const n = counts.get(activityId) || 0;
+        counts.set(activityId, n + 1);
+        return `round-slot:${activityId}:${n}`;
+    });
+}
+
+/**
  * Plans a circuit: how many rounds the session starts with, each slot activity's values per
  * round, and notes. Values are reference targets only; they never become session results.
  * Clicking a round scopes the note composer to it, like a set in an activity plan.
@@ -34,6 +49,12 @@ function columnLabel(column) {
  *
  * `readOnly` shows the rounds in the same layout and fields with nothing to edit: a past
  * plan, or a session's logged rounds (`valueKind="logged"`, with the run's own `slots`).
+ * `alignKey` (the item's alignment key) marks each round and its activity rows so compared
+ * columns line up row by row.
+ *
+ * With `onSelectSlot`, each round's activities are selectable too, as circuit members are on
+ * the session page: `onSelectSlot(roundIndex, slotId)` picks one (`slotId` null goes back to
+ * the round) and `selectedSlot` ({ roundIndex, slotId }) marks it, read-only or not.
  */
 export default function CircuitPrescriptionEditor({
     circuit,
@@ -49,8 +70,12 @@ export default function CircuitPrescriptionEditor({
     readOnly = false,
     valueKind = 'planned',
     slots: slotsOverride = null,
+    alignKey = null,
+    selectedSlot = null,
+    onSelectSlot = null,
 }) {
     const slots = slotsOverride || getCircuitPlanSlots(circuit, activityById);
+    const slotKinds = slotAlignKinds(slots);
     const rounds = value?.rounds || [];
     const { selectedIndex, clearSelection, rowProps } = usePlanRowSelection(
         active && !readOnly,
@@ -88,6 +113,7 @@ export default function CircuitPrescriptionEditor({
                                 readOnly ? styles.roundStatic : '',
                                 isSelected ? styles.roundSelected : '',
                             ].filter(Boolean).join(' ')}
+                            data-align-key={planRowAlignKey(alignKey, 'round', roundIndex)}
                             {...(readOnly ? {} : rowProps(roundIndex))}
                         >
                             <div className={styles.roundHeader}>
@@ -121,13 +147,42 @@ export default function CircuitPrescriptionEditor({
                                 )}
                             </div>
                             {/* One activity per row; every round lays out the same, so values line up. */}
-                            {slots.map((slot) => {
+                            {slots.map((slot, slotIndex) => {
                                 const columns = getPrescriptionColumns(slot.definition);
                                 const entries = getCircuitRoundEntries(value, roundIndex, slot.id);
                                 const previousEntries = getCircuitRoundEntries(previous, roundIndex, slot.id);
+                                const isSlotSelected = selectedSlot?.roundIndex === roundIndex
+                                    && selectedSlot?.slotId === slot.id;
+                                const slotLabel = `Round ${roundIndex + 1} ${slot.definition.name}`;
                                 return (
-                                    <div key={slot.id} className={styles.roundSlot}>
-                                        <span className={styles.roundSlotName}>{slot.definition.name}</span>
+                                    <div
+                                        key={slot.id}
+                                        className={`${styles.roundSlot} ${isSlotSelected ? styles.roundSlotSelected : ''}`.trim()}
+                                        data-scope-member={onSelectSlot ? '' : undefined}
+                                        data-selected={isSlotSelected ? 'true' : undefined}
+                                        onClick={onSelectSlot ? (event) => {
+                                            // The member owns this click: its round and item are scoped with it.
+                                            event.stopPropagation();
+                                            const target = event.target instanceof Element ? event.target : null;
+                                            const isField = target?.closest('input, select, textarea, label');
+                                            onSelectSlot(roundIndex, isSlotSelected && !isField ? null : slot.id);
+                                        } : undefined}
+                                        data-align-key={alignKey
+                                            ? planRowAlignKey(`${alignKey}|round#${roundIndex}`, slotKinds[slotIndex])
+                                            : undefined}
+                                    >
+                                        {onSelectSlot ? (
+                                            <Button
+                                                unstyled
+                                                className={`${styles.roundSlotName} ${styles.roundSlotToggle}`}
+                                                aria-pressed={isSlotSelected}
+                                                aria-label={`${slotLabel}${isSlotSelected ? ', selected' : ''}`}
+                                            >
+                                                {slot.definition.name}
+                                            </Button>
+                                        ) : (
+                                            <span className={styles.roundSlotName}>{slot.definition.name}</span>
+                                        )}
                                         <span className={styles.roundSlotValues}>
                                             {columns.length === 0 ? (
                                                 <span className={styles.columnLabel}>No metrics</span>

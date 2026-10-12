@@ -168,6 +168,7 @@ export function getCircuitPlanSlots(circuit, activityById = new Map()) {
         .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
         .map((slot) => ({
             id: slot.id,
+            activity_definition_id: slot.activity_definition_id,
             definition: activityById.get(slot.activity_definition_id) || slot.activity || null,
         }))
         .filter((slot) => slot.definition);

@@ -12,6 +12,17 @@ export function isItemSurfaceClick(event) {
 }
 
 /**
+ * Whether a click inside a plan card landed on its empty space (not on an item, the activity
+ * picker, or a control), which deselects whatever is scoped. Clicks from portalled dialogs
+ * bubble through React but are not inside the card, so they never count.
+ */
+export function isCardBackgroundClick(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || !event.currentTarget.contains(target)) return false;
+    return !target.closest(`[data-plan-item], [data-plan-picker], ${INTERACTIVE}`);
+}
+
+/**
  * Whether focus should scope the item now. A button focused by the pointer waits for its
  * click: scoping reveals the item's composer and tag picker, and doing that between
  * mousedown and mouseup would move the button out from under the click.

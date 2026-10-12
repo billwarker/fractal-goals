@@ -20,7 +20,17 @@ export function useCircuitDefinitionMutations(rootId) {
     const invalidate = () => queryClient.invalidateQueries({ queryKey: ['circuits', rootId] });
     const createMutation = useMutation({
         mutationFn: (data) => fractalApi.createCircuit(rootId, data),
-        onSuccess: invalidate,
+        // The new definition is usable at once (e.g. added to a plan) before the list refetches.
+        onSuccess: (response) => {
+            const created = response?.data;
+            if (created?.id) {
+                queryClient.setQueryData(queryKeys.circuits(rootId), (previous) => {
+                    if (!Array.isArray(previous) || previous.some((circuit) => circuit.id === created.id)) return previous;
+                    return [...previous, created];
+                });
+            }
+            return invalidate();
+        },
     });
     const updateMutation = useMutation({
         mutationFn: ({ circuitId, data }) => fractalApi.updateCircuit(rootId, circuitId, data),

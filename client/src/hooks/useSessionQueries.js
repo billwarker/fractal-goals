@@ -173,6 +173,15 @@ export function useSessionDetail(rootId, sessionId) {
     });
 }
 
+/** A session's goal hierarchy and evidence (the session page's goals pane), shared by key. */
+export function useSessionGoalsView(rootId, sessionId) {
+    return useQuery({
+        queryKey: queryKeys.sessionGoalsView(rootId, sessionId),
+        queryFn: async () => (await fractalApi.getSessionGoalsView(rootId, sessionId)).data || null,
+        enabled: Boolean(rootId && sessionId),
+    });
+}
+
 export function useSessionNotes(rootId, sessionId) {
     const isReady = Boolean(rootId && sessionId);
 

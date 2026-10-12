@@ -131,6 +131,14 @@ vi.mock('../../hooks/useProgramDayReadModel', () => ({
     useSetProgramDaySessionCredit: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 const openPeriodEditor = vi.fn();
+vi.mock('../../hooks/useGoalQueries', async (importOriginal) => ({
+    ...(await importOriginal()),
+    useGoalActivities: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+}));
+vi.mock('../../hooks/useSessionQueries', async (importOriginal) => ({
+    ...(await importOriginal()),
+    useSessionGoalsView: () => ({ data: null }),
+}));
 vi.mock('../../hooks/useProgramSessionPlans', () => ({
     useProgramPlanOccurrences: () => ({ data: undefined, isLoading: false, error: null }),
 }));

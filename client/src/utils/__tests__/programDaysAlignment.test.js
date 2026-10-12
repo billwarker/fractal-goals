@@ -1,4 +1,6 @@
-import { pairAlignmentKeys, pickColumnDate, planAlignmentKeys, resolveDaysSelection } from '../programDaysView';
+import {
+    pairAlignmentKeys, pickColumnDate, planAlignmentKeys, planRowAlignKey, resolveDaysSelection,
+} from '../programDaysView';
 
 describe('plan column alignment', () => {
     it('keys the card, sections, and each activity or circuit by its occurrence index', () => {
@@ -24,6 +26,24 @@ describe('plan column alignment', () => {
             ['card', 'a#0', 'extra', 'b#0', 'c#0'],
             ['card', 'a#0', 'b#0', 'new', 'c#0'],
         )).toEqual([[0, 0], [1, 1], [3, 2], [4, 4]]);
+    });
+
+    it('keys rows inside an item, and none without an item key', () => {
+        expect(planRowAlignKey('t1|c:c#0', 'round', 2)).toBe('t1|c:c#0|round#2');
+        expect(planRowAlignKey('t1|a:a#0', 'sets-header')).toBe('t1|a:a#0|sets-header#0');
+        expect(planRowAlignKey(null, 'set', 0)).toBeUndefined();
+    });
+
+    it('pairs rounds row by row, the shorter side pairing its rounds only', () => {
+        const rows = (rounds) => ['card', 'c#0', ...Array.from({ length: rounds }, (_, index) => [
+            planRowAlignKey('c#0', 'round', index),
+            planRowAlignKey(`c#0|round#${index}`, 'round-slot:fl:0'),
+            planRowAlignKey(`c#0|round#${index}`, 'round-slot:pike:0'),
+        ]).flat(), 'next#0'];
+
+        expect(pairAlignmentKeys(rows(3), rows(2))).toEqual([
+            [0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [6, 6], [7, 7], [11, 8],
+        ]);
     });
 
     it('never crosses pairs when one side reordered its rows', () => {

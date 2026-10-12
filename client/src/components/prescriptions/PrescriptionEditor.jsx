@@ -17,6 +17,7 @@ import {
     withSetTags,
     withSetValue,
 } from '../../utils/prescriptionModel';
+import { planRowAlignKey } from '../../utils/programDaysView';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import { formatPlannedValue } from '../../utils/sessionPrescription';
 import PlanNoteComposer from './PlanNoteComposer';
@@ -49,6 +50,7 @@ function ghostValue(column, entries) {
  * `readOnly` shows values in the same layout and fields with nothing to edit: a past plan,
  * or what a session logged (`valueKind="logged"`), so either lines up beside a live plan.
  * `emptyText` replaces the layout when a read-only value has nothing in it.
+ * `alignKey` (the item's alignment key) marks each row so compared columns line up row by row.
  */
 export default function PrescriptionEditor({
     rootId,
@@ -66,6 +68,7 @@ export default function PrescriptionEditor({
     readOnly = false,
     valueKind = 'planned',
     emptyText = null,
+    alignKey = null,
 }) {
     const columns = getPrescriptionColumns(definition);
     const hasSets = Boolean(definition?.has_sets);
@@ -146,7 +149,11 @@ export default function PrescriptionEditor({
                     aria-label={groupLabel}
                     style={{ '--plan-columns': columns.length }}
                 >
-                    <div className={styles.headerRow} aria-hidden="true">
+                    <div
+                        className={styles.headerRow}
+                        aria-hidden="true"
+                        data-align-key={planRowAlignKey(alignKey, 'sets-header')}
+                    >
                         <span className={styles.setLabel}>Set</span>
                         {columns.map((column) => (
                             <span key={column.key} className={styles.columnLabel}>{columnLabel(column)}</span>
@@ -167,6 +174,7 @@ export default function PrescriptionEditor({
                                     readOnly ? styles.setBlockStatic : '',
                                     isSelected ? styles.setBlockSelected : '',
                                 ].filter(Boolean).join(' ')}
+                                data-align-key={planRowAlignKey(alignKey, 'set', setIndex)}
                                 {...(readOnly ? {} : rowProps(setIndex))}
                             >
                                 <div className={styles.setRow}>
@@ -234,7 +242,12 @@ export default function PrescriptionEditor({
                 </div>
             )}
             {columns.length > 0 && !hasSets && (
-                <div className={styles.flatRow} role="group" aria-label={groupLabel}>
+                <div
+                    className={styles.flatRow}
+                    role="group"
+                    aria-label={groupLabel}
+                    data-align-key={planRowAlignKey(alignKey, 'flat')}
+                >
                     {columns.map((column) => (
                         <label key={column.key} className={styles.flatField}>
                             <span className={styles.columnLabel}>{columnLabel(column)}</span>

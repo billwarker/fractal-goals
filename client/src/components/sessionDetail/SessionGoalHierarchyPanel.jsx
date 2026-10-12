@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
+import useGoalHierarchyHighlights from '../../hooks/useGoalHierarchyHighlights';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import { useTargetMutations } from '../../hooks/useTargetQueries';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
@@ -109,37 +110,17 @@ function SessionGoalHierarchyPanel({
     });
 
     const displayHierarchy = sessionHierarchy;
-    const hasActivityHighlight = selectedActivityGoalIds.size > 0;
-
-    const getGoalBranchHighlightState = useCallback((goal) => {
-        const goalId = String(goal.id);
-        if (selectedActivityGoalIds.has(goalId)) {
-            return 'target';
-        }
-        if (selectedActivityAncestorIds.has(goalId)) {
-            return 'ancestor';
-        }
-        return null;
-    }, [selectedActivityAncestorIds, selectedActivityGoalIds]);
-
-    const getGoalConnectorHighlightState = useCallback((goal) => {
-        if (!hasActivityHighlight) return false;
-        return Boolean(getGoalBranchHighlightState(goal));
-    }, [getGoalBranchHighlightState, hasActivityHighlight]);
-
-    const getGoalConnectorEdgeHighlightState = useCallback((parentGoal, childGoal) => {
-        if (!hasActivityHighlight) return false;
-        const childId = String(childGoal.id);
-        return selectedActivityGoalIds.has(childId) || selectedActivityAncestorIds.has(childId);
-    }, [hasActivityHighlight, selectedActivityAncestorIds, selectedActivityGoalIds]);
-
-    const getGoalConnectorEdgeState = useCallback((_parentGoal, childGoal) => {
-        const childId = String(childGoal.id);
-        if (selectedActivityGoalIds.has(childId) || selectedActivityAncestorIds.has(childId)) return 'selected';
-        if (completedEvidenceGoalIds.has(childId)) return 'completed';
-        if (evidenceGoalIds.has(childId)) return 'solid';
-        return 'dashed';
-    }, [completedEvidenceGoalIds, evidenceGoalIds, selectedActivityAncestorIds, selectedActivityGoalIds]);
+    const hierarchyHighlights = useGoalHierarchyHighlights({
+        selectedActivityGoalIds,
+        selectedActivityAncestorIds,
+        evidenceGoalIds,
+        completedEvidenceGoalIds,
+        activityGoalScope,
+        onGoalScopeToggle,
+        getGoalIcon,
+        getGoalColor,
+        getGoalSecondaryColor,
+    });
 
     const handleApplyScope = useCallback(async (goalIds) => {
         await updateSession({ goal_ids: goalIds });
@@ -200,26 +181,7 @@ function SessionGoalHierarchyPanel({
                         getGoalIcon={getGoalIcon}
                         completedColor={completedColor}
                         completedSecondaryColor={completedSecondaryColor}
-                        getGoalBranchHighlightState={getGoalBranchHighlightState}
-                        getGoalConnectorHighlightState={getGoalConnectorHighlightState}
-                        getGoalConnectorEdgeHighlightState={getGoalConnectorEdgeHighlightState}
-                        getGoalConnectorEdgeState={getGoalConnectorEdgeState}
-                        connectorHighlightMode="lineage"
-                        showGoalHighlightHalo
-                        onGoalIconClick={onGoalScopeToggle ? (goal) => onGoalScopeToggle({
-                            ...goal,
-                            scopePresentation: {
-                                icon: getGoalIcon(goal.type),
-                                color: getGoalColor(goal.type),
-                                secondaryColor: getGoalSecondaryColor(goal.type),
-                            },
-                        }) : undefined}
-                        isGoalIconSelected={(goal) => String(goal.id) === String(activityGoalScope?.goal?.id)}
-                        getGoalIconActionLabel={(goal, selected) => (
-                            selected
-                                ? `Clear activity scope for ${goal.name}`
-                                : `Scope activities to ${goal.name}`
-                        )}
+                        {...hierarchyHighlights}
                         onStartSubGoalCreation={readOnly ? undefined : handleStartSubGoalCreation}
                         scopedActivityName={scopedActivityName}
                         onAdjustScope={!readOnly && !selectedActivity ? () => setScopeModalOpen(true) : undefined}

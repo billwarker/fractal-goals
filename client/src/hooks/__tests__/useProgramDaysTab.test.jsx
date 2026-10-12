@@ -1,6 +1,15 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+vi.mock('../useGoalQueries', async (importOriginal) => ({
+    ...(await importOriginal()),
+    useGoalActivities: () => ({ data: [], isLoading: false, isError: false, refetch: vi.fn() }),
+}));
+const loggedSessionView = { goal_tree: { id: 'root', name: 'Root', children: [] }, session_activity_ids: ['fl'] };
+vi.mock('../useSessionQueries', async (importOriginal) => ({
+    ...(await importOriginal()),
+    useSessionGoalsView: (rootId, sessionId) => ({ data: sessionId === 'logged-1' ? loggedSessionView : null }),
+}));
 vi.mock('../useProgramSessionPlans', () => ({
     useProgramPlanOccurrences: () => ({ data: new Map(), isLoading: false, error: null }),
 }));
@@ -57,3 +66,84 @@ describe('useProgramDaysTab day order', () => {
         expect(onReorderDays).not.toHaveBeenCalled();
     });
 });
+
+describe('useProgramDaysTab goal scope', () => {
+    const goalTree = { id: 'root', name: 'Root', children: [
+        { id: 'strength', name: 'Strength', children: [{ id: 'lever', name: 'Front lever', children: [] }] },
+        { id: 'push', name: 'Push', children: [] },
+    ] };
+    const activities = [
+        { id: 'fl', name: 'Tuck FL', associated_goal_ids: ['lever'] },
+        { id: 'pike', name: 'Pike Push Ups', associated_goal_ids: ['push'] },
+    ];
+    const plan = (activityIds, overrides = {}) => ({
+        date: '2026-10-12', templateId: 't1', templateName: 'Upper', readOnly: false,
+        activityIds, selectedActivityId: null, ...overrides,
+    });
+    const goal = (id) => ({ id, name: id });
+
+    function renderScoped(initialEnabled = true) {
+        return renderHook(({ enabled }) => useProgramDaysTab({
+            rootId: 'root', program: { ...program, goal_ids: ['strength'] }, today: '2026-10-05', timezone: 'UTC',
+            enabled, setViewMode: vi.fn(), onLeavePane: vi.fn(), onCreateDay: vi.fn(), onEditDay: vi.fn(),
+            goalTree, activities, activityGroups: [],
+        }), { initialProps: { enabled: initialEnabled } });
+    }
+    const panel = (result) => result.current.goalsPanel.props;
+
+    it("follows the reported plan and scopes the picker to a goal in its hierarchy", () => {
+        const { result } = renderScoped();
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+
+        expect(panel(result).activePlan.templateName).toBe('Upper');
+        act(() => { panel(result).onGoalScopeToggle(goal('lever')); });
+
+        expect(result.current.planFocus.activityGoalScope.goal.id).toBe('lever');
+        act(() => { panel(result).onGoalScopeToggle(goal('lever')); });
+        expect(result.current.planFocus.activityGoalScope).toBeNull();
+    });
+
+    it("keeps the scope on another card that works toward the goal, and clears it on one that doesn't", () => {
+        const { result } = renderScoped();
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        act(() => { panel(result).onGoalScopeToggle(goal('lever')); });
+
+        act(() => { result.current.planFocus.onReport(plan(['fl', 'pike'], { date: '2026-10-05', readOnly: true })); });
+        expect(result.current.planFocus.activityGoalScope?.goal.id).toBe('lever');
+
+        act(() => { result.current.planFocus.onReport(plan(['pike'], { date: '2026-10-05' })); });
+        expect(result.current.planFocus.activityGoalScope).toBeNull();
+        expect(result.current.planFocus.announcement).toMatch(/scope for lever cleared/i);
+    });
+
+    it('clears the scope and the active plan when the day changes or the tab is left', () => {
+        const { result, rerender } = renderScoped();
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        act(() => { panel(result).onGoalScopeToggle(goal('strength')); });
+
+        act(() => { result.current.navigator.props.onSelectDay('b'); });
+        expect(result.current.planFocus.activityGoalScope).toBeNull();
+        expect(panel(result).activePlan).toBeNull();
+
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        act(() => { panel(result).onGoalScopeToggle(goal('strength')); });
+        rerender({ enabled: false });
+        expect(result.current.planFocus.activityGoalScope).toBeNull();
+    });
+
+    it("shows a logged session's own goals view, as its session page does", () => {
+        const { result } = renderScoped();
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        expect(panel(result).planGoalsView).not.toBe(loggedSessionView);
+
+        act(() => {
+            result.current.planFocus.onReport(plan(['fl'], {
+                readOnly: true, sessionId: 'logged-1',
+                instances: [{ id: 'i1', activity_definition_id: 'fl', completed: true, associated_goal_ids: [] }],
+            }));
+        });
+        expect(panel(result).planGoalsView).toBe(loggedSessionView);
+        expect(panel(result).activePlan.instances).toHaveLength(1);
+    });
+});
+

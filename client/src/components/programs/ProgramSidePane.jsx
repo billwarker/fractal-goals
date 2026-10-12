@@ -53,6 +53,7 @@ export default function ProgramSidePane({
     onCreateEvent = null,
     onEditPlan,
     daysNavigator = null,
+    daysGoals = null,
     viewToggle = null,
     view = 'details',
     onViewChange = () => {},
@@ -100,11 +101,16 @@ export default function ProgramSidePane({
     );
 
     if (daysNavigator) {
-        // The Days tab replaces the pane's review content with its day/template selector.
+        // The Days tab replaces the pane's review content with its day/template selector
+        // (Details) and the active plan's goal hierarchy (Goals).
+        const showDaysGoals = Boolean(daysGoals) && view === 'goals';
         return (
             <aside className={styles.sidePane} aria-label="Program side pane">
                 {paneHeader('Program days')}
-                <div className={styles.daysPaneBody}>{daysNavigator}</div>
+                {daysGoals ? <div className={styles.subViewBar}>{subViewToggle}</div> : null}
+                {showDaysGoals
+                    ? <div className={styles.goalsPane}>{daysGoals}</div>
+                    : <div className={styles.daysPaneBody}>{daysNavigator}</div>}
             </aside>
         );
     }

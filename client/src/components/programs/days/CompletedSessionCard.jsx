@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
@@ -9,6 +9,7 @@ import { fractalApi } from '../../../utils/api';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
+import { isCardBackgroundClick } from '../../prescriptions/usePlanRowSelection';
 import styles from './ProgramDaysView.module.css';
 
 /** A session section's recorded work items, from hydrated typed items or legacy exercises. */
@@ -38,7 +39,17 @@ const noop = () => {};
  * Shares the session detail cache. `alignmentPrefix` (the template it completed) lines its
  * rows up with the same template's plan in the other column.
  */
-export default function CompletedSessionCard({ rootId, sessionId, template, activities, alignmentPrefix = null }) {
+export default function CompletedSessionCard({
+    rootId,
+    sessionId,
+    template,
+    activities,
+    alignmentPrefix = null,
+    date = null,
+    isActive = false,
+    onActivate = null,
+    onReport = null,
+}) {
     const query = useQuery({
         queryKey: queryKeys.session(rootId, sessionId),
         queryFn: async () => (await fractalApi.getSession(rootId, sessionId)).data,
@@ -63,6 +74,47 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
             : { type: 'activity', activity_definition_id: activityIdOf(item.activity) })),
     }))) : null), [alignmentPrefix, sections]);
 
+    // The Goals side pane follows this card when active: the session's own goal evidence, and
+    // the goals of an activity picked here (picking only highlights; nothing is editable).
+    // `{ key, activityId, roundIndex?, slotId? }`: an activity, or one circuit member in a round.
+    const [selected, setSelected] = useState(null);
+    const instances = useMemo(() => sections.flatMap((section) => section.items.flatMap((item) => {
+        if (item.type === 'circuit') {
+            const done = Boolean(item.circuit.completed || item.circuit.completed_at);
+            return (item.circuit.slots || [])
+                .filter((slot) => slot.activity_definition_id)
+                .map((slot) => ({
+                    id: `${item.circuit.id}:${slot.id}`,
+                    activity_definition_id: String(slot.activity_definition_id),
+                    completed: done,
+                    associated_goal_ids: [],
+                }));
+        }
+        const activityId = activityIdOf(item.activity);
+        return activityId ? [{
+            id: item.activity.instance_id || item.activity.id,
+            activity_definition_id: String(activityId),
+            completed: Boolean(item.activity.completed),
+            associated_goal_ids: item.activity.associated_goal_ids || [],
+        }] : [];
+    })), [sections]);
+    const selectedActivityId = selected?.activityId || null;
+    const reportKey = JSON.stringify([instances, selectedActivityId]);
+    useEffect(() => {
+        if (!isActive || !onReport || !query.data) return;
+        const [reportedInstances, reportedSelection] = JSON.parse(reportKey);
+        onReport({
+            date,
+            templateId: template.id,
+            templateName: template.name,
+            readOnly: true,
+            sessionId,
+            instances: reportedInstances,
+            activityIds: [...new Set(reportedInstances.map((instance) => instance.activity_definition_id))].sort(),
+            selectedActivityId: reportedSelection,
+        });
+    }, [date, isActive, onReport, query.data, reportKey, sessionId, template.id, template.name]);
+
     if (query.isLoading) return <p className={styles.state} aria-busy="true">Loading session…</p>;
     if (query.error || !query.data) {
         return (
@@ -73,7 +125,7 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
     }
     const session = query.data;
 
-    const renderActivity = (activity) => {
+    const renderActivity = (activity, alignKey) => {
         const definition = activityById.get(activityIdOf(activity));
         if (!definition) return null;
         return (
@@ -91,15 +143,17 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
                 readOnly
                 valueKind="logged"
                 emptyText="No values logged."
+                alignKey={alignKey}
             />
         );
     };
 
-    const renderCircuit = (run) => {
+    const renderCircuit = (run, alignKey, itemKey) => {
         const slots = [...(run.slots || [])]
             .sort((left, right) => left.sort_order - right.sort_order)
             .map((slot) => ({
                 id: slot.id,
+                activity_definition_id: slot.activity_definition_id,
                 definition: activityById.get(slot.activity_definition_id)
                     || { ...(slot.activity_schema || {}), name: slot.activity_name },
             }));
@@ -124,15 +178,32 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
                 active={false}
                 readOnly
                 valueKind="logged"
+                alignKey={alignKey}
+                selectedSlot={selected?.key === itemKey && selected.slotId
+                    ? { roundIndex: selected.roundIndex, slotId: selected.slotId }
+                    : null}
+                onSelectSlot={(roundIndex, slotId) => {
+                    const slot = slots.find((candidate) => candidate.id === slotId);
+                    setSelected(slot ? {
+                        key: itemKey,
+                        activityId: slot.activity_definition_id ? String(slot.activity_definition_id) : null,
+                        roundIndex,
+                        slotId,
+                    } : { key: itemKey, activityId: null });
+                }}
             />
         );
     };
 
     return (
         <article
-            className={styles.planCard}
+            className={`${styles.planCard} ${isActive ? styles.planCardActive : ''}`.trim()}
+            data-active={isActive ? 'true' : undefined}
             data-align-key={alignKeys ? `${alignmentPrefix}|card` : undefined}
             aria-label={`${template.name} session`}
+            onClickCapture={onActivate || undefined}
+            onFocusCapture={onActivate || undefined}
+            onClick={(event) => { if (isCardBackgroundClick(event)) setSelected(null); }}
         >
             <header className={styles.planCardHeader}>
                 <SessionTemplateNameBadge name={template.name} color={template.color} wrap />
@@ -151,11 +222,21 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
                         const name = isCircuit
                             ? item.circuit.name
                             : item.activity.name || activityById.get(activityIdOf(item.activity))?.name || 'Activity';
+                        const itemKey = isCircuit
+                            ? `c:${item.circuit.id}`
+                            : `a:${activityIdOf(item.activity)}:${item.activity.instance_id || item.activity.id || itemIndex}`;
+                        const isHighlighted = selected?.key === itemKey;
                         return (
                             <div
-                                key={isCircuit ? item.circuit.id : (item.activity.instance_id || item.activity.id || itemIndex)}
-                                className={styles.planItem}
+                                key={itemKey}
+                                className={`${styles.planItem} ${styles.planItemSelectable} ${isHighlighted ? styles.planItemSelected : ''}`.trim()}
                                 data-align-key={alignKeys?.items[sectionIndex][itemIndex]}
+                                data-plan-item
+                                data-selected={isHighlighted ? 'true' : undefined}
+                                onClick={() => setSelected({
+                                    key: itemKey,
+                                    activityId: isCircuit ? null : String(activityIdOf(item.activity)),
+                                })}
                             >
                                 <div className={styles.planItemHeader}>
                                     <span className={styles.planItemName}>
@@ -163,7 +244,9 @@ export default function CompletedSessionCard({ rootId, sessionId, template, acti
                                         {isCircuit ? <Badge size="sm">Circuit</Badge> : null}
                                     </span>
                                 </div>
-                                {isCircuit ? renderCircuit(item.circuit) : renderActivity(item.activity)}
+                                {isCircuit
+                                    ? renderCircuit(item.circuit, alignKeys?.items[sectionIndex][itemIndex], itemKey)
+                                    : renderActivity(item.activity, alignKeys?.items[sectionIndex][itemIndex])}
                             </div>
                         );
                     })}

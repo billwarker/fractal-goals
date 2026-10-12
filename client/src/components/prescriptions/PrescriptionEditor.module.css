@@ -239,7 +239,8 @@
 .round {
     --field-columns: 1;
     display: grid;
-    grid-template-columns: minmax(96px, 28%) repeat(var(--field-columns), fit-content(140px) max-content);
+    /* The trailing flexible track lets headers, dividers, and notes span the whole round. */
+    grid-template-columns: minmax(96px, 28%) repeat(var(--field-columns), fit-content(140px) max-content) minmax(0, 1fr);
     gap: 6px 10px;
     padding: 8px 10px 10px;
     background: var(--color-bg-surface);
@@ -292,9 +293,42 @@
     overflow-wrap: anywhere;
 }
 
-/* The field columns, as a nested subgrid so wrapped rows never disturb the name. */
+/* A selected circuit member: its row within the round, as on the session page. */
+.roundSlotSelected {
+    /* The spread extends the tint around the row without changing layout, so the round's
+       shared columns stay aligned. */
+    --member-tint: color-mix(in srgb, var(--color-brand-success) 14%, transparent);
+    background: var(--member-tint);
+    box-shadow: 0 0 0 5px var(--member-tint);
+    border-radius: 2px;
+}
+
+.roundSlotSelected .roundSlotName {
+    color: var(--color-brand-success);
+    font-weight: 600;
+}
+
+.roundSlotToggle {
+    justify-self: start;
+    padding: 0;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    line-height: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.roundSlotToggle:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* The field columns, as a nested subgrid so wrapped rows never disturb the name. It stops
+   before the round's trailing flexible track, so fields wrap within the field columns. */
 .roundSlotValues {
-    grid-column: 2 / -1;
+    grid-column: 2 / -2;
     display: grid;
     grid-template-columns: subgrid;
     align-items: center;

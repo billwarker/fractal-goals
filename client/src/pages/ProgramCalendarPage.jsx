@@ -813,6 +813,10 @@ function ProgramCalendarPage() {
         onCreateDay: handleAddDayClick,
         onEditDay: handleEditDay,
         onReorderDays: reorderDays,
+        goalTree: treeData,
+        activities,
+        activityGroups,
+        onGoalClick: openGoalModal,
     });
     useEffect(() => {
         showSavedDayRef.current = daysTab.showDay;
@@ -903,6 +907,7 @@ function ProgramCalendarPage() {
                                         onSelectionChange={daysTab.setSelection}
                                         onEditDay={handleEditDay}
                                         showDayHeading={isMobile}
+                                        planFocus={daysTab.planFocus}
                                     />
                                 </Suspense>
                             </div>
@@ -969,6 +974,7 @@ function ProgramCalendarPage() {
                     onCreateEvent={() => periodEditor.openCreate(selectedTimeframeDates)}
                     onEditPlan={daysTab.openDayPlan}
                     daysNavigator={viewMode === 'days' && displayProgram ? daysTab.navigator : null}
+                    daysGoals={viewMode === 'days' && displayProgram ? daysTab.goalsPanel : null}
                     onSetSessionCredit={updateSessionCredit}
                     sessionCreditUpdating={sessionCreditMutation.isPending}
                 />

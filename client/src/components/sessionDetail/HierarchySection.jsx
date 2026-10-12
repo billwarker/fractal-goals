@@ -27,10 +27,12 @@ function HierarchySection({
     onAddTargetForGoal,
     scopedActivityName = null,
     onAdjustScope,
+    label: labelOverride = null,
+    adjustScopeLabel = 'Adjust scope',
 }) {
-    const label = scopedActivityName
+    const label = labelOverride || (scopedActivityName
         ? `Goals: ${scopedActivityName}`
-        : (type === 'activity' ? (activityDefinition?.name || 'Activity Goals') : 'Session Goals');
+        : (type === 'activity' ? (activityDefinition?.name || 'Activity Goals') : 'Session Goals'));
 
     return (
         <div className={styles.contextSection}>
@@ -47,7 +49,7 @@ function HierarchySection({
                     </button>
                 )}
                 {type === 'session' && onAdjustScope && (
-                    <button type="button" className={styles.editLink} onClick={onAdjustScope}>Adjust scope</button>
+                    <button type="button" className={styles.editLink} onClick={onAdjustScope}>{adjustScopeLabel}</button>
                 )}
             </div>
             <GoalHierarchyList

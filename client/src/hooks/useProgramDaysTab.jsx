@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
+import PlanGoalHierarchyPanel from '../components/programs/days/PlanGoalHierarchyPanel';
 import ProgramDaysNavigator from '../components/programs/days/ProgramDaysNavigator';
+import { buildPlanGoalsView, planGoalsViewHasGoal } from '../utils/planGoalsView';
 import { resolveDaysSelection } from '../utils/programDaysView';
 import { sortProgramDays } from '../utils/programViewModel';
+import { useGoalActivities } from './useGoalQueries';
 import { useProgramPlanOccurrences } from './useProgramSessionPlans';
+import { useSessionGoalsView } from './useSessionQueries';
 
 /**
  * Programs page Days tab state: which program day, date, and template is being planned,
@@ -21,9 +25,20 @@ function applyDayOrder(days, order) {
     ));
 }
 
+function sameActivePlan(left, right) {
+    return left?.date === right?.date
+        && left?.templateId === right?.templateId
+        && left?.readOnly === right?.readOnly
+        && left?.templateName === right?.templateName
+        && left?.selectedActivityId === right?.selectedActivityId
+        && left?.sessionId === right?.sessionId
+        && (left?.activityIds || []).join(',') === (right?.activityIds || []).join(',')
+        && JSON.stringify(left?.instances || null) === JSON.stringify(right?.instances || null);
+}
+
 export default function useProgramDaysTab({
     rootId, program, today, timezone, enabled, setViewMode, onLeavePane, onCreateDay, onEditDay,
-    onReorderDays = null,
+    onReorderDays = null, goalTree = null, activities = [], activityGroups = [], onGoalClick = null,
 }) {
     const [selection, setSelection] = useState(null);
     // One program day at a time by default; the side pane toggles a second, comparison column.
@@ -35,6 +50,96 @@ export default function useProgramDaysTab({
     const resolved = resolveDaysSelection({
         days, occurrencesByDay: occurrencesQuery.data, selection, today, compare,
     });
+    const selectedDay = resolved.found?.day || null;
+
+    // The plan card the Goals side pane follows (one template on one date; null keys mean the
+    // planning column's first card), what that card reports about itself, and the goal its
+    // activity picker is scoped to, as on the session page.
+    const [activeKey, setActiveKey] = useState(null);
+    const [activePlan, setActivePlan] = useState(null);
+    const [scopedGoal, setScopedGoal] = useState(null);
+    const [scopeAnnouncement, setScopeAnnouncement] = useState('');
+    const activatePlan = useCallback((key) => setActiveKey((current) => (
+        current?.date === key.date && current?.templateId === key.templateId ? current : key
+    )), []);
+    const reportActivePlan = useCallback((plan) => setActivePlan((current) => (
+        sameActivePlan(current, plan) ? current : plan
+    )), []);
+    // Scope belongs to the Days tab: leaving it, or choosing another day, clears it. Reset while
+    // rendering (not in an effect), so the new day's cards report after the reset, not before it.
+    const focusOwner = `${Boolean(enabled)}|${selectedDay ? String(selectedDay.id) : ''}`;
+    const [focusOwnerSeen, setFocusOwnerSeen] = useState(focusOwner);
+    if (focusOwnerSeen !== focusOwner) {
+        setFocusOwnerSeen(focusOwner);
+        setActiveKey(null);
+        setActivePlan(null);
+        setScopedGoal(null);
+    }
+    // The selected date must be on screen: a key for a date no longer shown falls back to the default.
+    const visibleKey = activeKey && resolved.columnDates.includes(activeKey.date)
+        ? activeKey
+        : { date: resolved.date, templateId: null };
+
+    // Like a session started from the day: the day's goals, else the program's.
+    const scopeGoalIds = useMemo(() => (
+        selectedDay?.goal_ids?.length ? selectedDay.goal_ids : (program?.goal_ids || [])
+    ), [program?.goal_ids, selectedDay?.goal_ids]);
+    const builtGoalsView = useMemo(() => buildPlanGoalsView({
+        goalTree,
+        scopeGoalIds,
+        activityIds: activePlan?.activityIds || [],
+        activities,
+        activityGroups,
+    }), [activePlan?.activityIds, activities, activityGroups, goalTree, scopeGoalIds]);
+    // A logged session shows its own evidence, exactly as its session page does (shared cache).
+    const loggedSessionId = activePlan?.sessionId || null;
+    const sessionGoalsViewQuery = useSessionGoalsView(rootId, loggedSessionId);
+    const planGoalsView = (loggedSessionId && sessionGoalsViewQuery.data) || builtGoalsView;
+    // A scope survives switching cards only while its goal is still in the hierarchy.
+    useEffect(() => {
+        if (!scopedGoal || !planGoalsView || planGoalsViewHasGoal(planGoalsView, scopedGoal.id)) return;
+        setScopedGoal(null);
+        setScopeAnnouncement(`Activity scope for ${scopedGoal.name} cleared: this plan doesn't work toward it.`);
+    }, [planGoalsView, scopedGoal]);
+    const toggleGoalScope = useCallback((goal) => {
+        if (!goal?.id) return;
+        setScopeAnnouncement('');
+        setScopedGoal((current) => (String(current?.id) === String(goal.id) ? null : goal));
+    }, []);
+    const clearGoalScope = useCallback(() => setScopedGoal(null), []);
+    const goalActivitiesQuery = useGoalActivities(rootId, scopedGoal?.id);
+    const activityGoalScope = useMemo(() => (scopedGoal ? {
+        goal: scopedGoal,
+        activityIds: (goalActivitiesQuery.data || []).map((activity) => String(activity.id)),
+        isLoading: goalActivitiesQuery.isLoading,
+        isError: goalActivitiesQuery.isError,
+        onRetry: goalActivitiesQuery.refetch,
+        onClear: clearGoalScope,
+    } : null), [
+        clearGoalScope, goalActivitiesQuery.data, goalActivitiesQuery.isError,
+        goalActivitiesQuery.isLoading, goalActivitiesQuery.refetch, scopedGoal,
+    ]);
+    const planFocus = {
+        activeKey: visibleKey,
+        onActivate: activatePlan,
+        onReport: reportActivePlan,
+        activityGoalScope,
+        dayGoalIds: selectedDay?.goal_ids || [],
+        announcement: scopeAnnouncement,
+    };
+    // The side pane's Goals view: the active plan card's goal hierarchy.
+    const goalsPanel = selectedDay ? (
+        <PlanGoalHierarchyPanel
+            planGoalsView={planGoalsView}
+            activities={activities}
+            activePlan={activePlan}
+            dayName={selectedDay.name}
+            activityGoalScope={activityGoalScope}
+            onGoalScopeToggle={toggleGoalScope}
+            onGoalClick={onGoalClick}
+            onEditDayGoals={onEditDay ? () => onEditDay(selectedDay) : null}
+        />
+    ) : null;
 
     // Keeps the chosen dates when staying on the same day; a template brings its plan into view.
     const selectDay = (dayId, templateId = null) => {
@@ -103,5 +208,7 @@ export default function useProgramDaysTab({
         navigator,
         resolved,
         occurrencesQuery,
+        planFocus,
+        goalsPanel,
     };
 }

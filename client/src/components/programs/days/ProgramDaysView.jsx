@@ -37,6 +37,7 @@ export default function ProgramDaysView({
     onSelectionChange,
     onEditDay = null,
     showDayHeading = false,
+    planFocus = null,
 }) {
     const { found, occurrences, date, compareDate, columnDates } = resolved;
     const occurrenceDates = useMemo(() => occurrences.map((occurrence) => occurrence.date), [occurrences]);
@@ -93,6 +94,7 @@ export default function ProgramDaysView({
                 <h2 id="program-days-title">{found.day.name}</h2>
             </header>
             <p className={styles.visuallyHidden} aria-live="polite">{announcement}</p>
+            <p className={styles.visuallyHidden} aria-live="polite">{planFocus?.announcement || ''}</p>
             {occurrencesQuery.isLoading ? <p className={styles.state} aria-busy="true">Loading dates…</p> : null}
             {occurrencesQuery.error ? (
                 <p className={styles.state} role="alert">
@@ -168,6 +170,7 @@ export default function ProgramDaysView({
                                 activities={activities}
                                 circuits={circuits}
                                 activityGroups={activityGroups}
+                                planFocus={planFocus}
                             />
                         );
                     })}
