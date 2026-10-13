@@ -31,8 +31,6 @@ export default function ProgramSidePane({
     selectedRange,
     selectionLabel = null,
     dayDetailQuery,
-    onPreviousDay,
-    onNextDay,
     today,
     blocks,
     onScheduleDay,
@@ -103,13 +101,11 @@ export default function ProgramSidePane({
         <aside className={styles.sidePane} aria-label="Program side pane">
             {scope === 'day' ? (
                 <header className={styles.dayReviewHeader}>
-                    <div className={`${styles.dayReviewHeading} ${collapseButton ? '' : styles.dayReviewHeadingFixed}`.trim()}>
-                        <Button unstyled className={styles.dayNavButton} onClick={onPreviousDay} aria-label="Previous day">‹</Button>
+                    <div className={styles.dayReviewHeading}>
                         <div className={styles.dayReviewTitle}>
                             <h2>{formatLiteralDate(contextDate, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2>
                             {dayBlockLabel ? <p className={styles.dayReviewContext}>{dayBlockLabel}</p> : null}
                         </div>
-                        <Button unstyled className={styles.dayNavButton} onClick={onNextDay} aria-label="Next day">›</Button>
                         {collapseButton}
                     </div>
                 </header>

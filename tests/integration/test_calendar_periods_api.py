@@ -85,7 +85,7 @@ class TestCalendarPeriodsApi:
         }
 
         payload, days = _days(authed_client, period_world, period_world["start"], today)
-        assert payload["schema_version"] == 7
+        assert payload["schema_version"] == 8
         assert [item["id"] for item in payload["periods"]] == [period["id"]]
         assert days[first.isoformat()]["state"] == "rest"
         assert days[first.isoformat()]["status_source"] == "period"

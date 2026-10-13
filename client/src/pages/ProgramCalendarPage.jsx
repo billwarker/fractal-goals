@@ -24,7 +24,7 @@ import { useProgramDetailMutations } from '../hooks/useProgramDetailMutations';
 import { useProgramDetailViewModel } from '../hooks/useProgramDetailViewModel';
 import { useProgramGoalSets } from '../hooks/useProgramGoalSets';
 import { programFocusScope } from '../utils/programFocus';
-import { duplicateProgramStructure, shiftDatePart } from '../utils/programDuplication';
+import { duplicateProgramStructure } from '../utils/programDuplication';
 import { useProgramMetrics } from '../hooks/useProgramMetrics';
 import { buildBlockCards } from '../utils/programBlocksViewModel';
 import { useProgramDayMovePicker } from '../hooks/useProgramDayMovePicker';
@@ -548,12 +548,6 @@ function ProgramCalendarPage() {
         setIsSidePaneVisible(true);
     };
 
-    const moveScopedDay = (offset) => {
-        const nextDate = shiftDatePart(contextDate, offset);
-        if (!nextDate || !displayProgram || !isProgramActive(displayProgram, nextDate)) return;
-        dispatchCalendarContext({ type: 'focus_day', date: nextDate, programId: displayProgram.id });
-    };
-
     // The calendar reports the rows actually on screen (the month grid, or the
     // scrolled continuous rows); the feed loads the month chunks they touch.
     const handleCalendarVisibleRangeChange = useCallback((range) => {
@@ -878,8 +872,6 @@ function ProgramCalendarPage() {
                     selectedRange={selectedCalendarRange}
                     selectionLabel={selectedTimeframeLabel}
                     dayDetailQuery={dayDetailQuery}
-                    onPreviousDay={() => moveScopedDay(-1)}
-                    onNextDay={() => moveScopedDay(1)}
                     today={todayInTimezone}
                     blocks={sortedBlocks}
                     moveDraft={movePicker.draft}

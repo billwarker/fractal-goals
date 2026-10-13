@@ -188,13 +188,15 @@ event, then automatic evaluation. Streaks are drawn from server `chain_role`/`ru
 recomputed in the client.
 
 **Read models.** The client expects metrics calculation v9 (`services/program_metrics_service.py`,
-`program_rollups.py`, `program_block_metrics.py`), day read model schema v7
+`program_rollups.py`, `program_block_metrics.py`), day read model schema v8
 (`ProgramDayReadModelService`, IANA timezone required, bounded window, cursor-paged detail), and the
 root-scoped calendar feed schema v1 (`GET /api/<root_id>/programs/calendar-feed`,
 `ProgramCalendarFeedService`, ≤62 days, weak ETag, month chunks nested under the day read-model query
 root). `services/program_scope.py` resolves program scope; execution metrics are bounded server read
 models, not client recomputation. The Days workspace reads one evaluator pass from
-`GET …/plan-occurrences`.
+`GET …/plan-occurrences`. Program read models omit alignment metrics; day-review session rows
+show timing and a credit-options menu without credit-source labels. Goal evidence still owns
+coverage and streak evaluation.
 
 **Dated session plans.** `program_session_plans` (`services/program_session_plans.py`) holds one plan per
 program day, template, and date. Plans are virtual until saved (an unplanned occurrence *is* the

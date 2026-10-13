@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 import ProgramSidePane from '../ProgramSidePane';
@@ -13,7 +13,7 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 }));
 
 describe('ProgramSidePane day heading', () => {
-    it('centers the date between the day navigation controls without a redundant eyebrow', () => {
+    it('shows the date and Collapse without day navigation controls', () => {
         const onPreviousDay = vi.fn();
         const onNextDay = vi.fn();
         render(
@@ -40,10 +40,8 @@ describe('ProgramSidePane day heading', () => {
         expect(row.className).toContain('dayReviewHeading');
         expect(within(row).getByRole('button', { name: 'Collapse' })).toBeInTheDocument();
         expect(screen.queryByRole('img', { name: 'requirements met' })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Next day' }));
-        expect(onPreviousDay).toHaveBeenCalledOnce();
-        expect(onNextDay).toHaveBeenCalledOnce();
+        expect(screen.queryByRole('button', { name: 'Previous day' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Next day' })).not.toBeInTheDocument();
     });
 
     it('shows the selected timeframe and scoped overview for a multi-day range', () => {

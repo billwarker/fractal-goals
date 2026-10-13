@@ -204,8 +204,12 @@ describe('ProgramDayPane', () => {
         expect(screen.getByRole('button', { name: /Change status for Strength day/ })).toHaveTextContent('✓');
         expect(screen.queryByRole('img', { name: 'Strength day: requirements met' })).not.toBeInTheDocument();
         expect(screen.getByLabelText('Main work session: completed')).toBeInTheDocument();
-        const sessionLink = screen.getByRole('link', { name: /Main work.*20 minutes.*Start 2:00 PM.*End 2:20 PM/i });
+        const sessionLink = screen.getByRole('link', { name: /Main work.*completed/i });
         expect(sessionLink).toHaveAttribute('href', '/root-1/session/session-1');
+        const timing = sessionLink.parentElement.nextElementSibling;
+        expect(timing).toHaveTextContent('Start 2:00 PM');
+        expect(timing).toHaveTextContent('End 2:20 PM');
+        expect(timing).toHaveTextContent('20 minutes');
         expect(within(sessionLink).getByTitle('Main work')).toHaveStyle({ color: 'rgb(13, 189, 201)' });
         expect(screen.getAllByTitle('Main work')).toHaveLength(1);
         expect(screen.queryByRole('link', { name: /Start Main work/ })).not.toBeInTheDocument();

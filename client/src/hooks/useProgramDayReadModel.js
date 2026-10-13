@@ -5,7 +5,7 @@ import { fractalApi } from '../utils/api';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { queryKeys } from './queryKeys';
 
-const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 7;
+const PROGRAM_DAY_READ_MODEL_SCHEMA_VERSION = 8;
 
 function unwrapReadModelResponse(response) {
     const payload = response.data;

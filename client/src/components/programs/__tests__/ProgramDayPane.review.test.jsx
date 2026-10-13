@@ -87,7 +87,8 @@ describe('ProgramDayPane day review', () => {
         expect(screen.queryByRole('heading', { name: 'Plan this day' })).not.toBeInTheDocument();
         expect(screen.queryByRole('heading', { name: 'Day summary' })).not.toBeInTheDocument();
         const sessionsCard = screen.getByRole('heading', { name: 'Sessions' }).closest('section');
-        expect(within(sessionsCard).getByRole('img', { name: '50% of activity time aligned to program goals' })).toBeInTheDocument();
+        expect(within(sessionsCard).queryByRole('img', { name: /aligned/ })).not.toBeInTheDocument();
+        expect(within(sessionsCard).getByText('30 minutes')).toBeInTheDocument();
         expect(screen.queryByText(/don’t count toward this day/)).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Count as/ })).not.toBeInTheDocument();
     });
@@ -121,7 +122,7 @@ describe('ProgramDayPane day review', () => {
         }
     });
 
-    it('lists credited sessions on a missed day and separates off-plan work with a one-click credit', async () => {
+    it('lists credited sessions on a missed day and separates off-plan work with credit options', async () => {
         const onSetSessionCredit = vi.fn().mockResolvedValue(true);
         const credited = reviewSession({
             id: 'credited', name: 'Planche Focus', relation: 'credited',
@@ -149,13 +150,14 @@ describe('ProgramDayPane day review', () => {
 
         const dayCard = screen.getByRole('heading', { name: 'Strength day' }).closest('section');
         const countedList = within(dayCard).getByLabelText('Sessions counted toward Strength day');
-        expect(within(countedList).getByText('Matched template')).toBeInTheDocument();
-        expect(within(countedList).getByRole('img', { name: '50% of activity time aligned to program goals' })).toBeInTheDocument();
+        expect(within(countedList).queryByText('Matched template')).not.toBeInTheDocument();
+        expect(within(countedList).queryByRole('img', { name: /aligned/ })).not.toBeInTheDocument();
         const offPlanCard = within(dayCard).getByRole('group', { name: 'Off-plan sessions' });
         expect(screen.getAllByRole('heading', { name: 'Off-plan sessions' })).toHaveLength(1);
         expect(within(offPlanCard).getByText(/don’t count toward this day/)).toBeInTheDocument();
         expect(within(offPlanCard).queryByText('Planche Focus')).not.toBeInTheDocument();
-        fireEvent.click(within(offPlanCard).getByRole('button', { name: 'Count as Handstand' }));
+        fireEvent.click(within(offPlanCard).getByRole('button', { name: 'Change how Run counts toward this day' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Count as Handstand' }));
         await waitFor(() => expect(onSetSessionCredit).toHaveBeenCalledWith(offPlan, 'credit', 'template-2'));
     });
 
@@ -195,12 +197,12 @@ describe('ProgramDayPane day review', () => {
         await waitFor(() => expect(trigger).toHaveAttribute('aria-expanded', 'false'));
 
         fireEvent.click(screen.getByRole('button', { name: 'Change how Manual session counts toward this day' }));
-        expect(screen.getByText('Counted manually')).toBeInTheDocument();
+        expect(screen.queryByText('Counted manually')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('menuitem', { name: 'Use automatic credit' }));
         await waitFor(() => expect(onSetSessionCredit).toHaveBeenCalledWith(manual, 'automatic', undefined));
     });
 
-    it('labels excluded and other-program sessions and disables credit actions while pending', () => {
+    it('omits credit labels and disables credit actions while pending', () => {
         renderPane({
             date: '2026-09-01',
             sessionCreditUpdating: true,
@@ -217,9 +219,9 @@ describe('ProgramDayPane day review', () => {
             } } },
         });
 
-        expect(screen.getByText('Not counted')).toBeInTheDocument();
-        expect(screen.getByText('Other program')).toBeInTheDocument();
+        expect(screen.queryByText('Not counted')).not.toBeInTheDocument();
+        expect(screen.queryByText('Other program')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Change how Excluded counts toward this day' })).toBeDisabled();
-        expect(screen.getByRole('button', { name: 'Count as Main work' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Change how Other counts toward this day' })).toBeDisabled();
     });
 });

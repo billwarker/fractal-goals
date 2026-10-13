@@ -146,7 +146,7 @@ def _put_credit(client, world, **body):
 
 @pytest.mark.integration
 class TestProgramDayReviewSummary:
-    def test_detail_lists_every_session_with_relation_credit_and_alignment(self, authed_client, credit_world):
+    def test_detail_lists_every_session_with_credit_without_alignment(self, authed_client, credit_world):
         payload = _detail(authed_client, credit_world, credit_world["yesterday"].isoformat())
         detail = payload["detail"]
         sessions = {item["id"]: item for item in detail["sessions"]}
@@ -154,18 +154,16 @@ class TestProgramDayReviewSummary:
         off_plan = sessions[credit_world["sessions"]["off_plan"].id]
         other = sessions[credit_world["sessions"]["other"].id]
 
-        assert payload["schema_version"] == 7
+        assert payload["schema_version"] == 8
         assert detail["state"] == "scheduled_partial"
         assert detail["can_edit_credits"] is True
         assert (matched["relation"], matched["credit"]["source"]) == ("credited", "template_match")
         assert matched["credit_options"] == []
-        assert matched["alignment"]["aligned_seconds"] == 600
-        assert matched["alignment"]["goal_ids"] == [credit_world["goals"]["mid_term"].id]
+        assert all("alignment" not in session for session in sessions.values())
         assert (off_plan["relation"], off_plan["credit"]) == ("off_plan", None)
         assert [option["template_id"] for option in off_plan["credit_options"]] == [
             credit_world["templates"]["second"].id,
         ]
-        assert off_plan["alignment"]["aligned_seconds"] == 0
         assert other["relation"] == "other_program"
         assert detail["occurrences"][0]["credits"] == [{
             "session_id": credit_world["sessions"]["matched"].id,
@@ -226,7 +224,7 @@ class TestProgramDayReviewSummary:
 
         assert detail["scheduled"] is False
         assert detail["can_edit_credits"] is False
-        assert detail["sessions"][0]["alignment"]["aligned_ratio"] == 1
+        assert "alignment" not in detail["sessions"][0]
         assert detail["sessions"][0]["relation"] == "off_plan"
         assert detail["sessions"][0]["credit_options"] == []
         assert payload["days"][0]["completed_sessions"][0]["name"] == "Planche Focus"

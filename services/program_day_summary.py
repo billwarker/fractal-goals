@@ -1,4 +1,4 @@
-"""Pure goal-alignment projections shared by program metrics and day review."""
+"""Pure goal-evidence allocation for program metrics."""
 
 from collections import defaultdict
 
@@ -24,35 +24,3 @@ def allocate_equal_split(items, goal_ids_of):
             if timestamp is not None:
                 row["last"] = max(filter(None, [row["last"], timestamp]))
     return groups
-
-
-def alignment_facts(evidence):
-    """Summarize how much completed activity evidence served program goals.
-
-    Duration is the basis when any evidence is timed; otherwise the ratio falls
-    back to activity counts so untimed practice still reports alignment.
-    """
-    aligned = [item for item in evidence if item["in_scope_ids"]]
-    total_seconds = sum(item["duration"] for item in evidence)
-    aligned_seconds = sum(item["duration"] for item in aligned)
-    basis = "duration" if total_seconds > 0 else "count"
-    if basis == "duration":
-        ratio = aligned_seconds / total_seconds
-    else:
-        ratio = len(aligned) / len(evidence) if evidence else None
-    return {
-        "aligned_seconds": aligned_seconds,
-        "total_seconds": total_seconds,
-        "aligned_activity_count": len(aligned),
-        "activity_count": len(evidence),
-        "aligned_ratio": round(ratio, 4) if ratio is not None else None,
-        "basis": basis,
-    }
-
-
-def session_alignment(evidence):
-    facts = alignment_facts(evidence)
-    return {
-        **facts,
-        "goal_ids": sorted({goal_id for item in evidence for goal_id in item["in_scope_ids"]}),
-    }

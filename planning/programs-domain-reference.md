@@ -92,7 +92,7 @@ the gestures (press-and-drag selects the range between cells, including over eve
 live preview; a press without movement toggles one date; Shift extends), so FullCalendar's own
 selection and clicks stand down in that mode. Status actions apply only to the scheduled subset;
 **Plan event** spans the whole selection. Cells are keyboard-selectable and highlighted when selected.
-The client expects program metrics calculation v9 and day read model schema v7 (occurrence `block`
+The client expects program metrics calculation v9 and day read model schema v8 (occurrence `block`
 may be null and carries `week_index` for tracked blocks).
 Metrics v9 reports **consistency** (met scheduled program days over observed ones; rest and
 event-protected days excluded). `services/program_rollups.py` holds the pure date records, block
@@ -160,10 +160,11 @@ In multi-day mode, the sidebar requests metrics for the exact selected scheduled
 gaps from adherence, evidence, and block totals. Non-contiguous selections use a compact
 "N selected days" heading rather than displaying the misleading first-to-last date range.
 
-The day-review pane is review-first: its one session list covers every session on the date, labelled
-credited (with source), off-plan, or other program, with per-session goal alignment (the same
-equal-split allocation as program metrics, via `services/program_day_summary.py`) and server-provided
-credit options. Off-plan sessions sit inside the first program-day card; planning actions appear only
+The day-review pane is review-first: its session lists cover every session on the date, grouped
+by occurrence credit or off-plan work. Session rows omit credit-source labels and alignment metrics;
+server-provided credit actions live in the top-right options menu. Start, end, and duration share
+a metadata row. The selected-date header has no previous/next arrows. The Calendar/Days toggle
+sizes to its labels without increasing its height. Off-plan sessions sit inside the first program-day card; planning actions appear only
 for today and future unscheduled dates. Range summaries list each observed date's completed sessions
 (any program, with session and template names plus template color); the calendar shows those sessions
 on scheduled and unscheduled dates, using the shared session-template badge when available. Scheduled
@@ -172,7 +173,7 @@ program-payload session events are not rendered on the Programs page. Multiple c
 using the same template on one date are represented by one badge with a count (for example, “×4”).
 Sessions credited to a specific program-day occurrence render inside that ribbon on a line below it.
 
-`ProgramDayReadModelService` emits schema v7, requires an IANA timezone, caps the complete
+`ProgramDayReadModelService` emits schema v8, requires an IANA timezone, caps the complete
 expanded chain window at `MAX_WINDOW_DAYS`, reports truncated context, and provides cursor-paged
 day detail. The client rejects unsupported schema versions. FullCalendar block labels are
 reconciled idempotently, cleaned on cell unmount, and activated through React event delegation.

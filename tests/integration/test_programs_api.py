@@ -248,7 +248,7 @@ class TestProgramCRUD:
         )
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['schema_version'] == 7
+        assert payload['schema_version'] == 8
         assert payload['chain']['context_start'] == target_date.isoformat()
         assert payload['chain']['context_truncated_before'] is False
         assert payload['days'][0]['state'] == 'scheduled_pending'
@@ -595,7 +595,7 @@ class TestProgramCRUD:
             event.remove(engine, "before_cursor_execute", capture_statement)
 
         assert (error, status) == (None, 200)
-        assert payload["schema_version"] == 7
+        assert payload["schema_version"] == 8
         assert len(statements) <= 40
 
     def test_delete_program(self, authed_client, db_session, sample_ultimate_goal, sample_program):

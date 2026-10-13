@@ -6,8 +6,7 @@ import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import useAnchoredMenuController from '../../hooks/useAnchoredMenuController';
 import { formatDateValue, formatDurationHuman } from '../../utils/dateUtils';
-import { describeSessionCredit, sessionCreditActions } from '../../utils/programDaySessionCredit';
-import ProgramDayAlignmentBar from './ProgramDayAlignmentBar';
+import { sessionCreditActions } from '../../utils/programDaySessionCredit';
 import styles from './ProgramSidePane.module.css';
 
 function SessionCreditMenu({ session, actions, pending, onChoose }) {
@@ -55,16 +54,13 @@ export default function ProgramDaySessionRow({
 }) {
     const startTime = formatDateValue(session.session_start, 'h:mm A', timezone);
     const endTime = formatDateValue(session.session_end || session.completed_at, 'h:mm A', timezone);
-    const creditLabel = describeSessionCredit(session);
     const actions = sessionCreditActions(session, canEditCredits);
-    const alignment = session.alignment;
     const choose = (action) => onSetCredit?.(session, action.disposition, action.templateId);
-    const singleCredit = actions.length === 1 && actions[0].disposition === 'credit';
 
     return (
         <div className={styles.sessionCard}>
-            <Link to={`/${rootId}/session/${session.id}`} className={styles.sessionRow}>
-                <span className={styles.sessionIdentity}>
+            <div className={styles.sessionIdentity}>
+                <Link to={`/${rootId}/session/${session.id}`} className={styles.sessionRow}>
                     <span className={styles.sessionTemplateStatus}>
                         {session.template ? (
                             <SessionTemplateNameBadge name={session.template.name} color={session.template.color} size="sm" wrap />
@@ -76,31 +72,16 @@ export default function ProgramDaySessionRow({
                             label={`${session.name}: ${session.completed ? 'completed' : session.is_paused ? 'paused' : 'in progress'}`}
                         />
                     </span>
-                    <span className={styles.sessionDuration}>{formatDurationHuman(session.total_duration_seconds)}</span>
-                </span>
-                <span className={styles.sessionMetadata}>
-                    <span>Start <time dateTime={session.session_start}>{startTime || '—'}</time></span>
-                    <span>End <time dateTime={session.session_end || session.completed_at}>{endTime || '—'}</time></span>
-                </span>
-            </Link>
-            {creditLabel || alignment?.activity_count || actions.length ? (
-                <div className={styles.sessionFooter}>
-                    {creditLabel ? <span className={styles.creditLabel}>{creditLabel}</span> : null}
-                    {alignment?.activity_count ? (
-                        <ProgramDayAlignmentBar alignment={alignment} />
-                    ) : null}
-                    {singleCredit ? (
-                        <button
-                            type="button"
-                            className={styles.creditInlineAction}
-                            disabled={pending}
-                            onClick={() => choose(actions[0])}
-                        >{actions[0].label}</button>
-                    ) : actions.length ? (
-                        <SessionCreditMenu session={session} actions={actions} pending={pending} onChoose={choose} />
-                    ) : null}
-                </div>
-            ) : null}
+                </Link>
+                {actions.length ? (
+                    <SessionCreditMenu session={session} actions={actions} pending={pending} onChoose={choose} />
+                ) : null}
+            </div>
+            <div className={styles.sessionMetadata}>
+                <span>Start <time dateTime={session.session_start}>{startTime || '—'}</time></span>
+                <span>End <time dateTime={session.session_end || session.completed_at}>{endTime || '—'}</time></span>
+                <span className={styles.sessionDuration}>{formatDurationHuman(session.total_duration_seconds)}</span>
+            </div>
         </div>
     );
 }

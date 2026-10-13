@@ -20,7 +20,6 @@ from services.program_day_occurrences import (
 )
 from services.program_calendar_sessions import load_completed_sessions_by_date
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
-from services.program_day_summary import session_alignment
 from services.program_rollups import block_weeks
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
 from services.program_scope import resolve_program_scope
@@ -30,7 +29,7 @@ from services.session_runtime import get_session_template_color, get_session_tem
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
     # A hard safety bound for one local date; the summary covers every loaded
     # session while the session list itself is cursor-paged.
@@ -84,8 +83,6 @@ class ProgramDayReadModelService:
         all_facts = built["all_facts"]
         facts = built["facts"]
         periods = built["periods"]
-        scope = built["scope"]
-        goals_by_id = built["goals_by_id"]
         local_today = built["local_today"]
         chain_start = built["chain_start"]
         chain_context_truncated = built["chain_context_truncated"]
@@ -112,7 +109,7 @@ class ProgramDayReadModelService:
         if detail:
             payload["detail"] = self._detail(
                 root_id, current_user_id, program, facts, detail, zone, limit, cursor_offset,
-                scope_goal_ids=scope.goal_ids, local_today=local_today, goals_by_id=goals_by_id,
+                local_today=local_today,
             )
         return payload, None, 200
 
@@ -145,7 +142,7 @@ class ProgramDayReadModelService:
             periods = load_calendar_periods(self.db_session, root_id, current_user_id, chain_start, chain_end)
         scope = resolve_program_scope(self.db_session, root_id, program.id)
         local_today = datetime.now(zone).date()
-        range_evidence, goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
+        range_evidence, _goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
             root_id, current_user_id, zone, scope.goal_ids,
             start=start, end=min(end, local_today),
         )
@@ -158,8 +155,6 @@ class ProgramDayReadModelService:
             "all_facts": all_facts,
             "facts": [item for item in all_facts if start <= item["date"] <= end],
             "periods": periods,
-            "scope": scope,
-            "goals_by_id": goals_by_id,
             "local_today": local_today,
             "chain_start": chain_start,
             "chain_end": chain_end,
@@ -291,18 +286,11 @@ class ProgramDayReadModelService:
         }
 
     def _detail(self, root_id, current_user_id, program, facts, detail_date, zone, limit, offset,
-                *, scope_goal_ids, local_today, goals_by_id=None):
+                *, local_today):
         fact = next((item for item in facts if item["date"] == detail_date), None)
         occurrence_rows = fact["occurrences"] if fact else []
         credit_facts = fact["session_credits"] if fact else {}
         day_sessions = self._load_day_sessions(root_id, current_user_id, detail_date, zone)
-        evidence, _goals_by_id = ProgramMetricsService(self.db_session).load_resolved_evidence(
-            root_id, current_user_id, zone, scope_goal_ids,
-            session_ids=[session.id for session in day_sessions], goals_by_id=goals_by_id,
-        )
-        evidence_by_session = defaultdict(list)
-        for item in evidence:
-            evidence_by_session[item["session_id"]].append(item)
         date_evaluation = fact["date_evaluation"] if fact else None
         can_edit_credits = bool(fact and fact["scheduled"] and detail_date <= local_today)
         credit_options = self._credit_options(occurrence_rows, date_evaluation) if can_edit_credits else []
@@ -361,7 +349,7 @@ class ProgramDayReadModelService:
             "sessions": [
                 self._serialize_day_session(
                     session, program.id, credit_facts.get(session.id),
-                    evidence_by_session[session.id], credit_options,
+                    credit_options,
                 ) for session in page
             ],
             "sessions_page": {
@@ -392,7 +380,7 @@ class ProgramDayReadModelService:
         return list(options.values())
 
     @classmethod
-    def _serialize_day_session(cls, session, program_id, credit_fact, evidence, credit_options):
+    def _serialize_day_session(cls, session, program_id, credit_fact, credit_options):
         relation = cls._session_relation(session, program_id, credit_fact)
         credited = relation == "credited"
         return {
@@ -405,7 +393,6 @@ class ProgramDayReadModelService:
                 "program_day_ids": credit_fact["program_day_ids"],
             } if credited else None,
             "excluded": bool(credit_fact and credit_fact["excluded"]),
-            "alignment": session_alignment(evidence),
             "credit_options": credit_options if session.completed and not credited else [],
         }
 

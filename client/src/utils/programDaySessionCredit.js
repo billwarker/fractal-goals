@@ -1,18 +1,5 @@
 /** Presentation helpers for program day-review session credit facts. */
 
-const CREDIT_SOURCE_LABELS = {
-    linked: 'Linked',
-    template_match: 'Matched template',
-    manual: 'Counted manually',
-};
-
-export function describeSessionCredit(session) {
-    if (session.credit) return CREDIT_SOURCE_LABELS[session.credit.source] || null;
-    if (session.excluded) return 'Not counted';
-    if (session.relation === 'other_program') return 'Other program';
-    return null;
-}
-
 /** Credit actions the server permits for this session, in display order. */
 export function sessionCreditActions(session, canEditCredits) {
     if (!canEditCredits || !session.completed) return [];

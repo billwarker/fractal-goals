@@ -60,7 +60,8 @@
 }
 
 .headerViewToggle {
-    width: auto;
+    width: max-content;
+    min-width: max-content;
     flex: 0 0 auto;
     align-self: center;
     box-sizing: border-box;
@@ -68,6 +69,9 @@
 
 /* The 8px tab frame plus 24px tabs matches HeaderButton's 32px desktop height. */
 .headerViewToggle :global(button[role="tab"]) {
+    flex: 1 0 auto;
+    min-width: max-content;
+    white-space: nowrap;
     min-height: 24px;
     padding: 4px 12px;
 }
