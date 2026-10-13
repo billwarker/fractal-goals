@@ -13,6 +13,7 @@ function SessionOptionsModal({
     sessionName,
     onCreateTemplate,
     onDuplicateSession,
+    canDuplicateSession = false,
     onPauseResume,
     onDelete,
     isPaused = false,
@@ -93,23 +94,25 @@ function SessionOptionsModal({
                         )}
                     </div>
 
-                    <div className={styles.optionCard}>
-                        <div className={styles.optionHeader}>
-                            <div className={styles.optionCopy}>
-                                <Heading level={4} className={styles.optionTitle}>Duplicate Session</Heading>
-                                <Text as="p" size="sm" className={styles.optionDescription}>
-                                    Clone this session into a new active session with the same sections and activities.
-                                </Text>
+                    {isCompleted && canDuplicateSession && (
+                        <div className={styles.optionCard}>
+                            <div className={styles.optionHeader}>
+                                <div className={styles.optionCopy}>
+                                    <Heading level={4} className={styles.optionTitle}>Duplicate Session</Heading>
+                                    <Text as="p" size="sm" className={styles.optionDescription}>
+                                        Clone this session into a new active session with the same sections and activities.
+                                    </Text>
+                                </div>
+                                <Button
+                                    onClick={onDuplicateSession}
+                                    isLoading={isDuplicatingSession}
+                                    disabled={isSavingTemplate}
+                                >
+                                    Duplicate Session
+                                </Button>
                             </div>
-                            <Button
-                                onClick={onDuplicateSession}
-                                isLoading={isDuplicatingSession}
-                                disabled={isSavingTemplate}
-                            >
-                                Duplicate Session
-                            </Button>
                         </div>
-                    </div>
+                    )}
 
                     <div className={styles.optionCard}>
                         <div className={styles.optionHeader}>

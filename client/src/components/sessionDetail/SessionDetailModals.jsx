@@ -35,6 +35,7 @@ function SessionDetailModals({
     sessionName,
     onCreateTemplate,
     onDuplicateSession,
+    canDuplicateSession,
     onPauseResume,
     onDeleteSessionRequest,
     isPaused,
@@ -102,6 +103,7 @@ function SessionDetailModals({
                 sessionName={sessionName}
                 onCreateTemplate={onCreateTemplate}
                 onDuplicateSession={onDuplicateSession}
+                canDuplicateSession={canDuplicateSession}
                 onPauseResume={onPauseResume}
                 onDelete={onDeleteSessionRequest}
                 isPaused={isPaused}

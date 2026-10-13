@@ -1,4 +1,6 @@
 import { useMemo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { useActiveSession } from './useSessionQueries';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
 import { useGoalActivities } from './useGoalQueries';
 import useSessionOptionsMutations from './useSessionOptionsMutations';
@@ -8,6 +10,8 @@ import useSessionDetailUiState from './useSessionDetailUiState';
 import useSessionSidePaneViewModel from './useSessionSidePaneViewModel';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
+    const { user } = useAuth();
+    const activeSessionQuery = useActiveSession(user?.id, rootId);
     const {
         session,
         activities,
@@ -130,7 +134,14 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         return createdTemplate;
     };
 
+    const canDuplicateSession = Boolean(
+        (session?.completed ?? session?.attributes?.completed)
+        && activeSessionQuery.isSuccess
+        && !activeSessionQuery.data
+    );
+
     const handleDuplicateSession = async () => {
+        if (!canDuplicateSession) return;
         const duplicatedSession = await duplicateSession();
         setShowOptionsModal(false);
         navigate(`/${rootId}/session/${duplicatedSession.id}`);
@@ -217,6 +228,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setShowOptionsModal,
         handleCreateTemplate,
         handleDuplicateSession,
+        canDuplicateSession,
         handlePauseResume,
         handleDeleteSessionRequest,
         isSavingTemplate,

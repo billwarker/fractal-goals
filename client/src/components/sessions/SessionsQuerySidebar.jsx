@@ -177,28 +177,6 @@ function SessionsQuerySidebar({
 
                 <section className="sessions-query-sidebar-section">
                     <div className="sessions-query-sidebar-section-header">
-                        <h4>Completion</h4>
-                    </div>
-                    <div className="sessions-query-chip-group">
-                        {[
-                            { value: 'all', label: 'All' },
-                            { value: 'incomplete', label: 'Incomplete' },
-                            { value: 'completed', label: 'Completed' },
-                        ].map((option) => (
-                            <button
-                                key={option.value}
-                                type="button"
-                                className={`sessions-query-chip ${filters.completed === option.value ? 'active' : ''}`}
-                                onClick={() => onUpdateFilters?.({ completed: option.value })}
-                            >
-                                {option.label}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="sessions-query-sidebar-section">
-                    <div className="sessions-query-sidebar-section-header">
                         <h4>Sort</h4>
                     </div>
                     <div className="sessions-query-sort-row">

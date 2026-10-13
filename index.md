@@ -109,8 +109,12 @@ invalidation; duplication starts with no one-off links. Interaction details:
 
 ### Sessions, activities, and progress
 
-Sessions are the execution container. Activity definitions and instances, metrics, sets,
-circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
+Sessions are the execution container. Each user can have one unfinished session per fractal,
+including paused sessions. Session Detail offers duplication only for completed sessions after
+the shared active-session query confirms none is ongoing. The Sessions sidebar has no completion
+filter; legacy completion URL parameters do not constrain its list or heatmap.
+
+Activity definitions and instances, metrics, sets, circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
 calculated from canonical result data; obsolete snapshot progress is not a competing source.
 Activities, circuit runs, and rounds use one fractal-owned tag catalog (`ActivityTagDefinition`).
 Circuit pickers read the full catalog and assign its identity, extending activity bindings to

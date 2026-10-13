@@ -16,7 +16,6 @@ const SESSION_HEATMAP_MODES = ['count', 'duration'];
 const SESSION_DURATION_OPERATORS = ['gt', 'lt'];
 
 const DEFAULT_FILTERS = {
-    completed: 'all',
     sortBy: 'session_start',
     sortOrder: 'desc',
     rangePreset: '90d',
@@ -94,7 +93,6 @@ export function useSessionsPageFilters(timezone) {
 
     const filters = useMemo(() => {
         const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
-        const completed = searchParams.get('completed') || DEFAULT_FILTERS.completed;
         const sortBy = searchParams.get('sort_by') || DEFAULT_FILTERS.sortBy;
         const sortOrder = searchParams.get('sort_order') || DEFAULT_FILTERS.sortOrder;
         const requestedPreset = searchParams.get('range_preset') || DEFAULT_FILTERS.rangePreset;
@@ -129,7 +127,6 @@ export function useSessionsPageFilters(timezone) {
         }
 
         return {
-            completed,
             sortBy,
             sortOrder,
             rangePreset,
@@ -144,7 +141,6 @@ export function useSessionsPageFilters(timezone) {
     }, [searchParams, timezone]);
 
     const apiFilters = useMemo(() => ({
-        completed: filters.completed,
         sort_by: filters.sortBy,
         sort_order: filters.sortOrder,
         range_start: filters.rangeStart || undefined,
@@ -173,11 +169,7 @@ export function useSessionsPageFilters(timezone) {
 
         const nextParams = new URLSearchParams(searchParams);
 
-        if (nextFilters.completed !== DEFAULT_FILTERS.completed) {
-            nextParams.set('completed', nextFilters.completed);
-        } else {
-            nextParams.delete('completed');
-        }
+        nextParams.delete('completed');
 
         if (nextFilters.sortBy !== DEFAULT_FILTERS.sortBy) {
             nextParams.set('sort_by', nextFilters.sortBy);
@@ -251,8 +243,7 @@ export function useSessionsPageFilters(timezone) {
     }, [setSearchParams]);
 
     const hasActiveFilters = useMemo(() => (
-        filters.completed !== DEFAULT_FILTERS.completed
-        || filters.sortBy !== DEFAULT_FILTERS.sortBy
+        filters.sortBy !== DEFAULT_FILTERS.sortBy
         || filters.sortOrder !== DEFAULT_FILTERS.sortOrder
         || filters.rangePreset !== DEFAULT_FILTERS.rangePreset
         || filters.durationMinutes !== DEFAULT_FILTERS.durationMinutes

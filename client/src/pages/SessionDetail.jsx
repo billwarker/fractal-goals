@@ -86,6 +86,7 @@ function SessionDetailContent() {
         setShowOptionsModal,
         handleCreateTemplate,
         handleDuplicateSession,
+        canDuplicateSession,
         handlePauseResume,
         handleDeleteSessionRequest,
         isSavingTemplate,
@@ -192,6 +193,7 @@ function SessionDetailContent() {
                     sessionName={session?.name}
                     onCreateTemplate={handleCreateTemplate}
                     onDuplicateSession={handleDuplicateSession}
+                    canDuplicateSession={canDuplicateSession}
                     onPauseResume={handlePauseResume}
                     onDeleteSessionRequest={handleDeleteSessionRequest}
                     isPaused={Boolean(session?.is_paused)}
@@ -281,6 +283,7 @@ function SessionDetailContent() {
                 sessionName={session?.name}
                 onCreateTemplate={handleCreateTemplate}
                 onDuplicateSession={handleDuplicateSession}
+                canDuplicateSession={canDuplicateSession}
                 onPauseResume={handlePauseResume}
                 onDeleteSessionRequest={handleDeleteSessionRequest}
                 isPaused={Boolean(session?.is_paused)}

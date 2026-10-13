@@ -52,11 +52,26 @@ describe('SessionOptionsModal', () => {
                 sessionName="Morning Workout"
                 onCreateTemplate={vi.fn()}
                 onDuplicateSession={onDuplicateSession}
+                isCompleted
+                canDuplicateSession
             />
         );
 
         fireEvent.click(screen.getByRole('button', { name: 'Duplicate Session' }));
         expect(onDuplicateSession).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        { isCompleted: false, isPaused: false, canDuplicateSession: false },
+        { isCompleted: false, isPaused: true, canDuplicateSession: false },
+        { isCompleted: true, isPaused: false, canDuplicateSession: false },
+    ])('hides duplication when unavailable: %j', (state) => {
+        renderWithProviders(
+            <SessionOptionsModal isOpen onClose={vi.fn()} {...state} />
+        );
+        expect(screen.queryByText('Duplicate Session')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save as Template' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Delete Session' })).toBeEnabled();
     });
 
     it('runs pause/resume and delete actions from options', () => {
