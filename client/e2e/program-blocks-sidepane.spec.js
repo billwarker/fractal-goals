@@ -24,6 +24,12 @@ test('summarizes a block in the calendar pane and adds a program day with option
     const viewBox = await programView.boundingBox();
     const optionsBox = await page.getByRole('button', { name: 'Program Options', exact: true }).boundingBox();
     expect(viewBox.x + viewBox.width).toBeLessThanOrEqual(optionsBox.x);
+    expect(viewBox.height).toBe(optionsBox.height);
+    expect(optionsBox.height).toBe(suffix === 'mobile' ? 44 : 32);
+    if (suffix === 'desktop') {
+        const sidebarButtonBox = await page.getByRole('button', { name: 'Hide Sidebar', exact: true }).boundingBox();
+        expect(sidebarButtonBox.height).toBe(optionsBox.height);
+    }
     if (suffix === 'desktop') {
         const title = page.getByRole('heading', { level: 1 });
         const subtitle = title.locator('xpath=../following-sibling::p');
