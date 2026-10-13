@@ -346,19 +346,7 @@ function SessionActivityItemView({
                 </SessionItemHeaderLeft>
 
                 <SessionItemHeaderRight>
-                    {quickMode ? (
-                        <div className={styles.actionStack}>
-                            <div className={styles.quickModeStatus}>
-                                <ActivityCompletionButton
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onUpdate('completed', !exercise.completed);
-                                    }}
-                                    completed={exercise.completed}
-                                />
-                            </div>
-                        </div>
-                    ) : (
+                    {!quickMode && (
                         <div className={styles.actionStack}>
                             <SessionItemTimerControls>
                                 <SessionItemTimerMeta>
@@ -768,7 +756,7 @@ function SessionActivityItemView({
                         )
                     ) : (
                         <div className={styles.noMetricsMessage}>
-                            {quickMode ? 'Mark this activity complete when finished.' : 'Track activity based on completion checkbox above.'}
+                            {quickMode ? 'This activity is completed when you complete the quick session.' : 'Track activity based on completion checkbox above.'}
                         </div>
                     )
                 )}

@@ -2,15 +2,24 @@ import json
 from datetime import datetime
 from uuid import uuid4
 
-from models import SessionTemplate
+import pytest
+
+from models import ActivityInstance, SessionTemplate
 
 
+@pytest.mark.parametrize('activity_completed', [False, True, None])
+@pytest.mark.parametrize('activity_count', [1, 5])
+@pytest.mark.parametrize('has_sets', [False, True])
 def test_quick_complete_endpoint_creates_and_completes_session(
+    activity_completed,
+    activity_count,
+    has_sets,
     authed_client,
     db_session,
     sample_goal_hierarchy,
     sample_activity_definition,
 ):
+    sample_activity_definition.has_sets = has_sets
     root_id = sample_goal_hierarchy['ultimate'].id
     quick_template = SessionTemplate(
         id=str(uuid4()),
@@ -22,6 +31,7 @@ def test_quick_complete_endpoint_creates_and_completes_session(
             'template_color': '#123456',
             'activities': [
                 {'activity_id': sample_activity_definition.id, 'name': sample_activity_definition.name}
+                for _ in range(activity_count)
             ],
         }),
     )
@@ -43,7 +53,8 @@ def test_quick_complete_endpoint_creates_and_completes_session(
             'activity_instances': [
                 {
                     'activity_definition_id': sample_activity_definition.id,
-                    'completed': True,
+                    'completed': activity_completed,
+                    'has_sets': has_sets,
                     'metrics': [],
                     'sets': [],
                 }
@@ -57,3 +68,7 @@ def test_quick_complete_endpoint_creates_and_completes_session(
     assert data['session_type'] == 'quick'
     assert data['template_color'] == '#123456'
     assert data['attributes']['session_data']['activity_ids']
+
+    instances = db_session.query(ActivityInstance).filter_by(session_id=data['id']).all()
+    assert len(instances) == activity_count
+    assert all(instance.completed for instance in instances)

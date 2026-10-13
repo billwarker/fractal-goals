@@ -240,8 +240,10 @@ request-scoped preloaded history projection.
 `goal_analytics_queries.py` owns relational analytics attribution; `GoalAnalyticsService`
 returns SQL aggregates by default and explicit chart buckets on demand (366 points for one
 goal, 120 per goal for multi-goal charts). Date/activity filters apply before aggregation.
-`SessionAnalyticsService` caps each evidence page at 500 instances within the requested
-latest-session window and reports continuation metadata; charts explicitly load more evidence.
+`SessionAnalyticsService` caps each evidence page at 500 instances within a paginated
+session window and reports continuation for both instances and older sessions. Analytics charts
+automatically traverse both continuations, merge session identities, and show loading/retry status
+until full history is available.
 `SessionListReadModel` remains available through the opt-in `view=summary` API. The Sessions
 page requests full session records so activities and notes render inline as each page loads,
 without a separate detail-expansion control. `WindowedSessionRow` retains measured spacers,
@@ -276,7 +278,9 @@ focus restoration, and viewport-safe repositioning through scroll and resize.
 Circuit runs follow the same selection, lifecycle, timing, removal, metric, and note contracts
 as regular session activities. The parent circuit owns its clock; rounds and members remain
 structural children, and circuit notes use canonical session-note targets rather than a parallel
-store. Quick-entry sessions remain activity-only; standard sessions and templates own the full
+store. Completing a quick session completes every active activity instance, including untimed ones;
+quick-entry cards have no individual completion control and use the shared session completion button.
+Quick-entry sessions remain activity-only; standard sessions and templates own the full
 circuit lifecycle. Detailed behavior is covered by the circuit component and service tests.
 
 ### SaaS and operations

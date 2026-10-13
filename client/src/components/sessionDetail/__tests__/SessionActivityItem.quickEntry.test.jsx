@@ -234,7 +234,7 @@ it('truncates long descriptions to one line and exposes the full value in a tool
         expect(descriptionLink).toHaveAttribute('href', description);
     });
 
-it('renders completion button and hides timer controls in quick mode', () => {
+it('hides individual completion and timer controls in quick mode', () => {
         renderWithProviders(
             <SessionActivityItem
                 exercise={{ ...baseExercise, metrics: [] }}
@@ -253,8 +253,8 @@ it('renders completion button and hides timer controls in quick mode', () => {
         expect(screen.queryByTitle('Start timer')).not.toBeInTheDocument();
         expect(screen.queryByTitle('Instant complete (0s duration)')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: '×' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: '✓ Complete' })).toBeInTheDocument();
-        expect(screen.getByText('Mark this activity complete when finished.')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: '✓ Complete' })).not.toBeInTheDocument();
+        expect(screen.getByText('This activity is completed when you complete the quick session.')).toBeInTheDocument();
     });
 
 it('keeps the completion button in the last timer action slot across timer states', () => {

@@ -241,11 +241,6 @@
     max-width: 100%;
 }
 
-.quickModeStatus {
-    display: flex;
-    align-items: center;
-}
-
 .timerMetaColumn {
     display: flex;
     flex-direction: row;

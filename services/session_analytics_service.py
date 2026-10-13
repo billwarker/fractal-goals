@@ -119,7 +119,7 @@ class SessionAnalyticsService:
             "metrics": copy.deepcopy(metric_values),
         }
 
-    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500) -> ServiceResult[JsonDict]:
+    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500, session_offset=0) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -135,7 +135,10 @@ class SessionAnalyticsService:
             Session.deleted_at == None,
         ).options(
             *self._analytics_session_read_options(),
-        ).order_by(*ordering).limit(clamped_limit).all()
+        ).order_by(*ordering).offset(session_offset).limit(clamped_limit + 1).all()
+
+        has_more_sessions = len(sessions) > clamped_limit
+        sessions = sessions[:clamped_limit]
 
         serialized_sessions = [serialize_session_for_analytics(session) for session in sessions]
         session_lookup = {
@@ -224,6 +227,8 @@ class SessionAnalyticsService:
             "sessions": serialized_sessions,
             "activity_instances": instances_by_activity,
             "limit": clamped_limit,
+            "session_pagination": {"limit": clamped_limit, "offset": session_offset,
+                                   "next_offset": session_offset + len(sessions) if has_more_sessions else None},
             "evidence_pagination": {"limit": page_size, "offset": instance_offset, "has_more": has_more,
                                     "next_offset": instance_offset + returned if has_more else None},
         }, None, 200

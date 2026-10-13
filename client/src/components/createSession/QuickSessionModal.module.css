@@ -20,6 +20,10 @@
     background: var(--color-bg-card);
 }
 
+.completeButton {
+    --completion-button-width: auto;
+}
+
 @media (max-width: 560px) {
     .body {
         padding: 0;

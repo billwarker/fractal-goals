@@ -4,6 +4,7 @@ import Button from '../atoms/Button';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
+import SessionCompletionButton from '../common/SessionCompletionButton';
 import { QuickSessionWorkspace } from '../sessionDetail';
 import styles from './QuickSessionModal.module.css';
 
@@ -43,14 +44,12 @@ function QuickSessionModal({
                 >
                     Cancel
                 </Button>
-                <Button
-                    variant="success"
+                <SessionCompletionButton
+                    pendingLabel="✓ Complete Quick Session"
                     onClick={onComplete}
                     isLoading={isSubmitting}
                     className={styles.completeButton}
-                >
-                    {isSubmitting ? 'Completing...' : 'Complete Quick Session'}
-                </Button>
+                />
             </ModalFooter>
         </Modal>
     );

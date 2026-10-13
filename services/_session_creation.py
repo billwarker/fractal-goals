@@ -722,7 +722,7 @@ class _SessionCreationMixin:
 
             if draft_instance.get('has_sets'):
                 update_payload = {
-                    'completed': bool(draft_instance.get('completed')),
+                    'completed': True,
                     'sets': draft_instance.get('sets', []),
                 }
                 if notes is not None:
@@ -751,7 +751,7 @@ class _SessionCreationMixin:
                     return None, metrics_error, metrics_status
 
             instance_payload = {
-                'completed': bool(draft_instance.get('completed')),
+                'completed': True,
             }
             if notes is not None:
                 instance_payload['notes'] = notes

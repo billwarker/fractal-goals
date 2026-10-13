@@ -272,7 +272,6 @@ function CreateSession() {
                 ...buildTemplateSessionPayload(selectedTemplate, null),
                 activity_instances: (queuedQuickSession.activityInstances || []).map((draftInstance) => ({
                     activity_definition_id: draftInstance.activity_definition_id,
-                    completed: Boolean(draftInstance.completed),
                     has_sets: Boolean(draftInstance.has_sets),
                     notes: draftInstance.notes || '',
                     metrics: sanitizeMetrics(draftInstance.metrics),

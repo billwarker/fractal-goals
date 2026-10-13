@@ -10,7 +10,7 @@ const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('../../utils/notify', () => ({ default: notify }));
 
 
-it('aligns every activity and circuit control after completing the session', async () => {
+it.each(['normal', 'quick'])('aligns activities and circuits after completing a %s session', async (sessionType) => {
     const queryClient = new QueryClient({
         defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
     });
@@ -33,7 +33,7 @@ it('aligns every activity and circuit control after completing the session', asy
     const { result } = renderHook(() => useSessionCompletion({
         rootId: 'root-1',
         sessionId: 'session-1',
-        session: { id: 'session-1', completed: false },
+        session: { id: 'session-1', completed: false, session_type: sessionType },
         sessionActivitiesKey: activitiesKey,
         queryClient,
         updateSession,
@@ -44,7 +44,7 @@ it('aligns every activity and circuit control after completing the session', asy
     expect(updateSession).toHaveBeenCalledWith({ completed: true });
     expect(queryClient.getQueryData(activitiesKey)).toEqual([
         { id: 'inst-1', completed: true, time_start: '2026-08-25T10:00:00Z' },
-        { id: 'inst-unstarted', completed: false, time_start: null },
+        { id: 'inst-unstarted', completed: sessionType === 'quick', time_start: null },
         { id: 'inst-2', completed: true },
     ]);
     expect(queryClient.getQueryData(circuitsKey)).toEqual([

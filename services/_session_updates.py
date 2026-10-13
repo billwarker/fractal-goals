@@ -184,6 +184,9 @@ class _SessionUpdatesMixin:
                         continue
                     if instance.completed:
                         continue
+                    if is_quick_session(session):
+                        instance.completed = True
+                        continue
                     if not instance.time_start:
                         continue
                     elif not instance.time_stop:

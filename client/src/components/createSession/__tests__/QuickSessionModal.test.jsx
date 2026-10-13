@@ -25,7 +25,7 @@ describe('QuickSessionModal', () => {
 
         expect(screen.getByRole('dialog', { name: 'Quick Session · Weigh Myself' })).toBeInTheDocument();
         expect(screen.getByTestId('quick-session-workspace')).toHaveTextContent('completion action: false');
-        fireEvent.click(screen.getByRole('button', { name: 'Complete Quick Session' }));
+        fireEvent.click(screen.getByRole('button', { name: '✓ Complete Quick Session' }));
         expect(onComplete).toHaveBeenCalledTimes(1);
     });
 

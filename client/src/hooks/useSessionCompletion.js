@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateValue } from '../utils/dateUtils';
+import { isQuickSession } from '../utils/sessionRuntime';
 import { logError } from '../utils/logger';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
@@ -35,7 +36,7 @@ export function useSessionCompletion({
                     Array.isArray(previous)
                         ? previous.map((instance) => ({
                             ...instance,
-                            completed: instance.completed || Boolean(instance.time_start),
+                            completed: isQuickSession(session) || instance.completed || Boolean(instance.time_start),
                         }))
                         : previous
                 ));

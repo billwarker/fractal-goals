@@ -255,8 +255,8 @@ class SessionService:
             }
         }, None, 200
 
-    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500) -> ServiceResult[JsonDict]:
-        return self._analytics_service().get_session_analytics_summary(root_id, current_user_id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit)
+    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500, session_offset=0) -> ServiceResult[JsonDict]:
+        return self._analytics_service().get_session_analytics_summary(root_id, current_user_id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit, session_offset=session_offset)
 
     def get_session_heatmap(self, root_id, current_user_id, filters=None) -> ServiceResult[JsonDict]:
         return self._analytics_service().get_session_heatmap(root_id, current_user_id, filters=filters)

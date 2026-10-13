@@ -183,14 +183,15 @@ def get_session_analytics_summary(current_user, root_id):
     try:
         try:
             limit = min(int(request.args.get('limit', 50)), 200)
+            session_offset = int(request.args.get('session_offset', 0))
             instance_offset = int(request.args.get('instance_offset', 0))
             instance_limit = min(int(request.args.get('instance_limit', 500)), 500)
-            if limit < 1 or instance_offset < 0 or instance_limit < 1:
+            if limit < 1 or session_offset < 0 or instance_offset < 0 or instance_limit < 1:
                 return jsonify({'error': 'Invalid pagination'}), 400
         except ValueError:
             return jsonify({"error": "Invalid limit"}), 400
 
-        result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit)
+        result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit, session_offset=session_offset)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return jsonify(result)

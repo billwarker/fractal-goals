@@ -76,7 +76,7 @@ describe('useAnalyticsPageData', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(queryClient.getQueryData([...queryKeys.analyticsSummary('root-1'), 'paged']).pages[0]).toMatchObject({
+        expect(queryClient.getQueryData([...queryKeys.analyticsSummary('root-1'), 'history']).pages[0]).toMatchObject({
             sessions: [{ id: 'session-1', name: 'Session A' }],
         });
         expect(queryClient.getQueryData(queryKeys.goalAnalytics('root-1'))).toEqual({ totals: { complete: 3 } });
@@ -93,26 +93,44 @@ describe('useAnalyticsPageData', () => {
         });
         expect(result.current.activityGroups).toEqual([{ id: 'group-1', name: 'Technique' }]);
     });
-    it('defers evidence and fetches additional pages only when requested', async () => {
+    it('defers evidence then automatically loads every instance and session page', async () => {
         const queryClient = createQueryClient();
         getGoalAnalytics.mockResolvedValue({ data: { goals: [] } });
         getActivities.mockResolvedValue({ data: [] });
         getActivityGroups.mockResolvedValue({ data: [] });
         getSessionAnalyticsSummary
-            .mockResolvedValueOnce({ data: { sessions: [], activity_instances: { a: [{ id: 'one' }] }, evidence_pagination: { next_offset: 500 } } })
-            .mockResolvedValueOnce({ data: { sessions: [], activity_instances: { a: [{ id: 'two' }] }, evidence_pagination: { next_offset: null } } });
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 'recent' }], activity_instances: { a: [{ id: 'one' }] }, evidence_pagination: { next_offset: 500 } } })
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 'recent' }], activity_instances: { a: [{ id: 'two' }] }, evidence_pagination: { next_offset: null }, session_pagination: { next_offset: 50 } } })
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 'older' }], activity_instances: { a: [{ id: 'three' }] }, session_pagination: { next_offset: null } } });
         const { result, rerender } = renderHook(({ enabled }) => useAnalyticsPageData('root', { needsSessionEvidence: enabled }), {
             initialProps: { enabled: false }, wrapper: createWrapper(queryClient),
         });
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(getSessionAnalyticsSummary).not.toHaveBeenCalled();
         rerender({ enabled: true });
-        await waitFor(() => expect(result.current.hasMoreEvidence).toBe(true));
-        expect(getSessionAnalyticsSummary).toHaveBeenCalledTimes(1);
-        await act(async () => { await result.current.loadMoreEvidence(); });
-        await waitFor(() => expect(result.current.activityInstances.a.map((row) => row.id)).toEqual(['one', 'two']));
-        expect(getSessionAnalyticsSummary).toHaveBeenLastCalledWith('root', { limit: 50, instance_offset: 500, instance_limit: 500 });
+        await waitFor(() => expect(result.current.activityInstances.a?.map((row) => row.id)).toEqual(['one', 'two', 'three']));
+        expect(getSessionAnalyticsSummary).toHaveBeenNthCalledWith(2, 'root', { limit: 50, session_offset: 0, instance_offset: 500, instance_limit: 500 });
+        expect(getSessionAnalyticsSummary).toHaveBeenLastCalledWith('root', { limit: 50, session_offset: 50, instance_offset: 0, instance_limit: 500 });
+        expect(result.current.sessions.map((row) => row.id)).toEqual(['recent', 'older']);
         expect(result.current.hasMoreEvidence).toBe(false);
+    });
+
+    it('preserves loaded history when a later page fails and allows retry', async () => {
+        getGoalAnalytics.mockResolvedValue({ data: {} });
+        getActivities.mockResolvedValue({ data: [] });
+        getActivityGroups.mockResolvedValue({ data: [] });
+        getSessionAnalyticsSummary
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 'recent' }], activity_instances: { a: [{ id: 'one' }] }, session_pagination: { next_offset: 50 } } })
+            .mockRejectedValueOnce(new Error('History unavailable'))
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 'older' }], activity_instances: { a: [{ id: 'two' }] } } });
+        const { result } = renderHook(() => useAnalyticsPageData('root'), { wrapper: createWrapper(createQueryClient()) });
+        await waitFor(() => expect(result.current.evidenceError?.message).toBe('History unavailable'));
+        expect(getSessionAnalyticsSummary).toHaveBeenCalledTimes(2);
+        expect(result.current.activityInstances.a.map((row) => row.id)).toEqual(['one']);
+        await act(async () => { await result.current.loadMoreEvidence(); });
+        await waitFor(() => expect(result.current.hasMoreEvidence).toBe(false));
+        expect(result.current.evidenceError).toBeNull();
+        expect(result.current.sessions.map((row) => row.id)).toEqual(['recent', 'older']);
     });
 
 });

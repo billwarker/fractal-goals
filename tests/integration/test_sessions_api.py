@@ -823,6 +823,8 @@ class TestSessionCRUDEndpoints:
         assert updated['completed'] is True
         assert updated['session_end'] is None
         assert updated['total_duration_seconds'] is None
+        instances = db_session.query(ActivityInstance).filter_by(session_id=created['id']).all()
+        assert instances and all(instance.completed for instance in instances)
 
     def test_create_session_persists_template_activities(
         self, authed_client, sample_goal_hierarchy, sample_session_template, sample_activity_definition
