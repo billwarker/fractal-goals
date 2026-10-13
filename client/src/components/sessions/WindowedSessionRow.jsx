@@ -1,15 +1,18 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 /** Keep measured spacers while expensive cards are outside the scroll viewport. */
 export default function WindowedSessionRow({ children, label, pinned = false }) {
     const row = useRef(null);
     const focusFromSpacer = useRef(false);
-    const [nearViewport, setNearViewport] = useState(typeof IntersectionObserver === 'undefined');
+    const [nearViewport, setNearViewport] = useState(true);
     const [focused, setFocused] = useState(false);
     const [height, setHeight] = useState(260);
     const mounted = nearViewport || pinned || focused;
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (typeof IntersectionObserver === 'undefined') return undefined;
+        const bounds = row.current.getBoundingClientRect();
+        if (bounds.height > 0) setHeight(bounds.height);
+        setNearViewport(bounds.bottom >= -800 && bounds.top <= window.innerHeight + 800);
         const observer = new IntersectionObserver(([entry]) => setNearViewport(entry.isIntersecting), { rootMargin: '800px' });
         observer.observe(row.current);
         return () => observer.disconnect();

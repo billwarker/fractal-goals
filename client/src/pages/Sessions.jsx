@@ -11,8 +11,7 @@ import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQuerie
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
 import usePersistedPaneOpen from '../hooks/usePersistedPaneOpen';
-import { SessionsQuerySidebar } from '../components/sessions';
-import SessionListCard from '../components/sessions/SessionListCard';
+import { SessionsQuerySidebar, SessionCardExpanded } from '../components/sessions';
 import WindowedSessionRow from '../components/sessions/WindowedSessionRow';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
@@ -341,7 +340,7 @@ function Sessions() {
                 />
 
                 <div className={styles.sessionsList}>
-                    {sessionsLoading || (sessionsFetching && !isFetchingNextPage) ? (
+                    {sessionsLoading ? (
                         <LoadingState label="Loading session data..." className={styles.loadingContainer} />
                     ) : sessionsError ? (
                         <EmptyState
@@ -363,7 +362,7 @@ function Sessions() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {visibleSessions.map((session) => (
                                 <WindowedSessionRow key={session.id} label={session.name} pinned={selectedSessionId === session.id}>
-                                <SessionListCard
+                                <SessionCardExpanded
                                     session={session}
                                     rootId={rootId}
                                     activities={activities}

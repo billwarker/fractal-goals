@@ -242,9 +242,12 @@ returns SQL aggregates by default and explicit chart buckets on demand (366 poin
 goal, 120 per goal for multi-goal charts). Date/activity filters apply before aggregation.
 `SessionAnalyticsService` caps each evidence page at 500 instances within the requested
 latest-session window and reports continuation metadata; charts explicitly load more evidence.
-`SessionListReadModel` serves `view=summary` cards, while `SessionListCard` fetches selected
-session details through the shared session query key. `WindowedSessionRow` retains measured
-spacers, selection and keyboard focus when offscreen cards unmount.
+`SessionListReadModel` remains available through the opt-in `view=summary` API. The Sessions
+page requests full session records so activities and notes render inline as each page loads,
+without a separate detail-expansion control. `WindowedSessionRow` retains measured spacers,
+selection and keyboard focus when offscreen cards unmount.
+Rows measure initial visibility before paint so visible cards appear immediately. Background
+session refreshes retain the loaded list instead of replacing it with a loading screen.
 
 `flowTreeLayout.js` owns geometry. `useFlowTreeGraph` memoizes it by ordered topology,
 layout mode and viewport class, separately from callbacks, colors and evidence presentation.

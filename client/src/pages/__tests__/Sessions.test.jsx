@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../test/test-utils';
 import Sessions from '../Sessions';
 
@@ -71,10 +71,6 @@ vi.mock('../../components/sessions', () => ({
     )
 }));
 
-vi.mock('../../components/sessions/SessionListCard', () => ({
-    default: ({ session }) => <div>expanded:{session.id}:instances:{session.activity_instances?.length || 0}</div>,
-}));
-
 vi.mock('../../components/sessionDetail/QuickSessionWorkspace', () => ({
     default: () => <div data-testid="quick-session-modal-content">quick session modal</div>,
 }));
@@ -142,6 +138,27 @@ describe('Sessions page data loading', () => {
         expect(screen.queryByText(/No sessions found/)).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
         expect(screen.queryByRole('contentinfo', { name: 'Session filter controls' })).not.toBeInTheDocument();
+    });
+
+    it('keeps loaded cards mounted during a background refresh', async () => {
+        const response = { data: {
+            sessions: [{ id: 's1', name: 'Session 1', activity_instances: [{ id: 'i1' }] }],
+            pagination: { limit: 10, offset: 0, total: 1, has_more: false },
+        } };
+        getSessions.mockResolvedValue(response);
+        getActivities.mockResolvedValue({ data: [] });
+        const { queryClient } = renderWithProviders(<Sessions />, {
+            route: '/root-1/sessions', path: '/:rootId/sessions',
+            withTimezone: false, withTheme: false,
+        });
+        const card = await screen.findByText('expanded:s1:instances:1');
+        let finishRefresh;
+        getSessions.mockImplementationOnce(() => new Promise((resolve) => { finishRefresh = resolve; }));
+        await act(async () => { void queryClient.invalidateQueries({ queryKey: ['sessions', 'root-1', 'search'] }); });
+        await waitFor(() => expect(finishRefresh).toBeDefined());
+        expect(screen.getByText('expanded:s1:instances:1')).toBe(card);
+        expect(screen.queryByText('Loading session data...')).not.toBeInTheDocument();
+        await act(async () => { finishRefresh(response); });
     });
 
     it('renders session cards while activity reference data is still loading', async () => {

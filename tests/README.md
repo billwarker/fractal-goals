@@ -470,6 +470,7 @@ The browser runner already creates its own disposable database.
 `tests/performance/test_history_scaling.py` checks 1k/5k/10k histories for bounded ORM hydration
 and exact aggregate totals. Payload/query budgets cover the summary session path, aggregate goal
 analytics and paged activity evidence. Browser performance fixtures have 150 goals and 120
-sessions; their gate checks response bytes, detail-request deferral, offscreen card unmounting
+sessions; their gate checks full inline records without per-card detail requests, response
+bytes, offscreen card unmounting,
 and a 500 ms maximum goal-selection long task in desktop/mobile Chromium. That local budget
 is a regression gate, not a mobile hardware or production latency certification.

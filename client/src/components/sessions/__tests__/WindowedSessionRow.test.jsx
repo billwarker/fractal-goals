@@ -11,7 +11,7 @@ it('unmounts offscreen content, pins selection, and restores keyboard focus from
     });
     const children = <a href="/session">Session details</a>;
     const { rerender, unmount } = render(<WindowedSessionRow label="Practice">{children}</WindowedSessionRow>);
-    expect(screen.queryByText('Session details')).not.toBeInTheDocument();
+    expect(screen.getByText('Session details')).toBeInTheDocument();
     act(() => visibility([{ isIntersecting: true }]));
     expect(screen.getByText('Session details')).toBeInTheDocument();
     act(() => visibility([{ isIntersecting: false }]));

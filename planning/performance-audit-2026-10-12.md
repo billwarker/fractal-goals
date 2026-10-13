@@ -309,3 +309,39 @@ candidate. Cross-worker aggregate caching or new indexes need deployment evidenc
 invalidation before adding them.
 
 Suggested commit: `perf: bound history reads and defer expensive UI work`
+
+## Follow-up: restore inline session contents
+
+At the user's request, the Sessions page now loads full session records again and renders
+activities and notes inline without the “Show activities and notes” button. The deferred
+`SessionListCard` wrapper and its placeholder/loading/retry props were removed. Windowing,
+pagination, tree geometry reuse, and bounded analytics/history reads remain in place.
+The summary API remains opt-in; the 90% list-response reduction above describes that API,
+not the current Sessions page. The browser gate now verifies inline detail delivery without
+per-card detail requests and keeps mounted cards bounded; its page budget allows full records.
+
+Quality audit: this restores the requested presentation with one canonical card component.
+Full list payloads again grow with selected sessions' nested details, an accepted tradeoff
+for inline loading. S+ production evidence and broader browser-suite gaps above still apply.
+Verification: 19 affected unit/page/hook tests and both desktop/mobile browser checks pass;
+lint and production build pass, with Sessions route JS at 219.5 KiB gzip. The browser tree
+selection check waits for the viewport animation to settle before choosing a visible node.
+
+Suggested commit: `fix: restore inline session activities and notes`
+
+## Follow-up: eliminate session-list flashes
+
+Visible rows now render their cards immediately and measure initial visibility/height in a
+layout effect before paint. This replaces the initial 260px “View session” button flash
+while retaining offscreen windowing and measured spacer heights. Loaded session cards also
+stay mounted during background refreshes; the loading screen applies only to the initial
+request. Regression coverage verifies immediate visible content, offscreen unmounting,
+keyboard focus, pinned selection, and stable card identity during refresh.
+Verification: 9 focused tests, both desktop/mobile browser checks, lint, and production
+build pass; Sessions static transfer remains within budget at 219.6 KiB JS gzip.
+
+Quality audit: these changes address two source-confirmed causes of visual flashes without
+adding another loading state or changing inline detail delivery. Production/mobile evidence
+and broader browser-suite gaps noted above remain the distance to S+.
+
+Suggested commit: `fix: prevent session cards flashing during load and refresh`

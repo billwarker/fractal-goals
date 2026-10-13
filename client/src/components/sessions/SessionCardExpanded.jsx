@@ -143,10 +143,6 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
     getGoalColor,
     formatDate,
     readOnly = false,
-    detailsDeferred = false,
-    detailsLoading = false,
-    detailsError = null,
-    onRetryDetails,
 
     progressSettingsOverride = undefined,
 }) {
@@ -388,13 +384,7 @@ const SessionCardExpanded = memo(function SessionCardExpanded({
 
             {/* Bottom Level: Session data with horizontal sections */}
             <div className={styles.cardBottomLevel}>
-                {detailsDeferred ? (
-                    <div style={{ padding: '12px 20px' }}>
-                        {detailsLoading ? <span role="status">Loading session details...</span>
-                            : detailsError ? <span role="alert">Details could not be loaded. <button type="button" onClick={(event) => { event.stopPropagation(); onRetryDetails?.(); }}>Retry</button></span>
-                                : <button type="button" onClick={(event) => { event.stopPropagation(); onSelect?.(session.id); }}>Show activities and notes</button>}
-                    </div>
-                ) : quickSession ? (
+                {quickSession ? (
                     quickActivities.length > 0 ? (
                         <div className={styles.quickActivityList}>
                             {quickActivities.map((activity, index) => {

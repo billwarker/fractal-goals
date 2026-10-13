@@ -121,7 +121,7 @@ function normalizeSessionSearchFilters(filters = {}) {
 
 export function useSessionsSearch(rootId, filters = {}, pageSize = 10) {
     const isReady = Boolean(rootId);
-    const normalizedFilters = { ...normalizeSessionSearchFilters(filters), view: 'summary' };
+    const normalizedFilters = normalizeSessionSearchFilters(filters);
 
     return useInfiniteQuery({
         queryKey: queryKeys.sessionsSearch(rootId, normalizedFilters),
