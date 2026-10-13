@@ -18,6 +18,7 @@ import { isSMART } from '../utils/smartHelpers';
 import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
+import { useGuardedLogout } from '../offline/OutboxContext';
 
 /**
  * Selection Page - Fractal Goal Selection
@@ -35,7 +36,8 @@ function Selection() {
     const [isAuthModalOpen, setAuthModalOpen] = useState(false);
     const [fractalToDelete, setFractalToDelete] = useState(null);
 
-    const { user, logout, isAuthenticated, loading: authLoading } = useAuth();
+    const { user, isAuthenticated, loading: authLoading } = useAuth();
+    const logout = useGuardedLogout();
     const { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { animatedIcons } = useTheme();
     const isMobile = useIsMobile();

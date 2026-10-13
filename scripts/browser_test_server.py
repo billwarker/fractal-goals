@@ -358,6 +358,10 @@ def main():
                 adjustments_root = f"browser-adjustments-root-{suffix}"
                 db.add(Goal(id=adjustments_root, root_id=adjustments_root, owner_id=user.id,
                             level_id=ultimate_level.id, name=f"Browser Adjustments {suffix}"))
+                # One active session per fractal: the offline spec gets its own.
+                offline_root = f"browser-offline-root-{suffix}"
+                db.add(Goal(id=offline_root, root_id=offline_root, owner_id=user.id,
+                            level_id=ultimate_level.id, name=f"Browser Offline {suffix}"))
             db.commit()
         from app import app
         from extensions import limiter

@@ -17,13 +17,10 @@ from services.activity_set_service import ActivitySetValidationError, replace_ac
 from services.work_interval_service import WorkIntervalConflict, WorkIntervalService
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
+from services.occurred_at import resolve_occurred_at
 from services.serializers import serialize_activity_instance, serialize_session
 from services.service_types import JsonDict, ServiceResult
 from services.timer_loading import activity_instance_query_options, session_query_options
-
-
-def _utc_now_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _parse_iso_datetime(value) -> datetime | None:
@@ -271,9 +268,11 @@ class TimerService:
             if self._is_circuit_child(instance.id):
                 return None, "Circuit child timing is owned by its circuit run", 409
 
-        start_time = _utc_now_naive()
         interval_service = WorkIntervalService(self.db_session)
         interval_service.lock_session(instance.session_id)
+        start_time, time_error = resolve_occurred_at(self.db_session, session_record, data.get('occurred_at'))
+        if time_error:
+            return None, time_error, 400
         running_circuit = self.db_session.query(CircuitRun.id).filter(
             CircuitRun.session_id == instance.session_id,
             CircuitRun.status.in_(("active", "paused")),
@@ -389,6 +388,7 @@ class TimerService:
         current_user_id,
         *,
         async_completion=False,
+        occurred_at=None,
     ) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
         if not root:
@@ -410,7 +410,9 @@ class TimerService:
         if quick_error:
             return None, *quick_error
 
-        now = _utc_now_naive()
+        now, time_error = resolve_occurred_at(self.db_session, session_record, occurred_at)
+        if time_error:
+            return None, time_error, 400
         interval_service = WorkIntervalService(self.db_session)
         open_interval = interval_service.get_open(instance.session_id)
         if open_interval and open_interval.activity_instance_id == instance.id:
@@ -631,7 +633,7 @@ class TimerService:
             "activity_name": activity_name,
         }, None, 200
 
-    def pause_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
+    def pause_session(self, root_id, session_id, current_user_id, *, occurred_at=None) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -649,7 +651,9 @@ class TimerService:
         if session.is_paused:
             return None, "Session is already paused", 400
 
-        now = _utc_now_naive()
+        now, time_error = resolve_occurred_at(self.db_session, session, occurred_at)
+        if time_error:
+            return None, time_error, 400
         session.is_paused = True
         session.last_paused_at = now
 
@@ -692,7 +696,7 @@ class TimerService:
             "serialized": serialize_session(refreshed),
         }, None, 200
 
-    def resume_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
+    def resume_session(self, root_id, session_id, current_user_id, *, occurred_at=None) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -710,7 +714,9 @@ class TimerService:
         if not session.is_paused:
             return None, "Session is not paused", 400
 
-        now = _utc_now_naive()
+        now, time_error = resolve_occurred_at(self.db_session, session, occurred_at)
+        if time_error:
+            return None, time_error, 400
         if session.last_paused_at:
             paused_duration = (now - session.last_paused_at).total_seconds()
             session.total_paused_seconds = (session.total_paused_seconds or 0) + int(paused_duration)

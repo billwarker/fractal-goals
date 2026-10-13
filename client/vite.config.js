@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 import bundleBudgets from './scripts/bundle-budgets.mjs'
 
 // https://vite.dev/config/
@@ -20,6 +21,33 @@ export default defineConfig(({ mode }) => {
       },
       react(),
       bundleBudgets(),
+      // App-shell precache so an open session survives reloads with no signal.
+      // API responses are never cached here: session data persists per user
+      // through the query cache, and writes through the offline outbox.
+      VitePWA({
+        registerType: 'prompt',
+        injectRegister: false,
+        manifest: {
+          name: 'Fractal Goals',
+          short_name: 'Fractal Goals',
+          description: 'Goals, programs, and training sessions in one app.',
+          start_url: '/',
+          scope: '/',
+          display: 'standalone',
+          background_color: '#121419',
+          theme_color: '#121419',
+          icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+        },
+        workbox: {
+          globPatterns: ['**/*.{js,css,html,svg,woff,woff2,ico}'],
+          navigateFallback: '/index.html',
+          navigateFallbackDenylist: [/^\/api\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
+          cleanupOutdatedCaches: true,
+          clientsClaim: false,
+          skipWaiting: false,
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        },
+      }),
     ],
     server: {
       proxy: {

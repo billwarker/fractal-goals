@@ -3,6 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PRIVACY_VERSION, TERMS_VERSION } from '../content/legal/legalVersions';
 import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
+import { isNetworkError } from '../utils/networkErrors';
+import { subscribeConnectivity } from '../offline/connectivity';
+import { clearPersistedQueryCache } from '../offline/queryPersistence';
+import { clearUserSnapshot, loadUserSnapshot } from '../offline/userSnapshot';
 import notify from '../utils/notify';
 import { logError } from '../utils/logger';
 import { isPublicLandingLocation } from '../utils/marketingHost';
@@ -12,6 +16,8 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    // Opened with no signal from the last user's on-device snapshot; re-verified when online.
+    const [offlineBoot, setOfflineBoot] = useState(false);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const location = useLocation();
@@ -35,6 +41,9 @@ export function AuthProvider({ children }) {
             if (isPublicLanding) return;
             authVersionRef.current += 1;
             clearAccessToken();
+            void clearPersistedQueryCache(userIdRef.current);
+            void clearUserSnapshot();
+            setOfflineBoot(false);
             replaceUser(null);
             setLoading(false);
             notify.error('Your session expired. Please log in again.');
@@ -63,20 +72,31 @@ export function AuthProvider({ children }) {
     const fetchCurrentUser = useCallback(async () => {
         const authVersion = authVersionRef.current;
         const isStaleAuthCheck = () => authVersionRef.current !== authVersion;
+        const bootFromSnapshot = async (error) => {
+            const snapshot = await loadUserSnapshot();
+            if (isStaleAuthCheck()) return;
+            if (snapshot) {
+                replaceUser(snapshot);
+                setOfflineBoot(true);
+            } else {
+                logError("Failed to fetch current user:", error);
+            }
+        };
 
         try {
             const res = await authApi.getMe();
             if (isStaleAuthCheck()) return;
             replaceUser(res.data);
+            setOfflineBoot(false);
             await authApi.getCsrf();
         } catch (err) {
             if (isStaleAuthCheck()) return;
 
             const status = err?.response?.status;
-            const isNetworkError = !err?.response;
+            const networkFailure = isNetworkError(err);
 
             // Keep token for transient network failures so interceptor retries can recover.
-            if (!isNetworkError && (status === 401 || status === 403)) {
+            if (!networkFailure && (status === 401 || status === 403)) {
                 try {
                     const refreshResponse = await authApi.refresh();
                     if (isStaleAuthCheck()) return;
@@ -88,11 +108,19 @@ export function AuthProvider({ children }) {
                         await authApi.getCsrf();
                         return;
                     }
-                } catch {
+                } catch (refreshError) {
                     if (isStaleAuthCheck()) return;
+                    if (isNetworkError(refreshError)) {
+                        await bootFromSnapshot(refreshError);
+                        return;
+                    }
                     clearAccessToken();
+                    void clearPersistedQueryCache(userIdRef.current);
+                    void clearUserSnapshot();
                     replaceUser(null);
                 }
+            } else if (networkFailure) {
+                await bootFromSnapshot(err);
             } else {
                 logError("Failed to fetch current user:", err);
             }
@@ -108,6 +136,13 @@ export function AuthProvider({ children }) {
         }
         fetchCurrentUser();
     }, [fetchCurrentUser, isPublicLanding]);
+
+    useEffect(() => {
+        if (!offlineBoot) return undefined;
+        return subscribeConnectivity((online) => {
+            if (online) void fetchCurrentUser();
+        });
+    }, [fetchCurrentUser, offlineBoot]);
 
     const login = async (usernameOrEmail, password, options = {}) => {
         try {
@@ -151,6 +186,9 @@ export function AuthProvider({ children }) {
     const endLocalSession = () => {
         authVersionRef.current += 1;
         clearAccessToken();
+        void clearPersistedQueryCache(userIdRef.current);
+        void clearUserSnapshot();
+        setOfflineBoot(false);
         replaceUser(null);
     };
 
@@ -179,7 +217,8 @@ export function AuthProvider({ children }) {
         logout,
         signOutEverywhere,
         setUser: replaceUser,
-        isAuthenticated: !!user
+        isAuthenticated: !!user,
+        isOfflineSession: offlineBoot,
     };
 
     return (

@@ -32,6 +32,7 @@ from .program import (
 from .calendar_period import CalendarPeriod, CALENDAR_PERIOD_KINDS
 from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, Note, EventLog, PageSurfaceLayout
 from .product_event import ProductEvent
+from .idempotency import IdempotencyRecord
 from .agent import (
     AgentOAuthClient, AgentGrant, AgentAuthorizationCode, AgentCredential,
     AgentTaskBrief, AgentProposal, AgentApproval, AgentRun, AgentOperation,

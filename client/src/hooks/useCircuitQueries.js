@@ -1,6 +1,10 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { isOnline } from '../offline/connectivity';
+import { useOutbox } from '../offline/OutboxContext';
+import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
+import { activeWorkConflictError, findRunningInstance, nowIso } from '../offline/sessionOps';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { refreshCircuitSessionConsumers, updateCircuitRunCache } from './circuitQueryCache';
@@ -96,7 +100,73 @@ export function useCircuitRunActions(rootId, sessionId) {
             await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, variables.action);
         },
     });
-    return { ...mutation, saveMemberMetrics };
+    const offline = useOfflineCircuitActions(rootId, sessionId, mutation.mutateAsync);
+    if (!offline) return { ...mutation, saveMemberMetrics };
+    return { ...mutation, mutateAsync: offline.mutateAsync, saveMemberMetrics: offline.saveMemberMetrics };
+}
+
+const QUEUED_RUN_ACTIONS = new Set(['startRun', 'completeRun', 'resetRun', 'deleteRun']);
+
+/** Device-first circuit timing and member results; structural edits wait for the queue and a connection. */
+function useOfflineCircuitActions(rootId, sessionId, directMutateAsync) {
+    const queryClient = useQueryClient();
+    const outbox = useOutbox();
+
+    return useMemo(() => {
+        if (!outbox || !rootId || !sessionId) return null;
+        const enqueue = (kind, request, meta, options) => {
+            const op = { scope: sessionId, kind, ...request, ...options, meta: { rootId, sessionId, ...meta } };
+            applyOptimistic(queryClient, op);
+            return outbox.submit(op);
+        };
+
+        const assertCanStart = (runId) => {
+            const session = queryClient.getQueryData(queryKeys.session(rootId, sessionId));
+            if (session?.is_paused) throw new Error('Resume the session before starting a circuit');
+            const runs = queryClient.getQueryData(queryKeys.sessionCircuitRuns(rootId, sessionId)) || [];
+            if (runs.some((run) => run.id !== runId && ['active', 'paused'].includes(run.status))) {
+                throw new Error('Another circuit is already active in this session');
+            }
+            const running = findRunningInstance(queryClient.getQueryData(queryKeys.sessionActivities(rootId, sessionId)));
+            if (running) throw activeWorkConflictError(running);
+        };
+
+        const mutateAsync = async (variables) => {
+            const { action, runId } = variables;
+            if (!QUEUED_RUN_ACTIONS.has(action)) {
+                if (!isOnline()) throw new Error('This change needs a connection');
+                await outbox.whenDrained(sessionId);
+                return directMutateAsync(variables);
+            }
+            if (action === 'startRun') assertCanStart(runId);
+            const occurredAt = nowIso();
+            const base = `/${rootId}/circuit-runs/${runId}`;
+            const request = {
+                startRun: { method: 'post', url: `${base}/start`, body: { occurred_at: occurredAt } },
+                completeRun: { method: 'post', url: `${base}/complete`, body: { occurred_at: occurredAt } },
+                resetRun: { method: 'patch', url: `${base}/timing`, body: { time_start: null, time_stop: null } },
+                deleteRun: { method: 'delete', url: base },
+            }[action];
+            await enqueue(SESSION_OP.CIRCUIT_RUN, request, { runId, action, occurredAt }, { entityIds: [runId] });
+            return { data: null };
+        };
+
+        const saveMemberMetrics = async ({ runId, memberId, metrics }) => {
+            await enqueue(
+                SESSION_OP.CIRCUIT_MEMBER,
+                {
+                    method: 'patch',
+                    url: `/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`,
+                    body: { metrics },
+                },
+                { runId, memberId, metrics },
+                { entityIds: [runId, memberId], coalesceKey: `circuit-member:${memberId}` },
+            );
+            return { data: null };
+        };
+
+        return { mutateAsync, saveMemberMetrics };
+    }, [directMutateAsync, outbox, queryClient, rootId, sessionId]);
 }
 
 

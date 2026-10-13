@@ -76,6 +76,13 @@
     transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
 }
 
+.syncIndicatorSlot {
+    position: fixed;
+    bottom: 52px;
+    right: 24px;
+    z-index: 999;
+}
+
 .autoSaveDefault {
     border-color: var(--color-text-muted);
     color: var(--color-text-muted);
@@ -199,7 +206,8 @@
 }
 
 @media (max-width: 1024px) {
-    .autoSaveIndicator {
+    .autoSaveIndicator,
+    .syncIndicatorSlot {
         right: 16px;
         bottom: 52px;
     }
@@ -261,7 +269,8 @@
         border-color: var(--color-brand-primary);
     }
 
-    .autoSaveIndicator {
+    .autoSaveIndicator,
+    .syncIndicatorSlot {
         bottom: calc(var(--mobile-session-footer-height) + var(--spacing-sm));
     }
 }

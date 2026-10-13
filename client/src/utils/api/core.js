@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { isPublicLandingLocation } from '../marketingHost';
+import { isNetworkError } from '../networkErrors';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -162,6 +163,7 @@ axios.interceptors.response.use(
                     return axios(originalRequest);
                 }
             } catch (csrfRefreshError) {
+                if (isNetworkError(csrfRefreshError)) return Promise.reject(csrfRefreshError);
                 clearAccessToken();
                 dispatchSessionExpired({ reason: 'csrf_expired' });
                 return Promise.reject(csrfRefreshError);
@@ -214,8 +216,12 @@ axios.interceptors.response.use(
 
                 return axios(originalRequest);
             } catch (refreshError) {
-                clearAccessToken();
                 processQueue(refreshError, null);
+                if (isNetworkError(refreshError)) {
+                    // Keep the refresh cookie and in-memory state; the next request retries.
+                    return Promise.reject(refreshError);
+                }
+                clearAccessToken();
                 dispatchSessionExpired({ reason: 'refresh_failed' });
                 return Promise.reject(refreshError);
             } finally {

@@ -127,6 +127,11 @@ class SessionUpdateSchema(BaseModel):
     goal_ids: Optional[List[str]] = None
 
 
+class SessionUpdateRequestSchema(SessionUpdateSchema):
+    """HTTP session update; ``occurred_at`` is when the user acted (offline replays arrive late)."""
+    occurred_at: Optional[str] = None
+
+
 class SessionGoalScopePreviewSchema(BaseModel):
     template_id: str = Field(..., min_length=1)
     program_day_id: Optional[str] = None

@@ -8,6 +8,8 @@ export const globalApi = {
     updateGoalLevel: (levelId, data) => axios.put(`${API_BASE}/goal-levels/${levelId}`, data),
     resetGoalLevel: (levelId) => axios.delete(`${API_BASE}/goal-levels/${levelId}`),
     getFeatureFlags: () => axios.get(`${API_BASE}/feature-flags`),
+    // Reachability only: no auth, no database.
+    probeHealth: () => axios.get(`${API_BASE}/healthz`, { timeout: 5000, _skipAuth: true }),
     getAnalyticsCatalog: () => axios.get(`${API_BASE}/analytics/catalog`),
     runAnalyticsQuery: (querySpec) => axios.post(`${API_BASE}/analytics/query/run`, { query_spec: querySpec }),
     getAnalyticsQueryProfiles: () => axios.get(`${API_BASE}/analytics/query-profiles`),

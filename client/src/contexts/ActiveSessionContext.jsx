@@ -5,6 +5,7 @@ import useSessionAchievementNotifications from '../hooks/useSessionAchievementNo
 import useSessionDetailData from '../hooks/useSessionDetailData';
 import useSessionDraftAutosave from '../hooks/useSessionDraftAutosave';
 import useSessionDetailMutations from '../hooks/useSessionDetailMutations';
+import useOfflineSessionWrites from '../hooks/useOfflineSessionWrites';
 import { queryKeys } from '../hooks/queryKeys';
 import { fractalApi } from '../utils/api';
 import { invalidateSessionLists } from '../utils/queryInvalidation';
@@ -248,11 +249,11 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
             scheduleStatusClear(3000);
         }
     });
-    const { mutateAsync: mutateSession } = updateSessionMutation;
-
+    // Resolved below once the draft setters exist; offline sync swaps in a device-first write.
+    const updateSessionRef = useRef(updateSessionMutation.mutateAsync);
     const saveSessionData = useCallback(
-        (nextData) => mutateSession({ session_data: nextData }),
-        [mutateSession],
+        (nextData) => updateSessionRef.current({ session_data: nextData }),
+        [],
     );
 
     const {
@@ -272,6 +273,32 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setDraggedItem,
         setSidePaneMode,
     });
+
+    const offlineWrites = useOfflineSessionWrites({
+        rootId,
+        sessionId,
+        session,
+        activities,
+        groupMap,
+        queryClient,
+        sessionActivitiesKey,
+        updateSessionDataDraft,
+        setSessionDataDraft,
+        setShowActivitySelector,
+    });
+
+    const updateSession = useMemo(() => {
+        if (!offlineWrites) return updateSessionMutation.mutateAsync;
+        return async (updates) => {
+            const result = await offlineWrites.updateSession(updates);
+            setAutoSaveStatus('saved');
+            scheduleStatusClear(2000);
+            return result;
+        };
+    }, [offlineWrites, scheduleStatusClear, updateSessionMutation.mutateAsync]);
+    useEffect(() => {
+        updateSessionRef.current = updateSession;
+    }, [updateSession]);
 
     const calculateTotalDuration = useCallback(() => calculateSessionItemDuration(
         activityInstances,
@@ -310,13 +337,14 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         sessionNotesKey,
         fractalTreeKey,
         activitiesKey,
-        updateSession: updateSessionMutation.mutateAsync,
+        updateSession,
         updateSessionDataDraft,
         setSessionDataDraft,
         setShowActivitySelector,
         setIsDeletingSession,
         instanceQueuesRef,
         instanceRollbackRef,
+        offlineWrites,
     });
 
     // 5. Effects
@@ -404,7 +432,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setLocalSessionData: setSessionDataDraft,
         refreshSession,
         refreshInstances,
-        updateSession: updateSessionMutation.mutateAsync,
+        updateSession,
         addActivity,
         removeActivity,
         updateInstance,
@@ -426,7 +454,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setSessionDataDraft,
         refreshSession,
         refreshInstances,
-        updateSessionMutation.mutateAsync,
+        updateSession,
         addActivity,
         removeActivity,
         updateInstance,

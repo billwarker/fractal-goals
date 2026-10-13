@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 from models import get_session
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
 from services.completion_handlers import get_recent_achievements, get_live_progress
 from services.progress_service import ProgressService
@@ -35,12 +36,18 @@ def _validation_error_response(error: ValidationError):
     return jsonify({"error": "Validation failed", "details": errors}), 400
 
 
+def _client_occurred_at():
+    body = request.get_json(silent=True)
+    return body.get('occurred_at') if isinstance(body, dict) else None
+
+
 # ============================================================================
 # ACTIVITY INSTANCE TIME TRACKING ENDPOINTS
 # ============================================================================
 
 @timers_bp.route('/<root_id>/activity-instances', methods=['GET', 'POST'])
 @token_required
+@idempotent
 def activity_instances(current_user, root_id):
     """Get all activity instances (GET) or create a new one (POST) if owned by user."""
     db_session = get_db_session()
@@ -83,6 +90,7 @@ def activity_instances(current_user, root_id):
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/start', methods=['POST'])
 @token_required
+@idempotent
 def start_activity_timer(current_user, root_id, instance_id):
     """Start the timer for an activity instance if owned by user."""
     db_session = get_db_session()
@@ -134,6 +142,7 @@ def start_activity_timer(current_user, root_id, instance_id):
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>/complete', methods=['POST'])
 @token_required
+@idempotent
 def complete_activity_instance(current_user, root_id, instance_id):
     """Complete an activity instance (sets stop time and marks as completed)."""
     db_session = get_db_session()
@@ -148,6 +157,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
             instance_id,
             current_user.id,
             async_completion=async_completion,
+            occurred_at=_client_occurred_at(),
         )
         if error:
             return jsonify({"error": error}), status
@@ -177,6 +187,7 @@ def complete_activity_instance(current_user, root_id, instance_id):
 
 @timers_bp.route('/<root_id>/activity-instances/<instance_id>', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(TimerActivityInstanceManualUpdateSchema)
 def update_activity_instance(current_user, root_id, instance_id, validated_data):
     """Update an activity instance manually if owned by user."""
@@ -210,12 +221,15 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
 
 @timers_bp.route('/<root_id>/timers/session/<session_id>/pause', methods=['POST'])
 @token_required
+@idempotent
 def pause_session(current_user, root_id, session_id):
     """Pause the session and all currently active activity instances."""
     db_session = get_db_session()
     service = TimerService(db_session)
     try:
-        payload, error, status = service.pause_session(root_id, session_id, current_user.id)
+        payload, error, status = service.pause_session(
+            root_id, session_id, current_user.id, occurred_at=_client_occurred_at(),
+        )
         if error:
             return jsonify({"error": error}), status
 
@@ -229,12 +243,15 @@ def pause_session(current_user, root_id, session_id):
 
 @timers_bp.route('/<root_id>/timers/session/<session_id>/resume', methods=['POST'])
 @token_required
+@idempotent
 def resume_session(current_user, root_id, session_id):
     """Resume the session and all currently paused activity instances."""
     db_session = get_db_session()
     service = TimerService(db_session)
     try:
-        payload, error, status = service.resume_session(root_id, session_id, current_user.id)
+        payload, error, status = service.resume_session(
+            root_id, session_id, current_user.id, occurred_at=_client_occurred_at(),
+        )
         if error:
             return jsonify({"error": error}), status
 

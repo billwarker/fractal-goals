@@ -27,6 +27,15 @@ const {
     },
 }));
 
+const { userSnapshot } = vi.hoisted(() => ({
+    userSnapshot: {
+        loadUserSnapshot: vi.fn(),
+        clearUserSnapshot: vi.fn(),
+    },
+}));
+
+vi.mock('../../offline/userSnapshot', () => userSnapshot);
+
 vi.mock('../../utils/api', () => ({
     authApi,
     setAccessToken,
@@ -91,6 +100,42 @@ describe('AuthContext cache boundary', () => {
         authApi.refresh.mockRejectedValue({ response: { status: 401 } });
         authApi.getCsrf.mockResolvedValue({});
         authApi.logout.mockResolvedValue({});
+        userSnapshot.loadUserSnapshot.mockResolvedValue(null);
+        userSnapshot.clearUserSnapshot.mockResolvedValue(undefined);
+    });
+
+    it('opens from the on-device snapshot when the boot check cannot reach the server', async () => {
+        authApi.getMe.mockRejectedValueOnce(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' }));
+        userSnapshot.loadUserSnapshot.mockResolvedValueOnce({ id: 'user-a', username: 'alpha' });
+
+        renderAuthHarness();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('user-id')).toHaveTextContent('user-a');
+        });
+        expect(clearAccessToken).not.toHaveBeenCalled();
+    });
+
+    it('stays signed out offline when this device has no snapshot', async () => {
+        authApi.getMe.mockRejectedValueOnce(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' }));
+
+        renderAuthHarness();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('loading')).toHaveTextContent('false');
+        });
+        expect(screen.getByTestId('user-id')).toHaveTextContent('none');
+    });
+
+    it('forgets the on-device snapshot on logout', async () => {
+        authApi.getMe.mockResolvedValueOnce({ data: { id: 'user-a' } });
+        renderAuthHarness();
+        await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('user-a'));
+
+        fireEvent.click(screen.getByText('Logout'));
+
+        await waitFor(() => expect(screen.getByTestId('user-id')).toHaveTextContent('none'));
+        expect(userSnapshot.clearUserSnapshot).toHaveBeenCalled();
     });
 
     it('refreshes a remembered browser session when the boot-time me request is stale', async () => {

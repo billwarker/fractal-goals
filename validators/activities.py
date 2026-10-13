@@ -218,6 +218,7 @@ class ActivityTimerStartSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     target_duration_seconds: Optional[int] = None
     switch: bool = False
+    occurred_at: Optional[str] = None
 
     @field_validator('target_duration_seconds')
     @classmethod

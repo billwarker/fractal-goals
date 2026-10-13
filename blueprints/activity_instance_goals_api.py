@@ -1,6 +1,7 @@
 """HTTP boundary for explicit execution-to-goal links."""
 from flask import Blueprint
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, service_response as _service_response
 from validators import validate_request
 from validators.activities import ActivityInstanceGoalSchema
@@ -21,6 +22,7 @@ def get_instance_goals(current_user, root_id, instance_id):
 
 @instance_goals_bp.route('/<root_id>/activity-instances/<instance_id>/goals', methods=['POST'])
 @token_required
+@idempotent
 @validate_request(ActivityInstanceGoalSchema)
 def associate_instance_goal(current_user, root_id, instance_id, validated_data):
     session = get_db_session()
@@ -32,6 +34,7 @@ def associate_instance_goal(current_user, root_id, instance_id, validated_data):
 
 @instance_goals_bp.route('/<root_id>/activity-instances/<instance_id>/goals/<goal_id>', methods=['DELETE'])
 @token_required
+@idempotent
 def disassociate_instance_goal(current_user, root_id, instance_id, goal_id):
     session = get_db_session()
     try:

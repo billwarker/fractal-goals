@@ -9,13 +9,14 @@ from models import (
 )
 from validators import (
     validate_request,
-    SessionCreateSchema, SessionUpdateSchema,
+    SessionCreateSchema, SessionUpdateRequestSchema,
     ActivityInstanceCreateSchema, ActivityInstanceUpdateSchema,
     ActivityMetricsUpdateSchema, ActivityReorderSchema,
     QuickSessionCompleteSchema,
     SessionGoalScopePreviewSchema,
 )
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error, require_owned_root
 from services.serializers import serialize_activity_instance
 from services.session_service import SessionService
@@ -271,6 +272,7 @@ def get_flowtree_session_metrics(current_user, root_id):
 
 @sessions_bp.route('/<root_id>/sessions', methods=['POST'])
 @token_required
+@idempotent
 @validate_request(SessionCreateSchema)
 def create_fractal_session(current_user, root_id, validated_data):
     """Create a new session within a fractal."""
@@ -324,6 +326,7 @@ def preview_session_goal_scope(current_user, root_id, validated_data):
 
 @sessions_bp.route('/<root_id>/sessions/quick-complete', methods=['POST'])
 @token_required
+@idempotent
 @validate_request(QuickSessionCompleteSchema)
 def complete_quick_session(current_user, root_id, validated_data):
     """Create and complete a quick session in one request."""
@@ -344,7 +347,8 @@ def complete_quick_session(current_user, root_id, validated_data):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['PUT'])
 @token_required
-@validate_request(SessionUpdateSchema)
+@idempotent
+@validate_request(SessionUpdateRequestSchema)
 def update_session(current_user, root_id, session_id, validated_data):
     """Update a session's details."""
     db_session = get_db_session()
@@ -398,6 +402,7 @@ def get_session_endpoint(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['DELETE'])
 @token_required
+@idempotent
 def delete_session_endpoint(current_user, root_id, session_id):
     """Delete a session."""
     db_session = get_db_session()
@@ -459,6 +464,7 @@ def get_session_activities(current_user, root_id, session_id):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities', methods=['POST'])
 @token_required
+@idempotent
 @validate_request(ActivityInstanceCreateSchema)
 def add_activity_to_session(current_user, root_id, session_id, validated_data):
     """Add a new activity instance to a session."""
@@ -480,6 +486,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/reorder', methods=['POST'])
 @token_required
+@idempotent
 @validate_request(ActivityReorderSchema)
 def reorder_activities(current_user, root_id, session_id, validated_data):
     """Reorder activities in a session."""
@@ -505,6 +512,7 @@ def reorder_activities(current_user, root_id, session_id, validated_data):
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(ActivityInstanceUpdateSchema)
 def update_activity_instance_in_session(current_user, root_id, session_id, instance_id, validated_data):
     """Update activity instance in session context."""
@@ -531,6 +539,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>', methods=['DELETE'])
 @token_required
+@idempotent
 def remove_activity_from_session(current_user, root_id, session_id, instance_id):
     """Remove an activity instance from a session."""
     db_session = get_db_session()
@@ -555,6 +564,7 @@ def remove_activity_from_session(current_user, root_id, session_id, instance_id)
 
 @sessions_bp.route('/<root_id>/sessions/<session_id>/activities/<instance_id>/metrics', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(ActivityMetricsUpdateSchema)
 def update_activity_metrics(current_user, root_id, session_id, instance_id, validated_data):
     """Replace the activity instance's metric set with the payload's metric rows."""

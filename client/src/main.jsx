@@ -13,6 +13,8 @@ const queryClient = new QueryClient({
             gcTime: 1000 * 60 * 5,
             retry: 1,
             refetchOnWindowFocus: false,
+            // Serve cached data while offline instead of parking queries in a paused state.
+            networkMode: 'offlineFirst',
         },
     },
 });

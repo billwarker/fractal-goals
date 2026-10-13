@@ -134,6 +134,27 @@ def serve_vite_svg():
     return send_from_directory(CLIENT_BUILD_DIR, 'vite.svg')
 
 
+# App-shell files the offline service worker precaches. The worker itself and
+# its manifest must always revalidate so a deploy can replace them.
+@pages_bp.route('/sw.js')
+@pages_bp.route('/manifest.webmanifest')
+def serve_service_worker_files():
+    response = send_from_directory(CLIENT_BUILD_DIR, request.path.lstrip('/'))
+    response.headers['Cache-Control'] = 'no-cache'
+    return response
+
+
+@pages_bp.route('/workbox-<name>')
+@pages_bp.route('/favicon.svg')
+def serve_app_shell_files(name=None):
+    return send_from_directory(CLIENT_BUILD_DIR, request.path.lstrip('/'))
+
+
+@pages_bp.route('/index.html')
+def serve_index_html():
+    return render_react_app()
+
+
 @pages_bp.route('/admin')
 @pages_bp.route('/reset-password')
 @pages_bp.route('/terms')

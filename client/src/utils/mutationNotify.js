@@ -1,5 +1,6 @@
 import notify from './notify';
 import { logError } from '../utils/logger';
+import { isNetworkError } from './networkErrors';
 
 function formatStructuredError(value) {
     if (!value) {
@@ -51,6 +52,9 @@ export function formatError(error, fallbackMessage = 'Unknown error') {
     }
     if (error?.code === 'ECONNABORTED') {
         return 'The request timed out. Refresh to check whether it completed before retrying.';
+    }
+    if (isNetworkError(error)) {
+        return "You're offline. This change needs a connection; try again when you're back online.";
     }
     return (
         formatStructuredError(error?.response?.data?.error)

@@ -30,6 +30,14 @@ class NoteCreateSchema(BaseModel):
         return sanitize_note_content(v)
 
 
+class NoteCreateRequestSchema(NoteCreateSchema):
+    """HTTP note creation; adds a client-minted id so offline notes can be edited before they sync."""
+    id: Optional[str] = Field(
+        None,
+        pattern=r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    )
+
+
 class NoteUpdateSchema(BaseModel):
     """Schema for updating a note."""
     content: Optional[str] = Field(None, min_length=1, max_length=MAX_DESCRIPTION_LENGTH)

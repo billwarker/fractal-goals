@@ -11,11 +11,12 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from extensions import limiter
-from models import get_engine, get_session
+from models import Note, get_engine, get_session
 from services.note_service import NoteService
 from services.oembed_service import get_instagram_oembed
-from validators import NoteCreateSchema, NoteUpdateSchema, validate_request
+from validators import NoteCreateRequestSchema, NoteUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -143,10 +144,14 @@ def get_activity_history(current_user, root_id, activity_id):
 
 @notes_bp.route('/<root_id>/notes', methods=['POST'])
 @token_required
-@validate_request(NoteCreateSchema)
+@idempotent
+@validate_request(NoteCreateRequestSchema)
 def create_note(current_user, root_id, validated_data):
     db_session, note_service = _with_note_service()
     try:
+        # Client-minted ids (offline notes) must be new; replays are handled by @idempotent.
+        if validated_data.get('id') and db_session.get(Note, validated_data['id']) is not None:
+            return jsonify({"error": "A note with this id already exists"}), 409
         payload, error, status = note_service.create_note(root_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
@@ -161,6 +166,7 @@ def create_note(current_user, root_id, validated_data):
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(NoteUpdateSchema)
 def update_note(current_user, root_id, note_id, validated_data):
     db_session, note_service = _with_note_service()
@@ -179,6 +185,7 @@ def update_note(current_user, root_id, note_id, validated_data):
 
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['DELETE'])
 @token_required
+@idempotent
 def delete_note(current_user, root_id, note_id):
     db_session, note_service = _with_note_service()
     try:
@@ -260,6 +267,7 @@ def get_all_notes(current_user, root_id):
 
 @notes_bp.route('/<root_id>/notes/<note_id>/pin', methods=['PUT'])
 @token_required
+@idempotent
 def pin_note(current_user, root_id, note_id):
     db_session, note_service = _with_note_service()
     try:
@@ -277,6 +285,7 @@ def pin_note(current_user, root_id, note_id):
 
 @notes_bp.route('/<root_id>/notes/<note_id>/unpin', methods=['PUT'])
 @token_required
+@idempotent
 def unpin_note(current_user, root_id, note_id):
     db_session, note_service = _with_note_service()
     try:

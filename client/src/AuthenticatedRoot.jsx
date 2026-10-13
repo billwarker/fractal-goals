@@ -6,6 +6,9 @@ import AppRouter from './AppRouter';
 import ApplicationProviders from './ApplicationProviders';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { DebugProvider, useDebug } from './contexts/DebugContext';
+import { installConnectivity } from './offline/connectivity';
+
+installConnectivity();
 
 const ReactQueryDevtools = lazy(() => import('@tanstack/react-query-devtools').then((module) => ({
     default: module.ReactQueryDevtools,

@@ -6,6 +6,7 @@ import { GoalsProvider } from './contexts/GoalsContext';
 import { OnboardingProvider } from './contexts/OnboardingContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { TimezoneProvider } from './contexts/TimezoneContext';
+import { OutboxProvider } from './offline/OutboxContext';
 
 // Canonical data/provider envelope shared by the authenticated app and the
 // public landing experience. Keeping this composition in one place prevents
@@ -15,15 +16,17 @@ export default function ApplicationProviders({ children }) {
     return (
         <TimezoneProvider>
             <AuthProvider>
-                <OnboardingProvider>
-                    <GoalLevelsProvider>
-                        <GoalsProvider>
-                            <ThemeProvider>
-                                <ActivitiesProvider>{children}</ActivitiesProvider>
-                            </ThemeProvider>
-                        </GoalsProvider>
-                    </GoalLevelsProvider>
-                </OnboardingProvider>
+                <OutboxProvider>
+                    <OnboardingProvider>
+                        <GoalLevelsProvider>
+                            <GoalsProvider>
+                                <ThemeProvider>
+                                    <ActivitiesProvider>{children}</ActivitiesProvider>
+                                </ThemeProvider>
+                            </GoalsProvider>
+                        </GoalLevelsProvider>
+                    </OnboardingProvider>
+                </OutboxProvider>
             </AuthProvider>
         </TimezoneProvider>
     );

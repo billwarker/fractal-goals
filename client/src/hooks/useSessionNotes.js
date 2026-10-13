@@ -5,7 +5,11 @@
  * Fetches both current session notes and previous notes for activity definitions.
  */
 
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useOutbox } from '../offline/OutboxContext';
+import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
+import { nowIso } from '../offline/sessionOps';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
@@ -18,7 +22,70 @@ import { queryKeys } from './queryKeys';
  */
 export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
     const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
+
+    // Session notes are written device-first when offline sync is on.
+    const offlineNotes = useMemo(() => {
+        if (!outbox || !rootId || !sessionId) return null;
+        const enqueue = (kind, request, meta, options = {}) => {
+            const op = {
+                scope: sessionId,
+                kind,
+                ...request,
+                ...options,
+                meta: { rootId, sessionId, ...meta },
+            };
+            applyOptimistic(queryClient, op);
+            return outbox.submit(op);
+        };
+        return {
+            addNote: async (data) => {
+                const id = crypto.randomUUID();
+                const at = nowIso();
+                const note = {
+                    id,
+                    root_id: rootId,
+                    context_type: data.context_type,
+                    context_id: data.context_id,
+                    session_id: data.session_id || sessionId,
+                    activity_instance_id: data.activity_instance_id || null,
+                    activity_definition_id: data.activity_definition_id || null,
+                    activity_set_id: data.activity_set_id || null,
+                    goal_id: data.goal_id || null,
+                    content: data.content,
+                    pinned_at: null,
+                    created_at: at,
+                    updated_at: at,
+                    _pendingSync: true,
+                };
+                await enqueue(
+                    SESSION_OP.NOTE_CREATE,
+                    { method: 'post', url: `/${rootId}/notes`, body: { ...data, id } },
+                    { note },
+                    { creates: [id], entityIds: data.activity_instance_id ? [data.activity_instance_id] : [] },
+                );
+                return { data: note };
+            },
+            updateNote: async (noteId, content) => {
+                await enqueue(
+                    SESSION_OP.NOTE_UPDATE,
+                    { method: 'put', url: `/${rootId}/notes/${noteId}`, body: { content } },
+                    { noteId },
+                    { entityIds: [noteId], coalesceKey: `note:${noteId}:content` },
+                );
+                return { data: { id: noteId, content } };
+            },
+            deleteNote: async (noteId) => {
+                await enqueue(
+                    SESSION_OP.NOTE_DELETE,
+                    { method: 'delete', url: `/${rootId}/notes/${noteId}` },
+                    { noteId },
+                    { entityIds: [noteId] },
+                );
+            },
+        };
+    }, [outbox, queryClient, rootId, sessionId]);
 
     // Query for current session notes
     const {
@@ -119,9 +186,15 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         previousSessionNotes,
         loading: notesLoading || prevSessionLoading,
         error: notesError,
-        addNote: (data) => addNoteMutation.mutateAsync(data),
-        updateNote: (id, content) => updateNoteMutation.mutateAsync({ noteId: id, content }),
-        deleteNote: (id) => deleteNoteMutation.mutateAsync(id),
+        addNote: (data) => (
+            offlineNotes && (!data.session_id || data.session_id === sessionId)
+                ? offlineNotes.addNote(data)
+                : addNoteMutation.mutateAsync(data)
+        ),
+        updateNote: (id, content) => (
+            offlineNotes ? offlineNotes.updateNote(id, content) : updateNoteMutation.mutateAsync({ noteId: id, content })
+        ),
+        deleteNote: (id) => (offlineNotes ? offlineNotes.deleteNote(id) : deleteNoteMutation.mutateAsync(id)),
         refreshNotes
     };
 }

@@ -10,6 +10,7 @@ from services.circuit_completion import (
 )
 from services.circuit_timing import parse_circuit_time
 from services.events import Event, Events, event_bus
+from services.occurred_at import resolve_occurred_at
 from services.serializers import serialize_circuit_run
 from services.work_interval_service import WorkIntervalService, utc_now_naive
 
@@ -59,7 +60,7 @@ class CircuitRunTimingOperations:
             return None, "Circuit timing overlaps another circuit", 409
         return None
 
-    def start(self, root_id, run_id, user_id):
+    def start(self, root_id, run_id, user_id, *, occurred_at=None):
         locked = self.owner._authorized_locked_run(root_id, run_id, user_id)
         if isinstance(locked, tuple) and len(locked) == 3:
             return locked
@@ -73,8 +74,11 @@ class CircuitRunTimingOperations:
         conflict = self._active_conflict(run)
         if conflict:
             return conflict
+        started_at, time_error = resolve_occurred_at(self.db_session, session, occurred_at)
+        if time_error:
+            return None, time_error, 400
         run.status = "active"
-        run.time_start = utc_now_naive()
+        run.time_start = started_at
         run.time_stop = None
         run.duration_seconds = None
         self.db_session.commit()
@@ -158,14 +162,22 @@ class CircuitRunTimingOperations:
         }, source="circuit_service.update_run_timing"))
         return serialize_circuit_run(self.owner._run(root_id, run.id)), None, 200
 
-    def complete(self, root_id, run_id, user_id):
+    def complete(self, root_id, run_id, user_id, *, occurred_at=None):
         locked = self.owner._authorized_locked_run(root_id, run_id, user_id)
         if isinstance(locked, tuple) and len(locked) == 3:
             return locked
-        run, _session = locked
+        run, session = locked
         if run.status == "completed":
             return serialize_circuit_run(run), None, 200
-        now = utc_now_naive()
+        run_floors = [value for value in (run.time_start, run.last_paused_at) if value is not None]
+        now, time_error = resolve_occurred_at(
+            self.db_session,
+            session,
+            occurred_at,
+            extra_floor=max(run_floors) if run_floors else None,
+        )
+        if time_error:
+            return None, time_error, 400
         if not run.time_start:
             run.time_start = now
         if run.time_start > now:

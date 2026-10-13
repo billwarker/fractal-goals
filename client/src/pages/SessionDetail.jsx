@@ -16,6 +16,7 @@ import { isQuickSession } from '../utils/sessionRuntime';
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
+import SessionSyncIndicator from '../components/sessionDetail/SessionSyncIndicator';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 /**
@@ -93,6 +94,22 @@ function SessionDetailContent() {
         isDuplicatingSession,
         activityGoalScope,
     } = useSessionDetailController({ rootId, sessionId, navigate, isMobile });
+
+    const autoSavePill = autoSaveStatus ? (
+        <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
+            {autoSaveStatus === 'saving' && 'Saving changes...'}
+            {autoSaveStatus === 'saved' && 'Saved'}
+            {autoSaveStatus === 'error' && 'Save failed'}
+        </div>
+    ) : null;
+    // With offline sync on, the sync indicator owns this slot and falls back to the save pill.
+    const saveStatusIndicator = (
+        <SessionSyncIndicator
+            sessionId={sessionId}
+            fallback={autoSavePill}
+            className={styles.syncIndicatorSlot}
+        />
+    );
     const isCompleted = Boolean(session?.attributes?.completed);
 
     useEffect(() => {
@@ -202,13 +219,7 @@ function SessionDetailContent() {
                     isDuplicatingSession={isDuplicatingSession}
                 />
 
-                {autoSaveStatus && (
-                    <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
-                        {autoSaveStatus === 'saving' && 'Saving changes...'}
-                        {autoSaveStatus === 'saved' && 'Saved'}
-                        {autoSaveStatus === 'error' && 'Save failed'}
-                    </div>
-                )}
+                {saveStatusIndicator}
             </div>
         );
     }
@@ -292,13 +303,7 @@ function SessionDetailContent() {
                 isDuplicatingSession={isDuplicatingSession}
             />
 
-            {autoSaveStatus && (
-                <div className={`${styles.autoSaveIndicator} ${autoSaveStatus === 'saved' ? styles.autoSaveSaved : autoSaveStatus === 'error' ? styles.autoSaveError : styles.autoSaveDefault}`}>
-                    {autoSaveStatus === 'saving' && 'Saving changes...'}
-                    {autoSaveStatus === 'saved' && 'Saved'}
-                    {autoSaveStatus === 'error' && 'Save failed'}
-                </div>
-            )}
+            {saveStatusIndicator}
 
             {isMobile && (
                 <SessionDetailMobileDock

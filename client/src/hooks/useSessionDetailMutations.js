@@ -37,6 +37,7 @@ export function useSessionDetailMutations({
     setIsDeletingSession,
     instanceQueuesRef,
     instanceRollbackRef,
+    offlineWrites = null,
 }) {
     const goalsKey = queryKeys.goals(rootId);
     const goalsForSelectionKey = queryKeys.goalsForSelection(rootId);
@@ -371,6 +372,13 @@ export function useSessionDetailMutations({
         }
     });
 
+    // Device-first when offline sync is on; otherwise a direct, awaited write.
+    const writeInstance = useCallback((instanceId, updates) => (
+        offlineWrites
+            ? offlineWrites.updateInstance(instanceId, updates)
+            : updateInstanceMutation.mutateAsync({ instanceId, updates })
+    ), [offlineWrites, updateInstanceMutation]);
+
     const getInstanceQueue = useCallback((instanceId) => {
         if (!instanceId) return null;
         const existing = instanceQueuesRef.current.get(instanceId);
@@ -629,34 +637,25 @@ export function useSessionDetailMutations({
 
         try {
             if (Array.isArray(instance.sets) && instance.sets.length > 0) {
-                await updateInstanceMutation.mutateAsync({
-                    instanceId,
-                    updates: {
-                        sets: [],
-                        completed: false,
-                        time_start: null,
-                        time_stop: null,
-                        duration_seconds: null,
-                        target_duration_seconds: null,
-                    },
+                await writeInstance(instanceId, {
+                    sets: [],
+                    completed: false,
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: null,
+                    target_duration_seconds: null,
                 });
             } else {
                 const flatMetrics = instance.metrics || instance.metric_values || [];
                 if (Array.isArray(flatMetrics) && flatMetrics.length > 0) {
-                    await updateInstanceMutation.mutateAsync({
-                        instanceId,
-                        updates: { metrics: [] },
-                    });
+                    await writeInstance(instanceId, { metrics: [] });
                 }
-                await updateInstanceMutation.mutateAsync({
-                    instanceId,
-                    updates: {
-                        completed: false,
-                        time_start: null,
-                        time_stop: null,
-                        duration_seconds: null,
-                        target_duration_seconds: null,
-                    },
+                await writeInstance(instanceId, {
+                    completed: false,
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: null,
+                    target_duration_seconds: null,
                 });
             }
             notify.success('Activity values cleared');
@@ -670,7 +669,7 @@ export function useSessionDetailMutations({
         activityInstances,
         queryClient,
         sessionActivitiesKey,
-        updateInstanceMutation,
+        writeInstance,
     ]);
 
     const copyActivityValuesFromSource = useCallback(async (targetInstanceId, sourceInstance) => {
@@ -690,16 +689,10 @@ export function useSessionDetailMutations({
 
         try {
             if (copiedSets.length > 0 || Array.isArray(targetInstance.sets)) {
-                await updateInstanceMutation.mutateAsync({
-                    instanceId: targetInstanceId,
-                    updates: { sets: copiedSets },
-                });
+                await writeInstance(targetInstanceId, { sets: copiedSets });
             }
 
-            await updateInstanceMutation.mutateAsync({
-                instanceId: targetInstanceId,
-                updates: { metrics: copiedMetrics },
-            });
+            await writeInstance(targetInstanceId, { metrics: copiedMetrics });
 
             notify.success('Copied values from previous instance');
             return targetInstanceId;
@@ -712,7 +705,7 @@ export function useSessionDetailMutations({
         activityInstances,
         queryClient,
         sessionActivitiesKey,
-        updateInstanceMutation,
+        writeInstance,
     ]);
 
     const copyActivityValuesFromInstance = useCallback(async (targetInstanceId, sourceInstanceId) => {
@@ -753,11 +746,11 @@ export function useSessionDetailMutations({
     }, [activitiesKey, invalidateGoalQueries, queryClient, rootId, sessionKey]);
 
     return {
-        addActivity: handleAddActivity,
-        removeActivity: removeActivityMutation.mutate,
-        updateInstance: enqueueInstanceUpdate,
-        updateTimer: handleUpdateTimer,
-        duplicateActivityInstance,
+        addActivity: offlineWrites?.addActivity || handleAddActivity,
+        removeActivity: offlineWrites?.removeActivity || removeActivityMutation.mutate,
+        updateInstance: offlineWrites?.updateInstance || enqueueInstanceUpdate,
+        updateTimer: offlineWrites?.updateTimer || handleUpdateTimer,
+        duplicateActivityInstance: offlineWrites?.duplicateActivityInstance || duplicateActivityInstance,
         clearActivityInstanceValues,
         copyActivityValuesFromSource,
         copyActivityValuesFromInstance,
@@ -767,8 +760,8 @@ export function useSessionDetailMutations({
         reorderActivity: handleReorderActivity,
         moveActivity: handleMoveActivity,
         deleteSession: deleteSessionMutation.mutateAsync,
-        pauseSession: pauseSessionMutation.mutateAsync,
-        resumeSession: resumeSessionMutation.mutateAsync,
+        pauseSession: offlineWrites?.pauseSession || pauseSessionMutation.mutateAsync,
+        resumeSession: offlineWrites?.resumeSession || resumeSessionMutation.mutateAsync,
         toggleSessionComplete: handleToggleSessionComplete,
     };
 }

@@ -37,6 +37,7 @@ Key decisions:
 - [PostgreSQL-first persistence](docs/architecture/ADR_0001_POSTGRES_FIRST.md)
 - [React Query as the client data layer](docs/architecture/ADR_0002_REACT_QUERY_CANONICAL_DATA_LAYER.md)
 - [Analytics service ownership](docs/architecture/ADR_0003_ANALYTICS_SERVICE_TOPOLOGY.md)
+- [Device-first writes for open sessions](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md)
 - [Database migration policy](docs/architecture/MIGRATION_POLICY.md)
 - [Backup and restore runbook](docs/architecture/BACKUP_RESTORE_RUNBOOK.md)
 
@@ -54,7 +55,10 @@ The normal flow is:
 
 Remote records live in TanStack Query. Components do not mirror API collections into context
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
-affected read models.
+affected read models. In-session writes go through the per-user outbox (`client/src/offline/`)
+instead. They patch the cache, persist, and sync in
+order with `Idempotency-Key` and `occurred_at`; the session's queries are invalidated once its
+queue drains. See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 
 Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx` (a fixed,
 portalled full-width footer button) and the `--mobile-page-footer-height` / `--mobile-sidebar-height`
@@ -152,7 +156,10 @@ terminal timer boundary: its open ordinary activity work interval is closed in t
 transaction before the session is committed; circuit-child timing remains owned by the circuit
 clock. Completing a paused session ends it at the pause boundary (`last_paused_at`), not the click:
 `session_end`, paused activity timers, and paused circuit runs all close there, and any client-sent
-`session_end` is ignored; `completed_at` still records the click. `services/timer_loading.py`
+`session_end` is ignored; `completed_at` still records the click. Timer, pause/resume, circuit
+start/complete and completion writes accept `occurred_at` (the user's action time), clamped by
+`services/occurred_at.py`. In-session write routes are `@idempotent` (`blueprints/idempotency.py`).
+`services/timer_loading.py`
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
 

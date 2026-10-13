@@ -74,6 +74,7 @@ from .sessions import (
     SessionGoalAssociationSchema,
     SessionGoalScopePreviewSchema,
     SessionUpdateSchema,
+    SessionUpdateRequestSchema,
 )
 from .activities import (
     ActivityDefinitionCreateSchema,
@@ -110,6 +111,7 @@ from .fractal_metrics import (
 )
 from .notes import (
     NoteCreateSchema,
+    NoteCreateRequestSchema,
     NoteUpdateSchema,
 )
 from .dashboards import (
@@ -232,6 +234,7 @@ __all__ = [
     "MetricDefinitionSchema",
     "MetricValueSchema",
     "NoteCreateSchema",
+    "NoteCreateRequestSchema",
     "NoteUpdateSchema",
     "PAGE_SURFACE_PAGES",
     "PAGE_SURFACE_PANEL_KINDS",
@@ -267,6 +270,7 @@ __all__ = [
     "SessionTemplateFromSessionSchema",
     "SessionTemplateUpdateSchema",
     "SessionUpdateSchema",
+    "SessionUpdateRequestSchema",
     "SplitDefinitionSchema",
     "TargetSchema",
     "TelemetryEventSchema",

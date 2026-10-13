@@ -7,6 +7,7 @@ import models
 from models import ActivityInstance, CircuitRun, Session, validate_root_goal
 from services import Event, Events, event_bus
 from services.circuit_completion import circuit_completion_event_data, finalize_circuit_run
+from services.occurred_at import resolve_occurred_at
 from services.payload_normalizers import normalize_session_payload
 from services.serializers import serialize_session
 from services.service_types import JsonDict, ServiceResult
@@ -139,9 +140,15 @@ class _SessionUpdatesMixin:
                 )
                 if conflict:
                     return None, conflict, 409
+            if data['completed'] and not session.completed:
+                completed_at, time_error = resolve_occurred_at(self.db_session, session, data.get('occurred_at'))
+                if time_error:
+                    return None, time_error, 400
+            else:
+                completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             session.completed = data['completed']
             if data['completed']:
-                session.completed_at = datetime.now(timezone.utc)
+                session.completed_at = completed_at.replace(tzinfo=timezone.utc)
                 completion_time = session.completed_at
                 pause_boundary = self._pause_completion_boundary(session)
                 if pause_boundary:

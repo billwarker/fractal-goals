@@ -706,7 +706,7 @@ class NoteService:
                 activity_instance_id = activity_set.activity_instance_id
 
             note = Note(
-                id=str(uuid.uuid4()),
+                id=data.get('id') or str(uuid.uuid4()),
                 root_id=root_id,
                 context_type=context_type,
                 context_id=context_id,

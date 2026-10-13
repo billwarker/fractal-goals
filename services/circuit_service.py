@@ -454,8 +454,8 @@ class CircuitService:
         }, source="circuit_service.delete_run"))
         return {"message": "Circuit run deleted", **run_payload}, None, 200
 
-    def start_run(self, root_id, run_id, user_id):
-        return self.timing_operations.start(root_id, run_id, user_id)
+    def start_run(self, root_id, run_id, user_id, *, occurred_at=None):
+        return self.timing_operations.start(root_id, run_id, user_id, occurred_at=occurred_at)
 
     def _authorized_run(self, root_id, run_id, user_id, *, for_update=False):
         if not self._owned_root(root_id, user_id):
@@ -606,5 +606,5 @@ class CircuitService:
     def mutate_round_tag(self, root_id, run_id, round_id, user_id, data):
         return self.tag_operations.mutate(root_id, run_id, user_id, data, round_id=round_id)
 
-    def complete_run(self, root_id, run_id, user_id):
-        return self.timing_operations.complete(root_id, run_id, user_id)
+    def complete_run(self, root_id, run_id, user_id, *, occurred_at=None):
+        return self.timing_operations.complete(root_id, run_id, user_id, occurred_at=occurred_at)

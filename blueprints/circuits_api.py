@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from services.circuit_service import CircuitService
 from validators import (
     CircuitDefinitionCreateSchema,
@@ -135,6 +136,7 @@ def list_circuit_runs(current_user, root_id, session_id):
 
 @circuits_bp.route("/<root_id>/sessions/<session_id>/circuit-runs", methods=["POST"])
 @token_required
+@idempotent
 def create_circuit_run(current_user, root_id, session_id):
     data, error = _validated(CircuitRunCreateSchema)
     if error:
@@ -156,6 +158,7 @@ def get_circuit_run(current_user, root_id, run_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>", methods=["DELETE"])
 @token_required
+@idempotent
 def delete_circuit_run(current_user, root_id, run_id):
     return _execute(
         lambda service: service.delete_run(root_id, run_id, current_user.id),
@@ -164,26 +167,33 @@ def delete_circuit_run(current_user, root_id, run_id):
 
 
 def _run_action(current_user, root_id, run_id, action_name):
+    body = request.get_json(silent=True)
+    occurred_at = body.get("occurred_at") if isinstance(body, dict) else None
     return _execute(
-        lambda service: getattr(service, action_name)(root_id, run_id, current_user.id),
+        lambda service: getattr(service, action_name)(
+            root_id, run_id, current_user.id, occurred_at=occurred_at,
+        ),
         f"Error performing circuit action {action_name}",
     )
 
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/start", methods=["POST"])
 @token_required
+@idempotent
 def start_circuit_run(current_user, root_id, run_id):
     return _run_action(current_user, root_id, run_id, "start_run")
 
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/complete", methods=["POST"])
 @token_required
+@idempotent
 def complete_circuit_run(current_user, root_id, run_id):
     return _run_action(current_user, root_id, run_id, "complete_run")
 
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/timing", methods=["PATCH"])
 @token_required
+@idempotent
 def update_circuit_run_timing(current_user, root_id, run_id):
     data, error = _validated(CircuitRunTimingUpdateSchema)
     if error:
@@ -196,6 +206,7 @@ def update_circuit_run_timing(current_user, root_id, run_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/rounds/<round_id>", methods=["DELETE"])
 @token_required
+@idempotent
 def delete_circuit_round(current_user, root_id, run_id, round_id):
     return _execute(
         lambda service: service.delete_round(root_id, run_id, round_id, current_user.id),
@@ -205,6 +216,7 @@ def delete_circuit_round(current_user, root_id, run_id, round_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/rounds", methods=["POST"])
 @token_required
+@idempotent
 def add_circuit_round(current_user, root_id, run_id):
     return _execute(
         lambda service: service.add_round(root_id, run_id, current_user.id),
@@ -214,6 +226,7 @@ def add_circuit_round(current_user, root_id, run_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/members/<member_id>/metrics", methods=["PATCH"])
 @token_required
+@idempotent
 def update_circuit_member_metrics(current_user, root_id, run_id, member_id):
     data, error = _validated(CircuitMemberMetricsUpdateSchema)
     if error:
@@ -232,6 +245,7 @@ def update_circuit_member_metrics(current_user, root_id, run_id, member_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/members/<member_id>/metrics/cascade", methods=["POST"])
 @token_required
+@idempotent
 def cascade_circuit_member_metric(current_user, root_id, run_id, member_id):
     data, error = _validated(CircuitMemberMetricCascadeSchema)
     if error:
@@ -251,6 +265,7 @@ def cascade_circuit_member_metric(current_user, root_id, run_id, member_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/tags", methods=["PATCH"])
 @token_required
+@idempotent
 def mutate_circuit_run_tag(current_user, root_id, run_id):
     data, error = _validated(CircuitScopeTagMutationSchema)
     if error:
@@ -263,6 +278,7 @@ def mutate_circuit_run_tag(current_user, root_id, run_id):
 
 @circuits_bp.route("/<root_id>/circuit-runs/<run_id>/rounds/<round_id>/tags", methods=["PATCH"])
 @token_required
+@idempotent
 def mutate_circuit_round_tag(current_user, root_id, run_id, round_id):
     data, error = _validated(CircuitScopeTagMutationSchema)
     if error:
