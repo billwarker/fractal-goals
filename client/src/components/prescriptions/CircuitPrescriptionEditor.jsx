@@ -55,6 +55,7 @@ function slotAlignKinds(slots) {
  * With `onSelectSlot`, each round's activities are selectable too, as circuit members are on
  * the session page: `onSelectSlot(roundIndex, slotId)` picks one (`slotId` null goes back to
  * the round) and `selectedSlot` ({ roundIndex, slotId }) marks it, read-only or not.
+ * Read-only rounds remain selectable when the caller supplies `onSelectRound`.
  */
 export default function CircuitPrescriptionEditor({
     circuit,
@@ -78,7 +79,7 @@ export default function CircuitPrescriptionEditor({
     const slotKinds = slotAlignKinds(slots);
     const rounds = value?.rounds || [];
     const { selectedIndex, clearSelection, rowProps } = usePlanRowSelection(
-        active && !readOnly,
+        active && (!readOnly || Boolean(onSelectRound)),
         rounds.length,
         onSelectRound ? { selectedIndex: selectedRoundIndex ?? null, onSelect: onSelectRound } : null,
     );
@@ -110,14 +111,14 @@ export default function CircuitPrescriptionEditor({
                             key={roundIndex}
                             className={[
                                 styles.round,
-                                readOnly ? styles.roundStatic : '',
+                                readOnly && !onSelectRound ? styles.roundStatic : '',
                                 isSelected ? styles.roundSelected : '',
                             ].filter(Boolean).join(' ')}
                             data-align-key={planRowAlignKey(alignKey, 'round', roundIndex)}
-                            {...(readOnly ? {} : rowProps(roundIndex))}
+                            {...(readOnly && !onSelectRound ? {} : rowProps(roundIndex))}
                         >
                             <div className={styles.roundHeader}>
-                                {readOnly ? (
+                                {readOnly && !onSelectRound ? (
                                     <span className={`${styles.setToggle} ${styles.roundTitle}`}>Round {roundIndex + 1}</span>
                                 ) : (
                                     <Button

@@ -210,6 +210,11 @@ own continuous-mode windows and streak drawing.
 **ORM note.** `ProgramDay.template_links` is the only writable path to `program_day_templates`;
 `ProgramDay.templates` is `viewonly`, so ORM cascades delete each link once.
 
+Days logged-session cards share the Session Detail query cache. `CompletedSessionHeader` owns
+badge navigation and session metadata; shared prescription editors own circuit round/member
+highlighting in both editable and read-only cards. See
+[Plan editor UI contracts](planning/ui-contracts-reference.md#plan-editors-and-planned-value-hints).
+
 Detailed design:
 
 - [Programs — domain and UI reference](planning/programs-domain-reference.md)

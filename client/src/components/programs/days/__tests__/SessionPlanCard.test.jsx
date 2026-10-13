@@ -217,6 +217,12 @@ describe('SessionPlanCard selection', () => {
         fireEvent.click(within(card).getByRole('button', { name: 'Round 1 Bench Press' }));
         expect(onReport).toHaveBeenLastCalledWith(expect.objectContaining({ selectedActivityId: 'bench' }));
         expect(within(card).queryByRole('button', { name: '+ Add round' })).not.toBeInTheDocument();
+        fireEvent.click(within(card).getByRole('button', { name: 'Round 2' }));
+        expect(within(card).getByRole('button', { name: 'Round 2, selected' })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(card).getByRole('button', { name: 'Round 1 Bench Press' })).toHaveAttribute('aria-pressed', 'false');
+        expect(onReport).toHaveBeenLastCalledWith(expect.objectContaining({ selectedActivityId: null }));
+        fireEvent.click(within(card).getByRole('button', { name: 'Round 2, selected' }));
+        expect(within(card).getByRole('button', { name: 'Round 2' })).toHaveAttribute('aria-pressed', 'false');
     });
 
     it("deselects when the card's empty space is clicked", () => {
@@ -235,4 +241,3 @@ describe('SessionPlanCard selection', () => {
         expect(card.querySelector('[data-plan-item][data-selected="true"]')).not.toBeNull();
     });
 });
-

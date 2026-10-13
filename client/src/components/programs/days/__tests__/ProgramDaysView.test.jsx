@@ -393,7 +393,7 @@ describe('ProgramDaysView', () => {
         expect(within(rounds).getByLabelText('Round 1 Bench Press logged Weight')).toHaveValue('40');
         expect(within(rounds).getByText('Round 2')).toBeInTheDocument();
         expect(within(session).queryByRole('button', { name: /Remove|Add/ })).not.toBeInTheDocument();
-        expect(within(session).getByRole('link', { name: 'Completed · Open session' })).toHaveAttribute('href', '/root/session/sess-1');
+        expect(within(session).getByRole('link', { name: 'Bench Day' })).toHaveAttribute('href', '/root/session/sess-1');
         expect(session.querySelector('[data-align-key="tmpl|a:bench#0"]')).not.toBeNull();
         expect(session.querySelector('[data-align-key="tmpl|c:circ#0"]')).not.toBeNull();
         expect(screen.queryByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).not.toBeInTheDocument();

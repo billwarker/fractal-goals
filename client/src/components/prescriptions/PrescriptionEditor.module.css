@@ -267,8 +267,8 @@
 }
 
 .roundSelected {
-    background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-surface));
     border-color: var(--color-brand-success);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-success) 20%, transparent);
 }
 
 .roundTitle {
@@ -278,6 +278,7 @@
 }
 
 .roundSlot {
+    position: relative;
     display: grid;
     grid-template-columns: subgrid;
     align-items: center;
@@ -295,17 +296,18 @@
 
 /* A selected circuit member: its row within the round, as on the session page. */
 .roundSlotSelected {
-    /* The spread extends the tint around the row without changing layout, so the round's
-       shared columns stay aligned. */
-    --member-tint: color-mix(in srgb, var(--color-brand-success) 14%, transparent);
-    background: var(--member-tint);
-    box-shadow: 0 0 0 5px var(--member-tint);
-    border-radius: 2px;
+    border-top-color: transparent;
 }
 
-.roundSlotSelected .roundSlotName {
-    color: var(--color-brand-success);
-    font-weight: 600;
+.roundSlotSelected::after {
+    /* Replace the divider at the row's top edge, with breathing room on the other
+       sides. Painting the border separately preserves the shared subgrid tracks. */
+    content: '';
+    position: absolute;
+    inset: -1px -5px -5px;
+    border: 1px solid var(--color-brand-success);
+    border-radius: 4px;
+    pointer-events: none;
 }
 
 .roundSlotToggle {

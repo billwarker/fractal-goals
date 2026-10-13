@@ -1,15 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 
 import Badge from '../../atoms/Badge';
-import SessionTemplateNameBadge from '../../common/SessionTemplateNameBadge';
 import { queryKeys } from '../../../hooks/queryKeys';
 import { fractalApi } from '../../../utils/api';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
-import { isCardBackgroundClick } from '../../prescriptions/usePlanRowSelection';
+import { isCardBackgroundClick, isItemSurfaceClick } from '../../prescriptions/usePlanRowSelection';
+import CompletedSessionHeader from './CompletedSessionHeader';
 import styles from './ProgramDaysView.module.css';
 
 /** A session section's recorded work items, from hydrated typed items or legacy exercises. */
@@ -76,7 +75,7 @@ export default function CompletedSessionCard({
 
     // The Goals side pane follows this card when active: the session's own goal evidence, and
     // the goals of an activity picked here (picking only highlights; nothing is editable).
-    // `{ key, activityId, roundIndex?, slotId? }`: an activity, or one circuit member in a round.
+    // `{ key, activityId, roundIndex?, slotId? }`: an item, round, or circuit member.
     const [selected, setSelected] = useState(null);
     const instances = useMemo(() => sections.flatMap((section) => section.items.flatMap((item) => {
         if (item.type === 'circuit') {
@@ -175,10 +174,12 @@ export default function CompletedSessionCard({
                 value={{ rounds, notes: null }}
                 onChange={noop}
                 idPrefix={`logged-${sessionId}-${run.id}`}
-                active={false}
+                active={selected?.key === itemKey}
                 readOnly
                 valueKind="logged"
                 alignKey={alignKey}
+                selectedRoundIndex={selected?.key === itemKey ? selected.roundIndex : null}
+                onSelectRound={(roundIndex) => setSelected({ key: itemKey, activityId: null, roundIndex })}
                 selectedSlot={selected?.key === itemKey && selected.slotId
                     ? { roundIndex: selected.roundIndex, slotId: selected.slotId }
                     : null}
@@ -189,7 +190,7 @@ export default function CompletedSessionCard({
                         activityId: slot.activity_definition_id ? String(slot.activity_definition_id) : null,
                         roundIndex,
                         slotId,
-                    } : { key: itemKey, activityId: null });
+                    } : { key: itemKey, activityId: null, roundIndex });
                 }}
             />
         );
@@ -205,12 +206,7 @@ export default function CompletedSessionCard({
             onFocusCapture={onActivate || undefined}
             onClick={(event) => { if (isCardBackgroundClick(event)) setSelected(null); }}
         >
-            <header className={styles.planCardHeader}>
-                <SessionTemplateNameBadge name={template.name} color={template.color} wrap />
-                <Link className={styles.planSource} to={`/${rootId}/session/${session.id}`}>
-                    {session.completed ? 'Completed' : 'In progress'} · Open session
-                </Link>
-            </header>
+            <CompletedSessionHeader rootId={rootId} session={session} template={template} />
             {sections.length === 0 ? <p className={styles.planEmpty}>No activities were recorded in this session.</p> : null}
             {sections.map((section, sectionIndex) => (
                 // Sections have no identity beyond their position in the session.
@@ -233,10 +229,13 @@ export default function CompletedSessionCard({
                                 data-align-key={alignKeys?.items[sectionIndex][itemIndex]}
                                 data-plan-item
                                 data-selected={isHighlighted ? 'true' : undefined}
-                                onClick={() => setSelected({
-                                    key: itemKey,
-                                    activityId: isCircuit ? null : String(activityIdOf(item.activity)),
-                                })}
+                                onClick={(event) => {
+                                    const selectsWholeItem = isItemSurfaceClick(event);
+                                    setSelected((current) => !selectsWholeItem && current?.key === itemKey ? current : {
+                                        key: itemKey,
+                                        activityId: isCircuit ? null : String(activityIdOf(item.activity)),
+                                    });
+                                }}
                             >
                                 <div className={styles.planItemHeader}>
                                     <span className={styles.planItemName}>

@@ -208,7 +208,7 @@ export default function SessionPlanCard({
                         const isHighlighted = scope.itemKey === itemKey;
                         const isSelected = !readOnly && isHighlighted;
                         const rowScope = {
-                            selectedIndex: isSelected ? scope.rowIndex : null,
+                            selectedIndex: isHighlighted ? scope.rowIndex : null,
                             onSelect: (rowIndex) => setScope({ ...NO_SCOPE, itemKey, rowIndex }),
                         };
                         return (
@@ -222,7 +222,7 @@ export default function SessionPlanCard({
                                 data-align-key={alignKeys.items[sectionIndex][itemIndex]}
                                 data-plan-item
                                 data-selected={isHighlighted ? 'true' : undefined}
-                                onClick={readOnly ? () => scopeItem(itemKey) : (event) => {
+                                onClick={(event) => {
                                     // A click on the item itself (not a set or a control) scopes back to the whole item.
                                     if (isItemSurfaceClick(event)) setScope({ ...NO_SCOPE, itemKey });
                                     else scopeItem(itemKey);
@@ -299,7 +299,7 @@ export default function SessionPlanCard({
                                 {circuit && (!readOnly || item.prescription?.rounds?.length) ? (
                                     <CircuitPrescriptionEditor
                                         circuit={circuit}
-                                        active={isSelected}
+                                        active={isHighlighted}
                                         readOnly={readOnly}
                                         selectedRoundIndex={rowScope.selectedIndex}
                                         onSelectRound={rowScope.onSelect}

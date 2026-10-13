@@ -74,3 +74,15 @@ optionally a set or round; the scoped target gets the note composer (`PlanNoteCo
 picker (`PlanTagEditor`, `ActivityTagEditor` in controlled mode). The session card shows a
 "(plan 100)" hint beside the "(last …)" progress hint, in the same style, coloured met/under by
 `utils/sessionPrescription.js`.
+
+In the Programs Days workspace, past plans and logged sessions also allow circuit round
+and member selection without editing recorded values. Round and member highlights use
+green borders without a green fill. Selecting a member scopes its activity goals;
+the member border replaces its top divider without moving the shared metric columns.
+Selecting the round clears member goal scope. Clicking a selected member returns to its
+round; clicking a selected round returns to its circuit; card background clears selection.
+Logged session headers link the session name badge to Session Detail, place the shared
+completion checkmark beside completed session badges, and show session start,
+end in the user's selected timezone, and active duration (excluding pauses).
+Metadata groups naturally sized fields with moderate gaps, centered in the space beside the badge.
+On small screens it aligns left and wraps, with an em dash for unavailable values.
