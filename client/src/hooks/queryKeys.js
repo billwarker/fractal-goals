@@ -87,7 +87,7 @@ export const queryKeys = {
     ],
     goalTimelineRoot: (rootId, goalId) => ['goalTimeline', rootId, goalId],
     goalTimelinesRoot: (rootId) => ['goalTimeline', rootId],
-    goalAnalytics: (rootId) => ['goal-analytics', rootId],
+    goalAnalytics: (rootId, options = undefined) => options ? ['goal-analytics', rootId, options] : ['goal-analytics', rootId],
     targetAnalytics: (rootId, targetId, since = 'creation') => ['targetAnalytics', rootId, targetId, since],
     targetAnalyticsRoot: (rootId, targetId) => ['targetAnalytics', rootId, targetId],
     goalActivityInstances: (rootId, goalId, activityId) => ['goalActivityInstances', rootId, goalId, activityId],

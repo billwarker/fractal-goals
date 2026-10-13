@@ -47,7 +47,7 @@ def assert_block_dates_valid(program, start_date, end_date):
             'code': BLOCK_INVALID_DATES,
             'field': 'start_date' if start_date is None else 'end_date',
         }, 400)
-    if start_date is None:
+    if start_date is None or end_date is None:
         return
     if end_date < start_date:
         raise ProgramServiceValidationError({
@@ -79,8 +79,8 @@ def block_overlap_error(conflicts):
         ),
         'code': BLOCK_OVERLAP,
         'conflicts': [
-            {**conflict, 'start_date': date_part(conflict['start_date']).isoformat(),
-             'end_date': date_part(conflict['end_date']).isoformat()}
+            {**conflict, 'start_date': _format_day(date_part(conflict['start_date'])),
+             'end_date': _format_day(date_part(conflict['end_date']))}
             for conflict in conflicts
         ],
     }, 409)
@@ -117,6 +117,7 @@ def assert_blocks_within_program(session, program_id, program_start, program_end
         (ProgramBlock.start_date < program_start) | (ProgramBlock.end_date > program_end),
     ).order_by(ProgramBlock.start_date).first()
     if stranded:
+        stranded_start = date_part(stranded.start_date)
         raise ProgramServiceValidationError({
             'error': (
                 f"{stranded.name} runs {_format_day(date_part(stranded.start_date))} – "
@@ -124,7 +125,8 @@ def assert_blocks_within_program(session, program_id, program_start, program_end
                 "Move or shorten the block first."
             ),
             'code': BLOCK_INVALID_DATES,
-            'field': 'start_date' if date_part(stranded.start_date) < program_start else 'end_date',
+            'field': 'start_date' if (program_start is not None and stranded_start is not None
+                                    and stranded_start < program_start) else 'end_date',
         }, 400)
 
 

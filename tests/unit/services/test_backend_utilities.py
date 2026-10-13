@@ -2,7 +2,6 @@ import pytest
 from types import SimpleNamespace
 
 from models import _safe_load_json
-from services import analytics_cache
 from services.event_logger import _get_entity_info, _get_event_description
 from services.events import Event, EventBus, Events
 from services.goal_type_utils import get_canonical_goal_level_name, get_canonical_goal_type
@@ -15,94 +14,6 @@ def test_safe_json_loader_handles_valid_native_and_malformed_inputs():
     assert _safe_load_json('{"day_id": "day-1"}', {}) == {"day_id": "day-1"}
     assert _safe_load_json("{malformed", {}) == {}
     assert _safe_load_json(b"\xff", {}) == {}
-
-
-def test_analytics_cache_set_get_and_expire(monkeypatch):
-    analytics_cache._ANALYTICS_BY_ROOT.clear()
-
-    now = {"value": 1000.0}
-
-    def fake_time():
-        return now["value"]
-
-    monkeypatch.setattr(analytics_cache.time, "time", fake_time)
-
-    analytics_cache.set_analytics("root-1", {"score": 7}, ttl_seconds=2)
-    assert analytics_cache.get_analytics("root-1") == {"score": 7}
-
-    now["value"] = 1003.0
-    assert analytics_cache.get_analytics("root-1") is None
-
-
-def test_analytics_cache_ttl_has_minimum_one_second(monkeypatch):
-    analytics_cache._ANALYTICS_BY_ROOT.clear()
-
-    now = {"value": 2000.0}
-    monkeypatch.setattr(analytics_cache.time, "time", lambda: now["value"])
-
-    analytics_cache.set_analytics("root-2", {"score": 9}, ttl_seconds=0)
-    now["value"] = 2000.5
-    assert analytics_cache.get_analytics("root-2") == {"score": 9}
-
-    now["value"] = 2001.1
-    assert analytics_cache.get_analytics("root-2") is None
-
-
-def test_analytics_cache_invalidation_via_event_bus(monkeypatch):
-    analytics_cache._ANALYTICS_BY_ROOT.clear()
-
-    isolated_bus = EventBus()
-    monkeypatch.setattr(analytics_cache, "event_bus", isolated_bus)
-
-    analytics_cache.set_analytics("root-3", {"value": 1})
-    analytics_cache.setup_analytics_cache_invalidation()
-
-    isolated_bus.emit(Event("goal.updated", {"root_id": "root-3"}))
-    assert analytics_cache.get_analytics("root-3") is None
-
-    # Event with no root_id should not invalidate other entries.
-    analytics_cache.set_analytics("root-4", {"value": 2})
-    isolated_bus.emit(Event("goal.updated", {}))
-    assert analytics_cache.get_analytics("root-4") == {"value": 2}
-
-
-def test_analytics_cache_logs_redis_failures_and_uses_local_fallback(monkeypatch, caplog):
-    analytics_cache._ANALYTICS_BY_ROOT.clear()
-
-    from redis.exceptions import ConnectionError as RedisConnectionError
-
-    class BrokenRedis:
-        def get(self, _key):
-            raise RedisConnectionError("read unavailable")
-
-        def setex(self, _key, _ttl, _payload):
-            raise RedisConnectionError("write unavailable")
-
-        def delete(self, _key):
-            raise RedisConnectionError("delete unavailable")
-
-    monkeypatch.setattr(analytics_cache, "_get_redis_client", lambda: BrokenRedis())
-
-    with caplog.at_level("WARNING", logger="services.analytics_cache"):
-        analytics_cache.set_analytics("root-fallback", {"score": 11})
-        assert analytics_cache.get_analytics("root-fallback") == {"score": 11}
-        analytics_cache.invalidate_root("root-fallback")
-
-    assert "cache write failed for root_id=root-fallback" in caplog.text
-    assert "cache read failed for root_id=root-fallback" in caplog.text
-    assert "cache invalidation failed for root_id=root-fallback" in caplog.text
-    assert analytics_cache._ANALYTICS_BY_ROOT == {}
-
-
-def test_analytics_cache_does_not_hide_non_redis_errors(monkeypatch):
-    class BuggyRedis:
-        def get(self, _key):
-            raise RuntimeError("programming error")
-
-    monkeypatch.setattr(analytics_cache, "_get_redis_client", lambda: BuggyRedis())
-
-    with pytest.raises(RuntimeError, match="programming error"):
-        analytics_cache.get_analytics("root-bug")
 
 
 def _make_goal(level_name=None, parent=None):

@@ -83,8 +83,8 @@ class ProgramCalendarFeedService:
         program_days = []
         credits_by_date = {}
         for program in programs:
-            program_start = max(start, date_part(program.start_date))
-            program_end = min(end, date_part(program.end_date))
+            program_start = max(start, date_part(program.start_date) or start)
+            program_end = min(end, date_part(program.end_date) or end)
             built = self.read_model.build_range_facts(
                 root_id, current_user_id, program, start, end, zone, periods=periods,
             )
@@ -125,7 +125,7 @@ class ProgramCalendarFeedService:
                 for program in programs
                 for block in sorted(program.blocks or [], key=lambda item: (str(item.start_date), item.id))
                 if block.start_date and block.end_date
-                and date_part(block.start_date) <= end and date_part(block.end_date) >= start
+                and (date_part(block.start_date) or end) <= end and (date_part(block.end_date) or start) >= start
             ],
             "program_days": program_days,
             "completed_session_days": completed_session_days,

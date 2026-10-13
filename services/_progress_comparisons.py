@@ -1,10 +1,8 @@
 """Mixin for ProgressService: building comparisons, summaries, and per-activity comparison maps.
 """
 
-import json
 from typing import Optional
-from sqlalchemy import func
-from models import ActivityInstance, Session
+from models import ActivityInstance
 
 
 class _ProgressComparisonsMixin:
@@ -295,46 +293,3 @@ class _ProgressComparisonsMixin:
             'progress_view_id': view_id,
             'progress_view_config': config,
         }
-
-    def _build_activity_comparison_map(self, activity_def, config, view_id, instances):
-        signature = json.dumps(config, sort_keys=True, separators=(',', ':'))
-        cache_key = (activity_def.id, view_id, signature)
-        if cache_key in self._comparison_cache:
-            return self._comparison_cache[cache_key]
-        included = []
-        results = {}
-        self._calculation_config = config
-        for instance in instances:
-            if not self._instance_included(instance):
-                results[instance.id] = self._comparison_payload(
-                    instance, activity_def, None, view_id=view_id, config=config,
-                )
-                continue
-            eligible = [row for row in included if row.session_id != instance.session_id]
-            previous = next((row for row in reversed(eligible) if row.completed), None)
-            if previous is None and eligible:
-                previous = eligible[-1]
-            results[instance.id] = self._comparison_payload(
-                instance, activity_def, previous, view_id=view_id, config=config,
-            )
-            included.append(instance)
-        self._comparison_cache[cache_key] = results
-        return results
-
-    def _activity_comparison_map(self, activity_def, config, view_id):
-        """Build an activity's comparison chain once, in canonical time order."""
-        effective_time = func.coalesce(
-            ActivityInstance.time_stop,
-            Session.session_start,
-            ActivityInstance.created_at,
-        )
-        instances = (
-            self._active_instances_query()
-            .filter(
-                ActivityInstance.activity_definition_id == activity_def.id,
-                ActivityInstance.root_id == activity_def.root_id,
-            )
-            .order_by(effective_time.asc(), ActivityInstance.id.asc())
-            .all()
-        )
-        return self._build_activity_comparison_map(activity_def, config, view_id, instances)

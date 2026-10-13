@@ -124,7 +124,7 @@ def build_occurrences(program, start: date, end: date):
         if weekday_names(day):
             candidates = iter_dates(first, last)
         else:
-            candidates = sorted(explicit_schedule_dates(day))
+            candidates = sorted(value for value in explicit_schedule_dates(day) if value is not None)
         for day_value in candidates:
             if not day_value or not (first <= day_value <= last):
                 continue

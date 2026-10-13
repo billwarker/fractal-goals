@@ -26,12 +26,14 @@ Use these backend ownership boundaries:
 - `services/session_analytics_service.py` owns legacy/root-scoped session and
   activity read models still needed by existing visualizations, landing publish,
   and FlowTree metrics until their equivalents are catalog-backed.
-- `services/goal_analytics_service.py` owns the older goal analytics summary
-  endpoint and should stay narrow while charts migrate to the engine.
+- `services/goal_analytics_service.py` owns root-scoped SQL aggregates and bounded
+  chart buckets; `goal_analytics_queries.py` owns their relational evidence attribution.
+  Charts request their filtered buckets on demand while they migrate to the engine.
 - `services/goal_target_service.py` owns target-specific analytics because it
   shares target evidence rules with target CRUD and evaluation.
-- `services/analytics_cache.py` and `services/analytics_query_cache.py` own
-  cache plumbing only.
+- `services/analytics_query_cache.py` owns query-engine cache plumbing. The unused
+  process-local goal analytics cache was removed in October 2026; aggregate reads
+  remain fresh across application workers.
 
 Frontend chart profiles should prefer catalog-backed query profiles whenever
 the catalog exposes the needed fields. Read-model-backed visualizations must be

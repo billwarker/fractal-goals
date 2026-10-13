@@ -1,5 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { formatDuration } from '../components/analytics/formatDuration';
+import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
@@ -52,15 +54,6 @@ const analyticsFallback = (
     </div>
 );
 
-const formatDuration = (seconds) => {
-    if (!seconds || seconds === 0) return '0m';
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-        return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-};
 
 let windowIdCounter = 1;
 const generateWindowId = () => `window-${++windowIdCounter}`;
@@ -72,14 +65,6 @@ function Analytics() {
     const { debugMode } = useDebug();
     const { flags } = useFeatureFlags();
     const showSqlExplorer = isFeatureEnabled(flags, FEATURE_FLAGS.analyticsSqlExplorer);
-    const {
-        activities,
-        activityGroups,
-        activityInstances,
-        goalAnalytics,
-        loading,
-        sessions,
-    } = useAnalyticsPageData(rootId);
     const {
         analyticsViews,
         createAnalyticsView,
@@ -103,6 +88,18 @@ function Analytics() {
     const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
     const [saveKind, setSaveKind] = useState('view');
     const [activeMode, setActiveMode] = useState('dashboard');
+    const {
+        activities,
+        activityGroups,
+        activityInstances,
+        goalAnalytics,
+        loading,
+        sessions,
+        hasMoreEvidence, loadingMoreEvidence, loadMoreEvidence,
+        evidenceLoading, evidenceError, retryEvidence,
+    } = useAnalyticsPageData(rootId, {
+        needsSessionEvidence: Object.values(windowStates).some((state) => ['sessions', 'activities'].includes(state.selectedCategory)),
+    });
     const [consoleInitialSql, setConsoleInitialSql] = useState('');
     const [dashboardBounds, setDashboardBounds] = useState(null);
     const [isDashboardSettling, setIsDashboardSettling] = useState(false);
@@ -251,8 +248,8 @@ function Analytics() {
         activityGroups,
         activityInstances,
         formatDuration,
-        rootId,
-    }), [sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId]);
+        rootId, evidenceLoading, evidenceError, retryEvidence,
+    }), [sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId, evidenceLoading, evidenceError, retryEvidence]);
 
     const handleDateRangeChange = useCallback((nextRange) => {
         let normalized = {
@@ -496,6 +493,7 @@ function Analytics() {
                 />
 
                 <AnalyticsOnboardingState rootId={rootId} />
+                <AnalyticsEvidenceNotice {...{ hasMoreEvidence, loadingMoreEvidence, loadMoreEvidence }} />
 
                 {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />

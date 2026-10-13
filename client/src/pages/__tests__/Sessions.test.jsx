@@ -71,8 +71,12 @@ vi.mock('../../components/sessions', () => ({
     )
 }));
 
-vi.mock('../../components/sessionDetail', () => ({
-    QuickSessionWorkspace: () => <div data-testid="quick-session-modal-content">quick session modal</div>,
+vi.mock('../../components/sessions/SessionListCard', () => ({
+    default: ({ session }) => <div>expanded:{session.id}:instances:{session.activity_instances?.length || 0}</div>,
+}));
+
+vi.mock('../../components/sessionDetail/QuickSessionWorkspace', () => ({
+    default: () => <div data-testid="quick-session-modal-content">quick session modal</div>,
 }));
 
 vi.mock('../../contexts/ActiveSessionContext', () => ({

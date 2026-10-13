@@ -22,7 +22,6 @@ Usage:
 from services.events import event_bus, Event, Events, EventBus
 from services.completion_handlers import init_completion_handlers
 from services.event_logger import setup_event_logging
-from services.analytics_cache import setup_analytics_cache_invalidation
 from services.analytics_query_cache import setup_analytics_query_cache_invalidation
 
 _services_initialized = False
@@ -38,7 +37,6 @@ def init_services():
         return
     init_completion_handlers()
     setup_event_logging()
-    setup_analytics_cache_invalidation()
     setup_analytics_query_cache_invalidation()
     _services_initialized = True
     # Add future service initializations here

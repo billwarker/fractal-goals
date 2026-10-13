@@ -198,9 +198,9 @@ class _HeaderClient:
 @pytest.mark.parametrize(("path", "max_queries", "max_bytes"), [
     ("/goals", 8, 360_000),
     ("/goals/selection", 12, 90_000),
-    ("/sessions?limit=20", 20, 310_000),
-    ("/sessions/analytics-summary", 14, 700_000),
-    ("/goals/analytics", 14, 460_000),
+    ("/sessions?limit=20&view=summary", 12, 50_000),
+    ("/sessions/analytics-summary", 14, 350_000),
+    ("/goals/analytics", 8, 350_000),
 ])
 def test_power_account_root_read_budgets(client, query_counter, power_account_dataset, path, max_queries, max_bytes):
     root_id = power_account_dataset["root"].id

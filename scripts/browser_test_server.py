@@ -132,6 +132,23 @@ def _seed_goal_heatmap(db, suffix, user, now):
             payload={'goal_id': goal_id, 'activity_name': f'Practice plan {index}'}))
 
 
+def _seed_performance_fractal(db, suffix, user, ultimate_level, now):
+    """Large list/tree fixtures kept separate from workflow-mutated browser roots."""
+    from datetime import timedelta
+    from models import Goal, Session
+    root_id = f'browser-performance-{suffix}'
+    db.add(Goal(id=root_id, root_id=root_id, owner_id=user.id, level_id=ultimate_level.id,
+                name=f'Browser Performance {suffix}'))
+    db.flush()
+    db.add_all([Goal(id=f'{root_id}-goal-{index}', root_id=root_id, owner_id=user.id,
+                    parent_id=root_id, level_id=ultimate_level.id, name=f'Performance goal {index}')
+                for index in range(150)])
+    db.execute(Session.__table__.insert(), [dict(id=f'{root_id}-session-{index}', root_id=root_id,
+        owner_id=user.id, name=f'Performance session {index}', session_start=now - timedelta(days=index + 1),
+        session_end=now - timedelta(days=index + 1) + timedelta(minutes=30), completed=True,
+        total_duration_seconds=1800, attributes={'private_notes': 'large body ' * 4000}) for index in range(120)])
+
+
 def main():
     source = make_url(config.get_database_url())
     if source.host not in ("localhost", "127.0.0.1", "::1"):
@@ -200,7 +217,7 @@ def main():
             ))
             # Desktop/mobile specs create independent programs under the fixture account.
             # Keep production quota enforcement active without exhausting its free-tier default.
-            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50}}))
+            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000}}))
             for suffix in ("desktop", "mobile"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
@@ -335,6 +352,7 @@ def main():
                         data={},
                     )
                 )
+                _seed_performance_fractal(db, suffix, user, ultimate_level, now)
                 _seed_goal_heatmap(db, suffix, user, now)
                 _seed_planning_fractal(db, suffix, user, ultimate_level, today)
                 adjustments_root = f"browser-adjustments-root-{suffix}"

@@ -168,9 +168,8 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
     }
 
 
-def serialize_activity_instance_for_analytics(instance, *, session_name=None, session_date=None):
+def serialize_activity_instance_for_analytics(instance, *, session_name=None, session_date=None, compact=False):
     """Serialize the subset of activity-instance fields needed by analytics views."""
-    data_dict = _safe_load_json(instance.data, {})
     metric_values_list = [
         serialize_metric_value(m)
         for m in instance.metric_values
@@ -178,7 +177,7 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
     ]
     normalized_sets = [serialize_activity_set(row) for row in (getattr(instance, "sets", None) or [])]
 
-    return {
+    payload = {
         "id": instance.id,
         "session_id": instance.session_id,
         "activity_definition_id": instance.activity_definition_id,
@@ -197,6 +196,18 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
         "progress_comparison": getattr(instance, '_dynamic_progress', None),
     }
+
+    if compact:
+        payload.pop('metric_values')
+        for activity_set in payload['sets']:
+            for key in ('notes', 'tags', 'inherited_tags', 'effective_tags', 'created_at', 'updated_at', 'tag_assignment_version'):
+                activity_set.pop(key, None)
+        comparison = payload['progress_comparison']
+        if comparison:
+            payload['progress_comparison'] = {key: comparison.get(key) for key in (
+                'included', 'is_first_instance', 'previous_instance_id', 'metric_comparisons',
+            )}
+    return payload
 
 
 def serialize_circuit_definition(definition, instantiation_summary=None):

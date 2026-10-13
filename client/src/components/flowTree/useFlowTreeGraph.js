@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { resolveGoalLevel, useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { buildGraphPresentation } from './flowTreeGraphUtils';
+import { buildGraphPresentation, prepareGraphPresentation, getLayoutedElements, getHierarchyLayoutedElements } from './flowTreeGraphUtils';
 
 /**
  * Lay out the goal tree for React Flow.
@@ -16,7 +16,6 @@ export default function useFlowTreeGraph({
     onAddChild,
     selectedNodeId,
     viewSettings,
-    sessions,
     evidenceGoalIds,
     metricsSummary,
     activities,
@@ -33,39 +32,28 @@ export default function useFlowTreeGraph({
         [goalLevels],
     );
 
+    const structure = useMemo(() => prepareGraphPresentation({
+        treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor, viewSettings,
+        evidenceGoalIds, allowedGoalIds, getSortChildrenBy,
+    }), [treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor,
+        viewSettings, evidenceGoalIds, allowedGoalIds, getSortChildrenBy]);
+
+    // Fixed node dimensions make geometry depend only on ordered topology and layout.
+    // Selection still changes topology when it narrows the tree to a lineage.
+    const topology = JSON.stringify({
+        nodes: structure?.rawNodes.map(({ id }) => ({ id })) || [],
+        edges: structure?.rawEdges.map(({ id, source, target }) => ({ id, source, target })) || [],
+    });
+    const geometry = useMemo(() => {
+        const { nodes, edges } = JSON.parse(topology);
+        return layoutMode === 'hierarchy'
+            ? getHierarchyLayoutedElements(nodes, edges, isMobile)
+            : getLayoutedElements(nodes, edges, 'TB', isMobile);
+    }, [topology, isMobile, layoutMode]);
+
     return useMemo(() => buildGraphPresentation({
-        treeData,
-        onNodeClick,
-        onAddChild,
-        selectedNodeId,
-        completedGoalColor,
-        viewSettings,
-        sessions,
-        evidenceGoalIds,
-        metricsSummary,
-        activities,
-        activityGroups,
-        programs,
-        allowedGoalIds,
-        isMobile,
-        layoutMode,
-        getSortChildrenBy,
-    }), [
-        treeData,
-        onNodeClick,
-        onAddChild,
-        selectedNodeId,
-        completedGoalColor,
-        viewSettings,
-        sessions,
-        evidenceGoalIds,
-        metricsSummary,
-        activities,
-        activityGroups,
-        programs,
-        allowedGoalIds,
-        isMobile,
-        layoutMode,
-        getSortChildrenBy,
-    ]);
+        structure, geometry, completedGoalColor, metricsSummary, activities,
+        activityGroups, programs, isMobile, layoutMode,
+    }), [structure, geometry, completedGoalColor, metricsSummary, activities,
+        activityGroups, programs, isMobile, layoutMode]);
 }

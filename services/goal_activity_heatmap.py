@@ -29,48 +29,32 @@ def local_day_bounds(day, zone):
     )
 
 
-def aggregate_goal_days(entries, start, end, zone):
-    """Return every calendar day, including empty days; each evidence id counts once."""
+def aggregate_goal_days(rows, start, end, zone, pause_intervals=()):
+    """Fill empty lifetime days around SQL aggregates without hydrating history."""
     start_date, end_date = start.astimezone(zone).date(), end.astimezone(zone).date()
-    days = {}
+    by_day = {row.date: row for row in rows}
+    pause_ranges = [
+        (utc_datetime(interval.paused_at).astimezone(zone).date(),
+         utc_datetime(interval.resumed_at).astimezone(zone).date() if interval.resumed_at else end_date + timedelta(days=1))
+        for interval in pause_intervals if start <= utc_datetime(interval.paused_at) <= end
+    ]
+    days = []
     current = start_date
     while current <= end_date:
-        days[current.isoformat()] = {
-            'date': current.isoformat(), 'activities': 0, 'events': 0,
-            'duration_seconds': 0, 'milestones': 0, 'paused': False,
-        }
+        row = by_day.get(current)
+        days.append({
+            'date': current.isoformat(), 'activities': row.activities if row else 0,
+            'events': row.events if row else 0, 'duration_seconds': row.duration_seconds if row else 0,
+            'milestones': row.milestones if row else 0,
+            'paused': any(first <= current < last for first, last in pause_ranges),
+        })
         current += timedelta(days=1)
-
-    seen = set()
-    pause_ranges = []
-    for entry in entries:
-        if entry['id'] in seen:
-            continue
-        seen.add(entry['id'])
-        occurred = utc_datetime(entry['timestamp'])
-        day = days.get(occurred.astimezone(zone).date().isoformat())
-        if not day or occurred < start or occurred > end:
-            continue
-        day['events'] += 1
-        if entry['event_type'] == 'activity.completed':
-            day['activities'] += 1
-            day['duration_seconds'] += max(0, entry['payload'].get('duration_seconds') or 0)
-        if entry['event_type'] in {'target.achieved', 'goal.completed'}:
-            day['milestones'] += 1
-        if entry['event_type'] == 'goal.paused' and entry['relationship'] == 'self':
-            resumed = entry['payload'].get('resumed_at')
-            pause_ranges.append((occurred.astimezone(zone).date(),
-                                 utc_datetime(resumed).astimezone(zone).date() if resumed else end_date + timedelta(days=1)))
-    for day in days.values():
-        date_value = datetime.strptime(day['date'], '%Y-%m-%d').date()
-        day['paused'] = any(first <= date_value < last for first, last in pause_ranges)
-
     return {
         'range_start': start_date.isoformat(), 'range_end': end_date.isoformat(),
-        'timezone': zone.key, 'days': list(days.values()),
-        'total_activities': sum(day['activities'] for day in days.values()),
-        'total_events': sum(day['events'] for day in days.values()),
-        'total_duration_seconds': sum(day['duration_seconds'] for day in days.values()),
-        'work_days': sum(day['activities'] > 0 for day in days.values()),
-        'event_days': sum(day['events'] > 0 for day in days.values()),
+        'timezone': zone.key, 'days': days,
+        'total_activities': sum(day['activities'] for day in days),
+        'total_events': sum(day['events'] for day in days),
+        'total_duration_seconds': sum(day['duration_seconds'] for day in days),
+        'work_days': sum(day['activities'] > 0 for day in days),
+        'event_days': sum(day['events'] > 0 for day in days),
     }

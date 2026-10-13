@@ -125,3 +125,37 @@ def test_session_analytics_summary_derives_duration_from_start_and_end_when_miss
 def test_session_analytics_summary_rejects_invalid_limit(authed_client, sample_practice_session):
     response = authed_client.get(f'/api/{sample_practice_session.root_id}/sessions/analytics-summary?limit=oops')
     assert response.status_code == 400
+
+
+@pytest.mark.integration
+def test_analytics_evidence_pages_do_not_repeat_or_hydrate_unselected_rows(authed_client, db_session, sample_practice_session, sample_activity_definition):
+    from sqlalchemy import event
+    instances = [ActivityInstance(id=str(uuid4()), root_id=sample_practice_session.root_id,
+                 session_id=sample_practice_session.id, activity_definition_id=sample_activity_definition.id) for _ in range(7)]
+    db_session.add_all(instances)
+    db_session.commit()
+    ids = {row.id for row in instances}
+    root_id = sample_practice_session.root_id
+    db_session.expunge_all()
+    loaded = []
+    def on_load(row, _context):
+        loaded.append(row.id)
+    event.listen(ActivityInstance, 'load', on_load)
+    try:
+        seen = set()
+        offset = 0
+        while True:
+            loaded.clear()
+            payload = authed_client.get(f'/api/{root_id}/sessions/analytics-summary?instance_limit=2&instance_offset={offset}').get_json()
+            page = {row['id'] for rows in payload['activity_instances'].values() for row in rows}
+            assert len(page) <= 2
+            assert len(set(loaded)) <= 3  # One lookahead identity.
+            assert not seen & page
+            seen.update(page)
+            pagination = payload['evidence_pagination']
+            if not pagination['has_more']:
+                break
+            offset = pagination['next_offset']
+        assert seen == ids
+    finally:
+        event.remove(ActivityInstance, 'load', on_load)

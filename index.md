@@ -225,6 +225,31 @@ Detailed design:
 - [Viewport-driven calendar feed](planning/program-calendar-viewport-feed.md)
 - [Calendar invariants and optional templates](planning/program-calendar-invariants-and-optional-templates.md)
 
+### Bounded history reads
+
+`ProgressService` resolves one predecessor identity per requested instance in SQL, then
+hydrates only requested instances and those predecessors. Completed predecessors take
+priority, same-session instances are excluded, and tag/set inclusion remains canonical.
+There is no competing full-history comparison cache/calculation.
+
+`goal_evidence_query.py` projects canonical timeline identities; `goal_evidence_read_model.py`
+owns SQL keyset pages and timezone-aware daily aggregates. `GoalTimelineService` enriches
+only the selected page through `GoalHistoryReadModel`. Snapshot publication retains its
+request-scoped preloaded history projection.
+
+`goal_analytics_queries.py` owns relational analytics attribution; `GoalAnalyticsService`
+returns SQL aggregates by default and explicit chart buckets on demand (366 points for one
+goal, 120 per goal for multi-goal charts). Date/activity filters apply before aggregation.
+`SessionAnalyticsService` caps each evidence page at 500 instances within the requested
+latest-session window and reports continuation metadata; charts explicitly load more evidence.
+`SessionListReadModel` serves `view=summary` cards, while `SessionListCard` fetches selected
+session details through the shared session query key. `WindowedSessionRow` retains measured
+spacers, selection and keyboard focus when offscreen cards unmount.
+
+`flowTreeLayout.js` owns geometry. `useFlowTreeGraph` memoizes it by ordered topology,
+layout mode and viewport class, separately from callbacks, colors and evidence presentation.
+Optional surface widgets and the quick-session workspace load at their use boundaries.
+
 ### Notes and analytics
 
 Notes support goal/session/activity scoping and safe markdown media rendering. Analytics uses
@@ -332,6 +357,9 @@ Shared frontend test doubles live in `client/src/test/` (excluded from coverage)
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with
 `vi.mock(path, () => import(helper))`.
 
+`run-tests.sh` runs backend pytest through `scripts/run_isolated_backend_tests.py`, which
+creates and drops a uniquely named disposable testing database. `FRACTAL_TEST_DATABASE_URL`
+keeps that isolation through repeated test-environment bootstraps.
 Backend tests build the schema once per pytest session and clear ORM rows in dependency
 order between tests, preserving real commit and independent-connection semantics. Frontend tests use
 four isolated Vitest threads. The `all` command runs the complete backend and frontend
@@ -352,6 +380,10 @@ The broader production assessment, release-gate gaps, and test-speed evidence ar
 Read-path query and payload budgets for a power-user-sized account live in
 `tests/performance/test_power_account_budgets.py`; the performance pass that introduced them is in
 [Performance Pass — September 2026](planning/performance-pass-2026-09.md).
+History scaling guards live in `tests/performance/test_history_scaling.py`; authenticated
+static dependency budgets live in `client/scripts/bundle-budgets.mjs`; large-list/tree browser
+checks live in `client/e2e/performance.spec.js`. The measured baseline and remediation evidence
+are in [Performance Audit — October 12, 2026](planning/performance-audit-2026-10-12.md).
 
 ## Practical invariants
 

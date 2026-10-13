@@ -159,7 +159,7 @@ Organized by area. Each item includes the specific code location and expected im
 
 - [ ] **P24. ETag support for goal tree responses** — Goal tree payloads can be 200KB+. Add ETag headers based on `max(updated_at)` of goals in the tree. Return `304 Not Modified` when unchanged. *Files:* `goals_api.py`, `goal_service.py`. *Impact:* Eliminates redundant large payload transfers.
 
-- [ ] **P25. Redis-backed analytics cache** — Replace process-local `_ANALYTICS_BY_ROOT` dict with Redis. Shared across workers, survives restarts, and supports TTL natively. *File:* `analytics_cache.py`. *Impact:* Cache consistency across processes.
+- [x] **P25. Redis-backed analytics cache — retired October 12, 2026.** The unused process-local goal cache was removed; SQL aggregate reads remain fresh across workers. Redis is unnecessary for this path. See [the remediation audit](../../planning/performance-audit-2026-10-12.md).
 
 ### Frontend — Computation (P26-P30)
 

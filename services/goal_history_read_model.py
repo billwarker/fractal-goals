@@ -126,10 +126,10 @@ class GoalHistoryReadModel:
             .all()
         )
 
-    def instance_links(self, goal_ids):
+    def instance_links(self, goal_ids, *, instance_ids=None):
         if "instance_links" in self._rows:
             return {key: values & set(goal_ids) for key, values in self._rows["instance_links"].items() if values & set(goal_ids)}
-        return load_instance_goal_ids(self.db_session, self.root_id, goal_ids=goal_ids)
+        return load_instance_goal_ids(self.db_session, self.root_id, goal_ids=goal_ids, instance_ids=instance_ids)
 
     def instances(self, activity_ids, *, summary_only=False, occurred_range=None, instance_ids=None, linked_instance_ids=None, linked_goal_ids=None):
         if instance_ids is not None and not instance_ids:
@@ -186,7 +186,7 @@ class GoalHistoryReadModel:
             query = query.filter(ActivityInstance.id.in_(instance_ids))
         return query.all()
 
-    def association_events(self, goal_ids, limit=None):
+    def association_events(self, goal_ids, limit=None, *, event_ids=None):
         if "association_events" in self._rows:
             rows = [
                 row
@@ -194,7 +194,7 @@ class GoalHistoryReadModel:
                 if (row.payload or {}).get("goal_id") in goal_ids
             ]
             return rows[:limit] if limit is not None else rows
-        return (
+        query = (
             self.db_session.query(EventLog)
             .filter(
                 EventLog.root_id == self.root_id,
@@ -211,9 +211,10 @@ class GoalHistoryReadModel:
                 EventLog.payload["goal_id"].astext.in_(goal_ids),
             )
             .order_by(EventLog.timestamp.desc(), EventLog.id.desc())
-            .limit(limit)
-            .all()
         )
+        if event_ids is not None:
+            query = query.filter(EventLog.id.in_(event_ids))
+        return query.limit(limit).all()
 
     def targets(self, goal_ids, *, summary_only=False, target_ids=None):
         if target_ids is not None and not target_ids:

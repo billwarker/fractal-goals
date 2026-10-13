@@ -130,12 +130,15 @@ def get_fractal_sessions(current_user, root_id):
         except ValueError:
             return jsonify({"error": "Invalid pagination parameters"}), 400
 
+        view = request.args.get('view', 'detail')
+        if view not in {'summary', 'detail'} or limit < 1 or offset < 0:
+            return jsonify({'error': 'Invalid session view or pagination parameters'}), 400
         result, error, status = service.get_fractal_sessions(
             root_id,
             current_user.id,
             limit,
             offset,
-            filters=_get_session_query_filters(),
+            filters=_get_session_query_filters(), view=view,
         )
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
@@ -180,10 +183,14 @@ def get_session_analytics_summary(current_user, root_id):
     try:
         try:
             limit = min(int(request.args.get('limit', 50)), 200)
+            instance_offset = int(request.args.get('instance_offset', 0))
+            instance_limit = min(int(request.args.get('instance_limit', 500)), 500)
+            if limit < 1 or instance_offset < 0 or instance_limit < 1:
+                return jsonify({'error': 'Invalid pagination'}), 400
         except ValueError:
             return jsonify({"error": "Invalid limit"}), 400
 
-        result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit)
+        result, error, status = service.get_session_analytics_summary(root_id, current_user.id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
         return jsonify(result)

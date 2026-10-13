@@ -1,4 +1,4 @@
-import { API_BASE, axios } from './core';
+import { API_BASE, axios, buildQueryString } from './core';
 
 export const fractalGoalsApi = {
     getGoals: (rootId) => axios.get(`${API_BASE}/${rootId}/goals`),
@@ -26,7 +26,7 @@ export const fractalGoalsApi = {
         axios.get(`${API_BASE}/${rootId}/targets/${targetId}/analytics${since === 'all' ? '?since=all' : ''}`),
     getGoalActivityInstances: (rootId, goalId, activityId) =>
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities/${activityId}/instances`),
-    getGoalAnalytics: (rootId) => axios.get(`${API_BASE}/${rootId}/goals/analytics`),
+    getGoalAnalytics: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/goals/analytics${buildQueryString(options)}`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
     getGoalActivityHeatmap: (rootId, goalId, { includeChildren = true, timezone = 'UTC', date = null, view = 'calendar', metric = 'activities', cursor = null, limit = 20 } = {}) =>

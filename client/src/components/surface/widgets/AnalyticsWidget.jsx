@@ -7,6 +7,8 @@ import {
 import { sanitizeDashboardLayoutPayload } from '../../analytics/dashboardState';
 import { useAnalyticsViews } from '../../../hooks/useDashboardQueries';
 import { useAnalyticsPageData } from '../../../hooks/useAnalyticsPageData';
+import useGoalAnalyticsRead from '../../analytics/useGoalAnalyticsRead';
+import AnalyticsEvidenceNotice from '../../analytics/AnalyticsEvidenceNotice';
 
 const EMPTY = [];
 
@@ -76,7 +78,6 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
     const rootId = sharedData?.rootId;
     const chartRef = useRef(null);
     const { analyticsViewItems } = useAnalyticsViews(rootId);
-    const analyticsData = useAnalyticsPageData(rootId);
 
     const savedViewId = state?.savedViewId || null;
     const category = state?.category || null;
@@ -107,6 +108,13 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
         };
     }, [savedViewId, analyticsViewItems, category, visualizationId]);
 
+    const analyticsData = useAnalyticsPageData(rootId, { needsSessionEvidence: ['sessions', 'activities'].includes(resolved.viz?.category) });
+    const chartRead = useGoalAnalyticsRead({ rootId, selectedCategory: resolved.viz?.category,
+        selectedVisualization: resolved.viz?.id, selectedGoal: null,
+        resolvedGlobalFilters: { hasGoalFilter: false, hasActivityFilter: false },
+        goalAnalytics: analyticsData.goalAnalytics, effectiveDateRange: null, hasActiveDateRange: false });
+    const chartAnalytics = chartRead.data || analyticsData.goalAnalytics;
+
     const scopedGoalIds = useMemo(() => (
         viewMode === 'scoped' && sharedData?.visibleGoalIds
             ? new Set(sharedData.visibleGoalIds)
@@ -114,7 +122,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
     ), [sharedData, viewMode]);
 
     const goalAnalytics = useMemo(() => {
-        const raw = analyticsData.goalAnalytics || {};
+        const raw = chartAnalytics || {};
         if (!scopedGoalIds) return raw;
         const goals = (raw.goals || []).filter((goal) => scopedGoalIds.has(goal.id));
         return {
@@ -126,7 +134,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
                 completed_goals: goals.filter((goal) => goal.completed).length,
             },
         };
-    }, [analyticsData.goalAnalytics, scopedGoalIds]);
+    }, [chartAnalytics, scopedGoalIds]);
 
     const effectiveSharedData = useMemo(() => ({
         ...sharedData,
@@ -176,7 +184,8 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
 
     return (
         <div className="surface-analytics" data-no-panel-drag="true">
-            {resolved.queryProfileView ? (
+            <AnalyticsEvidenceNotice {...analyticsData} />
+            {chartRead.isFetching || analyticsData.evidenceLoading ? <div role="status">Loading analytics…</div> : chartRead.isError || analyticsData.evidenceError ? <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => chartRead.isError ? chartRead.refetch() : analyticsData.retryEvidence()}>Retry</button></div> : resolved.queryProfileView ? (
                 renderQueryProfileView()
             ) : Chart ? (
                 <div className="surface-analytics-chart">

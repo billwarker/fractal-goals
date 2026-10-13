@@ -168,11 +168,11 @@ ensure_frontend_tools() {
 }
 
 backend_pytest() {
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pytest "$@")
+    (cd "$ROOT_DIR" && "$VENV_PYTHON" "$ROOT_DIR/scripts/run_isolated_backend_tests.py" "$@")
 }
 
 backend_pytest_no_cov() {
-    (cd "$ROOT_DIR" && "$VENV_PYTHON" -m pytest -o addopts="--verbose --strict-markers" "$@")
+    (cd "$ROOT_DIR" && "$VENV_PYTHON" "$ROOT_DIR/scripts/run_isolated_backend_tests.py" -o addopts="--verbose --strict-markers" "$@")
 }
 
 frontend_vitest() {
@@ -204,7 +204,7 @@ run_agent_adapter_tests() {
     (cd "$ROOT_DIR" && \
         AGENT_MCP_RESOURCE_URI="${AGENT_MCP_RESOURCE_URI:-http://127.0.0.1:8000/mcp}" \
         AGENT_OAUTH_ISSUER="${AGENT_OAUTH_ISSUER:-http://127.0.0.1:5000}" \
-        "$VENV_PYTHON" -m pytest -o addopts="" agent_adapter/tests/)
+        "$VENV_PYTHON" "$ROOT_DIR/scripts/run_isolated_backend_tests.py" -o addopts="" agent_adapter/tests/)
 }
 
 run_frontend_tests() {

@@ -182,8 +182,8 @@ def get_program_calendar_feed(current_user, root_id):
             range_end=request.args.get('range_end'),
             timezone_name=timezone_name,
         )
-        if error:
-            return payload, error, status
+        if error or payload is None:
+            return payload, error or 'Calendar feed unavailable', status if error else 500
         response = jsonify(payload)
         logger.info(
             "calendar_feed_response range=%s..%s programs=%s days=%s session_days=%s "

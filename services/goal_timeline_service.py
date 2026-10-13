@@ -115,47 +115,55 @@ class GoalTimelineService:
             )
 
         activity_range = (start, end)
+        day_end = None
         if selected_day is not None:
             day_start, day_end = local_day_bounds(selected_day, zone)
             activity_range = (max(start, day_start), min(end, day_end))
-        payload, error, status = self._project_timeline(
-            root_id, goal_id, current_user_id,
-            types=['activity', 'target', 'goal_lifecycle'],
-            include_children=include_children, validated_root=root,
-            preloaded_goals_by_id=goals, summary_only=page_size is not None or selected_day is None,
-            entry_filter=in_range, activity_range=activity_range,
+        from services.goal_evidence_read_model import GoalEvidenceReadModel
+        scope_ids = {item.id for item in self._collect_goal_subtree(goal)} if include_children else {goal.id}
+        evidence = GoalEvidenceReadModel(
+            self.db_session, root_id, scope_ids,
+            inherited_parent_id=goal.parent_id if goal.inherit_parent_activities and goal.parent_id in goals else None,
         )
-        if error:
-            return None, error, status
-        if payload is None:
-            return None, "Goal history unavailable", 500
         if page_size is not None:
-            from services.goal_timeline_page import timeline_page
             try:
-                page, pagination = timeline_page(payload['entries'], metric, page_size, cursor)
+                page, pagination = evidence.page(
+                    *activity_range, metric, page_size, cursor,
+                    exclusive_end=day_end if selected_day else None,
+                )
             except (ValueError, TypeError):
                 return None, "Provide a valid timeline mode, cursor and page size (1–100)", 400
             if not page:
                 return {'entries': [], 'pagination': pagination}, None, 200
-            selected_ids = {entry['id'] for entry in page}
-            instance_ids = {entry['entity_id'] for entry in page if entry['event_type'] == 'activity.completed'}
+            selected_ids = {entry.id for entry in page}
+            instance_ids = {entry.entity_id for entry in page if entry.event_type == 'activity.completed'}
             rich, error, status = self._project_timeline(
                 root_id, goal_id, current_user_id, types=['activity', 'target', 'goal_lifecycle'],
                 include_children=include_children, validated_root=root, preloaded_goals_by_id=goals,
                 entry_filter=in_range, activity_range=activity_range,
                 selected_entry_ids=selected_ids, activity_instance_ids=instance_ids,
-                target_ids={entry['entity_id'] for entry in page if entry['entity_type'] == 'target'},
+                target_ids={entry.entity_id for entry in page if entry.entity_type == 'target'},
             )
             if error:
                 return None, error, status
             if rich is None:
                 return None, "Goal history unavailable", 500
             by_id = {entry['id']: entry for entry in rich['entries']}
-            return {'entries': [by_id[entry['id']] for entry in page if entry['id'] in by_id],
+            return {'entries': [by_id[entry.id] for entry in page if entry.id in by_id],
                     'pagination': pagination}, None, 200
         if selected_day:
+            payload, error, status = self._project_timeline(
+                root_id, goal_id, current_user_id,
+                types=['activity', 'target', 'goal_lifecycle'], include_children=include_children,
+                validated_root=root, preloaded_goals_by_id=goals, entry_filter=in_range,
+                activity_range=activity_range,
+            )
+            if error:
+                return None, error, status
+            if payload is None:
+                return None, 'Goal history unavailable', 500
             return {'date': selected_day.isoformat(), 'entries': payload['entries']}, None, 200
-        return aggregate_goal_days(payload['entries'], start, end, zone), None, 200
+        return aggregate_goal_days(evidence.days(start, end, zone), start, end, zone, goal.pause_intervals), None, 200
 
     def _project_timeline(
         self,
@@ -320,7 +328,7 @@ class GoalTimelineService:
             for activity in activities_by_group.get(group_id, []):
                 activity_contexts.setdefault(activity.id, []).append((source_goal, associated_at))
 
-        instance_links = history.instance_links(timeline_goal_ids)
+        instance_links = history.instance_links(timeline_goal_ids, instance_ids=activity_instance_ids)
         if 'activity' in requested_types and (activity_contexts or instance_links):
             instances = history.instances(list(activity_contexts.keys()), summary_only=summary_only, occurred_range=activity_range, instance_ids=activity_instance_ids, linked_instance_ids=set(instance_links))
             for instance in instances:
@@ -374,7 +382,7 @@ class GoalTimelineService:
                 )
 
         if 'activity' in requested_types:
-            association_events = history.association_events(effective_goal_ids, limit)
+            association_events = history.association_events(effective_goal_ids, limit, event_ids={item.split(':', 1)[1] for item in selected_entry_ids if item.startswith('association_event:')} if selected_entry_ids is not None else None)
             for association_event in association_events:
                 event_payload = association_event.payload or {}
                 source_goal_id = event_payload.get('goal_id')

@@ -1,5 +1,5 @@
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import { useAnalyticsPageData } from '../useAnalyticsPageData';
@@ -76,7 +76,7 @@ describe('useAnalyticsPageData', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(queryClient.getQueryData(queryKeys.analyticsSummary('root-1'))).toMatchObject({
+        expect(queryClient.getQueryData([...queryKeys.analyticsSummary('root-1'), 'paged']).pages[0]).toMatchObject({
             sessions: [{ id: 'session-1', name: 'Session A' }],
         });
         expect(queryClient.getQueryData(queryKeys.goalAnalytics('root-1'))).toEqual({ totals: { complete: 3 } });
@@ -93,4 +93,26 @@ describe('useAnalyticsPageData', () => {
         });
         expect(result.current.activityGroups).toEqual([{ id: 'group-1', name: 'Technique' }]);
     });
+    it('defers evidence and fetches additional pages only when requested', async () => {
+        const queryClient = createQueryClient();
+        getGoalAnalytics.mockResolvedValue({ data: { goals: [] } });
+        getActivities.mockResolvedValue({ data: [] });
+        getActivityGroups.mockResolvedValue({ data: [] });
+        getSessionAnalyticsSummary
+            .mockResolvedValueOnce({ data: { sessions: [], activity_instances: { a: [{ id: 'one' }] }, evidence_pagination: { next_offset: 500 } } })
+            .mockResolvedValueOnce({ data: { sessions: [], activity_instances: { a: [{ id: 'two' }] }, evidence_pagination: { next_offset: null } } });
+        const { result, rerender } = renderHook(({ enabled }) => useAnalyticsPageData('root', { needsSessionEvidence: enabled }), {
+            initialProps: { enabled: false }, wrapper: createWrapper(queryClient),
+        });
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(getSessionAnalyticsSummary).not.toHaveBeenCalled();
+        rerender({ enabled: true });
+        await waitFor(() => expect(result.current.hasMoreEvidence).toBe(true));
+        expect(getSessionAnalyticsSummary).toHaveBeenCalledTimes(1);
+        await act(async () => { await result.current.loadMoreEvidence(); });
+        await waitFor(() => expect(result.current.activityInstances.a.map((row) => row.id)).toEqual(['one', 'two']));
+        expect(getSessionAnalyticsSummary).toHaveBeenLastCalledWith('root', { limit: 50, instance_offset: 500, instance_limit: 500 });
+        expect(result.current.hasMoreEvidence).toBe(false);
+    });
+
 });

@@ -1,6 +1,6 @@
 """Canonical per-execution attribution. Explicit links never widen definition scope."""
-from sqlalchemy import select
-from models import ActivityInstance, Goal, Session, activity_instance_goal_associations
+from sqlalchemy import select, func, or_, not_
+from models import ActivityInstance, Goal, GoalPauseInterval, Session, activity_instance_goal_associations
 from services.goal_contribution import as_utc_datetime, resolve_contribution_goal
 
 
@@ -62,3 +62,18 @@ def resolve_instance_goals(instance_id, definition_goals, direct_links, goals_by
                 goals[goal.id] = goal
             goal = goals_by_id.get(goal.parent_id)
     return list(goals.values())
+
+
+def instance_contribution_clause(instance, goal):
+    """SQL equivalent of instance_contributes_to_goal, shared by aggregate reads."""
+    occurred = func.coalesce(instance.time_start, instance.created_at)
+    paused = select(GoalPauseInterval.id).where(
+        GoalPauseInterval.goal_id == goal.id,
+        GoalPauseInterval.paused_at <= occurred,
+        or_(GoalPauseInterval.resumed_at.is_(None), GoalPauseInterval.resumed_at > occurred),
+    ).correlate(instance, goal).exists()
+    return (goal.deleted_at.is_(None) & goal.paused.is_not(True)
+            & occurred.is_not(None)
+            & or_(goal.created_at.is_(None), occurred >= goal.created_at)
+            & or_(goal.completed_at.is_(None), occurred <= goal.completed_at)
+            & not_(paused))

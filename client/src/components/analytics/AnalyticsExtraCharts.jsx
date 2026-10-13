@@ -140,7 +140,7 @@ export function GoalMomentumChart({ goals = [], chartRef }) {
     const chartTheme = useChartThemeDefaults();
     const data = useMemo(() => {
         const rows = goals
-            .map((goal) => ({ label: goal.name, seconds: (goal.activity_durations_by_date || []).reduce((sum, item) => sum + (item.duration_seconds || 0), 0) }))
+            .map((goal) => ({ label: goal.name, seconds: goal.activity_duration_seconds ?? (goal.activity_durations_by_date || []).reduce((sum, item) => sum + (item.duration_seconds || 0), 0) }))
             .filter((row) => row.seconds > 0)
             .sort((a, b) => b.seconds - a.seconds)
             .slice(0, 12);
@@ -159,6 +159,7 @@ export function StaleGoalsChart({ goals = [] }) {
                 const dates = [
                     ...(goal.activity_durations_by_date || []).map((item) => item.date),
                     ...(goal.session_durations_by_date || []).map((item) => item.date),
+                    goal.last_evidence_at,
                     goal.created_at,
                 ].filter(Boolean).map((value) => new Date(value)).filter((date) => !Number.isNaN(date.getTime()));
                 const last = dates.length ? new Date(Math.max(...dates.map((date) => date.getTime()))) : null;

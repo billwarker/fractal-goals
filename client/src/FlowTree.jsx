@@ -100,7 +100,6 @@ function getHierarchyViewport(bounds, viewportWidth, viewportHeight, isMobile, s
 
 const FlowTree = React.forwardRef(({
     treeData,
-    sessions = EMPTY_ARRAY,
     evidenceGoalIds = null,
     metricsSummary = null,
     activities = EMPTY_ARRAY,
@@ -137,7 +136,7 @@ const FlowTree = React.forwardRef(({
     }), []);
 
     const { nodes: graphNodes, edges: graphEdges, metrics: graphMetrics } = useFlowTreeGraph({
-        treeData, onNodeClick, onAddChild, selectedNodeId, viewSettings, sessions, evidenceGoalIds,
+        treeData, onNodeClick, onAddChild, selectedNodeId, viewSettings, evidenceGoalIds,
         metricsSummary, activities, activityGroups, programs, allowedGoalIds, isMobile, layoutMode,
     });
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);

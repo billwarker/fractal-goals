@@ -3,14 +3,15 @@
 Tag filters, inclusion rules, effective time ordering, and predecessor lookup.
 """
 
-from typing import Optional
-from sqlalchemy import and_, func, not_, or_, true
+from typing import Any, Optional
+from sqlalchemy import and_, func, not_, or_, true, select, tuple_
 from sqlalchemy.orm import joinedload, selectinload
 from models import ActivityDefinition, ActivityInstance, ActivitySet, ActivityTag, Session
 from services.activity_instance_data import load_instance_sets
 
 
 class _ProgressInstancesMixin:
+    db: Any
     @staticmethod
     def _matches_tag_config(tag_ids, config) -> bool:
         present = set(tag_ids or [])
@@ -137,20 +138,37 @@ class _ProgressInstancesMixin:
             clauses.append(not_(or_(*none_clauses)))
         return and_(*clauses)
 
-    @staticmethod
-    def _predecessor_ids_for_targets(included_rows, target_ids):
-        target_ids = set(target_ids)
-        predecessors = {}
-        prior_rows = []
-        for row in included_rows:
-            if row.id in target_ids:
-                eligible = [candidate for candidate in prior_rows if candidate.session_id != row.session_id]
-                previous = next((candidate for candidate in reversed(eligible) if candidate.completed), None)
-                if previous is None and eligible:
-                    previous = eligible[-1]
-                predecessors[row.id] = previous.id if previous else None
-            prior_rows.append(row)
-        return predecessors
+    def _load_predecessor_ids(self, instances, activities, configs, *, exclude_session_id=None):
+        """Return at most one identity per requested instance, entirely in SQL.
+
+        Completed predecessors win over incomplete ones; ties use the instance ID.
+        Candidate history is never hydrated or transferred to Python.
+        """
+        scopes = [
+            and_(ActivityInstance.activity_definition_id == activity_id,
+                 ActivityInstance.root_id == activities[activity_id].root_id,
+                 self._included_instance_clause(activities[activity_id], config))
+            for activity_id, config in configs.items()
+        ]
+        if not instances or not scopes:
+            return {}
+        targets = self._active_instance_identity_query().filter(
+            ActivityInstance.id.in_([instance.id for instance in instances]),
+        ).add_columns(ActivityInstance.activity_definition_id).subquery('progress_targets')
+        candidates = self._active_instance_identity_query().filter(or_(*scopes))
+        if exclude_session_id:
+            candidates = candidates.filter(ActivityInstance.session_id != exclude_session_id)
+        candidates = candidates.add_columns(ActivityInstance.activity_definition_id).subquery('progress_candidates')
+        earlier = select(candidates.c.id).where(
+            candidates.c.activity_definition_id == targets.c.activity_definition_id,
+            candidates.c.session_id != targets.c.session_id,
+            tuple_(candidates.c.effective_time, candidates.c.id) < tuple_(targets.c.effective_time, targets.c.id),
+        ).order_by(candidates.c.effective_time.desc(), candidates.c.id.desc()).correlate(targets)
+        completed = earlier.where(candidates.c.completed.is_(True)).limit(1).scalar_subquery()
+        fallback = earlier.limit(1).scalar_subquery()
+        return dict(self.db.execute(select(
+            targets.c.id, func.coalesce(completed, fallback).label('previous_id'),
+        )).all())
 
     def _get_active_instance(self, activity_instance_id: str) -> Optional[ActivityInstance]:
         return (

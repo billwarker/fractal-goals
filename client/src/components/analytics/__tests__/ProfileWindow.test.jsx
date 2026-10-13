@@ -1,6 +1,10 @@
 import React from 'react';
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as renderBase, screen } from '@testing-library/react';
+
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const render = (element) => renderBase(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{element}</QueryClientProvider>);
 
 import ProfileWindow from '../ProfileWindow';
 

@@ -30,7 +30,6 @@ from services.serializers import (
     serialize_target,
 )
 from extensions import limiter
-from services.analytics_cache import get_analytics, set_analytics
 from services.goal_analytics_service import GoalAnalyticsService
 from services.goal_service import (
     GoalService,
@@ -576,18 +575,18 @@ def get_goal_analytics(current_user, root_id):
     """
     db_session = get_db_session()
     try:
-        root = require_owned_root(db_session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
+        if any(request.args.get(key) not in (None, 'true', 'false') for key in ('charts', 'activity_filter')):
+            return jsonify({"error": "Analytics flags must be true or false"}), 400
 
-        cached = get_analytics(root_id)
-        if cached is not None:
-            return jsonify(cached)
         service = GoalAnalyticsService(db_session)
-        payload, error, status = service.get_goal_analytics(root_id, current_user.id)
+        payload, error, status = service.get_goal_analytics(
+            root_id, current_user.id, range_start=request.args.get('range_start'),
+            range_end=request.args.get('range_end'),
+            activity_ids=request.args.getlist('activity_ids') if 'activity_ids' in request.args or request.args.get('activity_filter') == 'true' else None,
+            chart_goal_id=request.args.get('chart_goal_id'), charts=request.args.get('charts') == 'true',
+        )
         if error:
-            return jsonify({"error": error}), status
-        set_analytics(root_id, payload)
+            return jsonify({'error': error}), status
         return jsonify(payload), status
         
     except SQLAlchemyError:

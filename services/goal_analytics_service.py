@@ -1,205 +1,143 @@
+"""Aggregate goal analytics; only a selected goal loads bounded chart buckets."""
 from datetime import datetime, timezone
-
+from math import ceil
+from sqlalchemy import func, select, true
 from sqlalchemy.orm import joinedload
-from services.instance_goal_evidence import load_instance_goal_ids, resolve_instance_goals, instance_contributes_to_goal
-from services.goal_loading import load_fractal_goals_for_serialization
+from models import ActivityDefinition, Goal, validate_root_goal
+from services.goal_activity_heatmap import utc_datetime
+from services.goal_analytics_queries import analytics_evidence
+from services.serializers import format_utc
+from services.view_serializers import serialize_goal_analytics_goal, serialize_goal_analytics_payload
 
-from models import ActivityInstance, ActivityDefinition, Goal, Session, validate_root_goal
-from services.view_serializers import (
-    serialize_goal_activity_breakdown_item,
-    serialize_goal_activity_duration_item,
-    serialize_goal_analytics_goal,
-    serialize_goal_analytics_payload,
-    serialize_goal_session_analytics_row,
-    serialize_goal_session_duration_item,
-)
+MAX_CHART_POINTS = 366
 
 
 class GoalAnalyticsService:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def get_goal_analytics(self, root_id, current_user_id):
+    def get_goal_analytics(self, root_id, current_user_id, *, range_start=None, range_end=None,
+                           activity_ids=None, chart_goal_id=None, charts=False):
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
-            return None, "Fractal not found or access denied", 404
-
-        all_goals = self.db_session.query(Goal).filter(
-            Goal.root_id == root_id,
-            Goal.deleted_at.is_(None),
+            return None, 'Fractal not found or access denied', 404
+        try:
+            start = utc_datetime(range_start) if range_start else None
+            end = utc_datetime(range_end) if range_end else None
+            if start and end and end < start:
+                raise ValueError('Reversed range')
+            if len(activity_ids or []) > 200:
+                raise ValueError('Too many activities')
+        except (ValueError, TypeError, OverflowError):
+            return None, 'Provide valid analytics dates and at most 200 activities', 400
+        goals = self.db_session.query(Goal).options(joinedload(Goal.level)).filter(
+            Goal.root_id == root_id, Goal.deleted_at.is_(None),
         ).all()
-
+        if chart_goal_id and chart_goal_id not in {goal.id for goal in goals}:
+            return None, 'Goal not found', 404
+        sessions, instances = analytics_evidence(root_id)
+        activity = select(instances)
+        if activity_ids is not None:
+            activity = activity.where(instances.c.activity_definition_id.in_(activity_ids))
+        if start:
+            activity = activity.where(instances.c.session_start >= start)
+        if end:
+            activity = activity.where(instances.c.session_start <= end)
+        activity = activity.cte('analytics_filtered_activities')
+        session_time = select(sessions)
+        if activity_ids is not None:
+            session_time = select(activity.c.goal_id, activity.c.session_id,
+                                  func.sum(func.coalesce(activity.c.duration_seconds, 0)).label('duration_seconds'),
+                                  activity.c.session_start).group_by(activity.c.goal_id, activity.c.session_id, activity.c.session_start)
+        else:
+            if start:
+                session_time = session_time.where(sessions.c.session_start >= start)
+            if end:
+                session_time = session_time.where(sessions.c.session_start <= end)
+        session_time = session_time.cte('analytics_filtered_sessions')
+        totals = {row.goal_id: row for row in self.db_session.execute(select(
+            session_time.c.goal_id, func.count().label('session_count'),
+            func.sum(session_time.c.duration_seconds).label('duration'),
+            func.max(session_time.c.session_start).label('last_date'),
+        ).group_by(session_time.c.goal_id))}
+        breakdown = {}
+        for row in self.db_session.execute(select(
+            activity.c.goal_id, activity.c.activity_definition_id, ActivityDefinition.name,
+            func.count().label('instance_count'), func.sum(func.coalesce(activity.c.duration_seconds, 0)).label('duration'),
+            func.max(activity.c.session_start).label('last_date'),
+        ).outerjoin(ActivityDefinition, ActivityDefinition.id == activity.c.activity_definition_id).group_by(
+            activity.c.goal_id, activity.c.activity_definition_id, ActivityDefinition.name,
+        )):
+            breakdown.setdefault(row.goal_id, []).append({
+                'activity_id': row.activity_definition_id, 'activity_name': row.name or 'Unknown',
+                'instance_count': row.instance_count, 'total_duration_seconds': row.duration,
+                'last_date': format_utc(row.last_date),
+            })
+        chart_rows = {}
+        activity_chart_rows = {}
+        bucket_days = 1
+        if charts or chart_goal_id:
+            scope = session_time.c.goal_id == chart_goal_id if chart_goal_id else true()
+            bounds = self.db_session.execute(select(
+                func.min(session_time.c.session_start), func.max(session_time.c.session_start),
+            ).where(scope)).one()
+            if bounds[0] and bounds[1]:
+                span = (bounds[1] - bounds[0]).total_seconds()
+                point_budget = MAX_CHART_POINTS if chart_goal_id else 120
+                bucket_days = max(1, ceil((span / 86400 + 1) / (point_budget - 1)))
+                width = bucket_days * 86400
+                bucket = func.to_timestamp(func.floor(func.extract('epoch', session_time.c.session_start) / width) * width)
+                for row in self.db_session.execute(select(
+                    session_time.c.goal_id, bucket.label('date'), func.sum(session_time.c.duration_seconds).label('duration'),
+                    func.count().label('count'),
+                ).where(scope, session_time.c.session_start.is_not(None)).group_by(session_time.c.goal_id, bucket).order_by(bucket)):
+                    chart_rows.setdefault(row.goal_id, []).append({
+                        'date': format_utc(row.date), 'duration_seconds': row.duration,
+                        'session_count': row.count, 'session_name': 'Sessions',
+                    })
+                activity_bucket = func.to_timestamp(func.floor(func.extract('epoch', activity.c.session_start) / width) * width)
+                activity_scope = activity.c.goal_id == chart_goal_id if chart_goal_id else true()
+                for row in self.db_session.execute(select(
+                    activity.c.goal_id, activity_bucket.label('date'),
+                    func.sum(activity.c.duration_seconds).label('duration'), func.count().label('count'),
+                ).where(activity_scope, activity.c.duration_seconds != 0, activity.c.session_start.is_not(None))
+                  .group_by(activity.c.goal_id, activity_bucket).order_by(activity_bucket)):
+                    activity_chart_rows.setdefault(row.goal_id, []).append({
+                        'date': format_utc(row.date), 'duration_seconds': row.duration,
+                        'instance_count': row.count, 'activity_name': 'Activities',
+                    })
         now = datetime.now(timezone.utc)
-        completed_goals = [goal for goal in all_goals if goal.completed]
-        total_completed = len(completed_goals)
-
-        goal_ages = []
-        for goal in all_goals:
-            if not goal.created_at:
-                continue
-            created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
-            goal_ages.append((now - created).days)
-        avg_goal_age = sum(goal_ages) / len(goal_ages) if goal_ages else 0
-
-        completion_times = []
-        for goal in completed_goals:
-            if not goal.completed_at or not goal.created_at:
-                continue
-            created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
-            completed = goal.completed_at.replace(tzinfo=timezone.utc) if goal.completed_at.tzinfo is None else goal.completed_at
-            completion_times.append((completed - created).days)
-        avg_time_to_completion = sum(completion_times) / len(completion_times) if completion_times else 0
-
-        all_sessions = self.db_session.query(Session).options(
-            joinedload(Session.goals)
-        ).filter(
-            Session.root_id == root_id,
-            Session.deleted_at.is_(None),
-        ).all()
-
-        goal_session_map = {}
-        session_row_by_id = {}
-        for session in all_sessions:
-            session_duration = session.total_duration_seconds or 0
-            if session_duration == 0 and session.session_start and session.session_end:
-                start = session.session_start.replace(tzinfo=timezone.utc) if session.session_start.tzinfo is None else session.session_start
-                end = session.session_end.replace(tzinfo=timezone.utc) if session.session_end.tzinfo is None else session.session_end
-                session_duration = int((end - start).total_seconds())
-
-            session_payload = serialize_goal_session_analytics_row(
-                session_id=session.id,
-                session_name=session.name,
-                duration_seconds=session_duration,
-                completed=session.completed,
-                session_start=session.session_start,
-            )
-            session_row_by_id[session.id] = session_payload
-            for goal in session.goals:
-                goal_session_map.setdefault(goal.id, []).append(session_payload)
-
-        session_ids = list(session_row_by_id.keys())
-        all_activity_instances = []
-        if session_ids:
-            all_activity_instances = self.db_session.query(ActivityInstance).options(
-                joinedload(ActivityInstance.definition)
-            ).filter(
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.session_id.in_(session_ids),
-                ActivityInstance.deleted_at.is_(None),
-            ).all()
-
-        session_activity_map = {}
-        for instance in all_activity_instances:
-            session_activity_map.setdefault(instance.session_id, []).append(instance)
-
-        explicit_instances_by_goal = {}
-        direct_links = load_instance_goal_ids(self.db_session, root_id, instance_ids={row.id for row in all_activity_instances})
-        goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id) if direct_links else {}
-        for instance in all_activity_instances:
-            if not instance.completed:
-                continue
-            for goal in resolve_instance_goals(instance.id, [], direct_links, goals_by_id):
-                if not instance_contributes_to_goal(instance, goal):
-                    continue
-                explicit_instances_by_goal.setdefault(goal.id, []).append(instance)
-        for goal_id, instances in explicit_instances_by_goal.items():
-            known = {row['session_id'] for row in goal_session_map.get(goal_id, [])}
-            durations = {}
-            for instance in instances:
-                if instance.session_id not in known:
-                    durations[instance.session_id] = durations.get(instance.session_id, 0) + (instance.duration_seconds or 0)
-            for session_id, duration in durations.items():
-                row = session_row_by_id.get(session_id)
-                if row:
-                    goal_session_map.setdefault(goal_id, []).append({**row, 'duration_seconds': duration, 'instance_scoped': True})
-
-        total_duration_completed = 0
-        completed_goals_with_sessions = 0
-        for goal in completed_goals:
-            if goal.id not in goal_session_map:
-                continue
-            goal_duration = sum(session["duration_seconds"] for session in goal_session_map[goal.id])
-            if goal_duration <= 0:
-                continue
-            total_duration_completed += goal_duration
-            completed_goals_with_sessions += 1
-        avg_duration_to_completion = (
-            total_duration_completed / completed_goals_with_sessions
-            if completed_goals_with_sessions > 0 else 0
-        )
-
-        goals_data = []
-        for goal in all_goals:
-            sessions_for_goal = goal_session_map.get(goal.id, [])
-            total_duration = sum(session["duration_seconds"] for session in sessions_for_goal)
-            session_count = len(sessions_for_goal)
-
-            activity_breakdown = {}
-            goal_activity_instances = []
-            for session in sessions_for_goal:
-                if not session.get('instance_scoped'):
-                    goal_activity_instances.extend(session_activity_map.get(session["session_id"], []))
-            goal_activity_instances = list({row.id: row for row in [*goal_activity_instances, *explicit_instances_by_goal.get(goal.id, [])]}.values())
-
-            for instance in goal_activity_instances:
-                activity_name = instance.definition.name if instance.definition else "Unknown"
-                activity_id = instance.activity_definition_id
-                if activity_id not in activity_breakdown:
-                    activity_breakdown[activity_id] = serialize_goal_activity_breakdown_item(
-                        activity_id=activity_id,
-                        activity_name=activity_name,
-                        instance_count=0,
-                        total_duration_seconds=0,
-                    )
-                activity_breakdown[activity_id]["instance_count"] += 1
-                if instance.duration_seconds:
-                    activity_breakdown[activity_id]["total_duration_seconds"] += instance.duration_seconds
-
-            goal_age_days = 0
+        payload_goals = []
+        ages, completion_times, completion_durations = [], [], []
+        for goal in goals:
+            age = (now - utc_datetime(goal.created_at)).days if goal.created_at else 0
             if goal.created_at:
-                created = goal.created_at.replace(tzinfo=timezone.utc) if goal.created_at.tzinfo is None else goal.created_at
-                goal_age_days = (now - created).days
-
-            session_durations_by_date = []
-            for session in sessions_for_goal:
-                if session["session_start"]:
-                    session_durations_by_date.append(serialize_goal_session_duration_item(
-                        date=session["session_start"],
-                        duration_seconds=session["duration_seconds"],
-                        session_name=session["session_name"],
-                    ))
-            session_durations_by_date.sort(key=lambda item: item["date"])
-
-            activity_durations_by_date = []
-            for instance in goal_activity_instances:
-                session = session_row_by_id.get(instance.session_id)
-                if session and session["session_start"] and instance.duration_seconds:
-                    activity_durations_by_date.append(serialize_goal_activity_duration_item(
-                        date=session["session_start"],
-                        duration_seconds=instance.duration_seconds,
-                        activity_name=instance.definition.name if instance.definition else "Unknown",
-                    ))
-            activity_durations_by_date.sort(key=lambda item: item["date"])
-
-            goals_data.append(serialize_goal_analytics_goal(
-                goal,
-                age_days=goal_age_days,
-                total_duration_seconds=total_duration,
-                session_count=session_count,
-                activity_breakdown=activity_breakdown.values(),
-                session_durations_by_date=session_durations_by_date,
-                activity_durations_by_date=activity_durations_by_date,
-            ))
-
-        payload = serialize_goal_analytics_payload(
-            {
-                "total_goals": len(all_goals),
-                "completed_goals": total_completed,
-                "completion_rate": (total_completed / len(all_goals) * 100) if all_goals else 0,
-                "avg_goal_age_days": round(avg_goal_age, 1),
-                "avg_time_to_completion_days": round(avg_time_to_completion, 1),
-                "avg_duration_to_completion_seconds": round(avg_duration_to_completion, 0),
-            },
-            goals_data,
-        )
+                ages.append(age)
+            if goal.completed and goal.completed_at and goal.created_at:
+                completion_times.append((utc_datetime(goal.completed_at) - utc_datetime(goal.created_at)).days)
+            total = totals.get(goal.id)
+            duration = total.duration if total else 0
+            if goal.completed and duration > 0:
+                completion_durations.append(duration)
+            items = breakdown.get(goal.id, [])
+            result = serialize_goal_analytics_goal(
+                goal, age_days=age, total_duration_seconds=duration, session_count=total.session_count if total else 0,
+                activity_breakdown=items, session_durations_by_date=chart_rows.get(goal.id, []),
+                activity_durations_by_date=activity_chart_rows.get(goal.id, []),
+            )
+            result['activity_duration_seconds'] = sum(item['total_duration_seconds'] for item in items)
+            result['last_evidence_at'] = max([(format_utc(total.last_date) or '') if total else '', *[item['last_date'] or '' for item in items]], default='') or None
+            payload_goals.append(result)
+        completed = sum(bool(goal.completed) for goal in goals)
+        def average(values):
+            return sum(values) / len(values) if values else 0
+        payload = serialize_goal_analytics_payload({
+            'total_goals': len(goals), 'completed_goals': completed,
+            'completion_rate': completed / len(goals) * 100 if goals else 0,
+            'avg_goal_age_days': round(average(ages), 1),
+            'avg_time_to_completion_days': round(average(completion_times), 1),
+            'avg_duration_to_completion_seconds': round(average(completion_durations)),
+        }, payload_goals)
+        payload['metadata'] = {'aggregated': True, 'chart_goal_id': chart_goal_id,
+                               'chart_bucket_days': bucket_days, 'max_chart_points': MAX_CHART_POINTS if chart_goal_id else 120}
         return payload, None, 200

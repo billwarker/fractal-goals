@@ -383,9 +383,9 @@ class AgentProposalsMixin:
                     for row in template_links
                 ],
             },
-            "occurrence_exclusions": sorted(_iso(row.date) for row in day.occurrence_exclusions or []),
+            "occurrence_exclusions": sorted(value for row in day.occurrence_exclusions or [] if (value := _iso(row.date)) is not None),
             "occurrence_schedules": sorted(
-                _iso(row.date) for row in (day.occurrence_schedules or [])
+                value for row in (day.occurrence_schedules or []) if (value := _iso(row.date)) is not None
             ),
             "scheduled_sessions": [
                 {

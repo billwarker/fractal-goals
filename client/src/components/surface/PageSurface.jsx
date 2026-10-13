@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 
 import GridLayout, {
     GRID_UNIT,
@@ -7,7 +7,7 @@ import GridLayout, {
     migrateSplitLayoutToGrid,
     updatePanelIfNoOverlap,
 } from './gridLayout/GridLayout';
-import SurfaceWidget from './SurfaceWidget';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import AddWidgetMenu from './AddWidgetMenu';
 import { getWidgetDefinition, getWidgetMinimumSize } from './widgetRegistry';
 import {
@@ -19,6 +19,7 @@ import {
     sanitizeSurfaceConfig,
 } from './surfaceState';
 
+const SurfaceWidget = lazyWithRetry(() => import('./SurfaceWidget'), 'components/surface/SurfaceWidget');
 const DEFAULT_DETAIL_PCT = 34;
 const MIN_DETAIL_PCT = 20;
 const MAX_DETAIL_PCT = 70;
@@ -30,7 +31,6 @@ function clampDetailCells(cells, totalColumns) {
     return Math.min(maxCells, Math.max(minCells, Math.round(cells)));
 }
 
-/** Detail region width (in whole-surface grid cells) from the detail_panel hint. */
 function detailCellsFromHint(hint, totalColumns) {
     const cols = Math.max(1, totalColumns || GRID_COLUMNS);
     if (hint && typeof hint === 'object') {
@@ -254,8 +254,6 @@ export default function PageSurface({
         return placement ? { ...placement, widgetType: previewWidgetType } : null;
     }, [addMenu, bounds, liveLayout.panels, previewWidgetType]);
 
-    // Settle (suppress transitions for one paint) on config identity change or
-    // when the split appears/disappears, mirroring analytics' restore behavior.
     useEffect(() => {
         const key = `${activeConfig ? 'cfg' : 'def'}:${showDetailRegion}`;
         if (prevConfigKeyRef.current === key) return;
@@ -541,16 +539,18 @@ export default function PageSurface({
                 style={{ width: '100%', height: '100%' }}
                 onMouseDown={onSelect}
             >
-                <SurfaceWidget
-                    widgetType={content?.widgetType}
-                    state={content?.state}
-                    onStateChange={(next) => handleWidgetStateChange(panelId, next)}
-                    sharedData={sharedWidgetData}
-                    viewMode={viewMode}
-                    configureMode={configureMode}
-                    onDragStart={onDragStart}
-                    onRemove={() => handleRemovePanel(panelId)}
-                />
+                <Suspense fallback={<div role="status">Loading widget…</div>}>
+                    <SurfaceWidget
+                        widgetType={content?.widgetType}
+                        state={content?.state}
+                        onStateChange={(next) => handleWidgetStateChange(panelId, next)}
+                        sharedData={sharedWidgetData}
+                        viewMode={viewMode}
+                        configureMode={configureMode}
+                        onDragStart={onDragStart}
+                        onRemove={() => handleRemovePanel(panelId)}
+                    />
+                </Suspense>
             </div>
         );
     }, [config.panel_contents, treePanelId, configureMode, selectedPanelId, onSelectedPanelIdChange, renderTree, sharedWidgetData, viewMode, handleWidgetStateChange, handleRemovePanel]);

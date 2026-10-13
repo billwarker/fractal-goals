@@ -1,5 +1,7 @@
 """Canonical domain validation and preview construction for agent proposals."""
 
+from typing import Any
+
 from services.activity_service import ActivityService
 from services.goal_service import GoalService, sync_goal_targets
 from services.note_service import NoteService
@@ -9,6 +11,7 @@ from services.agent_operation_versions import operation_restore_payload
 
 
 class AgentProposalPreviewMixin:
+    db_session: Any
     def _validate_and_preview_operation(self, task, user_id, operation):
         self._root(task.root_id, user_id)
         if operation["type"] == "update_goal":

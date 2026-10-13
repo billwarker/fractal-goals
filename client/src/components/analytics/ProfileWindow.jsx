@@ -15,6 +15,8 @@ import {
     TimerIcon,
     VisualizationIcon,
 } from './AnalyticsIcons';
+import useGoalAnalyticsRead from './useGoalAnalyticsRead';
+import { summarizeFilteredGoals } from './filteredGoalSummary';
 import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import styles from './ProfileWindow.module.css';
 import {
@@ -35,7 +37,6 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * ProfileWindow - A single analytics window that can display various visualizations
  * 
  * @param {object} props
- * @param {string} props.windowId - Unique ID for this window
  * @param {boolean} props.canSplit - Whether this window can be split (only first window)
  * @param {function} props.onSplit - Callback when split button is clicked
  * @param {boolean} props.canClose - Whether this window can be closed
@@ -68,12 +69,10 @@ function ProfileWindow({
     const chartRef = useRef(null);
     const containerRef = useRef(null);
 
-    // Local state for split dropdown
     const [showSplitMenu, setShowSplitMenu] = useState(false);
     const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
     const [isQueryOverlayOpen, setIsQueryOverlayOpen] = useState(false);
 
-    // Track container width for responsive styling
     const [isNarrow, setIsNarrow] = useState(false);
     const [isVeryNarrow, setIsVeryNarrow] = useState(false);
 
@@ -102,7 +101,6 @@ function ProfileWindow({
     } = windowState;
     const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
-    // Helper to update state (setSelectedCategory is handled by handleCategoryChange below)
     const setSelectedVisualization = (value) => updateWindowState(getVisualizationSelectionUpdate(windowState, value));
     const updateVisualizationState = React.useCallback((updates) => {
         updateWindowState(getVisualizationStateUpdate(windowState, updates));
@@ -146,6 +144,10 @@ function ProfileWindow({
         if (end && date > end) return false;
         return true;
     }, [effectiveDateRange, hasActiveDateRange]);
+
+    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
+        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange });
+    const scopedGoalAnalytics = scopedGoalQuery.data || goalAnalytics;
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -258,7 +260,7 @@ function ProfileWindow({
     }, [activityInstances, isDateInRange, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
 
     const filteredGoalAnalyticsGoals = useMemo(() => {
-        const goals = goalAnalytics?.goals || [];
+        const goals = scopedGoalAnalytics?.goals || [];
         const scopedGoals = resolvedGlobalFilters.hasGoalFilter
             ? goals.filter((goal) => resolvedGlobalFilters.goalIds.has(goal.id))
             : goals;
@@ -266,6 +268,9 @@ function ProfileWindow({
             ? new Set(scopedActivities.map((activity) => activity.name))
             : null;
 
+        if (scopedGoalAnalytics?.metadata?.aggregated) {
+            return scopedGoals.map((goal) => ({ ...goal, completed: Boolean(goal.completed && isDateInRange(goal.completed_at)) }));
+        }
         return scopedGoals.map((goal) => {
             const activityDurations = (goal.activity_durations_by_date || []).filter((item) => (
                 isDateInRange(item.date)
@@ -306,34 +311,10 @@ function ProfileWindow({
                 session_count: sessionDurations.length,
             };
         });
-    }, [goalAnalytics?.goals, hasActiveDateRange, isDateInRange, resolvedGlobalFilters.goalIds, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.hasGoalFilter, scopedActivities]);
+    }, [scopedGoalAnalytics, hasActiveDateRange, isDateInRange, resolvedGlobalFilters.goalIds, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.hasGoalFilter, scopedActivities]);
 
-    const filteredGoalSummary = useMemo(() => {
-        const completedGoals = filteredGoalAnalyticsGoals.filter((goal) => goal.completed);
-        const completionTimes = completedGoals.map((goal) => {
-            const created = goal.created_at ? new Date(goal.created_at) : null;
-            const completed = goal.completed_at ? new Date(goal.completed_at) : null;
-            if (!created || !completed || Number.isNaN(created.getTime()) || Number.isNaN(completed.getTime())) {
-                return null;
-            }
-            return Math.max(0, Math.round((completed - created) / 86400000));
-        }).filter((value) => value != null);
-        const durations = completedGoals.map((goal) => goal.total_duration_seconds || 0).filter((value) => value > 0);
-
-        return {
-            completed_goals: completedGoals.length,
-            completion_rate: filteredGoalAnalyticsGoals.length > 0
-                ? (completedGoals.length / filteredGoalAnalyticsGoals.length) * 100
-                : 0,
-            avg_goal_age_days: goalAnalytics?.summary?.avg_goal_age_days || 0,
-            avg_time_to_completion_days: completionTimes.length
-                ? completionTimes.reduce((sum, value) => sum + value, 0) / completionTimes.length
-                : 0,
-            avg_duration_to_completion_seconds: durations.length
-                ? durations.reduce((sum, value) => sum + value, 0) / durations.length
-                : 0,
-        };
-    }, [filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days]);
+    const filteredGoalSummary = useMemo(() => summarizeFilteredGoals(filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days),
+        [filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days]);
 
     const effectiveSelectedGoal = useMemo(() => {
         if (selectedGoal?.id && filteredGoalAnalyticsGoals.some((goal) => goal.id === selectedGoal.id)) {
@@ -634,11 +615,6 @@ function ProfileWindow({
     );
 
 
-
-
-
-
-
     // Render the actual visualization content
     const renderVisualizationContent = () => {
         if (!selectedCategory) {
@@ -649,6 +625,13 @@ function ProfileWindow({
             return renderVisualizationCards();
         }
 
+        const readQuery = selectedCategory === 'goals' ? scopedGoalQuery : {
+            isFetching: data.evidenceLoading, isError: Boolean(data.evidenceError), refetch: data.retryEvidence,
+        };
+        if (readQuery.isFetching) return <div role="status">Loading analytics...</div>;
+        if (readQuery.isError) {
+            return <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => readQuery.refetch()}>Retry</button></div>;
+        }
         const VisualizationChart = selectedVisualizationMeta?.Chart;
         if (!VisualizationChart) return null;
 

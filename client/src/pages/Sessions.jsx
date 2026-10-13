@@ -11,8 +11,9 @@ import { useSessionsHeatmap, useSessionsSearch } from '../hooks/useSessionQuerie
 import useSessionsPageFilters from '../hooks/useSessionsPageFilters';
 import useIsMobile from '../hooks/useIsMobile';
 import usePersistedPaneOpen from '../hooks/usePersistedPaneOpen';
-import { SessionCardExpanded, SessionsQuerySidebar } from '../components/sessions';
-import { QuickSessionWorkspace } from '../components/sessionDetail';
+import { SessionsQuerySidebar } from '../components/sessions';
+import SessionListCard from '../components/sessions/SessionListCard';
+import WindowedSessionRow from '../components/sessions/WindowedSessionRow';
 import CardCornerActionButton from '../components/common/CardCornerActionButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import Spinner from '../components/atoms/Spinner';
@@ -34,10 +35,8 @@ import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
+const QuickSessionWorkspace = lazyWithRetry(() => import('../components/sessionDetail/QuickSessionWorkspace'), 'components/sessionDetail/QuickSessionWorkspace');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-/**
- * Sessions Page - View and query practice sessions
- */
 function Sessions() {
     const { getGoalColor } = useGoalLevels();
     const { rootId } = useParams();
@@ -363,8 +362,8 @@ function Sessions() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {visibleSessions.map((session) => (
-                                <SessionCardExpanded
-                                    key={session.id}
+                                <WindowedSessionRow key={session.id} label={session.name} pinned={selectedSessionId === session.id}>
+                                <SessionListCard
                                     session={session}
                                     rootId={rootId}
                                     activities={activities}
@@ -378,6 +377,7 @@ function Sessions() {
                                     formatDate={formatDate}
                                     sessionActivityInstances={session.activity_instances || []}
                                 />
+                                </WindowedSessionRow>
                             ))}
 
                             {hasNextPage && (
@@ -469,7 +469,7 @@ function Sessions() {
                             title="Close"
                         />
                         <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSession.id}>
-                            <QuickSessionWorkspace />
+                            <Suspense fallback={<LoadingState message="Loading session…" />}><QuickSessionWorkspace /></Suspense>
                         </ActiveSessionProvider>
                     </div>
                 </ModalBackdrop>,

@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
 import SurfaceWidget from '../SurfaceWidget';
 
 vi.mock('../../../hooks/useDashboardQueries', () => ({
@@ -22,9 +24,13 @@ vi.mock('../../../hooks/useAnalyticsPageData', () => ({
     }),
 }));
 
+function renderWithQuery(element) {
+    return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{element}</QueryClientProvider>);
+}
+
 describe('SurfaceWidget', () => {
     it('bakes the selected analytics view name into the header outside configure mode', () => {
-        const { container } = render(
+        const { container } = renderWithQuery(
             <SurfaceWidget
                 widgetType="analytics"
                 state={{ savedViewId: 'view-1' }}
@@ -42,7 +48,7 @@ describe('SurfaceWidget', () => {
     it('renders the analytics saved-view selector in the widget header', () => {
         const handleStateChange = vi.fn();
 
-        const { container } = render(
+        const { container } = renderWithQuery(
             <SurfaceWidget
                 widgetType="analytics"
                 state={{ savedViewId: 'view-1' }}

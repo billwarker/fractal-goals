@@ -119,7 +119,7 @@ class SessionAnalyticsService:
             "metrics": copy.deepcopy(metric_values),
         }
 
-    def get_session_analytics_summary(self, root_id, current_user_id, limit=50) -> ServiceResult[JsonDict]:
+    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -147,16 +147,25 @@ class SessionAnalyticsService:
         }
         session_ids = list(session_lookup.keys())
         instances_by_activity: dict[str, list[JsonDict]] = {}
+        page_size = max(1, min(int(instance_limit), 500))
+        has_more = False
+        returned = 0
 
         if session_ids:
-            activity_instances = self.db_session.query(ActivityInstance).filter(
+            instance_query = self.db_session.query(ActivityInstance).filter(
                 ActivityInstance.session_id.in_(session_ids),
                 ActivityInstance.deleted_at == None,
             ).options(
                 *self._session_activity_read_options(),
-            ).all()
+            )
+            activity_instances = instance_query.order_by(ActivityInstance.created_at.desc(), ActivityInstance.id.desc()).offset(instance_offset).limit(page_size + 1).all()
+            has_more = len(activity_instances) > page_size
+            activity_instances = activity_instances[:page_size]
+            returned = len(activity_instances)
 
-            persisted_session_ids = set()
+            persisted_session_ids = {session_id for (session_id,) in self.db_session.query(ActivityInstance.session_id).filter(
+                ActivityInstance.session_id.in_(session_ids), ActivityInstance.deleted_at.is_(None),
+            ).distinct().all()}
             progress = ProgressService(self.db_session)
             comparisons = progress.compute_comparisons_for_instances(activity_instances, preloaded=True)
             for instance in activity_instances:
@@ -170,9 +179,11 @@ class SessionAnalyticsService:
                     instance,
                     session_name=session_meta.get("name"),
                     session_date=session_meta.get("date"),
+                    compact=True,
                 )
                 instances_by_activity.setdefault(instance.activity_definition_id, []).append(serialized_instance)
 
+            legacy_skip = max(0, instance_offset - instance_query.count()) if instance_offset else 0
             for session in sessions:
                 if session.id in persisted_session_ids:
                     continue
@@ -196,6 +207,13 @@ class SessionAnalyticsService:
                             continue
 
                         legacy_counter += 1
+                        if legacy_skip:
+                            legacy_skip -= 1
+                            continue
+                        if returned >= page_size:
+                            has_more = True
+                            continue
+                        returned += 1
                         activity_id = exercise["activity_id"]
                         fallback_id = f"{session.id}-legacy-{legacy_counter}"
                         instances_by_activity.setdefault(activity_id, []).append(
@@ -206,6 +224,8 @@ class SessionAnalyticsService:
             "sessions": serialized_sessions,
             "activity_instances": instances_by_activity,
             "limit": clamped_limit,
+            "evidence_pagination": {"limit": page_size, "offset": instance_offset, "has_more": has_more,
+                                    "next_offset": instance_offset + returned if has_more else None},
         }, None, 200
 
     def get_session_heatmap(self, root_id, current_user_id, filters=None) -> ServiceResult[JsonDict]:

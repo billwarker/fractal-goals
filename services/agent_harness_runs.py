@@ -1,5 +1,7 @@
 """Runs operations for the delegated AI harness."""
 
+from typing import Any
+
 import logging
 import datetime as dt
 from sqlalchemy import or_
@@ -33,6 +35,7 @@ def _enabled_run_origins(agent_flags):
 
 
 class AgentRunsMixin:
+    db_session: Any
     def _mark_unstarted_operations(
         self, run_id, worker_id, fencing_token, stop_sequence, *, cancelled,
     ):

@@ -9,7 +9,7 @@ completed instance of the same activity from a different session.
 import logging
 from typing import Optional
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import func
 
 from models import (
     ActivityDefinition,
@@ -43,7 +43,6 @@ class ProgressService(
     def __init__(self, db_session):
         self.db = db_session
         self._calculation_config = dict(EMPTY_PROGRESS_VIEW_CONFIG)
-        self._comparison_cache = {}
         self._root_settings_cache = {}
 
     # ------------------------------------------------------------------
@@ -86,7 +85,6 @@ class ProgressService(
         }
         configs_by_activity = {}
         view_ids_by_activity = {}
-        included_scope_clauses = []
         for activity in activities.values():
             if not enabled_roots.get(activity.root_id, True):
                 continue
@@ -94,41 +92,7 @@ class ProgressService(
             config = normalize_progress_view_config(view.config if view else EMPTY_PROGRESS_VIEW_CONFIG)
             configs_by_activity[activity.id] = config
             view_ids_by_activity[activity.id] = view.id if view else None
-            included_scope_clauses.append(
-                and_(
-                    ActivityInstance.activity_definition_id == activity.id,
-                    ActivityInstance.root_id == activity.root_id,
-                    self._included_instance_clause(activity, config),
-                )
-            )
-
-        included_rows = []
-        if included_scope_clauses:
-            included_rows = (
-                self._active_instance_identity_query()
-                .filter(or_(*included_scope_clauses))
-                .add_columns(ActivityInstance.activity_definition_id)
-                .order_by(
-                    ActivityInstance.activity_definition_id,
-                    self._effective_time_expression().asc(),
-                    ActivityInstance.id.asc(),
-                )
-                .all()
-            )
-        rows_by_activity = {}
-        for row in included_rows:
-            rows_by_activity.setdefault(row.activity_definition_id, []).append(row)
-
-        predecessor_ids = {}
-        included_ids = set()
-        target_ids_by_activity = {}
-        for target in targets:
-            target_ids_by_activity.setdefault(target.activity_definition_id, []).append(target.id)
-        for activity_id, rows in rows_by_activity.items():
-            included_ids.update(row.id for row in rows)
-            predecessor_ids.update(
-                self._predecessor_ids_for_targets(rows, target_ids_by_activity.get(activity_id, []))
-            )
+        predecessor_ids = self._load_predecessor_ids(targets, activities, configs_by_activity)
 
         required_previous_ids = {instance_id for instance_id in predecessor_ids.values() if instance_id}
         previous_by_id = {}
@@ -144,7 +108,7 @@ class ProgressService(
             config = configs_by_activity.get(activity.id)
             if config is None:
                 continue
-            previous_id = predecessor_ids.get(target.id) if target.id in included_ids else None
+            previous_id = predecessor_ids.get(target.id)
             results[target.id] = self._comparison_payload(
                 target,
                 activity,
@@ -182,7 +146,10 @@ class ProgressService(
             return None
         normalized = normalize_progress_view_config(resolved_config)
         selected_view_id = view_id if view_id is not None else activity_def.active_progress_view_id
-        return self._activity_comparison_map(activity_def, normalized, selected_view_id).get(instance.id)
+        predecessor_ids = self._load_predecessor_ids([instance], {activity_def.id: activity_def}, {activity_def.id: normalized})
+        previous_id = predecessor_ids.get(instance.id)
+        previous = self._get_active_instance(previous_id) if previous_id else None
+        return self._comparison_payload(instance, activity_def, previous, view_id=selected_view_id, config=normalized)
 
     def get_progress_for_instance(self, activity_instance_id: str) -> Optional[dict]:
         """Calculate progress from canonical activity data and the active saved view."""
@@ -257,12 +224,6 @@ class ProgressService(
         total = base_identity_query.count()
         included_clause = self._included_instance_clause(activity, normalized_config)
         included_count = base_identity_query.filter(included_clause).count()
-        included_rows = (
-            base_identity_query
-            .filter(included_clause)
-            .order_by(self._effective_time_expression().asc(), ActivityInstance.id.asc())
-            .all()
-        )
         page_query = self._active_instances_query().filter(
             ActivityInstance.activity_definition_id == activity.id,
             ActivityInstance.root_id == root_id,
@@ -276,7 +237,9 @@ class ProgressService(
             .limit(limit)
             .all()
         )
-        predecessor_ids = self._predecessor_ids_for_targets(included_rows, [instance.id for instance in instances])
+        predecessor_ids = self._load_predecessor_ids(
+            instances, {activity.id: activity}, {activity.id: normalized_config}, exclude_session_id=exclude_session_id,
+        )
         needed_previous_ids = {row_id for row_id in predecessor_ids.values() if row_id}
         previous_by_id = {}
         if needed_previous_ids:
@@ -287,9 +250,8 @@ class ProgressService(
 
         comparison_map = {}
         self._calculation_config = normalized_config
-        included_ids = {row.id for row in included_rows}
         for instance in instances:
-            previous_id = predecessor_ids.get(instance.id) if instance.id in included_ids else None
+            previous_id = predecessor_ids.get(instance.id)
             comparison_map[instance.id] = self._comparison_payload(
                 instance,
                 activity,

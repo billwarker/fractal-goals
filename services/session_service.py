@@ -215,15 +215,15 @@ class SessionService:
     def _effective_session_timestamp():
         return func.coalesce(Session.session_start, Session.created_at)
 
-    def get_fractal_sessions(self, root_id, current_user_id, limit=10, offset=0, filters=None) -> ServiceResult[JsonDict]:
+    def get_fractal_sessions(self, root_id, current_user_id, limit=10, offset=0, filters=None, view="detail") -> ServiceResult[JsonDict]:
         """Get sessions for a specific fractal."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
              return None, "Fractal not found or access denied", 404
 
         normalized_filters, error, status = self._session_filters.normalize_filters(filters)
-        if error:
-            return None, error, status
+        if error or normalized_filters is None:
+            return None, error or "Invalid session filters", status if error else 400
 
         base_query = self.db_session.query(Session).filter(
             Session.root_id == root_id,
@@ -232,12 +232,18 @@ class SessionService:
         filtered_query = self._session_filters.apply_filters(base_query, root_id, normalized_filters)
         total_count = filtered_query.count()
 
-        sessions = filtered_query.options(
-            *self._session_read_options(),
-        ).order_by(*self._session_filters.build_ordering(normalized_filters)).offset(offset).limit(limit).all()
+        if view == 'summary':
+            from services.session_list_read_model import SessionListReadModel
+            result = SessionListReadModel(self.db_session).load(
+                filtered_query, self._session_filters.build_ordering(normalized_filters), limit, offset,
+            )
+        else:
+            sessions = filtered_query.options(
+                *self._session_read_options(),
+            ).order_by(*self._session_filters.build_ordering(normalized_filters)).offset(offset).limit(limit).all()
 
-        self._attach_completed_goals(sessions)
-        result = [serialize_session(s) for s in sessions]
+            self._attach_completed_goals(sessions)
+            result = [serialize_session(s) for s in sessions]
 
         return {
             "sessions": result,
@@ -249,8 +255,8 @@ class SessionService:
             }
         }, None, 200
 
-    def get_session_analytics_summary(self, root_id, current_user_id, limit=50) -> ServiceResult[JsonDict]:
-        return self._analytics_service().get_session_analytics_summary(root_id, current_user_id, limit=limit)
+    def get_session_analytics_summary(self, root_id, current_user_id, limit=50, instance_offset=0, instance_limit=500) -> ServiceResult[JsonDict]:
+        return self._analytics_service().get_session_analytics_summary(root_id, current_user_id, limit=limit, instance_offset=instance_offset, instance_limit=instance_limit)
 
     def get_session_heatmap(self, root_id, current_user_id, filters=None) -> ServiceResult[JsonDict]:
         return self._analytics_service().get_session_heatmap(root_id, current_user_id, filters=filters)
