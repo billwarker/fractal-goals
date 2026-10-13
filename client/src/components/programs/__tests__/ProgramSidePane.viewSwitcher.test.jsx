@@ -12,8 +12,6 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
     }),
 }));
 
-const viewToggle = <div role="tablist" aria-label="Program view"><button type="button" role="tab">Calendar</button></div>;
-
 function renderPane(props) {
     return render(
         <MemoryRouter>
@@ -29,18 +27,18 @@ function renderPane(props) {
 }
 
 describe('ProgramSidePane view switcher', () => {
-    it('leads with the page view toggle, with the Details/Goals sub-toggle beneath at program scope', () => {
+    it('shows only Details/Goals at program scope and no tabs at range scope', () => {
         const onViewChange = vi.fn();
-        const { unmount } = renderPane({ scope: 'program', viewToggle, onViewChange });
+        const { unmount } = renderPane({ scope: 'program', onViewChange });
 
         const tablists = screen.getAllByRole('tablist');
-        expect(tablists.map((list) => list.getAttribute('aria-label'))).toEqual(['Program view', 'Program side pane views']);
+        expect(tablists.map((list) => list.getAttribute('aria-label'))).toEqual(['Program side pane views']);
         screen.getByRole('tab', { name: 'Goals' }).click();
         expect(onViewChange).toHaveBeenCalledWith('goals');
         unmount();
 
-        renderPane({ scope: 'range', viewToggle, selectedRange: { startDate: '2026-09-01', endDate: '2026-09-03' } });
-        expect(screen.getAllByRole('tablist').map((list) => list.getAttribute('aria-label'))).toEqual(['Program view']);
+        renderPane({ scope: 'range', selectedRange: { startDate: '2026-09-01', endDate: '2026-09-03' } });
+        expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Collapse' })).not.toBeInTheDocument();
     });
 
@@ -48,7 +46,6 @@ describe('ProgramSidePane view switcher', () => {
         renderPane({
             scope: 'program',
             view: 'goals',
-            viewToggle,
             programMetricsLoading: false,
             programMetrics: {
                 program: { progress: { rate: 0.5 } },
@@ -71,7 +68,7 @@ describe('ProgramSidePane view switcher', () => {
             outcomes: { goals_completed_in_window: 0, goals_in_scope: 0 },
         };
         const blocksPanel = <ul aria-label="Blocks"><li>Month 1</li></ul>;
-        const { unmount } = renderPane({ scope: 'program', viewToggle, programMetricsLoading: false, programMetrics: metrics, blocksPanel });
+        const { unmount } = renderPane({ scope: 'program', programMetricsLoading: false, programMetrics: metrics, blocksPanel });
 
         const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
         expect(headings).toEqual(['Blocks']);
@@ -80,7 +77,7 @@ describe('ProgramSidePane view switcher', () => {
         unmount();
 
         renderPane({
-            scope: 'range', viewToggle, programMetricsLoading: false, programMetrics: { ...metrics, window: { is_partial: true } },
+            scope: 'range', programMetricsLoading: false, programMetrics: { ...metrics, window: { is_partial: true } },
             blocksPanel, selectedRange: { startDate: '2026-09-01', endDate: '2026-09-03' },
         });
         expect(screen.queryByRole('list', { name: 'Blocks' })).not.toBeInTheDocument();
@@ -89,7 +86,7 @@ describe('ProgramSidePane view switcher', () => {
     it('offers New block and New event in the Details footer only', () => {
         const onCreateBlock = vi.fn();
         const onCreateEvent = vi.fn();
-        const { unmount } = renderPane({ scope: 'program', viewToggle, onCreateBlock, onCreateEvent });
+        const { unmount } = renderPane({ scope: 'program', onCreateBlock, onCreateEvent });
 
         screen.getByRole('button', { name: 'New block' }).click();
         screen.getByRole('button', { name: 'New event' }).click();
@@ -97,50 +94,49 @@ describe('ProgramSidePane view switcher', () => {
         expect(onCreateEvent).toHaveBeenCalledTimes(1);
         unmount();
 
-        renderPane({ scope: 'program', view: 'goals', viewToggle, onCreateBlock, onCreateEvent });
+        renderPane({ scope: 'program', view: 'goals', onCreateBlock, onCreateEvent });
         expect(screen.queryByRole('button', { name: 'New block' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'New event' })).not.toBeInTheDocument();
     });
 
-    it('keeps the day review heading under the toggle without a collapse control on desktop', () => {
+    it('keeps the day review heading without page view tabs', () => {
         renderPane({
             scope: 'day',
-            viewToggle,
             contextDate: '2026-09-02',
             dayDetailQuery: { data: { detail: { occurrences: [], sessions: [] } } },
         });
 
-        expect(screen.getByRole('tablist', { name: 'Program view' })).toBeInTheDocument();
+        expect(screen.queryByRole('tablist', { name: 'Program view' })).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Wednesday, September 2, 2026' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Collapse' })).not.toBeInTheDocument();
     });
 
-    it('shows the days navigator under the toggle on the Days tab', () => {
-        renderPane({ scope: 'program', viewToggle, daysNavigator: <nav aria-label="Program days" /> });
+    it('shows the days navigator beneath its header on the Days tab', () => {
+        renderPane({ scope: 'program', daysNavigator: <nav aria-label="Program days" /> });
 
-        expect(screen.getByRole('tablist', { name: 'Program view' })).toBeInTheDocument();
+        expect(screen.queryByRole('tablist', { name: 'Program view' })).not.toBeInTheDocument();
         expect(screen.getByRole('navigation', { name: 'Program days' })).toBeInTheDocument();
-        expect(screen.queryByRole('heading', { name: 'Program days' })).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Program days' })).toBeInTheDocument();
     });
 
-    it('puts one Collapse control beside the view toggle on desktop, in every scope', () => {
+    it('puts Details/Goals beside one Collapse control at program scope and retains Collapse at day scope', () => {
         const onCollapse = vi.fn();
-        const { unmount } = renderPane({ scope: 'program', viewToggle, onCollapse });
+        const { unmount } = renderPane({ scope: 'program', onCollapse });
 
         const collapse = screen.getByRole('button', { name: 'Collapse' });
-        expect(collapse.closest('div').parentElement).toContainElement(screen.getByRole('tablist', { name: 'Program view' }));
+        expect(collapse.closest('div').parentElement).toContainElement(screen.getByRole('tablist', { name: 'Program side pane views' }));
         collapse.click();
         expect(onCollapse).toHaveBeenCalledTimes(1);
         unmount();
 
         renderPane({
-            scope: 'day', viewToggle, onCollapse, contextDate: '2026-09-02',
+            scope: 'day', onCollapse, contextDate: '2026-09-02',
             dayDetailQuery: { data: { detail: { occurrences: [], sessions: [] } } },
         });
         expect(screen.getAllByRole('button', { name: 'Collapse' })).toHaveLength(1);
     });
 
-    it('keeps its own headers and a Collapse control in the mobile sheet', () => {
+    it('keeps its headers and a Collapse control in the mobile sheet', () => {
         renderPane({ scope: 'program', onCollapse: vi.fn() });
 
         expect(screen.getAllByRole('tablist').map((list) => list.getAttribute('aria-label'))).toEqual(['Program side pane views']);
@@ -151,8 +147,10 @@ describe('ProgramSidePane view switcher', () => {
         const onViewChange = vi.fn();
         const navigator = <nav aria-label="Program days">Days list</nav>;
         const goals = <div>Plan goals</div>;
-        const { rerender } = renderPane({ scope: 'program', viewToggle, daysNavigator: navigator, daysGoals: goals, onViewChange });
+        const { rerender } = renderPane({ scope: 'program', daysNavigator: navigator, daysGoals: goals, onViewChange, onCollapse: vi.fn() });
 
+        const collapse = screen.getByRole('button', { name: 'Collapse' });
+        expect(collapse.closest('div').parentElement).toContainElement(screen.getByRole('tablist', { name: 'Program side pane views' }));
         expect(screen.getByRole('navigation', { name: 'Program days' })).toBeInTheDocument();
         expect(screen.queryByText('Plan goals')).not.toBeInTheDocument();
         screen.getByRole('tab', { name: 'Goals' }).click();
@@ -162,7 +160,7 @@ describe('ProgramSidePane view switcher', () => {
             <MemoryRouter>
                 <ProgramSidePane
                     program={{ id: 'program-1', name: 'Strong Finish' }} goals={[]} blocks={[]} programMetricsLoading
-                    scope="program" view="goals" viewToggle={viewToggle} daysNavigator={navigator} daysGoals={goals}
+                    scope="program" view="goals" daysNavigator={navigator} daysGoals={goals}
                 />
             </MemoryRouter>,
         );

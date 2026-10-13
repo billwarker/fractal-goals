@@ -59,14 +59,11 @@
     gap: 8px 12px;
 }
 
-/* Title-row placement of the program span and status, just left of the header actions. */
-.headerMetaInline {
-    display: inline-flex;
-    align-items: center;
+.headerViewToggle {
+    width: 260px;
+    flex: 0 0 260px;
     align-self: center;
-    font-size: 14px;
-    color: var(--color-text-secondary);
-    white-space: nowrap;
+    box-sizing: border-box;
 }
 
 @media (min-width: 769px) {
@@ -276,13 +273,7 @@
 }
 
 @media (max-width: 768px) {
-    .mobileViewToggle {
-        width: 260px;
-        min-width: 260px;
-        flex: 0 0 260px;
-    }
-
-    .mobileViewToggle :global(button[role="tab"]) {
+    .headerViewToggle :global(button[role="tab"]) {
         min-height: 38px;
     }
 

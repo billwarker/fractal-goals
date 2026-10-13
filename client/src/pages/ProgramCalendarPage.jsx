@@ -380,8 +380,7 @@ function ProgramCalendarPage() {
             ))}
         </span>
     );
-    // The program's span and status. Desktop shows it on the title row beside the header
-    // actions; mobile hides the title copy, so it stays the subtitle there.
+    // Keep the program's full date span and status beneath the contextual title.
     const programMeta = displayProgram ? (
         <span className={styles.headerMetaRow}>
             <span>{formatLiteralDate(displayProgram.start_date)} - {formatLiteralDate(displayProgram.end_date)}</span>
@@ -393,7 +392,7 @@ function ProgramCalendarPage() {
         </span>
     ) : null;
     const pageSubtitle = displayProgram
-        ? (isMobile ? programMeta : null)
+        ? programMeta
         : (selectedRangeText ? 'No program scheduled for these days.' : 'No program scheduled for this day.');
     const duplicateInitialData = useMemo(() => {
         if (builderState.mode !== 'duplicate' || !builderState.duplicateSource) return null;
@@ -710,18 +709,17 @@ function ProgramCalendarPage() {
 
     const viewToggle = displayProgram ? (
         <ViewToggleTabs
-            className={styles.mobileViewToggle}
+            className={styles.headerViewToggle}
             items={PROGRAM_VIEW_ITEMS}
             value={viewMode}
             onChange={setViewMode}
             ariaLabel="Program view"
         />
     ) : null;
-    // Mobile keeps the view toggle in the header and opens the sidebar from its footer.
+    // Both layouts switch views in the header; mobile opens the sidebar from its footer.
     const viewActions = (
         <>
-            {isMobile ? viewToggle : null}
-            {!isMobile && programMeta ? <span className={styles.headerMetaInline}>{programMeta}</span> : null}
+            {viewToggle}
             <HeaderButton variant="secondary" onClick={() => setIsProgramOptionsOpen(true)}>
                 Program Options
             </HeaderButton>
@@ -855,7 +853,6 @@ function ProgramCalendarPage() {
                     isMobile={isMobile}
                     isVisible={isSidePaneVisible}
                     onClose={() => setIsSidePaneVisible(false)}
-                    viewToggle={isMobile ? null : viewToggle}
                     view={sidePaneView}
                     onViewChange={setSidePaneView}
                     program={displayProgram}

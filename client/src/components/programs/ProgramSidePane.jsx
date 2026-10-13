@@ -54,7 +54,6 @@ export default function ProgramSidePane({
     onEditPlan,
     daysNavigator = null,
     daysGoals = null,
-    viewToggle = null,
     view = 'details',
     onViewChange = () => {},
 }) {
@@ -63,7 +62,7 @@ export default function ProgramSidePane({
     const dayBlockLabel = scope === 'day' && contextDate
         ? blockWeekLabel(blockForDate(program?.blocks || blocks, contextDate), contextDate)
         : '';
-    const collapseControl = onCollapse ? (
+    const collapseButton = onCollapse ? (
         <SidePaneHeaderButton className={styles.collapseButton} onClick={onCollapse}>
             Collapse
         </SidePaneHeaderButton>
@@ -84,21 +83,6 @@ export default function ProgramSidePane({
     );
     const showSubViews = Boolean(program) && scope === 'program' && !daysNavigator;
     const activeView = showSubViews ? view : 'details';
-    // Desktop: the page's view toggle leads the pane, with Collapse beside it; Details/Goals
-    // sits beneath the header line. The mobile sheet keeps its own headers, each carrying
-    // the Collapse (close) control.
-    const viewSwitcher = viewToggle ? (
-        <div className={styles.viewSwitcher}>
-            <div className={styles.viewSwitcherToggle}>{viewToggle}</div>
-            {collapseControl}
-        </div>
-    ) : null;
-    const collapseButton = viewSwitcher ? null : collapseControl;
-    const paneHeader = (title) => viewSwitcher || (
-        <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
-            <h2 className={styles.daysPaneTitle}>{title}</h2>
-        </SidePaneHeader>
-    );
 
     if (daysNavigator) {
         // The Days tab replaces the pane's review content with its day/template selector
@@ -106,8 +90,9 @@ export default function ProgramSidePane({
         const showDaysGoals = Boolean(daysGoals) && view === 'goals';
         return (
             <aside className={styles.sidePane} aria-label="Program side pane">
-                {paneHeader('Program days')}
-                {daysGoals ? <div className={styles.subViewBar}>{subViewToggle}</div> : null}
+                <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
+                    {daysGoals ? subViewToggle : <h2 className={styles.daysPaneTitle}>Program days</h2>}
+                </SidePaneHeader>
                 {showDaysGoals
                     ? <div className={styles.goalsPane}>{daysGoals}</div>
                     : <div className={styles.daysPaneBody}>{daysNavigator}</div>}
@@ -116,7 +101,6 @@ export default function ProgramSidePane({
     }
     return (
         <aside className={styles.sidePane} aria-label="Program side pane">
-            {viewSwitcher}
             {scope === 'day' ? (
                 <header className={styles.dayReviewHeader}>
                     <div className={`${styles.dayReviewHeading} ${collapseButton ? '' : styles.dayReviewHeadingFixed}`.trim()}>
@@ -130,13 +114,9 @@ export default function ProgramSidePane({
                     </div>
                 </header>
             ) : scope === 'program' ? (
-                viewSwitcher ? (
-                    showSubViews ? <div className={styles.subViewBar}>{subViewToggle}</div> : null
-                ) : (
-                    <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
-                        {program ? subViewToggle : <h2 className={styles.daysPaneTitle}>Program</h2>}
-                    </SidePaneHeader>
-                )
+                <SidePaneHeader className={styles.programHeader} actions={collapseButton}>
+                    {program ? subViewToggle : <h2 className={styles.daysPaneTitle}>Program</h2>}
+                </SidePaneHeader>
             ) : (
                 <SidePaneHeader className={styles.scopedHeader} actions={collapseButton}>
                     <nav className={styles.scopeNav} aria-label="Program scope">

@@ -153,7 +153,7 @@ vi.mock('../../hooks/useCalendarPeriods', () => ({
 }));
 
 vi.mock('../../components/layout/PageHeader', () => ({
-    default: ({ title, subtitle, actions }) => <header>{title}{subtitle}{actions}</header>,
+    default: ({ title, subtitle, actions }) => <header><div data-testid="header-copy">{title}<p>{subtitle}</p></div><div data-testid="header-actions">{actions}</div></header>,
 }));
 vi.mock('../../components/programs/days/ProgramDaysView', () => ({
     default: () => <div>Program days workspace</div>,
@@ -297,10 +297,22 @@ describe('ProgramCalendarPage multi-day selection', () => {
         expect(calendar).toHaveAttribute('aria-selected', 'true');
     });
 
-    it('keeps the mobile footer out of the desktop layout', () => {
+    it('keeps desktop view switching before Program Options and the date span beneath the title', async () => {
         renderPage();
+        const actions = screen.getByTestId('header-actions');
+        const tabs = within(actions).getByRole('tablist', { name: 'Program view' });
+        const options = within(actions).getByRole('button', { name: 'Program Options' });
+        expect(tabs.compareDocumentPosition(options) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        const subtitle = screen.getByTestId('header-copy').querySelector('p');
+        expect(subtitle).toHaveTextContent('Sep 1, 2026 - Dec 31, 2026');
+        expect(actions).not.toHaveTextContent('Sep 1, 2026 - Dec 31, 2026');
+        fireEvent.click(screen.getByRole('button', { name: 'Hide Sidebar' }));
+        expect(screen.queryByRole('complementary', { name: 'Program sidebar' })).not.toBeInTheDocument();
+        fireEvent.click(within(tabs).getByRole('tab', { name: 'Days' }));
+        expect(await screen.findByText('Program days workspace')).toBeInTheDocument();
+        expect(within(tabs).getByRole('tab', { name: 'Days' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.queryByRole('contentinfo', { name: 'Program sidebar controls' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Hide Sidebar' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Show Sidebar' })).toBeInTheDocument();
     });
 
     it('scopes directly to a past program when its calendar label is selected', () => {

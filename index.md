@@ -156,6 +156,9 @@ inside the same SQLAlchemy transaction or savepoint.
 
 Programs contain dated blocks and reusable program-day definitions. The complete domain and UI
 description is in [Programs — domain and UI reference](planning/programs-domain-reference.md).
+`ProgramCalendarPage` owns the header Calendar/Days switcher (before Program Options) and
+program date-span subtitle; `ProgramSidePane` owns scoped content and the Details/Goals
+switcher beside Collapse in its header, including in the Days view.
 
 **Ownership and scheduling.** Program days belong to the program (`program_days.program_id`), not a
 block. A day recurs on weekdays (`day_of_week`) every `repeat_every_weeks` weeks (week zero is the
