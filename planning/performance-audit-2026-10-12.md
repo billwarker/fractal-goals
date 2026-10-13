@@ -345,3 +345,26 @@ adding another loading state or changing inline detail delivery. Production/mobi
 and broader browser-suite gaps noted above remain the distance to S+.
 
 Suggested commit: `fix: prevent session cards flashing during load and refresh`
+
+
+## Follow-up: remove fast-scroll placeholder swaps
+
+The initial-visibility fix above still allowed fast scrolling to outrun the asynchronous
+IntersectionObserver callback. `WindowedSessionRow` now retains real card DOM and uses
+`content-visibility: auto` with remembered intrinsic block sizes. Selected/focused rows
+render normally. The observer, measured-spacer state, focus-transfer effects, and full-size
+placeholder buttons have been removed. This supersedes the earlier mounted-card-count contract:
+DOM now grows with loaded pages, while offscreen layout/paint remains deferred. Pagination
+still bounds each network response, and cards do not introduce detail requests.
+The approach follows [browser rendering guidance](https://web.dev/articles/content-visibility).
+
+Verification: 9 focused component/page tests, desktop/mobile Chromium checks over 60 loaded
+sessions with repeated large scroll jumps and distant keyboard focus, zero-warning lint,
+client type checks, responsive/maintainability checks, and production build all pass.
+The browser test checks skipped card contents rather than their retained outer row boxes.
+
+Quality audit: A+ for this verified scope. No competing placeholder implementation remains;
+`index.md` matches the new rendering contract. Distance to S+ production assurance remains
+physical-device and cross-engine scrolling evidence plus memory profiling for many loaded pages.
+
+Suggested commit: `fix: remove session placeholder flashes during fast scrolling`

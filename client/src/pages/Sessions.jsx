@@ -361,7 +361,7 @@ function Sessions() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                             {visibleSessions.map((session) => (
-                                <WindowedSessionRow key={session.id} label={session.name} pinned={selectedSessionId === session.id}>
+                                <WindowedSessionRow key={session.id} pinned={selectedSessionId === session.id}>
                                 <SessionCardExpanded
                                     session={session}
                                     rootId={rootId}

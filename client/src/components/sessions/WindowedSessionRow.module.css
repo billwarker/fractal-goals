@@ -1,0 +1,9 @@
+.row {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 260px;
+}
+
+.pinned,
+.row:focus-within {
+    content-visibility: visible;
+}

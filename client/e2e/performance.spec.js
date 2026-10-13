@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('large session lists load details inline and keep mounted cards bounded', async ({ page }, testInfo) => {
+test('large session lists keep real cards available during fast scrolling and defer offscreen rendering', async ({ page }, testInfo) => {
     const root = `browser-performance-${testInfo.project.name}`;
     const details = [];
     const errors = [];
@@ -31,8 +31,25 @@ test('large session lists load details inline and keep mounted cards bounded', a
         await page.getByRole('button', { name: 'Load 10 More Sessions' }).click();
         await expect(page.locator('[data-session-window-row]')).toHaveCount((index + 2) * 10);
     }
-    // Spacers retain all 60 row positions; only near-viewport card bodies stay mounted.
-    await expect.poll(() => page.locator('[data-session-window-row] > div').count()).toBeLessThan(25);
+    const rows = page.locator('[data-session-window-row]');
+    await expect(rows.locator(':scope > button')).toHaveCount(0);
+    await expect(rows.locator(':scope > div')).toHaveCount(60);
+    // Native rendering skips offscreen cards without removing their DOM or swapping in buttons.
+    await expect.poll(() => rows.evaluateAll((items) => items.filter((row) =>
+        row.firstElementChild.checkVisibility({ contentVisibilityAuto: true })).length)).toBeLessThan(25);
+    for (const index of [40, 5, 55, 0]) {
+        const row = rows.nth(index);
+        await row.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+        await expect(row.getByText(`Performance session ${index}`, { exact: true })).toBeVisible();
+        await expect(row.locator(':scope > button')).toHaveCount(0);
+        expect(await row.evaluate((element) => element.firstElementChild.checkVisibility({ contentVisibilityAuto: true }))).toBe(true);
+    }
+    // Focus a distant card directly: it must remain the same DOM node as selection changes.
+    const distantLink = rows.nth(45).getByRole('link', { name: 'Performance session 45', exact: true });
+    await distantLink.focus();
+    await expect(distantLink).toBeFocused();
+    expect(await rows.nth(45).evaluate((element) => getComputedStyle(element).contentVisibility)).toBe('visible');
+    await page.screenshot({ path: testInfo.outputPath('sessions-after-fast-scroll.png') });
     expect(details).toEqual([]);
     await page.goto(`/${root}/goals`);
     await expect(page.getByText('Performance goal 149', { exact: true })).toBeAttached();

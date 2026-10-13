@@ -251,9 +251,10 @@ automatically traverse both continuations, merge session identities, and show lo
 until full history is available.
 `SessionListReadModel` remains available through the opt-in `view=summary` API. The Sessions
 page requests full session records so activities and notes render inline as each page loads,
-without a separate detail-expansion control. `WindowedSessionRow` retains measured spacers,
-selection and keyboard focus when offscreen cards unmount.
-Rows measure initial visibility before paint so visible cards appear immediately. Background
+without a separate detail-expansion control. `WindowedSessionRow` retains real cards in the DOM and uses CSS `content-visibility: auto`
+to defer offscreen layout and paint. Intrinsic block sizes remember rendered heights; selected
+and focused cards stay rendered. No observer-driven unmounting or placeholder buttons participate
+in scrolling. Background
 session refreshes retain the loaded list instead of replacing it with a loading screen.
 
 `flowTreeLayout.js` owns geometry. `useFlowTreeGraph` memoizes it by ordered topology,
