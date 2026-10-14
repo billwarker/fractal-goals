@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '../contexts/AuthContext';
+import { useConfirmUnsyncedChanges } from '../offline/OutboxContext';
 import { authApi, globalApi, setAccessToken } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
@@ -8,6 +9,7 @@ import { buildQuotaRows, toggleQuotaRootId } from '../components/modals/settings
 
 export function useAccountSettings(activeTab) {
     const { user, setUser, signOutEverywhere } = useAuth();
+    const confirmUnsynced = useConfirmUnsyncedChanges();
     const [accountUsage, setAccountUsage] = useState(null);
     const [accountUsageLoading, setAccountUsageLoading] = useState(false);
     const [availableFractals, setAvailableFractals] = useState([]);
@@ -167,7 +169,7 @@ export function useAccountSettings(activeTab) {
         const confirmed = window.confirm(
             'Sign out of all devices?\n\nEvery session, including this one, will end and you will need to log in again.'
         );
-        if (!confirmed) return;
+        if (!confirmed || !confirmUnsynced('Sign out of all devices')) return;
         try {
             await signOutEverywhere();
         } catch (err) {

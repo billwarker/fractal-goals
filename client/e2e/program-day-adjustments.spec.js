@@ -38,8 +38,13 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
         return output;
     }, { root, program: created.id, today, later, token });
     await page.goto(`/${root}/programs`);
+    // Mobile renders program days as titled status marks rather than text pills.
+    const dayLabel = (date, name) => {
+        const cell = page.locator(`.fc-daygrid-day[data-date="${date}"]`);
+        return cell.getByText(name, { exact: true }).or(cell.getByTitle(name, { exact: true }));
+    };
     // Choose the isolated program's ribbon when other programs share this date.
-    await page.locator(`.fc-daygrid-day[data-date="${today}"]`).getByText('Move Practice', { exact: true }).click();
+    await dayLabel(today, 'Move Practice').first().click();
     const card = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Move Practice', exact: true }) }).first();
     await card.getByRole('button', { name: 'Move day', exact: true }).scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('schedule-actions.png') });
@@ -57,8 +62,8 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
         await destination.press('Enter');
     }
     await expect(card.getByLabel('Move to date')).toHaveValue(later);
-    await expect(page.locator(`.fc-daygrid-day[data-date="${today}"]`).getByText('Move Practice', { exact: true })).toHaveCount(1);
-    await expect(page.locator(`.fc-daygrid-day[data-date="${later}"]`).getByText('Replace Practice', { exact: true })).toHaveCount(1);
+    await expect(dayLabel(today, 'Move Practice')).toHaveCount(1);
+    await expect(dayLabel(later, 'Replace Practice')).toHaveCount(1);
     // Manual entry remains available after a calendar pick.
     await card.getByLabel('Move to date').fill(today);
     await expect(card.getByRole('button', { name: 'Move and replace' })).toBeDisabled();
@@ -70,9 +75,9 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(page.viewportSize().width + 1);
     await card.getByRole('button', { name: 'Move and replace' }).click();
     await expect(page.getByRole('heading', { name: 'Move Practice', exact: true })).toBeVisible();
-    await expect(page.locator(`.fc-daygrid-day[data-date="${today}"]`).getByText('Move Practice', { exact: true })).toHaveCount(0);
-    await expect(page.locator(`.fc-daygrid-day[data-date="${later}"]`).getByText('Move Practice', { exact: true })).toHaveCount(1);
-    await expect(page.locator(`.fc-daygrid-day[data-date="${later}"]`).getByText('Replace Practice', { exact: true })).toHaveCount(0);
+    await expect(dayLabel(today, 'Move Practice')).toHaveCount(0);
+    await expect(dayLabel(later, 'Move Practice')).toHaveCount(1);
+    await expect(dayLabel(later, 'Replace Practice')).toHaveCount(0);
     await card.getByRole('button', { name: 'Remove from this date' }).click();
     await card.getByRole('button', { name: 'Cancel', exact: true }).click();
     await expect(card.getByRole('button', { name: 'Remove from this date' })).toBeFocused();

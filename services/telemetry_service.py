@@ -26,6 +26,10 @@ ALLOWED_EVENTS = frozenset({
     "onboarding_step_completed",
     "onboarding_completed",
     "onboarding_dismissed",
+    # Offline sync health: counts, ages, and error codes only, never content.
+    "offline_sync_drained",
+    "offline_op_rejected",
+    "offline_boot",
 })
 
 MAX_BATCH_SIZE = 20

@@ -2,10 +2,10 @@ import { dehydrate, hydrate } from '@tanstack/react-query';
 
 import { idbDelete, idbGet, idbSet } from './idbKeyValue';
 
-// Persists only what an in-progress session needs to render with no signal:
-// the session itself, its activities, circuits, notes and goal view, plus the
-// activity catalogue (to add activities). Everything is scoped to one user and
-// expires after two days.
+// Persists only what in-progress work needs with no signal: the session itself,
+// its activities, circuits, notes and goal view, plus the activity and circuit
+// catalogues (to add items) and session templates (to start a quick session).
+// Everything is scoped to one user and expires after two days.
 
 const PERSISTED_PREFIXES = new Set([
     'session',
@@ -15,6 +15,8 @@ const PERSISTED_PREFIXES = new Set([
     'session-goals-view',
     'activities',
     'activity-groups',
+    'circuits',
+    'session-templates',
 ]);
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const WRITE_THROTTLE_MS = 1000;

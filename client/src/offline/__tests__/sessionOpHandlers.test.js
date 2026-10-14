@@ -101,6 +101,32 @@ describe('session op handlers', () => {
         expect(queryClient.getQueryData(activitiesKey).map((entry) => entry.id)).toEqual(['i1', 'i2']);
     });
 
+    it('shows a circuit added offline in its section and keeps it through a refetch', async () => {
+        const { queryClient, outbox } = env;
+        const circuitsKey = queryKeys.sessionCircuitRuns(rootId, sessionId);
+        queryClient.setQueryData(circuitsKey, []);
+        queryClient.setQueryData(sessionKey, {
+            id: sessionId,
+            attributes: { session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_instance_id: 'i1' }] }] } },
+        });
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.CIRCUIT_CREATE,
+            creates: ['run-1'],
+            meta: { runId: 'run-1', placeholder: { id: 'run-1', rounds: [] }, sectionIndex: 0, itemIndex: 0 },
+        });
+
+        await queryClient.fetchQuery({ queryKey: circuitsKey, queryFn: async () => [], staleTime: 0 });
+        await queryClient.fetchQuery({
+            queryKey: sessionKey,
+            queryFn: async () => ({ id: sessionId, attributes: { session_data: { sections: [{ name: 'Main', items: [] }] } } }),
+            staleTime: 0,
+        });
+
+        expect(queryClient.getQueryData(circuitsKey).map((run) => run.id)).toEqual(['run-1']);
+        expect(queryClient.getQueryData(sessionKey).attributes.session_data.sections[0].items)
+            .toEqual([{ type: 'circuit', circuit_run_id: 'run-1' }]);
+    });
+
     it('refreshes the session once after its queue drains', async () => {
         const { queryClient, outbox, goOnline } = env;
         const invalidate = vi.spyOn(queryClient, 'invalidateQueries');

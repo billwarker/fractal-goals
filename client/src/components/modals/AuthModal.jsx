@@ -13,6 +13,7 @@ import styles from './AuthModal.module.css';
 import '../../App.css';
 import notify from '../../utils/notify';
 import { logError } from '../../utils/logger';
+import { useIsOnline } from '../../offline/useIsOnline';
 
 /**
  * AuthModal - Refactored to match exactly the application modal standards
@@ -43,6 +44,7 @@ function AuthModalInner({ onClose }) {
         return errors;
     };
 
+    const online = useIsOnline();
     const {
         values,
         errors,
@@ -304,7 +306,11 @@ function AuthModalInner({ onClose }) {
                         </div>
                     )}
 
-                    {generalError && (
+                    {!online ? (
+                        <div className={styles.errorMessage} role="status">
+                            You're offline. Connect to {isLogin ? 'log in' : 'create an account'}.
+                        </div>
+                    ) : generalError && (
                         <div className={styles.errorMessage}>
                             {generalError}
                         </div>
@@ -316,7 +322,7 @@ function AuthModalInner({ onClose }) {
                         <div className={styles.actions}>
                             <Button
                                 type="submit"
-                                disabled={isSubmitting || (!isLogin && !values.acceptedTerms)}
+                                disabled={!online || isSubmitting || (!isLogin && !values.acceptedTerms)}
                                 fullWidth
                                 variant="primary"
                                 style={{ fontWeight: 'bold' }}

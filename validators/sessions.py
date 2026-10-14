@@ -107,6 +107,11 @@ class QuickSessionActivityInstanceSchema(BaseModel):
 
 class QuickSessionCompleteSchema(SessionCreateSchema):
     activity_instances: List[QuickSessionActivityInstanceSchema] = Field(default_factory=list)
+    # Client-minted id: a quick session completed offline is queued and replayed later.
+    id: Optional[str] = Field(
+        None,
+        pattern=r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    )
 
 
 

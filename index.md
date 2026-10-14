@@ -58,7 +58,9 @@ or local storage. Mutation success invalidates the narrow shared query-key root 
 affected read models. In-session writes go through the per-user outbox (`client/src/offline/`)
 instead. They patch the cache, persist, and sync in
 order with `Idempotency-Key` and `occurred_at`; the session's queries are invalidated once its
-queue drains. See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
+queue drains. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
+mirrored in `offline/circuitIds.js`). Quick-session drafts persist per user and fractal.
+See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 
 Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx` (a fixed,
 portalled full-width footer button) and the `--mobile-page-footer-height` / `--mobile-sidebar-height`

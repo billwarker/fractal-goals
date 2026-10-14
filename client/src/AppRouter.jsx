@@ -43,6 +43,9 @@ import { trackEvent } from './utils/telemetry';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation } from './utils/marketingHost';
 import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
 import AgentChangeSubscription from './components/agent/AgentChangeSubscription';
+import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicator';
+import OfflineSignInScreen from './offline/OfflineSignInScreen';
+import { useIsOnline } from './offline/useIsOnline';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from './utils/marketingHost';
 
@@ -61,7 +64,8 @@ const appEnvironment = import.meta.env.VITE_ENV || 'development';
 
 function App() {
     const location = useLocation();
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, loading: authLoading } = useAuth();
+    const online = useIsOnline();
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -187,6 +191,10 @@ function App() {
         <HeaderProvider>
             <div className="app-container">
                 <AgentChangeSubscription rootId={activeRootId} authenticated={isAuthenticated} />
+                {/* Session Detail shows its own indicator; elsewhere this tracks every queued change. */}
+                {isAuthenticated && !/^\/[^/]+\/session\/[^/]+/.test(location.pathname) && (
+                    <SessionSyncIndicator idleOfflineLabel="Offline" className={styles.globalSyncSlot} />
+                )}
                 {mustChangePassword && (
                     <Suspense fallback={null}>
                         <ForcePasswordChangeModal />
@@ -217,7 +225,9 @@ function App() {
                             Admin {adminMode === 'read_only' ? 'read-only' : 'read-write'} access
                         </div>
                     )}
-                    {redirectDeprecatedLandingRoute ? (
+                    {!isAuthenticated && !authLoading && !online && !showLandingPage && !showLegalPage ? (
+                        <OfflineSignInScreen />
+                    ) : redirectDeprecatedLandingRoute ? (
                         <Navigate to="/" replace />
                     ) : showLandingPage ? (
                         <Suspense fallback={<div className="loading-spinner">Loading...</div>}><Landing /></Suspense>

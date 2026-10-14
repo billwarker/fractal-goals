@@ -10,6 +10,9 @@ vi.mock('../api', () => ({
     },
 }));
 
+const { online } = vi.hoisted(() => ({ online: { value: true } }));
+vi.mock('../../offline/connectivity', () => ({ isOnline: () => online.value }));
+
 import {
     __telemetryTestHooks,
     extractRootIdFromPath,
@@ -47,6 +50,21 @@ describe('telemetry queue', () => {
         vi.clearAllMocks();
         recordEvents.mockResolvedValue({ data: { accepted: 1 } });
         __telemetryTestHooks.reset();
+        online.value = true;
+    });
+
+    it('keeps queued events while offline instead of dropping them', async () => {
+        setTelemetryEnabled(true);
+        trackEvent('offline_sync_drained', { props: { ops: 2 } });
+        online.value = false;
+
+        await __telemetryTestHooks.flush();
+        expect(recordEvents).not.toHaveBeenCalled();
+        expect(__telemetryTestHooks.getQueue()).toHaveLength(1);
+
+        online.value = true;
+        await __telemetryTestHooks.flush();
+        expect(recordEvents).toHaveBeenCalledTimes(1);
     });
 
     afterEach(() => {

@@ -36,8 +36,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                 ...options,
                 meta: { rootId, sessionId, ...meta },
             };
-            applyOptimistic(queryClient, op);
-            return outbox.submit(op);
+            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
         };
         return {
             addNote: async (data) => {

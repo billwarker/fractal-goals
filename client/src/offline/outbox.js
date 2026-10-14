@@ -57,6 +57,8 @@ export function createOutbox({
     createId = defaultId,
     setTimer = (callback, delay) => setTimeout(callback, delay),
     clearTimer = (handle) => clearTimeout(handle),
+    // Health events for telemetry: ('drained', stats) and ('rejected', details).
+    onEvent = () => {},
 } = {}) {
     if (!store || typeof send !== 'function') {
         throw new Error('createOutbox requires a store and a send function');
@@ -74,6 +76,7 @@ export function createOutbox({
     let flushing = null;
     let flushAgain = false;
     let inFlightOpId = null;
+    let drainStats = { ops: 0, maxAgeMs: 0, retries: 0 };
     let retryTimer = null;
     let hydrated = null;
 
@@ -113,6 +116,14 @@ export function createOutbox({
         entry.forEach(({ resolve, reject }) => (outcome.ok ? resolve(outcome.value) : reject(outcome.error)));
     };
 
+    const safeEmit = (type, payload) => {
+        try {
+            onEvent(type, payload);
+        } catch {
+            // Telemetry must never affect syncing.
+        }
+    };
+
     const runHandler = (op, phase, payload) => {
         const handler = handlers.get(op.kind)?.[phase];
         if (!handler) return;
@@ -142,6 +153,7 @@ export function createOutbox({
         await store.put(rejected);
         ops = ops.map((entry) => (entry.opId === op.opId ? rejected : entry));
         runHandler(rejected, 'onReject', error);
+        safeEmit('rejected', { kind: op.kind, status: error.status ?? null, code: error.code ?? null });
         settle(op.opId, { ok: false, error: Object.assign(new Error(error.message), { outboxError: error }) });
         announce({ type: 'rejected', opId: op.opId });
 
@@ -207,6 +219,17 @@ export function createOutbox({
             if (op.scope && !ops.some((entry) => entry.scope === op.scope && entry.state === OP_STATE.PENDING)) {
                 syncedAt[op.scope] = now();
             }
+            drainStats.ops += 1;
+            drainStats.retries += op.attempts || 0;
+            drainStats.maxAgeMs = Math.max(drainStats.maxAgeMs, now() - Date.parse(op.createdAt || 0));
+            if (!ops.some((entry) => entry.state === OP_STATE.PENDING)) {
+                safeEmit('drained', {
+                    ops: drainStats.ops,
+                    max_age_s: Math.round(drainStats.maxAgeMs / 1000),
+                    retries: drainStats.retries,
+                });
+                drainStats = { ops: 0, maxAgeMs: 0, retries: 0 };
+            }
             await refresh();
         }
     };
@@ -249,6 +272,8 @@ export function createOutbox({
         entityIds = [],
         creates = [],
         meta = {},
+        // Runs once the op is durable and before it can be sent: shown means saved.
+        onPersisted = null,
     }) {
         await hydrated;
         const opId = createId();
@@ -291,6 +316,7 @@ export function createOutbox({
             }
             await store.put(op);
         });
+        onPersisted?.(op);
 
         await refresh();
         announce({ type: 'changed' });

@@ -12,8 +12,8 @@ test('scoped instance links persist independently and builder receives the scope
     const { token } = await (await login).json();
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
     const suffix = testInfo.project.name;
-    const root = `browser-adjustments-root-${suffix}`;
-    const goalName = `Browser Adjustments ${suffix}`;
+    const root = `browser-associations-root-${suffix}`;
+    const goalName = `Browser Associations ${suffix}`;
     const { session, definition } = await page.evaluate(async ({ root, token }) => {
         const post = async (path, body) => {
             const response = await fetch(`/api/${root}/${path}`, { method: 'POST', headers: {

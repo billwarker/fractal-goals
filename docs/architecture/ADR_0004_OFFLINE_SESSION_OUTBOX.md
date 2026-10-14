@@ -36,9 +36,14 @@ Supporting rules:
   session's latest timing boundary and no later than server time. Values older than 24 h are
   rejected. Without `occurred_at`, server time is used as before. The rule that completing a
   paused session ends it at the pause still applies.
-- **Client IDs.** Activity instances and session notes created offline use client-generated
-  UUIDs, so later queued writes can reference them. A rejected create also rejects every queued
-  op that touches the same record.
+- **Client IDs.** Activity instances, session notes and quick sessions created offline use
+  client-generated UUIDs, so later queued writes can reference them. A rejected create also
+  rejects every queued op that touches the same record.
+- **Deterministic circuit IDs.** One "add circuit" expands into slots, rounds, members and their
+  sets or instances. The client mints only the run (or added round) ID; `services/circuit_ids.py`
+  derives every child ID from it with UUIDv5, and `client/src/offline/circuitIds.js` derives the
+  same IDs, so members created offline can be edited before sync. Shared vectors in
+  `tests/fixtures/circuit_id_vectors.json` keep the two implementations identical.
 - **Failures.** Network errors, 5xx, 408 and 429 keep the op and retry with backoff. Other 4xx
   responses mark it *rejected* and roll back only that op; the session's sync indicator lists it
   for Retry or Discard. A network failure never signs the user out.
@@ -49,14 +54,24 @@ Supporting rules:
   session's query keys are invalidated once, when its queue drains.
 - **What is queued and what is not.**
   - Queued: activity add/remove/values, timers, pause/resume, session layout and completion,
-    session notes, circuit start/complete/reset/delete, and circuit member results.
-  - Not queued: everything else (goals, templates, adding circuits or rounds, analytics). These
-    wait for the queue to drain and need a connection; offline errors say so.
+    session notes, every circuit action (add, rounds, timing, results, cascade, tags), and
+    quick-session completion.
+  - Not queued: everything else (goals, templates, circuit definitions, analytics). These wait for
+    the queue to drain and need a connection; offline errors say so.
+- **Quick sessions.** A draft with entered values is kept in IndexedDB per user and fractal, so a
+  reload or an accidental close can resume it from Create Session.
 - **Opening the app offline.** `vite-plugin-pwa` precaches the app shell; `/api/*` is never
   cached by the service worker. Queries the open session needs are persisted per user in
   IndexedDB for up to 48 h (`offline/queryPersistence.js`). With no signal, the app opens from an
   on-device user snapshot; nothing is authorized until the cookie refresh succeeds online.
   Updates wait for a user-initiated reload and are offered only when nothing is waiting to sync.
+  Signed out with no signal, an offline screen replaces sign-in and gives way automatically once
+  the connection returns.
+- **Status.** The session page shows its own sync indicator; every other page shows an app-wide
+  one for all queued changes, with the same review list.
+- **Health telemetry.** `offline_sync_drained` (op count, maximum queued age, retries),
+  `offline_op_rejected` (kind, status, code) and `offline_boot` (seconds offline, recorded on
+  reconnect) carry counts and codes only, never content.
 
 ## Consequences
 
@@ -66,4 +81,7 @@ Supporting rules:
   the user's outbox and sync at their next sign-in on that device.
 - New in-session write paths must go through `useOfflineSessionWrites` (or register an op kind)
   rather than calling the API directly.
-- Sessions must still be started with signal.
+- Sessions must still be started with signal. Quick sessions are the exception, since they live
+  on the device until completion.
+- Two devices editing the same session while one is offline are not merged: the server stays
+  authoritative, and anything it refuses is listed for review on the device that queued it.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import or_
 
-from models import ActivityInstance, ActivitySet, Note
+from models import ActivityInstance, ActivitySet, CircuitRound, Note
 from services.circuit_rules import (
     ESTIMATED_CIRCUIT_RESULT_BYTES,
     MAX_CIRCUIT_ROUNDS,
@@ -21,13 +21,15 @@ class CircuitRoundOperations:
         self.owner = owner
         self.db_session = owner.db_session
 
-    def add(self, root_id, run_id, user_id):
+    def add(self, root_id, run_id, user_id, *, round_id=None):
         locked = self.owner._authorized_locked_run(root_id, run_id, user_id)
         if isinstance(locked, tuple) and len(locked) == 3:
             return locked
         run, session = locked
         if session.completed:
             return None, "Completed sessions cannot add circuit rounds", 409
+        if round_id and self.db_session.get(CircuitRound, round_id) is not None:
+            return None, "A circuit round with this id already exists", 409
 
         additional_instances = sum(1 for slot in run.slots if not slot.has_sets)
         quota = QuotaService(self.db_session)
@@ -52,7 +54,7 @@ class CircuitRoundOperations:
             return None, storage_error, storage_status
 
         added_round = self.owner._create_round_occurrences(
-            run, next_round_number, completed=run.status == "completed"
+            run, next_round_number, completed=run.status == "completed", round_id=round_id,
         )
         _, inherit_error, inherit_status = self.owner.tag_operations.inherit_run_tags(
             run, added_round, user_id

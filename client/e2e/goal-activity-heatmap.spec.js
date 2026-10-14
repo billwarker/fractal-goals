@@ -52,13 +52,15 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         }));
         expect(new Set(sizes.map((size) => size.top)).size).toBe(1);
         expect(sizes.every((size) => size.height >= 44)).toBe(true);
-        expect(await actions.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+        // The labelled row sits inside its horizontal scroller; the row itself never scrolls.
+        const scroller = actions.locator('..');
+        expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
         await page.screenshot({ path: testInfo.outputPath('mobile-footer.png') });
-        const before = await actions.boundingBox();
-        await actions.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+        const before = await scroller.boundingBox();
+        await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
         await expect(actions.getByRole('button').last()).toBeInViewport({ ratio: 1 });
-        expect((await actions.boundingBox()).x).toBe(before.x);
-        await actions.evaluate((element) => { element.scrollLeft = 0; });
+        expect((await scroller.boundingBox()).x).toBe(before.x);
+        await scroller.evaluate((element) => { element.scrollLeft = 0; });
     }
     const cells = heatmap.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} ·/ });
     await expect(cells).toHaveCount(501);

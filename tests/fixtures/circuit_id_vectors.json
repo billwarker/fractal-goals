@@ -1,0 +1,47 @@
+{
+  "description": "UUIDv5 derivations shared by services/circuit_ids.py and client/src/offline/circuitIds.js",
+  "vectors": [
+    {
+      "fn": "run_slot_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": "slot-def-1",
+      "expected": "1b207513-b0be-5ec7-a9e5-a04c5831ad99"
+    },
+    {
+      "fn": "run_slot_instance_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": "slot-def-1",
+      "expected": "3141d837-1f11-50dc-81eb-53acf117b5d8"
+    },
+    {
+      "fn": "initial_round_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 1,
+      "expected": "934e78a3-2092-5d2e-b72d-c27b37ef0d4e"
+    },
+    {
+      "fn": "initial_round_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 12,
+      "expected": "328471dc-66ac-5a38-943a-097ebecc8f94"
+    },
+    {
+      "fn": "round_member_id",
+      "parent": "9b2d4f60-1a3c-4e5f-8a7b-2c3d4e5f6a7b",
+      "arg": "a0b1c2d3-0000-4000-8000-000000000001",
+      "expected": "e322d481-9473-5f1b-8942-6caac2414eb0"
+    },
+    {
+      "fn": "round_member_set_id",
+      "parent": "9b2d4f60-1a3c-4e5f-8a7b-2c3d4e5f6a7b",
+      "arg": "a0b1c2d3-0000-4000-8000-000000000001",
+      "expected": "c8dcbc90-b63f-5eda-bbb6-f8bee28efdaa"
+    },
+    {
+      "fn": "round_member_instance_id",
+      "parent": "9b2d4f60-1a3c-4e5f-8a7b-2c3d4e5f6a7b",
+      "arg": "a0b1c2d3-0000-4000-8000-000000000001",
+      "expected": "81ffb8d0-829c-566f-949d-7fdc4088d998"
+    }
+  ]
+}

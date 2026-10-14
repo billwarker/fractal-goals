@@ -24,11 +24,12 @@ test('summarizes a block in the calendar pane and adds a program day with option
     const viewBox = await programView.boundingBox();
     const optionsBox = await page.getByRole('button', { name: 'Program Options', exact: true }).boundingBox();
     expect(viewBox.x + viewBox.width).toBeLessThanOrEqual(optionsBox.x);
-    expect(viewBox.height).toBe(optionsBox.height);
-    expect(optionsBox.height).toBe(suffix === 'mobile' ? 44 : 32);
+    // Heights can differ by a sub-pixel rounding fraction; compare to 0.01px.
+    expect(viewBox.height).toBeCloseTo(optionsBox.height, 2);
+    expect(optionsBox.height).toBeCloseTo(suffix === 'mobile' ? 44 : 32, 2);
     if (suffix === 'desktop') {
         const sidebarButtonBox = await page.getByRole('button', { name: 'Hide Sidebar', exact: true }).boundingBox();
-        expect(sidebarButtonBox.height).toBe(optionsBox.height);
+        expect(sidebarButtonBox.height).toBeCloseTo(optionsBox.height, 2);
     }
     if (suffix === 'desktop') {
         const title = page.getByRole('heading', { level: 1 });
@@ -44,10 +45,13 @@ test('summarizes a block in the calendar pane and adds a program day with option
     const expectSidebarHeader = async () => {
         const toggle = sidebar.getByRole('tablist', { name: 'Program side pane views', exact: true });
         const collapse = sidebar.getByRole('button', { name: 'Collapse', exact: true });
-        const toggleBox = await toggle.boundingBox();
-        const collapseBox = await collapse.boundingBox();
-        expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(collapseBox.x);
-        expect(Math.abs(toggleBox.y - collapseBox.y)).toBeLessThan(8);
+        // The mobile sheet slides in; measure once it has settled.
+        await expect(async () => {
+            const toggleBox = await toggle.boundingBox();
+            const collapseBox = await collapse.boundingBox();
+            expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(collapseBox.x);
+            expect(Math.abs(toggleBox.y - collapseBox.y)).toBeLessThan(8);
+        }).toPass();
     };
     await expectSidebarHeader();
 

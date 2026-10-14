@@ -18,6 +18,7 @@ from models import (
     session_goals,
     validate_root_goal,
 )
+from services import circuit_ids
 from services.circuit_metric_service import CircuitMetricService
 from services.circuit_definition_operations import CircuitDefinitionOperations
 from services.circuit_round_operations import CircuitRoundOperations
@@ -181,18 +182,26 @@ class CircuitService:
     def restore_definition(self, root_id, definition_id, user_id):
         return self.definition_operations.restore(root_id, definition_id, user_id)
 
-    def _create_round_occurrences(self, run, round_number, *, completed=False):
-        circuit_round = CircuitRound(circuit_run_id=run.id, round_number=round_number)
+    def _create_round_occurrences(self, run, round_number, *, completed=False, round_id=None):
+        # A client-supplied round id makes every member, set, and instance id derivable offline.
+        ids = (lambda derive, slot: {'id': derive(round_id, slot.id)}) if round_id else (lambda derive, slot: {})
+        circuit_round = CircuitRound(
+            **({'id': round_id} if round_id else {}),
+            circuit_run_id=run.id,
+            round_number=round_number,
+        )
         self.db_session.add(circuit_round)
         self.db_session.flush()
         for run_slot in sorted(run.slots, key=lambda slot: slot.sort_order):
             member = CircuitRoundMember(
+                **ids(circuit_ids.round_member_id, run_slot),
                 circuit_round_id=circuit_round.id,
                 circuit_run_slot_id=run_slot.id,
                 sort_order=run_slot.sort_order,
             )
             if run_slot.has_sets:
                 activity_set = ActivitySet(
+                    **ids(circuit_ids.round_member_set_id, run_slot),
                     activity_instance_id=run_slot.activity_instance_id,
                     sort_order=round_number - 1,
                     status="completed" if completed else "planned",
@@ -202,6 +211,7 @@ class CircuitService:
                 member.activity_set_id = activity_set.id
             else:
                 instance = ActivityInstance(
+                    **ids(circuit_ids.round_member_instance_id, run_slot),
                     session_id=run.session_id,
                     root_id=run.root_id,
                     activity_definition_id=run_slot.activity_definition_id,
@@ -321,7 +331,11 @@ class CircuitService:
         )
         if storage_error:
             return None, storage_error, storage_status
+        client_run_id = data.get("id")
+        if client_run_id and self.db_session.get(CircuitRun, client_run_id) is not None:
+            return None, "A circuit run with this id already exists", 409
         run = CircuitRun(
+            **({'id': client_run_id} if client_run_id else {}),
             root_id=root_id,
             session_id=session_id,
             circuit_definition_id=definition.id,
@@ -335,6 +349,7 @@ class CircuitService:
         for slot in sorted(definition.slots, key=lambda item: item.sort_order):
             activity = slot.activity_definition
             run_slot = CircuitRunSlot(
+                **({'id': circuit_ids.run_slot_id(run.id, slot.id)} if client_run_id else {}),
                 circuit_run_id=run.id,
                 source_slot_id=slot.id,
                 activity_definition_id=activity.id,
@@ -346,6 +361,7 @@ class CircuitService:
             )
             if activity.has_sets:
                 instance = ActivityInstance(
+                    **({'id': circuit_ids.run_slot_instance_id(run.id, slot.id)} if client_run_id else {}),
                     session_id=session_id,
                     root_id=root_id,
                     activity_definition_id=activity.id,
@@ -356,7 +372,11 @@ class CircuitService:
             self.db_session.add(run_slot)
         self.db_session.flush()
         for round_number in range(1, round_count + 1):
-            self._create_round_occurrences(run, round_number)
+            self._create_round_occurrences(
+                run,
+                round_number,
+                round_id=circuit_ids.initial_round_id(run.id, round_number) if client_run_id else None,
+            )
         if attach_goals:
             self._attach_member_goals(session, definition, root_id)
         structure_error = append_circuit_run_item(
@@ -594,8 +614,8 @@ class CircuitService:
             }, source="circuit_service.cascade_member_metric", context={"db_session": self.db_session}))
         return serialize_circuit_run(self._run(root_id, run.id)), None, 200
 
-    def add_round(self, root_id, run_id, user_id):
-        return self.round_operations.add(root_id, run_id, user_id)
+    def add_round(self, root_id, run_id, user_id, *, round_id=None):
+        return self.round_operations.add(root_id, run_id, user_id, round_id=round_id)
 
     def delete_round(self, root_id, run_id, round_id, user_id):
         return self.round_operations.delete(root_id, run_id, round_id, user_id)

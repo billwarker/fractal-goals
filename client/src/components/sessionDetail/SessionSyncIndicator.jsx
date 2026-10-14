@@ -34,8 +34,16 @@ export function describeOp(op) {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
-/** Where this session's changes are: on the device, syncing, synced, or needing review. */
-export default function SessionSyncIndicator({ sessionId, fallback = null, className = '' }) {
+/**
+ * Where queued changes are: on the device, syncing, synced, or needing review.
+ * With a ``sessionId`` it covers that session; without one, every queued change.
+ */
+export default function SessionSyncIndicator({
+    sessionId = null,
+    fallback = null,
+    className = '',
+    idleOfflineLabel = 'Offline · changes will save on this device',
+}) {
     const outbox = useOutbox();
     const status = useOutboxStatus(sessionId);
     const [reviewOpen, setReviewOpen] = useState(false);
@@ -65,7 +73,7 @@ export default function SessionSyncIndicator({ sessionId, fallback = null, class
         tone = 'warning';
         label = status.pendingCount > 0
             ? `Offline · ${plural(status.pendingCount, 'change')} saved on this device`
-            : 'Offline · changes will save on this device';
+            : idleOfflineLabel;
     } else if (status.pendingCount > 0) {
         label = `Syncing ${plural(status.pendingCount, 'change')}…`;
     } else if (showSynced) {

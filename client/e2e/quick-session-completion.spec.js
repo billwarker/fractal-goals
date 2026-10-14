@@ -11,7 +11,7 @@ test('quick sessions complete every activity through one shared control', async 
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     const { token } = await (await login).json();
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    const root = `browser-adjustments-root-${testInfo.project.name}`;
+    const root = `browser-quick-session-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
     const activityResponse = await page.request.post(`/api/${root}/activities`, {
         headers, data: { name: 'Quick Completion Practice', has_metrics: false },

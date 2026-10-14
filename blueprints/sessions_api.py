@@ -5,6 +5,7 @@ logger = logging.getLogger(__name__)
 import models
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import (
+    Session,
     get_session,
 )
 from validators import (
@@ -333,6 +334,9 @@ def complete_quick_session(current_user, root_id, validated_data):
     db_session = get_db_session()
     service = SessionService(db_session)
     try:
+        # A queued offline completion carries its own id; replays are handled by @idempotent.
+        if validated_data.get('id') and db_session.get(Session, validated_data['id']) is not None:
+            return jsonify({"error": "A session with this id already exists"}), 409
         result, error, status = service.create_completed_quick_session(root_id, current_user.id, validated_data)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status

@@ -44,6 +44,13 @@ class CircuitRunCreateSchema(BaseModel):
     circuit_definition_id: str = Field(..., min_length=1)
     section_index: Optional[int] = Field(None, ge=0)
     item_index: Optional[int] = Field(None, ge=0)
+    # Client-minted run id; every slot/round/member id is then derived (services/circuit_ids.py).
+    id: Optional[str] = Field(None, pattern=r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+
+
+class CircuitRoundCreateSchema(BaseModel):
+    # Client-minted round id; member, set, and instance ids are derived from it.
+    round_id: Optional[str] = Field(None, pattern=r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
 
 
 class CircuitRunTimingUpdateSchema(BaseModel):

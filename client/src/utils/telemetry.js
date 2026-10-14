@@ -9,6 +9,7 @@
  */
 import { telemetryApi } from './api';
 import { logDebug } from './logger';
+import { isOnline } from '../offline/connectivity';
 
 const FLUSH_INTERVAL_MS = 10000;
 const MAX_QUEUE_LENGTH = 40;
@@ -54,7 +55,8 @@ export const extractRootIdFromPath = (pathname) => {
 };
 
 async function flush() {
-    if (!enabled || flushInFlight || queue.length === 0) return;
+    // Keep events while offline; a failed send would drop the batch.
+    if (!enabled || flushInFlight || queue.length === 0 || !isOnline()) return;
     const events = queue.splice(0, MAX_BATCH_SIZE);
     flushInFlight = true;
     try {

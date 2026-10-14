@@ -1,4 +1,5 @@
 import { queryKeys } from '../hooks/queryKeys';
+import { getSectionItems, withSectionItems } from '../hooks/sessionItemMutationUtils';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import {
@@ -6,6 +7,7 @@ import {
     applySessionResume,
     applyTimerAction,
 } from './sessionOps';
+import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun } from './circuitOps';
 
 // Every queued in-session write has a kind. Each kind knows how to show itself
 // in the cache before the server answers (`optimistic`), which is also re-run
@@ -25,7 +27,14 @@ export const SESSION_OP = Object.freeze({
     NOTE_DELETE: 'session.note.delete',
     CIRCUIT_RUN: 'session.circuit.run',
     CIRCUIT_MEMBER: 'session.circuit.member',
+    QUICK_COMPLETE: 'session.quick.complete',
+    CIRCUIT_CREATE: 'session.circuit.create',
+    CIRCUIT_ROUND_ADD: 'session.circuit.round.add',
+    CIRCUIT_ROUND_REMOVE: 'session.circuit.round.remove',
+    CIRCUIT_CASCADE: 'session.circuit.cascade',
+    CIRCUIT_TAG: 'session.circuit.tag',
 });
+
 
 const SESSION_QUERY_PREFIXES = new Set(['session', 'session-activities', 'session-notes', 'circuit-runs']);
 
@@ -36,7 +45,7 @@ const keysFor = ({ rootId, sessionId }) => ({
     circuits: queryKeys.sessionCircuitRuns(rootId, sessionId),
 });
 
-function patchRun(run, action, at) {
+function patchRun(run, action, at, value = null) {
     if (action === 'startRun') {
         return { ...run, status: 'active', time_start: at, time_stop: null, duration_seconds: null };
     }
@@ -53,6 +62,9 @@ function patchRun(run, action, at) {
             duration_seconds: Math.max(0, elapsed - (run.total_paused_seconds || 0)),
         };
     }
+    if (action === 'updateRunTiming') {
+        return { ...run, ...(value || {}) };
+    }
     if (action === 'resetRun') {
         return {
             ...run,
@@ -68,6 +80,26 @@ function patchRun(run, action, at) {
 }
 
 const mapList = (updater) => (previous) => (Array.isArray(previous) ? updater(previous) : previous);
+
+const patchRunById = (queryClient, meta, runId, patch) => queryClient.setQueryData(
+    keysFor(meta).circuits,
+    mapList((runs) => runs.map((run) => (run.id === runId ? patch(run) : run))),
+);
+
+/** Mirror of the server's append_circuit_run_item on the cached session. */
+function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, runId }) {
+    const sections = Array.isArray(sessionData?.sections) && sessionData.sections.length
+        ? [...sessionData.sections]
+        : [{ name: 'Main', items: [] }];
+    const section = sections[sectionIndex];
+    if (!section) return sessionData;
+    const items = getSectionItems(section).filter((item) => !(item?.type === 'circuit' && item.circuit_run_id === runId));
+    const entry = { type: 'circuit', circuit_run_id: runId };
+    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex <= items.length) items.splice(itemIndex, 0, entry);
+    else items.push(entry);
+    sections[sectionIndex] = withSectionItems(section, items);
+    return { ...(sessionData || {}), sections };
+}
 
 const OPTIMISTIC = {
     [SESSION_OP.INSTANCE_UPDATE]: (queryClient, op) => {
@@ -135,11 +167,11 @@ const OPTIMISTIC = {
         });
     },
     [SESSION_OP.CIRCUIT_RUN]: (queryClient, op) => {
-        const { runId, action, occurredAt } = op.meta;
+        const { runId, action, occurredAt, value } = op.meta;
         queryClient.setQueryData(keysFor(op.meta).circuits, mapList((runs) => (
             action === 'deleteRun'
                 ? runs.filter((run) => run.id !== runId)
-                : runs.map((run) => (run.id === runId ? patchRun(run, action, occurredAt) : run))
+                : runs.map((run) => (run.id === runId ? patchRun(run, action, occurredAt, value) : run))
         )));
     },
     [SESSION_OP.CIRCUIT_MEMBER]: (queryClient, op) => {
@@ -161,6 +193,37 @@ const OPTIMISTIC = {
                 })),
             }
         ))));
+    },
+    [SESSION_OP.CIRCUIT_CREATE]: (queryClient, op) => {
+        const { placeholder, sectionIndex, itemIndex } = op.meta;
+        const keys = keysFor(op.meta);
+        queryClient.setQueryData(keys.circuits, (previous) => {
+            const runs = Array.isArray(previous) ? previous : [];
+            return runs.some((run) => run.id === placeholder.id) ? runs : [...runs, placeholder];
+        });
+        queryClient.setQueryData(keys.session, (previous) => {
+            if (!previous) return previous;
+            const sessionData = previous.attributes?.session_data;
+            return {
+                ...previous,
+                attributes: {
+                    ...(previous.attributes || {}),
+                    session_data: insertCircuitItem(sessionData, { sectionIndex, itemIndex, runId: placeholder.id }),
+                },
+            };
+        });
+    },
+    [SESSION_OP.CIRCUIT_ROUND_ADD]: (queryClient, op) => {
+        patchRunById(queryClient, op.meta, op.meta.runId, (run) => addRoundToRun(run, op.meta.round));
+    },
+    [SESSION_OP.CIRCUIT_ROUND_REMOVE]: (queryClient, op) => {
+        patchRunById(queryClient, op.meta, op.meta.runId, (run) => removeRoundFromRun(run, op.meta.roundId));
+    },
+    [SESSION_OP.CIRCUIT_CASCADE]: (queryClient, op) => {
+        patchRunById(queryClient, op.meta, op.meta.runId, (run) => cascadeMemberMetric(run, op.meta));
+    },
+    [SESSION_OP.CIRCUIT_TAG]: (queryClient, op) => {
+        patchRunById(queryClient, op.meta, op.meta.runId, (run) => applyTagChange(run, op.meta));
     },
     [SESSION_OP.NOTE_CREATE]: (queryClient, op) => {
         const { note } = op.meta;
@@ -241,10 +304,18 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                 break;
             case SESSION_OP.CIRCUIT_RUN:
             case SESSION_OP.CIRCUIT_MEMBER:
+            case SESSION_OP.CIRCUIT_CREATE:
+            case SESSION_OP.CIRCUIT_ROUND_ADD:
+            case SESSION_OP.CIRCUIT_ROUND_REMOVE:
+            case SESSION_OP.CIRCUIT_CASCADE:
+            case SESSION_OP.CIRCUIT_TAG:
                 if (op.meta.action === 'deleteRun' || !data?.id || outbox.hasPendingEntity(op.meta.runId)) break;
                 queryClient.setQueryData(keysFor(op.meta).circuits, mapList((runs) => (
                     runs.map((run) => (run.id === data.id ? data : run))
                 )));
+                break;
+            case SESSION_OP.QUICK_COMPLETE:
+                // The new session shows up in lists once its scope drains (invalidateSessionAfterSync).
                 break;
             case SESSION_OP.NOTE_CREATE:
             case SESSION_OP.NOTE_UPDATE:

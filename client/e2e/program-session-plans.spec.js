@@ -25,7 +25,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     await expect(cards).toHaveCount(2);
     const card = cards.first();
     await expect(card).toContainText('Template default');
-    const benchKey = `[data-align-key*="|a:browser-plan-bench-${suffix}#0"]`;
+    const benchKey = `[data-align-key$="|a:browser-plan-bench-${suffix}#0"]`;
     const bench = card.locator(benchKey);
 
     // Week 1: two planned sets at 100 kg.
@@ -68,7 +68,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
         // Another set on next week's Bench Press makes that card taller; the Barbell Row rows
         // below still line up side by side.
         await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
-        const rowKey = `[data-align-key*="|a:browser-plan-row-${suffix}#0"]`;
+        const rowKey = `[data-align-key$="|a:browser-plan-row-${suffix}#0"]`;
         await expect(async () => {
             const [left, right] = await Promise.all([card, nextCard].map((plan) => plan.locator(rowKey).boundingBox()));
             expect(Math.abs(left.y - right.y)).toBeLessThanOrEqual(1);
@@ -105,7 +105,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
         await expect(sessionCard).toHaveCount(1);
         await expect(nextPlan).toHaveCount(1);
         // The session's Barbell Row lines up with the same activity in next week's plan.
-        const rowKey = `[data-align-key*="|a:browser-plan-row-${suffix}#0"]`;
+        const rowKey = `[data-align-key$="|a:browser-plan-row-${suffix}#0"]`;
         await expect(async () => {
             const [left, right] = await Promise.all([sessionCard, nextPlan].map((card) => card.locator(rowKey).boundingBox()));
             expect(Math.abs(left.y - right.y)).toBeLessThanOrEqual(1);

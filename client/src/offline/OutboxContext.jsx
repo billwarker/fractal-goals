@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE, axios } from '../utils/api/core';
+import { trackEvent } from '../utils/telemetry';
 import { checkConnectivity, isOnline, subscribeConnectivity } from './connectivity';
 import { createIndexedDbStore } from './indexedDbStore';
 import { OP_STATE, createOutbox } from './outbox';
@@ -16,7 +17,7 @@ import { saveUserSnapshot } from './userSnapshot';
 // timeout costs nothing but a retry.
 const OUTBOX_REQUEST_TIMEOUT_MS = 8000;
 
-const OutboxContext = createContext(null);
+export const OutboxContext = createContext(null);
 
 export function sendOutboxOp(op) {
     return axios.request({
@@ -35,6 +36,10 @@ function createUserOutbox(userId) {
         send: sendOutboxOp,
         isOnline,
         channel,
+        onEvent: (type, props) => trackEvent(
+            type === 'drained' ? 'offline_sync_drained' : 'offline_op_rejected',
+            { props },
+        ),
     });
 }
 
@@ -116,24 +121,33 @@ export function useOutboxStatus(scope = null) {
             rejected: inScope.filter((op) => op.state === OP_STATE.REJECTED),
             syncing: snapshot.syncing,
             pausedForAuth: snapshot.pausedForAuth,
-            lastSyncedAt: scope ? snapshot.syncedAt?.[scope] || null : null,
+            // Without a scope, the most recent drain of any scope counts.
+            lastSyncedAt: scope
+                ? snapshot.syncedAt?.[scope] || null
+                : Math.max(0, ...Object.values(snapshot.syncedAt || {})) || null,
         };
     }, [online, outbox, scope, snapshot]);
 }
 
+/**
+ * Asks before an action that ends the session while changes still wait to sync.
+ * Returns true when it is safe to continue (nothing pending, or the user agreed).
+ */
+export function useConfirmUnsyncedChanges() {
+    const outbox = useOutbox();
+    return useCallback((action = 'Sign out') => {
+        const pending = outbox ? outbox.pendingOps().length : 0;
+        if (pending === 0) return true;
+        return window.confirm(
+            `${pending} change${pending === 1 ? " hasn't" : "s haven't"} synced yet. `
+            + `They stay on this device and sync the next time you sign in here. ${action} anyway?`,
+        );
+    }, [outbox]);
+}
+
 /** Logout that warns when changes are still waiting to sync from this device. */
 export function useGuardedLogout() {
-    const outbox = useOutbox();
     const { logout } = useAuth();
-    return useCallback(() => {
-        const pending = outbox ? outbox.pendingOps().length : 0;
-        if (pending > 0) {
-            const confirmed = window.confirm(
-                `${pending} change${pending === 1 ? " hasn't" : "s haven't"} synced yet. `
-                + 'They stay on this device and sync the next time you sign in here. Sign out anyway?',
-            );
-            if (!confirmed) return undefined;
-        }
-        return logout();
-    }, [logout, outbox]);
+    const confirmUnsynced = useConfirmUnsyncedChanges();
+    return useCallback(() => (confirmUnsynced() ? logout() : undefined), [confirmUnsynced, logout]);
 }

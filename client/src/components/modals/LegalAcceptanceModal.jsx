@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGuardedLogout } from '../../offline/OutboxContext';
 import { PRIVACY_VERSION, TERMS_VERSION } from '../../content/legal/legalVersions';
 import { authApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
@@ -13,7 +14,8 @@ import styles from './AuthModal.module.css';
 
 /** Blocking review for accounts with missing or outdated legal acceptance. */
 function LegalAcceptanceModal() {
-    const { logout, setUser } = useAuth();
+    const { setUser } = useAuth();
+    const logout = useGuardedLogout();
     const [accepted, setAccepted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState(null);

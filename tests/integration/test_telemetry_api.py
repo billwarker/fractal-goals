@@ -47,6 +47,22 @@ class TestTelemetryEventsEndpoint:
         assert response.get_json()['accepted'] == 1
         assert db_session.query(ProductEvent).count() == 1
 
+    def test_accepts_offline_sync_health_events(self, authed_client, db_session):
+        response = authed_client.post(
+            '/api/telemetry/events',
+            data=json.dumps({'events': [
+                {'name': 'offline_sync_drained', 'props': {'ops': 4, 'max_age_s': 380, 'retries': 2}},
+                {'name': 'offline_op_rejected', 'props': {'kind': 'session.timer', 'status': 409, 'code': None}},
+                {'name': 'offline_boot', 'props': {'offline_seconds': 600}},
+            ]}),
+            content_type='application/json',
+        )
+
+        assert response.status_code == 202
+        assert response.get_json()['accepted'] == 3
+        names = {event.event_name for event in db_session.query(ProductEvent).all()}
+        assert names == {'offline_sync_drained', 'offline_op_rejected', 'offline_boot'}
+
     def test_rejects_oversized_batches(self, authed_client):
         events = [{'name': 'page_view'} for _ in range(21)]
         response = authed_client.post(

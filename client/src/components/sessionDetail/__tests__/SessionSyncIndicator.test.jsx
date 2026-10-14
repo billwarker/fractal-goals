@@ -42,6 +42,12 @@ describe('SessionSyncIndicator', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Offline · 3 changes saved on this device');
     });
 
+    it('says only "Offline" outside a session when nothing is queued', () => {
+        status.current = { ...baseStatus, online: false };
+        render(<SessionSyncIndicator idleOfflineLabel="Offline" />);
+        expect(screen.getByRole('status')).toHaveTextContent(/^Offline$/);
+    });
+
     it('shows progress while syncing', () => {
         status.current = { ...baseStatus, pendingCount: 1 };
         render(<SessionSyncIndicator sessionId="s" />);

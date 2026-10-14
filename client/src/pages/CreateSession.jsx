@@ -36,8 +36,9 @@ import headerStyles from '../components/layout/PageHeader.module.css';
 import styles from './CreateSession.module.css';
 import '../App.css';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { getISOYMDInTimezone } from '../utils/dateUtils';
+import { formatDateValue, getISOYMDInTimezone } from '../utils/dateUtils';
 import { useCreateSessionAutoSelection, useCreateSessionProgramContext } from '../hooks/useCreateSessionProgramContext';
+import { useQuickSessionPersistence } from '../hooks/useQuickSessionPersistence';
 
 /**
  * Create Session Page
@@ -72,6 +73,12 @@ function CreateSession() {
     const [sessionSource, setSessionSource] = useState(null); // 'program' or 'template'
     const [queuedQuickSession, setQueuedQuickSession] = useState(null);
     const [quickSessionModalOpen, setQuickSessionModalOpen] = useState(false);
+    const quickPersistence = useQuickSessionPersistence({
+        rootId,
+        userId: user?.id,
+        draft: queuedQuickSession,
+        template: selectedTemplate,
+    });
     const [manualGoalIds, setManualGoalIds] = useState([]);
     const [mobileGoalsOpen, setMobileGoalsOpen] = useState(false);
 
@@ -279,6 +286,19 @@ function CreateSession() {
                 })),
             };
 
+            // Device-first: queue the completion so a dead zone never loses the workout.
+            const outcome = await quickPersistence.queueCompletion(quickSessionPayload);
+            if (outcome) {
+                // A rejection is reported by the outbox and kept for review; the draft is done either way.
+                await quickPersistence.clearDraft();
+                setQueuedQuickSession(null);
+                setQuickSessionModalOpen(false);
+                setSelectedTemplate(null);
+                if (outcome === 'synced') notify.success('Quick session completed.');
+                if (outcome === 'queued') notify.success("Quick session saved on this device. It will sync when you're back online.");
+                return;
+            }
+
             const completedSessionResponse = await fractalApi.completeQuickSession(rootId, quickSessionPayload);
             const completedSession = completedSessionResponse.data;
 
@@ -288,6 +308,7 @@ function CreateSession() {
             setQueuedQuickSession(null);
             setQuickSessionModalOpen(false);
             setSelectedTemplate(null);
+            void quickPersistence.clearDraft();
             notify.success('Quick session completed.');
         } catch (err) {
             logError('Error completing queued quick session:', err);
@@ -358,6 +379,15 @@ function CreateSession() {
         handleSelectProgramDay(primaryTodayProgramDay);
     };
 
+    const handleResumeQuickSession = () => {
+        const { draft, template } = quickPersistence.savedDraft;
+        resetSelectionState();
+        setSelectedTemplate(template);
+        setQueuedQuickSession(draft);
+        setQuickSessionModalOpen(true);
+    };
+
+    // Closing keeps any entered values on the device; the notice below offers to resume.
     const handleCloseQuickSessionModal = () => {
         if (creating) return;
         setQuickSessionModalOpen(false);
@@ -483,6 +513,16 @@ function CreateSession() {
                     <div className={styles.notice} role="status">
                         <span>{deepLinkNotice}</span>
                         <button type="button" onClick={() => setDeepLinkNotice(null)}>Dismiss</button>
+                    </div>
+                ) : null}
+                {quickPersistence.savedDraft && !queuedQuickSession ? (
+                    <div className={styles.notice} role="status">
+                        <span>
+                            Unfinished quick session: {quickPersistence.savedDraft.template.name}
+                            {' '}(saved {formatDateValue(new Date(quickPersistence.savedDraft.savedAt).toISOString(), 'h:mm A', timezone)})
+                        </span>
+                        <button type="button" onClick={handleResumeQuickSession}>Resume</button>
+                        <button type="button" onClick={() => void quickPersistence.clearDraft()}>Discard</button>
                     </div>
                 ) : null}
                 <div className={styles.sessionWorkspaceLayout}>

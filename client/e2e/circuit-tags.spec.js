@@ -9,7 +9,7 @@ test('circuit and round tags use activity chips and the shared catalog', async (
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     const { token } = await (await login).json();
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    const root = `browser-adjustments-root-${testInfo.project.name}`;
+    const root = `browser-circuit-tags-root-${testInfo.project.name}`;
     const { session, tag } = await page.evaluate(async ({ root, token }) => {
         const post = async (path, body) => {
             const response = await fetch(`/api/${root}/${path}`, {

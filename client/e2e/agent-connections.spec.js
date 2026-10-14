@@ -42,10 +42,12 @@ test('AI connection settings are keyboard accessible and revoke delegated grants
     expect(errors).toEqual([]);
 });
 
-test('AI handoff, delegated proposal, keyboard review, worker execution, refresh, cancellation, and reload work end to end', async ({ page }, testInfo) => {
+test('Ask AI reviews a proposal by keyboard, the worker applies it, and the tree refreshes while minimized', async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     const suffix = testInfo.project.name;
-    const rootId = `browser-root-${suffix}`;
+    // A dedicated fractal whose seeded conversation ends in a create-goal proposal.
+    const rootId = `browser-ai-root-${suffix}`;
+    const goalName = `Weekly mobility ${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
@@ -56,109 +58,45 @@ test('AI handoff, delegated proposal, keyboard review, worker execution, refresh
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     await expect(page.getByText(`Browser Practice ${suffix}`).first()).toBeVisible();
     await page.goto(`/${rootId}/goals`);
+    await expect(page.getByText(goalName, { exact: true })).toHaveCount(0);
 
+    // The pop-up is non-modal, opens from the keyboard, and closes with Escape back to its opener.
     const askAi = page.getByRole('button', { name: 'ASK AI', exact: true });
     await askAi.focus();
     await askAi.press('Enter');
-    const dialog = page.getByRole('dialog', { name: 'Fractal AI' });
+    const dialog = page.getByRole('dialog', { name: 'Ask AI' });
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('aria-modal', 'false');
-    const providerSelect = dialog.getByLabel('Connected provider');
-    await expect(providerSelect).toBeEnabled();
-    await providerSelect.selectOption(`browser-agent-grant-${suffix}`);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(askAi).toBeFocused();
 
-    const createTask = async (request) => {
-        const responsePromise = page.waitForResponse((response) => (
-            response.url().endsWith('/api/agent/tasks') && response.request().method() === 'POST'
-        ));
-        await dialog.getByLabel('Message').fill(request);
-        await dialog.getByRole('button', { name: 'Prepare handoff' }).click();
-        const response = await responsePromise;
-        expect(response.status()).toBe(201);
-        return response.json();
-    };
-
-    const sendDelegatedProposal = async (task, operations) => {
-        const token = `browser-agent-access-token-${suffix}`;
-        const exchangeResponse = await page.request.post('/api/agent/internal/exchange', {
-            data: { access_token: token },
-            headers: { 'X-Fractal-Agent-Secret': 'browser-test-only-shared-secret' },
-        });
-        expect(exchangeResponse.status()).toBe(200);
-        const exchange = await exchangeResponse.json();
-        const proposalResponse = await page.request.post(
-            `/api/agent/internal/tasks/${encodeURIComponent(task.id)}/proposals`,
-            {
-                data: { operations },
-                headers: {
-                    Authorization: `Bearer ${exchange.access_token}`,
-                    'X-Fractal-Agent-Secret': 'browser-test-only-shared-secret',
-                },
-            },
-        );
-        expect(proposalResponse.status()).toBe(201);
-        return proposalResponse.json();
-    };
-
-    const cancellationTask = await createTask('Prepare several planning notes, then let me cancel the queued run.');
+    // Server state survives navigation: the conversation is still there on another page.
+    await askAi.press('Enter');
+    await expect(dialog.getByText('Add a long-term goal for weekly mobility work.', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('I prepared one change for you to review.', { exact: true })).toBeVisible();
+    // No provider keys are configured here, and the pop-up says so instead of offering a composer.
+    await expect(dialog.getByRole('status').filter({ hasText: 'No embedded provider is available' })).toBeVisible();
     await page.getByRole('link', { name: 'PROGRAMS', exact: true }).click();
     await expect(page).toHaveURL(`/${rootId}/programs`);
-    await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('Prepare several planning notes, then let me cancel the queued run.', { exact: true }).first()).toBeVisible();
+    await expect(dialog.getByText('Add a long-term goal for weekly mobility work.', { exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'GOALS', exact: true }).click();
     await expect(page).toHaveURL(`/${rootId}/goals`);
-    const cancellationProposal = await sendDelegatedProposal(cancellationTask, Array.from({ length: 10 }, (_, index) => ({
-        operation_id: `cancel-note-${index}`,
-        type: 'create_note',
-        data: {
-            content: `Queued note ${index}`,
-            context_type: 'root',
-            context_id: rootId,
-        },
-    })));
-    expect(cancellationProposal.status).toBe('awaiting_approval');
-    await expect(dialog.getByRole('button', { name: 'Approve and run' })).toBeVisible({ timeout: 15_000 });
 
-    // Let the standalone worker complete an empty poll and enter its bounded
-    // idle wait so the queued cancellation is deterministic on desktop/mobile.
-    await page.waitForTimeout(10_500);
-    const approveCancellation = dialog.getByRole('button', { name: 'Approve and run' });
-    await approveCancellation.focus();
-    await approveCancellation.press('Enter');
-    const cancelButton = dialog.getByRole('button', { name: 'Cancel remaining work' });
-    await expect(cancelButton).toBeVisible({ timeout: 5_000 });
-    await cancelButton.focus();
-    await cancelButton.press('Enter');
-    await expect(dialog.getByText('cancelled', { exact: true })).toBeVisible({ timeout: 5_000 });
+    const review = dialog.getByRole('region', { name: 'Review proposed changes' });
+    await expect(review).toContainText('awaiting approval');
+    await expect(review).toContainText(goalName);
+    const approve = review.getByRole('button', { name: 'Approve and run' });
+    await approve.focus();
+    await approve.press('Enter');
+    await expect(review).toContainText('approved', { timeout: 10_000 });
+    await expect(review.getByRole('button', { name: 'Approve and run' })).toHaveCount(0);
 
-    const executionTask = await createTask('Create one goal and show it on this screen.');
-    const executionProposal = await sendDelegatedProposal(executionTask, [{
-        operation_id: 'visible-goal',
-        type: 'create_goal',
-        data: {
-            name: `External refresh goal ${suffix}`,
-            type: 'LongTermGoal',
-            parent_id: rootId,
-        },
-    }]);
-    expect(executionProposal.status).toBe('awaiting_approval');
-    await expect(dialog.getByRole('button', { name: 'Approve and run' })).toBeVisible({ timeout: 15_000 });
-    const approveExecution = dialog.getByRole('button', { name: 'Approve and run' });
-    await approveExecution.focus();
-    await approveExecution.press('Enter');
     await dialog.getByRole('button', { name: 'Minimize AI assistant' }).click();
     await expect(dialog).toBeHidden();
-
-    // The authenticated-layout cursor subscription refreshes the visible goal
-    // tree while the assistant pop-up is minimized.
-    await expect(page.getByText(`External refresh goal ${suffix}`, { exact: true })).toBeVisible({ timeout: 30_000 });
+    // The change subscription refreshes the visible tree once the worker has applied it.
+    await expect(page.getByText(goalName, { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.reload();
-    await expect(page.getByText(`External refresh goal ${suffix}`, { exact: true })).toBeVisible();
-
-    const reopenedAskAi = page.getByRole('button', { name: 'ASK AI', exact: true });
-    await reopenedAskAi.focus();
-    await reopenedAskAi.press('Enter');
-    const reopenedDialog = page.getByRole('dialog', { name: 'Fractal AI' });
-    await expect(reopenedDialog.getByText('succeeded', { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(goalName, { exact: true })).toBeVisible();
     expect(errors).toEqual([]);
 });

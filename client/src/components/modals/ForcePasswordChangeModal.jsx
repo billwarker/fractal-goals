@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGuardedLogout } from '../../offline/OutboxContext';
 import { useForm } from '../../hooks/useForm';
 import { authApi, setAccessToken } from '../../utils/api';
 import { logError } from '../../utils/logger';
@@ -18,7 +19,8 @@ import styles from './AuthModal.module.css';
  * until the password is updated, so this modal cannot be dismissed.
  */
 function ForcePasswordChangeModal() {
-    const { logout, setUser } = useAuth();
+    const { setUser } = useAuth();
+    const logout = useGuardedLogout();
     const [generalError, setGeneralError] = useState(null);
 
     const validate = (values) => {

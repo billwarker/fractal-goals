@@ -29,6 +29,9 @@ vi.mock('../../../utils/notify', () => ({
     default: notify,
 }));
 
+const { connection } = vi.hoisted(() => ({ connection: { online: true } }));
+vi.mock('../../../offline/useIsOnline', () => ({ useIsOnline: () => connection.online }));
+
 vi.mock('../../../utils/api', () => ({
     authApi: {
         forgotPassword: (...args) => forgotPassword(...args),
@@ -40,6 +43,15 @@ describe('AuthModal', () => {
         vi.clearAllMocks();
         login.mockResolvedValue({ token: 'token-a', user: { id: 'user-a' } });
         window.history.pushState({}, '', '/');
+        connection.online = true;
+    });
+
+    it('explains that logging in needs a connection while offline', () => {
+        connection.online = false;
+        render(<AuthModal isOpen onClose={() => {}} />);
+
+        expect(screen.getByRole('status')).toHaveTextContent("You're offline. Connect to log in.");
+        expect(screen.getByRole('button', { name: 'LOG IN' })).toBeDisabled();
     });
 
     it('sends remember-me preference with login', async () => {

@@ -92,7 +92,8 @@ export function useProgramCalendarSelection({
         const endDate = subtractDaysToDateString(info.endStr, 1);
         const program = programForRange(startDate, endDate);
 
-        info.view.calendar.unselect();
+        // Drag selection in multi-day mode is ours, not FullCalendar's, so there may be no view.
+        info.view?.calendar?.unselect();
         if (blockCreationMode && startDate === endDate) return;
         updateRangeContext({ startDate, endDate, program });
         setIsSidePaneVisible(true);

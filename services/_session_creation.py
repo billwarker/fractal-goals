@@ -131,6 +131,7 @@ class _SessionCreationMixin:
             return None, "Invalid datetime format. Use ISO-8601 (e.g. 2026-02-18T15:30:00Z)", 400
 
         new_session = Session(
+            **({'id': data['id']} if data.get('id') else {}),
             name=data.get('name', 'Untitled Session'),
             description=data.get('description', ''),
             owner_id=current_user_id,

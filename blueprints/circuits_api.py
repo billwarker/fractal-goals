@@ -14,6 +14,7 @@ from validators import (
     CircuitMemberMetricCascadeSchema,
     CircuitMemberMetricsUpdateSchema,
     CircuitRunCreateSchema,
+    CircuitRoundCreateSchema,
     CircuitRunTimingUpdateSchema,
     CircuitScopeTagMutationSchema,
 )
@@ -218,8 +219,11 @@ def delete_circuit_round(current_user, root_id, run_id, round_id):
 @token_required
 @idempotent
 def add_circuit_round(current_user, root_id, run_id):
+    data, error = _validated(CircuitRoundCreateSchema)
+    if error:
+        return error
     return _execute(
-        lambda service: service.add_round(root_id, run_id, current_user.id),
+        lambda service: service.add_round(root_id, run_id, current_user.id, round_id=data.get("round_id")),
         "Error adding circuit round",
     )
 

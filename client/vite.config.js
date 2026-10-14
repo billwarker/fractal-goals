@@ -40,6 +40,23 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,svg,woff,woff2,ico}'],
+          // Pages never needed mid-workout are fetched on demand, then kept by the runtime route below.
+          globIgnores: [
+            '**/assets/Admin-*',
+            '**/assets/Landing*',
+            '**/assets/PublicLandingRoot-*',
+            '**/assets/Legal-*',
+            '**/assets/ResetPassword-*',
+          ],
+          runtimeCaching: [{
+            // Hashed build assets never change, so a cached copy is always correct.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/assets/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'app-assets',
+              expiration: { maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 60 },
+            },
+          }],
           navigateFallback: '/index.html',
           navigateFallbackDenylist: [/^\/api\//, /^\/sitemap\.xml$/, /^\/robots\.txt$/],
           cleanupOutdatedCaches: true,

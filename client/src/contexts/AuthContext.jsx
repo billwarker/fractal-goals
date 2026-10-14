@@ -7,6 +7,7 @@ import { isNetworkError } from '../utils/networkErrors';
 import { subscribeConnectivity } from '../offline/connectivity';
 import { clearPersistedQueryCache } from '../offline/queryPersistence';
 import { clearUserSnapshot, loadUserSnapshot } from '../offline/userSnapshot';
+import { trackEvent } from '../utils/telemetry';
 import notify from '../utils/notify';
 import { logError } from '../utils/logger';
 import { isPublicLandingLocation } from '../utils/marketingHost';
@@ -18,6 +19,7 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
     // Opened with no signal from the last user's on-device snapshot; re-verified when online.
     const [offlineBoot, setOfflineBoot] = useState(false);
+    const offlineBootAtRef = useRef(null);
     const queryClient = useQueryClient();
     const navigate = useNavigate();
     const location = useLocation();
@@ -69,6 +71,17 @@ export function AuthProvider({ children }) {
         };
     }, [isPublicLanding, navigate, replaceUser]);
 
+    // Recorded once back online, so the event is never lost to an offline flush.
+    const recordOfflineRecovery = useCallback(() => {
+        if (offlineBootAtRef.current) {
+            trackEvent('offline_boot', {
+                props: { offline_seconds: Math.round((Date.now() - offlineBootAtRef.current) / 1000) },
+            });
+            offlineBootAtRef.current = null;
+        }
+        setOfflineBoot(false);
+    }, []);
+
     const fetchCurrentUser = useCallback(async () => {
         const authVersion = authVersionRef.current;
         const isStaleAuthCheck = () => authVersionRef.current !== authVersion;
@@ -77,6 +90,7 @@ export function AuthProvider({ children }) {
             if (isStaleAuthCheck()) return;
             if (snapshot) {
                 replaceUser(snapshot);
+                offlineBootAtRef.current = Date.now();
                 setOfflineBoot(true);
             } else {
                 logError("Failed to fetch current user:", error);
@@ -87,7 +101,7 @@ export function AuthProvider({ children }) {
             const res = await authApi.getMe();
             if (isStaleAuthCheck()) return;
             replaceUser(res.data);
-            setOfflineBoot(false);
+            recordOfflineRecovery();
             await authApi.getCsrf();
         } catch (err) {
             if (isStaleAuthCheck()) return;
@@ -105,6 +119,7 @@ export function AuthProvider({ children }) {
                     }
                     if (refreshResponse.data?.user) {
                         replaceUser(refreshResponse.data.user);
+                        recordOfflineRecovery();
                         await authApi.getCsrf();
                         return;
                     }
@@ -127,7 +142,7 @@ export function AuthProvider({ children }) {
         } finally {
             setLoading(false);
         }
-    }, [replaceUser]);
+    }, [recordOfflineRecovery, replaceUser]);
 
     useEffect(() => {
         if (isPublicLanding) {

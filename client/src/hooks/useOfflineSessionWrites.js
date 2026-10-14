@@ -75,8 +75,7 @@ export function useOfflineSessionWrites({
                 creates: options.creates || [],
                 meta: { rootId, sessionId, ...meta },
             };
-            applyOptimistic(queryClient, op);
-            return outbox.submit(op);
+            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
         };
 
         const updateInstance = async (instanceId, updates) => {

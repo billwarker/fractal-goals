@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isOnline } from '../offline/connectivity';
 import { useOutbox } from '../offline/OutboxContext';
 import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
+import { buildPlaceholderRound, buildPlaceholderRun } from '../offline/circuitOps';
 import { activeWorkConflictError, findRunningInstance, nowIso } from '../offline/sessionOps';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
@@ -100,30 +101,46 @@ export function useCircuitRunActions(rootId, sessionId) {
             await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, variables.action);
         },
     });
-    const offline = useOfflineCircuitActions(rootId, sessionId, mutation.mutateAsync);
+    const offline = useOfflineCircuitActions(rootId, sessionId);
     if (!offline) return { ...mutation, saveMemberMetrics };
     return { ...mutation, mutateAsync: offline.mutateAsync, saveMemberMetrics: offline.saveMemberMetrics };
 }
 
-const QUEUED_RUN_ACTIONS = new Set(['startRun', 'completeRun', 'resetRun', 'deleteRun']);
+/** Every id a placeholder run or round introduces, so a rejected create cascades to its edits. */
+function placeholderIds(run) {
+    return [
+        run.id,
+        ...(run.slots || []).flatMap((slot) => [slot.id, slot.activity_instance_id].filter(Boolean)),
+        ...(run.rounds || []).flatMap(roundIds),
+    ];
+}
 
-/** Device-first circuit timing and member results; structural edits wait for the queue and a connection. */
-function useOfflineCircuitActions(rootId, sessionId, directMutateAsync) {
+function roundIds(round) {
+    return [
+        round.id,
+        ...(round.members || []).flatMap((member) => [member.id, member.activity_set_id, member.activity_instance_id]
+            .filter(Boolean)),
+    ];
+}
+
+/** Device-first circuit writes: every circuit action is queued and shown immediately. */
+function useOfflineCircuitActions(rootId, sessionId) {
     const queryClient = useQueryClient();
     const outbox = useOutbox();
 
     return useMemo(() => {
         if (!outbox || !rootId || !sessionId) return null;
+        const runsKey = queryKeys.sessionCircuitRuns(rootId, sessionId);
+        const findRun = (runId) => (queryClient.getQueryData(runsKey) || []).find?.((run) => run.id === runId) || null;
         const enqueue = (kind, request, meta, options) => {
             const op = { scope: sessionId, kind, ...request, ...options, meta: { rootId, sessionId, ...meta } };
-            applyOptimistic(queryClient, op);
-            return outbox.submit(op);
+            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
         };
 
         const assertCanStart = (runId) => {
             const session = queryClient.getQueryData(queryKeys.session(rootId, sessionId));
             if (session?.is_paused) throw new Error('Resume the session before starting a circuit');
-            const runs = queryClient.getQueryData(queryKeys.sessionCircuitRuns(rootId, sessionId)) || [];
+            const runs = queryClient.getQueryData(runsKey) || [];
             if (runs.some((run) => run.id !== runId && ['active', 'paused'].includes(run.status))) {
                 throw new Error('Another circuit is already active in this session');
             }
@@ -131,48 +148,112 @@ function useOfflineCircuitActions(rootId, sessionId, directMutateAsync) {
             if (running) throw activeWorkConflictError(running);
         };
 
-        const mutateAsync = async (variables) => {
-            const { action, runId } = variables;
-            if (!QUEUED_RUN_ACTIONS.has(action)) {
-                if (!isOnline()) throw new Error('This change needs a connection');
-                await outbox.whenDrained(sessionId);
-                return directMutateAsync(variables);
-            }
-            if (action === 'startRun') assertCanStart(runId);
-            const occurredAt = nowIso();
-            const base = `/${rootId}/circuit-runs/${runId}`;
-            const request = {
-                startRun: { method: 'post', url: `${base}/start`, body: { occurred_at: occurredAt } },
-                completeRun: { method: 'post', url: `${base}/complete`, body: { occurred_at: occurredAt } },
-                resetRun: { method: 'patch', url: `${base}/timing`, body: { time_start: null, time_stop: null } },
-                deleteRun: { method: 'delete', url: base },
-            }[action];
-            await enqueue(SESSION_OP.CIRCUIT_RUN, request, { runId, action, occurredAt }, { entityIds: [runId] });
-            return { data: null };
-        };
-
         const saveMemberMetrics = async ({ runId, memberId, metrics }) => {
             await enqueue(
                 SESSION_OP.CIRCUIT_MEMBER,
-                {
-                    method: 'patch',
-                    url: `/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`,
-                    body: { metrics },
-                },
+                { method: 'patch', url: `/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`, body: { metrics } },
                 { runId, memberId, metrics },
                 { entityIds: [runId, memberId], coalesceKey: `circuit-member:${memberId}` },
             );
             return { data: null };
         };
 
+        const mutateAsync = async ({ action, runId, roundId, memberId, value }) => {
+            const base = `/${rootId}/circuit-runs/${runId}`;
+            switch (action) {
+                case 'startRun':
+                case 'completeRun':
+                case 'resetRun':
+                case 'deleteRun':
+                case 'updateRunTiming': {
+                    if (action === 'startRun') assertCanStart(runId);
+                    const occurredAt = nowIso();
+                    const request = {
+                        startRun: { method: 'post', url: `${base}/start`, body: { occurred_at: occurredAt } },
+                        completeRun: { method: 'post', url: `${base}/complete`, body: { occurred_at: occurredAt } },
+                        resetRun: { method: 'patch', url: `${base}/timing`, body: { time_start: null, time_stop: null } },
+                        updateRunTiming: { method: 'patch', url: `${base}/timing`, body: value },
+                        deleteRun: { method: 'delete', url: base },
+                    }[action];
+                    await enqueue(SESSION_OP.CIRCUIT_RUN, request, { runId, action, occurredAt, value }, { entityIds: [runId] });
+                    return { data: null };
+                }
+                case 'addRound': {
+                    const run = findRun(runId);
+                    if (!run) throw new Error('Circuit not found');
+                    const newRoundId = crypto.randomUUID();
+                    const round = await buildPlaceholderRound(run.slots || [], {
+                        roundId: newRoundId,
+                        roundNumber: Math.max(0, ...(run.rounds || []).map((item) => item.round_number)) + 1,
+                        tags: run.tags || [],
+                    });
+                    await enqueue(
+                        SESSION_OP.CIRCUIT_ROUND_ADD,
+                        { method: 'post', url: `${base}/rounds`, body: { round_id: newRoundId } },
+                        { runId, round },
+                        { entityIds: [runId], creates: roundIds(round) },
+                    );
+                    return { data: null };
+                }
+                case 'removeRound':
+                    await enqueue(
+                        SESSION_OP.CIRCUIT_ROUND_REMOVE,
+                        { method: 'delete', url: `${base}/rounds/${roundId}` },
+                        { runId, roundId },
+                        { entityIds: [runId, roundId] },
+                    );
+                    return { data: null };
+                case 'updateMemberMetrics':
+                    return saveMemberMetrics({ runId, memberId, metrics: value });
+                case 'cascadeMemberMetric':
+                    await enqueue(
+                        SESSION_OP.CIRCUIT_CASCADE,
+                        {
+                            method: 'post',
+                            url: `${base}/members/${memberId}/metrics/cascade`,
+                            body: { metric_id: value.metricId, ...(value.splitId ? { split_id: value.splitId } : {}) },
+                        },
+                        { runId, memberId, metricId: value.metricId, splitId: value.splitId || null },
+                        { entityIds: [runId, memberId] },
+                    );
+                    return { data: null };
+                case 'updateRunTag':
+                case 'updateRoundTag':
+                    await enqueue(
+                        SESSION_OP.CIRCUIT_TAG,
+                        {
+                            method: 'patch',
+                            url: action === 'updateRoundTag' ? `${base}/rounds/${roundId}/tags` : `${base}/tags`,
+                            body: value,
+                        },
+                        { runId, roundId: action === 'updateRoundTag' ? roundId : null, data: value },
+                        { entityIds: [runId, ...(roundId ? [roundId] : [])] },
+                    );
+                    return { data: null };
+                default:
+                    throw new Error(`Unknown circuit action: ${action}`);
+            }
+        };
+
         return { mutateAsync, saveMemberMetrics };
-    }, [directMutateAsync, outbox, queryClient, rootId, sessionId]);
+    }, [outbox, queryClient, rootId, sessionId]);
 }
 
 
+/** A cached circuit definition (any archived filter), or null. */
+function cachedCircuitDefinition(queryClient, rootId, definitionId) {
+    for (const [, data] of queryClient.getQueriesData({ queryKey: queryKeys.circuitsRoot(rootId) })) {
+        const list = Array.isArray(data) ? data : data?.items || data?.circuits || [];
+        const match = list.find?.((definition) => definition.id === definitionId);
+        if (match) return match;
+    }
+    return null;
+}
+
 export function useCreateCircuitRun(rootId, sessionId) {
     const queryClient = useQueryClient();
-    return useMutation({
+    const outbox = useOutbox();
+    const direct = useMutation({
         mutationFn: ({ circuitDefinitionId, sectionIndex, itemIndex }) => fractalApi.createCircuitRun(
             rootId,
             sessionId,
@@ -187,4 +268,42 @@ export function useCreateCircuitRun(rootId, sessionId) {
             await refreshCircuitSessionConsumers(queryClient, rootId, sessionId, 'createRun');
         },
     });
+
+    // Device-first: the run, its slots, rounds, and members appear immediately with the
+    // same ids the server will derive from the client-minted run id.
+    const mutateAsync = useCallback(async (variables) => {
+        const definition = outbox && cachedCircuitDefinition(queryClient, rootId, variables.circuitDefinitionId);
+        if (!definition) {
+            if (outbox && !isOnline()) throw new Error('This circuit needs a connection to add');
+            if (outbox) await outbox.whenDrained(sessionId);
+            return direct.mutateAsync(variables);
+        }
+        const runId = crypto.randomUUID();
+        const placeholder = await buildPlaceholderRun(definition, { runId, sessionId, rootId });
+        const op = {
+            scope: sessionId,
+            kind: SESSION_OP.CIRCUIT_CREATE,
+            method: 'post',
+            url: `/${rootId}/sessions/${sessionId}/circuit-runs`,
+            body: {
+                id: runId,
+                circuit_definition_id: definition.id,
+                section_index: variables.sectionIndex,
+                ...(Number.isInteger(variables.itemIndex) ? { item_index: variables.itemIndex } : {}),
+            },
+            creates: placeholderIds(placeholder),
+            meta: {
+                rootId,
+                sessionId,
+                runId,
+                placeholder,
+                sectionIndex: variables.sectionIndex ?? 0,
+                itemIndex: Number.isInteger(variables.itemIndex) ? variables.itemIndex : null,
+            },
+        };
+        await outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
+        return { data: placeholder };
+    }, [direct, outbox, queryClient, rootId, sessionId]);
+
+    return { ...direct, mutateAsync };
 }

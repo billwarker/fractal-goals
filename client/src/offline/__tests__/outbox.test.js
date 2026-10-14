@@ -222,6 +222,31 @@ describe('outbox', () => {
         expect(outbox.hasPending('session-1')).toBe(false);
     });
 
+    it('reports drain and rejection health without content', async () => {
+        const onEvent = vi.fn();
+        let isUp = false;
+        const sender = vi.fn()
+            .mockRejectedValueOnce(httpError(409, { code: 'active_work_exists', error: 'secret detail' }))
+            .mockResolvedValue({ status: 200, data: {} });
+        const outbox = createOutbox({
+            store: createMemoryStore(),
+            send: sender,
+            isOnline: () => isUp,
+            lock: (callback) => callback(),
+            onEvent,
+        });
+
+        await outbox.submit(op({ kind: 'session.timer', url: '/rejected', body: { note: 'private' } }));
+        await outbox.submit(op({ url: '/a' }));
+        await outbox.submit(op({ url: '/b' }));
+        isUp = true;
+        await outbox.flush();
+
+        expect(onEvent).toHaveBeenCalledWith('rejected', { kind: 'session.timer', status: 409, code: 'active_work_exists' });
+        expect(onEvent).toHaveBeenCalledWith('drained', expect.objectContaining({ ops: 2, retries: 0 }));
+        expect(JSON.stringify(onEvent.mock.calls)).not.toMatch(/private|secret/);
+    });
+
     it('lets a rejected op be retried or discarded', async () => {
         const sender = vi.fn()
             .mockRejectedValueOnce(httpError(400))

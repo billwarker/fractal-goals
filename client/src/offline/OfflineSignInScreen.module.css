@@ -1,0 +1,27 @@
+.screen {
+    display: grid;
+    min-height: calc(100dvh - var(--app-nav-height, 0px));
+    place-items: center;
+    padding: 24px 16px;
+    box-sizing: border-box;
+}
+
+.card {
+    display: grid;
+    justify-items: center;
+    gap: var(--spacing-md);
+    max-width: 420px;
+    text-align: center;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 24px;
+}
+
+.body {
+    margin: 0;
+    color: var(--color-text-secondary, var(--color-text-muted));
+    line-height: 1.5;
+}

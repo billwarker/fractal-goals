@@ -16,6 +16,8 @@ os.environ["AGENT_MCP_RESOURCE_URI"] = "https://mcp.browser.invalid/mcp"
 os.environ["AGENT_OAUTH_ISSUER"] = "https://issuer.browser.invalid"
 os.environ["AGENT_ADAPTER_ID"] = "browser-test-adapter"
 os.environ["AGENT_ADAPTER_SHARED_SECRET"] = "browser-test-only-shared-secret"
+# Lets the Ask AI pop-up list seeded conversations; no provider keys exist, so nothing calls out.
+os.environ["AGENT_EMBEDDED_PRIVACY_APPROVED"] = "true"
 
 from config import config
 from sqlalchemy import create_engine, text
@@ -91,6 +93,49 @@ def _seed_planning_fractal(db, suffix, user, level, today):
     db.add(ProgramDayTemplate(
         program_day_id=f"browser-plan-day-{suffix}", session_template_id=f"browser-plan-template-{suffix}",
         is_required=True, order=0,
+    ))
+
+
+def _seed_embedded_proposal(db, suffix, user):
+    """An Ask AI conversation whose last turn left a create-goal proposal awaiting review.
+
+    The proposal is built by the same task/proposal services the embedded worker uses, so the
+    preview, hash, and approval path are real; only the provider call that would have produced
+    it is skipped.
+    """
+    from datetime import datetime, timezone
+    from models import (
+        AgentEmbeddedConversation, AgentEmbeddedMessage, AgentEmbeddedRun, Goal, GoalLevel,
+    )
+    from services.agent_harness_service import AgentHarnessService
+
+    root_id = f"browser-ai-root-{suffix}"
+    db.add(GoalLevel(id=f"browser-ai-long-level-{suffix}", name='Long Term Goal', rank=1,
+                     color='#ff9800', owner_id=user.id, root_id=root_id))
+    db.flush()
+    request = "Add a long-term goal for weekly mobility work."
+    conversation = AgentEmbeddedConversation(user_id=user.id, root_id=root_id, provider="openai",
+                                             model="browser-seeded", timezone="UTC")
+    db.add(conversation)
+    db.flush()
+    user_message = AgentEmbeddedMessage(conversation_id=conversation.id, role="user", content=request)
+    db.add(user_message)
+    db.flush()
+    harness = AgentHarnessService(db)
+    task = harness.create_task(user.id, {
+        "root_id": root_id, "request_text": request, "timezone": "UTC", "context": {},
+    }, execution_origin="embedded_openai", commit=False)
+    proposal = harness.create_proposal(user.id, task["id"], {"operations": [{
+        "operation_id": "mobility-goal",
+        "type": "create_goal",
+        "data": {"name": f"Weekly mobility {suffix}", "type": "LongTermGoal", "parent_id": root_id},
+    }]}, commit=False)
+    db.add(AgentEmbeddedMessage(conversation_id=conversation.id, role="assistant",
+                                content="I prepared one change for you to review."))
+    db.add(AgentEmbeddedRun(
+        conversation_id=conversation.id, user_id=user.id, root_id=root_id, status="succeeded",
+        step_budget=8, token_budget=20000, checkpoint={"user_message_id": user_message.id},
+        proposal_id=proposal["id"], finished_at=datetime.now(timezone.utc),
     ))
 
 
@@ -210,14 +255,16 @@ def main():
                 value={
                     "ai_agent_connectors": True,
                     "ai_agent_writes": True,
-                    "ai_agent_embedded": False,
-                    "ai_agent_embedded_openai": False,
+                    "ai_agent_embedded": True,
+                    # The seeded Ask AI proposal comes from this origin; with no API key the
+                    # provider still lists as unavailable, so nothing calls out.
+                    "ai_agent_embedded_openai": True,
                     "ai_agent_embedded_anthropic": False,
                 },
             ))
             # Desktop/mobile specs create independent programs under the fixture account.
             # Keep production quota enforcement active without exhausting its free-tier default.
-            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000}}))
+            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000}}))
             for suffix in ("desktop", "mobile"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
@@ -358,10 +405,23 @@ def main():
                 adjustments_root = f"browser-adjustments-root-{suffix}"
                 db.add(Goal(id=adjustments_root, root_id=adjustments_root, owner_id=user.id,
                             level_id=ultimate_level.id, name=f"Browser Adjustments {suffix}"))
-                # One active session per fractal: the offline spec gets its own.
-                offline_root = f"browser-offline-root-{suffix}"
-                db.add(Goal(id=offline_root, root_id=offline_root, owner_id=user.id,
-                            level_id=ultimate_level.id, name=f"Browser Offline {suffix}"))
+                # One unfinished session per fractal: specs that start sessions each get their own
+                # fractal so a session left open by one spec can never block another.
+                for slug, label in (
+                    ("offline", "Offline"),
+                    ("circuit-tags", "Circuit Tags"),
+                    ("associations", "Associations"),
+                    ("quick-session", "Quick Session"),
+                    ("ai", "AI"),
+                    ("offline-quick", "Offline Quick"),
+                    ("offline-circuit", "Offline Circuit"),
+                ):
+                    spec_root = f"browser-{slug}-root-{suffix}"
+                    db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,
+                                level_id=ultimate_level.id, name=f"Browser {label} {suffix}"))
+            db.commit()
+            for suffix in ("desktop", "mobile"):
+                _seed_embedded_proposal(db, suffix, user)
             db.commit()
         from app import app
         from extensions import limiter

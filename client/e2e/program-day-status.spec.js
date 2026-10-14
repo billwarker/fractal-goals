@@ -65,7 +65,8 @@ test('single and bulk program-day statuses persist in the calendar', async ({ pa
         await page.mouse.down();
         await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, { steps: 12 });
         await page.mouse.up();
-        await expect(page.getByRole('region', { name: 'Program day status actions' })).toContainText('3 selected');
+        // A drag selects every day in range; statuses apply to the scheduled ones (offsets 0, 1, 3).
+        await expect(page.getByRole('region', { name: 'Program day status actions' })).toContainText('4 selected · 3 scheduled');
         await page.getByRole('button', { name: 'Cancel', exact: true }).click();
     }
     await page.reload();
