@@ -6,6 +6,7 @@ import logging
 
 from blueprints.api_utils import get_db_session, internal_error, parse_optional_pagination
 from blueprints.auth_api import token_required
+from blueprints.idempotency import purge_expired_idempotency_records
 from services.admin_service import AdminService
 from services.admin_usage_service import AdminUsageService
 from services.feature_flag_service import FeatureFlagService
@@ -118,7 +119,10 @@ def prune_admin_usage(current_user):
         )
         if error:
             return jsonify({"error": error}), status
-        return jsonify(payload), status
+        # Expired offline-sync idempotency records belong to the same housekeeping pass.
+        idempotency_deleted = purge_expired_idempotency_records(db_session)
+        db_session.commit()
+        return jsonify({**(payload or {}), "idempotency_records_deleted": idempotency_deleted}), status
     except SQLAlchemyError:
         db_session.rollback()
         return internal_error(logger, "Error pruning product events")

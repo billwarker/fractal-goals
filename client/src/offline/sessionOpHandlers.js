@@ -1,4 +1,5 @@
 import { queryKeys } from '../hooks/queryKeys';
+import { SESSION_OP } from './opKinds';
 import { getSectionItems, withSectionItems } from '../hooks/sessionItemMutationUtils';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
@@ -14,26 +15,9 @@ import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun 
 // whenever fresh server data lands while the op is still queued, so a refetch
 // or a reload never hides an unsynced change.
 
-export const SESSION_OP = Object.freeze({
-    INSTANCE_UPDATE: 'session.instance.update',
-    ACTIVITY_ADD: 'session.activity.add',
-    ACTIVITY_REMOVE: 'session.activity.remove',
-    TIMER: 'session.timer',
-    PAUSE: 'session.pause',
-    RESUME: 'session.resume',
-    UPDATE: 'session.update',
-    NOTE_CREATE: 'session.note.create',
-    NOTE_UPDATE: 'session.note.update',
-    NOTE_DELETE: 'session.note.delete',
-    CIRCUIT_RUN: 'session.circuit.run',
-    CIRCUIT_MEMBER: 'session.circuit.member',
-    QUICK_COMPLETE: 'session.quick.complete',
-    CIRCUIT_CREATE: 'session.circuit.create',
-    CIRCUIT_ROUND_ADD: 'session.circuit.round.add',
-    CIRCUIT_ROUND_REMOVE: 'session.circuit.round.remove',
-    CIRCUIT_CASCADE: 'session.circuit.cascade',
-    CIRCUIT_TAG: 'session.circuit.tag',
-});
+export { SESSION_OP };
+
+export { findSessionForActivity } from './sessionCache';
 
 
 const SESSION_QUERY_PREFIXES = new Set(['session', 'session-activities', 'session-notes', 'circuit-runs']);
@@ -85,6 +69,17 @@ const patchRunById = (queryClient, meta, runId, patch) => queryClient.setQueryDa
     keysFor(meta).circuits,
     mapList((runs) => runs.map((run) => (run.id === runId ? patch(run) : run))),
 );
+
+/** Circuit member/slot instances created offline, so circuit views can resolve members before sync. */
+function addInstances(queryClient, meta) {
+    if (!meta.instances?.length) return;
+    queryClient.setQueryData(keysFor(meta).activities, (previous) => {
+        const list = Array.isArray(previous) ? previous : [];
+        const known = new Set(list.map((instance) => instance.id));
+        const added = meta.instances.filter((instance) => !known.has(instance.id));
+        return added.length ? [...list, ...added] : list;
+    });
+}
 
 /** Mirror of the server's append_circuit_run_item on the cached session. */
 function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, runId }) {
@@ -197,6 +192,7 @@ const OPTIMISTIC = {
     [SESSION_OP.CIRCUIT_CREATE]: (queryClient, op) => {
         const { placeholder, sectionIndex, itemIndex } = op.meta;
         const keys = keysFor(op.meta);
+        addInstances(queryClient, op.meta);
         queryClient.setQueryData(keys.circuits, (previous) => {
             const runs = Array.isArray(previous) ? previous : [];
             return runs.some((run) => run.id === placeholder.id) ? runs : [...runs, placeholder];
@@ -214,6 +210,7 @@ const OPTIMISTIC = {
         });
     },
     [SESSION_OP.CIRCUIT_ROUND_ADD]: (queryClient, op) => {
+        addInstances(queryClient, op.meta);
         patchRunById(queryClient, op.meta, op.meta.runId, (run) => addRoundToRun(run, op.meta.round));
     },
     [SESSION_OP.CIRCUIT_ROUND_REMOVE]: (queryClient, op) => {
@@ -224,6 +221,31 @@ const OPTIMISTIC = {
     },
     [SESSION_OP.CIRCUIT_TAG]: (queryClient, op) => {
         patchRunById(queryClient, op.meta, op.meta.runId, (run) => applyTagChange(run, op.meta));
+    },
+    [SESSION_OP.INSTANCE_TAGS]: (queryClient, op) => {
+        const { instanceId, tags } = op.meta;
+        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
+            instance.id === instanceId ? { ...instance, tags } : instance
+        ))));
+    },
+    [SESSION_OP.SET_TAGS]: (queryClient, op) => {
+        const { instanceId, setId, tags } = op.meta;
+        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
+            instance.id !== instanceId ? instance : {
+                ...instance,
+                sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
+            }
+        ))));
+    },
+    [SESSION_OP.INSTANCE_GOAL_LINK]: (queryClient, op) => {
+        const { instanceId, goalId, remove } = op.meta;
+        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
+            if (instance.id !== instanceId) return instance;
+            const ids = new Set(instance.associated_goal_ids || []);
+            if (remove) ids.delete(goalId);
+            else ids.add(goalId);
+            return { ...instance, associated_goal_ids: [...ids].sort() };
+        })));
     },
     [SESSION_OP.NOTE_CREATE]: (queryClient, op) => {
         const { note } = op.meta;
@@ -314,6 +336,34 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                     runs.map((run) => (run.id === data.id ? data : run))
                 )));
                 break;
+            case SESSION_OP.INSTANCE_TAGS:
+            case SESSION_OP.SET_TAGS:
+                // The new assignment version keeps later online edits' concurrency checks valid.
+                if (data?.version == null || outbox.hasPendingEntity(op.meta.setId || instanceId)) break;
+                queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
+                    if (instance.id !== instanceId) return instance;
+                    if (!op.meta.setId) return { ...instance, tag_assignment_version: data.version };
+                    return {
+                        ...instance,
+                        sets: (instance.sets || []).map((set) => (
+                            set.id === op.meta.setId ? { ...set, tag_assignment_version: data.version } : set
+                        )),
+                    };
+                })));
+                break;
+            case SESSION_OP.INSTANCE_GOAL_LINK:
+                if (Array.isArray(data?.associated_goal_ids) && !outbox.hasPendingEntity(instanceId)) {
+                    queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
+                        instance.id === instanceId ? { ...instance, associated_goal_ids: data.associated_goal_ids } : instance
+                    ))));
+                }
+                invalidateQueryKeys(queryClient, [
+                    queryKeys.fractalTree(op.meta.rootId),
+                    queryKeys.goals(op.meta.rootId),
+                    queryKeys.goalTimelinesRoot(op.meta.rootId),
+                    queryKeys.goalAnalytics(op.meta.rootId),
+                ]);
+                break;
             case SESSION_OP.QUICK_COMPLETE:
                 // The new session shows up in lists once its scope drains (invalidateSessionAfterSync).
                 break;
@@ -336,6 +386,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
     };
 
     const unregister = Object.values(SESSION_OP).map((kind) => outbox.registerHandler(kind, {
+        optimistic: (op) => applyOptimistic(queryClient, op),
         onAck: ack,
         onReject: reject,
     }));

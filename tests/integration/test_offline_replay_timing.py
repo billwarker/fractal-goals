@@ -93,6 +93,14 @@ class TestActivityTimerOccurredAt:
         _start(authed_client, instance, occurred_at=_iso(_now() + timedelta(minutes=5)))
         assert _close(_refresh(db_session, ActivityInstance, instance.id).time_start, _now())
 
+    def test_a_tap_from_days_ago_is_still_honoured(self, authed_client, db_session, instance, started_session):
+        started_session.session_start = _now() - timedelta(days=4)
+        db_session.commit()
+        tapped = _now() - timedelta(days=3)
+
+        assert _start(authed_client, instance, occurred_at=_iso(tapped)).status_code == 200
+        assert _close(_refresh(db_session, ActivityInstance, instance.id).time_start, tapped)
+
     def test_completion_cannot_precede_its_start(self, authed_client, db_session, instance):
         tapped_start = _now() - timedelta(minutes=5)
         _start(authed_client, instance, occurred_at=_iso(tapped_start))
@@ -106,7 +114,7 @@ class TestActivityTimerOccurredAt:
 
     @pytest.mark.parametrize('bad_value, message', [
         ('yesterday-ish', 'ISO 8601'),
-        (_iso(_now() - timedelta(hours=30)), 'too old'),
+        (_iso(_now() - timedelta(days=8)), 'too old'),
     ])
     def test_invalid_or_stale_time_is_rejected(self, authed_client, instance, bad_value, message):
         response = _start(authed_client, instance, occurred_at=bad_value)

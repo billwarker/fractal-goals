@@ -1,8 +1,12 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { offlineCacheVersion } from './scripts/offline-cache-version.mjs';
 
 export default defineConfig({
     plugins: [react()],
+    define: {
+        __OFFLINE_CACHE_VERSION__: JSON.stringify(offlineCacheVersion()),
+    },
     test: {
         environment: 'jsdom',
         globals: true,

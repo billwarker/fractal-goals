@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMemoryStore, createOutbox } from '../../offline/outbox';
-import { SESSION_OP } from '../../offline/sessionOpHandlers';
+import { SESSION_OP, registerSessionOpHandlers } from '../../offline/sessionOpHandlers';
 import { queryKeys } from '../queryKeys';
 import { useOfflineSessionWrites } from '../useOfflineSessionWrites';
 
@@ -22,6 +22,8 @@ function setup({ instances = [] } = {}) {
     queryClient.setQueryData(queryKeys.session(rootId, sessionId), { id: sessionId, is_paused: false });
     const store = createMemoryStore();
     outboxRef.current = createOutbox({ store, send: vi.fn(), isOnline: () => false, lock: (fn) => fn() });
+    // As OutboxProvider does: registered kinds apply their optimistic patch once saved.
+    registerSessionOpHandlers(outboxRef.current, queryClient);
     let draft = { sections: [{ name: 'Main', items: [] }] };
     const updateSessionDataDraft = (updater) => {
         draft = typeof updater === 'function' ? updater(draft) : updater;

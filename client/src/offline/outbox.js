@@ -10,11 +10,16 @@
 
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60000;
+// A change the server keeps failing (not one waiting for signal) is given up on
+// after this, so it can never block every later change behind it.
+const MAX_SERVER_FAILURES = 8;
+const MAX_SERVER_FAILURE_AGE_MS = 24 * 60 * 60 * 1000;
+// Rejected changes wait for review this long, then are discarded so they can't linger forever.
+const REJECTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const OP_STATE = Object.freeze({
-    PENDING: 'pending',
-    REJECTED: 'rejected',
-});
+import { OP_STATE } from './opKinds';
+
+export { OP_STATE };
 
 function defaultId() {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -149,7 +154,7 @@ export function createOutbox({
     };
 
     const rejectOp = async (op, error) => {
-        const rejected = { ...op, state: OP_STATE.REJECTED, error };
+        const rejected = { ...op, state: OP_STATE.REJECTED, error, rejectedAt: now() };
         await store.put(rejected);
         ops = ops.map((entry) => (entry.opId === op.opId ? rejected : entry));
         runHandler(rejected, 'onReject', error);
@@ -197,9 +202,28 @@ export function createOutbox({
                     await refresh();
                     continue;
                 }
+                const described = describeError(error);
+                // Only failures the server answered count toward giving up; offline waits forever.
+                const answered = Boolean(error?.response) && verdict !== 'auth';
+                const serverFailures = (op.serverFailures || 0) + (answered ? 1 : 0);
+                const firstServerFailureAt = op.firstServerFailureAt || (answered ? now() : null);
+                if (answered && (
+                    serverFailures >= MAX_SERVER_FAILURES
+                    || now() - firstServerFailureAt >= MAX_SERVER_FAILURE_AGE_MS
+                )) {
+                    await rejectOp(op, {
+                        ...described,
+                        code: 'retry_exhausted',
+                        message: `The server kept failing to save this change (${described.message})`,
+                    });
+                    await refresh();
+                    continue;
+                }
                 const attempts = (op.attempts || 0) + 1;
                 const nextAttemptAt = now() + backoff(attempts);
-                await store.put({ ...op, attempts, nextAttemptAt, lastError: describeError(error) });
+                await store.put({
+                    ...op, attempts, nextAttemptAt, serverFailures, firstServerFailureAt, lastError: described,
+                });
                 if (verdict === 'auth') {
                     pausedForAuth = true;
                 } else {
@@ -257,8 +281,9 @@ export function createOutbox({
         return flushing;
     }
 
-    const nextSeq = () => {
-        const highest = ops.reduce((max, op) => Math.max(max, op.seq || 0), 0);
+    // Read inside the cross-tab lock, so two tabs never hand out the same position.
+    const nextSeq = (stored) => {
+        const highest = stored.reduce((max, op) => Math.max(max, op.seq || 0), 0);
         return Math.max(highest + 1, now());
     };
 
@@ -272,6 +297,8 @@ export function createOutbox({
         entityIds = [],
         creates = [],
         meta = {},
+        // Deleting these entities makes queued, unsent edits to them pointless.
+        supersedes = [],
         // Runs once the op is durable and before it can be sent: shown means saved.
         onPersisted = null,
     }) {
@@ -289,7 +316,7 @@ export function createOutbox({
             entityIds: [...new Set([...entityIds, ...creates])],
             creates,
             meta,
-            seq: nextSeq(),
+            seq: 0,
             attempts: 0,
             nextAttemptAt: 0,
             state: OP_STATE.PENDING,
@@ -302,21 +329,41 @@ export function createOutbox({
         // Callers that only care about durability may ignore the promise.
         settled.catch(() => {});
 
+        let cancelled = false;
         await lock(async () => {
+            const stored = await store.getAll();
+            const unsent = (existing) => existing.state === OP_STATE.PENDING && existing.opId !== inFlightOpId;
             if (coalesceKey) {
-                for (const existing of await store.getAll()) {
-                    if (existing.coalesceKey !== coalesceKey || existing.state !== OP_STATE.PENDING) continue;
-                    // The server may already be applying it; let the newer value follow it.
-                    if (existing.opId === inFlightOpId) continue;
+                for (const existing of stored) {
+                    // The server may already be applying an in-flight one; the newer value follows it.
+                    if (existing.coalesceKey !== coalesceKey || !unsent(existing)) continue;
                     await store.delete(existing.opId);
                     const superseded = settlers.get(existing.opId) || [];
                     settlers.delete(existing.opId);
                     settlers.get(opId).push(...superseded);
                 }
             }
-            await store.put(op);
+            if (supersedes.length) {
+                for (const existing of stored) {
+                    if (!unsent(existing) || !(existing.entityIds || []).some((id) => supersedes.includes(id))) continue;
+                    // Created and deleted before the server ever saw it: nothing needs sending at all.
+                    if ((existing.creates || []).some((id) => supersedes.includes(id))) cancelled = true;
+                    await store.delete(existing.opId);
+                    settle(existing.opId, { ok: true, value: { superseded: true } });
+                }
+            }
+            op.seq = nextSeq(await store.getAll());
+            if (!cancelled) await store.put(op);
         });
+        // Shown means saved: the kind's optimistic patch runs only once the op is durable.
+        runHandler(op, 'optimistic');
         onPersisted?.(op);
+        if (cancelled) {
+            settle(opId, { ok: true, value: { superseded: true } });
+            await refresh();
+            announce({ type: 'changed' });
+            return { opId, settled };
+        }
 
         await refresh();
         announce({ type: 'changed' });
@@ -370,7 +417,18 @@ export function createOutbox({
         };
     }
 
-    hydrated = refresh();
+    const expireRejected = async () => {
+        const expired = (await store.getAll()).filter((op) => (
+            op.state === OP_STATE.REJECTED && now() - (op.rejectedAt || Date.parse(op.createdAt || 0)) >= REJECTED_TTL_MS
+        ));
+        for (const op of expired) await store.delete(op.opId);
+        if (expired.length) {
+            announce({ type: 'changed' });
+            safeEmit('expired', { count: expired.length });
+        }
+    };
+
+    hydrated = expireRejected().then(refresh);
 
     return {
         submit,

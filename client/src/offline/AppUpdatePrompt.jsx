@@ -5,12 +5,15 @@ import styles from './AppUpdatePrompt.module.css';
 import { useOutboxStatus } from './OutboxContext';
 import { applyAppUpdate, isAppUpdateReady, subscribeAppUpdate } from './serviceWorker';
 
-/** Offers a waiting app update, but never while changes are still waiting to sync. */
+/**
+ * Offers a waiting app update, but not while changes are still waiting to sync.
+ * Rejected changes don't block it: they persist across the reload and expire on their own.
+ */
 export default function AppUpdatePrompt() {
     const updateReady = useSyncExternalStore(subscribeAppUpdate, isAppUpdateReady, () => false);
-    const { pendingCount, rejected } = useOutboxStatus();
+    const { pendingCount } = useOutboxStatus();
 
-    if (!updateReady || pendingCount > 0 || rejected.length > 0) return null;
+    if (!updateReady || pendingCount > 0) return null;
 
     return (
         <div className={styles.prompt} role="status">

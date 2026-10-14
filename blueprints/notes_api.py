@@ -15,6 +15,7 @@ from blueprints.idempotency import idempotent
 from extensions import limiter
 from models import Note, get_engine, get_session
 from services.note_service import NoteService
+from services.serializers import serialize_note_display
 from services.oembed_service import get_instagram_oembed
 from validators import NoteCreateRequestSchema, NoteUpdateSchema, validate_request
 
@@ -149,9 +150,15 @@ def get_activity_history(current_user, root_id, activity_id):
 def create_note(current_user, root_id, validated_data):
     db_session, note_service = _with_note_service()
     try:
-        # Client-minted ids (offline notes) must be new; replays are handled by @idempotent.
-        if validated_data.get('id') and db_session.get(Note, validated_data['id']) is not None:
-            return jsonify({"error": "A note with this id already exists"}), 409
+        # Client-minted ids (offline notes): a replay whose idempotency record is gone finds its own note.
+        existing = db_session.get(Note, validated_data['id']) if validated_data.get('id') else None
+        if existing is not None:
+            same_note = (existing.root_id, existing.context_type, existing.context_id) == (
+                root_id, validated_data.get('context_type'), validated_data.get('context_id'),
+            )
+            if not same_note or existing.deleted_at is not None:
+                return jsonify({"error": "A note with this id already exists"}), 409
+            return jsonify(serialize_note_display(existing)), 200
         payload, error, status = note_service.create_note(root_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status

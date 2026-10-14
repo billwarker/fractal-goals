@@ -22,6 +22,7 @@ from validators import (
     ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
 )
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, internal_error, service_response as _service_response
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition,
@@ -224,6 +225,7 @@ def preview_activity_tag_catalog_merge(current_user, root_id, validated_data):
 
 @activities_bp.route('/<root_id>/activity-instances/<instance_id>/tags', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(ActivityTagAssignmentSchema)
 def replace_activity_instance_tags(current_user, root_id, instance_id, validated_data):
     session = get_db_session()
@@ -237,6 +239,7 @@ def replace_activity_instance_tags(current_user, root_id, instance_id, validated
 
 @activities_bp.route('/<root_id>/activity-sets/<set_id>/tags', methods=['PUT'])
 @token_required
+@idempotent
 @validate_request(ActivityTagAssignmentSchema)
 def replace_activity_set_tags(current_user, root_id, set_id, validated_data):
     session = get_db_session()

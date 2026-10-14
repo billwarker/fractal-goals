@@ -1,73 +1,61 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../contexts/AuthContext';
-import { API_BASE, axios } from '../utils/api/core';
-import { trackEvent } from '../utils/telemetry';
-import { checkConnectivity, isOnline, subscribeConnectivity } from './connectivity';
-import { createIndexedDbStore } from './indexedDbStore';
-import { OP_STATE, createOutbox } from './outbox';
-import { restoreQueryCache, startQueryPersistence } from './queryPersistence';
+import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
 import AppUpdatePrompt from './AppUpdatePrompt';
-import { registerAppServiceWorker } from './serviceWorker';
-import { registerSessionOpHandlers } from './sessionOpHandlers';
+import { checkConnectivity, isOnline, subscribeConnectivity } from './connectivity';
+import { OP_STATE } from './opKinds';
+import { registerAppServiceWorker, unregisterAppServiceWorker } from './serviceWorker';
 import { saveUserSnapshot } from './userSnapshot';
 
-// Dead connections should be noticed quickly; the op stays queued, so a short
-// timeout costs nothing but a retry.
-const OUTBOX_REQUEST_TIMEOUT_MS = 8000;
-
 export const OutboxContext = createContext(null);
-
-export function sendOutboxOp(op) {
-    return axios.request({
-        method: op.method,
-        url: `${API_BASE}${op.url}`,
-        data: op.body ?? undefined,
-        headers: { 'Idempotency-Key': op.idempotencyKey },
-        timeout: OUTBOX_REQUEST_TIMEOUT_MS,
-    });
-}
-
-function createUserOutbox(userId) {
-    const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(`fractal-outbox:${userId}`);
-    return createOutbox({
-        store: createIndexedDbStore(userId),
-        send: sendOutboxOp,
-        isOnline,
-        channel,
-        onEvent: (type, props) => trackEvent(
-            type === 'drained' ? 'offline_sync_drained' : 'offline_op_rejected',
-            { props },
-        ),
-    });
-}
 
 export function OutboxProvider({ children }) {
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const userId = user?.id || null;
 
-    const outbox = useMemo(() => (userId ? createUserOutbox(userId) : null), [userId]);
+    // The sync engine loads on demand, so no route's initial bundle carries it. Until it
+    // arrives (milliseconds; the service worker precaches it) writes take the direct path.
+    const [loaded, setLoaded] = useState({ userId: null, engine: null, outbox: null });
+    useEffect(() => {
+        if (!userId) return undefined;
+        let cancelled = false;
+        import('./engine').then((engine) => {
+            if (!cancelled) setLoaded({ userId, engine, outbox: engine.createUserOutbox(userId) });
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [userId]);
+    const engine = loaded.engine;
+    const outbox = loaded.userId === userId ? loaded.outbox : null;
 
     // Restoring the persisted cache is what lets an open session render with no signal.
     useEffect(() => {
-        if (!userId) return undefined;
-        void restoreQueryCache(queryClient, userId);
-        return startQueryPersistence(queryClient, userId);
-    }, [queryClient, userId]);
+        if (!userId || !engine) return undefined;
+        void engine.restoreQueryCache(queryClient, userId);
+        return engine.startQueryPersistence(queryClient, userId);
+    }, [engine, queryClient, userId]);
 
     useEffect(() => {
         if (user) void saveUserSnapshot(user);
     }, [user]);
 
+    // Kill switch: an admin flag removes the offline shell everywhere without a deploy.
+    // Only a successful flag load decides, so failing to load flags offline never unregisters.
+    const { flags, isSuccess: flagsLoaded } = useFeatureFlags({ enabled: Boolean(userId) });
+    const serviceWorkerDisabled = isFeatureEnabled(flags, FEATURE_FLAGS.offlineServiceWorkerDisabled);
     useEffect(() => {
-        if (userId && import.meta.env.PROD) registerAppServiceWorker();
-    }, [userId]);
+        if (!userId || !flagsLoaded || !import.meta.env.PROD) return;
+        if (serviceWorkerDisabled) void unregisterAppServiceWorker();
+        else registerAppServiceWorker();
+    }, [flagsLoaded, serviceWorkerDisabled, userId]);
 
     useEffect(() => {
-        if (!outbox) return undefined;
-        const unregisterHandlers = registerSessionOpHandlers(outbox, queryClient);
+        if (!outbox || !engine) return undefined;
+        const unregisterHandlers = engine.registerSessionOpHandlers(outbox, queryClient);
         const unsubscribe = subscribeConnectivity((online) => {
             if (online) void outbox.flush();
         });
@@ -86,7 +74,7 @@ export function OutboxProvider({ children }) {
             window.removeEventListener('auth:token_refreshed', handleRefreshed);
             document.removeEventListener('visibilitychange', handleVisible);
         };
-    }, [outbox, queryClient]);
+    }, [engine, outbox, queryClient]);
 
     return (
         <OutboxContext.Provider value={outbox}>
@@ -145,9 +133,21 @@ export function useConfirmUnsyncedChanges() {
     }, [outbox]);
 }
 
-/** Logout that warns when changes are still waiting to sync from this device. */
+/**
+ * Logout that warns when changes are still waiting to sync. Kept changes sync the next
+ * time this user signs in here; on a shared device they can be discarded instead.
+ */
 export function useGuardedLogout() {
     const { logout } = useAuth();
+    const outbox = useOutbox();
     const confirmUnsynced = useConfirmUnsyncedChanges();
-    return useCallback(() => (confirmUnsynced() ? logout() : undefined), [confirmUnsynced, logout]);
+    return useCallback(async () => {
+        if (!confirmUnsynced()) return undefined;
+        if (outbox && outbox.pendingOps().length > 0 && window.confirm(
+            'Also discard those changes from this device? Choose Cancel to keep them for your next sign-in here.',
+        )) {
+            await outbox.clear();
+        }
+        return logout();
+    }, [confirmUnsynced, logout, outbox]);
 }

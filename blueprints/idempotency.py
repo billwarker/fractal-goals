@@ -25,6 +25,10 @@ MAX_KEY_LENGTH = 255
 # A claim older than this belongs to a request that died mid-flight.
 STALE_CLAIM_AFTER = timedelta(minutes=2)
 RECORD_TTL = timedelta(days=14)
+# Larger responses are recorded as status only; the client's post-sync refresh fetches the data.
+MAX_STORED_BODY_BYTES = 64 * 1024
+GLOBAL_PURGE_INTERVAL = timedelta(hours=1)
+_last_global_purge = None
 
 
 def _utc_now_naive() -> datetime:
@@ -43,7 +47,7 @@ def _request_hash() -> str:
 
 def _replay(record: IdempotencyRecord) -> Response:
     response = Response(
-        record.response_body or '',
+        record.response_body if record.response_body is not None else '{"replayed": true}',
         status=record.response_status or 200,
         mimetype=record.response_mimetype or 'application/json',
     )
@@ -58,6 +62,7 @@ def _claim(db, user_id, key, request_hash):
         IdempotencyRecord.user_id == user_id,
         IdempotencyRecord.created_at < now - RECORD_TTL,
     ).delete(synchronize_session=False)
+    _purge_globally_if_due(db, now)
     db.add(IdempotencyRecord(
         user_id=user_id,
         key=key,
@@ -97,15 +102,32 @@ def _claim(db, user_id, key, request_hash):
     return True, None
 
 
+def purge_expired_idempotency_records(db, *, now=None) -> int:
+    """Remove every user's expired records (inactive users never trigger the per-user purge)."""
+    deleted = db.query(IdempotencyRecord).filter(
+        IdempotencyRecord.created_at < (now or _utc_now_naive()) - RECORD_TTL,
+    ).delete(synchronize_session=False)
+    return deleted
+
+
+def _purge_globally_if_due(db, now):
+    global _last_global_purge
+    if _last_global_purge is not None and now - _last_global_purge < GLOBAL_PURGE_INTERVAL:
+        return
+    _last_global_purge = now
+    purge_expired_idempotency_records(db, now=now)
+
+
 def _finish(db, user_id, key, response: Response):
     record = db.get(IdempotencyRecord, (user_id, key))
     if record is None:
         return
     if 200 <= response.status_code < 300:
+        body = response.get_data(as_text=True)
         record.status = 'done'
         record.response_status = response.status_code
         record.response_mimetype = response.mimetype
-        record.response_body = response.get_data(as_text=True)
+        record.response_body = body if len(body.encode('utf-8')) <= MAX_STORED_BODY_BYTES else None
     else:
         db.delete(record)
     db.commit()

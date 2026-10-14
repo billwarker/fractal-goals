@@ -66,11 +66,11 @@ export function instanceCoalesceKey(instanceId, updates) {
     return `instance:${instanceId}:${Object.keys(updates).sort().join(',')}`;
 }
 
-export function buildPlaceholderInstance({ id, sessionId, rootId, definition, groupName = null, now = Date.now() }) {
+/** An activity instance created offline, shaped like serialize_activity_instance (which has no root_id). */
+export function buildPlaceholderInstance({ id, sessionId, definition, groupName = null, now = Date.now() }) {
     return {
         id,
         session_id: sessionId,
-        root_id: rootId,
         activity_definition_id: definition.id,
         associated_goal_ids: [],
         name: definition.name,
@@ -96,6 +96,70 @@ export function buildPlaceholderInstance({ id, sessionId, rootId, definition, gr
         tag_assignment_version: 0,
         progress_comparison: null,
         prescription: null,
+        _pendingSync: true,
+    };
+}
+
+// Mirror of services/_serialize_notes_misc.py derive_note_type / note_type_label.
+const NOTE_TYPE_LABELS = {
+    fractal_note: 'Fractal Note',
+    goal_note: 'Goal Note',
+    session_note: 'Session Note',
+    program_note: 'Program Note',
+    activity_instance_note: 'Activity Instance Note',
+    activity_set_note: 'Activity Set Note',
+    activity_definition_note: 'Activity Definition Note',
+    circuit_run_note: 'Activity Circuit Note',
+    circuit_round_note: 'Circuit Round Note',
+    goal_completion_note: 'Goal Completion Note',
+    note: 'Note',
+};
+
+function deriveNoteType(contextType, { setIndex = null, activitySetId = null, noteKind = null } = {}) {
+    if (contextType === 'goal' && noteKind === 'goal_completion') return 'goal_completion_note';
+    if (contextType === 'activity_instance') {
+        return setIndex !== null || activitySetId ? 'activity_set_note' : 'activity_instance_note';
+    }
+    return {
+        root: 'fractal_note',
+        goal: 'goal_note',
+        session: 'session_note',
+        program: 'program_note',
+        activity_definition: 'activity_definition_note',
+        circuit_run: 'circuit_run_note',
+        circuit_round: 'circuit_round_note',
+    }[contextType] || 'note';
+}
+
+/** A note written offline, shaped like the server's display serializer. */
+export function buildPlaceholderNote({ id, data, session = null, setIndex = null, now = Date.now() }) {
+    const at = nowIso(now);
+    const noteType = deriveNoteType(data.context_type, {
+        setIndex, activitySetId: data.activity_set_id, noteKind: data.note_kind,
+    });
+    return {
+        id,
+        context_type: data.context_type,
+        context_id: data.context_id,
+        session_id: data.session_id || session?.id || null,
+        activity_instance_id: data.activity_instance_id || null,
+        activity_definition_id: data.activity_definition_id || null,
+        activity_set_id: data.activity_set_id || null,
+        goal_id: data.goal_id || null,
+        agent_grant_id: null,
+        agent_run_id: null,
+        content: data.content,
+        note_kind: data.note_kind || null,
+        note_type: noteType,
+        note_type_label: NOTE_TYPE_LABELS[noteType] || 'Note',
+        set_index: setIndex,
+        is_pinned: false,
+        pinned_at: null,
+        created_at: at,
+        updated_at: at,
+        session_name: session?.name ?? null,
+        session_date: session?.session_start || session?.created_at || null,
+        session_template_name: session ? (session.attributes?.session_data?.template_name || session.name) : null,
         _pendingSync: true,
     };
 }

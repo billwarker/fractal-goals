@@ -54,4 +54,27 @@ describe('sign-out guards', () => {
         expect(confirm).toHaveBeenCalledWith(expect.stringContaining("1 change hasn't synced yet"));
         expect(confirm).toHaveBeenCalledWith(expect.stringContaining('Sign out of all devices anyway?'));
     });
+
+    it('can also discard the unsynced changes, for a shared device', async () => {
+        vi.spyOn(window, 'confirm').mockReturnValueOnce(true).mockReturnValueOnce(true);
+        const outbox = await outboxWithPending(2);
+        const { result } = renderHook(() => useGuardedLogout(), { wrapper: wrapperFor(outbox) });
+
+        await result.current();
+
+        expect(outbox.pendingOps()).toHaveLength(0);
+        expect(logout).toHaveBeenCalled();
+    });
+
+    it('keeps the changes for the next sign-in by default', async () => {
+        vi.spyOn(window, 'confirm').mockReturnValueOnce(true).mockReturnValueOnce(false);
+        const outbox = await outboxWithPending(2);
+        const { result } = renderHook(() => useGuardedLogout(), { wrapper: wrapperFor(outbox) });
+
+        await result.current();
+
+        expect(outbox.pendingOps()).toHaveLength(2);
+        expect(logout).toHaveBeenCalled();
+    });
 });
+

@@ -30,6 +30,7 @@ ALLOWED_EVENTS = frozenset({
     "offline_sync_drained",
     "offline_op_rejected",
     "offline_boot",
+    "offline_ops_expired",
 })
 
 MAX_BATCH_SIZE = 20

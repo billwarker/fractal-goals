@@ -1,4 +1,4 @@
-import { idbDelete, idbGet, idbSet } from './idbKeyValue';
+import { idbDelete, idbDeletePrefix, idbGet, idbSet } from './idbKeyValue';
 
 // A quick session lives entirely on the device until it is completed. Keeping
 // the draft here means a reload, a crash, or a dead battery never loses a workout.
@@ -21,6 +21,11 @@ export async function loadQuickSessionDraft(userId, rootId, { now = Date.now() }
         return null;
     }
     return saved;
+}
+
+/** Sign-out removes every unfinished quick session this user left on the device. */
+export function clearQuickSessionDraftsForUser(userId) {
+    return userId ? idbDeletePrefix(`quick-draft:${userId}:`) : Promise.resolve();
 }
 
 export function clearQuickSessionDraft(userId, rootId) {

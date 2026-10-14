@@ -14,7 +14,8 @@ from sqlalchemy import func
 
 from models import SessionWorkInterval
 
-MAX_CLIENT_LAG = timedelta(hours=24)
+# Matches the quick-draft lifetime: a phone offline for days still records when you tapped.
+MAX_CLIENT_LAG = timedelta(days=7)
 
 
 def utc_now_naive() -> datetime:

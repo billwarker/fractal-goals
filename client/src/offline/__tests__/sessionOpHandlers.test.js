@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryKeys } from '../../hooks/queryKeys';
 import { createMemoryStore, createOutbox } from '../outbox';
-import { SESSION_OP, applyOptimistic, registerSessionOpHandlers } from '../sessionOpHandlers';
+import { SESSION_OP, applyOptimistic, findSessionForActivity, registerSessionOpHandlers } from '../sessionOpHandlers';
 
 vi.mock('../../utils/notify', () => ({ default: { error: vi.fn(), success: vi.fn() } }));
 
@@ -144,4 +144,30 @@ describe('session op handlers', () => {
         expect(invalidatedKeys).toContain(JSON.stringify(sessionKey));
         expect(invalidatedKeys).toContain(JSON.stringify(activitiesKey));
     });
+
+    it('finds which cached session an instance or set belongs to', () => {
+        env.queryClient.setQueryData(activitiesKey, [{ id: 'i1', sets: [{ id: 'set-1' }] }]);
+        expect(findSessionForActivity(env.queryClient, rootId, { instanceId: 'i1' })).toEqual({ sessionId, instanceId: 'i1' });
+        expect(findSessionForActivity(env.queryClient, rootId, { setId: 'set-1' })).toEqual({ sessionId, instanceId: 'i1' });
+        expect(findSessionForActivity(env.queryClient, rootId, { instanceId: 'nope' })).toBeNull();
+    });
+
+    it('shows queued tag and goal-link changes on the instance', async () => {
+        const { queryClient, outbox } = env;
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.INSTANCE_TAGS,
+            entityIds: ['i1'],
+            meta: { instanceId: 'i1', tags: [{ id: 't1', name: 'Heavy' }] },
+        });
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.INSTANCE_GOAL_LINK,
+            entityIds: ['i1'],
+            meta: { instanceId: 'i1', goalId: 'g2', remove: false },
+        });
+
+        const [instance] = queryClient.getQueryData(activitiesKey);
+        expect(instance.tags).toEqual([{ id: 't1', name: 'Heavy' }]);
+        expect(instance.associated_goal_ids).toEqual(['g2']);
+    });
 });
+

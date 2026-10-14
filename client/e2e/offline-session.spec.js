@@ -196,3 +196,127 @@ test('signed out with no signal, the app says so and recovers when the connectio
     await expect(page.getByText('LOG IN', { exact: true })).toBeVisible();
     expect(errors).toEqual([]);
 });
+
+test('offline tag edits sync, and an activity added then deleted offline never reaches the server', async ({ page, context }, testInfo) => {
+    test.setTimeout(90_000);
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await logIn(page);
+    const root = `browser-offline-edits-root-${testInfo.project.name}`;
+    const headers = { Authorization: `Bearer ${token}` };
+    const post = async (path, data) => {
+        const response = await page.request.post(`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${await response.text()}`).toBeTruthy();
+        return response.json();
+    };
+    const kept = await post('activities', { name: 'Kept lift', has_metrics: false });
+    await post('activities', { name: 'Scrapped drill', has_metrics: false });
+    await post('activity-tags', { name: 'Heavy day', color: '#123ABC', scope: 'selected', activity_ids: [kept.id] });
+    const session = await post('sessions', {
+        name: 'Offline edits', goal_ids: [root],
+        session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_definition_id: kept.id }] }] },
+    });
+
+    await page.goto(`/${root}/session/${session.id}`);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect(page.getByText('Kept lift').first()).toBeVisible();
+    await page.waitForTimeout(1500);
+
+    const sent = [];
+    page.on('request', (request) => {
+        if (request.url().includes('/api/') && request.method() !== 'GET') sent.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    });
+    await context.setOffline(true);
+
+    // Tag the existing activity.
+    await page.getByText('Kept lift', { exact: true }).first().click();
+    await page.getByRole('group', { name: 'Activity tags' }).getByRole('button', { name: 'Add tag' }).click();
+    await page.getByRole('dialog', { name: 'Choose activity tags' }).getByText('Heavy day', { exact: true }).click();
+    await page.getByRole('button', { name: 'Close tag picker' }).click();
+    await expect(page.getByRole('group', { name: 'Activity tags' }).getByTitle('Heavy day')).toBeVisible();
+
+    // Add an activity, then change your mind.
+    await page.getByText('+ Add Activity').first().click();
+    await page.getByRole('button', { name: 'Select Scrapped drill' }).click();
+    await expect(page.getByText('Scrapped drill', { exact: true }).first()).toBeVisible();
+    await page.getByText('Scrapped drill', { exact: true }).first().click();
+    await page.getByRole('button', { name: 'Delete activity' }).last().click();
+    await expect(page.getByText('Scrapped drill', { exact: true })).toHaveCount(0);
+
+    await context.setOffline(false);
+    await expect(page.getByRole('status').filter({ hasText: 'All changes synced' })).toBeVisible({ timeout: 30_000 });
+    expect(sent.some((entry) => entry.endsWith('/tags'))).toBe(true);
+    expect(sent.some((entry) => entry.includes(`/sessions/${session.id}/activities`) && !entry.endsWith('/tags'))).toBe(false);
+
+    const instances = await (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
+    expect(instances.map((instance) => instance.name)).toEqual(['Kept lift']);
+    expect(instances[0].tags.map((tag) => tag.name)).toEqual(['Heavy day']);
+    expect(errors).toEqual([]);
+    await page.request.delete(`/api/${root}/sessions/${session.id}`, { headers });
+});
+
+test('a change the server keeps failing is set aside, and later changes still sync', async ({ page, context }, testInfo) => {
+    // Real backoff: eight failed attempts take roughly 60-125 s, so run once, on desktop.
+    test.skip(testInfo.project.name !== 'desktop', 'Timing-bound; one project is enough');
+    test.setTimeout(240_000);
+    const token = await logIn(page);
+    const root = `browser-offline-ceiling-root-${testInfo.project.name}`;
+    const headers = { Authorization: `Bearer ${token}` };
+    const post = async (path, data) => (await page.request.post(`/api/${root}/${path}`, { headers, data })).json();
+    const broken = await post('activities', { name: 'Broken start', has_metrics: false });
+    const fine = await post('activities', { name: 'Fine finish', has_metrics: false });
+    const session = await post('sessions', {
+        name: 'Ceiling', goal_ids: [root],
+        session_data: { sections: [{ name: 'Main', items: [
+            { type: 'activity', activity_definition_id: broken.id },
+            { type: 'activity', activity_definition_id: fine.id },
+        ] }] },
+    });
+    const instances = await (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
+    const brokenInstance = instances.find((instance) => instance.name === 'Broken start');
+    const fineInstance = instances.find((instance) => instance.name === 'Fine finish');
+    await page.route(`**/activity-instances/${brokenInstance.id}/start`, (route) => route.fulfill({ status: 500, json: { error: 'boom' } }));
+
+    await page.goto(`/${root}/session/${session.id}`);
+    await expect(page.getByText('Fine finish').first()).toBeVisible();
+    await context.setOffline(true);
+    await page.getByTitle('Start timer').first().click();
+    await page.getByTitle('Instant complete (0s duration)').last().click();
+    await context.setOffline(false);
+
+    // The later change waits behind the failing one, then syncs once that is set aside.
+    await expect.poll(async () => {
+        const rows = await (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
+        return rows.find((row) => row.id === fineInstance.id)?.completed;
+    }, { timeout: 200_000, intervals: [5_000] }).toBe(true);
+    const status = page.getByRole('status').filter({ hasText: "couldn't sync" });
+    await expect(status).toBeVisible();
+    await status.getByRole('button', { name: 'Review' }).click();
+    await expect(page.getByRole('dialog', { name: "Changes that couldn't sync" }).getByText(/kept failing to save this change/)).toBeVisible();
+    await page.request.delete(`/api/${root}/sessions/${session.id}`, { headers });
+});
+
+test('the offline kill switch removes the service worker on the next load', async ({ page }) => {
+    await logIn(page);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBeGreaterThan(0);
+
+    await page.route('**/api/feature-flags', async (route) => {
+        // The kill switch reloads the page, which can dispose an in-flight interception.
+        try {
+            const response = await route.fetch();
+            const payload = await response.json();
+            payload.flags = { ...payload.flags, offline_service_worker_disabled: true };
+            await route.fulfill({ response, json: payload });
+        } catch {
+            await route.abort().catch(() => {});
+        }
+    });
+    await page.reload();
+    await expect.poll(
+        () => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length),
+        { timeout: 15_000 },
+    ).toBe(0);
+    expect(await page.evaluate(async () => (await caches.keys()).filter((key) => key.startsWith('workbox-')))).toEqual([]);
+});

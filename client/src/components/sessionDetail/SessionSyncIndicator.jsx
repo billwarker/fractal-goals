@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { useOutbox, useOutboxStatus } from '../../offline/OutboxContext';
-import { SESSION_OP } from '../../offline/sessionOpHandlers';
+import { SESSION_OP } from '../../offline/opKinds';
 import Button from '../atoms/Button';
 import styles from './SessionSyncIndicator.module.css';
 

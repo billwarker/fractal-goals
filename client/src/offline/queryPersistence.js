@@ -20,8 +20,10 @@ const PERSISTED_PREFIXES = new Set([
 ]);
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const WRITE_THROTTLE_MS = 1000;
-// Bump when a persisted query's data shape changes incompatibly.
-const BUSTER = 'v1';
+// Versioned by the server's recorded shapes (scripts/offline-cache-version.mjs): when a
+// serializer changes, the regenerated contract changes this and older caches are dropped.
+export const CACHE_VERSION = __OFFLINE_CACHE_VERSION__;
+const BUSTER = CACHE_VERSION;
 
 const storageKey = (userId) => `query-cache:${userId}`;
 

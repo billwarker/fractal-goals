@@ -1,5 +1,8 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useOutbox } from '../offline/OutboxContext';
+import { SESSION_OP } from '../offline/opKinds';
+import { findSessionForActivity } from '../offline/sessionCache';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
@@ -193,6 +196,24 @@ export function useActivityProgressViewMutations(rootId, activityId) {
 
 export function useActivityTagMutations(rootId, activityId) {
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
+    // In a cached session, tag assignments queue like any in-session write (last write wins, so no version).
+    const queueAssignment = async ({ kind, instanceId = null, setId = null, tagIds, tags }) => {
+        const found = outbox && findSessionForActivity(queryClient, rootId, { instanceId, setId });
+        if (!found) return null;
+        const entityId = setId || found.instanceId;
+        await outbox.submit({
+            scope: found.sessionId,
+            kind,
+            method: 'put',
+            url: setId ? `/${rootId}/activity-sets/${setId}/tags` : `/${rootId}/activity-instances/${found.instanceId}/tags`,
+            body: { tag_ids: tagIds },
+            coalesceKey: `tags:${entityId}`,
+            entityIds: [found.instanceId, ...(setId ? [setId] : [])],
+            meta: { rootId, sessionId: found.sessionId, instanceId: found.instanceId, setId, tags: tags || [] },
+        });
+        return { data: {} };
+    };
     const invalidate = () => invalidateTagsAndProgress(queryClient, rootId, activityId);
     const create = useMutation({
         mutationFn: (data) => fractalApi.createActivityTagCatalogItem(rootId, {
@@ -230,8 +251,12 @@ export function useActivityTagMutations(rootId, activityId) {
         archiveTag: (data) => archive.mutateAsync(data),
         updateCatalogTag: (data) => updateCatalog.mutateAsync(data),
         hardDeleteCatalogTag: (data) => hardDeleteCatalog.mutateAsync(data),
-        assignInstanceTags: (data) => assignInstance.mutateAsync(data),
-        assignSetTags: (data) => assignSet.mutateAsync(data),
+        assignInstanceTags: async (data) => (
+            await queueAssignment({ kind: SESSION_OP.INSTANCE_TAGS, ...data }) || assignInstance.mutateAsync(data)
+        ),
+        assignSetTags: async (data) => (
+            await queueAssignment({ kind: SESSION_OP.SET_TAGS, ...data }) || assignSet.mutateAsync(data)
+        ),
         isPending: create.isPending || archive.isPending
             || updateCatalog.isPending || hardDeleteCatalog.isPending || assignInstance.isPending || assignSet.isPending,
     };

@@ -208,6 +208,20 @@ class SessionActivityService:
         if not activity_definition_id:
             return None, "activity_definition_id required", 400
 
+        # A replayed offline create (its idempotency record gone) is the same request: succeed.
+        client_instance_id = data.get('instance_id')
+        existing = self.db_session.get(ActivityInstance, client_instance_id) if client_instance_id else None
+        if existing is not None:
+            if (existing.root_id, existing.session_id, existing.activity_definition_id) != (
+                root_id, session_id, activity_definition_id,
+            ) or existing.deleted_at is not None:
+                return None, "An activity with this id already exists", 409
+            return {
+                "instance": existing,
+                "serialized": serialize_activity_instance(existing),
+                "activity_name": existing.definition.name if existing.definition else 'Unknown',
+            }, None, 200
+
         activity_def = get_owned_activity_definition(
             self.db_session,
             root_id,

@@ -2,6 +2,7 @@
 // serialize_circuit_run so the existing circuit views render placeholders as-is;
 // the server's copy replaces each one when its write is acknowledged.
 
+import { buildPlaceholderInstance } from './sessionOps';
 import {
     initialRoundId,
     roundMemberId,
@@ -84,6 +85,34 @@ export async function buildPlaceholderRun(definition, { runId, sessionId, rootId
         rounds: [firstRound],
         _pendingSync: true,
     };
+}
+
+/**
+ * The activity instances the server creates alongside a circuit: one per set-based
+ * slot, plus one per non-set member in ``rounds``. Circuit views resolve members
+ * through these, so they must exist before sync too.
+ */
+export function placeholderCircuitInstances(run, { sessionId, rootId, rounds = run.rounds || [] }) {
+    const slotsById = new Map((run.slots || []).map((slot) => [slot.id, slot]));
+    const instanceFor = (id, slot) => buildPlaceholderInstance({
+        id,
+        sessionId,
+        rootId,
+        definition: {
+            id: slot.activity_definition_id,
+            name: slot.activity_name,
+            has_sets: slot.has_sets,
+            has_metrics: slot.has_metrics,
+        },
+    });
+    const slotInstances = rounds === run.rounds
+        ? (run.slots || []).filter((slot) => slot.has_sets && slot.activity_instance_id)
+            .map((slot) => instanceFor(slot.activity_instance_id, slot))
+        : [];
+    const memberInstances = rounds.flatMap((round) => (round.members || [])
+        .filter((member) => !member.activity_set_id && member.activity_instance_id)
+        .map((member) => instanceFor(member.activity_instance_id, slotsById.get(member.circuit_run_slot_id) || {})));
+    return [...slotInstances, ...memberInstances];
 }
 
 const withRounds = (run, rounds) => ({ ...run, rounds, round_count: rounds.length });

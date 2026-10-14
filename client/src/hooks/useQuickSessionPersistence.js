@@ -6,7 +6,7 @@ import {
     loadQuickSessionDraft,
     saveQuickSessionDraft,
 } from '../offline/quickSessionDraft';
-import { SESSION_OP } from '../offline/sessionOpHandlers';
+import { SESSION_OP } from '../offline/opKinds';
 
 const SAVE_DEBOUNCE_MS = 400;
 

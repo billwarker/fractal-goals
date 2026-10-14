@@ -19,7 +19,7 @@ from validators import (
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error, require_owned_root
-from services.serializers import serialize_activity_instance
+from services.serializers import serialize_activity_instance, serialize_session
 from services.session_service import SessionService
 from services.progress_service import ProgressService
 from services.completion_handlers import get_live_progress
@@ -334,9 +334,13 @@ def complete_quick_session(current_user, root_id, validated_data):
     db_session = get_db_session()
     service = SessionService(db_session)
     try:
-        # A queued offline completion carries its own id; replays are handled by @idempotent.
-        if validated_data.get('id') and db_session.get(Session, validated_data['id']) is not None:
-            return jsonify({"error": "A session with this id already exists"}), 409
+        # A queued offline completion carries its own id. A replay whose idempotency record is
+        # gone finds its own session: return it rather than failing a change that was saved.
+        existing = db_session.get(Session, validated_data['id']) if validated_data.get('id') else None
+        if existing is not None:
+            if existing.root_id != root_id or existing.owner_id != current_user.id or existing.deleted_at is not None:
+                return jsonify({"error": "A session with this id already exists"}), 409
+            return jsonify(serialize_session(existing)), 200
         result, error, status = service.create_completed_quick_session(root_id, current_user.id, validated_data)
         if error:
             return jsonify(error if isinstance(error, dict) else {"error": error}), status
@@ -478,7 +482,7 @@ def add_activity_to_session(current_user, root_id, session_id, validated_data):
         payload, error, status = service.add_activity_to_session(root_id, session_id, current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
-        return jsonify(payload.get("serialized") or serialize_activity_instance(payload["instance"])), 201
+        return jsonify(payload.get("serialized") or serialize_activity_instance(payload["instance"])), status
         
     except SQLAlchemyError:
         db_session.rollback()

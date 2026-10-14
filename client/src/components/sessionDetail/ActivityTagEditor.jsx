@@ -144,7 +144,8 @@ function ActivityTagEditor({
         };
     }, [assignableTags.length, closePicker, isPickerOpen]);
 
-    const persist = async (nextIds) => {
+    // ``newTags``: tags created this moment, not yet in ``localTags`` until the next render.
+    const persist = async (nextIds, newTags = []) => {
         if (isControlled) {
             onChangeTags(nextIds);
             return;
@@ -152,10 +153,15 @@ function ActivityTagEditor({
         const generation = assignmentGenerationRef.current + 1;
         assignmentGenerationRef.current = generation;
         setOptimisticSelection({ assignmentKey, ids: nextIds });
+        // Full tag objects let an offline (queued) assignment show immediately.
+        const tagsById = new Map([...localTags, ...newTags].map((tag) => [tag.id, tag]));
+        const nextTags = nextIds.map((id) => tagsById.get(id)).filter(Boolean);
         const execute = async () => {
             const response = setId
-                ? await assignSetTags({ setId, tagIds: nextIds, version: assignmentVersionRef.current })
-                : await assignInstanceTags({ instanceId, tagIds: nextIds, version: assignmentVersionRef.current });
+                ? await assignSetTags({ setId, tagIds: nextIds, version: assignmentVersionRef.current, tags: nextTags })
+                : await assignInstanceTags({
+                    instanceId, tagIds: nextIds, version: assignmentVersionRef.current, tags: nextTags,
+                });
             if (response?.data?.version) assignmentVersionRef.current = response.data.version;
             return response;
         };
@@ -206,7 +212,7 @@ function ActivityTagEditor({
             setName('');
             setCreateScope('selected');
             try {
-                await persist([...selectedIds, tag.id]);
+                await persist([...selectedIds, tag.id], [tag]);
                 notify.success(`Created and assigned “${tag.name}”`);
             } catch {
                 notify.warning(`Created “${tag.name}”, but it could not be assigned. You can retry from the picker.`);

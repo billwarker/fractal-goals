@@ -89,16 +89,25 @@ class TestClientMintedCircuitIds:
             circuit_ids.round_member_id(round_id, member['circuit_run_slot_id']) for member in added['members']
         }
 
-    def test_reused_ids_are_rejected(self, authed_client, circuit_setup):
+    def test_replayed_creates_succeed_without_duplicating(self, authed_client, circuit_setup):
         run_id = str(uuid.uuid4())
-        _create(authed_client, circuit_setup, id=run_id)
-        assert _create(authed_client, circuit_setup, id=run_id).status_code == 409
+        first = _create(authed_client, circuit_setup, id=run_id)
+        replay = _create(authed_client, circuit_setup, id=run_id)
+        assert (first.status_code, replay.status_code) == (201, 200)
+        assert replay.get_json()['id'] == run_id
 
-        run = _create(authed_client, circuit_setup).get_json()
-        round_url = f"/api/{circuit_setup['root_id']}/circuit-runs/{run['id']}/rounds"
+        round_url = f"/api/{circuit_setup['root_id']}/circuit-runs/{run_id}/rounds"
         round_id = str(uuid.uuid4())
         assert authed_client.post(round_url, json={'round_id': round_id}).status_code == 201
-        assert authed_client.post(round_url, json={'round_id': round_id}).status_code == 409
+        replayed_round = authed_client.post(round_url, json={'round_id': round_id})
+        assert replayed_round.status_code == 200
+        assert [item['round_number'] for item in replayed_round.get_json()['rounds']] == [1, 2]
+
+    def test_ids_used_by_another_record_are_rejected(self, authed_client, circuit_setup):
+        first = _create(authed_client, circuit_setup).get_json()
+        second = _create(authed_client, circuit_setup).get_json()
+        round_url = f"/api/{circuit_setup['root_id']}/circuit-runs/{second['id']}/rounds"
+        assert authed_client.post(round_url, json={'round_id': first['rounds'][0]['id']}).status_code == 409
 
     def test_without_client_ids_children_stay_random(self, authed_client, db_session, circuit_setup):
         run = _create(authed_client, circuit_setup).get_json()

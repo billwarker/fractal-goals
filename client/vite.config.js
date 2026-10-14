@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import bundleBudgets from './scripts/bundle-budgets.mjs'
+import { offlineCacheVersion } from './scripts/offline-cache-version.mjs'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -79,6 +80,7 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_ENV': JSON.stringify(env.VITE_ENV || mode),
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL || '/api'),
       'import.meta.env.VITE_LANDING_EXAMPLES_STATIC_URL': JSON.stringify(landingExamplesStaticUrl),
+      __OFFLINE_CACHE_VERSION__: JSON.stringify(offlineCacheVersion()),
     },
   }
 })

@@ -102,12 +102,14 @@ def test_quick_complete_accepts_a_client_id_and_replays_safely(
 
     first = client.post(url, data=body, headers=keyed)
     replay = client.post(url, data=body, headers=keyed)
-    reused = client.post(url, data=body, headers=auth_headers)
+    # The idempotency record gone (new key): the server finds the session it already saved.
+    late_replay = client.post(url, data=body, headers=auth_headers)
 
     assert first.status_code == 201
     assert first.get_json()['id'] == session_id
     assert replay.status_code == 201
     assert replay.headers.get('Idempotent-Replayed') == 'true'
-    assert reused.status_code == 409
+    assert late_replay.status_code == 200
+    assert late_replay.get_json()['id'] == session_id
     db_session.expire_all()
     assert db_session.query(Session).filter(Session.root_id == root_id).count() == 1

@@ -28,8 +28,12 @@ class CircuitRoundOperations:
         run, session = locked
         if session.completed:
             return None, "Completed sessions cannot add circuit rounds", 409
-        if round_id and self.db_session.get(CircuitRound, round_id) is not None:
-            return None, "A circuit round with this id already exists", 409
+        existing_round = self.db_session.get(CircuitRound, round_id) if round_id else None
+        if existing_round is not None:
+            # A replayed offline round add finds its own round: the same request succeeded earlier.
+            if existing_round.circuit_run_id != run.id:
+                return None, "A circuit round with this id already exists", 409
+            return serialize_circuit_run(self.owner._run(root_id, run.id)), None, 200
 
         additional_instances = sum(1 for slot in run.slots if not slot.has_sets)
         quota = QuotaService(self.db_session)

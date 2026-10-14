@@ -82,5 +82,11 @@ it('extends an existing catalog match instead of creating a duplicate', async ()
     await waitFor(() => expect(mocks.updateCatalogTag).toHaveBeenCalledWith({
         definitionId: 'definition-match', version: 4, activity_ids: ['other', 'activity'], scope: 'selected',
     }));
-    expect(mocks.assignInstanceTags).toHaveBeenCalledWith({ instanceId: 'instance', tagIds: ['binding-reusable'], version: 1 });
+    expect(mocks.assignInstanceTags).toHaveBeenCalledWith({
+        instanceId: 'instance',
+        tagIds: ['binding-reusable'],
+        version: 1,
+        // The just-extended binding travels with the request so a queued assignment shows at once.
+        tags: [expect.objectContaining({ id: 'binding-reusable', name: 'Reusable' })],
+    });
 });

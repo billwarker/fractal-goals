@@ -269,4 +269,95 @@ describe('outbox', () => {
         await outbox.discard(again.opId);
         expect(outbox.getSnapshot().ops).toHaveLength(0);
     });
+
+    it('gives up on a change the server keeps failing so later changes still sync', async () => {
+        const sender = vi.fn(async (entry) => {
+            if (entry.url === '/poison') throw httpError(500, { error: 'boom' });
+            return { status: 200, data: {} };
+        });
+        const { outbox, sent, goOnline } = setup({ send: sender, online: false });
+        const poison = await outbox.submit(op({ url: '/poison' }));
+        await outbox.submit(op({ url: '/after' }));
+
+        await goOnline();
+        await vi.runAllTimersAsync();
+
+        await expect(poison.settled).rejects.toThrow(/kept failing/);
+        expect(sent.filter((entry) => entry.url === '/poison')).toHaveLength(8);
+        expect(sent.at(-1).url).toBe('/after');
+        expect(outbox.getSnapshot().ops).toEqual([
+            expect.objectContaining({ url: '/poison', state: OP_STATE.REJECTED, error: expect.objectContaining({ code: 'retry_exhausted' }) }),
+        ]);
+    });
+
+    it('never gives up while the device simply has no connection', async () => {
+        const sender = vi.fn().mockRejectedValue(networkError());
+        const { outbox, sent } = setup({ send: sender });
+
+        await outbox.submit(op({ url: '/waiting' }));
+        await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+
+        expect(sent.length).toBeGreaterThan(8);
+        expect(outbox.getSnapshot().ops[0]).toMatchObject({ state: OP_STATE.PENDING, serverFailures: 0 });
+    });
+
+    it('drops queued edits to a deleted record, and cancels a create that never left the device', async () => {
+        const { outbox, sent, goOnline } = setup({ online: false });
+        const create = await outbox.submit(op({ kind: 'activity.add', url: '/add', creates: ['inst-1'] }));
+        const edit = await outbox.submit(op({ url: '/edit', entityIds: ['inst-1'] }));
+        await outbox.submit(op({ url: '/other', entityIds: ['inst-2'] }));
+        const remove = await outbox.submit(op({ url: '/remove', method: 'delete', entityIds: ['inst-1'], supersedes: ['inst-1'] }));
+
+        await expect(create.settled).resolves.toEqual({ superseded: true });
+        await expect(edit.settled).resolves.toEqual({ superseded: true });
+        await expect(remove.settled).resolves.toEqual({ superseded: true });
+        await goOnline();
+        expect(sent.map((entry) => entry.url)).toEqual(['/other']);
+    });
+
+    it('still sends a delete when the record already reached the server', async () => {
+        const { outbox, sent, goOnline } = setup({ online: false });
+        await outbox.submit(op({ url: '/edit', entityIds: ['saved-1'] }));
+        await outbox.submit(op({ url: '/remove', method: 'delete', entityIds: ['saved-1'], supersedes: ['saved-1'] }));
+
+        await goOnline();
+        expect(sent.map((entry) => entry.url)).toEqual(['/remove']);
+    });
+
+    it('gives each change a unique position even across tabs sharing one queue', async () => {
+        const store = createMemoryStore();
+        let chain = Promise.resolve();
+        const sharedLock = (callback) => {
+            const run = chain.then(callback);
+            chain = run.catch(() => {});
+            return run;
+        };
+        const make = () => createOutbox({ store, send: vi.fn(), isOnline: () => false, lock: sharedLock, now: () => 1000 });
+        const [tabA, tabB] = [make(), make()];
+
+        await Promise.all([
+            tabA.submit(op({ url: '/a1' })), tabB.submit(op({ url: '/b1' })),
+            tabA.submit(op({ url: '/a2' })), tabB.submit(op({ url: '/b2' })),
+        ]);
+
+        const seqs = (await store.getAll()).map((entry) => entry.seq);
+        expect(new Set(seqs).size).toBe(4);
+    });
+
+    it('discards rejected changes after 7 days and says so', async () => {
+        const onEvent = vi.fn();
+        const day = 24 * 60 * 60 * 1000;
+        const base = { kind: 'k', method: 'put', url: '/x', entityIds: [], creates: [], state: OP_STATE.REJECTED };
+        const store = createMemoryStore([
+            { ...base, opId: 'old', seq: 1, rejectedAt: Date.now() - 8 * day },
+            { ...base, opId: 'recent', seq: 2, rejectedAt: Date.now() - day },
+        ]);
+        const outbox = createOutbox({ store, send: vi.fn(), isOnline: () => false, lock: (fn) => fn(), onEvent });
+
+        await outbox.ready();
+
+        expect(outbox.getSnapshot().ops.map((entry) => entry.opId)).toEqual(['recent']);
+        expect(onEvent).toHaveBeenCalledWith('expired', { count: 1 });
+    });
 });
+

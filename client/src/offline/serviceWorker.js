@@ -72,3 +72,29 @@ export function registerAppServiceWorker() {
     if (document.readyState === 'complete') void register();
     else window.addEventListener('load', () => void register(), { once: true });
 }
+
+const KILL_RELOAD_KEY = 'fractal-sw-kill-reloaded';
+
+/**
+ * Kill switch: remove the worker and every cache it owns. Reloads once so the
+ * page is served fresh from the network; the session guard prevents a loop.
+ */
+export async function unregisterAppServiceWorker() {
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+    if (typeof caches !== 'undefined') {
+        const keys = await caches.keys();
+        await Promise.all(keys
+            .filter((key) => key.startsWith('workbox-') || key === 'app-assets')
+            .map((key) => caches.delete(key)));
+    }
+    let alreadyReloaded = false;
+    try {
+        alreadyReloaded = sessionStorage.getItem(KILL_RELOAD_KEY) === '1';
+        sessionStorage.setItem(KILL_RELOAD_KEY, '1');
+    } catch {
+        alreadyReloaded = true;
+    }
+    if (registrations.length > 0 && !alreadyReloaded) window.location.reload();
+}

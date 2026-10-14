@@ -48,10 +48,15 @@ test('program date header, view toggle, and session options fit the sidebar', as
     const session = pane.getByRole('link', { name: /Upper Body/ });
     const options = pane.getByRole('button', { name: 'Change how Upper Body Session counts toward this day' });
     const duration = pane.getByText('1 hour 52 minutes', { exact: true });
-    const [identityBox, optionsBox, durationBox] = await Promise.all([session, options, duration].map((node) => node.boundingBox()));
-    expect(optionsBox.x).toBeGreaterThanOrEqual(identityBox.x + identityBox.width);
-    expect(Math.abs(optionsBox.y + optionsBox.height / 2 - identityBox.y - identityBox.height / 2)).toBeLessThanOrEqual(2);
-    expect(durationBox.y).toBeGreaterThanOrEqual(optionsBox.y + optionsBox.height);
+    // The mobile sheet slides in; compare positions once it has settled, from one frame.
+    await expect(async () => {
+        const [identityBox, optionsBox, durationBox] = await Promise.all(
+            [session, options, duration].map((node) => node.boundingBox()),
+        );
+        expect(optionsBox.x).toBeGreaterThanOrEqual(identityBox.x + identityBox.width);
+        expect(Math.abs(optionsBox.y + optionsBox.height / 2 - identityBox.y - identityBox.height / 2)).toBeLessThanOrEqual(2);
+        expect(durationBox.y).toBeGreaterThanOrEqual(optionsBox.y + optionsBox.height);
+    }).toPass();
     const metadata = duration.locator('..');
     await expect(metadata).toContainText('Start 7:12 AM');
     await expect(metadata).toContainText('End 9:05 AM');

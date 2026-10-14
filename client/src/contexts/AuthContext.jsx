@@ -7,6 +7,7 @@ import { isNetworkError } from '../utils/networkErrors';
 import { subscribeConnectivity } from '../offline/connectivity';
 import { clearPersistedQueryCache } from '../offline/queryPersistence';
 import { clearUserSnapshot, loadUserSnapshot } from '../offline/userSnapshot';
+import { clearQuickSessionDraftsForUser } from '../offline/quickSessionDraft';
 import { trackEvent } from '../utils/telemetry';
 import notify from '../utils/notify';
 import { logError } from '../utils/logger';
@@ -203,6 +204,7 @@ export function AuthProvider({ children }) {
         clearAccessToken();
         void clearPersistedQueryCache(userIdRef.current);
         void clearUserSnapshot();
+        void clearQuickSessionDraftsForUser(userIdRef.current);
         setOfflineBoot(false);
         replaceUser(null);
     };

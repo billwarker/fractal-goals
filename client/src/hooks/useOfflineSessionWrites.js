@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 import { useOutbox } from '../offline/OutboxContext';
-import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
+import { SESSION_OP } from '../offline/opKinds';
 import {
     activeWorkConflictError,
     buildInstanceUpdateRequest,
@@ -73,9 +73,10 @@ export function useOfflineSessionWrites({
                 coalesceKey: options.coalesceKey || null,
                 entityIds: options.entityIds || [],
                 creates: options.creates || [],
+                supersedes: options.supersedes || [],
                 meta: { rootId, sessionId, ...meta },
             };
-            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
+            return outbox.submit(op);
         };
 
         const updateInstance = async (instanceId, updates) => {
@@ -154,7 +155,7 @@ export function useOfflineSessionWrites({
                 SESSION_OP.ACTIVITY_REMOVE,
                 { method: 'delete', url: `/${rootId}/sessions/${sessionId}/activities/${instanceId}` },
                 { instanceId },
-                { entityIds: [instanceId] },
+                { entityIds: [instanceId], supersedes: [instanceId] },
             );
         };
 

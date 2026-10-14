@@ -3,9 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isOnline } from '../offline/connectivity';
 import { useOutbox } from '../offline/OutboxContext';
-import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
-import { buildPlaceholderRound, buildPlaceholderRun } from '../offline/circuitOps';
-import { activeWorkConflictError, findRunningInstance, nowIso } from '../offline/sessionOps';
+import { SESSION_OP } from '../offline/opKinds';
+
+// Circuit placeholder builders load with the first offline circuit action, not with every route.
+const loadCircuitOps = () => import('../offline/circuitOps');
+const loadSessionOps = () => import('../offline/sessionOps');
+const nowIso = () => new Date().toISOString();
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { refreshCircuitSessionConsumers, updateCircuitRunCache } from './circuitQueryCache';
@@ -134,10 +137,11 @@ function useOfflineCircuitActions(rootId, sessionId) {
         const findRun = (runId) => (queryClient.getQueryData(runsKey) || []).find?.((run) => run.id === runId) || null;
         const enqueue = (kind, request, meta, options) => {
             const op = { scope: sessionId, kind, ...request, ...options, meta: { rootId, sessionId, ...meta } };
-            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
+            return outbox.submit(op);
         };
 
-        const assertCanStart = (runId) => {
+        const assertCanStart = async (runId) => {
+            const { activeWorkConflictError, findRunningInstance } = await loadSessionOps();
             const session = queryClient.getQueryData(queryKeys.session(rootId, sessionId));
             if (session?.is_paused) throw new Error('Resume the session before starting a circuit');
             const runs = queryClient.getQueryData(runsKey) || [];
@@ -149,11 +153,17 @@ function useOfflineCircuitActions(rootId, sessionId) {
         };
 
         const saveMemberMetrics = async ({ runId, memberId, metrics }) => {
+            // Include the member's round so removing that round drops this queued edit.
+            const roundId = (findRun(runId)?.rounds || [])
+                .find((round) => (round.members || []).some((member) => member.id === memberId))?.id;
             await enqueue(
                 SESSION_OP.CIRCUIT_MEMBER,
                 { method: 'patch', url: `/${rootId}/circuit-runs/${runId}/members/${memberId}/metrics`, body: { metrics } },
                 { runId, memberId, metrics },
-                { entityIds: [runId, memberId], coalesceKey: `circuit-member:${memberId}` },
+                {
+                    entityIds: [runId, memberId, ...(roundId ? [roundId] : [])],
+                    coalesceKey: `circuit-member:${memberId}`,
+                },
             );
             return { data: null };
         };
@@ -166,7 +176,7 @@ function useOfflineCircuitActions(rootId, sessionId) {
                 case 'resetRun':
                 case 'deleteRun':
                 case 'updateRunTiming': {
-                    if (action === 'startRun') assertCanStart(runId);
+                    if (action === 'startRun') await assertCanStart(runId);
                     const occurredAt = nowIso();
                     const request = {
                         startRun: { method: 'post', url: `${base}/start`, body: { occurred_at: occurredAt } },
@@ -175,12 +185,16 @@ function useOfflineCircuitActions(rootId, sessionId) {
                         updateRunTiming: { method: 'patch', url: `${base}/timing`, body: value },
                         deleteRun: { method: 'delete', url: base },
                     }[action];
-                    await enqueue(SESSION_OP.CIRCUIT_RUN, request, { runId, action, occurredAt, value }, { entityIds: [runId] });
+                    await enqueue(SESSION_OP.CIRCUIT_RUN, request, { runId, action, occurredAt, value }, {
+                        entityIds: [runId],
+                        ...(action === 'deleteRun' ? { supersedes: [runId] } : {}),
+                    });
                     return { data: null };
                 }
                 case 'addRound': {
                     const run = findRun(runId);
                     if (!run) throw new Error('Circuit not found');
+                    const { buildPlaceholderRound, placeholderCircuitInstances } = await loadCircuitOps();
                     const newRoundId = crypto.randomUUID();
                     const round = await buildPlaceholderRound(run.slots || [], {
                         roundId: newRoundId,
@@ -190,7 +204,7 @@ function useOfflineCircuitActions(rootId, sessionId) {
                     await enqueue(
                         SESSION_OP.CIRCUIT_ROUND_ADD,
                         { method: 'post', url: `${base}/rounds`, body: { round_id: newRoundId } },
-                        { runId, round },
+                        { runId, round, instances: placeholderCircuitInstances(run, { sessionId, rootId, rounds: [round] }) },
                         { entityIds: [runId], creates: roundIds(round) },
                     );
                     return { data: null };
@@ -200,7 +214,7 @@ function useOfflineCircuitActions(rootId, sessionId) {
                         SESSION_OP.CIRCUIT_ROUND_REMOVE,
                         { method: 'delete', url: `${base}/rounds/${roundId}` },
                         { runId, roundId },
-                        { entityIds: [runId, roundId] },
+                        { entityIds: [runId, roundId], supersedes: [roundId] },
                     );
                     return { data: null };
                 case 'updateMemberMetrics':
@@ -278,6 +292,7 @@ export function useCreateCircuitRun(rootId, sessionId) {
             if (outbox) await outbox.whenDrained(sessionId);
             return direct.mutateAsync(variables);
         }
+        const { buildPlaceholderRun, placeholderCircuitInstances } = await loadCircuitOps();
         const runId = crypto.randomUUID();
         const placeholder = await buildPlaceholderRun(definition, { runId, sessionId, rootId });
         const op = {
@@ -297,11 +312,12 @@ export function useCreateCircuitRun(rootId, sessionId) {
                 sessionId,
                 runId,
                 placeholder,
+                instances: placeholderCircuitInstances(placeholder, { sessionId, rootId }),
                 sectionIndex: variables.sectionIndex ?? 0,
                 itemIndex: Number.isInteger(variables.itemIndex) ? variables.itemIndex : null,
             },
         };
-        await outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
+        await outbox.submit(op);
         return { data: placeholder };
     }, [direct, outbox, queryClient, rootId, sessionId]);
 

@@ -57,6 +57,12 @@ FEATURE_FLAG_DEFINITIONS: dict[str, JsonDict] = {
         "description": "Allows the embedded assistant to use the configured Anthropic API account.",
         "default_enabled": False,
     },
+    "offline_service_worker_disabled": {
+        "key": "offline_service_worker_disabled",
+        "label": "Disable offline app shell",
+        "description": "Kill switch: unregisters the offline service worker and clears its caches on every device at next load.",
+        "default_enabled": False,
+    },
 }
 
 

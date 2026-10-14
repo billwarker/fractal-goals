@@ -332,8 +332,14 @@ class CircuitService:
         if storage_error:
             return None, storage_error, storage_status
         client_run_id = data.get("id")
-        if client_run_id and self.db_session.get(CircuitRun, client_run_id) is not None:
-            return None, "A circuit run with this id already exists", 409
+        existing_run = self.db_session.get(CircuitRun, client_run_id) if client_run_id else None
+        if existing_run is not None:
+            # A replayed offline create finds its own run: the same request succeeded earlier.
+            if (existing_run.root_id, existing_run.session_id, existing_run.circuit_definition_id) != (
+                root_id, session_id, definition.id,
+            ):
+                return None, "A circuit run with this id already exists", 409
+            return serialize_circuit_run(self._run(root_id, existing_run.id)), None, 200
         run = CircuitRun(
             **({'id': client_run_id} if client_run_id else {}),
             root_id=root_id,

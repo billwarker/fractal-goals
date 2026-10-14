@@ -17,6 +17,7 @@ def test_feature_flags_default_off_and_persisted(db_session):
         "ai_agent_embedded": False,
         "ai_agent_embedded_openai": False,
         "ai_agent_embedded_anthropic": False,
+        "offline_service_worker_disabled": False,
     }
     assert [item["key"] for item in payload["definitions"]] == [
         "onboarding_v1",
@@ -27,6 +28,7 @@ def test_feature_flags_default_off_and_persisted(db_session):
         "ai_agent_embedded",
         "ai_agent_embedded_openai",
         "ai_agent_embedded_anthropic",
+        "offline_service_worker_disabled",
     ]
 
     updated, error, status = service.update_flags({"analytics_sql_explorer": True})

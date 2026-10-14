@@ -12,6 +12,36 @@ sessions, app-wide sync status, offline sign-in, telemetry).
 
 Recommendations are not implemented in this document.
 
+## Addendum — remediation (2026-10-14): **S+ (98/100)**
+
+Every finding below is closed. Each fix has a test that fails if it regresses. Plan:
+[offline-sessions-s-plus-remediation-2026-10.md](offline-sessions-s-plus-remediation-2026-10.md).
+
+| Finding | Resolution | Evidence |
+|---|---|---|
+| H1 stuck queue | Retry ceiling counts only server-answered failures (8 attempts or 24 h), then marks the op `retry_exhausted` for review; offline waits forever | Outbox unit tests; Playwright: a forced-500 start is set aside and the later change syncs |
+| H2 replayed creates | Activity, note, quick session, circuit run and round return the existing record with 200 when it matches the request; 409 only for a foreign collision | Integration tests per path (the old activity 500 is covered) |
+| M1 no kill switch | Admin flag `offline_service_worker_disabled` unregisters the worker and clears its caches, reloading once; offline flag failures never unregister | Unit test; Playwright kill-switch spec |
+| M2 updates withheld | Only pending ops block the update prompt; rejected ops expire after 7 days with a notice and `offline_ops_expired` telemetry | Unit tests |
+| M3 unqueued edits | Instance/set tag edits (last-write-wins, latest list coalesced) and goal links (link+unlink cancel) are queued; tag routes `@idempotent` | Unit tests; Playwright offline tag spec |
+| M4 clock skew | Client median offset from response `Date` headers (round trip ≤2 s, ≥2 s to apply), applied to `occurred_at` at send | Unit tests |
+| M5 storage growth | Hourly global purge of expired records, also run by the admin prune; responses over 64 KB stored as status only | Integration tests |
+| M6 circuit instances | Offline circuits and rounds also create their member/slot activity instances, with derived IDs | Unit tests |
+| M7 >24 h timing | `occurred_at` window raised to 7 days; floor/now clamps unchanged | Integration test (3 days accepted, 8 days rejected) |
+| L1 logout | Sign-out deletes quick drafts; the warning can also discard the queued changes | Unit tests |
+| L2/L5 contracts | `serverContract.json` recorded from real responses (freshness test); placeholders must match exactly, patches write only contract fields; the cache version is a build-time hash of the contract | Contract tests (this caught two real drifts: instance `root_id`, ten missing note fields) |
+| L3 ordering | `seq` assigned inside the cross-tab lock from the store | Two-tab unit test |
+| L4 edit after delete | Deletes supersede queued edits; create + delete offline sends nothing | Unit tests; Playwright: the add+delete pair never reaches the server |
+| L6 flakes | Mobile layout checks wait for the sheet to settle; the perf test uses best-of-three timing | Repeated runs |
+
+**Found during remediation:**
+- **Code-splitting the engine:** the offline engine was in every route's initial bundle, including the public landing page. It now loads on demand: optimistic patches live in the outbox's handler registry, and hooks import only dependency-free op kinds. Every route's initial JS is now about 5–6 KiB gzip smaller than before remediation; Analytics is 313.1, back under its 320 KiB budget.
+- **Tag-extension gap:** an assignment made right after extending a catalog tag lost its tag object; it now carries the new binding.
+
+Remaining two points: there is no automated real-device test (manual airplane-mode checks only), and two devices editing the same session offline are not merged (deliberate).
+
+---
+
 ## Verdict: **A− (88/100)**
 
 The architecture is right, and the main paths have strong evidence behind them:

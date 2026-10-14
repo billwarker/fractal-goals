@@ -11,6 +11,31 @@ import { isNetworkError } from '../utils/networkErrors';
 const PROBE_MIN_DELAY_MS = 2000;
 const PROBE_MAX_DELAY_MS = 30000;
 
+// Phone clocks drift. Each API response's Date header gives the server's time, so
+// the median gap tells how far this device is off; queued action times are
+// shifted by it when sent. Date has 1 s resolution, so small gaps are ignored.
+const CLOCK_SAMPLE_LIMIT = 15;
+const CLOCK_MAX_ROUND_TRIP_MS = 2000;
+const CLOCK_MIN_CORRECTION_MS = 2000;
+let clockSamples = [];
+
+export function recordClockSample({ sentAt, receivedAt, serverDate }) {
+    const serverTime = Date.parse(serverDate);
+    const roundTrip = receivedAt - sentAt;
+    if (Number.isNaN(serverTime) || !(roundTrip >= 0) || roundTrip > CLOCK_MAX_ROUND_TRIP_MS) return;
+    // Date truncates to the second: its midpoint is the best estimate.
+    const offset = (serverTime + 500) - (sentAt + roundTrip / 2);
+    clockSamples = [...clockSamples, offset].slice(-CLOCK_SAMPLE_LIMIT);
+}
+
+/** Milliseconds to add to this device's clock to match the server; 0 when within noise. */
+export function getClockOffsetMs() {
+    if (clockSamples.length < 3) return 0;
+    const sorted = [...clockSamples].sort((left, right) => left - right);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    return Math.abs(median) >= CLOCK_MIN_CORRECTION_MS ? Math.round(median) : 0;
+}
+
 const listeners = new Set();
 let online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
 let probeTimer = null;
@@ -87,9 +112,17 @@ export function installConnectivity() {
         if (document.visibilityState === 'visible') checkConnectivity();
     });
 
+    axios.interceptors.request.use((config) => {
+        config._sentAt = Date.now();
+        return config;
+    });
     axios.interceptors.response.use(
         (response) => {
             reportRequestSucceeded();
+            const serverDate = response.headers?.date;
+            if (serverDate && response.config?._sentAt) {
+                recordClockSample({ sentAt: response.config._sentAt, receivedAt: Date.now(), serverDate });
+            }
             return response;
         },
         (error) => {
@@ -111,6 +144,7 @@ export function resetConnectivityForTests({ initialOnline = true } = {}) {
     probeTimer = null;
     probeDelay = PROBE_MIN_DELAY_MS;
     online = initialOnline;
+    clockSamples = [];
     listeners.clear();
     installed = false;
 }

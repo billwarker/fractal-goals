@@ -1,4 +1,6 @@
 import { useIsMutating, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useOutbox } from '../offline/OutboxContext';
+import { SESSION_OP } from '../offline/opKinds';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
@@ -34,5 +36,27 @@ export default function useActivityInstanceGoalAssociation(rootId, sessionId, in
             await invalidateInstanceGoalQueries(queryClient, rootId, sessionId);
         },
     });
-    return { ...mutation, isPending: mutation.isPending || pendingCount > 0 };
+    const outbox = useOutbox();
+    if (!outbox || !sessionId) return { ...mutation, isPending: mutation.isPending || pendingCount > 0 };
+
+    // Queued: a link then an unlink made offline (or the reverse) cancel out before sending.
+    const mutateAsync = async ({ goalId, remove }) => {
+        const linkKey = `goal-link:${instanceId}:${goalId}`;
+        const unlinkKey = `goal-unlink:${instanceId}:${goalId}`;
+        await outbox.submit({
+            scope: sessionId,
+            kind: SESSION_OP.INSTANCE_GOAL_LINK,
+            method: remove ? 'delete' : 'post',
+            url: remove
+                ? `/${rootId}/activity-instances/${instanceId}/goals/${goalId}`
+                : `/${rootId}/activity-instances/${instanceId}/goals`,
+            body: remove ? null : { goal_id: goalId },
+            entityIds: [instanceId],
+            creates: [remove ? unlinkKey : linkKey],
+            supersedes: [remove ? linkKey : unlinkKey],
+            meta: { rootId, sessionId, instanceId, goalId, remove: Boolean(remove) },
+        });
+        return null;
+    };
+    return { ...mutation, mutateAsync, mutate: (variables) => void mutateAsync(variables), isPending: false };
 }

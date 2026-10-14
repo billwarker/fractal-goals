@@ -5,7 +5,9 @@ vi.mock('../../utils/api/globalApi', () => ({ globalApi: { probeHealth } }));
 
 import {
     checkConnectivity,
+    getClockOffsetMs,
     isOnline,
+    recordClockSample,
     reportRequestFailed,
     reportRequestSucceeded,
     resetConnectivityForTests,
@@ -74,5 +76,31 @@ describe('connectivity', () => {
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         expect(isOnline()).toBe(true);
+    });
+});
+
+describe('clock offset', () => {
+    beforeEach(() => resetConnectivityForTests());
+
+    const sample = (deviceAheadMs, roundTrip = 100) => {
+        const sentAt = 1_000_000;
+        const truth = sentAt + roundTrip / 2 - deviceAheadMs;
+        recordClockSample({
+            sentAt,
+            receivedAt: sentAt + roundTrip,
+            serverDate: new Date(Math.floor(truth / 1000) * 1000).toUTCString(),
+        });
+    };
+
+    it('measures how far the device clock is off from the server', () => {
+        [0, 1, 2].forEach(() => sample(90_000));
+        expect(Math.abs(getClockOffsetMs() + 90_000)).toBeLessThan(1000);
+    });
+
+    it('ignores slow round trips and noise under two seconds', () => {
+        [0, 1, 2].forEach(() => sample(500));
+        expect(getClockOffsetMs()).toBe(0);
+        [0, 1, 2, 3].forEach(() => sample(-60_000, 5000));
+        expect(getClockOffsetMs()).toBe(0);
     });
 });

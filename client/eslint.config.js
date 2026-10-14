@@ -18,6 +18,8 @@ export default defineConfig([
       globals: {
         ...globals.browser,
         ...globals.node,
+        // Build-time constant injected by Vite's define (scripts/offline-cache-version.mjs).
+        __OFFLINE_CACHE_VERSION__: 'readonly',
         describe: 'readonly',
         it: 'readonly',
         expect: 'readonly',

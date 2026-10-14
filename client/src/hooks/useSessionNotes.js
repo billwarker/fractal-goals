@@ -8,8 +8,7 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutbox } from '../offline/OutboxContext';
-import { SESSION_OP, applyOptimistic } from '../offline/sessionOpHandlers';
-import { nowIso } from '../offline/sessionOps';
+import { SESSION_OP } from '../offline/opKinds';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
@@ -36,28 +35,17 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                 ...options,
                 meta: { rootId, sessionId, ...meta },
             };
-            return outbox.submit({ ...op, onPersisted: (saved) => applyOptimistic(queryClient, saved) });
+            return outbox.submit(op);
         };
         return {
             addNote: async (data) => {
                 const id = crypto.randomUUID();
-                const at = nowIso();
-                const note = {
+                const { buildPlaceholderNote } = await import('../offline/sessionOps');
+                const note = buildPlaceholderNote({
                     id,
-                    root_id: rootId,
-                    context_type: data.context_type,
-                    context_id: data.context_id,
-                    session_id: data.session_id || sessionId,
-                    activity_instance_id: data.activity_instance_id || null,
-                    activity_definition_id: data.activity_definition_id || null,
-                    activity_set_id: data.activity_set_id || null,
-                    goal_id: data.goal_id || null,
-                    content: data.content,
-                    pinned_at: null,
-                    created_at: at,
-                    updated_at: at,
-                    _pendingSync: true,
-                };
+                    data: { ...data, session_id: data.session_id || sessionId },
+                    session: queryClient.getQueryData(queryKeys.session(rootId, sessionId)) || null,
+                });
                 await enqueue(
                     SESSION_OP.NOTE_CREATE,
                     { method: 'post', url: `/${rootId}/notes`, body: { ...data, id } },
@@ -80,7 +68,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                     SESSION_OP.NOTE_DELETE,
                     { method: 'delete', url: `/${rootId}/notes/${noteId}` },
                     { noteId },
-                    { entityIds: [noteId] },
+                    { entityIds: [noteId], supersedes: [noteId] },
                 );
             },
         };

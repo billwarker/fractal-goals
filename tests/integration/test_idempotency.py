@@ -161,3 +161,47 @@ class TestIdempotentWrites:
 
         db_session.expire_all()
         assert db_session.get(IdempotencyRecord, (test_user.id, 'old')) is None
+
+    def test_expired_records_of_every_user_are_purged_hourly(
+        self, client, auth_headers, db_session, test_user, sample_practice_session, sample_activity_definition,
+    ):
+        from blueprints import idempotency
+        from models import User
+
+        other = User(id=str(uuid4()), username=f'other-{uuid4().hex[:8]}', email=f'{uuid4().hex[:8]}@example.com')
+        other.set_password('Password123!')
+        db_session.add(other)
+        db_session.add(IdempotencyRecord(
+            user_id=other.id, key='stale', method='POST', path='/x',
+            request_hash='0' * 64, status='done', created_at=utc_now() - timedelta(days=30),
+        ))
+        db_session.commit()
+        idempotency._last_global_purge = None
+
+        client.post(
+            self._add_url(sample_practice_session),
+            data=json.dumps({'activity_definition_id': sample_activity_definition.id}),
+            headers=_keyed(auth_headers, str(uuid4())),
+        )
+
+        db_session.expire_all()
+        assert db_session.get(IdempotencyRecord, (other.id, 'stale')) is None
+
+    def test_large_responses_are_stored_as_status_only(
+        self, client, auth_headers, db_session, monkeypatch, sample_practice_session, sample_activity_definition,
+    ):
+        from blueprints import idempotency
+
+        monkeypatch.setattr(idempotency, 'MAX_STORED_BODY_BYTES', 10)
+        url = self._add_url(sample_practice_session)
+        body = json.dumps({'activity_definition_id': sample_activity_definition.id})
+        headers = _keyed(auth_headers, str(uuid4()))
+
+        first = client.post(url, data=body, headers=headers)
+        replay = client.post(url, data=body, headers=headers)
+
+        assert first.status_code == 201
+        assert replay.status_code == 201
+        assert replay.get_json() == {'replayed': True}
+        assert _instance_count(db_session, sample_practice_session.id) == 1
+

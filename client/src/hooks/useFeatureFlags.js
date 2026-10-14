@@ -12,6 +12,7 @@ export const FEATURE_FLAGS = {
     aiAgentEmbedded: 'ai_agent_embedded',
     aiAgentEmbeddedOpenAI: 'ai_agent_embedded_openai',
     aiAgentEmbeddedAnthropic: 'ai_agent_embedded_anthropic',
+    offlineServiceWorkerDisabled: 'offline_service_worker_disabled',
 };
 
 const DEFAULT_FLAGS = {
@@ -23,6 +24,7 @@ const DEFAULT_FLAGS = {
     [FEATURE_FLAGS.aiAgentEmbedded]: false,
     [FEATURE_FLAGS.aiAgentEmbeddedOpenAI]: false,
     [FEATURE_FLAGS.aiAgentEmbeddedAnthropic]: false,
+    [FEATURE_FLAGS.offlineServiceWorkerDisabled]: false,
 };
 
 export function normalizeFeatureFlags(flags) {
@@ -46,6 +48,7 @@ export function useFeatureFlags({ enabled = true } = {}) {
     return {
         flags: normalizeFeatureFlags(query.data),
         isLoading: query.isLoading,
+        isSuccess: query.isSuccess,
         error: query.error,
     };
 }

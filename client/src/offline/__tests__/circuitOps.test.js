@@ -8,6 +8,7 @@ import {
     buildPlaceholderRound,
     buildPlaceholderRun,
     cascadeMemberMetric,
+    placeholderCircuitInstances,
     removeRoundFromRun,
 } from '../circuitOps';
 
@@ -54,6 +55,24 @@ describe('buildPlaceholderRun', () => {
             activity_set_id: null,
             activity_instance_id: await circuitIds.roundMemberInstanceId(round.id, burpee.id),
         });
+    });
+});
+
+describe('placeholderCircuitInstances', () => {
+    it('creates the slot and member instances the server will create, with matching ids', async () => {
+        const run = await buildPlaceholderRun(definition, { runId, sessionId: 's', rootId: 'r' });
+        const instances = placeholderCircuitInstances(run, { sessionId: 's', rootId: 'r' });
+        const [squat, burpee] = run.slots;
+        const [round] = run.rounds;
+
+        expect(instances.map((instance) => instance.id)).toEqual([
+            squat.activity_instance_id,
+            round.members.find((member) => member.circuit_run_slot_id === burpee.id).activity_instance_id,
+        ]);
+        expect(instances[1]).toMatchObject({ name: 'Burpee', session_id: 's', activity_definition_id: 'burpee' });
+
+        const next = await buildPlaceholderRound(run.slots, { roundId: '9b2d4f60-1a3c-4e5f-8a7b-2c3d4e5f6a7b', roundNumber: 2 });
+        expect(placeholderCircuitInstances(run, { sessionId: 's', rootId: 'r', rounds: [next] })).toHaveLength(1);
     });
 });
 
