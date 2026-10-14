@@ -165,6 +165,13 @@ start/complete and completion writes accept `occurred_at` (the user's action tim
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
 
+Session Detail's main mobile workspace uses full-width hierarchy bands with depth-independent
+insets, three-column name/value/unit rows with progress hints underneath, and one mobile
+Start/Stop/Duration row; circuit names align left and selection perimeters paint above
+descendant backgrounds.
+The page's `data-session-detail-content` boundary scopes the shared component styles.
+See [Mobile session hierarchy](planning/ui-contracts-reference.md#session-detail-mobile-hierarchy).
+
 ### Programs
 
 Programs contain dated blocks and reusable program-day definitions. The complete domain and UI

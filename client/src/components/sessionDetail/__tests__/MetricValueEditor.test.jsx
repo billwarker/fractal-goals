@@ -7,6 +7,27 @@ import useMetricDrafts from '../useMetricDrafts';
 
 
 describe('MetricValueEditor draft performance', () => {
+    it.each([{ predefinedValues: [] }, { predefinedValues: ['10', '20'] }])('keeps metric names and units accessible for filled and empty fields (%j)', ({ predefinedValues }) => {
+        const onCommit = vi.fn();
+        const { rerender } = render(<MetricValueEditor
+            metricDef={{ name: 'Hold Time', unit: 'Seconds', input_type: 'number', precision: 0, predefined_values: predefinedValues }}
+            value={10}
+            onDraftChange={vi.fn()}
+            onCommit={onCommit}
+        />);
+        const field = screen.getByRole(predefinedValues.length ? 'combobox' : 'textbox', { name: 'Hold Time' });
+        expect(field).toHaveValue('10');
+        expect(field).toHaveAccessibleDescription('Seconds');
+        rerender(<MetricValueEditor
+            metricDef={{ name: 'Hold Time', unit: 'Seconds', input_type: 'number', precision: 0, predefined_values: predefinedValues }}
+            value=""
+            onDraftChange={vi.fn()}
+            onCommit={onCommit}
+        />);
+        expect(field).toHaveValue('');
+        expect(onCommit).not.toHaveBeenCalled();
+    });
+
     it.each([false, true])('updates existing values when format changes (readOnly=%s)', (readOnly) => {
         const onCommit = vi.fn();
         const props = { value: 12.75, readOnly, onDraftChange: vi.fn(), onCommit };

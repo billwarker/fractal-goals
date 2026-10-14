@@ -122,7 +122,7 @@
     width: 100%;
 }
 
-.memberHeader > :last-child {
+.memberHeader > :nth-child(2) {
     align-items: center;
 }
 
@@ -158,6 +158,8 @@
     min-width: 0;
 }
 
+/* Keep the desktop input / metadata / cascade order. On mobile the editor's
+   value action stays inside the value cell and metadata joins the outer grid. */
 .memberMetricControl {
     display: flex;
     align-items: center;
@@ -165,11 +167,57 @@
     min-width: 0;
 }
 
+.memberMetricControl > span {
+    order: 1;
+}
+
+.memberMetricControl button {
+    order: 2;
+}
+
 .memberMetricError {
     grid-column: 1 / -1;
     margin: 0;
     color: var(--color-brand-danger);
     font-size: var(--font-size-xs);
+}
+
+@media (max-width: 768px) {
+    :global([data-session-detail-content]) .round,
+    :global([data-session-detail-content]) .memberCard {
+        padding-inline: 0;
+    }
+
+    :global([data-session-detail-content]) .roundHeader {
+        padding-inline: 8px;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .roundIdentity {
+        overflow-wrap: anywhere;
+    }
+
+    :global([data-session-detail-content]) .roundActions {
+        flex-wrap: wrap;
+    }
+
+    :global([data-session-detail-content]) .memberHeader > :first-child {
+        padding-right: 0;
+    }
+
+    :global([data-session-detail-content]) .memberHeader > :nth-child(2) {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    :global([data-session-detail-content]) .memberMetrics {
+        margin-inline: 0;
+    }
+
+    :global([data-session-detail-content]) .memberScopeControl,
+    :global([data-session-detail-content]) .error {
+        padding-inline: 8px;
+    }
 }
 
 .notesSection {
@@ -191,6 +239,10 @@
 }
 
 @container (max-width: 760px) {
+    :global([data-session-detail-content]) .memberMetricControl {
+        display: contents;
+    }
+
     .cardHeader {
         flex-direction: column;
     }
@@ -220,13 +272,13 @@
         gap: 4px;
     }
 
-    .memberHeader > :last-child {
+    .memberHeader > :nth-child(2) {
         width: auto;
         min-width: 58px;
         justify-self: end;
     }
 
-    .memberHeader > :last-child > * {
+    .memberHeader > :nth-child(2) > * {
         width: auto;
         max-width: 100%;
     }

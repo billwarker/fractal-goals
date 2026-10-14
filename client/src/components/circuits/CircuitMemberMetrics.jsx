@@ -152,19 +152,19 @@ export default function CircuitMemberMetrics({
                         )}
                         disabled={disabled || saving}
                         inputId={inputId}
+                        valueAction={showCascade ? (
+                            <MetricCascadeButton
+                                value={currentValue}
+                                unit={metric.unit}
+                                destinationLabel="rounds"
+                                onClick={() => onCascade(metric.id, split?.id || null)}
+                            />
+                        ) : null}
                         onDraftChange={(value) => {
                             draftsRef.current[key] = value;
                         }}
                         onCommit={(value) => commit(metric, split?.id || null, value)}
                     />
-                    {showCascade && (
-                        <MetricCascadeButton
-                            value={currentValue}
-                            unit={metric.unit}
-                            destinationLabel="rounds"
-                            onClick={() => onCascade(metric.id, split?.id || null)}
-                        />
-                    )}
                 </div>
             </div>
         );

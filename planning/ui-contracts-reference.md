@@ -52,6 +52,34 @@ contained within the calendar and vertical scrolling owned by the modal/panel bo
 snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
 See [Goal Timeline](goal-activity-heatmap.md).
 
+## Session Detail mobile hierarchy
+
+At viewport widths up to 768px, Session Detail's main workspace has one 12px page gutter.
+Sections retain their outer surface. Activity/circuit, round, member, set, and split containers
+use shared horizontal edges, background bands, and horizontal separators rather than cumulative
+padding or nested rounded boxes. Only leaf headings, timers, notes, and metric/set rows have an
+8px inset; adding a structural level must not reduce descendants' usable width.
+
+Mobile metric rows use three columns: name, value field, and unit. All three align vertically
+on the same row; long names/units wrap within their columns. Inputs retain accessible metric
+names and units and a minimum 96px width. Progress and planned values occupy a wrapping
+full-width supporting row underneath; empty hint rows do not take space.
+On mobile, cascade actions sit below the hint row without moving the name/value/unit alignment.
+Desktop keeps its existing action grouping. Circuit member identity blocks stay
+left-aligned whether or not right-side tag/goal controls are present.
+Delete-button space is reserved only beside the item title;
+timers below it use the full content width. Start, Stop, and Duration occupy one mobile row,
+with equal timestamp columns and a narrower duration column (minimum 64px). Controls are 36px
+high and actions remain on the row below. Timestamp inputs preserve their full values and scroll
+horizontally while editing; their titles expose the full timestamps. Selection uses a pointer-transparent perimeter
+overlay painted above child backgrounds, so full-width metrics cannot obscure its side edges.
+
+The contract is scoped by `data-session-detail-content` on the main workspace. Desktop and
+shared components outside that workspace retain their existing layout. The compact metric grid
+also applies within the existing 760px container breakpoint in narrow desktop panes; desktop
+container spacing remains unchanged. Browser regression
+coverage lives in `client/e2e/session-detail-width.spec.js`.
+
 ## Session Detail one-off goal links
 
 Session Detail captures its goal-icon scope when opening create/copy definition drafts; copied

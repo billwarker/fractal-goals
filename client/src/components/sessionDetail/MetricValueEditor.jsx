@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useId, useMemo, useRef } from 'react';
 
 import {
     formatAllowedMetricValueLabel,
@@ -19,6 +19,7 @@ export default function MetricValueEditor({
     onDraftChange,
     onCommit,
     progress = null,
+    valueAction = null,
     isDraft = false,
     disabled = false,
     readOnly = false,
@@ -29,6 +30,7 @@ export default function MetricValueEditor({
     const allowedValues = useMemo(() => getAllowedMetricValues(metricDef), [metricDef]);
     const formattedValue = isDraft ? String(value ?? '') : formatMetricValueForInput(metricDef, value);
     const inputRef = useRef(null);
+    const unitId = useId();
     const selectedAllowedValue = allowedValues.length > 0
         ? normalizeMetricValueForStorage(metricDef, value)
         : null;
@@ -41,11 +43,12 @@ export default function MetricValueEditor({
 
     return (
         <>
-            <div className={styles.metricValueControl}>
+            <div className={`${styles.metricValueControl} ${valueAction ? styles.metricValueWithAction : ''}`}>
                 {allowedValues.length > 0 ? (
                     <select
                         id={inputId}
-                        aria-label={ariaLabel}
+                        aria-label={ariaLabel || metricDef.name}
+                        aria-describedby={unitId}
                         className={`${inputClassName} ${styles.metricSelect}`}
                         value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
                         disabled={disabled || readOnly}
@@ -68,7 +71,8 @@ export default function MetricValueEditor({
                         {...(placeholder != null ? { placeholder } : {})}
                         ref={inputRef}
                         id={inputId}
-                        aria-label={ariaLabel}
+                        aria-label={ariaLabel || metricDef.name}
+                        aria-describedby={unitId}
                         className={inputClassName}
                         defaultValue={formattedValue}
                         disabled={disabled}
@@ -91,10 +95,11 @@ export default function MetricValueEditor({
                         }}
                     />
                 )}
+                {valueAction}
             </div>
             <span className={metaClassName}>
-                <span className={unitClassName}>{metricDef.unit}</span>
-                {progress}
+                <span id={unitId} className={unitClassName}>{metricDef.unit}</span>
+                <span className={styles.metricHints}>{progress}</span>
             </span>
         </>
     );

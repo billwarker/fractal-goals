@@ -171,7 +171,7 @@ function SessionDetailContent() {
     if (isQuickSession(session)) {
         return (
             <div className={styles.sessionDetailContainer}>
-                <div className={styles.sessionMainContent}>
+                <div className={styles.sessionMainContent} data-session-detail-content>
                     <QuickSessionWorkspace onOpenActivityBuilder={handleOpenActivityBuilder} />
                 </div>
 
@@ -228,7 +228,7 @@ function SessionDetailContent() {
 
     return (
         <div className={styles.sessionDetailContainer}>
-            <div className={styles.sessionMainContent}>
+            <div className={styles.sessionMainContent} data-session-detail-content>
                 <div className={styles.sessionSectionsList}>
                     {localSessionData.sections?.map((section, sectionIndex) => (
                         <SessionSection

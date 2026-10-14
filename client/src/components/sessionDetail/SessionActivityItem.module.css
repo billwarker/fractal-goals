@@ -765,6 +765,10 @@
     min-width: 0;
 }
 
+.metricValueWithAction {
+    display: contents;
+}
+
 .metricSelect {
     cursor: pointer;
 }
@@ -831,9 +835,14 @@
     min-width: 0;
 }
 
+.metricHints {
+    display: contents;
+}
+
 .metricMetaLarge {
     gap: 14px;
 }
+
 
 .metricUnitLarge {
     font-size: 13px;
@@ -1247,4 +1256,253 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+/* Session Detail's mobile hierarchy uses bands, rather than cumulative insets.
+   Scope to the workspace: these primitives also render in other features. */
+@media (max-width: 768px) {
+    :global([data-session-detail-content]) .activityCard {
+        min-width: 0;
+        padding: 12px 0;
+        border-width: 1px 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    :global([data-session-detail-content]) .activityCardSelected,
+    :global([data-session-detail-content]) .setRowSelected {
+        background: color-mix(in srgb, var(--color-brand-success) 10%, var(--color-bg-card-alt));
+        box-shadow: none;
+    }
+
+    /* Paint above descendant backgrounds so full-width children cannot cover
+       the selected container's perimeter. The overlay never intercepts input. */
+    :global([data-session-detail-content]) .activityCardSelected::after,
+    :global([data-session-detail-content]) .setRowSelected::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        box-shadow: inset 0 0 0 1px var(--color-brand-success);
+        pointer-events: none;
+    }
+
+    :global([data-session-detail-content]) .activityHeader {
+        padding-inline: 8px;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .activityHeaderLeft {
+        padding-right: 30px;
+    }
+
+    :global([data-session-detail-content]) .activityHeaderRight {
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .timerMetaColumn {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(64px, 0.6fr);
+        align-items: start;
+        gap: 8px;
+    }
+
+    :global([data-session-detail-content]) .timerFieldContainer > .timerLabel {
+        min-height: 14px;
+    }
+
+    :global([data-session-detail-content]) .timerInput,
+    :global([data-session-detail-content]) .durationDisplay {
+        height: 36px;
+        min-height: 36px;
+    }
+
+    :global([data-session-detail-content]) .timerValidationError,
+    :global([data-session-detail-content]) .timerModeHint {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    :global([data-session-detail-content]) .contentArea {
+        padding: 0;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .setRow {
+        position: relative;
+        padding: 8px;
+        border-width: 1px 0;
+        border-radius: 0;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .setNumber {
+        width: auto;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .splitContainer,
+    :global([data-session-detail-content]) .singleMetricGroup {
+        padding-inline: 0;
+        border-width: 1px 0;
+        border-radius: 0;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .singleMetricGroup {
+        padding-inline: 8px;
+    }
+
+    :global([data-session-detail-content]) .singleMetricsContainer {
+        padding-inline: 8px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    :global([data-session-detail-content]) .contentArea > .planNote {
+        padding-inline: 8px;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .notesSection {
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .setTrailingControls,
+    :global([data-session-detail-content]) .cascadeButtonsContainer {
+        flex-wrap: wrap;
+        min-width: 0;
+        max-width: 100%;
+    }
+}
+
+/* The same compact metric grid also serves a narrow desktop pane. */
+@container (max-width: 760px) {
+    :global([data-session-detail-content]) .metricInputContainer {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(96px, 1fr);
+        gap: 6px 8px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .metricValueControl {
+        grid-column: 2;
+        grid-row: 1;
+        min-width: 96px;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction > input,
+    :global([data-session-detail-content]) .metricValueWithAction > select {
+        flex: 1 0 96px;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction > button {
+        margin: 0;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    :global([data-session-detail-content]) .metricLabel,
+    :global([data-session-detail-content]) .metricLabelLarge {
+        grid-column: 1;
+        grid-row: 1;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .metricInput {
+        width: 100%;
+        min-width: 96px;
+        max-width: 100%;
+    }
+
+    :global([data-session-detail-content]) .metricMeta,
+    :global([data-session-detail-content]) .metricMetaLarge {
+        display: flex;
+        flex-wrap: wrap;
+        justify-self: stretch;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        min-width: 0;
+        max-width: 100%;
+        gap: 4px 8px;
+    }
+
+    :global([data-session-detail-content]) .metricMeta > span,
+    :global([data-session-detail-content]) .metricMetaLarge > span {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+    }
+
+}
+
+/* Three mobile columns keep units beside their field; comparison hints own
+   the supporting row below. Desktop retains its existing metadata grouping. */
+@media (max-width: 768px) {
+    :global([data-session-detail-content]) .metricInputContainer {
+        grid-template-columns: minmax(0, 1fr) minmax(96px, 1.2fr) minmax(0, 0.65fr);
+        align-items: center;
+    }
+
+    :global([data-session-detail-content]) .metricMeta,
+    :global([data-session-detail-content]) .metricMetaLarge {
+        display: contents;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction {
+        display: contents;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction > input,
+    :global([data-session-detail-content]) .metricValueWithAction > select {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    :global([data-session-detail-content]) .metricValueWithAction > button {
+        grid-column: 2;
+        grid-row: auto;
+    }
+
+    :global([data-session-detail-content]) .metricUnit,
+    :global([data-session-detail-content]) .metricUnitLarge {
+        grid-column: 3;
+        grid-row: 1;
+        min-width: 0;
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+    }
+
+    :global([data-session-detail-content]) .metricHints {
+        display: flex;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        flex-wrap: wrap;
+        gap: 4px 8px;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .metricHints:empty {
+        display: none;
+    }
+
+    :global([data-session-detail-content]) .metricHints > span {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
 }

@@ -410,6 +410,7 @@ def main():
                 for slug, label in (
                     ("offline", "Offline"),
                     ("circuit-tags", "Circuit Tags"),
+                    ("session-width", "Session Width"),
                     ("associations", "Associations"),
                     ("quick-session", "Quick Session"),
                     ("ai", "AI"),

@@ -65,3 +65,22 @@
     margin-right: 6px;
     margin-left: 6px;
 }
+
+@container (max-width: 760px) {
+    :global([data-session-detail-content]) .metric {
+        min-width: 0;
+        flex-wrap: wrap;
+        white-space: normal;
+    }
+
+    :global([data-session-detail-content]) .label,
+    :global([data-session-detail-content]) .value {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    :global([data-session-detail-content]) .label {
+        flex: 0 1 auto;
+    }
+}

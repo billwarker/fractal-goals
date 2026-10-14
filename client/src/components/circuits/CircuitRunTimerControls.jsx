@@ -87,7 +87,7 @@ export default function CircuitRunTimerControls({
                         value={localStartTime}
                         readOnly
                         onClick={(event) => event.stopPropagation()}
-                        title="Circuit timing is controlled by Start and Complete"
+                        title={`${localStartTime || 'No start time'} · Circuit timing is controlled by Start and Complete`}
                     />
                     {relativeTimeAdjustment.renderPanel('start', localStartTime)}
                 </div>
@@ -105,7 +105,7 @@ export default function CircuitRunTimerControls({
                         value={localStopTime}
                         readOnly
                         onClick={(event) => event.stopPropagation()}
-                        title="Circuit timing is controlled by Start and Complete"
+                        title={`${localStopTime || 'No stop time'} · Circuit timing is controlled by Start and Complete`}
                     />
                     {relativeTimeAdjustment.renderPanel('stop', localStopTime)}
                 </div>

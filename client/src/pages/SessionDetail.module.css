@@ -223,7 +223,7 @@
     }
 
     .sessionMainContent {
-        padding: var(--spacing-lg);
+        padding: var(--spacing-lg) 12px;
         padding-bottom: calc(var(--mobile-session-footer-height) + var(--spacing-lg));
     }
 

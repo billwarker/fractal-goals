@@ -362,6 +362,8 @@ function SessionActivityItemView({
                                             type="text"
                                             placeholder="YYYY-MM-DD HH:MM:SS"
                                             value={localStartTime}
+                                            aria-label="Activity start time"
+                                            title={localStartTime || 'YYYY-MM-DD HH:MM:SS'}
                                             onChange={(e) => {
                                                 setStartTimeDraft(e.target.value);
                                                 setTimeInputErrors((current) => ({ ...current, start: '' }));
@@ -387,6 +389,8 @@ function SessionActivityItemView({
                                             type="text"
                                             placeholder="YYYY-MM-DD HH:MM:SS"
                                             value={localStopTime}
+                                            aria-label="Activity stop time"
+                                            title={localStopTime || 'YYYY-MM-DD HH:MM:SS'}
                                             onChange={(e) => {
                                                 setStopTimeDraft(e.target.value);
                                                 setTimeInputErrors((current) => ({ ...current, stop: '' }));

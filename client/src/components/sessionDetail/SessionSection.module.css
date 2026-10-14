@@ -381,3 +381,25 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* Structural levels share edges; only their leaf content owns an inset. */
+@media (max-width: 768px) {
+    :global([data-session-detail-content]) .sectionContainer {
+        padding: 16px 0;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .sectionHeader {
+        padding-inline: 8px;
+        margin-bottom: 16px;
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .sectionTitle {
+        overflow-wrap: anywhere;
+    }
+
+    :global([data-session-detail-content]) .activitiesContainer {
+        min-width: 0;
+    }
+}

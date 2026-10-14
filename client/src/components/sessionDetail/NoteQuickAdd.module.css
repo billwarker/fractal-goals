@@ -76,3 +76,19 @@
     color: var(--color-text-muted);
     font-style: italic;
 }
+
+@media (max-width: 768px) {
+    :global([data-session-detail-content]) .noteQuickAdd {
+        padding: 8px;
+        border-width: 1px 0;
+        border-radius: 0;
+    }
+
+    :global([data-session-detail-content]) .quickAddTextarea {
+        min-width: 0;
+    }
+
+    :global([data-session-detail-content]) .noteSubmitBtn {
+        flex-shrink: 0;
+    }
+}
