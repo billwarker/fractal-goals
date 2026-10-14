@@ -86,7 +86,7 @@ def test_block_rows_report_status_counts_consistency_streak_and_goals(world):
     payload = world['payload']
     block = _block(payload, world['strength']['id'])
 
-    assert payload['calculation_version'] == CALCULATION_VERSION == 9
+    assert payload['calculation_version'] == CALCULATION_VERSION == 10
     assert 'alignment' not in payload
     assert block['status_counts'] == {'complete': 2, 'missed': 1, 'rest': 1, 'pending': 0, 'scheduled': 4}
     assert block['consistency'] == {'met_days': 2, 'scheduled_days_observed': 3, 'rate': 0.666667}

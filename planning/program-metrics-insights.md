@@ -606,3 +606,15 @@ Seed migration fixtures for: relational day linkage, valid JSON-only program lin
 - Drifted `is_completed` / `goals_completed` / `completion_percentage` columns are left alone (Q30) — metrics compute from source and never read them.
 - Program scope, hierarchy, activity associations, pause history, and current completion fields are not immutable event snapshots. V1 completed-program retrospectives are transparently recomputed from current records (Q34).
 - The additive `program_id` / `program_block_id` columns describe explicit session execution context; they do not attempt to infer a program merely because root work happened to align with its goals.
+
+## Goal-completion denominator (calculation v10)
+
+`outcomes.goals_in_scope` counts goals eligible for the program Goals pane, rather than the
+full structural attribution scope. Completed goals with completion dates before the program
+start or after its end are excluded. Boundaries are inclusive, using literal persisted date
+parts like the Goals pane; unfinished goals and completed goals without timestamps remain
+eligible. Each goal is filtered independently, preserving visible descendants of hidden parents.
+`scope.goal_ids`, evidence attribution, coverage, and targets retain their structural scope.
+The numerator counts currently completed eligible goals in the selected display window (with
+existing user-timezone bucketing). Shorter or disjoint selections do not shrink the denominator.
+Shared Python/JavaScript fixtures guard the eligibility rule against drift.

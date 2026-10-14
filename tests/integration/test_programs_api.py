@@ -484,7 +484,7 @@ class TestProgramCRUD:
         response = authed_client.get(f'{url}?timezone=UTC')
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['calculation_version'] == 9
+        assert payload['calculation_version'] == 10
         assert payload['window']['timezone'] == 'UTC'
         assert payload['semantics'] == {
             'attribution': 'current_state',

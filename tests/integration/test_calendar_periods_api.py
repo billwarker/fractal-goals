@@ -98,7 +98,7 @@ class TestCalendarPeriodsApi:
             f"/api/{period_world['root'].id}/programs/{period_world['program'].id}/metrics"
             f"?range_start={period_world['start']}&range_end={today}&timezone=UTC"
         ).get_json()
-        assert metrics["calculation_version"] == 9
+        assert metrics["calculation_version"] == 10
         assert metrics["consistency"]["period_rest_days"] == 3
         assert [item["id"] for item in metrics["periods"]] == [period["id"]]
         metric_states = {day["date"]: day["state"] for day in metrics["days"]}

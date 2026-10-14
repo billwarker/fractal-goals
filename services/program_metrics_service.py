@@ -15,6 +15,7 @@ from services.goal_contribution import resolve_contribution_goal
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.goal_type_utils import get_canonical_goal_type
 from services.program_block_metrics import build_block_rows, current_block_summary, schedule_outlook
+from services.program_goal_window import is_goal_in_program_window
 from services.program_focus import focus_scopes_from_goals, load_focus_seed_rows
 from services.program_rollups import build_date_records
 from services.program_scope import ProgramScope, expand_descendants, resolve_program_scopes
@@ -36,7 +37,7 @@ from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 366
-CALCULATION_VERSION = 9
+CALCULATION_VERSION = 10
 MINIMUM_SUFFICIENCY_DAYS = 7
 
 
@@ -677,7 +678,12 @@ class ProgramMetricsService:
             })
 
         completed_targets = [target for target in targets if in_selected_window(target.completed_at)]
-        completed_goals = [goal for goal_id, goal in goals_by_id.items() if goal_id in scope.goal_ids and in_selected_window(goal.completed_at)]
+        outcome_goals = [
+            goal for goal_id, goal in goals_by_id.items()
+            if goal_id in scope.goal_ids
+            and is_goal_in_program_window(goal, program_start, program_end)
+        ]
+        completed_goals = [goal for goal in outcome_goals if goal.completed and in_selected_window(goal.completed_at)]
         execution_duration = sum(session_duration_seconds_from_row(item.total_duration_seconds, item.duration_minutes, item.session_start, item.session_end) for item in program_sessions)
 
         return {
@@ -721,7 +727,7 @@ class ProgramMetricsService:
             "volume": volume,
             "weekday": weekday,
             "outcomes": {
-                "goals_completed_in_window": len(completed_goals), "goals_in_scope": len(scope.goal_ids),
+                "goals_completed_in_window": len(completed_goals), "goals_in_scope": len(outcome_goals),
                 "targets_met_in_window": [{"target_id": item.id, "goal_id": item.goal_id, "name": item.name, "met_at": _as_utc(item.completed_at).isoformat().replace("+00:00", "Z")} for item in completed_targets],
                 "targets_open": sum(not item.completed for item in targets), "attribution": "current_state",
             },

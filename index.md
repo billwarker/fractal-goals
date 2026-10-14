@@ -167,6 +167,13 @@ inside the same SQLAlchemy transaction or savepoint.
 
 Programs contain dated blocks and reusable program-day definitions. The complete domain and UI
 description is in [Programs — domain and UI reference](planning/programs-domain-reference.md).
+Program goal-completion totals share the Goals pane's eligibility rule: completed goals outside
+inclusive program dates are excluded; unfinished goals and goals without completion dates stay
+eligible, including descendants of excluded parents. Structural scope for evidence attribution
+remains unchanged. Selected timeframes narrow the numerator only; the denominator remains the
+program-wide eligible goal count. `services/program_goal_window.py` and
+`client/src/utils/programGoalWindow.js` share regression fixtures for this contract.
+
 `ProgramCalendarPage` owns the header Calendar/Days switcher (before Program Options) and
 program date-span subtitle; `ProgramSidePane` owns scoped content and the Details/Goals
 switcher beside Collapse in its header, including in the Days view.
@@ -198,7 +205,7 @@ sessions identically. Manual Complete/Rest statuses and fractal-wide calendar ev
 event, then automatic evaluation. Streaks are drawn from server `chain_role`/`run_length_at_date`, never
 recomputed in the client.
 
-**Read models.** The client expects metrics calculation v9 (`services/program_metrics_service.py`,
+**Read models.** The client expects metrics calculation v10 (`services/program_metrics_service.py`,
 `program_rollups.py`, `program_block_metrics.py`), day read model schema v8
 (`ProgramDayReadModelService`, IANA timezone required, bounded window, cursor-paged detail), and the
 root-scoped calendar feed schema v1 (`GET /api/<root_id>/programs/calendar-feed`,

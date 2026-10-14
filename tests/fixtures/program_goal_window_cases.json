@@ -1,0 +1,10 @@
+[
+  { "name": "unfinished", "completed": false, "completed_at": null, "eligible": true },
+  { "name": "unfinished with stale completion date", "completed": false, "completed_at": "2026-05-01T12:00:00Z", "eligible": true },
+  { "name": "completed without date", "completed": true, "completed_at": null, "eligible": true },
+  { "name": "completed before program", "completed": true, "completed_at": "2026-05-21T23:59:59Z", "eligible": false },
+  { "name": "completed at inclusive start", "completed": true, "completed_at": "2026-05-22T00:00:00Z", "eligible": true },
+  { "name": "completed within program", "completed": true, "completed_at": "2026-06-01T12:00:00Z", "eligible": true },
+  { "name": "completed at inclusive end", "completed": true, "completed_at": "2026-08-31T23:59:59Z", "eligible": true },
+  { "name": "completed after program", "completed": true, "completed_at": "2026-09-01T00:00:00Z", "eligible": false }
+]

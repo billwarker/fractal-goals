@@ -373,3 +373,61 @@ def test_comparison_uses_exact_occurrence_completion_not_aligned_goal_evidence(
     )
     assert (error, status) == (None, 200)
     assert completed["programs"][0]["met_days"] == 1
+
+
+def test_goal_completion_denominator_matches_visible_program_goals(
+    db_session, sample_goal_hierarchy, test_user,
+):
+    from models import Goal
+
+    root = sample_goal_hierarchy['ultimate']
+    hidden_parent = sample_goal_hierarchy['mid_term']
+    visible_child = sample_goal_hierarchy['short_term']
+    hidden_parent.completed = True
+    hidden_parent.completed_at = datetime(2026, 5, 21, 23, 59, 59)
+    # An unfinished descendant of a hidden parent remains eligible.
+    visible_child.completed = False
+    program = Program(
+        root_id=root.id, name='Windowed goals', start_date=datetime(2026, 5, 22),
+        end_date=datetime(2026, 8, 31), weekly_schedule={},
+    )
+    db_session.add(program)
+    db_session.flush()
+    db_session.execute(program_goals.insert().values(program_id=program.id, goal_id=hidden_parent.id))
+    for name, completed_at in (
+        ('Start boundary', datetime(2026, 5, 22)),
+        ('End boundary', datetime(2026, 8, 31, 23, 59, 59)),
+        ('After program', datetime(2026, 9, 1)),
+        ('Unknown completion date', None),
+    ):
+        db_session.add(Goal(
+            root_id=root.id, parent_id=hidden_parent.id, name=name,
+            completed=True, completed_at=completed_at,
+        ))
+    db_session.commit()
+    service = ProgramMetricsService(db_session)
+    base = dict(timezone_name='UTC', as_of=date(2026, 9, 2))
+
+    full, error, status = service.get_program_metrics(root.id, program.id, test_user.id, **base)
+    assert (error, status) == (None, 200)
+    assert full['scope']['goal_count'] == 6  # Structural scope is unchanged.
+    assert full['outcomes']['goals_in_scope'] == 4
+    assert full['outcomes']['goals_completed_in_window'] == 2
+
+    for selection in (
+        dict(range_start='2026-05-22', range_end='2026-05-23'),
+        dict(dates='2026-05-22,2026-06-01'),
+    ):
+        partial, error, status = service.get_program_metrics(root.id, program.id, test_user.id, **base, **selection)
+        assert (error, status) == (None, 200)
+        assert partial['outcomes']['goals_in_scope'] == 4
+        assert partial['outcomes']['goals_completed_in_window'] == 1
+
+    # Removing completion restores an excluded parent without losing its children.
+    hidden_parent.completed = False
+    hidden_parent.completed_at = None
+    db_session.commit()
+    restored, error, status = service.get_program_metrics(root.id, program.id, test_user.id, **base)
+    assert (error, status) == (None, 200)
+    assert restored['outcomes']['goals_in_scope'] == 5
+    assert restored['outcomes']['goals_completed_in_window'] == 2
