@@ -114,9 +114,11 @@ def normalize_goal_payload(data, *, partial=False):
     if 'deadline' in normalized:
         normalized['deadline'] = _normalize_optional_string(normalized.get('deadline'))
 
-    if 'targets' in normalized or not partial:
-        targets = normalized.get('targets')
-        normalized['targets'] = targets if isinstance(targets, list) else []
+    if 'started_at' in normalized:
+        normalized['started_at'] = _normalize_optional_string(normalized.get('started_at'))
+
+    if 'completion_condition' in normalized or not partial:
+        normalized['completion_condition'] = normalized.get('completion_condition') or 'manual'
 
     return normalized
 

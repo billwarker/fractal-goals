@@ -6,7 +6,7 @@ import logging
 import time as time_module
 from sqlalchemy.orm import joinedload, selectinload
 
-from models import ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Session, Target, validate_root_goal
+from models import ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Session, validate_root_goal
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.effective_goal_activities import resolve_effective_goals_by_activity
@@ -37,7 +37,7 @@ from services.service_types import JsonDict, ServiceResult
 
 logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 366
-CALCULATION_VERSION = 10
+CALCULATION_VERSION = 11
 MINIMUM_SUFFICIENCY_DAYS = 7
 
 
@@ -186,7 +186,6 @@ class ProgramMetricsService:
         program_sessions = load_program_credit_candidates(
             self.db_session, root_id, current_user_id, [program], utc_start, utc_end, session_credits,
         )[program.id]
-        targets = self._load_targets(root_id, current_user_id, scope.goal_ids)
         status_overrides = load_program_status_overrides(
             self.db_session, [program.id], window["display_start"], window["display_end"]
         )[program.id]
@@ -201,7 +200,6 @@ class ProgramMetricsService:
             goals_by_id=goals_by_id,
             evidence=evidence,
             program_sessions=program_sessions,
-            targets=targets,
             window=window,
             zone=zone,
             timezone_name=timezone_name or "UTC",
@@ -449,19 +447,6 @@ class ProgramMetricsService:
             effective_at < end,
         ).all()
 
-    def _load_targets(self, root_id, current_user_id, scope_ids):
-        if not scope_ids:
-            return []
-        return build_scoped_dataset_query(
-            self.db_session, "targets", [root_id], current_user_id
-        ).filter(Target.goal_id.in_(scope_ids)).with_entities(
-            Target.id,
-            Target.goal_id,
-            Target.name,
-            Target.completed,
-            Target.completed_at,
-        ).all()
-
     def _resolve_evidence(self, rows, effective_goals, goals_by_id, scope_ids, zone):
         scope_ids = set(scope_ids)
         resolved = []
@@ -494,7 +479,7 @@ class ProgramMetricsService:
         seed_ids = frozenset(goal_id for _, _, goal_id in seed_rows if goal_id in goals_by_id)
         return focus, ProgramScope(seed_ids, expand_descendants(seed_ids, children))
 
-    def _aggregate(self, *, program, scope, focus, goals_by_id, evidence, program_sessions, targets, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
+    def _aggregate(self, *, program, scope, focus, goals_by_id, evidence, program_sessions, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
         program_start, program_end = _date_part(program.start_date), _date_part(program.end_date)
         if local_today < program_start:
             status = "upcoming"
@@ -597,9 +582,6 @@ class ProgramMetricsService:
 
         coverage = allocate_equal_split(aligned, lambda item: item["in_scope_ids"])
 
-        targets_by_goal = defaultdict(list)
-        for target in targets:
-            targets_by_goal[target.goal_id].append(target)
         def in_selected_window(value):
             local_date = _local_date(value, zone)
             return bool(local_date and (
@@ -613,7 +595,6 @@ class ProgramMetricsService:
             if not goal:
                 continue
             values = coverage[goal_id]
-            goal_targets = targets_by_goal[goal_id]
             last = values["last"]
             goal_coverage.append({
                 "goal_id": goal_id,
@@ -631,7 +612,6 @@ class ProgramMetricsService:
                 "last_evidence_at": last.isoformat().replace("+00:00", "Z") if last else None,
                 "days_since_evidence": (local_today - _local_date(last, zone)).days if last else None,
                 "completed_in_window": in_selected_window(goal.completed_at),
-                "targets_met_in_window": sum(in_selected_window(target.completed_at) for target in goal_targets),
             })
 
         sessions_by_occurrence = completed_credits_by_occurrence_template(day_facts)
@@ -677,10 +657,10 @@ class ProgramMetricsService:
                 "duration_seconds": sum(item["duration_seconds"] for item in weekday_days),
             })
 
-        completed_targets = [target for target in targets if in_selected_window(target.completed_at)]
         outcome_goals = [
             goal for goal_id, goal in goals_by_id.items()
             if goal_id in scope.goal_ids
+            and program_start is not None and program_end is not None
             and is_goal_in_program_window(goal, program_start, program_end)
         ]
         completed_goals = [goal for goal in outcome_goals if goal.completed and in_selected_window(goal.completed_at)]
@@ -728,8 +708,7 @@ class ProgramMetricsService:
             "weekday": weekday,
             "outcomes": {
                 "goals_completed_in_window": len(completed_goals), "goals_in_scope": len(outcome_goals),
-                "targets_met_in_window": [{"target_id": item.id, "goal_id": item.goal_id, "name": item.name, "met_at": _as_utc(item.completed_at).isoformat().replace("+00:00", "Z")} for item in completed_targets],
-                "targets_open": sum(not item.completed for item in targets), "attribution": "current_state",
+                "attribution": "current_state",
             },
             "data_sufficiency": {
                 "has_data": bool(evidence or program_sessions or status_overrides), "observed_days": window["observed_days"],

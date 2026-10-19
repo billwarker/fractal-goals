@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
-import {
-    normalizeGoalNode,
-    parseGoalTargets,
-} from '../utils/goalNodeModel';
+import { normalizeGoalNode } from '../utils/goalNodeModel';
 import { getCurrentSessionActivityDefIds } from '../utils/sessionGoalScope';
-import { getGoalStatus, getTargetStatus } from '../utils/sessionGoalStatus';
+import { getGoalStatus } from '../utils/sessionGoalStatus';
 
 /**
  * Iteratively flattens the backend nested tree into a normalized array.
@@ -72,8 +69,7 @@ export function useSessionGoalsViewModel({
     activityInstances,
     localSessionData,
     selectedActivity,
-    targetAchievements,
-    achievedTargetIds,
+    conditionProgressByGoalId,
 }) {
     // 1. Build ONE primary flat, normalized list of all goals
     const normalizedTree = useMemo(() => {
@@ -177,9 +173,9 @@ export function useSessionGoalsViewModel({
             .filter((node) => !visibleIds || visibleIds.has(String(node.id)))
             .map(node => ({
                 ...node,
-                status: getGoalStatus(node, targetAchievements, achievedTargetIds)
+                status: getGoalStatus(node, conditionProgressByGoalId)
             }));
-    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, normalizedTree, parentMap, sessionGoalsView, targetAchievements, achievedTargetIds]);
+    }, [activityGoalIdsByActivity, currentSessionActivityDefIds, normalizedTree, parentMap, sessionGoalsView, conditionProgressByGoalId]);
 
     // 3. Derive Activity Hierarchy (filtered by associated activity)
     const activityHierarchy = useMemo(() => {
@@ -202,40 +198,28 @@ export function useSessionGoalsViewModel({
             .filter(node => relevantIds.has(String(node.id)))
             .map(node => ({
                 ...node,
-                status: getGoalStatus(node, targetAchievements, achievedTargetIds)
+                status: getGoalStatus(node, conditionProgressByGoalId)
             }));
 
-    }, [activeActivityDefId, selectedActivityGoalIds, selectedActivityInSession, normalizedTree, parentMap, targetAchievements, achievedTargetIds]);
+    }, [activeActivityDefId, selectedActivityGoalIds, selectedActivityInSession, normalizedTree, parentMap, conditionProgressByGoalId]);
 
-    // 4. Build Target Cards
-    const targetCards = useMemo(() => {
+    // 4. Goals in view that complete on an activity threshold (scoped to the selected activity's).
+    const conditionCards = useMemo(() => {
         const sourceHierarchy = activeActivityDefId ? activityHierarchy : sessionHierarchy;
-        const cards = [];
-
-        sourceHierarchy.forEach((goal) => {
-            const goalTargets = parseGoalTargets(goal);
-            goalTargets.forEach((target) => {
-                // Filter targets to just the active activity context if applicable
-                if (activeActivityDefId && target.activity_id !== activeActivityDefId) return;
-                if (target.activity_instance_id && activeActivityInstanceId && target.activity_instance_id !== activeActivityInstanceId) return;
-
-                const status = getTargetStatus(target, goal, targetAchievements, achievedTargetIds);
-                cards.push({
-                    ...target,
-                    _goalDepth: goal.depth || 0,
-                    _goalName: goal.name,
-                    _goalType: goal.type,
-                    _goalId: goal.id,
-                    is_completed_realtime: status.isCompleted,
-                    completion_reason: status.reason
-                });
-            });
-        });
-
-        // Lowest depth index appears first (highest level goals) vs lowest physical placement?
-        // Let's sort to match previous logic
-        return cards.sort((a, b) => b._goalDepth - a._goalDepth);
-    }, [activeActivityDefId, activeActivityInstanceId, activityHierarchy, sessionHierarchy, targetAchievements, achievedTargetIds]);
+        return sourceHierarchy
+            .filter((goal) => goal.completion_condition === 'activity_threshold' && goal.condition)
+            .filter((goal) => !activeActivityDefId || goal.condition.activity_definition_id === activeActivityDefId)
+            .map((goal) => ({
+                goalId: goal.id,
+                goalName: goal.name,
+                goalType: goal.type,
+                goalDepth: goal.depth || 0,
+                condition: goal.condition,
+                completed: goal.status.completed,
+                progress: goal.status.progress,
+            }))
+            .sort((a, b) => b.goalDepth - a.goalDepth);
+    }, [activeActivityDefId, activityHierarchy, sessionHierarchy]);
 
     const goalStatusById = useMemo(() => {
         const map = new Map();
@@ -245,25 +229,13 @@ export function useSessionGoalsViewModel({
         return map;
     }, [sessionHierarchy, activityHierarchy]);
 
-    const targetStatusById = useMemo(() => {
-        const map = new Map();
-        targetCards.forEach((target) => {
-            map.set(target.id, {
-                completed: target.is_completed_realtime,
-                reason: target.completion_reason,
-            });
-        });
-        return map;
-    }, [targetCards]);
-
     return {
         activeActivityDefId,
         activeActivityInstanceId,
         sessionHierarchy,
         activityHierarchy,
-        targetCards,
+        conditionCards,
         goalStatusById,
-        targetStatusById,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
         manualGoalIds,

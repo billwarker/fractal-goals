@@ -12,11 +12,10 @@ const savedSmartGoal = {
 
 const edits = (overrides = {}) => ({
     description: 'Saved description',
-    targets: [{ id: 't1' }],
+    completionCondition: 'activity_threshold',
     associatedActivityIds: ['a1'],
     deadline: '2026-12-01T00:00:00Z',
     relevanceStatement: 'Because',
-    completedViaChildren: false,
     inheritParentActivities: false,
     ...overrides,
 });
@@ -31,5 +30,13 @@ describe('buildLiveSmartGoal', () => {
 
     it('reports SMART when the edited values satisfy every criterion', () => {
         expect(isSMART(buildLiveSmartGoal(savedSmartGoal, edits()))).toBe(true);
+    });
+
+    it('is only measurable once the goal completes on its own', () => {
+        const manual = buildLiveSmartGoal(savedSmartGoal, edits({ completionCondition: 'manual' }));
+        const viaChildren = buildLiveSmartGoal(savedSmartGoal, edits({ completionCondition: 'children' }));
+
+        expect(calculateSMARTStatus(manual).measurable).toBe(false);
+        expect(calculateSMARTStatus(viaChildren).measurable).toBe(true);
     });
 });

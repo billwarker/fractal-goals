@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 
-import { getGoalNodeRevision, parseGoalTargets } from '../utils/goalNodeModel';
+import { getGoalNodeRevision } from '../utils/goalNodeModel';
+import { conditionToDraft, getGoalCompletionCondition, getGoalCondition, getGoalStartedAt } from '../utils/goalConditions';
 
-function buildInitialGoalFormState(goal, mode) {
+function buildInitialGoalFormState(goal, mode, initialCompletion) {
     let deadline = '';
     if (goal) {
         const rawDeadline = goal.attributes?.deadline || goal.deadline || '';
@@ -11,20 +12,22 @@ function buildInitialGoalFormState(goal, mode) {
         }
     }
 
-    const parsedTargets = parseGoalTargets(goal);
-
     return {
         name: mode === 'create' ? '' : (goal?.name || ''),
         description: mode === 'create' ? '' : (goal?.attributes?.description || goal?.description || ''),
         deadline: mode === 'create' ? '' : deadline,
         relevanceStatement: mode === 'create' ? '' : (goal?.attributes?.relevance_statement || ''),
-        completedViaChildren: mode === 'create' ? false : (goal?.attributes?.completed_via_children || false),
+        startedAt: mode === 'create' ? '' : getGoalStartedAt(goal),
+        completionCondition: mode === 'create'
+            ? (initialCompletion?.completionCondition ?? 'manual')
+            : getGoalCompletionCondition(goal),
+        conditionDraft: mode === 'create'
+            ? (initialCompletion?.conditionDraft ?? null)
+            : conditionToDraft(getGoalCondition(goal)),
         inheritParentActivities: mode === 'create'
             ? false
             : (goal?.attributes?.inherit_parent_activities || false),
         trackActivities: mode === 'create' ? true : (goal?.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true),
-        allowManualCompletion: mode === 'create' ? true : (goal?.attributes?.allow_manual_completion !== undefined ? goal.attributes.allow_manual_completion : true),
-        targets: mode === 'create' ? [] : parsedTargets,
     };
 }
 
@@ -32,8 +35,11 @@ function resolveNextValue(nextValue, currentValue) {
     return typeof nextValue === 'function' ? nextValue(currentValue) : nextValue;
 }
 
-export function useGoalForm(goal, mode) {
-    const initialState = useMemo(() => buildInitialGoalFormState(goal, mode), [goal, mode]);
+export function useGoalForm(goal, mode, initialCompletion = null) {
+    const initialState = useMemo(
+        () => buildInitialGoalFormState(goal, mode, initialCompletion),
+        [goal, mode, initialCompletion],
+    );
     const validationRules = useMemo(() => ({
         name: (val) => !val || !val.trim() ? 'Goal Name is required' : null,
         description: () => null,
@@ -152,16 +158,16 @@ export function useGoalForm(goal, mode) {
             setFieldValue('relevanceStatement', value);
             setFieldTouched('relevanceStatement');
         },
-        completedViaChildren: currentFormState.values.completedViaChildren,
-        setCompletedViaChildren: (value) => setFieldValue('completedViaChildren', value),
+        startedAt: currentFormState.values.startedAt,
+        setStartedAt: (value) => setFieldValue('startedAt', value),
+        completionCondition: currentFormState.values.completionCondition,
+        setCompletionCondition: (value) => setFieldValue('completionCondition', value),
+        conditionDraft: currentFormState.values.conditionDraft,
+        setConditionDraft: (value) => setFieldValue('conditionDraft', value),
         inheritParentActivities: currentFormState.values.inheritParentActivities,
         setInheritParentActivities: (value) => setFieldValue('inheritParentActivities', value),
         trackActivities: currentFormState.values.trackActivities,
         setTrackActivities: (value) => setFieldValue('trackActivities', value),
-        allowManualCompletion: currentFormState.values.allowManualCompletion,
-        setAllowManualCompletion: (value) => setFieldValue('allowManualCompletion', value),
-        targets: currentFormState.values.targets,
-        setTargets: (value) => setFieldValue('targets', value),
         errors: currentFormState.errors,
         validateForm,
         resetForm,

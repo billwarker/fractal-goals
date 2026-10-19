@@ -2,7 +2,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 from sqlalchemy.orm.attributes import set_committed_value
 
-from models import ActivityGroup, Goal, Target
+from models import ActivityGroup, Goal, GoalCompletionCondition, GoalConditionMetricRule
 
 
 def goal_serializer_relationship_loaders():
@@ -13,7 +13,11 @@ def goal_serializer_relationship_loaders():
     """
     return [
         joinedload(Goal.level),
-        selectinload(Goal.targets_rel).joinedload(Target.metric_conditions),
+        selectinload(Goal.condition).options(
+            joinedload(GoalCompletionCondition.activity),
+            joinedload(GoalCompletionCondition.metric),
+            selectinload(GoalCompletionCondition.rules).joinedload(GoalConditionMetricRule.metric),
+        ),
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),
         joinedload(Goal.pause_intervals),

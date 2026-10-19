@@ -46,14 +46,8 @@
 }
 
 .sessionListComfortable .addSubGoalBtn {
-    opacity: 1;
-    flex: 0 0 auto;
     min-width: 28px;
     min-height: 28px;
-    margin-left: auto;
-    border: 1px solid var(--color-border);
-    background: color-mix(in srgb, var(--color-bg-input) 72%, transparent);
-    color: var(--color-text-secondary);
     font-size: 16px;
 }
 
@@ -269,26 +263,47 @@
 }
 
 .addSubGoalBtn {
-    background: transparent;
-    border: none;
-    color: var(--text-tertiary);
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    padding: 0 4px;
-    opacity: 0;
-    transition: opacity 0.2s, color 0.2s;
-    border-radius: 4px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    min-height: 22px;
     margin-left: 6px;
+    padding: 0 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: color-mix(in srgb, var(--color-bg-input) 72%, transparent);
+    color: var(--color-text-secondary);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.sessionTreeNode:hover .addSubGoalBtn {
-    opacity: 1;
+.addSubGoalBtn:hover,
+.addSubGoalBtn:focus-visible {
+    border-color: var(--color-brand-primary);
+    color: var(--color-text-primary);
 }
 
-.addSubGoalBtn:hover {
-    background: var(--bg-tertiary);
-    color: var(--primary-color);
+/* A goal just created from this hierarchy flashes once so it is easy to find. */
+.sessionTreeRowJustCreated .sessionTreeNode {
+    border-radius: var(--border-radius-sm);
+    animation: goalJustCreated 2.4s ease-out;
+}
+
+@keyframes goalJustCreated {
+    0%, 35% { background: color-mix(in srgb, var(--color-brand-primary) 22%, transparent); }
+    100% { background: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sessionTreeRowJustCreated .sessionTreeNode {
+        animation: none;
+        outline: 1px solid var(--color-brand-primary);
+    }
 }
 
 .programNodeWrapper {
@@ -384,4 +399,39 @@
     .sessionList {
         --tree-indent: 24px;
     }
+}
+
+.sequenceStepNumber {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    margin-right: 6px;
+    padding: 0 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.sessionNodeNamePaused {
+    opacity: 0.6;
+    font-style: italic;
+}
+
+.assistive {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }

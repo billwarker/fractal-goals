@@ -428,8 +428,9 @@ def test_serialized_goal_attributes_hold_only_non_duplicated_fields(sample_ultim
     top_level_duplicates = {
         "id", "type", "level_id", "description", "deadline", "completed", "completed_at",
         "completed_session_id", "completion_state", "is_smart", "smart_status", "paused", "paused_at",
+        "completion_condition", "condition", "started_at", "sequence_track_id", "sequence_position",
     }
     assert top_level_duplicates <= set(goal_dict)
     assert not top_level_duplicates & set(goal_dict["attributes"])
     assert "level_characteristics" not in goal_dict
-    assert {"parent_id", "root_id", "targets", "associated_activity_ids"} <= set(goal_dict["attributes"])
+    assert {"parent_id", "root_id", "associated_activity_ids"} <= set(goal_dict["attributes"])

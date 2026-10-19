@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { useTargetAchievements } from './useTargetAchievements';
+import { useGoalConditionProgress } from './useGoalConditionQueries';
+import { getGoalCompletionCondition } from '../utils/goalConditions';
 import { useActivities, useActivityGroups } from './useActivityQueries';
 import { queryKeys } from './queryKeys';
 import { fractalApi } from '../utils/api';
@@ -99,16 +100,14 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         }, {});
     }, [activities]);
 
-    const allGoalsForTargets = useMemo(
-        () => flattenSessionGoalsViewGoals(sessionGoalsView),
+    // Goals in this session that complete on their own; their progress is derived on the server.
+    const conditionGoalIds = useMemo(
+        () => flattenSessionGoalsViewGoals(sessionGoalsView)
+            .filter((goal) => getGoalCompletionCondition(goal) !== 'manual')
+            .map((goal) => goal.id),
         [sessionGoalsView]
     );
-
-    const {
-        targetAchievements,
-        achievedTargetIds,
-        goalAchievements,
-    } = useTargetAchievements(activityInstances, allGoalsForTargets, sessionId);
+    const { progressByGoalId: conditionProgressByGoalId } = useGoalConditionProgress(rootId, conditionGoalIds);
 
     return {
         session,
@@ -129,9 +128,7 @@ export function useSessionDetailData({ rootId, sessionId, isDeletingSession }) {
         normalizedSessionData,
         groupMap,
         groupedActivities,
-        targetAchievements,
-        achievedTargetIds,
-        goalAchievements,
+        conditionProgressByGoalId,
         loading: sessionLoading || circuitRunsLoading || (session && !normalizedSessionData),
     };
 }

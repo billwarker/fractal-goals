@@ -17,10 +17,6 @@ vi.mock('../../../contexts/TimezoneContext', () => ({
     useTimezone: () => ({ timezone: 'UTC' }),
 }));
 
-vi.mock('../../atoms/GoalIcon', () => ({
-    default: () => <span data-testid="target-card-icon" />,
-}));
-
 const activityDefinitions = [{
     id: 'activity-1',
     name: 'Performance and Submission',
@@ -30,15 +26,22 @@ const activityDefinitions = [{
     ],
 }];
 
-const targets = [{
-    id: 'target-1',
-    activity_id: 'activity-1',
-    type: 'threshold',
-    metrics: [
-        { metric_id: 'speed', value: 100 },
-        { metric_id: 'quality', value: 8 },
-    ],
-}];
+const goal = {
+    id: 'goal-1',
+    completion_condition: 'activity_threshold',
+    condition: {
+        activity_definition_id: 'activity-1',
+        kind: 'single_session',
+        measure: 'sets',
+        min_sets: 1,
+        rules: [
+            { metric_definition_id: 'speed', operator: '>=', value: 100 },
+            { metric_definition_id: 'quality', operator: '>=', value: 8 },
+        ],
+    },
+};
+
+const conditionText = 'Performance and Submission: 1 set of Playback Speed ≥ 100 % and Quality ≥ 8 Rating in one session';
 
 const programs = [{
     id: 'program-1',
@@ -47,12 +50,12 @@ const programs = [{
 }];
 
 describe('Goal completion confirmation views', () => {
-    it('renders target cards and highlights complete-view programs with the program color', () => {
+    it('describes the condition and highlights complete-view programs with the program color', () => {
         const onCompletionNoteChange = vi.fn();
-        const { container } = render(
+        render(
             <GoalCompletionModal
                 programs={programs}
-                targets={targets}
+                goal={goal}
                 activityDefinitions={activityDefinitions}
                 completionDate={new Date('2026-07-06T16:20:21')}
                 accentColor="#b5179e"
@@ -62,13 +65,11 @@ describe('Goal completion confirmation views', () => {
             />
         );
 
-        expect(screen.getByText('Performance and Submission')).toBeInTheDocument();
-        expect(screen.getByText('Playback Speed')).toBeInTheDocument();
-        expect(screen.getByText('100 %')).toBeInTheDocument();
+        expect(screen.getByText(conditionText)).toBeInTheDocument();
+        expect(screen.getByText(/recorded as a manual override/)).toBeInTheDocument();
 
         const programRow = screen.getByText('Enlightened and Healthy Guitar').closest('div');
         expect(programRow).toHaveStyle({ '--program-accent': '#d000a9' });
-        expect(container.querySelector('[data-testid="target-card-icon"]')).toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText('Goal Completion Note (optional):'), {
             target: { value: 'This milestone finally clicked.' },
@@ -76,11 +77,11 @@ describe('Goal completion confirmation views', () => {
         expect(onCompletionNoteChange).toHaveBeenCalledWith('This milestone finally clicked.');
     });
 
-    it('renders target cards and highlights incomplete-view programs with the program color', () => {
+    it('describes the condition and highlights incomplete-view programs with the program color', () => {
         const { container } = render(
             <GoalUncompletionModal
                 programs={programs}
-                targets={targets}
+                goal={goal}
                 activityDefinitions={activityDefinitions}
                 completedAt="2026-07-06T16:20:21"
                 accentColor="#2ecc71"
@@ -101,9 +102,7 @@ describe('Goal completion confirmation views', () => {
             />
         );
 
-        expect(screen.getByText('Performance and Submission')).toBeInTheDocument();
-        expect(screen.getByText('Quality')).toBeInTheDocument();
-        expect(screen.getByText('8 Rating')).toBeInTheDocument();
+        expect(screen.getByText(conditionText)).toBeInTheDocument();
         expect(screen.getByText('This performance finally felt stable.')).toBeInTheDocument();
         expect(screen.queryByText(/This will remove the completion status/)).not.toBeInTheDocument();
 
@@ -111,16 +110,63 @@ describe('Goal completion confirmation views', () => {
         expect(programRow).toHaveStyle({ '--program-accent': '#d000a9' });
         expect(container.firstElementChild).toHaveStyle({ '--completion-confirm-accent': '#2ecc71' });
 
-        const targetCard = container.querySelector('[style*="--target-card-accent"]');
-        expect(targetCard).toHaveStyle({ '--target-card-accent': '#2ecc71' });
-
-        const sectionLabels = screen.getAllByText(/Was completed on:|Programs that will remove this completion:|Targets that will be marked incomplete \(1\):|Goal Completion Note:/)
+        const sectionLabels = screen.getAllByText(/Was completed on:|Programs that will remove this completion:|How this goal completes:|Goal Completion Note:/)
             .map((node) => node.textContent);
         expect(sectionLabels).toEqual([
             'Was completed on:',
             'Programs that will remove this completion:',
-            'Targets that will be marked incomplete (1):',
+            'How this goal completes:',
             'Goal Completion Note:',
         ]);
     });
+
+    it('omits the override hint for manual goals', () => {
+        render(
+            <GoalCompletionModal
+                goal={{ id: 'goal-2', completion_condition: 'manual' }}
+                completionDate={new Date('2026-07-06T16:20:21')}
+            />
+        );
+
+        expect(screen.getByText('Manually')).toBeInTheDocument();
+        expect(screen.queryByText(/manual override/)).not.toBeInTheDocument();
+    });
+
+    it('offers to begin the next goal in a sequence, checked by default', () => {
+        const onBeginNextChange = vi.fn();
+        render(
+            <GoalCompletionModal
+                goal={{ id: 'goal-1', completion_condition: 'manual' }}
+                completionDate={new Date('2026-07-06T16:20:21')}
+                sequenceNextStep={{ id: 'goal-2', name: 'Step 2' }}
+                beginNext
+                onBeginNextChange={onBeginNextChange}
+            />
+        );
+        const checkbox = screen.getByRole('checkbox', { name: /Begin next goal in sequence: Step 2/ });
+        expect(checkbox).toBeChecked();
+        fireEvent.click(checkbox);
+        expect(onBeginNextChange).toHaveBeenCalledWith(false);
+    });
+
+    it('offers to pause again the goal this completion began', () => {
+        const onPauseNextChange = vi.fn();
+        render(
+            <GoalUncompletionModal
+                goal={{ id: 'goal-1', completion_condition: 'manual' }}
+                completedAt="2026-07-06T16:20:21"
+                sequenceResumedStep={{ id: 'goal-2', name: 'Step 2' }}
+                pauseNext
+                onPauseNextChange={onPauseNextChange}
+            />
+        );
+        fireEvent.click(screen.getByRole('checkbox', { name: /Pause next goal in sequence: Step 2 again/ }));
+        expect(onPauseNextChange).toHaveBeenCalledWith(false);
+    });
+
+    it('shows no sequence choice for unsequenced goals', () => {
+        render(<GoalCompletionModal goal={{ id: 'goal-1', completion_condition: 'manual' }} completionDate={new Date()} />);
+        expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
 });
+

@@ -82,14 +82,54 @@ describe('useProgramDaysTab goal scope', () => {
     });
     const goal = (id) => ({ id, name: id });
 
-    function renderScoped(initialEnabled = true) {
-        return renderHook(({ enabled }) => useProgramDaysTab({
+    function renderScoped(initialEnabled = true, extra = {}) {
+        return renderHook(({ enabled, tree = goalTree }) => useProgramDaysTab({
             rootId: 'root', program: { ...program, goal_ids: ['strength'] }, today: '2026-10-05', timezone: 'UTC',
             enabled, setViewMode: vi.fn(), onLeavePane: vi.fn(), onCreateDay: vi.fn(), onEditDay: vi.fn(),
-            goalTree, activities, activityGroups: [],
+            goalTree: tree, activities, activityGroups: [], ...extra,
         }), { initialProps: { enabled: initialEnabled } });
     }
     const panel = (result) => result.current.goalsPanel.props;
+
+    it('creates goals under the scoped goal, toward the selected plan activity when there is one', () => {
+        const onStartSubGoalCreation = vi.fn();
+        const { result } = renderScoped(true, { onStartSubGoalCreation });
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+
+        act(() => { panel(result).onStartSubGoalCreation(goal('strength')); });
+        expect(onStartSubGoalCreation).toHaveBeenLastCalledWith(goal('strength'), expect.objectContaining({
+            initialActivities: [], initialCompletion: null,
+        }));
+
+        act(() => { result.current.planFocus.onReport(plan(['fl'], { selectedActivityId: 'fl' })); });
+        act(() => { panel(result).onStartSubGoalCreation(goal('strength')); });
+        const [, context] = onStartSubGoalCreation.mock.lastCall;
+        expect(context.initialActivities).toEqual([activities[0]]);
+        // Tuck FL tracks no metrics, so it starts without a threshold.
+        expect(context.initialCompletion).toBeNull();
+    });
+
+    it('keeps a goal created from the pane in view though no plan activity works toward it', () => {
+        const onStartSubGoalCreation = vi.fn();
+        const { result, rerender } = renderScoped(true, { onStartSubGoalCreation });
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        act(() => { panel(result).onStartSubGoalCreation(goal('push')); });
+
+        const grown = { ...goalTree, children: [goalTree.children[0], {
+            ...goalTree.children[1], children: [{ id: 'new', name: 'New', parent_id: 'push', children: [] }],
+        }] };
+        const [, context] = onStartSubGoalCreation.mock.lastCall;
+        act(() => { context.onCreated({ id: 'new' }); });
+        rerender({ enabled: true, tree: grown });
+
+        expect(panel(result).planGoalsView.session_goal_ids).toContain('new');
+    });
+
+    it('offers no creation without a handler', () => {
+        const { result } = renderScoped();
+        act(() => { result.current.planFocus.onReport(plan(['fl'])); });
+        expect(panel(result).onStartSubGoalCreation).toBeNull();
+    });
 
     it("follows the reported plan and scopes the picker to a goal in its hierarchy", () => {
         const { result } = renderScoped();

@@ -5,6 +5,7 @@ import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
+import { applyCreatedGoal } from '../utils/goalTreeCache';
 
 const GoalsContext = createContext();
 
@@ -62,9 +63,8 @@ export function GoalsProvider({ children }) {
             const res = await fractalApi.createGoal(rootId, goalData);
             return res.data;
         },
-        onSuccess: async (_, variables) => {
-            queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
+        onSuccess: async (goal, variables) => {
+            applyCreatedGoal(queryClient, queryKeys, variables.rootId, goal);
             await invalidateOnboardingProgress(queryClient, queryKeys);
             notify.success('Goal created');
         },
@@ -81,6 +81,7 @@ export function GoalsProvider({ children }) {
         onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(variables.rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
         },
         onError: (error) => {
@@ -89,18 +90,20 @@ export function GoalsProvider({ children }) {
     });
 
     const deleteGoalMutation = useMutation({
-        mutationFn: async ({ rootId, goalId }) => {
-            const res = await fractalApi.deleteGoal(rootId, goalId);
+        mutationFn: async ({ rootId, goalId, beginNext = true }) => {
+            const res = await fractalApi.deleteGoal(rootId, goalId, { beginNext });
             return res.data;
         },
         onSuccess: async (_, variables) => {
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionNotesRoot(variables.rootId) });
             await invalidateOnboardingProgress(queryClient, queryKeys);
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalSequenceRoot(variables.rootId) });
             notify.success('Goal deleted');
         },
         onError: (error) => {
@@ -109,8 +112,8 @@ export function GoalsProvider({ children }) {
     });
 
     const toggleGoalCompletionMutation = useMutation({
-        mutationFn: async ({ rootId, goalId, completed }) => {
-            const res = await fractalApi.toggleGoalCompletion(rootId, goalId, completed);
+        mutationFn: async ({ rootId, goalId, completed, sequenceOptions = null }) => {
+            const res = await fractalApi.toggleGoalCompletion(rootId, goalId, completed, null, sequenceOptions);
             return res.data;
         },
         onSuccess: (data, variables) => {
@@ -122,11 +125,13 @@ export function GoalsProvider({ children }) {
             ));
             queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goals(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalsForSelection(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.rootGoal(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalAnalytics(variables.rootId) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalSequenceRoot(variables.rootId) });
             const goalType = formatGoalTypeLabel(data?.attributes?.type || data?.type);
             const action = variables.completed ? 'Completed' : 'Uncompleted';
             const goalName = data?.name;
@@ -144,8 +149,8 @@ export function GoalsProvider({ children }) {
         setActiveRootId,
         createGoal: (rootId, goalData) => createGoalMutation.mutateAsync({ rootId, goalData }),
         updateGoal: (rootId, goalId, updates) => updateGoalMutation.mutateAsync({ rootId, goalId, updates }),
-        deleteGoal: (rootId, goalId) => deleteGoalMutation.mutateAsync({ rootId, goalId }),
-        toggleGoalCompletion: (rootId, goalId, completed) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed }),
+        deleteGoal: (rootId, goalId, { beginNext = true } = {}) => deleteGoalMutation.mutateAsync({ rootId, goalId, beginNext }),
+        toggleGoalCompletion: (rootId, goalId, completed, sequenceOptions = null) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed, sequenceOptions }),
     }), [
         activeRootId,
         createGoalMutation,

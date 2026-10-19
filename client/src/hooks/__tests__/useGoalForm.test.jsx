@@ -17,11 +17,8 @@ describe('useGoalForm', () => {
                             description: 'Initial description',
                             deadline: '2026-04-01T00:00:00.000Z',
                             relevance_statement: 'Initial why',
-                            completed_via_children: false,
                             inherit_parent_activities: true,
                             track_activities: true,
-                            allow_manual_completion: true,
-                            targets: [],
                         },
                     },
                 },
@@ -50,11 +47,8 @@ describe('useGoalForm', () => {
                     description: 'Fresh description',
                     deadline: '2026-05-01T00:00:00.000Z',
                     relevance_statement: 'Fresh why',
-                    completed_via_children: true,
                     inherit_parent_activities: false,
                     track_activities: false,
-                    allow_manual_completion: false,
-                    targets: [],
                 },
             },
         });
@@ -72,25 +66,70 @@ describe('useGoalForm', () => {
         expect(result.current.description).toBe('Fresh description');
     });
 
-    it('hydrates targets from top-level session hierarchy goal nodes', () => {
+    it('hydrates the completion condition from top-level session hierarchy goal nodes', () => {
         const { result } = renderHook(() => useGoalForm({
             id: 'goal-1',
             name: 'Session Goal',
-            targets: [
-                { id: 'target-1', name: 'Section 1', completed: false },
-            ],
+            completion_condition: 'activity_threshold',
+            started_at: '2026-03-01T00:00:00Z',
+            condition: {
+                activity_definition_id: 'activity-1',
+                kind: 'single_session',
+                measure: 'sets',
+                min_sets: 3,
+                rules: [{ metric_definition_id: 'speed', operator: '>=', value: 80 }],
+            },
             attributes: {
                 id: 'goal-1',
                 description: 'From session hierarchy',
             },
         }, 'view'));
 
-        expect(result.current.targets).toEqual([
-            { id: 'target-1', name: 'Section 1', completed: false },
-        ]);
+        expect(result.current.completionCondition).toBe('activity_threshold');
+        expect(result.current.conditionDraft).toEqual(expect.objectContaining({
+            activity_definition_id: 'activity-1',
+            min_sets: '3',
+            rules: [{ metric_definition_id: 'speed', operator: '>=', value: '80' }],
+        }));
     });
 
-    it('refreshes same-goal form state when target revision changes', () => {
+    it('starts create mode from the supplied initial completion', () => {
+        const conditionDraft = { activity_definition_id: 'activity-1', kind: 'cumulative', rules: [] };
+        const { result } = renderHook(() => useGoalForm(null, 'create', {
+            completionCondition: 'activity_threshold',
+            conditionDraft,
+        }));
+
+        expect(result.current.completionCondition).toBe('activity_threshold');
+        expect(result.current.conditionDraft).toBe(conditionDraft);
+        expect(result.current.startedAt).toBe('');
+    });
+
+    it('refreshes same-goal form state when condition content changes without timestamps', () => {
+        const goalWithValue = (value) => ({
+            id: 'goal-1',
+            name: 'Session Goal',
+            completion_condition: 'activity_threshold',
+            condition: {
+                activity_definition_id: 'activity-1',
+                kind: 'single_session',
+                rules: [{ metric_definition_id: 'speed', operator: '>=', value }],
+            },
+            attributes: { id: 'goal-1', description: 'Condition snapshot' },
+        });
+        const { result, rerender } = renderHook(
+            ({ goal }) => useGoalForm(goal, 'view'),
+            { initialProps: { goal: goalWithValue(80) } }
+        );
+
+        expect(result.current.conditionDraft.rules[0].value).toBe('80');
+
+        rerender({ goal: goalWithValue(90) });
+
+        expect(result.current.conditionDraft.rules[0].value).toBe('90');
+    });
+
+    it('refreshes same-goal form state when the completion condition switches to manual', () => {
         const { result, rerender } = renderHook(
             ({ goal }) => useGoalForm(goal, 'view'),
             {
@@ -98,83 +137,18 @@ describe('useGoalForm', () => {
                     goal: {
                         id: 'goal-1',
                         name: 'Session Goal',
-                        attributes: {
-                            id: 'goal-1',
-                            description: 'Empty first snapshot',
-                            targets: [],
-                        },
+                        completion_condition: 'children',
+                        attributes: { id: 'goal-1' },
                     },
                 },
             }
         );
 
-        expect(result.current.targets).toEqual([]);
+        expect(result.current.completionCondition).toBe('children');
 
-        rerender({
-            goal: {
-                id: 'goal-1',
-                name: 'Session Goal',
-                targets: [
-                    { id: 'target-1', name: 'Section 1', completed: false },
-                ],
-                attributes: {
-                    id: 'goal-1',
-                    description: 'Target snapshot',
-                },
-            },
-        });
+        rerender({ goal: { id: 'goal-1', name: 'Session Goal', completion_condition: 'manual', attributes: { id: 'goal-1' } } });
 
-        expect(result.current.targets).toEqual([
-            { id: 'target-1', name: 'Section 1', completed: false },
-        ]);
-    });
-
-    it('refreshes same-goal form state when target content changes without timestamps', () => {
-        const { result, rerender } = renderHook(
-            ({ goal }) => useGoalForm(goal, 'view'),
-            {
-                initialProps: {
-                    goal: {
-                        id: 'goal-1',
-                        name: 'Session Goal',
-                        targets: [
-                            {
-                                id: 'target-1',
-                                name: 'Section 1',
-                                completed: false,
-                                metrics: [{ metric_id: 'speed', value: 80 }],
-                            },
-                        ],
-                        attributes: {
-                            id: 'goal-1',
-                            description: 'Target snapshot',
-                        },
-                    },
-                },
-            }
-        );
-
-        expect(result.current.targets[0].metrics[0].value).toBe(80);
-
-        rerender({
-            goal: {
-                id: 'goal-1',
-                name: 'Session Goal',
-                targets: [
-                    {
-                        id: 'target-1',
-                        name: 'Section 1',
-                        completed: false,
-                        metrics: [{ metric_id: 'speed', value: 90 }],
-                    },
-                ],
-                attributes: {
-                    id: 'goal-1',
-                    description: 'Target snapshot',
-                },
-            },
-        });
-
-        expect(result.current.targets[0].metrics[0].value).toBe(90);
+        expect(result.current.completionCondition).toBe('manual');
+        expect(result.current.conditionDraft).toBeNull();
     });
 });

@@ -35,39 +35,17 @@ export function normalizeMetricRows(rows) {
     return { error: null, metrics: normalized };
 }
 
-function parseGoalTargets(node) {
-    const rawTargets = node?.attributes?.targets ?? node?.targets;
-    if (!rawTargets) {
-        return [];
-    }
-
-    if (Array.isArray(rawTargets)) {
-        return rawTargets;
-    }
-
-    if (typeof rawTargets === 'string') {
-        try {
-            const parsed = JSON.parse(rawTargets);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    }
-
-    return [];
-}
-
 export function flattenGoals(node, activityId, goals = [], parentId = null) {
     if (!node) {
         return goals;
     }
 
     const childrenIds = node.children ? node.children.map((child) => child.id || child.attributes?.id) : [];
-    const targets = parseGoalTargets(node);
-    const hasTargetForActivity = !!activityId && targets.some((target) => {
-        const targetActivityId = target?.activity_id || target?.activity_definition_id;
-        return targetActivityId === activityId;
-    });
+    const completionCondition = node.completion_condition ?? node.attributes?.completion_condition;
+    const condition = node.condition ?? node.attributes?.condition ?? null;
+    const completesOnActivity = !!activityId
+        && completionCondition === 'activity_threshold'
+        && condition?.activity_definition_id === activityId;
 
     goals.push({
         id: node.id || node.attributes?.id,
@@ -77,7 +55,7 @@ export function flattenGoals(node, activityId, goals = [], parentId = null) {
         completed_at: node.attributes?.completed_at || node.completed_at || null,
         parent_id: parentId,
         childrenIds,
-        hasTargetForActivity,
+        completesOnActivity,
     });
 
     if (node.children && node.children.length > 0) {

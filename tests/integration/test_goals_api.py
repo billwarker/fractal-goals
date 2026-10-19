@@ -10,8 +10,7 @@ Tests cover:
 - PUT /api/goals/<goal_id> - Update goal
 - DELETE /api/goals/<goal_id> - Delete goal
 - PATCH /api/goals/<goal_id>/complete - Toggle completion
-- POST /api/goals/<goal_id>/targets - Add target
-- DELETE /api/goals/<goal_id>/targets/<target_id> - Remove target
+- PUT /api/<root_id>/goals/<goal_id>/condition - Set how a goal completes
 """
 
 import pytest
@@ -20,7 +19,7 @@ from datetime import datetime, timedelta
 from datetime import timezone
 import uuid
 
-from models import ActivityDefinition, Goal, GoalLevel, Session, SessionTemplate, Target
+from models import ActivityDefinition, Goal, GoalLevel, Session, SessionTemplate
 from tests.conftest import session_token_for
 
 
@@ -329,22 +328,22 @@ class TestGoalCRUDEndpoints:
         )
         assert response.status_code == 404
 
-    def test_update_goal_rejects_non_array_targets(self, authed_client, sample_ultimate_goal):
-        """Target payloads must keep their validated list shape."""
+    def test_update_goal_rejects_unknown_completion_condition(self, authed_client, sample_ultimate_goal):
+        """Completion conditions are one of three validated kinds."""
         response = authed_client.put(
             f'/api/goals/{sample_ultimate_goal.id}',
-            json={'targets': {'name': 'not-a-list'}}
+            json={'completion_condition': 'sometimes'}
         )
         assert response.status_code == 400
         assert response.get_json()['error'] == 'Validation failed'
 
-    def test_update_goal_rejects_child_deadline_after_parent(
+    def test_update_goal_saves_child_deadline_after_parent_with_a_warning(
         self,
         authed_client,
         db_session,
         sample_goal_hierarchy,
     ):
-        """Global goal updates should still enforce parent deadline rules via the service."""
+        """Due dates are soft guidance: a date after the parent's is saved and reported."""
         parent_goal = sample_goal_hierarchy['mid_term']
         child_goal = sample_goal_hierarchy['short_term']
         parent_goal.deadline = datetime(2026, 3, 20, tzinfo=timezone.utc)
@@ -355,10 +354,10 @@ class TestGoalCRUDEndpoints:
             json={'deadline': '2026-03-25'}
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 200
         payload = response.get_json()
-        assert payload['error'] == 'Child deadline cannot be later than parent deadline'
-        assert payload['parent_deadline'] == '2026-03-20'
+        assert payload['deadline'][:10] == '2026-03-25'
+        assert {'code': 'after_parent', 'parent_deadline': '2026-03-20'} in payload['deadline_warnings']
     
     def test_delete_goal(self, authed_client, db_session, sample_goal_hierarchy):
         """Test deleting a goal."""
@@ -426,19 +425,19 @@ class TestGoalCompletionEndpoints:
         response = authed_client.patch('/api/goals/nonexistent-id/complete')
         assert response.status_code == 404
 
-    def test_toggle_completion_rejects_goal_level_manual_completion_block(
+    def test_manual_completion_is_always_available_as_an_override(
         self,
         authed_client,
         db_session,
         sample_ultimate_goal,
     ):
-        sample_ultimate_goal.allow_manual_completion = False
+        sample_ultimate_goal.completion_condition = 'children'
         db_session.commit()
 
         response = authed_client.patch(f'/api/goals/{sample_ultimate_goal.id}/complete')
 
-        assert response.status_code == 403
-        assert response.get_json()['error'] == 'Manual completion is not allowed for this goal level'
+        assert response.status_code == 200
+        assert response.get_json()['completion_state']['source'] == 'manual_override'
 
     def test_toggle_completion_rejects_non_boolean_completed(self, authed_client, sample_ultimate_goal):
         """Completion updates should reject malformed completed payloads."""
@@ -687,186 +686,6 @@ class TestGoalOptionsEndpoints:
 
 
 @pytest.mark.integration
-class TestGoalTargetEndpoints:
-    """Test goal target management endpoints."""
-    
-    def test_add_target_to_goal(self, authed_client, sample_ultimate_goal):
-        """Test adding a target to a goal."""
-        payload = {
-            'description': 'Complete 100 sessions',
-            'target_value': 100,
-            'current_value': 0
-        }
-        response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            data=json.dumps(payload),
-            content_type='application/json'
-        )
-        assert response.status_code == 201
-        data = json.loads(response.data)
-        assert 'targets' in data or 'id' in data
-
-    def test_add_target_rejects_non_array_metrics(self, authed_client, sample_ultimate_goal):
-        """Target metrics must be sent as an array of objects."""
-        response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={'name': 'Bad Target', 'metrics': {'metric_id': 'x'}}
-        )
-        assert response.status_code == 400
-        assert response.get_json()['error'] == 'Validation failed'
-
-    def test_add_target_normalizes_empty_optional_fields(self, authed_client, db_session, sample_ultimate_goal):
-        """Empty builder optional fields should not crash direct target create."""
-        response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={
-                'name': 'Form ≥ 0',
-                'type': 'threshold',
-                'time_scope': 'all_time',
-                'start_date': '',
-                'end_date': '',
-                'linked_block_id': '',
-                'frequency_count': '',
-                'metrics': [],
-            }
-        )
-        assert response.status_code == 201
-        target = db_session.query(Target).filter(Target.id == response.get_json()['id']).first()
-        assert target is not None
-        assert target.start_date is None
-        assert target.end_date is None
-        assert target.linked_block_id is None
-        assert target.frequency_count is None
-    
-    def test_remove_target_from_goal(self, authed_client, sample_ultimate_goal):
-        """Test removing a target from a goal."""
-        # First add a target
-        payload = {
-            'description': 'Test target',
-            'target_value': 50,
-            'current_value': 0
-        }
-        response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            data=json.dumps(payload),
-            content_type='application/json'
-        )
-        assert response.status_code == 201
-        
-        # Get the target ID (implementation-dependent)
-        # This test documents expected behavior
-        # Actual implementation may vary
-        target_id = 'target-id-placeholder'
-        
-        response = authed_client.delete(
-            f'/api/goals/{sample_ultimate_goal.id}/targets/{target_id}'
-        )
-        # Should succeed or return 404 if target management differs
-        assert response.status_code in [200, 404]
-
-    def test_update_goal_omits_targets_to_preserve_existing(self, authed_client, db_session, sample_ultimate_goal):
-        """Omitting targets should patch scalars without replacing the target set."""
-        create_response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={'name': 'Preserved Target', 'metrics': []}
-        )
-        assert create_response.status_code == 201
-        target_id = create_response.get_json()['id']
-
-        update_response = authed_client.put(
-            f'/api/goals/{sample_ultimate_goal.id}',
-            json={'name': 'Renamed Goal'}
-        )
-        assert update_response.status_code == 200
-
-        target = db_session.query(Target).filter(Target.id == target_id).first()
-        assert target is not None
-        assert target.deleted_at is None
-
-    def test_update_goal_empty_targets_clears_existing(self, authed_client, db_session, sample_ultimate_goal):
-        """Providing targets=[] should replace the goal target set with empty."""
-        create_response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={'name': 'Clear Me', 'metrics': []}
-        )
-        assert create_response.status_code == 201
-        target_id = create_response.get_json()['id']
-
-        update_response = authed_client.put(
-            f'/api/goals/{sample_ultimate_goal.id}',
-            json={'targets': []}
-        )
-        assert update_response.status_code == 200
-
-        target = db_session.query(Target).filter(Target.id == target_id).first()
-        assert target is not None
-        assert target.deleted_at is not None
-
-    def test_update_target_patches_name(self, authed_client, db_session, sample_ultimate_goal):
-        """PATCH on a single target updates it in place without a goal save."""
-        create_response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={'name': 'Original Name', 'metrics': []}
-        )
-        assert create_response.status_code == 201
-        target_id = create_response.get_json()['id']
-
-        patch_response = authed_client.patch(
-            f'/api/goals/{sample_ultimate_goal.id}/targets/{target_id}',
-            json={'name': 'Updated Name'}
-        )
-        assert patch_response.status_code == 200
-        assert patch_response.get_json()['target']['name'] == 'Updated Name'
-
-        target = db_session.query(Target).filter(Target.id == target_id).first()
-        assert target.name == 'Updated Name'
-        assert target.deleted_at is None
-
-    def test_update_target_missing_returns_404(self, authed_client, sample_ultimate_goal):
-        """PATCH on a non-existent target returns 404."""
-        response = authed_client.patch(
-            f'/api/goals/{sample_ultimate_goal.id}/targets/does-not-exist',
-            json={'name': 'X'}
-        )
-        assert response.status_code == 404
-
-    def test_target_analytics_returns_read_model(self, authed_client, sample_ultimate_goal):
-        """The analytics endpoint returns target + instances + summary."""
-        create_response = authed_client.post(
-            f'/api/goals/{sample_ultimate_goal.id}/targets',
-            json={'name': 'Analytics Target', 'metrics': []}
-        )
-        assert create_response.status_code == 201
-        target_id = create_response.get_json()['id']
-
-        root_id = sample_ultimate_goal.root_id or sample_ultimate_goal.id
-        response = authed_client.get(f'/api/{root_id}/targets/{target_id}/analytics')
-        assert response.status_code == 200
-        data = response.get_json()
-        assert 'target' in data
-        assert 'instances' in data and isinstance(data['instances'], list)
-        assert 'summary' in data
-        assert data['summary']['total_count'] == 0
-
-        # `since=all` is accepted and still returns the read model.
-        all_response = authed_client.get(f'/api/{root_id}/targets/{target_id}/analytics?since=all')
-        assert all_response.status_code == 200
-        assert 'instances' in all_response.get_json()
-
-    def test_goal_activity_instances_endpoint(self, authed_client, sample_ultimate_goal):
-        """The goal/activity instances endpoint powers the builder live preview."""
-        root_id = sample_ultimate_goal.root_id or sample_ultimate_goal.id
-        # Unknown activity id returns an empty instance list (no crash).
-        response = authed_client.get(
-            f'/api/{root_id}/goals/{sample_ultimate_goal.id}/activities/nonexistent-activity/instances'
-        )
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['instances'] == []
-        assert 'activity_definition' in data
-
-
-@pytest.mark.integration
 class TestGoalValidation:
     """Test goal validation and business rules."""
     
@@ -946,8 +765,8 @@ class TestGlobalGoalEndpointProtection:
         ("delete", "/api/goals/some-goal-id", None),
         ("get", "/api/goals/some-goal-id", None),
         ("put", "/api/goals/some-goal-id", {"name": "Updated"}),
-        ("post", "/api/goals/some-goal-id/targets", {"name": "Target"}),
-        ("delete", "/api/goals/some-goal-id/targets/some-target-id", None),
+        ("put", "/api/some-root/goals/some-goal-id/condition", {"completion_condition": "manual"}),
+        ("get", "/api/some-root/goals/condition-progress?goal_ids=a", None),
     ])
     def test_endpoints_require_auth(self, client, method, path, payload):
         kwargs = {}
@@ -963,14 +782,14 @@ class TestGlobalGoalEndpointProtection:
         ("delete", "delete_goal"),
         ("get", "get_goal"),
         ("put", "update_goal"),
-        ("post", "add_target"),
-        ("delete", "delete_target"),
+        ("put", "put_condition"),
+        ("get", "condition_evidence"),
     ])
     def test_endpoints_return_404_for_wrong_owner(
         self, client, db_session, sample_ultimate_goal, method, endpoint_kind
     ):
         from config import config
-        from models import User, Target
+        from models import User
 
         other_user = User(
             id=str(uuid.uuid4()),
@@ -989,17 +808,6 @@ class TestGlobalGoalEndpointProtection:
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
         }
-
-        target_id = str(uuid.uuid4())
-        if endpoint_kind == "delete_target":
-            target = Target(
-                id=target_id,
-                goal_id=sample_ultimate_goal.id,
-                root_id=sample_ultimate_goal.id,
-                name="Protected Target"
-            )
-            db_session.add(target)
-            db_session.commit()
 
         if endpoint_kind == "list_goals":
             path = "/api/goals"
@@ -1021,11 +829,11 @@ class TestGlobalGoalEndpointProtection:
         elif endpoint_kind == "update_goal":
             path = f"/api/goals/{sample_ultimate_goal.id}"
             payload = {"name": "Cross User Update"}
-        elif endpoint_kind == "add_target":
-            path = f"/api/goals/{sample_ultimate_goal.id}/targets"
-            payload = {"name": "Cross User Target"}
+        elif endpoint_kind == "put_condition":
+            path = f"/api/{sample_ultimate_goal.id}/goals/{sample_ultimate_goal.id}/condition"
+            payload = {"completion_condition": "children"}
         else:
-            path = f"/api/goals/{sample_ultimate_goal.id}/targets/{target_id}"
+            path = f"/api/{sample_ultimate_goal.id}/goals/{sample_ultimate_goal.id}/condition/evidence"
             payload = None
 
         kwargs = {"headers": headers}

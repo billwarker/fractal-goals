@@ -47,6 +47,7 @@ export function buildGoalDeadlineCalendarEvent({
             id: goal.id,
             goalId: goal.id,
             goalIcon: presentation.goalIcon,
+            goalCompleted: completed,
             ...extendedProps,
             sortOrder: 3,
         },

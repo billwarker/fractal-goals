@@ -352,10 +352,9 @@ describe('Admin', () => {
             data: {
                 root_id: 'root-1',
                 goals: [
-                    { id: 'goal-1', name: 'Build a repertoire', level_name: 'Long Term Goal', targets: [] },
-                    { id: 'goal-2', name: 'Play CAGED triads', level_name: 'Short Term Goal', targets: [] },
-                    { id: 'goal-3', name: 'Improve triad speed', level_name: 'Immediate Goal',
-                        targets: [{ id: 'target-1', name: '120 BPM clean changes' }] },
+                    { id: 'goal-1', name: 'Build a repertoire', level_name: 'Long Term Goal', has_activity_condition: false },
+                    { id: 'goal-2', name: 'Play CAGED triads', level_name: 'Short Term Goal', has_activity_condition: false },
+                    { id: 'goal-3', name: 'Improve triad speed', level_name: 'Immediate Goal', has_activity_condition: true },
                 ],
                 sessions: [
                     { id: 'session-empty', name: 'Timer only', session_start: '2026-06-09T12:00:00Z', activity_instance_count: 0 },
@@ -626,7 +625,7 @@ describe('Admin', () => {
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
         expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
-        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('4 issues blocking publish');
+        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('3 issues blocking publish');
         fireEvent.click(screen.getByRole('button', { name: /Landing page content/ }));
         await waitFor(() => expect(getLandingExampleOptions).toHaveBeenCalledWith('root-1'));
         expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent))
@@ -642,11 +641,10 @@ describe('Admin', () => {
         fireEvent.change(screen.getByLabelText('Example goal for Connect your work to your goals'), {
             target: { value: 'goal-2' },
         });
-        fireEvent.change(screen.getByLabelText('Example goal for Set measurable targets'), {
+        const conditionGoalSelect = screen.getByLabelText('Example goal for Know when you’re done');
+        expect([...conditionGoalSelect.options].map((option) => option.value)).toEqual(['', 'goal-3']);
+        fireEvent.change(conditionGoalSelect, {
             target: { value: 'goal-3' },
-        });
-        fireEvent.change(screen.getByLabelText('Example target for Set measurable targets'), {
-            target: { value: 'target-1' },
         });
         expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('0 issues blocking publish');
         expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
@@ -675,20 +673,22 @@ describe('Admin', () => {
             showcase: emptyShowcase,
             tree_view_settings: { fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true },
         }));
-        expect(savedExamples[0].landing_content.goals.bullets.map((bullet) => [bullet.goal_id, bullet.target_id])).toEqual([
-            ['goal-1', null],
-            ['goal-2', null],
-            ['goal-3', 'target-1'],
+        expect(savedExamples[0].landing_content.goals.bullets.map((bullet) => [bullet.key, bullet.goal_id])).toEqual([
+            ['break_down', 'goal-1'],
+            ['associate_activities', 'goal-2'],
+            ['set_conditions', 'goal-3'],
         ]);
         fireEvent.click(screen.getByRole('button', { name: 'Remove Chinese language tracker' }));
         fireEvent.click(screen.getByText('Publish'));
         await waitFor(() => expect(publishLandingExamples).toHaveBeenCalled());
         const publishedExamples = publishLandingExamples.mock.calls.at(-1)[0].examples;
         expect(publishedExamples).toHaveLength(1);
-        expect(publishedExamples[0].landing_content.goals.bullets[2]).toEqual(expect.objectContaining({
+        expect(publishedExamples[0].landing_content.goals.bullets[2]).toEqual({
+            key: 'set_conditions',
+            heading: 'Know when you’re done',
+            body: expect.any(String),
             goal_id: 'goal-3',
-            target_id: 'target-1',
-        }));
+        });
         expect(publishedExamples[0].tree_view_settings).toEqual({ fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true });
     });
     it('lists beta signups and updates their status', async () => {

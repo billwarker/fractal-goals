@@ -101,7 +101,6 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
     const [levelStyles, setLevelStyles] = useState(() => (
         createInitialLevelStyles(parent, getGoalColor, getGoalSecondaryColor)
     ));
-    const [targets] = useState([]);
 
     useEffect(() => {
         if (!openIconPickerType) return undefined;
@@ -166,7 +165,6 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
             deadline: deadline || null,
             type: goalType,
             parent_id: parent ? (parent.attributes?.id || parent.id) : null,
-            targets,
             ...(!parent ? { level_styles: levelStyles } : {})
         });
     };

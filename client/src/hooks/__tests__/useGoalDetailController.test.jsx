@@ -54,7 +54,7 @@ describe('useGoalDetailController', () => {
             completionDate: new Date('2026-03-01T12:00:00Z'),
             noteContent: 'Done well',
         });
-        expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
+        expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false, null);
     });
 
     it('lets an explicit local uncomplete override stale completed props', async () => {
@@ -83,7 +83,7 @@ describe('useGoalDetailController', () => {
         expect(result.current.isCompleted).toBe(false);
         expect(result.current.localCompletedAt).toBe(null);
         expect(onBeforeUncompletionConfirm).toHaveBeenCalled();
-        expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true);
+        expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true, null);
     });
 
     it('resets state when the controlled goal changes', () => {

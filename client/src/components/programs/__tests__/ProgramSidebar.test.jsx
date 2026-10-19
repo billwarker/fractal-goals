@@ -3,6 +3,18 @@ import { fireEvent, screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import ProgramSidebar from '../ProgramSidebar';
 
+const { draggableInstances } = vi.hoisted(() => ({ draggableInstances: [] }));
+vi.mock('@fullcalendar/interaction', () => ({
+    Draggable: class {
+        constructor(element, options) {
+            this.element = element;
+            this.options = options;
+            this.destroy = vi.fn();
+            draggableInstances.push(this);
+        }
+    },
+}));
+
 vi.mock('../../atoms/GoalIcon', () => ({
     default: ({ color, secondaryColor }) => (
         <svg data-testid="goal-icon" data-color={color} data-secondary-color={secondaryColor} />
@@ -117,6 +129,9 @@ describe('ProgramSidebar', () => {
 
         expect(screen.getByText('Mid Goal')).toBeInTheDocument();
         expect(screen.getByText('Short Goal')).toBeInTheDocument();
+        // Completed goals are hidden until asked for.
+        expect(screen.queryByText('Immediate Goal')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByLabelText('Show completed'));
         expect(screen.getByText('Immediate Goal')).toBeInTheDocument();
         const completedRow = screen.getByText('Immediate Goal').closest('[data-goal-id="immediate"]');
         const completedIcon = completedRow.querySelector('[data-testid="goal-icon"]');
@@ -181,8 +196,149 @@ describe('ProgramSidebar', () => {
             }
         );
 
+        fireEvent.click(screen.getByLabelText('Show completed'));
         expect(screen.getByText('Mid Goal')).toBeInTheDocument();
         expect(screen.queryByText('Completed Before Program')).not.toBeInTheDocument();
         expect(screen.getByText('Completed During Program')).toBeInTheDocument();
     });
+
+    describe('creating goals from the hierarchy', () => {
+        const tree = {
+            id: 'long',
+            type: 'LongTermGoal',
+            name: 'Long Goal',
+            children: [
+                { id: 'open', parent_id: 'long', type: 'MidTermGoal', name: 'Open Mid', children: [] },
+                { id: 'done', parent_id: 'long', type: 'MidTermGoal', name: 'Done Mid', completed: true, children: [] },
+                { id: 'paused', parent_id: 'long', type: 'MidTermGoal', name: 'Paused Mid', paused: true, children: [] },
+                { id: 'leaf', parent_id: 'long', type: 'ImmediateGoal', name: 'Leaf', children: [] },
+            ],
+        };
+        const byId = Object.fromEntries([tree, ...tree.children].map((goal) => [goal.id, goal]));
+        const renderSidebar = (props = {}) => renderWithProviders(
+            <ProgramSidebar
+                programGoalSeeds={[tree]}
+                onGoalClick={vi.fn()}
+                getGoalDetails={(id) => byId[id]}
+                hideMetrics
+                {...props}
+            />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false }
+        );
+
+        it('offers "+" only after the goal icon scopes it, and never on closed or lowest-level goals', () => {
+            const onStartSubGoalCreation = vi.fn();
+            renderSidebar({ onStartSubGoalCreation, defaultShowCompleted: true });
+
+            expect(screen.getByText('Select a goal’s icon to add a goal under it.')).toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /Add a child goal/ })).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Scope to Open Mid' }));
+            expect(screen.getByRole('button', { name: 'Clear scope for Open Mid' })).toHaveAttribute('aria-pressed', 'true');
+            fireEvent.click(screen.getByRole('button', { name: 'Add a child goal under Open Mid' }));
+            expect(onStartSubGoalCreation).toHaveBeenCalledWith(expect.objectContaining({ id: 'open' }));
+
+            ['Done Mid', 'Paused Mid', 'Leaf'].forEach((name) => {
+                fireEvent.click(screen.getByRole('button', { name: `Scope to ${name}` }));
+                expect(screen.queryByRole('button', { name: `Add a child goal under ${name}` })).not.toBeInTheDocument();
+            });
+            expect(screen.queryByRole('button', { name: 'Add a child goal under Open Mid' })).not.toBeInTheDocument();
+        });
+
+        it('keeps icons inert and shows no creation hint without a creation handler', () => {
+            renderSidebar();
+            expect(screen.queryByRole('button', { name: /Scope to/ })).not.toBeInTheDocument();
+            expect(screen.queryByText(/to add a goal under it/)).not.toBeInTheDocument();
+        });
+
+        it('marks a just-created goal', () => {
+            renderSidebar({ onStartSubGoalCreation: vi.fn(), justCreatedGoalId: 'open' });
+            expect(document.querySelector('[data-goal-id="open"]')).toHaveAttribute('data-just-created', 'true');
+            expect(document.querySelector('[data-goal-id="long"]')).not.toHaveAttribute('data-just-created');
+        });
+    });
+
+    describe('due dates on the Program calendar page', () => {
+        const tree = {
+            id: 'long',
+            type: 'LongTermGoal',
+            name: 'Long Goal',
+            deadline: '2026-12-01',
+            children: [
+                { id: 'soon', parent_id: 'long', type: 'MidTermGoal', name: 'Soon Mid', deadline: '2026-10-21', children: [] },
+                { id: 'none', parent_id: 'long', type: 'MidTermGoal', name: 'Undated Mid', children: [] },
+                { id: 'done', parent_id: 'long', type: 'MidTermGoal', name: 'Done Mid', completed: true, deadline: '2026-10-01', children: [] },
+            ],
+        };
+        const byId = Object.fromEntries([tree, ...tree.children].map((goal) => [goal.id, goal]));
+        const renderSidebar = (props = {}) => renderWithProviders(
+            <ProgramSidebar
+                programGoalSeeds={[tree]}
+                onGoalClick={vi.fn()}
+                getGoalDetails={(id) => byId[id]}
+                hideMetrics
+                defaultShowCompleted
+                {...props}
+            />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false }
+        );
+
+        beforeEach(() => { draggableInstances.length = 0; });
+
+        it('shows due chips for open goals only, left of the tree', () => {
+            renderSidebar({ dueToday: '2026-10-19' });
+            const soonRow = document.querySelector('[data-goal-id="soon"]');
+            expect(soonRow).toHaveTextContent('In 2d');
+            expect(document.querySelector('[data-goal-id="long"]')).toHaveTextContent('Dec 1');
+            expect(document.querySelector('[data-goal-id="none"] [data-due-tone]')).toBeNull();
+            expect(document.querySelector('[data-goal-id="done"] [data-due-tone]')).toBeNull();
+        });
+
+        it('shows no due chips elsewhere', () => {
+            renderSidebar();
+            expect(document.querySelector('[data-due-tone]')).toBeNull();
+        });
+
+        it('makes open goals drag sources for the calendar when enabled', () => {
+            const { unmount } = renderSidebar({ dueToday: '2026-10-19', dueDragEnabled: true, onStartSubGoalCreation: vi.fn() });
+            expect(screen.getByText(/Drag a goal onto a day to set its due date\./)).toBeInTheDocument();
+            expect(draggableInstances).toHaveLength(1);
+            expect(draggableInstances[0].options.itemSelector).toBe('[data-goal-due-drag="true"]');
+            expect(document.querySelector('[data-goal-id="soon"]')).toHaveAttribute('data-goal-due-drag', 'true');
+            expect(document.querySelector('[data-goal-id="done"]')).not.toHaveAttribute('data-goal-due-drag');
+            expect(draggableInstances[0].options.eventData(document.querySelector('[data-goal-id="soon"]')))
+                .toEqual({ title: 'Soon Mid', create: false });
+            unmount();
+            expect(draggableInstances[0].destroy).toHaveBeenCalled();
+        });
+
+        it('creates no drag source when disabled', () => {
+            renderSidebar({ dueToday: '2026-10-19' });
+            expect(draggableInstances).toHaveLength(0);
+            expect(document.querySelector('[data-goal-due-drag]')).toBeNull();
+        });
+    });
+
+    it('numbers sequence steps in order and says what a waiting step waits on', () => {
+        const tree = {
+            id: 'long', type: 'LongTermGoal', name: 'Long Goal',
+            children: [
+                { id: 's2', parent_id: 'long', type: 'MidTermGoal', name: 'Second', sequence_track_id: 't', sequence_position: 2, paused: true, pause_reason: 'sequence', children: [] },
+                { id: 's1', parent_id: 'long', type: 'MidTermGoal', name: 'First', sequence_track_id: 't', sequence_position: 1, children: [] },
+                { id: 'held', parent_id: 'long', type: 'MidTermGoal', name: 'Held', paused: true, pause_reason: 'manual', children: [] },
+            ],
+        };
+        const byId = Object.fromEntries([tree, ...tree.children].map((goal) => [goal.id, goal]));
+        renderWithProviders(
+            <ProgramSidebar programGoalSeeds={[tree]} onGoalClick={vi.fn()} getGoalDetails={(id) => byId[id]} hideMetrics />,
+            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false }
+        );
+
+        const rows = [...document.querySelectorAll('[data-goal-id]')].map((row) => row.getAttribute('data-goal-id'));
+        expect(rows).toEqual(['long', 's1', 's2', 'held']);
+        expect(screen.getByLabelText('Step 1 in sequence')).toHaveTextContent('1');
+        expect(screen.getByText('Paused · waiting on First')).toBeInTheDocument();
+        expect(screen.getByText('Paused')).toBeInTheDocument();
+    });
 });
+

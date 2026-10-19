@@ -6,6 +6,7 @@ import LandingGoalCards from './LandingGoalCards';
 import LandingSkeleton from './LandingSkeleton';
 import LandingTakeoverShell from './LandingTakeoverShell';
 import styles from './LandingExplorerTakeover.module.css';
+import scopedModalStyles from './LandingScopedModal.module.css';
 
 // Same modules as Landing's lazy imports, so the chunks are shared and
 // already warm by the time the takeover opens from the inline preview.
@@ -34,7 +35,8 @@ export default function LandingExplorerTakeover({
     seedLevels = [],
     onNodeClick,
     onClearSelectedGoal,
-    onTargetOpen,
+    conditionSnapshot = null,
+    evidencePortalTarget = null,
     goalDemos,
     cardStyles,
     onCanvasElement,
@@ -114,7 +116,9 @@ export default function LandingExplorerTakeover({
                                         initialView={goalDetailEntry.view}
                                         initialViewKey={goalDetailEntry.key}
                                         onGoalSelect={onNodeClick}
-                                        onTargetOpen={onTargetOpen}
+                                        conditionSnapshot={conditionSnapshot}
+                                        portalTarget={evidencePortalTarget}
+                                        overlayClassName={scopedModalStyles.scopedOverlay}
                                     />
                                 </GoalLevelsProvider>
                             </Suspense>

@@ -1,49 +1,10 @@
-"""Serializers for activities, metrics, sets, targets, circuits, and work intervals.
+"""Serializers for activities, metrics, sets, circuits, and work intervals.
 """
 
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
 from .activity_progress_view_service import serialize_activity_tag
 from services._serialize_common import format_utc, format_utc_precise
-
-
-def serialize_target(target):
-    """Serialize a Target object."""
-    metrics_json = []
-    if getattr(target, 'metric_conditions', None):
-        for condition in target.metric_conditions:
-            metrics_json.append({
-                "metric_id": condition.metric_definition_id,
-                "metric_definition_id": condition.metric_definition_id,
-                "operator": condition.operator,
-                "value": condition.target_value,
-                "target_value": condition.target_value
-            })
-            
-    return {
-        "id": target.id,
-        "goal_id": target.goal_id,
-        "root_id": target.root_id,
-        "activity_id": target.activity_id,
-        "activity_instance_id": getattr(target, 'activity_instance_id', None),
-        "activity_group_id": getattr(target, 'activity_group_id', None),
-        "template_id": getattr(target, 'template_id', None),
-        "name": target.name,
-        "type": target.type or "threshold",
-        "metrics": metrics_json,
-        "time_scope": target.time_scope or "all_time",
-        "start_date": format_utc(target.start_date),
-        "end_date": format_utc(target.end_date),
-        "linked_block_id": target.linked_block_id,
-        "frequency_days": target.frequency_days,
-        "frequency_count": target.frequency_count,
-        "completed": target.completed or False,
-        "completed_at": format_utc(target.completed_at),
-        "completed_session_id": getattr(target, 'completed_session_id', None),
-        "completed_instance_id": getattr(target, 'completed_instance_id', None),
-        "created_at": format_utc(target.created_at),
-        "updated_at": format_utc(target.updated_at)
-    }
 
 
 def serialize_metric_value(metric):

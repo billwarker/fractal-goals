@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { flattenGoalTree, parseGoalTargets } from '../utils/goalNodeModel';
+import { flattenGoalTree } from '../utils/goalNodeModel';
+import { getGoalCompletionCondition, getGoalCondition } from '../utils/goalConditions';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 import { normalizeGoalIds, useActivityGoalAssociations } from './useActivityGoalAssociations';
@@ -41,12 +42,10 @@ export function useSessionDetailGoalAssociations({
             .map((goal) => ({
                 ...goal,
                 parentName: goal.parent_id ? goalsById.get(goal.parent_id)?.name || null : null,
-                hasTargetForActivity: Boolean(
+                completesOnActivity: Boolean(
                     activityDefinitionId
-                    && parseGoalTargets(goal).some((target) => {
-                        const targetActivityId = target?.activity_id || target?.activity_definition_id;
-                        return targetActivityId === activityDefinitionId;
-                    })
+                    && getGoalCompletionCondition(goal) === 'activity_threshold'
+                    && getGoalCondition(goal)?.activity_definition_id === activityDefinitionId
                 ),
             }));
     }, [associationContext, fractalTree, showAssociationModal]);

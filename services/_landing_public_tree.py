@@ -1,18 +1,17 @@
-"""Mixin for LandingPublishService: the public goal tree, targets, history, and flow tree.
+"""Mixin for LandingPublishService: the public goal tree, conditions, history, and flow tree.
 """
 
 import logging
 from services.goal_note_read_model import load_root_goal_notes
 from services.landing_history_projection import compact_landing_timeline_entry
-from models import ActivityDefinition, Goal, GoalLevel, MetricDefinition, Target
+from models import ActivityDefinition, Goal, GoalLevel, MetricDefinition
 from services.activity_association_service import ActivityAssociationService
-from services.goal_target_service import GoalTargetService
 from services.goal_history_read_model import GoalHistoryReadModel
 from services.goal_timeline_service import GoalTimelineService
 from services.goal_type_utils import get_canonical_goal_type
 from services.note_service import NoteService
 from services.programs import ProgramService
-from services.serializers import calculate_smart_status, format_utc
+from services.serializers import calculate_smart_status, format_utc, serialize_goal_condition
 from services.service_types import JsonDict
 from services.session_service import SessionService
 from services._landing_common import (
@@ -26,81 +25,6 @@ logger = logging.getLogger(__name__)
 
 
 class _LandingPublicTreeMixin:
-    def _serialize_public_target(self, target: Target) -> JsonDict:
-        metrics = []
-        for condition in getattr(target, "metric_conditions", []) or []:
-            metrics.append({
-                "metric_id": condition.metric_definition_id,
-                "metric_definition_id": condition.metric_definition_id,
-                "operator": condition.operator,
-                "value": condition.target_value,
-                "target_value": condition.target_value,
-            })
-        return {
-            "id": target.id,
-            "name": target.name,
-            "activity_id": target.activity_id,
-            "type": target.type or "threshold",
-            "metrics": metrics,
-            "time_scope": target.time_scope or "all_time",
-            "start_date": format_utc(target.start_date),
-            "end_date": format_utc(target.end_date),
-            "frequency_days": target.frequency_days,
-            "frequency_count": target.frequency_count,
-            "completed": bool(target.completed),
-            "completed_at": format_utc(target.completed_at),
-            "created_at": format_utc(target.created_at),
-        }
-
-    def _build_landing_target_analytics(
-        self, root: Goal, serialized_tree: JsonDict, goals_by_id: dict[str, Goal], history=None
-    ) -> dict[str, JsonDict]:
-        """Publish bounded target analytics for the read-only public demo."""
-        targets = []
-        stack = [serialized_tree]
-        while stack:
-            node = stack.pop()
-            targets.extend(node.get("attributes", {}).get("targets") or [])
-            stack.extend(node.get("children") or [])
-
-        target_service = GoalTargetService(self.db_session)
-        result = {}
-        for target in targets:
-            target_id = target.get("id")
-            if not target_id:
-                continue
-            if not target.get("activity_id"):
-                result[target_id] = {
-                    "target": target,
-                    "activity_definition": None,
-                    "instances": [],
-                    "summary": {
-                        "created_at": target.get("created_at"),
-                        "total_count": 0,
-                        "last_instance_at": None,
-                        "days_since_created": None,
-                        "conditions": [],
-                        "completed": bool(target.get("completed")),
-                        "completed_at": target.get("completed_at"),
-                    },
-                }
-                continue
-            payload, error, _ = target_service.get_target_analytics(
-                root.id,
-                target_id,
-                root.owner_id,
-                since="all",
-                validated_root=root,
-                preloaded_goals_by_id=goals_by_id,
-                history=history,
-            )
-            if error or not payload:
-                continue
-            instances = payload.get("instances") or []
-            payload["instances"] = instances[-LANDING_EXAMPLE_ANALYTICS_LIMIT:]
-            result[target_id] = payload
-        return result
-
     @staticmethod
     def _serialize_landing_metric_ref(metric: MetricDefinition) -> JsonDict:
         fm = getattr(metric, 'fractal_metric', None)
@@ -155,13 +79,8 @@ class _LandingPublicTreeMixin:
         } if level else None
         # Use the app's canonical SMART logic so the snapshot's is_smart / smart_status
         # match the authenticated app (which also passes measurable/achievable via
-        # child-completion or activity associations, not just targets).
+        # child-completion or activity associations, not just conditions).
         smart_status = calculate_smart_status(goal)
-        targets = [
-            self._serialize_public_target(target)
-            for target in (goal.targets_rel or [])
-            if target.deleted_at is None
-        ]
         associated_activities = [
             self._serialize_landing_activity_ref(activity)
             for activity in (goal.associated_activities or [])
@@ -193,11 +112,11 @@ class _LandingPublicTreeMixin:
             "level_id": goal.level_id,
             "level_name": level_name,
             "level": level_payload,
-            "targets": targets,
+            "completion_condition": goal.completion_condition,
+            "condition": serialize_goal_condition(goal.condition),
+            "started_at": format_utc(goal.started_at),
             "relevance_statement": goal.relevance_statement,
-            "completed_via_children": bool(goal.completed_via_children),
             "inherit_parent_activities": bool(goal.inherit_parent_activities),
-            "allow_manual_completion": bool(goal.allow_manual_completion),
             "track_activities": bool(goal.track_activities),
             "is_smart": all(smart_status.values()),
             "smart_status": smart_status,
@@ -228,23 +147,22 @@ class _LandingPublicTreeMixin:
             "paused_at": attributes["paused_at"],
             "description": goal.description,
             "deadline": format_utc(goal.deadline),
+            "completion_condition": goal.completion_condition,
+            "condition": attributes["condition"],
             "attributes": attributes,
             "children": children,
         }
         if level:
             result["level_characteristics"] = {
-                "can_have_targets": getattr(level, "can_have_targets", True),
                 "deadline_min_value": level.deadline_min_value,
                 "deadline_min_unit": level.deadline_min_unit,
                 "deadline_max_value": level.deadline_max_value,
                 "deadline_max_unit": level.deadline_max_unit,
                 "max_children": level.max_children,
-                "auto_complete_when_children_done": getattr(level, "auto_complete_when_children_done", False),
                 "description_required": getattr(level, "description_required", False),
                 "default_deadline_offset_value": level.default_deadline_offset_value,
                 "default_deadline_offset_unit": level.default_deadline_offset_unit,
                 "sort_children_by": level.sort_children_by,
-                "allow_manual_completion": level.allow_manual_completion,
                 "requires_smart": getattr(level, "requires_smart", False),
             }
         return result

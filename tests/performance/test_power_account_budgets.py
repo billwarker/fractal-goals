@@ -27,7 +27,8 @@ from models import (
     ProgramDayOccurrenceSchedule,
     ProgramSessionPlan,
     SessionTemplate,
-    Target,
+    GoalCompletionCondition,
+    GoalConditionMetricRule,
     activity_goal_associations,
     program_goals,
     session_goals,
@@ -72,9 +73,6 @@ def power_account_dataset(db_session, test_user):
         goals.append(goal)
         parents_by_rank.setdefault(rank + 1, []).append(goal)
     db_session.flush()
-    for goal in goals[::3]:
-        db_session.add(Target(id=str(uuid.uuid4()), goal_id=goal.id, root_id=root.id, name=f"Target {goal.name}"))
-
     group = ActivityGroup(id=str(uuid.uuid4()), root_id=root.id, name="Power Group")
     db_session.add(group)
     db_session.flush()
@@ -96,6 +94,19 @@ def power_account_dataset(db_session, test_user):
             db_session.execute(activity_goal_associations.insert().values(
                 activity_id=activity.id, goal_id=goals[(index * 7 + offset) % GOAL_COUNT].id,
             ))
+    db_session.flush()
+    # Every third goal completes on an activity threshold (progress reads stay bounded).
+    for position, goal in enumerate(goals[::3]):
+        activity = activities[position % len(activities)]
+        goal.completion_condition = "activity_threshold"
+        condition = GoalCompletionCondition(
+            id=str(uuid.uuid4()), goal_id=goal.id, root_id=root.id, activity_definition_id=activity.id,
+            kind="single_session", measure="sets", min_sets=1,
+        )
+        condition.rules.append(GoalConditionMetricRule(
+            metric_definition_id=metrics_by_activity[activity.id][0].id, operator=">=", value=10,
+        ))
+        db_session.add(condition)
     template = SessionTemplate(
         id=str(uuid.uuid4()), root_id=root.id, name="Power Template",
         template_data=json.dumps({"sections": [{"name": "Main", "activities": []}]}),

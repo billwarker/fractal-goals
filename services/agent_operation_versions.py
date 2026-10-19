@@ -11,7 +11,8 @@ from models import (
     Program,
     ProgramBlock,
     ProgramDay,
-    Target,
+    GoalCompletionCondition,
+    GoalConditionMetricRule,
     SplitDefinition,
     activity_goal_associations,
     program_day_goals,
@@ -19,10 +20,11 @@ from models import (
     program_goals,
 )
 from services.agent_harness_common import AgentHarnessError, _digest
+from services.serializers import serialize_goal_condition
 
 MAX_GOAL_SUBTREE_ROWS = 500
 MAX_GOAL_SUBTREE_DEPTH = 4
-MAX_GOAL_SUBTREE_TARGETS = 2000
+MAX_GOAL_SUBTREE_CONDITIONS = 2000
 
 
 def _columns(entity):
@@ -95,34 +97,45 @@ def _goal_subtree_rows(session, root_id, goal_id, *, for_update):
     goals = query.all()
     if len(goals) != len(goal_ids):
         raise AgentHarnessError("Goal subtree changed during review", 409, "stale_context")
-    targets_query = session.query(Target).filter(
-        Target.goal_id.in_(goal_ids),
-    ).order_by(Target.id).limit(MAX_GOAL_SUBTREE_TARGETS + 1).populate_existing()
+    conditions_query = session.query(GoalCompletionCondition).filter(
+        GoalCompletionCondition.goal_id.in_(goal_ids),
+        GoalCompletionCondition.deleted_at.is_(None),
+    ).order_by(GoalCompletionCondition.id).limit(MAX_GOAL_SUBTREE_CONDITIONS + 1).populate_existing()
     if for_update:
-        targets_query = targets_query.with_for_update()
-    targets = targets_query.all()
-    if len(targets) > MAX_GOAL_SUBTREE_TARGETS:
+        conditions_query = conditions_query.with_for_update()
+    conditions = conditions_query.all()
+    if len(conditions) > MAX_GOAL_SUBTREE_CONDITIONS:
         raise AgentHarnessError(
-            "Goal subtree exceeds the reviewed target snapshot limit",
+            "Goal subtree exceeds the reviewed condition snapshot limit",
             409,
             "snapshot_too_large",
         )
-    targets_by_goal = {}
-    for target in targets:
-        targets_by_goal.setdefault(target.goal_id, []).append(target)
-    return goals, targets_by_goal
+    rules_by_condition = {}
+    if conditions:
+        for rule in session.query(GoalConditionMetricRule).filter(
+            GoalConditionMetricRule.condition_id.in_([condition.id for condition in conditions]),
+        ).order_by(GoalConditionMetricRule.id).populate_existing():
+            rules_by_condition.setdefault(rule.condition_id, []).append(rule)
+    conditions_by_goal = {
+        condition.goal_id: {
+            **_columns(condition),
+            "rules": [_columns(rule) for rule in rules_by_condition.get(condition.id, [])],
+        }
+        for condition in conditions
+    }
+    return goals, conditions_by_goal
 
 
 def operation_state_hash(session, root_id, operation, *, for_update=False):
     """Hash reviewed state; execution repeats under deterministic row locks."""
     operation_type = operation["type"]
     if operation_type == "update_goal":
-        goals, targets_by_goal = _goal_subtree_rows(
+        goals, conditions_by_goal = _goal_subtree_rows(
             session, root_id, operation["goal_id"], for_update=for_update,
         )
         subtree = [{
             "goal": _columns(goal),
-            "targets": [_columns(target) for target in targets_by_goal.get(goal.id, [])],
+            "condition": conditions_by_goal.get(goal.id),
         } for goal in goals]
         return _digest({"goal_subtree": subtree})
 
@@ -255,20 +268,25 @@ def operation_restore_payload(session, root_id, operation):
             "name": goal.name,
             "description": goal.description,
             "deadline": goal.deadline.date().isoformat() if goal.deadline else None,
+            "started_at": goal.started_at.date().isoformat() if goal.started_at else None,
             "parent_id": goal.parent_id,
-            "completed_via_children": goal.completed_via_children,
+            "completion_condition": goal.completion_condition,
+            "condition": serialize_goal_condition(goal.condition),
             "relevance_statement": goal.relevance_statement,
             "inherit_parent_activities": goal.inherit_parent_activities,
-            "allow_manual_completion": goal.allow_manual_completion,
             "track_activities": goal.track_activities,
             "progress_settings": goal.progress_settings,
         }
-        if "targets" in data or ("deadline" in data and goal.children):
+        if "deadline" in data and goal.children:
             supported = False
-        prior = {key: value for key, value in prior.items() if key in data}
+        restores_condition = "completion_condition" in data or "condition" in data
+        prior = {
+            key: value for key, value in prior.items()
+            if key in data or (restores_condition and key in {"completion_condition", "condition"})
+        }
         return {"type": kind, "goal_id": goal.id, "data": prior,
                 "undo_supported": supported,
-                "reason": "Goal targets or cascading child deadlines require a dedicated inverse plan" if not supported else None}
+                "reason": "Cascading child deadlines require a dedicated inverse plan" if not supported else None}
 
     if kind in {"update_activity", "associate_activity_goals"}:
         activity = session.query(ActivityDefinition).filter_by(

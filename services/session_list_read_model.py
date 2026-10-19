@@ -1,6 +1,6 @@
 """Session card summaries without activity, set, note or template-body hydration."""
 from sqlalchemy import case, func, select, union
-from models import Goal, _safe_load_json, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, Target, session_goals
+from models import Goal, _safe_load_json, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, session_goals
 from services.goal_loading import goal_serializer_relationship_loaders
 from services.serializers import format_utc, serialize_goal
 from services.session_runtime import get_template_color, normalize_session_type
@@ -16,8 +16,6 @@ class SessionListReadModel:
         references = union(
             select(Goal.completed_session_id.label('session_id'), Goal.id.label('goal_id')).where(
                 Goal.completed_session_id.in_(session_ids), Goal.deleted_at.is_(None)),
-            select(Target.completed_session_id, Goal.id).join(Goal, Goal.id == Target.goal_id).where(
-                Target.completed_session_id.in_(session_ids), Target.deleted_at.is_(None), Goal.deleted_at.is_(None)),
             select(Session.id, Goal.id).join(session_goals, session_goals.c.session_id == Session.id).join(
                 Goal, Goal.id == session_goals.c.goal_id,
             ).where(Session.id.in_(session_ids), Goal.completed.is_(True), Goal.deleted_at.is_(None),

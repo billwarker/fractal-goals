@@ -194,8 +194,8 @@ function SessionDetailContent() {
                         if (response?.data) setSelectedGoal(response.data);
                         return response?.data || response;
                     }}
-                    onToggleGoalCompletion={async (goalId, currentStatus) => {
-                        const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
+                    onToggleGoalCompletion={async (goalId, currentStatus, sequenceOptions = null) => {
+                        const response = await toggleGoalCompletion({ goalId, completed: !currentStatus, sequenceOptions });
                         if (response?.data) setSelectedGoal(response.data);
                         return response;
                     }}
@@ -278,8 +278,8 @@ function SessionDetailContent() {
                     if (response?.data) setSelectedGoal(response.data);
                     return response?.data || response;
                 }}
-                onToggleGoalCompletion={async (goalId, currentStatus) => {
-                    const response = await toggleGoalCompletion({ goalId, completed: !currentStatus });
+                onToggleGoalCompletion={async (goalId, currentStatus, sequenceOptions = null) => {
+                    const response = await toggleGoalCompletion({ goalId, completed: !currentStatus, sequenceOptions });
                     if (response?.data) setSelectedGoal(response.data);
                     return response;
                 }}

@@ -2,7 +2,7 @@
 from typing import Any
 from sqlalchemy import Float, cast, func, literal, or_, select, union_all
 from models import (
-    ActivityDefinition, ActivityInstance, EventLog, Goal, GoalPauseInterval, Session, Target,
+    ActivityDefinition, ActivityInstance, EventLog, Goal, GoalPauseInterval, Session,
     activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations,
 )
 from services.instance_goal_evidence import instance_contribution_clause
@@ -57,16 +57,6 @@ def timeline_evidence_query(root_id, goal_ids, *, inherited_parent_id=None):
         eligible,
     )
     queries = [activity]
-    for prefix, timestamp, event_type in (
-        ('target_created', Target.created_at, 'target.created'),
-        ('target_achieved', Target.completed_at, 'target.achieved'),
-    ):
-        query = row(prefix, Target.id, timestamp, event_type, 'target').where(
-            Target.root_id == root_id, Target.goal_id.in_(goal_ids), Target.deleted_at.is_(None),
-        )
-        if event_type == 'target.achieved':
-            query = query.where(Target.completed.is_(True))
-        queries.append(query)
     for prefix, timestamp, event_type in (
         ('goal_lifecycle_created', Goal.created_at, 'goal.created'),
         ('goal_lifecycle_completed', Goal.completed_at, 'goal.completed'),

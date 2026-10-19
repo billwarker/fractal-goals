@@ -20,7 +20,7 @@ from uuid import uuid4
 
 from models import (
     ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, SessionTemplate,
-    SessionWorkInterval, Target, Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule,
+    SessionWorkInterval, Program, ProgramBlock, ProgramDay, ProgramDayOccurrenceSchedule,
     CircuitDefinition, CircuitSlot, CircuitRun,
     activity_goal_associations, session_goals, program_goals, program_block_goals, program_day_goals,
 )
@@ -291,10 +291,10 @@ class TestSessionListEndpoints:
 
         assert [goal['id'] for goal in matching_session['completed_goals']] == [completed_goal.id]
 
-    def test_list_sessions_completed_goals_include_target_session_and_exclude_other_sessions(
+    def test_list_sessions_completed_goals_follow_completion_session_and_exclude_other_sessions(
         self, authed_client, db_session, sample_practice_session, sample_goal_hierarchy
     ):
-        """Target completion provenance should drive completed_goals without leaking across sessions."""
+        """A goal's completion session drives completed_goals without leaking across sessions."""
         root_id = sample_practice_session.root_id
         target_goal = sample_goal_hierarchy['short_term']
         other_goal = sample_goal_hierarchy['long_term']
@@ -311,26 +311,11 @@ class TestSessionListEndpoints:
         db_session.add(other_session)
         db_session.flush()
 
-        db_session.add_all([
-            Target(
-                id=str(uuid4()),
-                goal_id=target_goal.id,
-                root_id=root_id,
-                name='Complete in current session',
-                completed=True,
-                completed_at=datetime.now(timezone.utc),
-                completed_session_id=sample_practice_session.id,
-            ),
-            Target(
-                id=str(uuid4()),
-                goal_id=other_goal.id,
-                root_id=root_id,
-                name='Complete elsewhere',
-                completed=True,
-                completed_at=datetime.now(timezone.utc),
-                completed_session_id=other_session.id,
-            ),
-        ])
+        for goal, session in ((target_goal, sample_practice_session), (other_goal, other_session)):
+            goal.completed = True
+            goal.completion_source = 'condition'
+            goal.completed_at = datetime(2026, 2, 1, 9, 30, tzinfo=timezone.utc)
+            goal.completed_session_id = session.id
         db_session.commit()
 
         response = authed_client.get(f'/api/{root_id}/sessions')

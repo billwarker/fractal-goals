@@ -294,7 +294,6 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         const level = _resolveLevel(goalOrType);
         if (!level) return {};
         return {
-            allow_manual_completion: level.allow_manual_completion ?? true,
             track_activities: level.track_activities ?? true,
             requires_smart: level.requires_smart ?? false,
             deadline_min_value: level.deadline_min_value,
@@ -302,8 +301,6 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
             deadline_max_value: level.deadline_max_value,
             deadline_max_unit: level.deadline_max_unit,
             max_children: level.max_children,
-            auto_complete_when_children_done: level.auto_complete_when_children_done ?? false,
-            can_have_targets: level.can_have_targets ?? true,
 
             description_required: level.description_required ?? false,
             default_deadline_offset_value: level.default_deadline_offset_value,
@@ -312,11 +309,6 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         };
     };
 
-
-    const canHaveTargets = (goalOrType) => {
-        const chars = getLevelCharacteristics(goalOrType);
-        return chars.can_have_targets ?? true;
-    };
 
     const getDeadlineConstraints = (goalOrType) => {
         const chars = getLevelCharacteristics(goalOrType);
@@ -345,7 +337,6 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         getGoalColorDark,
         getCompletionColor,
         getLevelCharacteristics,
-        canHaveTargets,
         getDeadlineConstraints,
         updateGoalLevel: updateGoalLevelMutation.mutateAsync,
         resetGoalLevel: resetGoalLevelMutation.mutateAsync

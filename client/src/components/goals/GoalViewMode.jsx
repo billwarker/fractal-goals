@@ -8,7 +8,7 @@ import styles from '../GoalDetailModal.module.css';
 
 const GoalActivityHeatmap = lazyWithRetry(() => import('../goalDetail/GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
 
-const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
+const CompletionConditionSummary = lazyWithRetry(() => import('../goalDetail/CompletionConditionSummary'), 'components/goalDetail/CompletionConditionSummary');
 
 function GoalViewMode({
     mode,
@@ -19,32 +19,23 @@ function GoalViewMode({
     goalColor,
     parentGoalName,
     parentGoalColor,
-    isCompleted,
-    levelConfig,
-    trackActivities,
     displayMode,
     programs,
-    targets,
-    associatedActivities,
     activityDefinitions,
     name,
-    description,
-    deadline,
     relevanceStatement,
     goalCompletionNote,
+    conditionSnapshot = null,
     // Handlers
     onClose,
-    onUpdate,
-    setTargets,
-    onTargetClick,
-    onRequestTargetBuilder,
+    onCompleteNow,
+    portalTarget = null,
+    overlayClassName = '',
     readOnly = false,
     readOnlyTimelineEntries = null,
     onTimelineExplore,
 }) {
     const navigate = useNavigate();
-    const hasTargets = Array.isArray(targets) && targets.length > 0;
-    const canTrackActivities = trackActivities && levelConfig.track_activities !== false;
 
     return (
         <div className={styles.viewContainer}>
@@ -105,35 +96,20 @@ function GoalViewMode({
                 );
             })()}
 
-            {/* Targets Section - View Mode (Read-only) */}
-            {(hasTargets || canTrackActivities) && (
+            {mode !== 'create' && (
                 <Suspense fallback={null}>
-                    <TargetManager
-                        targets={targets}
-                        setTargets={setTargets}
-                        activityDefinitions={activityDefinitions}
-                        associatedActivities={associatedActivities}
+                    <CompletionConditionSummary
+                        goal={goal}
                         goalId={goalId}
+                        goalName={name}
                         rootId={rootId}
-                        isEditing={false}
-                        viewMode="list"
-                        onSave={readOnly ? undefined : (newTargets) => {
-                            if (onUpdate && goalId) {
-                                onUpdate(goalId, {
-                                    name,
-                                    description,
-                                    deadline,
-                                    relevance_statement: relevanceStatement,
-                                    targets: newTargets
-                                });
-                            }
-                        }}
-                        headerColor="var(--color-text-primary)"
-                        goalType={goalType}
-                        goalCompleted={isCompleted}
-                        onTargetClick={onTargetClick}
-                        onRequestBuilder={readOnly ? undefined : onRequestTargetBuilder}
+                        goalColor={goalColor}
+                        activityDefinitions={activityDefinitions}
                         readOnly={readOnly}
+                        snapshot={conditionSnapshot}
+                        onCompleteNow={onCompleteNow}
+                        portalContainer={portalTarget}
+                        overlayClassName={overlayClassName}
                     />
                 </Suspense>
             )}

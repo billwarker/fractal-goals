@@ -28,7 +28,6 @@ class _GoalFractalsMixin:
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
             selectinload(Goal.level),
-            selectinload(Goal.targets_rel),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter(
@@ -115,13 +114,11 @@ class _GoalFractalsMixin:
                 scoped = GoalLevel(
                     name=source.name, rank=source.rank, color=style['color'],
                     secondary_color=style['secondary_color'], icon=style['icon'], owner_id=current_user_id,
-                    allow_manual_completion=source.allow_manual_completion,
                     track_activities=source.track_activities, requires_smart=source.requires_smart,
                     deadline_min_value=source.deadline_min_value, deadline_min_unit=source.deadline_min_unit,
                     deadline_max_value=source.deadline_max_value, deadline_max_unit=source.deadline_max_unit,
                     max_children=source.max_children,
-                    auto_complete_when_children_done=source.auto_complete_when_children_done,
-                    can_have_targets=source.can_have_targets, description_required=source.description_required,
+                    description_required=source.description_required,
                     default_deadline_offset_value=source.default_deadline_offset_value,
                     default_deadline_offset_unit=source.default_deadline_offset_unit,
                     sort_children_by=source.sort_children_by,

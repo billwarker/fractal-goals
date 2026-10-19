@@ -39,7 +39,6 @@ class TestGoalLevelsApi:
             rank=4,
             owner_id=None,
             color="#123456",
-            allow_manual_completion=True,
         )
         db_session.add(system_level)
         db_session.commit()

@@ -67,6 +67,7 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
                     if (event.key === 'Enter' || event.key === ' ') activateGoalEvent(eventInfo, onGoalActivate, event);
                 } : undefined}
             >
+                <span className={styles.eventGoalPrefix}>{eventInfo.event.extendedProps.goalCompleted ? 'Done:' : 'Due:'}</span>
                 {goalIcon ? (
                     <span className={styles.eventGoalIcon} aria-hidden="true">
                         <GoalIcon {...goalIcon} size={13} />

@@ -241,15 +241,16 @@ function Sessions() {
         return updatedGoal;
     }, [queryClient, rootId, updateGoal]);
 
-    const handleToggleGoalCompletion = useCallback(async (goalId, currentStatus) => {
-        const updatedGoal = await toggleGoalCompletion(rootId, goalId, !currentStatus);
+    const handleToggleGoalCompletion = useCallback(async (goalId, currentStatus, sequenceOptions = null) => {
+        const updatedGoal = await toggleGoalCompletion(rootId, goalId, !currentStatus, sequenceOptions);
         if (updatedGoal) setSelectedGoal(updatedGoal);
         queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
         return updatedGoal;
     }, [queryClient, rootId, toggleGoalCompletion]);
 
-    const handleDeleteGoal = useCallback(async (goalId) => {
-        const result = await deleteGoal(rootId, goalId);
+    // The goal modal's Delete option confirms first and passes the goal with the user's choices.
+    const handleDeleteGoal = useCallback(async (goal, options = {}) => {
+        const result = await deleteGoal(rootId, goal?.id ?? goal, options);
         setSelectedGoal(null);
         queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
         return result;

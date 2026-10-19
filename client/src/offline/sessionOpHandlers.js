@@ -361,6 +361,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                     queryKeys.fractalTree(op.meta.rootId),
                     queryKeys.goals(op.meta.rootId),
                     queryKeys.goalTimelinesRoot(op.meta.rootId),
+                    queryKeys.goalConditionRoot(op.meta.rootId),
                     queryKeys.goalAnalytics(op.meta.rootId),
                 ]);
                 break;

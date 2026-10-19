@@ -37,8 +37,28 @@ function TreeCenterEdge({ data, style, className }) {
     );
 }
 
+/** A sequence arrow between sibling icons, arcing above the row, clear of the labels beside and below them. */
+function SequenceEdge({ data, style, className, markerEnd }) {
+    const source = data?.sourceCenter;
+    const target = data?.targetCenter;
+    if (!source || !target) return null;
+    const radius = data?.iconRadius || 15;
+    const startY = source.y - radius;
+    const endY = target.y - radius;
+    const dip = Math.min(startY, endY) - radius * 2.4;
+    return (
+        <BaseEdge
+            path={`M ${source.x} ${startY} C ${source.x} ${dip} ${target.x} ${dip} ${target.x} ${endY}`}
+            style={style}
+            className={className}
+            markerEnd={markerEnd}
+        />
+    );
+}
+
 const edgeTypes = {
     treeCenter: TreeCenterEdge,
+    sequence: SequenceEdge,
 };
 
 const EMPTY_ARRAY = [];

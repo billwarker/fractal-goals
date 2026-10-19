@@ -10,7 +10,7 @@ import uuid
 import pytest
 
 from models import Goal, GoalLevel
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ def long_term_goal(db_session, test_user, ultimate_goal, levels):
 
 @pytest.fixture
 def service(db_session):
-    return GoalService(db_session, sync_targets=sync_goal_targets)
+    return GoalService(db_session)
 
 
 # ---------------------------------------------------------------------------

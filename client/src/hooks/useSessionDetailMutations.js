@@ -6,6 +6,7 @@ import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
+import { applyCreatedGoal } from '../utils/goalTreeCache';
 import { invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 import { useSessionCompletion } from './useSessionCompletion';
@@ -210,11 +211,12 @@ export function useSessionDetailMutations({
     });
 
     const toggleGoalCompletionMutation = useMutation({
-        mutationFn: ({ goalId, completed }) => fractalApi.toggleGoalCompletion(
+        mutationFn: ({ goalId, completed, sequenceOptions = null }) => fractalApi.toggleGoalCompletion(
             rootId,
             goalId,
             completed,
-            completed ? sessionId : null
+            completed ? sessionId : null,
+            sequenceOptions,
         ),
         onSuccess: (response, variables) => {
             const goalResponse = response?.data;
@@ -229,6 +231,7 @@ export function useSessionDetailMutations({
                 queryClient.setQueryData(goalsForSelectionKey, (previous) => replaceGoalInList(previous, goalResponse));
             }
             invalidateGoalQueries();
+            queryClient.invalidateQueries({ queryKey: queryKeys.goalSequenceRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: sessionNotesKey });
             invalidateSessionListQueries();
@@ -734,6 +737,7 @@ export function useSessionDetailMutations({
     const createGoal = useCallback(async (goalData) => {
         try {
             const response = await fractalApi.createGoal(rootId, goalData);
+            applyCreatedGoal(queryClient, queryKeys, rootId, response.data);
             invalidateGoalQueries();
             queryClient.invalidateQueries({ queryKey: sessionKey });
             queryClient.invalidateQueries({ queryKey: activitiesKey });

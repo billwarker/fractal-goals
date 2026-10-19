@@ -5,11 +5,12 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import useGoalHierarchyHighlights from '../../hooks/useGoalHierarchyHighlights';
+import useJustCreatedGoal from '../../hooks/useJustCreatedGoal';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
-import { useTargetMutations } from '../../hooks/useTargetQueries';
+import { prefillConditionFromInstance } from '../../utils/goalConditions';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import HierarchySection from './HierarchySection';
-import TargetsSection from './TargetsSection';
+import ConditionCardsSection from './ConditionCardsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 import { logError } from '../../utils/logger';
 import { fractalApi } from '../../utils/api';
@@ -19,14 +20,16 @@ import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '..
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-const TargetAnalyticsModal = lazyWithRetry(() => import('../goalDetail/TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
+const ConditionEvidenceModal = lazyWithRetry(() => import('../goalDetail/ConditionEvidenceModal'), 'components/goalDetail/ConditionEvidenceModal');
 
 function SessionGoalHierarchyPanel({
     selectedActivity,
     onGoalClick,
     onGoalCreated,
     readOnly = false,
-    targetModal = null,
+    conditionSnapshots = null,
+    // Where the evidence modal portals and which overlay class scopes it (embedded landing demos).
+    conditionModalHost = null,
     activityGoalScope = null,
     onGoalScopeToggle,
     className = '',
@@ -39,8 +42,7 @@ function SessionGoalHierarchyPanel({
         activityInstances,
         activities: activityDefinitions,
         activityGroups,
-        targetAchievements,
-        achievedTargetIds,
+        conditionProgressByGoalId,
         sessionGoalsView,
     } = useActiveSessionData();
     const { createGoal, updateSession } = useActiveSessionActions();
@@ -48,7 +50,14 @@ function SessionGoalHierarchyPanel({
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
-    const [activeTarget, setActiveTarget] = useState(null);
+    const [evidenceCard, setEvidenceCard] = useState(null);
+    const [justCreatedGoalId, markGoalCreated] = useJustCreatedGoal();
+    // Published landing snapshots carry progress alongside each goal's evidence.
+    const snapshotProgressByGoalId = useMemo(() => (
+        conditionSnapshots
+            ? Object.fromEntries(Object.entries(conditionSnapshots).map(([goalId, snapshot]) => [goalId, snapshot?.progress]))
+            : null
+    ), [conditionSnapshots]);
     const [scopeModalOpen, setScopeModalOpen] = useState(false);
     const programInfo = session?.program_info || null;
     const programId = programInfo?.program_id || null;
@@ -73,8 +82,6 @@ function SessionGoalHierarchyPanel({
         const metricScopeIds = getProgramMetricScopeGoalIds(scopeSource, selectableGoalTree);
         return Array.from(buildProgramRenderScopeGoalIds(selectableGoalTree, metricScopeIds));
     }, [localSessionData?.program_context, program, programId, selectableGoalTree]);
-    const activeTargetGoalId = activeTarget?._goalId || null;
-    const { deleteTarget } = useTargetMutations(rootId, activeTargetGoalId);
 
     const activeActivityDef = useMemo(() => {
         if (!selectedActivity) return null;
@@ -93,7 +100,7 @@ function SessionGoalHierarchyPanel({
 
     const {
         sessionHierarchy,
-        targetCards,
+        conditionCards,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
         manualGoalIds,
@@ -105,8 +112,7 @@ function SessionGoalHierarchyPanel({
         activityInstances,
         localSessionData,
         selectedActivity,
-        targetAchievements,
-        achievedTargetIds,
+        conditionProgressByGoalId: snapshotProgressByGoalId || conditionProgressByGoalId,
     });
 
     const displayHierarchy = sessionHierarchy;
@@ -147,22 +153,31 @@ function SessionGoalHierarchyPanel({
             );
             const newGoalData = await createGoal(payloadWithAssociation);
             setCreateSubGoalParent(null);
+            const newGoalId = newGoalData?.id ?? newGoalData?.attributes?.id;
+            // Without a selected activity the new goal joins this session's goals, so the
+            // session hierarchy keeps showing it; with one, working toward that activity does.
+            if (newGoalId && !activeActivityDef) {
+                await handleApplyScope([...manualGoalIds, String(newGoalId)]);
+            }
+            markGoalCreated(newGoalData);
             if (onGoalCreated) onGoalCreated(newGoalData?.name);
             return newGoalData;
         } catch (err) {
             logError('Failed to create sub goal', err);
             throw err;
         }
-    }, [activeActivityDef, createGoal, onGoalCreated]);
+    }, [activeActivityDef, createGoal, handleApplyScope, manualGoalIds, markGoalCreated, onGoalCreated]);
 
-    const handleTargetDelete = useCallback((target) => {
-        if (!target?.id || !activeTargetGoalId) return;
-        deleteTarget(target.id)
-            .then(() => setActiveTarget(null))
-            .catch(() => {
-                // The mutation hook owns user-facing error notifications.
-            });
-    }, [activeTargetGoalId, deleteTarget]);
+    // A goal created while an activity is selected completes on that activity, seeded from the
+    // selected instance's best set.
+    const initialCompletion = useMemo(() => (
+        activeActivityDef?.metric_definitions
+            ? {
+                completionCondition: 'activity_threshold',
+                conditionDraft: prefillConditionFromInstance(selectedActivity, activeActivityDef),
+            }
+            : null
+    ), [activeActivityDef, selectedActivity]);
 
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
@@ -183,6 +198,7 @@ function SessionGoalHierarchyPanel({
                         completedSecondaryColor={completedSecondaryColor}
                         {...hierarchyHighlights}
                         onStartSubGoalCreation={readOnly ? undefined : handleStartSubGoalCreation}
+                        justCreatedGoalId={justCreatedGoalId}
                         scopedActivityName={scopedActivityName}
                         onAdjustScope={!readOnly && !selectedActivity ? () => setScopeModalOpen(true) : undefined}
                     />
@@ -195,34 +211,28 @@ function SessionGoalHierarchyPanel({
                             </small>
                         </div>
                     )}
-                    <TargetsSection
-                        targets={targetCards}
+                    <ConditionCardsSection
+                        cards={conditionCards}
                         activityDefinitions={activityDefinitions}
                         scopedActivityName={scopedActivityName}
-                        onTargetClick={setActiveTarget}
+                        getGoalColor={getGoalColor}
+                        onCardClick={setEvidenceCard}
                     />
                 </div>
             </div>
 
-            {activeTarget && (
-                <React.Suspense fallback={<div>Loading Target...</div>}>
-                    <TargetAnalyticsModal
-                        mode="view"
+            {evidenceCard && (
+                <React.Suspense fallback={null}>
+                    <ConditionEvidenceModal
+                        isOpen
+                        onClose={() => setEvidenceCard(null)}
                         rootId={rootId}
-                        goalId={activeTargetGoalId}
-                        target={activeTarget}
-                        goalType={activeTarget._goalType}
-                        goalColor={getGoalColor(activeTarget._goalType)}
-                        activityDefinitions={activityDefinitions}
-                        associatedActivities={activityDefinitions}
-                        analyticsData={targetModal?.resolveAnalyticsData?.(activeTarget) || null}
-                        readOnly={Boolean(targetModal?.readOnly)}
-                        portalTarget={targetModal?.portalTarget || null}
-                        overlayClassName={targetModal?.overlayClassName || ''}
-                        targets={targetCards.filter((target) => target._goalId === activeTargetGoalId)}
-                        setTargets={() => {}}
-                        onDelete={targetModal?.readOnly ? undefined : handleTargetDelete}
-                        onClose={() => setActiveTarget(null)}
+                        goalId={evidenceCard.goalId}
+                        goalName={evidenceCard.goalName}
+                        accentColor={getGoalColor(evidenceCard.goalType)}
+                        snapshot={conditionSnapshots?.[evidenceCard.goalId] || null}
+                        portalContainer={conditionModalHost?.portalContainer || null}
+                        overlayClassName={conditionModalHost?.overlayClassName || ''}
                     />
                 </React.Suspense>
             )}
@@ -240,6 +250,7 @@ function SessionGoalHierarchyPanel({
                         activityDefinitions={activityDefinitions}
                         activityGroups={activityGroups}
                         initialActivities={activeActivityDef ? [activeActivityDef] : []}
+                        initialCompletion={initialCompletion}
                     />
                 </React.Suspense>,
                 document.body

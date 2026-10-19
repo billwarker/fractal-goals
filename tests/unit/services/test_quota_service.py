@@ -334,7 +334,6 @@ def test_storage_usage_is_exact_and_executes_as_one_scalar_statement(
             sample_ultimate_goal.name,
             sample_ultimate_goal.description,
             sample_ultimate_goal.relevance_statement,
-            sample_ultimate_goal.targets,
             sample_ultimate_goal.progress_settings,
             sample_ultimate_goal.completion_reason,
         ),

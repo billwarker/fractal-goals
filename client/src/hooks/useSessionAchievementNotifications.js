@@ -1,119 +1,67 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import notify from '../utils/notify';
+import { flattenSessionGoalsViewGoals } from '../utils/goalNodeModel';
+import { getTypeDisplayName } from '../utils/goalHelpers';
 
+/**
+ * Announce goals this session completes (or un-completes) on their own.
+ *
+ * Completion is decided on the server; this watches the derived condition progress for the
+ * session's goals and notifies on transitions after the first load, never for goals that were
+ * already complete when the session opened.
+ */
 export function useSessionAchievementNotifications({
-    rootId,
     sessionId,
-    achievedTargetIds,
-    targetAchievements,
-    goalAchievements,
+    conditionProgressByGoalId,
+    sessionGoalsView,
     sessionLoading,
     instancesLoading,
     sessionGoalsViewLoading,
 }) {
-    const targetNotificationsInitializedRef = useRef(false);
-    const goalNotificationsInitializedRef = useRef(false);
-    const prevAchievedTargetIdsRef = useRef(new Set());
-    const prevCompletedIdsRef = useRef(new Set());
+    const initializedRef = useRef(false);
+    const previousCompletedRef = useRef(new Set());
+    const goalsById = useMemo(() => new Map(
+        flattenSessionGoalsViewGoals(sessionGoalsView).map((goal) => [String(goal.id), goal]),
+    ), [sessionGoalsView]);
 
     useEffect(() => {
-        targetNotificationsInitializedRef.current = false;
-        goalNotificationsInitializedRef.current = false;
-        prevAchievedTargetIdsRef.current = new Set();
-        prevCompletedIdsRef.current = new Set();
-    }, [rootId, sessionId]);
+        initializedRef.current = false;
+        previousCompletedRef.current = new Set();
+    }, [sessionId]);
 
     useEffect(() => {
-        if (!achievedTargetIds || !targetAchievements) return;
+        if (!conditionProgressByGoalId) return;
         if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
-        if (!targetNotificationsInitializedRef.current) {
-            prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-            targetNotificationsInitializedRef.current = true;
+        const progressEntries = Object.entries(conditionProgressByGoalId);
+        if (progressEntries.length === 0) return;
+
+        const currentCompleted = new Set(
+            progressEntries.filter(([, progress]) => progress?.completed).map(([goalId]) => goalId),
+        );
+        if (!initializedRef.current) {
+            previousCompletedRef.current = currentCompleted;
+            initializedRef.current = true;
             return;
         }
 
-        const previousAchieved = prevAchievedTargetIdsRef.current;
-        const newlyAchieved = [];
-        for (const targetId of achievedTargetIds) {
-            if (!previousAchieved.has(targetId)) {
-                const status = targetAchievements.get(targetId);
-                if (status && !status.wasAlreadyCompleted) newlyAchieved.push(status);
-            }
+        const label = (goalId) => {
+            const goal = goalsById.get(goalId);
+            const level = goal?.type ? getTypeDisplayName(goal.type) : 'Goal';
+            return `${level}: ${goal?.name || 'Goal'}`;
+        };
+        const completed = [...currentCompleted].filter((goalId) => !previousCompletedRef.current.has(goalId));
+        const reverted = [...previousCompletedRef.current].filter((goalId) => (
+            !currentCompleted.has(goalId) && conditionProgressByGoalId[goalId]
+        ));
+        if (completed.length > 0) {
+            notify.success(`Completed — ${completed.map(label).join(', ')}`, { duration: 6000 });
         }
-        if (newlyAchieved.length > 0) {
-            const names = newlyAchieved.map((status) => status.target.name || 'Target').join(', ');
-            notify.success(`Target achieved: ${names}`, { duration: 5000 });
+        if (reverted.length > 0) {
+            notify.success(`No longer complete — ${reverted.map(label).join(', ')}`, { duration: 6000 });
         }
-
-        const newlyReverted = [];
-        for (const targetId of previousAchieved) {
-            if (!achievedTargetIds.has(targetId)) {
-                const status = targetAchievements.get(targetId);
-                if (status) newlyReverted.push(status);
-            }
-        }
-        if (newlyReverted.length > 0) {
-            const names = newlyReverted.map((status) => status.target.name || 'Target').join(', ');
-            notify.success(`Target reverted: ${names}`, { duration: 5000 });
-        }
-
-        prevAchievedTargetIdsRef.current = new Set(achievedTargetIds);
-    }, [
-        achievedTargetIds,
-        instancesLoading,
-        sessionGoalsViewLoading,
-        sessionLoading,
-        targetAchievements,
-    ]);
-
-    useEffect(() => {
-        if (!goalAchievements) return;
-        if (sessionLoading || instancesLoading || sessionGoalsViewLoading) return;
-
-        const currentCompletedIds = new Set();
-        goalAchievements.forEach((status, goalId) => {
-            if (status.allAchieved) currentCompletedIds.add(goalId);
-        });
-
-        if (!goalNotificationsInitializedRef.current) {
-            prevCompletedIdsRef.current = currentCompletedIds;
-            goalNotificationsInitializedRef.current = true;
-            return;
-        }
-
-        const previousCompletedIds = prevCompletedIdsRef.current;
-        const newlyCompleted = [];
-        for (const goalId of currentCompletedIds) {
-            if (!previousCompletedIds.has(goalId)) {
-                const status = goalAchievements.get(goalId);
-                if (status && !status.wasAlreadyCompleted) newlyCompleted.push(status);
-            }
-        }
-        if (newlyCompleted.length > 0) {
-            const messages = newlyCompleted.map((status) => `${status.goalType || 'Goal'} Completed: ${status.goalName}`);
-            notify.success(messages.join(', '), { duration: 6000 });
-        }
-
-        const newlyUncompleted = [];
-        for (const goalId of previousCompletedIds) {
-            if (!currentCompletedIds.has(goalId)) {
-                const status = goalAchievements.get(goalId);
-                if (status) newlyUncompleted.push(status);
-            }
-        }
-        if (newlyUncompleted.length > 0) {
-            const messages = newlyUncompleted.map((status) => `${status.goalType || 'Goal'} Uncompleted: ${status.goalName}`);
-            notify.success(messages.join(', '), { duration: 6000 });
-        }
-
-        prevCompletedIdsRef.current = currentCompletedIds;
-    }, [
-        goalAchievements,
-        instancesLoading,
-        sessionGoalsViewLoading,
-        sessionLoading,
-    ]);
+        previousCompletedRef.current = currentCompleted;
+    }, [conditionProgressByGoalId, goalsById, instancesLoading, sessionGoalsViewLoading, sessionLoading]);
 }
 
 export default useSessionAchievementNotifications;

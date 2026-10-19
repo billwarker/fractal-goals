@@ -310,7 +310,7 @@ class TestProgramDaySessionCredits:
             f"/api/{credit_world['root'].id}/programs/{credit_world['program'].id}/metrics"
             f"?range_start={yesterday}&range_end={yesterday}&timezone=UTC"
         ).get_json()
-        assert metrics["calculation_version"] == 10
+        assert metrics["calculation_version"] == 11
         assert metrics["days"][0]["state"] == "scheduled_met"
 
         restored = _put_credit(authed_client, credit_world, session_id=off_plan_id, disposition="automatic")

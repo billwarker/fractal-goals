@@ -39,9 +39,9 @@ from models import (
     SessionTemplateStats,
     SignupInviteKey,
     SplitDefinition,
-    Target,
-    TargetContributionLedger,
-    TargetMetricCondition,
+    GoalCompletionCondition,
+    GoalConditionMetricRule,
+    GoalSequenceTrack,
     TemplateSectionStats,
     User,
     activity_goal_associations,
@@ -483,13 +483,17 @@ class AdminService(_AdminBetaSignupsMixin):
         self._delete_for_roots(EventLog, root_ids)
         self._delete_for_roots(AnalyticsDashboard, root_ids)
 
-        target_ids = [
-            row[0] for row in self.db_session.query(Target.id).filter(Target.root_id.in_(root_ids)).all()
+        condition_ids = [
+            row[0] for row in self.db_session.query(GoalCompletionCondition.id).filter(
+                GoalCompletionCondition.root_id.in_(root_ids),
+            ).all()
         ]
-        if target_ids:
-            self.db_session.execute(delete(TargetContributionLedger).where(TargetContributionLedger.target_id.in_(target_ids)))
-            self.db_session.execute(delete(TargetMetricCondition).where(TargetMetricCondition.target_id.in_(target_ids)))
-        self._delete_for_roots(Target, root_ids)
+        if condition_ids:
+            self.db_session.execute(
+                delete(GoalConditionMetricRule).where(GoalConditionMetricRule.condition_id.in_(condition_ids))
+            )
+        self._delete_for_roots(GoalCompletionCondition, root_ids)
+        self._delete_for_roots(GoalSequenceTrack, root_ids)
 
         metric_ids = [
             row[0] for row in self.db_session.query(MetricDefinition.id).filter(

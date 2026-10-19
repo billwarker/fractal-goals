@@ -163,15 +163,12 @@ def complete_activity_instance(current_user, root_id, instance_id):
             return jsonify({"error": error}), status
 
         result = payload["serialized"]
-        # Get any targets/goals that were achieved during this completion
+        # Goals whose condition this completion satisfied
         if async_completion:
-            result['achieved_targets'] = []
             result['completed_goals'] = []
             result['evaluation_queued'] = True
         else:
-            achievements = get_recent_achievements()
-            result['achieved_targets'] = achievements.get('achieved_targets', [])
-            result['completed_goals'] = achievements.get('completed_goals', [])
+            result['completed_goals'] = get_recent_achievements().get('completed_goals', [])
 
         result['progress_comparison'] = payload['progress_comparison']
         

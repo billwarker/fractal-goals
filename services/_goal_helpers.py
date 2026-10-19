@@ -3,14 +3,17 @@
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import selectinload
 
-from models import ActivityInstance, ActivityDefinition, ActivityGroup, Goal, GoalLevel, MetricDefinition, Note, Session, SessionTemplate, SplitDefinition, Target, activity_goal_associations, get_goal_by_id, validate_root_goal
+from models import ActivityInstance, ActivityDefinition, ActivityGroup, Goal, GoalLevel, MetricDefinition, Note, Session, SessionTemplate, SplitDefinition, activity_goal_associations, get_goal_by_id, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.goal_loading import load_fractal_goals_for_serialization
 from services.association_reconciliation import append_goal_association_event
+from services.goal_condition_service import (
+    ConditionValidationError, normalize_condition_payload, reconcile_goal, write_condition,
+)
 from validators import parse_date_string
 
 from services._goal_service_common import authorize_goal_access, logger
@@ -24,7 +27,7 @@ class _GoalHelpersMixin:
         """Return ``goal`` with its whole subtree bulk-loaded for serialize_goal.
 
         Serializing a goal with children otherwise lazy-loads every descendant's
-        level, targets, and associations one query at a time.
+        level, condition, and associations one query at a time.
         """
         return self._load_fractal_goals_for_serialization(goal.root_id or goal.id).get(goal.id, goal)
 
@@ -137,12 +140,6 @@ class _GoalHelpersMixin:
         for item in subtree:
             item.deleted_at = deleted_at
 
-        for target in self.db_session.query(Target).filter(
-            Target.goal_id.in_(subtree_ids),
-            Target.deleted_at.is_(None),
-        ).all():
-            target.deleted_at = deleted_at
-
         return subtree
 
     def _soft_delete_root_entities(self, root_id: str, deleted_at: datetime) -> None:
@@ -154,7 +151,6 @@ class _GoalHelpersMixin:
             MetricDefinition,
             SplitDefinition,
             SessionTemplate,
-            Target,
             Note,
         ):
             query = self.db_session.query(model).filter(model.root_id == root_id)
@@ -181,6 +177,57 @@ class _GoalHelpersMixin:
         except ValueError:
             return None, "Invalid deadline format. Use YYYY-MM-DD"
 
+    def _validate_completion_payload(self, root_id, data) -> tuple[str | dict, int] | None:
+        """Reject an invalid start date or condition before any row is written."""
+        if data.get('started_at'):
+            _, error = self._parse_deadline(data['started_at'])
+            if error:
+                return "Invalid start date format. Use YYYY-MM-DD", 400
+        if data.get('completion_condition') == 'activity_threshold':
+            try:
+                normalize_condition_payload(self.db_session, root_id, data.get('condition'))
+            except ConditionValidationError as error:
+                return {"error": str(error), "field": "condition"}, 400
+        return None
+
+    def _apply_completion_fields(self, goal, data, pending_events) -> tuple[str | dict, int] | None:
+        """Apply start date and completion condition from a create/update payload.
+
+        A goal the condition completed is re-evaluated in place when its condition or active
+        period changes; a newly satisfied condition is only reported (the client confirms).
+        """
+        changed = False
+        if 'started_at' in data:
+            started_at, error = self._parse_deadline(data['started_at'])
+            if error:
+                return "Invalid start date format. Use YYYY-MM-DD", 400
+            if started_at is not None and not isinstance(started_at, datetime):
+                started_at = datetime.combine(started_at, datetime.min.time())
+            goal.started_at = started_at or goal.created_at or datetime.now(timezone.utc).replace(tzinfo=None)
+            changed = True
+        # Only an explicit start date is held to the due date; a goal created after its due date
+        # (a backfilled goal) simply has an empty active period until its start is moved back.
+        if 'started_at' in data and data['started_at'] and goal.deadline and goal.started_at.date() > (
+            goal.deadline.date() if isinstance(goal.deadline, datetime) else goal.deadline
+        ):
+            return "The start date must be on or before the due date", 400
+        if 'completion_condition' in data or 'condition' in data:
+            completion_condition = data.get('completion_condition') or goal.completion_condition
+            try:
+                write_condition(self.db_session, goal, completion_condition, data.get('condition'))
+            except ConditionValidationError as error:
+                return {"error": str(error), "field": "condition"}, 400
+            changed = True
+        if 'deadline' in data:
+            changed = True
+        if changed and goal.id and goal.completed and goal.completion_source == 'condition':
+            self.db_session.flush()
+            goals_by_id = load_fractal_goals_for_serialization(self.db_session, goal.root_id or goal.id)
+            reconcile_goal(
+                self.db_session, goals_by_id.get(goal.id, goal), goals_by_id, pending_events, trigger='goal_updated',
+            )
+        return None
+
     def _validate_description_required(self, level_obj, description) -> str | None:
         if level_obj and getattr(level_obj, 'description_required', False):
             if not description or not description.strip():
@@ -202,15 +249,6 @@ class _GoalHelpersMixin:
         if current_children >= parent_max:
             return f"{error_prefix} '{parent_goal.level.name}' allows a maximum of {parent_max} children."
         return None
-
-    def _cascade_child_deadlines(self, parent_goal, new_max) -> None:
-        for child in (parent_goal.children or []):
-            if child.deadline:
-                child_deadline = child.deadline.date() if isinstance(child.deadline, datetime) else child.deadline
-                if child_deadline > new_max:
-                    child.deadline = new_max
-                    logger.info("Cascaded deadline update to child goal %s", child.id)
-                    self._cascade_child_deadlines(child, new_max)
 
     def _get_goal_level_rank(self, goal) -> int | None:
         if not goal:
@@ -303,6 +341,7 @@ class _GoalHelpersMixin:
         root_id,
         allow_parent_update=False,
         allow_extended_fields=False,
+        pending_events=None,
     ) -> tuple[Goal | None, tuple[str | dict, int] | None]:
         next_description = data['description'] if 'description' in data else goal.description
         level_error = self._validate_description_required(getattr(goal, 'level', None), next_description)
@@ -316,32 +355,18 @@ class _GoalHelpersMixin:
             if deadline_error:
                 return None, (deadline_error, 400)
 
-            if deadline and goal.parent_id:
-                parent = get_goal_by_id(self.db_session, goal.parent_id)
-                if parent and parent.deadline:
-                    parent_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
-                    if deadline > parent_deadline:
-                        return None, ({
-                            "error": "Child deadline cannot be later than parent deadline",
-                            "parent_deadline": parent_deadline.isoformat(),
-                        }, 400)
-
-            old_deadline = goal.deadline.date() if isinstance(goal.deadline, datetime) else goal.deadline
+            # Due dates are soft guidance (services/goal_deadline_rules.py): a date after the
+            # parent's, or before a child's, is saved and reported as a warning.
             goal.deadline = deadline
-            if deadline and (not old_deadline or deadline < old_deadline):
-                self._cascade_child_deadlines(goal, deadline)
 
         if 'name' in data and data['name'] is not None:
             goal.name = data['name']
         if 'description' in data and data['description'] is not None:
             goal.description = data['description']
 
-        if 'targets' in data:
-            self.sync_targets(self.db_session, goal, data['targets'] or [])
-            goal.targets = None
-
-        if 'completed_via_children' in data:
-            goal.completed_via_children = data['completed_via_children']
+        completion_error = self._apply_completion_fields(goal, data, pending_events)
+        if completion_error:
+            return None, completion_error
 
         if allow_parent_update and 'parent_id' in data:
             new_parent_id = data['parent_id']
@@ -368,8 +393,6 @@ class _GoalHelpersMixin:
                 goal.relevance_statement = data['relevance_statement']
             if 'inherit_parent_activities' in data:
                 goal.inherit_parent_activities = data['inherit_parent_activities']
-            if 'allow_manual_completion' in data:
-                goal.allow_manual_completion = data['allow_manual_completion']
             if 'track_activities' in data:
                 goal.track_activities = data['track_activities']
             if 'progress_settings' in data and goal.parent_id is None:

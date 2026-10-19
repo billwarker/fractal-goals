@@ -3,7 +3,7 @@
  * 
  * SMART goals are:
  * - Specific: Has a description
- * - Measurable: Has targets attached
+ * - Measurable: Completes on its own (an activity threshold or its child goals)
  * - Achievable: Has activities associated
  * - Relevant: Has relevance statement explaining connection to parent goal
  * - Time-bound: Has a deadline
@@ -29,11 +29,11 @@ export function calculateSMARTStatus(goal) {
 
     // Get values from either attributes or directly
     const description = attrs.description || goal.description || '';
-    const targets = attrs.targets || goal.targets || [];
+    const completionCondition = goal.completion_condition ?? attrs.completion_condition ?? 'manual';
     const relevanceStatement = attrs.relevance_statement || goal.relevance_statement || '';
     const deadline = attrs.deadline || goal.deadline;
     const associatedActivityIds = attrs.associated_activity_ids || goal.associated_activity_ids || [];
-    const completedViaChildren = attrs.completed_via_children || goal.completed_via_children || false;
+    const completedViaChildren = completionCondition === 'children';
 
     const trackActivities = attrs.track_activities !== undefined ? attrs.track_activities : (goal.track_activities !== undefined ? goal.track_activities : true);
 
@@ -51,7 +51,7 @@ export function calculateSMARTStatus(goal) {
 
     return {
         specific: !!(description && description.trim().length > 0),
-        measurable: !trackActivities || (Array.isArray(targets) && targets.length > 0) || completedViaChildren,
+        measurable: !trackActivities || completionCondition !== 'manual',
         achievable: !trackActivities || (Array.isArray(associatedActivityIds) && associatedActivityIds.length > 0) || completedViaChildren,
         relevant: !!(relevanceStatement && relevanceStatement.trim().length > 0),
         timeBound: !!deadline
@@ -97,7 +97,7 @@ export const SMART_CRITERIA = {
     measurable: {
         letter: 'M',
         label: 'Measurable',
-        description: 'Has targets attached'
+        description: 'Completes on an activity threshold or its child goals'
     },
     achievable: {
         letter: 'A',

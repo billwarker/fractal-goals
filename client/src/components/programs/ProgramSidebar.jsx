@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Draggable } from '@fullcalendar/interaction';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDurationSeconds } from '../../utils/formatters';
+import GoalDueChip from '../goals/GoalDueChip';
 import GoalHierarchyList from '../goals/GoalHierarchyList';
 import { useProgramGoalsHierarchyViewModel } from '../../hooks/useProgramGoalsHierarchyViewModel';
+import { hideCompletedBranches } from '../../utils/goalHierarchyFilters';
 import styles from './ProgramSidebar.module.css';
 
 function ProgramSidebar({
@@ -13,6 +16,11 @@ function ProgramSidebar({
     programGoalSeeds, // Top level goals to display
     onGoalClick, // (goal) => ...
     getGoalDetails, // Function to get full goal details by ID (needed for children)
+    onStartSubGoalCreation = null, // (parentGoal) => opens goal creation under the scoped goal
+    justCreatedGoalId = null,
+    defaultShowCompleted = false,
+    dueToday = null, // The user's today (YYYY-MM-DD): shows each open goal's due chip on the left.
+    dueDragEnabled = false, // Open goals can be dragged onto a calendar day to set their due date.
     compact = false,
     hideMetricsHeader = false,
     hideMetrics = false,
@@ -35,6 +43,26 @@ function ProgramSidebar({
         endDate: program?.end_date,
     });
     const isAuthoritativeMetrics = Boolean(programMetrics?.calculation_version);
+    // A goal's icon scopes the hierarchy to it; the scoped goal offers "+" to add a child.
+    const [scopedGoalId, setScopedGoalId] = useState(null);
+    const [showCompleted, setShowCompleted] = useState(defaultShowCompleted);
+    const visibleNodes = useMemo(
+        () => (showCompleted ? hierarchyNodes : hideCompletedBranches(hierarchyNodes)),
+        [hierarchyNodes, showCompleted],
+    );
+    const hasCompleted = hierarchyNodes.length !== hideCompletedBranches(hierarchyNodes).length;
+    const canCreate = Boolean(onStartSubGoalCreation);
+    const goalsListRef = useRef(null);
+    useEffect(() => {
+        if (!dueDragEnabled || !goalsListRef.current) return undefined;
+        // The calendar receives these as external drops; nothing is added as an event.
+        const draggable = new Draggable(goalsListRef.current, {
+            itemSelector: '[data-goal-due-drag="true"]',
+            minDistance: 6,
+            eventData: (element) => ({ title: element.dataset.goalName || '', create: false }),
+        });
+        return () => draggable.destroy();
+    }, [dueDragEnabled]);
 
     return (
         <div className={`${styles.sidebar} ${compact ? styles.compactSidebar : ''} ${flushMetricsPadding ? styles.flushMetricsPadding : ''} ${embedded ? styles.embedded : ''} ${className}`}>
@@ -88,11 +116,50 @@ function ProgramSidebar({
             {!hideGoals && (
                 <div className={styles.bottomSection}>
                     {hideGoalsHeader ? null : <h3 className={styles.sectionHeader}>Program Goals</h3>}
-                    <div className={styles.goalsScroll}>
+                    {(hasCompleted || showCompleted || canCreate) && hierarchyNodes.length > 0 ? (
+                        <div className={styles.goalsToolbar}>
+                            {canCreate ? (
+                                <p className={styles.goalsHint}>
+                                    {scopedGoalId ? 'Use + to add a goal under it.' : 'Select a goal’s icon to add a goal under it.'}
+                                    {dueDragEnabled ? ' Drag a goal onto a day to set its due date.' : ''}
+                                </p>
+                            ) : <span />}
+                            {hasCompleted || showCompleted ? (
+                                <label className={styles.showCompleted}>
+                                    <input
+                                        type="checkbox"
+                                        checked={showCompleted}
+                                        onChange={(event) => setShowCompleted(event.target.checked)}
+                                    />
+                                    Show completed
+                                </label>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    <div ref={goalsListRef} className={`${styles.goalsScroll} ${dueToday ? styles.withDueColumn : ''}`}>
                         <GoalHierarchyList
+                            getGoalRowAttributes={dueDragEnabled ? (goal) => (
+                                (goal.completed ?? goal.attributes?.completed) ? null : {
+                                    'data-goal-due-drag': 'true',
+                                    'data-goal-name': goal.name,
+                                }
+                            ) : undefined}
+                            getGoalLeftSlot={dueToday ? (node) => (
+                                <span className={styles.dueSlot}>
+                                    <GoalDueChip deadline={node.completed ? null : node.deadline} today={dueToday} />
+                                </span>
+                            ) : undefined}
                             variant="session"
-                            nodes={hierarchyNodes}
+                            nodes={visibleNodes}
                             onGoalClick={onGoalClick}
+                            onGoalIconClick={canCreate
+                                ? (goal) => setScopedGoalId((current) => (String(current) === String(goal.id) ? null : String(goal.id)))
+                                : undefined}
+                            isGoalIconSelected={(goal) => String(goal.id) === String(scopedGoalId)}
+                            getGoalIconActionLabel={(goal, selected) => (selected ? `Clear scope for ${goal.name}` : `Scope to ${goal.name}`)}
+                            showGoalHighlightHalo={canCreate}
+                            onStartSubGoalCreation={onStartSubGoalCreation || undefined}
+                            justCreatedGoalId={justCreatedGoalId}
                             getScopedCharacteristics={getLevelByName}
                             getGoalColor={getGoalColor}
                             getGoalSecondaryColor={getGoalSecondaryColor}

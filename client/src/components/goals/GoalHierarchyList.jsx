@@ -1,6 +1,6 @@
-import React, { useCallback, useMemo, useRef } from 'react';
-import { getTypeDisplayName } from '../../utils/goalHelpers';
-import { isExecutionGoalType } from '../../utils/goalNodeModel';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { getTypeDisplayName, getValidChildTypes } from '../../utils/goalHelpers';
+import { orderSequencedSiblings } from '../../utils/goalSequenceOrder';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchyIconAction from './GoalHierarchyIconAction';
@@ -38,7 +38,7 @@ function buildSessionHierarchyTree(nodes) {
     });
 
     const sortChildren = (treeNode) => {
-        treeNode.children.sort((a, b) => a.originalIndex - b.originalIndex);
+        treeNode.children = orderSequencedSiblings(treeNode.children.sort((a, b) => a.originalIndex - b.originalIndex));
         treeNode.children.forEach(sortChildren);
     };
 
@@ -73,11 +73,17 @@ function GoalHierarchyList({
     getGoalIcon,
     completedColor = 'var(--color-brand-success)',
     completedSecondaryColor = 'var(--color-brand-success)',
+    // Adding a child is offered on the scoped goal only (its icon is selected), and only while it
+    // is open: completed and paused goals take no new children, nor does the lowest level.
     onStartSubGoalCreation,
-    onAddTargetForGoal,
+    justCreatedGoalId = null,
+    // Extra data-/aria- attributes for a goal's row, e.g. to make it a drag source.
+    getGoalRowAttributes,
     emptyState = 'No goals associated',
 }) {
-    const canAddChild = (goalType) => !isExecutionGoalType(goalType);
+    const canAddChild = (node) => getValidChildTypes(node.type).length > 0
+        && !(node.status ? node.status.completed : node.completed)
+        && !node.paused;
     const handleGoalClick = (node) => {
         if (!onGoalClick) {
             return;
@@ -88,8 +94,29 @@ function GoalHierarchyList({
         onGoalClick(node.originalGoal || node);
     };
     const treeRoots = useMemo(() => buildSessionHierarchyTree(nodes), [nodes]);
+    // Sequence steps in view by track and position, to name the step a paused goal waits on.
+    const sequenceSteps = useMemo(() => {
+        const steps = new Map();
+        nodes.forEach((node) => {
+            const trackId = node?.sequence_track_id;
+            if (trackId && node.sequence_position != null) steps.set(`${trackId}:${node.sequence_position}`, node);
+        });
+        return steps;
+    }, [nodes]);
+    const pausedLabel = (node) => {
+        if (!node.paused) return undefined;
+        if (node.pause_reason !== 'sequence') return 'Paused';
+        const previous = sequenceSteps.get(`${node.sequence_track_id}:${node.sequence_position - 1}`);
+        return previous ? `Paused · waiting on ${previous.name}` : 'Paused · waiting on the step before';
+    };
     const listRef = useRef(null);
     const iconRefs = useRef(new Map());
+
+    useEffect(() => {
+        if (!justCreatedGoalId) return;
+        const row = listRef.current?.querySelector(`[data-goal-id="${CSS.escape(String(justCreatedGoalId))}"]`);
+        row?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    }, [justCreatedGoalId, nodes]);
 
     const getNodeHighlightState = useCallback((node) => {
         const originalNode = node.originalGoal || node;
@@ -231,6 +258,8 @@ function GoalHierarchyList({
             isGoalIconSelected ? iconSelected : Boolean(branchHighlightState)
         );
         const metaLabel = getGoalMetaLabel ? getGoalMetaLabel(originalNode) : null;
+        const justCreated = justCreatedGoalId != null && String(node.id) === String(justCreatedGoalId);
+        const showAddChild = Boolean(onStartSubGoalCreation) && iconSelected && canAddChild(node);
         const goalIcon = (
             <GoalIcon
                 shape={getGoalIcon ? getGoalIcon(node.type) : getScopedCharacteristics(node.type)?.icon || 'circle'}
@@ -243,8 +272,10 @@ function GoalHierarchyList({
         return (
             <div
                 key={node.id}
-                className={styles.sessionTreeRow}
+                className={`${styles.sessionTreeRow} ${justCreated ? styles.sessionTreeRowJustCreated : ''}`}
                 data-goal-id={node.id}
+                data-just-created={justCreated ? 'true' : undefined}
+                {...(getGoalRowAttributes ? getGoalRowAttributes(originalNode) : null)}
             >
                 {getGoalLeftSlot && (
                     <div className={styles.sessionLeftSlot}>
@@ -272,14 +303,20 @@ function GoalHierarchyList({
                             {goalIcon}
                         </GoalHierarchyIconAction>
                     </div>
-                    <div className={styles.sessionNodeContent}>
+                    <div className={styles.sessionNodeContent} title={pausedLabel(node)}>
+                        {node.sequence_position != null && node.sequence_track_id ? (
+                            <span className={styles.sequenceStepNumber} aria-label={`Step ${node.sequence_position} in sequence`}>
+                                {node.sequence_position}
+                            </span>
+                        ) : null}
                         <span
-                            className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''}`}
+                            className={`${styles.sessionNodeName} ${node.isLinked ? styles.sessionNodeNameActive : ''} ${!isSelectable ? styles.sessionNodeNameDisabled : ''} ${node.paused ? styles.sessionNodeNamePaused : ''}`}
                             style={getGoalNameStyle ? getGoalNameStyle(originalNode) : undefined}
                             onClick={() => handleGoalClick(node)}
                         >
                             {node.name}
                         </span>
+                        {node.paused ? <span className={styles.assistive}>{pausedLabel(node)}</span> : null}
                         {metaLabel && (
                             typeof metaLabel === 'string' ? (
                                 <span className={styles.sessionNodeMeta}>
@@ -287,18 +324,16 @@ function GoalHierarchyList({
                                 </span>
                             ) : metaLabel
                         )}
-                        {onStartSubGoalCreation && canAddChild(node.type) && (
+                        {showAddChild && (
                             <button
+                                type="button"
                                 className={styles.addSubGoalBtn}
                                 onClick={(event) => {
                                     event.stopPropagation();
-                                    if (node.type === 'ImmediateGoal' && onAddTargetForGoal) {
-                                        onAddTargetForGoal(node);
-                                        return;
-                                    }
                                     onStartSubGoalCreation(node);
                                 }}
-                                title={node.type === 'ImmediateGoal' ? 'Add Target' : 'Add Sub-goal'}
+                                title="Add a child goal"
+                                aria-label={`Add a child goal under ${node.name}`}
                             >
                                 +
                             </button>

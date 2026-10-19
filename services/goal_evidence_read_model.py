@@ -38,5 +38,5 @@ class GoalEvidenceReadModel:
             day.label('date'), func.count().label('events'),
             func.sum(case((activity, 1), else_=0)).label('activities'),
             func.sum(case((activity, func.greatest(e.c.duration_seconds, 0)), else_=0)).label('duration_seconds'),
-            func.sum(case((e.c.event_type.in_(['target.achieved', 'goal.completed']), 1), else_=0)).label('milestones'),
+            func.sum(case((e.c.event_type == 'goal.completed', 1), else_=0)).label('milestones'),
         ).group_by(day).order_by(day)).all()

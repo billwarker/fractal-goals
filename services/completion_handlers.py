@@ -2,9 +2,9 @@
 Completion Handlers
 
 Event handlers for managing completion cascades:
-- When a session is completed → evaluate targets for linked goals
-- When targets are achieved → auto-complete goals if all targets met
-- When a goal is completed → update parent goals and programs
+- When activity evidence changes (an instance is completed, edited, deleted, or its session is
+  completed or deleted) → re-evaluate every goal whose activity threshold watches that activity
+- When a goal is completed → complete a parent that completes via its children, and update programs
 
 These handlers subscribe to the event bus and react to completion-related events.
 """
@@ -13,15 +13,12 @@ import logging
 
 from services.events import event_bus, Event, Events
 from services.progress_service import ProgressService
-from services.instance_goal_target_reconciliation import recalculate_linked_instance_targets
-from services.goal_domain_rules import (
-    goal_uses_child_completion,
-)
+from services.goal_domain_rules import goal_completes_via_children
+from services.goal_condition_service import activities_with_conditions, reconcile_activity_conditions
 import models
 from models import (
     get_session,
     Goal,
-    Session,
     ActivityInstance,
 )
 from services._completion_context import _emit_pending_events, set_live_progress
@@ -32,12 +29,6 @@ from services._completion_context import (  # noqa: F401 - re-exported for exist
     get_recent_achievements,
 )
 from services._completion_programs import _check_parent_completion, _update_program_progress
-from services._completion_targets import (
-    _evaluate_goal_targets,
-    _revert_achievements_for_instance,
-    _run_evaluation_for_instance,
-    _serialize_instance_for_target_evaluation,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -61,235 +52,142 @@ def _get_db_session():
     return get_session(engine)
 
 
-@event_bus.on(Events.SESSION_COMPLETED)
-def handle_session_completed(event: Event):
-    """
-    When a session is completed, evaluate all targets for linked goals.
-
-    Expected event.data:
-        - session_id: str
-        - root_id: str
-    """
-    session_id = event.data.get('session_id')
-    root_id = event.data.get('root_id')
-
-    if not session_id or not root_id:
-        logger.warning(f"SESSION_COMPLETED missing required data: {event.data}")
+def _reconcile_activities(db_session, root_id, activity_ids, pending_events, *, trigger):
+    watched = activities_with_conditions(db_session, root_id, {activity_id for activity_id in activity_ids if activity_id})
+    if not watched:
         return
+    from services.goal_loading import load_fractal_goals_for_serialization
+    goals_by_id = load_fractal_goals_for_serialization(db_session, root_id)
+    for activity_id in sorted(watched):
+        reconcile_activity_conditions(
+            db_session, root_id, activity_id, pending_events, trigger=trigger, goals_by_id=goals_by_id,
+        )
 
-    logger.info(f"Processing session completion: {session_id}")
 
+def _session_activity_ids(db_session, session_id):
+    return {
+        activity_id for (activity_id,) in db_session.query(ActivityInstance.activity_definition_id).filter(
+            ActivityInstance.session_id == session_id,
+        ).distinct()
+    }
+
+
+def _handle_evidence_change(event: Event, *, root_id, activity_ids, trigger, after=None):
+    if not root_id or not activity_ids:
+        return
     db_session, owns_session = _resolve_db_session(event)
     pending_events = []
     try:
-        # Get the session with its linked goals
-        session = db_session.query(Session).filter_by(id=session_id).first()
-        if not session:
-            logger.warning(f"Session {session_id} not found")
-            return
-
-        # Get all goals linked to this session
-        linked_goals = session.goals or []
-
-        # Get all activity instances for this session
-        activity_instances = db_session.query(ActivityInstance).filter(
-            ActivityInstance.session_id == session_id,
-            ActivityInstance.deleted_at == None
-        ).all()
-
-        # Build a map of activity_id -> list of instance data
-        instances_by_activity = {}
-        for inst in activity_instances:
-            activity_id = inst.activity_definition_id
-            if activity_id not in instances_by_activity:
-                instances_by_activity[activity_id] = []
-            instances_by_activity[activity_id].append(_serialize_instance_for_target_evaluation(inst))
-
-        # Evaluate targets for each linked goal
-        # Evaluate targets for each linked goal
-        for goal in linked_goals:
-            _evaluate_goal_targets(
-                db_session,
-                goal,
-                instances_by_activity,
-                session_id,
-                pending_events=pending_events,
-            )
-
-        from services.instance_goal_evidence import load_instance_goal_ids
-        from services.goal_loading import load_fractal_goals_for_serialization
-        from services.instance_goal_target_reconciliation import recalculate_instance_goal_targets
-        links = load_instance_goal_ids(db_session, root_id, instance_ids={row.id for row in activity_instances})
-        if links:
-            goals = load_fractal_goals_for_serialization(db_session, root_id)
-            for instance in activity_instances:
-                if instance.id in links:
-                    recalculate_instance_goal_targets(db_session, instance, links[instance.id], goals, pending_events)
+        _reconcile_activities(db_session, root_id, activity_ids, pending_events, trigger=trigger)
+        if after is not None:
+            after(db_session)
         db_session.commit()
         _emit_pending_events(pending_events)
-
     # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
     except Exception as e:
         db_session.rollback()
-        logger.exception(f"Error handling session completion: {e}")
+        logger.exception(f"Error reconciling goal conditions ({trigger}): {e}")
+    finally:
+        _close_if_owned(db_session, owns_session)
+
+
+@event_bus.on(Events.SESSION_COMPLETED)
+def handle_session_completed(event: Event):
+    """Re-evaluate conditions watching any activity performed in the completed session."""
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    if not session_id or not root_id:
+        logger.warning(f"SESSION_COMPLETED missing required data: {event.data}")
+        return
+    db_session, owns_session = _resolve_db_session(event)
+    try:
+        activity_ids = _session_activity_ids(db_session, session_id)
+    finally:
+        _close_if_owned(db_session, owns_session)
+    _handle_evidence_change(event, root_id=root_id, activity_ids=activity_ids, trigger='session_completed')
+
+
+@event_bus.on(Events.SESSION_DELETED)
+def handle_session_deleted(event: Event):
+    """A deleted session's instances stop counting; revert anything they alone satisfied."""
+    session_id = event.data.get('session_id')
+    root_id = event.data.get('root_id')
+    if not session_id or not root_id:
+        return
+    db_session, owns_session = _resolve_db_session(event)
+    try:
+        activity_ids = _session_activity_ids(db_session, session_id)
+    finally:
+        _close_if_owned(db_session, owns_session)
+    _handle_evidence_change(event, root_id=root_id, activity_ids=activity_ids, trigger='session_deleted')
+
+
+def _instance_activity(event: Event):
+    """(root_id, activity_id) for the instance an event names, read from the payload when present."""
+    root_id = event.data.get('root_id')
+    activity_id = event.data.get('activity_definition_id')
+    if root_id and activity_id:
+        return root_id, activity_id
+    instance_id = event.data.get('instance_id')
+    if not instance_id:
+        return None, None
+    db_session, owns_session = _resolve_db_session(event)
+    try:
+        instance = db_session.get(ActivityInstance, instance_id)
+        if instance is None:
+            return root_id, activity_id
+        return root_id or instance.root_id, instance.activity_definition_id
     finally:
         _close_if_owned(db_session, owns_session)
 
 
 @event_bus.on(Events.ACTIVITY_INSTANCE_UPDATED)
 def handle_activity_instance_updated(event: Event):
-    """
-    When an activity instance is updated, check if it was marked as incomplete or complete.
-    If incomplete → revert any targets achieved by this specific instance.
-    If complete → evaluate threshold targets.
-    """
-    instance_id = event.data.get('instance_id')
-    session_id = event.data.get('session_id')
-    root_id = event.data.get('root_id')
-    updated_fields = event.data.get('updated_fields', [])
-
-    if not instance_id or not ({'completed', 'metric_values', 'metrics', 'sets'} & set(updated_fields)):
+    """Completion or result edits change evidence; re-evaluate the activity's conditions."""
+    updated_fields = set(event.data.get('updated_fields', []))
+    if not ({'completed', 'metric_values', 'metrics', 'sets'} & updated_fields):
         return
-
-    db_session, owns_session = _resolve_db_session(event)
-    pending_events = []
-    try:
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
-        if not instance:
-            return
-
-        # If instance was explicitly marked incomplete, revert its achievements.
-        if not instance.completed:
-            affected = recalculate_linked_instance_targets(db_session, instance, pending_events)
-            _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
-            db_session.commit()
-        # If instance was JUST marked complete, evaluate targets
-        elif instance.completed:
-            logger.info(f"[ACTIVITY_UPDATED] Instance {instance_id} marked complete. Evaluating targets.")
-
-            # Use same logic as handle_activity_instance_completed but wrapperized
-            _run_evaluation_for_instance(
-                db_session,
-                instance,
-                session_id,
-                root_id,
-                pending_events=pending_events,
-            )
-            db_session.commit()
-        _emit_pending_events(pending_events)
-
-    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(f"Error handling activity instance update: {e}")
-    finally:
-        _close_if_owned(db_session, owns_session)
+    root_id, activity_id = _instance_activity(event)
+    _handle_evidence_change(event, root_id=root_id, activity_ids={activity_id}, trigger='activity_instance_updated')
 
 
 @event_bus.on(Events.ACTIVITY_METRICS_UPDATED)
 def handle_activity_metrics_updated(event: Event):
-    """
-    When metrics/sets change on a completed instance, recompute threshold-driven
-    targets/goals. Incomplete instances should not persist target state from
-    metric edits alone.
-    """
+    """Recompute conditions after result edits on a completed instance, and live progress."""
     instance_id = event.data.get('instance_id')
-    root_id = event.data.get('root_id')
-    session_id = event.data.get('session_id')
-    if not all([instance_id, root_id, session_id]):
+    if not instance_id:
         return
+    root_id, activity_id = _instance_activity(event)
 
-    db_session, owns_session = _resolve_db_session(event)
-    pending_events = []
-    try:
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
-        if not instance or not instance.completed:
+    def record_live_progress(db_session):
+        instance = db_session.get(ActivityInstance, instance_id)
+        if instance is None or not instance.completed:
             return
-
-        affected = recalculate_linked_instance_targets(db_session, instance, pending_events)
-        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
-        _run_evaluation_for_instance(
-            db_session,
-            instance,
-            session_id,
-            root_id,
-            pending_events=pending_events, canonical_goal_ids=affected,
-        )
         comparison = None
         try:
             comparison = ProgressService(db_session).get_progress_for_instance(instance_id)
         except Exception as progress_err:  # Live progress is best-effort; the metric update must still commit.
             logger.warning("Error calculating dynamic progress for instance %s: %s", instance_id, progress_err)
-
-        db_session.commit()
-        _emit_pending_events(pending_events)
         set_live_progress(instance_id, comparison)
-    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(f"Error handling activity metrics update: {e}")
-    finally:
-        _close_if_owned(db_session, owns_session)
+
+    _handle_evidence_change(
+        event, root_id=root_id, activity_ids={activity_id}, trigger='activity_metrics_updated',
+        after=record_live_progress,
+    )
 
 
 @event_bus.on(Events.ACTIVITY_INSTANCE_COMPLETED)
 def handle_activity_instance_completed(event: Event):
-    """
-    When an activity instance is completed, evaluate THRESHOLD targets for linked goals.
-    """
-    instance_id = event.data.get('instance_id')
-    root_id = event.data.get('root_id')
-
-    if not all([instance_id, root_id]): # Removed session_id from this check
-        return
-
-    db_session, owns_session = _resolve_db_session(event)
-    pending_events = []
-    try:
-        instance = db_session.query(ActivityInstance).filter_by(id=instance_id).first()
-        if not instance:
-            return
-
-        _run_evaluation_for_instance(
-            db_session,
-            instance,
-            instance.session_id,
-            root_id,
-            pending_events=pending_events,
-        )
-        db_session.commit()
-        _emit_pending_events(pending_events)
-    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(f"Error handling activity instance completion: {e}")
-    finally:
-        _close_if_owned(db_session, owns_session)
+    """A completed instance is new evidence for the activity's conditions."""
+    root_id, activity_id = _instance_activity(event)
+    _handle_evidence_change(event, root_id=root_id, activity_ids={activity_id}, trigger='activity_instance_completed')
 
 
 @event_bus.on(Events.ACTIVITY_INSTANCE_DELETED)
 def handle_activity_instance_deleted(event: Event):
-    """
-    When an activity instance is deleted, revert targets achieved by it.
-    """
-    instance_id = event.data.get('instance_id')
-    if not instance_id:
-        return
-
-    db_session, owns_session = _resolve_db_session(event)
-    pending_events = []
-    try:
-        instance = db_session.get(ActivityInstance, instance_id)
-        affected = recalculate_linked_instance_targets(db_session, instance, pending_events) if instance else set()
-        _revert_achievements_for_instance(db_session, instance_id, pending_events=pending_events, exclude_goal_ids=affected)
-        db_session.commit()
-        _emit_pending_events(pending_events)
-    # Handler boundary: roll back and log; a failed cascade must not fail the emitter.
-    except Exception as e:
-        db_session.rollback()
-        logger.exception(f"Error handling activity instance deletion: {e}")
-    finally:
-        _close_if_owned(db_session, owns_session)
+    """A deleted instance stops counting; revert anything it alone satisfied."""
+    root_id, activity_id = _instance_activity(event)
+    _handle_evidence_change(event, root_id=root_id, activity_ids={activity_id}, trigger='activity_instance_deleted')
 
 
 @event_bus.on(Events.GOAL_COMPLETED)
@@ -302,7 +200,6 @@ def handle_goal_completed(event: Event):
         - root_id: str
     """
     goal_id = event.data.get('goal_id')
-    root_id = event.data.get('root_id')
 
     if not goal_id:
         return
@@ -316,12 +213,11 @@ def handle_goal_completed(event: Event):
         if not goal:
             return
 
-        # Check if parent goal has completed_via_children enabled (per-goal or level default)
+        # A parent that completes via its children completes once every child has.
         if goal.parent_id:
             parent = db_session.query(Goal).filter_by(id=goal.parent_id).first()
-            if parent:
-                if goal_uses_child_completion(parent):
-                    _check_parent_completion(db_session, parent, pending_events=pending_events)
+            if parent and goal_completes_via_children(parent):
+                _check_parent_completion(db_session, parent, pending_events=pending_events)
 
         # Update any programs this goal is part of
         _update_program_progress(db_session, goal, pending_events=pending_events)

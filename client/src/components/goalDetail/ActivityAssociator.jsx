@@ -47,8 +47,7 @@ const ActivityAssociator = ({
     activityDefinitions,
     activityGroups,
     setActivityGroups,
-    targets,
-    setTargets,
+    conditionActivityId = null,
     rootId,
     goalId,
     parentGoalId,
@@ -71,8 +70,6 @@ const ActivityAssociator = ({
     registerPickerFooterActions,
     dividerColor,
     onCopyActivity,
-    isTargetSelectionMode = false,
-    onSelectTargetActivity,
     readOnly = false,
 }) => {
     const activityActions = useOptionalActivities();
@@ -233,13 +230,9 @@ const ActivityAssociator = ({
         handleConfirmActivitySelection(activityIds, groupIds);
     }, [handleConfirmActivitySelection]);
 
-    const executeRemoveActivity = async (activity, removedTargetsCount = 0) => {
+    const executeRemoveActivity = async (activity) => {
         const activityId = activity?.id;
         if (!activityId) return;
-
-        const dependentTargets = Array.isArray(targets)
-            ? targets.filter(t => t.activity_id === activityId)
-            : [];
 
         const remainsInherited = Boolean(activity.inherited_from_children || activity.inherited_from_parent);
         const next = remainsInherited
@@ -270,7 +263,6 @@ const ActivityAssociator = ({
             }
         }
 
-        const countForToast = removedTargetsCount || dependentTargets.length;
         if (remainsInherited) {
             const sourceLabel = activity.inherited_from_children && activity.inherited_from_parent
                 ? 'other goals'
@@ -278,8 +270,6 @@ const ActivityAssociator = ({
                     ? 'a child goal'
                     : 'the parent goal';
             notify.success(`Direct association removed. "${activity.name}" remains inherited from ${sourceLabel}.`);
-        } else if (countForToast > 0) {
-            notify.success(`Activity association removed and ${countForToast} target${countForToast === 1 ? '' : 's'} deleted`);
         } else {
             notify.success("Activity association removed");
         }
@@ -296,15 +286,8 @@ const ActivityAssociator = ({
             return;
         }
 
-        const dependentTargets = Array.isArray(targets)
-            ? targets.filter(t => t.activity_id === activityId)
-            : [];
-
-        if (dependentTargets.length > 0) {
-            setPendingActivityRemoval({
-                activityId,
-                dependentTargetsCount: dependentTargets.length
-            });
+        if (conditionActivityId && activityId === conditionActivityId) {
+            setPendingActivityRemoval({ activityId });
             return;
         }
 
@@ -314,16 +297,9 @@ const ActivityAssociator = ({
     const handleConfirmActivityRemoval = async () => {
         if (!pendingActivityRemoval?.activityId) return;
 
-        const { activityId, dependentTargetsCount } = pendingActivityRemoval;
-        if (setTargets) {
-            setTargets(prev => {
-                if (!Array.isArray(prev)) return prev;
-                return prev.filter(t => t.activity_id !== activityId);
-            });
-        }
-
+        const { activityId } = pendingActivityRemoval;
         const activity = associatedActivities.find((item) => item.id === activityId);
-        await executeRemoveActivity(activity, dependentTargetsCount);
+        await executeRemoveActivity(activity);
         setPendingActivityRemoval(null);
     };
 
@@ -539,8 +515,6 @@ const ActivityAssociator = ({
             isProtectedByGroup={isActivityProtectedByLinkedGroup(activity)}
             onRemove={handleRemoveActivity}
             renderMetricIndicators={renderMetricIndicators}
-            isSelectable={isTargetSelectionMode}
-            onSelect={onSelectTargetActivity}
             readOnly={readOnly}
         />
     );
@@ -564,8 +538,8 @@ const ActivityAssociator = ({
                 showCloseButton={true}
             >
                 <p className={styles.removeModalText}>
-                    This activity is used by {pendingActivityRemoval?.dependentTargetsCount || 0} target{(pendingActivityRemoval?.dependentTargetsCount || 0) === 1 ? '' : 's'}.
-                    Removing the activity will also delete those target{(pendingActivityRemoval?.dependentTargetsCount || 0) === 1 ? '' : 's'}.
+                    This goal completes on this activity. Once it’s unlinked, its sessions stop counting
+                    toward the goal unless you link them one by one.
                 </p>
                 <div className={styles.removeModalActions}>
                     <Button variant="secondary" onClick={() => setPendingActivityRemoval(null)}>

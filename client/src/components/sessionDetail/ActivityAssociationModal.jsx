@@ -39,7 +39,7 @@ const ActivityAssociationModalContent = ({
         }
 
         return goals.filter((goal) => (
-            removedGoalIds.includes(goal.id) && goal.hasTargetForActivity
+            removedGoalIds.includes(goal.id) && goal.completesOnActivity
         ));
     }, [goals, initialGoalIds, selectedGoalIdSet]);
 
@@ -48,7 +48,7 @@ const ActivityAssociationModalContent = ({
     const handleConfirm = async () => {
         if (blockedGoalRemovals.length > 0) {
             const goalNames = blockedGoalRemovals.map((goal) => `"${goal.name}"`).join(', ');
-            notify.error(`Cannot remove goals with targets on this activity: ${goalNames}`);
+            notify.error(`These goals complete on this activity; change how they complete before unlinking it: ${goalNames}`);
             return;
         }
 
@@ -83,7 +83,7 @@ const ActivityAssociationModalContent = ({
                 />
                 {blockedGoalRemovals.length > 0 && (
                     <div className={styles.blockedHint}>
-                        Remove targets first for: {blockedGoalRemovals.map((goal) => goal.name).join(', ')}
+                        Change how these goals complete before unlinking: {blockedGoalRemovals.map((goal) => goal.name).join(', ')}
                     </div>
                 )}
             </ModalBody>

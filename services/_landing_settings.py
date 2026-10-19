@@ -114,7 +114,8 @@ class _LandingSettingsMixin:
         goals = source.get("goals") if isinstance(source.get("goals"), dict) else {}
         supplied = goals.get("bullets") if isinstance(goals.get("bullets"), list) else []
         supplied_by_key = {
-            item.get("key"): item
+            # Settings saved before conditions replaced targets used 'set_targets'.
+            ("set_conditions" if item.get("key") == "set_targets" else item.get("key")): item
             for item in supplied
             if isinstance(item, dict) and item.get("key")
         }
@@ -126,11 +127,6 @@ class _LandingSettingsMixin:
                 "heading": str(item.get("heading") or default["heading"]),
                 "body": str(item.get("body") or default["body"]),
                 "goal_id": str(item["goal_id"]) if item.get("goal_id") else None,
-                "target_id": (
-                    str(item["target_id"])
-                    if default["key"] == "set_targets" and item.get("target_id")
-                    else None
-                ),
             })
         return {"goals": {"bullets": bullets}}
 
@@ -293,15 +289,10 @@ class _LandingSettingsMixin:
                     "name": goal.name,
                     "parent_id": goal.parent_id,
                     "level_name": getattr(getattr(goal, "level", None), "name", None),
-                    "targets": [
-                        {
-                            "id": target.id,
-                            "name": target.name,
-                            "activity_id": target.activity_id,
-                        }
-                        for target in (goal.targets_rel or [])
-                        if target.deleted_at is None
-                    ],
+                    "completion_condition": goal.completion_condition,
+                    "has_activity_condition": (
+                        goal.completion_condition == "activity_threshold" and goal.condition is not None
+                    ),
                 }
                 for goal in goals.values()
                 if goal.deleted_at is None

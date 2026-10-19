@@ -23,8 +23,8 @@ function HierarchySection({
     isGoalIconSelected,
     getGoalIconActionLabel,
     onStartSubGoalCreation,
+    justCreatedGoalId = null,
     onOpenAssociate,
-    onAddTargetForGoal,
     scopedActivityName = null,
     onAdjustScope,
     label: labelOverride = null,
@@ -72,7 +72,7 @@ function HierarchySection({
                 isGoalIconSelected={isGoalIconSelected}
                 getGoalIconActionLabel={getGoalIconActionLabel}
                 onStartSubGoalCreation={onStartSubGoalCreation}
-                onAddTargetForGoal={onAddTargetForGoal}
+                justCreatedGoalId={justCreatedGoalId}
                 emptyState="No goals associated"
             />
         </div>

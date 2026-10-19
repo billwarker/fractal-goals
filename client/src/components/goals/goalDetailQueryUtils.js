@@ -14,6 +14,7 @@ export function invalidateGoalAssociationQueries(queryClient, rootId, goalId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.goalMetrics(goalId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalMetricsRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.goalTimelinesRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.activities(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.fractalTree(rootId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.programMetricsRoot(rootId) }),

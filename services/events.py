@@ -21,7 +21,7 @@ Event Naming Convention:
     Examples:
         - session.completed
         - goal.completed  
-        - target.achieved
+        - goal.uncompleted
         - activity.created
         - program.updated
 """
@@ -242,13 +242,6 @@ class Events:
     GOAL_COMPLETED = 'goal.completed'
     GOAL_UNCOMPLETED = 'goal.uncompleted'
     GOAL_DELETED = 'goal.deleted'
-    
-    # Target events
-    TARGET_ACHIEVED = 'target.achieved'
-    TARGET_REVERTED = 'target.reverted'
-    TARGET_CREATED = 'target.created'
-    TARGET_UPDATED = 'target.updated'
-    TARGET_DELETED = 'target.deleted'
     
     # Activity Instance events
     ACTIVITY_INSTANCE_CREATED = 'activity_instance.created'

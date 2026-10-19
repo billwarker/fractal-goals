@@ -39,19 +39,17 @@ export function getParentGoalInfo({ mode, parentGoal, goal, treeData }) {
  */
 export function buildLiveSmartGoal(goal, {
   description,
-  targets,
+  completionCondition,
   associatedActivityIds,
   deadline,
   relevanceStatement,
-  completedViaChildren,
   inheritParentActivities,
 }) {
   const edits = {
     description,
-    targets: Array.isArray(targets) ? targets : [],
+    completion_condition: completionCondition,
     deadline,
     relevance_statement: relevanceStatement,
-    completed_via_children: completedViaChildren,
     inherit_parent_activities: inheritParentActivities,
     smart_status: undefined,
     is_smart: undefined,

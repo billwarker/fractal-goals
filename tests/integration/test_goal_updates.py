@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 import uuid
 from models import Goal, GoalLevel
 
-def test_child_deadline_constraint(authed_client, db_session, test_user):
-    """Test that a child goal cannot have a deadline later than its parent."""
+def test_child_deadline_after_parent_is_saved_with_a_warning(authed_client, db_session, test_user):
+    """A child due after its parent is allowed; the response says so."""
     # 1. Create parent goal
     parent_deadline = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
     r = authed_client.post('/api/goals', json={
@@ -23,11 +23,11 @@ def test_child_deadline_constraint(authed_client, db_session, test_user):
         "parent_id": parent_id,
         "deadline": child_deadline
     })
-    assert r.status_code == 400
-    assert "Child deadline cannot be later than parent deadline" in r.get_json()["error"]
+    assert r.status_code == 201
+    assert r.get_json()["deadline_warnings"] == [{"code": "after_parent", "parent_deadline": parent_deadline}]
 
-def test_deadline_cascade(authed_client, db_session, test_user):
-    """Test that shortening a parent deadline cascades to children."""
+def test_shortening_a_parent_deadline_leaves_children_and_warns(authed_client, db_session, test_user):
+    """Moving a parent's due date before a child's no longer rewrites the child."""
     # 1. Create parent and child
     p_date = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
     c_date = (datetime.now(timezone.utc) + timedelta(days=25)).date().isoformat()
@@ -46,13 +46,11 @@ def test_deadline_cascade(authed_client, db_session, test_user):
     new_p_date = (datetime.now(timezone.utc) + timedelta(days=15)).date().isoformat()
     r = authed_client.put(f'/api/goals/{parent_id}', json={"deadline": new_p_date})
     assert r.status_code == 200
-    
-    # 3. Verify child deadline was clamped
+    assert r.get_json()["deadline_warnings"] == [{"code": "children_after", "count": 1, "latest": c_date}]
+
+    # 3. The child keeps its own due date
     r = authed_client.get(f'/api/goals/{child_id}')
-    child_resp = r.get_json()
-    # Extract just the date part from "YYYY-MM-DDTHH:MM:SSZ"
-    child_deadline_date = child_resp["deadline"].split('T')[0]
-    assert child_deadline_date == new_p_date
+    assert r.get_json()["deadline"].split('T')[0] == c_date
 
 def test_transient_goal_constraints(authed_client, db_session, test_user):
     """Removed MicroGoal/NanoGoal types are rejected."""

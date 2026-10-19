@@ -22,6 +22,9 @@ export default function ProgramSidePane({
     programMetrics,
     programGoalSeeds,
     onGoalClick,
+    onStartSubGoalCreation = null,
+    justCreatedGoalId = null,
+    dueDragEnabled = false,
     programMetricsLoading = false,
     programMetricsError = null,
     blocksPanel = null,
@@ -191,6 +194,10 @@ export default function ProgramSidePane({
                         programGoalSeeds={programGoalSeeds || []}
                         onGoalClick={onGoalClick || (() => {})}
                         getGoalDetails={getGoalDetails}
+                        onStartSubGoalCreation={onStartSubGoalCreation}
+                        justCreatedGoalId={justCreatedGoalId}
+                        dueToday={today}
+                        dueDragEnabled={dueDragEnabled}
                         compact
                         hideMetrics
                         hideGoalsHeader

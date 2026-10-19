@@ -6,7 +6,7 @@
 ## Product and runtime
 
 Fractal Goals is a full-stack goal and practice tracker built around a five-level hierarchical
-goal model. Sessions capture execution; activities, templates, programs, targets, progress,
+goal model. Sessions capture execution; activities, templates, programs, completion conditions, progress,
 notes, and analytics provide structure and evidence.
 
 - Backend: Flask on port 8001, PostgreSQL, SQLAlchemy, Alembic
@@ -71,16 +71,53 @@ tokens. Mobile openers leave the header; sheets sit above the footer. Page filte
 
 ## Core domains
 
-### Goals and targets
+### Goals and completion conditions
 
 Goals form `Ultimate → Long Term → Mid Term → Short Term → Immediate` hierarchies. Fractal
 roots self-scope with `root_id == id`. Goal status, contribution evidence, pause history,
-association inheritance, target evaluation, and timeline projections are service-owned.
+association inheritance, condition evaluation, and timeline projections are service-owned.
 
-Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_target_service.py`,
-`blueprints/goals_api.py`, `client/src/components/goals/`, and `client/src/pages/Goals.jsx`.
+Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_condition_*.py`,
+`blueprints/goals_api.py`, `blueprints/goal_conditions_api.py`, `client/src/components/goals/`,
+and `client/src/pages/Goals.jsx`.
 
-Goal Details has one Timeline section beneath targets: a lifetime calendar heatmap (intensity =
+Each goal completes in exactly one way (`goals.completion_condition`): an **activity threshold**
+(`goal_completion_conditions` + `goal_condition_metric_rules`: single session — N sets meeting every
+rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions),
+**children** (all child goals complete), or **manual**. Manual completion is always allowed and is
+recorded as `manual_override` unless the condition is `manual`. Progress is never stored: the pure
+`goal_condition_evaluator.py` runs over canonical instance evidence inside the goal's active period
+(`started_at` to deadline, minus pause intervals), and `goal_condition_service.reconcile_goal`
+completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
+After a manual uncompletion only newer evidence re-completes a goal. Rule values are
+`Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
+`CompletionConditionEditor`, `CompletionConditionSummary`, `ConditionEvidenceModal` and Session
+Detail's `ConditionCardsSection` render it, under the `goalCondition` query-key root.
+Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`);
+the target tables are dropped in a separate, later revision.
+See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
+
+Goals are created from the Program calendar, Days and Session Detail hierarchies by scoping a goal
+through its icon and using its "+" (`GoalHierarchyList`, `onStartSubGoalCreation`). Every create
+path inserts the server's goal into cached trees and refetches goal read models through
+`utils/goalTreeCache.js` `applyCreatedGoal`. Interaction details:
+[UI behaviour contracts](planning/ui-contracts-reference.md#creating-goals-from-hierarchies).
+
+Due dates are soft guidance. `services/goal_deadline_rules.py` (mirrored by
+`client/src/utils/goalDeadlineRules.js`, both checked against `tests/fixtures/goal_deadline_cases.json`)
+warns when a date is after the parent's, before a child's, outside the level's horizon, or outside a
+program. Goal create and update responses carry `deadline_warnings`. Nothing is rejected, and children
+are never rewritten. Program calendar due chips, badges and drag-to-set:
+[UI behaviour contracts](planning/ui-contracts-reference.md#goal-due-dates-on-the-program-calendar).
+
+Sequences (`services/goal_sequence_service.py`, `blueprints/goal_sequences_api.py`) order same-level
+siblings so each begins when the one before completes. They are built on pause: later steps hold a
+pause interval with reason `sequence`. Manual, condition and child completions resume the next step
+in their own transaction, recording `resumed_by_goal_id`, so un-completing re-pauses exactly that
+step. Move, Convert Level and Delete take a goal out of its sequence. Details:
+[UI behaviour contracts](planning/ui-contracts-reference.md#goal-sequences).
+
+Goal Details has one Timeline section beneath the completion summary: a lifetime calendar heatmap (intensity =
 completed-activity counts, user timezone, optional child scope) above cursor-paginated evidence
 cards; selecting a date filters the list. Header, sticky calendar, footer and responsive sizing
 contracts live in [UI behaviour contracts](planning/ui-contracts-reference.md#goal-details-and-timeline).
@@ -88,7 +125,7 @@ contracts live in [UI behaviour contracts](planning/ui-contracts-reference.md#go
 `blueprints/goal_history_api.py` registers history reads. `services/goal_timeline_service.py` owns the
 shared evidence projection, `services/goal_activity_heatmap.py` daily aggregation, and
 `services/goal_timeline_page.py` stable mode filtering/cursors. Calendar summaries use complete
-evidence; pages default to 20 entries with no total-history cap, and rich activity/target data loads
+evidence; pages default to 20 entries with no total-history cap, and rich activity data loads
 only for the selected page. Shared activity instances count once. `components/common/CalendarHeatmap.jsx`
 serves goal and session calendars; `GoalTimelineFeed.jsx` and `GoalTimelineEntries.jsx` own the list
 and canonical cards. All queries share the `goalTimeline` invalidation root. Published landing
@@ -98,11 +135,10 @@ See [Goal Timeline](planning/goal-activity-heatmap.md).
 Goal evidence is resolved per activity instance: active direct instance links are unioned with
 existing definition/group sources, and each instance counts once across overlapping sources and
 ancestor rollups. One-off links roll upward, never inherit downward or add a definition to a
-reusable activity catalog. Occurrence dates retain goal lifetime, pause/completion exclusions,
-and target windows. `services/instance_goal_evidence.py` owns that attribution invariant;
-`activity_instance_goal_service.py` owns authenticated, reversible association mutations, and
-`instance_goal_target_reconciliation.py` applies existing target lifecycle rules in the same
-transaction. The additive `activity_instance_goal_associations` table preserves creation history
+reusable activity catalog. Occurrence dates retain goal lifetime and pause/completion
+exclusions. `services/instance_goal_evidence.py` owns that attribution invariant;
+`activity_instance_goal_service.py` owns authenticated, reversible association mutations and
+reconciles affected goal conditions in the same transaction. The additive `activity_instance_goal_associations` table preserves creation history
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
@@ -150,7 +186,7 @@ snapshots the plan on `circuit_runs.prescription`.
 Planned set activities start with one empty `planned` set per planned set and are reference-only
 (no metric defaults). Plan editors live in `components/prescriptions/`, plan section helpers in
 `services/plan_sections.py`, and the session card's "(plan …)" hint in `utils/sessionPrescription.js`.
-Plans never feed targets.
+Plans never feed completion conditions.
 
 Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a

@@ -91,4 +91,21 @@ describe('renderProgramCalendarEventContent', () => {
         }));
         expect(screen.getByText(', streaks not protected')).toBeInTheDocument();
     });
+
+    it('reads goal badges as "Due:" with the goal icon and name, and completed goals as "Done:"', () => {
+        const onGoalActivate = vi.fn();
+        const { rerender } = render(renderProgramCalendarEventContent(
+            { event: { title: 'Run a 10k', extendedProps: { type: 'goal', goalCompleted: false } } },
+            onGoalActivate,
+        ));
+        const badge = screen.getByRole('button', { name: 'Open goal: Run a 10k' });
+        expect(badge).toHaveTextContent('Due:Run a 10k');
+        expect(badge.firstElementChild).toHaveTextContent('Due:');
+
+        rerender(renderProgramCalendarEventContent(
+            { event: { title: 'Run a 10k', extendedProps: { type: 'goal', goalCompleted: true } } },
+            onGoalActivate,
+        ));
+        expect(screen.getByRole('button', { name: 'Open goal: Run a 10k' })).toHaveTextContent('Done:Run a 10k');
+    });
 });

@@ -40,16 +40,6 @@ def serialize_goal_selection_item(short_term_goal, active_children):
     }
 
 
-def serialize_goal_target_evaluation_result(goal, *, targets_evaluated, targets_completed, newly_completed_targets, goal_completed):
-    return {
-        "goal": serialize_goal(goal, include_children=False),
-        "targets_evaluated": targets_evaluated,
-        "targets_completed": targets_completed,
-        "newly_completed_targets": list(newly_completed_targets),
-        "goal_completed": goal_completed,
-    }
-
-
 def serialize_previous_session_notes_group(session, notes):
     return {
         'session_id': session.id,

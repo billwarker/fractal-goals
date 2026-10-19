@@ -205,52 +205,21 @@ describe('useProgramGoalsHierarchyViewModel', () => {
         expect(result.current.map((node) => node.id)).toEqual(['seed', 'inside-attributes-status']);
     });
 
-    it('treats goals with all completed targets as completed for program date filtering', () => {
+    it('uses only the goal’s own completion for program date filtering', () => {
         const seed = {
             id: 'seed',
             type: 'MidTermGoal',
             name: 'Seed',
             children: [
+                { id: 'before', type: 'ShortTermGoal', name: 'Before', completed: true, completed_at: '2026-05-10T12:00:00Z', children: [] },
                 {
-                    id: 'target-before',
+                    id: 'inside',
                     type: 'ShortTermGoal',
-                    name: 'Target Before',
-                    targets: [
-                        {
-                            id: 'target-1',
-                            completed: true,
-                            completed_at: '2026-05-10T12:00:00Z',
-                        },
-                    ],
+                    name: 'Inside',
+                    attributes: { completed: true, completed_at: '2026-05-24T12:00:00Z' },
                     children: [],
                 },
-                {
-                    id: 'target-inside',
-                    type: 'ShortTermGoal',
-                    name: 'Target Inside',
-                    attributes: {
-                        targets: [
-                            {
-                                id: 'target-2',
-                                completed: true,
-                                completed_at: '2026-05-24T12:00:00Z',
-                            },
-                        ],
-                    },
-                    children: [],
-                },
-                {
-                    id: 'target-pending',
-                    type: 'ShortTermGoal',
-                    name: 'Target Pending',
-                    targets: [
-                        {
-                            id: 'target-3',
-                            completed: false,
-                        },
-                    ],
-                    children: [],
-                },
+                { id: 'pending', type: 'ShortTermGoal', name: 'Pending', completed: false, children: [] },
             ],
         };
 
@@ -260,10 +229,6 @@ describe('useProgramGoalsHierarchyViewModel', () => {
             endDate: '2026-05-26',
         }));
 
-        expect(result.current.map((node) => node.id)).toEqual([
-            'seed',
-            'target-inside',
-            'target-pending',
-        ]);
+        expect(result.current.map((node) => node.id)).toEqual(['seed', 'inside', 'pending']);
     });
 });

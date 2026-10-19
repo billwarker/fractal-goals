@@ -15,7 +15,6 @@ from models import (
     Program,
     Session,
     SessionTemplate,
-    Target,
 )
 from services.serializers import (
     format_utc,
@@ -65,20 +64,6 @@ class _LandingShowcaseMixin:
             if goal_id and goal_id not in existing_goals:
                 warnings.append(f"{bullet['heading']}: selected goal no longer exists and was skipped")
                 bullet["goal_id"] = None
-                bullet["target_id"] = None
-                continue
-            target_id = bullet.get("target_id")
-            if not target_id:
-                continue
-            target_exists = self.db_session.query(Target.id).filter(
-                Target.id == target_id,
-                Target.goal_id == goal_id,
-                Target.root_id == root.id,
-                Target.deleted_at.is_(None),
-            ).first()
-            if not target_exists:
-                warnings.append(f"{bullet['heading']}: selected target no longer exists and was skipped")
-                bullet["target_id"] = None
         return resolved, warnings
 
     def _resolve_landing_showcase(self, root: Goal, showcase: JsonDict | None) -> tuple[JsonDict, list[str]]:

@@ -12,6 +12,9 @@ import {
 } from '../../utils/goalNodeModel';
 import { isSMART } from '../../utils/smartHelpers';
 import { buildTreeMaps, getLineagePath, sortChildren } from './flowTreeTreeUtils';
+import { orderSequencedSiblings } from '../../utils/goalSequenceOrder';
+
+export { orderSequencedSiblings };
 
 const toId = (value) => (value == null ? null : String(value));
 
@@ -21,6 +24,28 @@ const getTreeIconCenter = (node, compact = false) => {
         x: node.position.x + (iconSize / 2),
         y: node.position.y + (iconSize / 2),
     };
+};
+
+/** Dashed arrows between consecutive visible steps of each sequence (not used for layout). */
+export const buildSequenceEdges = (orderedChildren, visibleNodeIds) => {
+    const byTrack = new Map();
+    orderedChildren.forEach((child) => {
+        const trackId = toId(child.sequence_track_id ?? child.attributes?.sequence_track_id);
+        const childId = toId(getGoalNodeId(child));
+        if (trackId && childId && visibleNodeIds.has(childId)) byTrack.set(trackId, [...(byTrack.get(trackId) || []), child]);
+    });
+    return [...byTrack.values()].flatMap((steps) => steps.slice(1).map((step, index) => {
+        const source = toId(getGoalNodeId(steps[index]));
+        const target = toId(getGoalNodeId(step));
+        return {
+            id: `sequence-${source}-${target}`,
+            source,
+            target,
+            type: 'sequence',
+            className: 'sequence-edge',
+            data: { sequence: true },
+        };
+    }));
 };
 
 export const DEFAULT_VIEW_SETTINGS = {
@@ -45,6 +70,7 @@ export const convertTreeToFlow = (
 ) => {
     const nodes = [];
     const edges = [];
+    const siblingGroups = [];
     const addedNodeIds = new Set();
     const visibleNodeIds = new Set();
 
@@ -117,14 +143,16 @@ export const convertTreeToFlow = (
             const sortBy = node.level_characteristics?.sort_children_by
                 || node.attributes?.level_characteristics?.sort_children_by
                 || getSortChildrenBy?.(node);
-            const sortedChildren = sortChildren(children, sortBy);
+            const sortedChildren = orderSequencedSiblings(sortChildren(children, sortBy));
+            siblingGroups.push(sortedChildren);
             sortedChildren.forEach((child) => traverse(child, nodeId));
         }
     };
 
     traverse(treeData);
+    const sequenceEdges = siblingGroups.flatMap((group) => buildSequenceEdges(group, visibleNodeIds));
 
-    return { nodes, edges, visibleNodeIds };
+    return { nodes, edges, visibleNodeIds, sequenceEdges };
 };
 
 export const prepareGraphPresentation = ({
@@ -152,7 +180,7 @@ export const prepareGraphPresentation = ({
     const activeLineageIds = getActiveLineageIds(effectiveEvidenceGoalIds, treeMaps.parentById, treeMaps.nodeById);
     const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, effectiveEvidenceGoalIds);
 
-    const { nodes: rawNodes, edges: rawEdges, visibleNodeIds } = convertTreeToFlow(
+    const { nodes: rawNodes, edges: rawEdges, visibleNodeIds, sequenceEdges } = convertTreeToFlow(
         treeData,
         onNodeClick,
         onAddChild,
@@ -167,8 +195,9 @@ export const prepareGraphPresentation = ({
         }
     );
 
+    // Sequence arrows are drawn over the tree but never fed to layout, so positions don't change.
     return { rawNodes, rawEdges, visibleNodeIds, treeMaps, effectiveEvidenceGoalIds,
-        activeLineageIds, inactiveNodeIds, normalizedSettings };
+        activeLineageIds, inactiveNodeIds, normalizedSettings, sequenceEdges };
 };
 
 export const buildGraphPresentation = ({
@@ -196,7 +225,7 @@ export const buildGraphPresentation = ({
     });
     if (!prepared) return { nodes: [], edges: [], metrics: null };
     const { rawNodes, rawEdges, visibleNodeIds, treeMaps, effectiveEvidenceGoalIds,
-        activeLineageIds, inactiveNodeIds, normalizedSettings } = prepared;
+        activeLineageIds, inactiveNodeIds, normalizedSettings, sequenceEdges = [] } = prepared;
 
     const layout = geometry || (layoutMode === 'hierarchy'
         ? getHierarchyLayoutedElements(rawNodes, rawEdges, isMobile)
@@ -340,9 +369,26 @@ export const buildGraphPresentation = ({
         treeMaps.childrenById
     );
 
+    const sequenceArrows = layoutMode === 'tree' ? sequenceEdges.flatMap((edge) => {
+        const source = layoutedNodeById.get(edge.source);
+        const target = layoutedNodeById.get(edge.target);
+        if (!source || !target) return [];
+        return [{
+            ...edge,
+            style: { stroke: 'var(--color-text-muted)', strokeWidth: 1.5, strokeDasharray: '5 5', pointerEvents: 'none' },
+            markerEnd: { type: 'arrowclosed', color: 'var(--color-text-muted)', width: 14, height: 14 },
+            data: {
+                ...edge.data,
+                sourceCenter: getTreeIconCenter(source, isMobile),
+                targetCenter: getTreeIconCenter(target, isMobile),
+                iconRadius: isMobile ? 11 : 15,
+            },
+        }];
+    }) : [];
+
     return {
         nodes,
-        edges: baseEdges,
+        edges: [...baseEdges, ...sequenceArrows],
         metrics,
     };
 };

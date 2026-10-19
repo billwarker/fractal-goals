@@ -9,7 +9,8 @@ import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import { getChildType, getValidChildTypes } from '../utils/goalHelpers';
-import { flattenGoalTree, isExecutionGoalType } from '../utils/goalNodeModel';
+import { flattenGoalTree } from '../utils/goalNodeModel';
+import { buildConditionPayload, validateConditionDraft } from '../utils/goalConditions';
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../utils/activityBuilder';
@@ -48,12 +49,14 @@ function GoalDetailModal({
     mode = 'view',  // 'view', 'edit', or 'create'
     onCreate,  // Function to call when creating a new goal
     parentGoal,  // Parent goal for context when creating
-    onGoalSelect, onTargetOpen, // Optional host actions for selecting goals/opening read-only targets
+    onGoalSelect, // Optional host action for selecting goals
+    conditionSnapshot = null, // Published landing condition analytics for read-only goals
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
     readOnly = false, portalTarget = null, overlayClassName = '',
     initialActivities = [], initialActivityGroups = [], // Create-mode associations
-    initialView = 'goal', initialTargetId = null, initialViewKey = 0,
+    initialCompletion = null, // Create-mode { completionCondition, conditionDraft } seed
+    initialView = 'goal', initialViewKey = 0,
 }) {
     const {
         getGoalColor = () => '#4caf50',
@@ -86,14 +89,14 @@ function GoalDetailModal({
         description, setDescription,
         deadline, setDeadline,
         relevanceStatement, setRelevanceStatement,
-        completedViaChildren, setCompletedViaChildren,
+        startedAt, setStartedAt,
+        completionCondition, setCompletionCondition,
+        conditionDraft, setConditionDraft,
         inheritParentActivities, setInheritParentActivities,
-        trackActivities, setTrackActivities,
-        allowManualCompletion, setAllowManualCompletion,
-        targets, setTargets,
+        trackActivities,
         resetForm,
         errors, validateForm
-    } = useGoalForm(goal, mode);
+    } = useGoalForm(goal, mode, initialCompletion);
     // In create mode, compute all valid child types for the parent.
     // When multiple levels are valid, show a level picker step before the form.
     const parentType = parentGoal?.attributes?.type || parentGoal?.type;
@@ -109,11 +112,11 @@ function GoalDetailModal({
     const [activityBuilderReturnView, setActivityBuilderReturnView] = useState('activity-associator');
     const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
     const [isActivityBuilderOpen, setIsActivityBuilderOpen] = useState(false);
-    const [isTargetSelectionMode, setIsTargetSelectionMode] = useState(false);
-    const [targetManagerReturnView, setTargetManagerReturnView] = useState('goal');
-    const [activeAnalyticsTarget, setActiveAnalyticsTarget] = useState(null);
-    // Builder modal config: null = closed; otherwise { target, activityId, lock }.
-    const [builderConfig, setBuilderConfig] = useState(null);
+    const [conditionErrors, setConditionErrors] = useState({});
+    const updateConditionDraft = React.useCallback((draft) => {
+        setConditionDraft(draft);
+        setConditionErrors({});
+    }, [setConditionDraft]);
     const goalHeaderRef = React.useRef(null);
     const contentScrollRef = React.useRef(null);
     const [goalHeaderStickyOffset, setGoalHeaderStickyOffset] = useState(0);
@@ -175,8 +178,6 @@ function GoalDetailModal({
         setIsEditing,
         localCompletedAt,
         isCompleted,
-        targetToEdit,
-        setTargetToEdit,
         viewState,
         setViewState,
         handleClose,
@@ -205,7 +206,7 @@ function GoalDetailModal({
         },
         resetForm,
     });
-    useInitialGoalDetailView({ goalId, initialTargetId, initialView, initialViewKey, isOpen, mode, setTargetToEdit, setViewState, targets });
+    useInitialGoalDetailView({ goalId, initialView, initialViewKey, isOpen, mode, setViewState });
     const textColor = getGoalTextColor(goalType);
     const completedColor = getGoalColor('Completed');
     const completedSecondaryColor = getGoalSecondaryColor('Completed');
@@ -271,12 +272,26 @@ function GoalDetailModal({
         readOnly,
     ]);
 
+    const conditionActivity = useMemo(() => (
+        activityDefinitions.find((activity) => activity.id === conditionDraft?.activity_definition_id) || null
+    ), [activityDefinitions, conditionDraft?.activity_definition_id]);
+
     const handleSave = async () => {
-        if (!validateForm()) {
+        const nextConditionErrors = completionCondition === 'activity_threshold'
+            ? validateConditionDraft(conditionDraft, conditionActivity)
+            : {};
+        setConditionErrors(nextConditionErrors);
+        const formValid = validateForm();
+        if (!formValid || Object.keys(nextConditionErrors).length > 0) {
             notify.error('Please fix the errors before saving.');
             return;
         }
 
+        const completionFields = {
+            completion_condition: completionCondition,
+            ...(completionCondition === 'activity_threshold' ? { condition: buildConditionPayload(conditionDraft) } : {}),
+            ...(startedAt ? { started_at: startedAt } : {}),
+        };
         const payload = mode === 'create' ? {
             name,
             description,
@@ -284,21 +299,17 @@ function GoalDetailModal({
             type: goalType,
             relevance_statement: relevanceStatement,
             parent_id: parentGoal?.attributes?.id || parentGoal?.id,
-            targets: targets,
-            completed_via_children: completedViaChildren,
             inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
-            allow_manual_completion: allowManualCompletion
+            ...completionFields,
         } : {
             name,
             description,
             deadline: deadline || null,
-            targets: targets,
             relevance_statement: relevanceStatement,
-            completed_via_children: completedViaChildren,
             inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
-            allow_manual_completion: allowManualCompletion
+            ...completionFields,
         };
 
         if (mode === 'create') {
@@ -433,38 +444,12 @@ function GoalDetailModal({
         setActivityPickerFooterActions(actions);
     }, []);
 
+    // Manual completion is always available; on a goal that completes on its own it is an override.
     const completionFooterState = useMemo(() => {
-        const isManualAllowed = levelConfig.allow_manual_completion !== false;
-        const canShowManual = allowManualCompletion && isManualAllowed && !isPaused;
-        const canToggleCompletion = !isPaused && Boolean(onToggleCompletion) && (isCompleted || canShowManual);
-        const isTargetsAllowed = levelConfig.track_activities !== false;
-        const isChildrenAllowed = !isExecutionGoalType(goalType);
-        const label = isPaused
-            ? 'Paused'
-            : isCompleted
-                ? 'Mark Incomplete'
-                : canShowManual
-                    ? 'Mark Complete'
-                    : trackActivities && isTargetsAllowed && completedViaChildren && isChildrenAllowed
-                        ? 'Complete via Children & Targets'
-                        : trackActivities && isTargetsAllowed
-                            ? 'Complete via Target(s)'
-                            : completedViaChildren && isChildrenAllowed
-                                ? 'Complete via Children'
-                                : 'Auto-completing...';
-
-        return { canShowManual, canToggleCompletion, label };
-    }, [
-        allowManualCompletion,
-        completedViaChildren,
-        goalType,
-        isCompleted,
-        isPaused,
-        levelConfig.allow_manual_completion,
-        levelConfig.track_activities,
-        onToggleCompletion,
-        trackActivities,
-    ]);
+        const canToggleCompletion = !isPaused && Boolean(onToggleCompletion);
+        const label = isPaused ? 'Paused' : isCompleted ? 'Mark Incomplete' : 'Mark Complete';
+        return { canShowManual: canToggleCompletion, canToggleCompletion, label };
+    }, [isCompleted, isPaused, onToggleCompletion]);
 
     const handleCompletionFooterClick = () => {
         if (readOnly || !completionFooterState.canToggleCompletion || isPaused) {
@@ -493,31 +478,6 @@ function GoalDetailModal({
         });
     }, [isActivitiesAssociationMode, viewState]);
 
-    const handleAddTargetFromActivities = () => {
-        if (isActivitiesAssociationMode) {
-            activitiesAssociateCancelAction?.();
-            return;
-        }
-        setTargetToEdit(null);
-        setIsTargetSelectionMode(true);
-    };
-
-    const handleSelectTargetActivity = (activity) => {
-        if (!activity?.id) return;
-        const fullActivity = activityDefinitions.find((candidate) => candidate.id === activity.id) || activity;
-        if (!Array.isArray(fullActivity.metric_definitions) || fullActivity.metric_definitions.length === 0) {
-            notify.error('Choose an activity with metrics to create a target.');
-            return;
-        }
-        // Open the builder in its dedicated modal, pre-scoped to the chosen activity.
-        setIsTargetSelectionMode(false);
-        setBuilderConfig({ target: null, activityId: fullActivity.id, lock: true });
-    };
-
-    const handleCancelTargetSelection = () => {
-        setIsTargetSelectionMode(false);
-    };
-
     const handleCreateActivityFromActivities = React.useCallback((seed) => {
         setActivityBuilderReturnView('goal-activities');
         setActivityBuilderTemplate(prepareActivityDefinitionDraft(seed));
@@ -531,27 +491,7 @@ function GoalDetailModal({
     }, []);
 
     const handleCancelActivitiesFlow = () => {
-        if (isTargetSelectionMode) {
-            handleCancelTargetSelection();
-            return;
-        }
         activitiesAssociateCancelAction?.();
-    };
-
-    const persistTargetChanges = (newTargets) => {
-        if (onUpdate && goalId) {
-            onUpdate(goalId, {
-                name,
-                description,
-                deadline,
-                relevance_statement: relevanceStatement,
-                targets: newTargets,
-                completed_via_children: completedViaChildren,
-                inherit_parent_activities: inheritParentActivities,
-                track_activities: trackActivities,
-                allow_manual_completion: allowManualCompletion,
-            });
-        }
     };
 
     const handleGoalViewNavigation = (nextViewState) => {
@@ -560,7 +500,6 @@ function GoalDetailModal({
             setIsEditing(false);
         }
         if (nextViewState !== 'goal-activities') {
-            setIsTargetSelectionMode(false);
             setIsActivitiesAssociationMode(false);
             setActivityPickerFooterActions(null);
         }
@@ -582,11 +521,10 @@ function GoalDetailModal({
 
     const goalForSmart = buildLiveSmartGoal(goal, {
         description,
-        targets,
+        completionCondition,
         associatedActivityIds: associatedActivities ? associatedActivities.map((a) => a.id) : [],
         deadline,
         relevanceStatement,
-        completedViaChildren,
         inheritParentActivities,
     });
 
@@ -597,25 +535,25 @@ function GoalDetailModal({
 
     return (
         <GoalDetailModalRenderSurface
-            activeAnalyticsTarget={activeAnalyticsTarget}
             activitiesAssociateAction={activitiesAssociateAction}
             activityBuilderReturnView={activityBuilderReturnView}
             activityBuilderTemplate={activityBuilderTemplate}
             activityDefinitions={activityDefinitions}
             activityGroups={activityGroups}
             activityPickerFooterActions={activityPickerFooterActions}
-            allowManualCompletion={allowManualCompletion}
             associatedActivities={associatedActivities}
             associatedActivityGroups={associatedActivityGroups}
             attachInlineCreatedActivity={attachInlineCreatedActivity}
-            builderConfig={builderConfig}
             canAddChildGoal={canAddChildGoal}
             childType={childType}
             completedColor={completedColor}
             completedSecondaryColor={completedSecondaryColor}
             completedTextColor={completedTextColor}
-            completedViaChildren={completedViaChildren}
+            completionCondition={completionCondition}
+            conditionDraft={conditionDraft}
+            conditionErrors={conditionErrors}
             completionFooterState={completionFooterState}
+            conditionSnapshot={conditionSnapshot}
             contentScrollRef={contentScrollRef}
             deadline={deadline}
             description={description}
@@ -638,7 +576,6 @@ function GoalDetailModal({
             getGoalIcon={getGoalIcon}
             getGoalSecondaryColor={getGoalSecondaryColor}
             handleAddChildGoal={handleAddChildGoal}
-            handleAddTargetFromActivities={handleAddTargetFromActivities}
             handleCancel={handleCancel}
             handleCancelActivitiesFlow={handleCancelActivitiesFlow}
             handleClose={handleClose}
@@ -651,7 +588,6 @@ function GoalDetailModal({
             onTimelineExplore={() => markOnboardingView('timeline')}
             handleQuickGoalNote={handleQuickGoalNote}
             handleSave={handleSave}
-            handleSelectTargetActivity={handleSelectTargetActivity}
             handleUncompletionConfirm={handleUncompletionConfirm}
             inheritParentActivities={inheritParentActivities}
             isActivitiesAssociationMode={isActivitiesAssociationMode}
@@ -659,7 +595,6 @@ function GoalDetailModal({
             isCompleted={isCompleted}
             isEditing={isEditing}
             isPaused={isPaused}
-            isTargetSelectionMode={isTargetSelectionMode}
             levelConfig={levelConfig}
             localCompletedAt={localCompletedAt}
             mode={mode}
@@ -667,16 +602,13 @@ function GoalDetailModal({
             needsLevelPicker={needsLevelPicker}
             onDelete={onDelete}
             onGoalSelect={onGoalSelect}
-            onTargetOpen={onTargetOpen}
             onMobileCollapse={onMobileCollapse}
             onToggleCompletion={onToggleCompletion}
-            onUpdate={onUpdate}
             parentGoal={parentGoal}
             parentGoalColor={parentGoalColor}
             parentGoalName={parentGoalName}
             parentType={parentType}
             persistAssociations={persistAssociations}
-            persistTargetChanges={persistTargetChanges}
             programs={programs}
             portalTarget={portalTarget} overlayClassName={overlayClassName}
             readOnly={readOnly}
@@ -691,15 +623,15 @@ function GoalDetailModal({
             relevanceStatement={relevanceStatement}
             rootId={rootId}
             selectedChildType={selectedChildType}
-            setActiveAnalyticsTarget={setActiveAnalyticsTarget}
             setActivityBuilderReturnView={setActivityBuilderReturnView}
             setActivityBuilderTemplate={setActivityBuilderTemplate}
             setActivityGroups={setActivityGroups}
             setAssociatedActivities={setAssociatedActivities}
             setAssociatedActivityGroups={setAssociatedActivityGroups}
-            setAllowManualCompletion={setAllowManualCompletion}
-            setBuilderConfig={setBuilderConfig}
-            setCompletedViaChildren={setCompletedViaChildren}
+            setCompletionCondition={setCompletionCondition}
+            setConditionDraft={updateConditionDraft}
+            setStartedAt={setStartedAt}
+            startedAt={startedAt}
             setDeadline={setDeadline}
             setDescription={setDescription}
             setInheritParentActivities={setInheritParentActivities}
@@ -709,16 +641,8 @@ function GoalDetailModal({
             setName={setName}
             setRelevanceStatement={setRelevanceStatement}
             setSelectedChildType={setSelectedChildType}
-            setTargetManagerReturnView={setTargetManagerReturnView}
-            setTargetToEdit={setTargetToEdit}
-            setTargets={setTargets}
-            setTrackActivities={setTrackActivities}
             setViewState={setViewState}
-            targetManagerReturnView={targetManagerReturnView}
-            targetToEdit={targetToEdit}
-            targets={targets}
             textColor={textColor}
-            trackActivities={trackActivities}
             treeData={treeData}
             validChildTypes={validChildTypes}
             viewState={viewState}

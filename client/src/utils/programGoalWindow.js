@@ -27,56 +27,12 @@ export function getProgramDatePart(value) {
     return parsed.toISOString().slice(0, 10);
 }
 
-export function getGoalTargets(goal) {
-    const rawTargets = goal?.targets ?? goal?.attributes?.targets;
-    if (!rawTargets) {
-        return [];
-    }
-
-    if (Array.isArray(rawTargets)) {
-        return rawTargets;
-    }
-
-    try {
-        const parsedTargets = typeof rawTargets === 'string'
-            ? JSON.parse(rawTargets)
-            : rawTargets;
-        return Array.isArray(parsedTargets) ? parsedTargets : [];
-    } catch {
-        return [];
-    }
-}
-
-function isTargetCompleted(target) {
-    return Boolean(
-        target?.completed
-        ?? target?.status?.completed
-        ?? target?.attributes?.completed
-    );
-}
-
 export function getGoalCompleted(goal) {
-    const targets = getGoalTargets(goal);
-    const targetsCompleted = targets.length > 0 && targets.every(isTargetCompleted);
-
     return Boolean(
         goal?.completed
         ?? goal?.status?.completed
         ?? goal?.attributes?.completed
         ?? goal?.attributes?.status?.completed
-        ?? targetsCompleted
-    );
-}
-
-function getTargetCompletedAt(target) {
-    return (
-        target?.completed_at
-        ?? target?.completedAt
-        ?? target?.status?.completed_at
-        ?? target?.status?.completedAt
-        ?? target?.attributes?.completed_at
-        ?? target?.attributes?.completedAt
-        ?? null
     );
 }
 
@@ -93,22 +49,7 @@ export function getGoalCompletedAt(goal) {
         ?? null
     );
 
-    if (directCompletedAt) {
-        return directCompletedAt;
-    }
-
-    const completedTargetDates = getGoalTargets(goal)
-        .filter(isTargetCompleted)
-        .map(getTargetCompletedAt)
-        .filter(Boolean)
-        .map((value) => new Date(value))
-        .filter((value) => !Number.isNaN(value.getTime()));
-
-    if (completedTargetDates.length === 0) {
-        return null;
-    }
-
-    return new Date(Math.max(...completedTargetDates.map((value) => value.getTime()))).toISOString();
+    return directCompletedAt || null;
 }
 
 export function isGoalCompletedOutsideProgramWindow(goal, startDate, endDate) {

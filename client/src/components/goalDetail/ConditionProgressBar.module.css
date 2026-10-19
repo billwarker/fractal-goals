@@ -1,0 +1,42 @@
+.progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.track {
+    flex: 1;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+}
+
+.fill {
+    height: 100%;
+    border-radius: inherit;
+    background: color-mix(in srgb, var(--condition-accent) 75%, transparent);
+    transition: width var(--transition-base, 160ms) ease;
+}
+
+.met {
+    background: var(--condition-accent);
+}
+
+.label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.compact .track {
+    height: 5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .fill {
+        transition: none;
+    }
+}

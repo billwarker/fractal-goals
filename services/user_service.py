@@ -118,7 +118,6 @@ class UserService:
         goals = []
         if root_ids:
             goals = self.db_session.query(Goal).options(
-                selectinload(Goal.targets_rel),
                 selectinload(Goal.associated_activities),
                 selectinload(Goal.associated_activity_groups),
             ).filter(

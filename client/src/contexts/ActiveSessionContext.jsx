@@ -12,6 +12,8 @@ import { invalidateSessionLists } from '../utils/queryInvalidation';
 import { calculateSessionItemDuration } from '../utils/sessionTime';
 import { useGoals } from './GoalsContext';
 
+const EMPTY_CONDITION_PROGRESS = Object.freeze({});
+
 const SessionDataContext = createContext(null);
 const SessionUiContext = createContext(null);
 const SessionActionsContext = createContext(null);
@@ -94,11 +96,8 @@ export function QueuedQuickSessionProvider({
         localSessionData: draftSession?.localSessionData || null,
         groupMap,
         groupedActivities,
-        // Match the shapes produced by useTargetAchievements: consumers call
-        // achievedTargetIds.has() and read goalAchievements as a Map.
-        targetAchievements: new Map(),
-        achievedTargetIds: new Set(),
-        goalAchievements: new Map(),
+        // Quick sessions have no server-side goal scope yet, so no condition progress.
+        conditionProgressByGoalId: EMPTY_CONDITION_PROGRESS,
         calculateTotalDuration,
     }), [
         activityDefinitions,
@@ -223,9 +222,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         normalizedSessionData,
         groupMap,
         groupedActivities,
-        targetAchievements,
-        achievedTargetIds,
-        goalAchievements,
+        conditionProgressByGoalId,
         loading,
     } = useSessionDetailData({
         rootId,
@@ -355,11 +352,9 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
     }, [rootId, setActiveRootId]);
 
     useSessionAchievementNotifications({
-        rootId,
         sessionId,
-        achievedTargetIds,
-        targetAchievements,
-        goalAchievements,
+        conditionProgressByGoalId,
+        sessionGoalsView,
         sessionLoading,
         instancesLoading,
         sessionGoalsViewLoading,
@@ -388,9 +383,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         localSessionData,
         groupMap,
         groupedActivities,
-        targetAchievements,
-        achievedTargetIds,
-        goalAchievements,
+        conditionProgressByGoalId,
         calculateTotalDuration,
     }), [
         rootId,
@@ -409,9 +402,7 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         autoSaveStatus,
         groupMap,
         groupedActivities,
-        targetAchievements,
-        achievedTargetIds,
-        goalAchievements,
+        conditionProgressByGoalId,
         calculateTotalDuration,
     ]);
 

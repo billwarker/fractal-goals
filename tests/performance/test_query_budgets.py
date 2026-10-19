@@ -21,7 +21,7 @@ from models import (
     ProgramBlock,
     ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate,
     SessionTemplate,
-    Target,
+    GoalCompletionCondition,
     User,
     activity_goal_associations,
 )
@@ -366,12 +366,16 @@ def landing_publish_budget_dataset(db_session):
                 activity_id=activity.id, goal_id=child.id
             )
         )
+        child.completion_condition = "activity_threshold"
         db_session.add(
-            Target(
+            GoalCompletionCondition(
                 id=str(uuid.uuid4()),
                 goal_id=child.id,
                 root_id=root.id,
-                name=f"Landing Target {index}",
+                activity_definition_id=activity.id,
+                kind="consistency",
+                measure="sets",
+                required_count=index + 1,
             )
         )
         db_session.add(
@@ -456,13 +460,16 @@ def landing_publish_budget_dataset(db_session):
                 goal_id=child.id,
             )
         )
+        child.completion_condition = "activity_threshold"
         db_session.add(
-            Target(
+            GoalCompletionCondition(
                 id=str(uuid.uuid4()),
                 goal_id=child.id,
                 root_id=second_root.id,
-                name=f"Second Landing Target {index}",
-                activity_id=second_activity.id,
+                activity_definition_id=second_activity.id,
+                kind="consistency",
+                measure="sets",
+                required_count=index + 1,
             )
         )
         db_session.add(
@@ -645,11 +652,12 @@ def test_publish_landing_examples_query_budget(
 
     # Reusing the validated/preloaded goal graph across enrichment phases keeps
     # this production-shaped 17-goal snapshot below one second locally while
-    # retaining CI headroom and a strict regression ceiling.
+    # retaining CI headroom and a strict regression ceiling. Condition analytics
+    # load each example root's watched activity once (constant per root, not per goal).
     assert_response_budget(
         response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 65
+    assert query_counter["total"] <= 66
 
 
 @pytest.mark.integration
@@ -1109,7 +1117,7 @@ def test_get_goal_timeline_query_budget(
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
-        f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,target,child_goal",
+        f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,child_goal",
         query_counter=query_counter,
     )
 

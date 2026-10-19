@@ -11,15 +11,6 @@ from services.completion_handlers import (
     handle_activity_instance_updated,
 )
 from services._completion_programs import _check_parent_completion
-from services._completion_targets import (
-    _evaluate_threshold_target,
-    _evaluate_sum_target,
-    _evaluate_frequency_target,
-)
-from services.goal_target_rules import (
-    check_metric_value as _check_metric_value,
-    check_metrics_meet_target as _check_metrics_meet_target,
-)
 from services.events import Event, Events
 from services.programs import ProgramService
 from services._session_lifecycle_common import _parse_iso_datetime_strict
@@ -51,85 +42,6 @@ class TestSessionServiceHelpers:
 
 @pytest.mark.unit
 class TestCompletionHandlersHelpers:
-    def test_check_metric_value_operators(self):
-        assert _check_metric_value(10, 10, ">=") is True
-        assert _check_metric_value(10, 9, ">=") is False
-        assert _check_metric_value(10, 9, "<=") is True
-        assert _check_metric_value(10, 10.0005, "==") is True
-        assert _check_metric_value(10, 11, ">") is True
-        assert _check_metric_value(10, 9, "<") is True
-        assert _check_metric_value(10, 10, "??") is False
-
-    def test_check_metrics_meet_target_requires_all_target_metrics(self):
-        target_metrics = [
-            {"metric_id": "m1", "value": 10, "operator": ">="},
-            {"metric_id": "m2", "value": 5, "operator": ">="},
-        ]
-        actual_ok = [
-            {"metric_id": "m1", "value": 10},
-            {"metric_id": "m2", "value": 7},
-        ]
-        actual_missing = [{"metric_id": "m1", "value": 12}]
-        assert _check_metrics_meet_target(target_metrics, actual_ok) is True
-        assert _check_metrics_meet_target(target_metrics, actual_missing) is False
-
-    def test_evaluate_threshold_target_checks_sets_and_flat_metrics(self):
-        target = {
-            "activity_id": "act-1",
-            "metrics": [{"metric_id": "m1", "value": 100, "operator": ">="}],
-        }
-        instances_by_activity = {
-            "act-1": [
-                {"sets": [{"metrics": [{"metric_id": "m1", "value": 95}]}], "metrics": []},
-                {"sets": [], "metrics": [{"metric_id": "m1", "value": 105}]},
-            ]
-        }
-        assert _evaluate_threshold_target(target, instances_by_activity) is True
-
-    def test_evaluate_sum_and_frequency_targets(self):
-        class MetricValueStub:
-            def __init__(self, metric_definition_id, value):
-                self.metric_definition_id = metric_definition_id
-                self.value = value
-
-        class ActivityInstanceStub:
-            def __init__(self, session_id, data, metric_values):
-                self.session_id = session_id
-                self.data = data
-                self.metric_values = metric_values
-                self.sets = [
-                    SimpleNamespace(
-                        metric_values=[
-                            MetricValueStub(metric['metric_id'], metric['value'])
-                            for metric in set_payload.get('metrics', [])
-                        ]
-                    )
-                    for set_payload in data.get('sets', [])
-                ]
-
-        instances = [
-            ActivityInstanceStub(
-                "s1",
-                {"sets": [{"metrics": [{"metric_id": "m1", "value": 30}]}]},
-                [MetricValueStub("m1", 20)],
-            ),
-            ActivityInstanceStub(
-                "s2",
-                {"sets": [{"metrics": [{"metric_id": "m1", "value": 40}]}]},
-                [MetricValueStub("m1", 15)],
-            ),
-        ]
-
-        target = {"metrics": [{"metric_id": "m1", "value": 100, "operator": ">="}]}
-        met, current, required = _evaluate_sum_target(target, instances)
-        assert met is True
-        assert current == 105.0
-        assert required == 100.0
-
-        freq_met, freq_count = _evaluate_frequency_target({"frequency_count": 2}, instances)
-        assert freq_met is True
-        assert freq_count == 2
-
     def test_check_parent_completion_queues_goal_completed_event(self, db_session, sample_ultimate_goal, monkeypatch):
         parent = Goal(
             id="parent-goal",
@@ -137,7 +49,7 @@ class TestCompletionHandlersHelpers:
             parent_id=sample_ultimate_goal.id,
             root_id=sample_ultimate_goal.id,
             completed=False,
-            completed_via_children=True,
+            completion_condition='children',
         )
         child = Goal(
             name="Child Goal",
@@ -375,113 +287,56 @@ class TestProgramServicePublicFlows:
 
 @pytest.mark.unit
 class TestCompletionHandlerPublicFlow:
-    def test_handle_activity_instance_updated_reverts_when_marked_incomplete(self, monkeypatch):
-        instance = SimpleNamespace(completed=False)
-        fake_db = _fake_db_session(instance)
-        reverted = []
-
+    def _capture_reconciles(self, monkeypatch, fake_db):
+        reconciled = []
         monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
         monkeypatch.setattr(
             completion_handlers,
-            "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
+            "_reconcile_activities",
+            lambda _db, root_id, activity_ids, pending_events, *, trigger: reconciled.append(
+                (root_id, set(activity_ids), trigger)
+            ),
         )
+        return reconciled
 
-        handle_activity_instance_updated(
-            Event(
-                Events.ACTIVITY_INSTANCE_UPDATED,
-                {"instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["completed"]},
-            )
-        )
+    def test_completion_toggles_reconcile_the_instances_activity(self, monkeypatch):
+        fake_db = _fake_db_session(SimpleNamespace(completed=False, root_id="root-1", activity_definition_id="act-1"))
+        reconciled = self._capture_reconciles(monkeypatch, fake_db)
 
-        assert reverted == ["inst-1"]
+        handle_activity_instance_updated(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            "instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["completed"],
+        }))
+
+        assert reconciled == [("root-1", {"act-1"}, "activity_instance_updated")]
         assert fake_db.committed is True
         assert fake_db.closed is True
 
-    def test_handle_activity_instance_updated_ignores_non_lifecycle_fields(self, monkeypatch):
-        instance = SimpleNamespace(completed=False)
-        fake_db = _fake_db_session(instance)
-        reverted = []
-
-        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: pytest.fail("Non-lifecycle updates must not open a database session"))
+    def test_non_lifecycle_fields_do_not_open_a_session(self, monkeypatch):
         monkeypatch.setattr(
-            completion_handlers,
-            "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
+            completion_handlers, "_get_db_session",
+            lambda: pytest.fail("Non-lifecycle updates must not open a database session"),
         )
 
-        handle_activity_instance_updated(
-            Event(
-                Events.ACTIVITY_INSTANCE_UPDATED,
-                {"instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["notes"]},
-            )
-        )
+        handle_activity_instance_updated(Event(Events.ACTIVITY_INSTANCE_UPDATED, {
+            "instance_id": "inst-1", "session_id": "session-1", "root_id": "root-1", "updated_fields": ["notes"],
+        }))
 
-        assert reverted == []
-        assert fake_db.committed is False
-        assert fake_db.closed is False
-
-    def test_handle_activity_instance_updated_evaluates_when_completed_field_toggled(self, monkeypatch):
-        instance = SimpleNamespace(completed=True)
+    def test_metric_edits_reconcile_and_record_live_progress(self, monkeypatch):
+        instance = SimpleNamespace(completed=True, root_id="root-3", activity_definition_id="act-3")
         fake_db = _fake_db_session(instance)
-        evaluated = []
-
-        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
+        reconciled = self._capture_reconciles(monkeypatch, fake_db)
         monkeypatch.setattr(
-            completion_handlers,
-            "_run_evaluation_for_instance",
-            lambda _db, inst, session_id, root_id, pending_events=None, canonical_goal_ids=None: evaluated.append((inst, session_id, root_id)),
+            completion_handlers.ProgressService, "get_progress_for_instance", lambda _self, instance_id: {"id": instance_id},
         )
 
-        handle_activity_instance_updated(
-            Event(
-                Events.ACTIVITY_INSTANCE_UPDATED,
-                {
-                    "instance_id": "inst-2",
-                    "session_id": "session-2",
-                    "root_id": "root-2",
-                    "updated_fields": ["completed"],
-                },
-            )
-        )
+        handle_activity_metrics_updated(Event(Events.ACTIVITY_METRICS_UPDATED, {
+            "instance_id": "inst-3", "session_id": "session-3", "root_id": "root-3",
+            "activity_definition_id": "act-3", "updated_fields": ["sets"],
+        }))
 
-        assert len(evaluated) == 1
-        assert evaluated[0][1] == "session-2"
-        assert evaluated[0][2] == "root-2"
+        assert reconciled == [("root-3", {"act-3"}, "activity_metrics_updated")]
+        assert completion_handlers.get_live_progress("inst-3") == {"id": "inst-3"}
         assert fake_db.committed is True
-        assert fake_db.closed is True
-
-    def test_handle_activity_metrics_updated_refreshes_completed_instance_targets(self, monkeypatch):
-        instance = SimpleNamespace(completed=True)
-        fake_db = _fake_db_session(instance)
-        reverted = []
-        evaluated = []
-
-        monkeypatch.setattr(completion_handlers, "_get_db_session", lambda: fake_db)
-        monkeypatch.setattr(
-            completion_handlers,
-            "_revert_achievements_for_instance",
-            lambda _db, instance_id, pending_events=None, exclude_goal_ids=(): reverted.append(instance_id),
-        )
-        monkeypatch.setattr(
-            completion_handlers,
-            "_run_evaluation_for_instance",
-            lambda _db, inst, session_id, root_id, pending_events=None, canonical_goal_ids=None: evaluated.append((inst, session_id, root_id)),
-        )
-
-        handle_activity_metrics_updated(
-            Event(
-                Events.ACTIVITY_METRICS_UPDATED,
-                {"instance_id": "inst-3", "session_id": "session-3", "root_id": "root-3", "updated_fields": ["sets"]},
-            )
-        )
-
-        assert reverted == ["inst-3"]
-        assert len(evaluated) == 1
-        assert evaluated[0][1] == "session-3"
-        assert evaluated[0][2] == "root-3"
-        assert fake_db.committed is True
-        assert fake_db.closed is True
 
 
 def _fake_db_session(instance):
@@ -503,6 +358,9 @@ def _fake_db_session(instance):
 
         def query(self, *_args, **_kwargs):
             return _FakeQuery(self._obj)
+
+        def get(self, *_args, **_kwargs):
+            return self._obj
 
         def commit(self):
             self.committed = True
@@ -526,12 +384,12 @@ class TestGoalCreationEventLogging:
         their first goal.created audit row.
         """
         import services._goal_crud as goal_crud
-        from services.goal_service import GoalService, sync_goal_targets
+        from services.goal_service import GoalService
 
         emitted = []
         monkeypatch.setattr(goal_crud.event_bus, "emit", lambda event: emitted.append(event))
 
-        service = GoalService(db_session, sync_targets=sync_goal_targets)
+        service = GoalService(db_session)
         goal, error, status = service.create_global_goal(
             test_user.id,
             {"name": "Brand New Fractal", "type": "UltimateGoal"},

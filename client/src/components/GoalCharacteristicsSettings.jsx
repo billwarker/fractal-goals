@@ -198,15 +198,6 @@ const GoalCharacteristicsSettings = () => {
 
                             {/* Behavior Toggles */}
                             <div className={styles.behaviorControls}>
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.allow_manual_completion ?? true}
-                                        onChange={(e) => handleChange(level.id, 'allow_manual_completion', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Allow Manual Completion
-                                </label>
 
                                 <label className={styles.checkboxLabel}>
                                     <input
@@ -226,26 +217,6 @@ const GoalCharacteristicsSettings = () => {
                                         className={styles.pointer}
                                     />
                                     Requires SMART Metrics
-                                </label>
-
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.auto_complete_when_children_done ?? false}
-                                        onChange={(e) => handleChange(level.id, 'auto_complete_when_children_done', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Auto-Complete When Children Done
-                                </label>
-
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.can_have_targets ?? true}
-                                        onChange={(e) => handleChange(level.id, 'can_have_targets', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Can Have Targets
                                 </label>
 
 

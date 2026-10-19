@@ -18,7 +18,7 @@ inside that height, and share the slide-up/backdrop entrance with reduced-motion
 
 ## Goal Details and Timeline
 
-Goal Details has one Timeline section beneath targets, combining a lifetime calendar with
+Goal Details has one Timeline section beneath the Completion summary, combining a lifetime calendar with
 cursor-paginated event cards. There is no separate Timeline tab. Cell intensity always uses
 completed-activity counts. A compact intensity/marker legend sits on one line below the calendar,
 followed by a summary showing hovered/focused or selected day details, otherwise lifetime work
@@ -31,7 +31,7 @@ close control stay fixed outside the title viewport; the metadata row omits the 
 badge before the SMART indicator. The SMART wrapper uses flex alignment so the chip shares the
 vertical center of the status and date metadata without inline baseline spacing. SMART and status
 chips share 76px width and 12px text; their height matches the metadata text line using the base
-line-height token. Description and targets
+line-height token. Description and the Completion summary
 scroll away naturally, then the complete Timeline calendar block (heading, child scope, heatmap,
 legend and summary) sticks directly below the measured goal header while events continue beneath.
 The sticky block uses the containing detail surface background, matching both modal and panel themes.
@@ -51,6 +51,89 @@ Goal detail content retains 24px horizontal insets (16px in narrow panels), with
 contained within the calendar and vertical scrolling owned by the modal/panel body. Published landing
 snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
 See [Goal Timeline](goal-activity-heatmap.md).
+
+## Goal completion conditions
+
+The edit form's "How does this goal complete?" field is a three-way tab set (Activity threshold,
+All child goals, Manually). "All child goals" is hidden for levels that cannot have children unless
+the goal already uses it. Choosing Activity threshold seeds a draft on the first activity linked
+to the goal, then the first in the fractal. Threshold kind tabs (Single session, Cumulative,
+Consistency) keep the measure and rules that still apply. Total yield is disabled unless the
+activity has two or more multiplied metrics. New rules default to "at most" for lower-is-better
+metrics. A live sentence preview uses the same wording as every read surface. Field errors match
+server validation and render as alerts beside their inputs. Start date and Deadline share one row,
+and activity outside that window doesn't count.
+
+The details view's Completion section shows the sentence, a progress bar (sets, sessions, totals or
+child goals), the completion source once complete, and "See the evidence". When the condition is
+met on an open, unpaused goal it shows "Your logged activity already meets this. Mark complete".
+Mark Complete is always in the footer; completing an unmet condition says it is a manual override.
+The evidence modal charts each rule (at most two axes) or the running total or count against a
+dashed threshold, with Active period / All history tabs and the twelve most recent sessions.
+Read-only landing views use the published snapshot and the scoped portal host, without fetching.
+Session Detail lists "Goal thresholds" cards for goals in view, scoped to the selected activity's
+goals, deepest first; a card opens the evidence modal.
+
+## Creating goals from hierarchies
+
+The Program calendar Goals pane, the Days tab Goals pane and Session Detail share one interaction
+on desktop and mobile: selecting a goal's icon scopes it, and the scoped goal shows a visible "+"
+right after its name. There is no hover affordance. "+" is never offered on completed or paused
+goals, on the lowest level, or in read-only views (past plans, landing demos). It opens the full
+goal modal in create mode, with a level picker covering every lower level when there is more than
+one. Children only: siblings are added from their parent. The Program pane explains the
+interaction until a goal is scoped. Its icon scope is local to the pane, while Days and Session
+Detail reuse their activity-picker scope.
+
+After creation the new goal is inserted into the cached goal trees (`utils/goalTreeCache.js`)
+before the shared refetch, so every hierarchy and the goal flow tree show it at once. The new row
+flashes once and scrolls into view (an outline under reduced motion), and the scope is kept.
+With a session or plan activity selected, the goal is linked to that activity and starts as an
+activity threshold on it, seeded from the selected instance in a session. Without one, a
+session-created goal joins the session's goals, and a Days-pane goal stays in that pane for the
+visit, since both views otherwise show only goals their scope or activities reach. A child of a
+program goal is in the program's focus automatically, because focus includes live descendants.
+The Program calendar Goals pane hides completed goals by default (a "Show completed" toggle),
+keeping a completed goal while it still leads to open work.
+
+## Goal due dates on the Program calendar
+
+Only the Program calendar page's Goals pane shows due chips, in a fixed column left of the tree
+(`GoalDueChip`, `utils/goalDueFormat.js`, the user's timezone). Chips read relatively within 30
+days ("Today", "In 5d", "3d overdue") and as dates beyond that, with the year when it differs.
+They are amber within 7 days and red when overdue. Goals without a due date, and completed
+goals, show none. The full date is in the tooltip and assistive text. The Days pane, Session
+Detail and the Goals page show no chips.
+
+Calendar cells show non-draggable "Due: [icon] [name]" badges ("Done:" on a completed goal's
+completion date). They open the goal, and busy cells collapse into FullCalendar's "+N more"
+popover. On desktop with a fine pointer, open goals in the Goals pane can be dragged onto a day
+to set their due date (FullCalendar `Draggable` and external `drop`). The drop saves at once and
+shows a toast with Undo. The toast lists soft-rule warnings: outside the program, outside the
+level's horizon (from the goal's start date), after the parent's due date, or child goals due
+later. Mobile has no drag; due dates are edited in the goal modal, whose deadline field shows
+the same warnings instead of blocking dates after the parent's.
+
+## Goal sequences
+
+Goal Details → Options → Sequence orders a goal with its same-level siblings. A draft list
+takes ↑/↓, remove and "+ sibling", then Create sequence, Save order, or Stop sequencing. A goal
+outside a sequence can also join a sibling's sequence as its last step. The first incomplete step
+is active, and later steps wait, paused with reason `sequence`. Pause/Resume stays the only manual
+activation control: resuming a later step starts it out of order, and pausing the active step
+leaves the others alone.
+
+Completing a step shows "Begin next goal in sequence: X" (checked). Un-completing it shows "Pause
+next goal in sequence: X again" (checked) when its completion began X. Condition and child-goal
+completions apply the defaults. Options → Delete confirms in the modal on every page, typing
+"delete" when descendants go too, and shows "Begin next goal in sequence: X" for the active step.
+Move and Convert Level take a goal out of its sequence. A goal the sequence held resumes, the rest
+renumber, and a sequence left with one goal ends. Copies never join.
+
+Hierarchy lists put the step number before the name and keep a sequence's steps together in
+order. Paused goals read muted with "Paused · waiting on X" (or "Paused"). The goal flow tree's
+tree layout draws one dashed arrow per consecutive pair, arcing above the row and never used for
+layout. The hierarchy layout relies on the step numbers instead.
 
 ## Session Detail mobile hierarchy
 

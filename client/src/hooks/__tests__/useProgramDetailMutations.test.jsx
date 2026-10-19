@@ -1,4 +1,6 @@
+import React from 'react';
 import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useProgramDetailMutations } from '../useProgramDetailMutations';
@@ -67,7 +69,9 @@ describe('useProgramDetailMutations', () => {
         onAttachGoalSaved: vi.fn(),
         onScheduleDaySaved: vi.fn(),
         onGoalEditorClosed: vi.fn(),
+        onGoalCreated: vi.fn(),
     };
+    let queryClient;
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -78,6 +82,7 @@ describe('useProgramDetailMutations', () => {
         deleteGoal.mockResolvedValue(undefined);
         createGoal.mockResolvedValue(undefined);
         Object.values(refreshers).forEach((mockFn) => mockFn.mockResolvedValue(undefined));
+        queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     });
 
     function renderMutations(overrides = {}) {
@@ -90,8 +95,41 @@ describe('useProgramDetailMutations', () => {
             attachBlockId: 'block-2',
             ...callbacks,
             ...overrides,
-        }));
+        }), {
+            wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+        });
     }
+
+    it('creates a goal, inserts it into the cached goal trees, and returns it for the goal modal', async () => {
+        const created = { id: 'goal-new', name: 'New child', attributes: { id: 'goal-new', parent_id: 'goal-1' } };
+        createGoal.mockResolvedValueOnce({ data: created });
+        queryClient.setQueryData(['goals-tree', 'root-1'], { id: 'root-1', children: [{ id: 'goal-1', children: [] }] });
+        const { result } = renderMutations();
+
+        let returned;
+        await act(async () => {
+            returned = await result.current.createGoal({ name: 'New child', parent_id: 'goal-1' });
+        });
+
+        expect(returned).toBe(created);
+        expect(callbacks.onGoalEditorClosed).toHaveBeenCalled();
+        expect(callbacks.onGoalCreated).toHaveBeenCalledWith(created);
+        expect(refreshers.programGoals).toHaveBeenCalled();
+        expect(queryClient.getQueryData(['goals-tree', 'root-1']).children[0].children.map((goal) => goal.id))
+            .toEqual(['goal-new']);
+        expect(notify.success).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a failed goal creation so the goal modal reports it', async () => {
+        createGoal.mockRejectedValueOnce(new Error('boom'));
+        const { result } = renderMutations();
+
+        await expect(act(async () => {
+            await result.current.createGoal({ name: 'x' });
+        })).rejects.toThrow('boom');
+        expect(callbacks.onGoalEditorClosed).not.toHaveBeenCalled();
+        expect(callbacks.onGoalCreated).not.toHaveBeenCalled();
+    });
 
     it('saves the edited program day and hands the saved day to the caller', async () => {
         mockActions.saveDay.mockResolvedValueOnce({ id: 'day-1', name: 'Intervals' });
@@ -135,17 +173,17 @@ describe('useProgramDetailMutations', () => {
         expect(notify.success).not.toHaveBeenCalled();
     });
 
-    it('deletes a goal after confirmation, then refreshes and closes the goal editor', async () => {
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-
+    it('deletes a confirmed goal with the sequence choice, then refreshes and closes the goal editor', async () => {
+        const confirmSpy = vi.spyOn(window, 'confirm');
         const { result } = renderMutations();
 
         await act(async () => {
-            await result.current.deleteGoal({ id: 'goal-1', name: 'Goal 1' });
+            await result.current.deleteGoal({ id: 'goal-1', name: 'Goal 1' }, { beginNext: false });
         });
 
-        expect(window.confirm).toHaveBeenCalledWith('Are you sure you want to delete "Goal 1" and all its children?');
-        expect(deleteGoal).toHaveBeenCalledWith('root-1', 'goal-1');
+        // The goal modal's Delete option has already confirmed.
+        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(deleteGoal).toHaveBeenCalledWith('root-1', 'goal-1', { beginNext: false });
         expect(callbacks.onGoalEditorClosed).toHaveBeenCalledTimes(1);
         expect(refreshers.programGoals).toHaveBeenCalledTimes(1);
         expect(notify.success).toHaveBeenCalledWith('Goal deleted');

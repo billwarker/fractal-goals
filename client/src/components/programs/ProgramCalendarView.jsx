@@ -75,6 +75,8 @@ function ProgramCalendarView({
     statusActions = null,
     continuous = false,
     onContinuousChange = null,
+    // (goalId, 'YYYY-MM-DD') when a goal from the Goals pane is dropped on a day.
+    onGoalDueDrop = null,
 }) {
     const calendarRef = React.useRef(null);
     const calendarContainerRef = React.useRef(null);
@@ -375,6 +377,11 @@ function ProgramCalendarView({
                 dayCellClassNames={readOnly && !continuous ? undefined : getDayCellClassNames}
                 dayCellDidMount={(dayInfo) => syncBlockLabelForCell(dayInfo.el)}
                 dayCellWillUnmount={(dayInfo) => clearCellDecoration(dayInfo.el, CELL_CLASS_NAMES)}
+                droppable={Boolean(onGoalDueDrop) && !readOnly}
+                drop={onGoalDueDrop ? (info) => {
+                    const goalId = info.draggedEl?.dataset?.goalId;
+                    if (goalId) onGoalDueDrop(goalId, info.dateStr);
+                } : undefined}
             />
             </div>
         </div>

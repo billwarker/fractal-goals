@@ -2,7 +2,6 @@ import React, { Suspense, useState, useEffect, useMemo, useCallback, useRef } fr
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import ErrorBoundary from '../components/ErrorBoundary';
-import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AlertModal from '../components/modals/AlertModal';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
@@ -104,7 +103,6 @@ function FractalGoals() {
 
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedParent, setSelectedParent] = useState(null);
-    const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
 
@@ -552,7 +550,7 @@ function FractalGoals() {
         const handleTypeToZoomKeyDown = (event) => {
             if (event.defaultPrevented) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
-            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (showGoalModal || alertData.isOpen) return;
             if (shouldIgnoreTypeToZoomKey(event)) return;
 
             if (event.key === 'Escape') {
@@ -609,7 +607,6 @@ function FractalGoals() {
         activeCycleGroup,
         alertData.isOpen,
         clearTypeToZoomSearch,
-        fractalToDelete,
         isTypeToZoomOpen,
         showGoalModal,
         typeToZoomQuery.length,
@@ -623,7 +620,7 @@ function FractalGoals() {
             if (isTypeToZoomOpen) return;
             if (event.defaultPrevented) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
-            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (showGoalModal || alertData.isOpen) return;
             if (shouldIgnoreTypeToZoomKey(event)) return;
             if (!isSearchCharacter(event.key)) return;
 
@@ -637,7 +634,7 @@ function FractalGoals() {
 
         window.addEventListener('keydown', handleTypeToZoomStartKeyDown, true);
         return () => window.removeEventListener('keydown', handleTypeToZoomStartKeyDown, true);
-    }, [alertData.isOpen, fractalToDelete, isTypeToZoomOpen, showGoalModal]);
+    }, [alertData.isOpen, isTypeToZoomOpen, showGoalModal]);
 
     useEffect(() => {
         if (!fractalData || !viewingGoal) return;
@@ -695,21 +692,21 @@ function FractalGoals() {
         }
     };
 
-    const handleToggleCompletion = async (goalId, currentStatus) => {
+    const handleToggleCompletion = async (goalId, currentStatus, sequenceOptions = null) => {
         try {
-            await toggleGoalCompletion(rootId, goalId, !currentStatus);
+            await toggleGoalCompletion(rootId, goalId, !currentStatus, sequenceOptions);
         } catch (err) {
             showAlert('Update Failed', 'Error updating completion: ' + err.message);
         }
     };
 
-    const handleDelete = async () => {
-        if (!fractalToDelete) return;
+    // The goal modal's Delete option has already confirmed, including any sequence choice.
+    const handleDelete = async (goal, options = {}) => {
+        if (!goal) return;
 
         try {
-            await deleteGoal(rootId, fractalToDelete.id);
+            await deleteGoal(rootId, getGoalNodeId(goal), options);
 
-            setFractalToDelete(null);
             setSidebarMode(null);
             setViewingGoal(null);
         } catch (err) {
@@ -926,7 +923,7 @@ function FractalGoals() {
                                                 }}
                                                 goal={viewingGoal}
                                                 onUpdate={handleUpdateNode}
-                                                onDelete={(node) => setFractalToDelete(node)}
+                                                onDelete={handleDelete}
                                                 onAddChild={handleAddChildClick}
                                                 onToggleCompletion={handleToggleCompletion}
                                                 evidenceGoalIds={evidenceGoalIds}
@@ -974,7 +971,7 @@ function FractalGoals() {
                             activityDefinitions={activities}
                             onToggleCompletion={handleToggleCompletion}
                             onAddChild={handleAddChildClick}
-                            onDelete={(node) => setFractalToDelete(node)}
+                            onDelete={handleDelete}
                             evidenceGoalIds={evidenceGoalIds}
                             rootId={rootId}
                             treeData={fractalData}
@@ -986,15 +983,6 @@ function FractalGoals() {
                     )}
                 </Suspense>
             )}
-
-            <DeleteConfirmModal
-                isOpen={!!fractalToDelete}
-                onClose={() => setFractalToDelete(null)}
-                onConfirm={handleDelete}
-                title="Delete Goal?"
-                message={`Are you sure you want to delete "${fractalToDelete?.name}" and all its children?`}
-                requireMatchingText="delete"
-            />
 
             <AlertModal
                 isOpen={alertData.isOpen}

@@ -475,7 +475,7 @@ const SettingsModalInner = ({ onClose }) => {
                                     <h3 className={styles.sectionTitle}>Your Data</h3>
                                     <p className={styles.checkboxDescription}>
                                         Download a portable copy of your core account content,
-                                        including goals, sessions, activities, programs, targets and notes.
+                                        including goals and their completion conditions, sessions, activities, programs and notes.
                                     </p>
                                     <form onSubmit={handleExportData} className={styles.formContainer}>
                                         <input

@@ -9,8 +9,7 @@ let activeSessionMock = {
     session: { session_goals: [] },
     activities: [],
     activityGroups: [],
-    targetAchievements: new Map(),
-    achievedTargetIds: new Set(),
+    conditionProgressByGoalId: {},
     createGoal: vi.fn(),
     refreshSession: vi.fn(),
     sessionGoalsView: null,
@@ -25,6 +24,7 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionData: () => activeSessionMock,
     useActiveSessionActions: () => ({
         createGoal: activeSessionMock.createGoal,
+        updateSession: activeSessionMock.updateSession,
     }),
 }));
 
@@ -70,37 +70,52 @@ vi.mock('../../../utils/api', () => ({
     }
 }));
 
-vi.mock('../TargetsSection', () => ({
-    default: ({ scopedActivityName, onTargetClick }) => (
-        <button
-            type="button"
-            onClick={() => onTargetClick?.({
-                id: 'target-1',
-                name: 'Target 1',
-                activity_id: 'activity-1',
-                _goalId: 'ig-1',
-                _goalType: 'ImmediateGoal',
-                metrics: [],
-            })}
-        >
-            {scopedActivityName ? `Targets: ${scopedActivityName}` : 'Targets'}
-        </button>
-    ),
-}));
-vi.mock('../GoalRow', () => ({ default: () => <div /> }));
-vi.mock('../../goalDetail/TargetAnalyticsModal', () => ({
-    default: ({ target, analyticsData, readOnly, portalTarget, overlayClassName }) => (
-        <div
-            data-testid="target-analytics-modal"
-            data-instance-count={analyticsData?.instances?.length || 0}
-            data-read-only={String(Boolean(readOnly))}
-            data-portal-target={portalTarget?.id || ''}
-            data-overlay-class={overlayClassName || ''}
-        >
-            {target.name}
+vi.mock('../../ConnectedGoalDetailModal', () => ({
+    default: ({ parentGoal, onCreate, initialCompletion, initialActivities }) => (
+        <div role="dialog" aria-label="Create goal">
+            <span>{`parent:${parentGoal?.id}`}</span>
+            <span>{`condition:${initialCompletion?.completionCondition || 'none'}`}</span>
+            <span>{`activities:${(initialActivities || []).map((activity) => activity.id).join(',')}`}</span>
+            <button type="button" onClick={() => onCreate({ name: 'New child', parent_id: parentGoal.id })}>create</button>
         </div>
     ),
 }));
+
+vi.mock('../../goalDetail/ConditionEvidenceModal', () => ({
+    default: ({ goalName, snapshot, portalContainer, overlayClassName }) => (
+        <div
+            data-testid="condition-evidence-modal"
+            data-instance-count={snapshot?.instances?.length || 0}
+            data-portal-target={portalContainer?.id || ''}
+            data-overlay-class={overlayClassName || ''}
+        >
+            {goalName}
+        </div>
+    ),
+}));
+
+function withPullUpCondition() {
+    const stg = activeSessionMock.sessionGoalsView.goal_tree.children[0];
+    activeSessionMock = {
+        ...activeSessionMock,
+        conditionProgressByGoalId: { 'ig-1': { met: false, current: 4, required: 10 } },
+        sessionGoalsView: {
+            ...activeSessionMock.sessionGoalsView,
+            goal_tree: {
+                ...activeSessionMock.sessionGoalsView.goal_tree,
+                children: [{
+                    ...stg,
+                    children: [{
+                        ...stg.children[0],
+                        name: 'Pull Up Volume',
+                        completion_condition: 'activity_threshold',
+                        condition: { activity_definition_id: 'activity-1', kind: 'consistency', required_count: 10, rules: [] },
+                    }],
+                }],
+            },
+        },
+    };
+}
 
 describe('SessionGoalHierarchyPanel smoke', () => {
     beforeEach(() => {
@@ -114,9 +129,9 @@ describe('SessionGoalHierarchyPanel smoke', () => {
             activityInstances: [{ id: 'instance-1', activity_definition_id: 'activity-1' }],
             activities: [{ id: 'activity-1', name: 'Pull Up', associated_goal_ids: ['ig-1'] }],
             activityGroups: [{ id: 'group-1', name: 'Technique', parent_id: null }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
+            conditionProgressByGoalId: {},
             createGoal: vi.fn(),
+            updateSession: vi.fn(() => Promise.resolve()),
             refreshSession: vi.fn(),
             sessionGoalsView: {
                 goal_tree: {
@@ -204,6 +219,7 @@ describe('SessionGoalHierarchyPanel smoke', () => {
     });
 
     it('shows the full session hierarchy when an activity is selected', async () => {
+        withPullUpCondition();
         renderWithProviders(
             <SessionGoalHierarchyPanel
                 selectedActivity={{
@@ -227,13 +243,15 @@ describe('SessionGoalHierarchyPanel smoke', () => {
             expect(screen.getByText('Goals: Pull Up')).toBeInTheDocument();
         });
         expect(screen.queryByText('Session Goals')).not.toBeInTheDocument();
-        expect(screen.getByText('Targets: Pull Up')).toBeInTheDocument();
+        expect(screen.getByText('Goal thresholds: Pull Up')).toBeInTheDocument();
+        expect(screen.getByText('Pull Up: 10 sessions')).toBeInTheDocument();
         expect(screen.getByText('STG')).toBeInTheDocument();
-        expect(screen.getByText('IG')).toBeInTheDocument();
+        expect(screen.getAllByText('Pull Up Volume')).toHaveLength(2);
         expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
     });
 
-    it('opens the target manager modal from a session target card', async () => {
+    it('opens the condition evidence modal from a session condition card', async () => {
+        withPullUpCondition();
         renderWithProviders(
             <SessionGoalHierarchyPanel
                 selectedActivity={{
@@ -253,15 +271,15 @@ describe('SessionGoalHierarchyPanel smoke', () => {
             }
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Targets: Pull Up' }));
-        expect(await screen.findByTestId('target-analytics-modal')).toHaveTextContent('Target 1');
+        fireEvent.click(await screen.findByRole('button', { name: /Pull Up: 10 sessions/ }));
+        expect(await screen.findByTestId('condition-evidence-modal')).toHaveTextContent('Pull Up Volume');
     });
 
-    it('uses a scoped read-only modal host and supplied landing analytics', async () => {
-        const portalTarget = document.createElement('div');
-        portalTarget.id = 'landing-session-example';
-        const analyticsData = { instances: [{ id: 'history-1' }, { id: 'history-2' }] };
-        const resolveAnalyticsData = vi.fn(() => analyticsData);
+    it('uses a scoped read-only modal host and published condition snapshots', async () => {
+        withPullUpCondition();
+        const portalContainer = document.createElement('div');
+        portalContainer.id = 'landing-session-example';
+        const snapshot = { progress: { met: true, current: 10, required: 10 }, instances: [{ id: 'history-1' }, { id: 'history-2' }] };
 
         renderWithProviders(
             <SessionGoalHierarchyPanel
@@ -270,12 +288,9 @@ describe('SessionGoalHierarchyPanel smoke', () => {
                     activity_definition_id: 'activity-1',
                     name: 'Pull Up'
                 }}
-                targetModal={{
-                    readOnly: true,
-                    portalTarget,
-                    overlayClassName: 'scoped-overlay',
-                    resolveAnalyticsData,
-                }}
+                readOnly
+                conditionSnapshots={{ 'ig-1': snapshot }}
+                conditionModalHost={{ portalContainer, overlayClassName: 'scoped-overlay' }}
             />,
             {
                 withTimezone: false,
@@ -285,12 +300,10 @@ describe('SessionGoalHierarchyPanel smoke', () => {
             }
         );
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Targets: Pull Up' }));
+        fireEvent.click(await screen.findByRole('button', { name: /Pull Up: 10 sessions/ }));
 
-        const modal = await screen.findByTestId('target-analytics-modal');
-        expect(resolveAnalyticsData).toHaveBeenCalledWith(expect.objectContaining({ id: 'target-1' }));
+        const modal = await screen.findByTestId('condition-evidence-modal');
         expect(modal).toHaveAttribute('data-instance-count', '2');
-        expect(modal).toHaveAttribute('data-read-only', 'true');
         expect(modal).toHaveAttribute('data-portal-target', 'landing-session-example');
         expect(modal).toHaveAttribute('data-overlay-class', 'scoped-overlay');
     });

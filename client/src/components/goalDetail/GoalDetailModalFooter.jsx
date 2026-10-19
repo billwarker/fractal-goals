@@ -26,13 +26,10 @@ function GoalDetailModalFooter({
     onConfirmCompletion,
     onConfirmUncompletion,
     showActivitiesFooter,
-    isTargetSelectionMode,
     isAssociationFlowActive,
     activityPickerFooterActions,
-    isTargetFlowActive,
     handleCancelActivitiesFlow,
     activitiesAssociateAction,
-    handleAddTargetFromActivities,
     showOptionsFooter,
     onCancelOptions,
     showDetailFooter,
@@ -113,15 +110,6 @@ function GoalDetailModalFooter({
         </div>
     ) : showActivitiesFooter ? (
         <div className={styles.completionFooter}>
-            {isTargetSelectionMode && (
-                <div
-                    className={styles.targetSelectionBanner}
-                    role="status"
-                    style={{ '--target-selection-accent': displayGoalColor }}
-                >
-                    Select the activity you want to create a target for.
-                </div>
-            )}
             {isAssociationFlowActive && activityPickerFooterActions ? (
                 <FooterActions>
                     <button
@@ -166,27 +154,14 @@ function GoalDetailModalFooter({
                 <FooterActions>
                     <button
                         type="button"
-                        onClick={isTargetFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}
-                        className={`${styles.completionFooterButton} ${isAssociationFlowActive ? styles.completionFooterButtonActive : ''}`}
-                        disabled={isAssociationFlowActive}
+                        onClick={isAssociationFlowActive ? handleCancelActivitiesFlow : activitiesAssociateAction}
+                        className={styles.completionFooterButton}
                         style={{
                             '--completion-accent': displayGoalColor,
                             '--completion-text': 'var(--color-text-primary)',
                         }}
                     >
-                        {isTargetFlowActive ? 'Cancel' : '+ Associate Activities'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={isAssociationFlowActive ? handleCancelActivitiesFlow : handleAddTargetFromActivities}
-                        className={`${styles.completionFooterButton} ${isTargetFlowActive ? styles.completionFooterButtonActive : ''}`}
-                        disabled={isTargetFlowActive}
-                        style={{
-                            '--completion-accent': displayGoalColor,
-                            '--completion-text': 'var(--color-text-primary)',
-                        }}
-                    >
-                        {isAssociationFlowActive ? 'Cancel' : '+ Add Target'}
+                        {isAssociationFlowActive ? 'Cancel' : '+ Associate Activities'}
                     </button>
                 </FooterActions>
             )}

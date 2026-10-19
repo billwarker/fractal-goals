@@ -31,6 +31,8 @@ def _check_parent_completion(db_session, parent: Goal, pending_events=None):
         parent.completion_reason = 'all_children_completed'
         parent.manually_uncompleted_at = None
         logger.info(f"Auto-completing parent goal {parent.id} - all children complete")
+        from services.goal_sequence_service import advance_after_completion
+        advance_after_completion(db_session, parent, pending_events if pending_events is not None else [])
         
         # Emit event for cascade
         _queue_event(pending_events, _build_event(Events.GOAL_COMPLETED, {

@@ -9,7 +9,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from config import config
 from models import AgentApproval, AgentChangeCursor, AgentOperation, AgentOutboxEvent, AgentProposal, AgentRun, AgentTaskBrief, EventLog, Goal, utc_now
 from services.activity_service import ActivityService
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 
@@ -247,7 +247,7 @@ class AgentRunsMixin:
         )
 
         if operation.kind == "update_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.update_fractal_goal(
                 locked_run.root_id,
                 input_data["goal_id"],
@@ -331,7 +331,7 @@ class AgentRunsMixin:
                 "href": self._app_href(locked_run.root_id, "programs", input_data["program_id"]),
             }
         elif operation.kind == "create_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.create_fractal_goal(
                 locked_run.root_id,
                 locked_run.user_id,

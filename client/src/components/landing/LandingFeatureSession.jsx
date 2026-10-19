@@ -6,7 +6,6 @@ import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { normalizeSectionActivityIds } from '../../utils/sessionSection';
 import SessionSection from '../sessionDetail/SessionSection';
 import SessionDetailPaneLayout from '../sessionDetail/SessionDetailPaneLayout';
-import { resolveLandingTargetAnalyticsData } from './landingTargetAnalyticsData';
 import sessionDetailStyles from '../../pages/SessionDetail.module.css';
 import scopedModalStyles from './LandingScopedModal.module.css';
 import styles from './LandingFeaturesSection.module.css';
@@ -14,10 +13,6 @@ import styles from './LandingFeaturesSection.module.css';
 const GoalDetailModal = lazyWithRetry(
     () => import('../ConnectedGoalDetailModal'),
     'components/ConnectedGoalDetailModal'
-);
-const LandingTargetManagerModal = lazyWithRetry(
-    () => import('./LandingTargetManagerModal'),
-    'components/landing/LandingTargetManagerModal'
 );
 
 function ensureAttributes(session) {
@@ -53,15 +48,6 @@ export function buildSections(session) {
         name: 'Exercises',
         activity_ids: instances.map((instance) => instance.id).filter(Boolean),
     }];
-}
-
-export function resolveSessionTargetAnalytics(example, activityDefinitions, target) {
-    return resolveLandingTargetAnalyticsData({
-        target,
-        activityDefinitions,
-        analyticsData: example?.targetAnalytics?.[target.id] || null,
-        historicalInstances: example?.analyticsActivityInstances?.[target.activity_id] || [],
-    });
 }
 
 function getNoteText(note) {
@@ -202,25 +188,12 @@ function LandingSessionScreenWithModel({
     const [sidePaneMode, setSidePaneMode] = useState('details');
     const [modalHost, setModalHost] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
-    const [selectedGoalTarget, setSelectedGoalTarget] = useState(null);
-    const handleGoalClick = useCallback((goal) => {
-        setSelectedGoal(goal);
-        setSelectedGoalTarget(null);
-    }, []);
-    const closeGoalDetail = useCallback(() => {
-        setSelectedGoal(null);
-        setSelectedGoalTarget(null);
-    }, []);
-    const resolveAnalyticsData = useCallback(
-        (target) => resolveSessionTargetAnalytics(example, activityDefinitions, target),
-        [activityDefinitions, example]
-    );
-    const targetModal = useMemo(() => ({
-        readOnly: true,
-        portalTarget: modalHost,
-        overlayClassName: scopedModalStyles.scopedOverlay,
-        resolveAnalyticsData,
-    }), [modalHost, resolveAnalyticsData]);
+    const handleGoalClick = useCallback((goal) => setSelectedGoal(goal), []);
+    const closeGoalDetail = useCallback(() => setSelectedGoal(null), []);
+    const conditionSnapshots = example.conditionAnalytics || null;
+    const conditionModalHost = useMemo(() => (
+        modalHost ? { portalContainer: modalHost, overlayClassName: scopedModalStyles.scopedOverlay } : null
+    ), [modalHost]);
     const sidePaneModel = useSessionSidePaneViewModel({
         selectedActivity,
         onNoteAdded: () => {},
@@ -237,7 +210,8 @@ function LandingSessionScreenWithModel({
         mode: sidePaneMode,
         onModeChange: setSidePaneMode,
         readOnly: true,
-        targetModal,
+        conditionSnapshots,
+        conditionModalHost,
     });
 
     return (
@@ -264,20 +238,7 @@ function LandingSessionScreenWithModel({
                         portalTarget={modalHost}
                         overlayClassName={scopedModalStyles.scopedOverlay}
                         onGoalSelect={handleGoalClick}
-                        onTargetOpen={setSelectedGoalTarget}
-                    />
-                </React.Suspense>
-            )}
-            {modalHost && selectedGoal && selectedGoalTarget && (
-                <React.Suspense fallback={null}>
-                    <LandingTargetManagerModal
-                        exampleId={example.id}
-                        goal={selectedGoal}
-                        target={selectedGoalTarget}
-                        activityDefinitions={activityDefinitions}
-                        analyticsData={resolveAnalyticsData(selectedGoalTarget)}
-                        portalTarget={modalHost}
-                        onClose={() => setSelectedGoalTarget(null)}
+                        conditionSnapshot={conditionSnapshots?.[selectedGoal.id] || null}
                     />
                 </React.Suspense>
             )}

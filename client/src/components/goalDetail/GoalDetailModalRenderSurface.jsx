@@ -3,7 +3,10 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../utils/activityBuilder';
 import { getProgramsAffectedByGoalCompletion } from '../../utils/goalCompletionPrograms';
 import { getTypeDisplayName } from '../../utils/goalHelpers';
+import { findGoalNodeById } from '../../utils/goalNodeModel';
+import { getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { useSequenceCompletionChoice } from '../../hooks/useGoalSequenceQueries';
 import notify from '../../utils/notify';
 import CloseButton from '../atoms/CloseButton';
 import GoalIcon from '../atoms/GoalIcon';
@@ -18,32 +21,30 @@ import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GoalDetailModalPortal from './GoalDetailModalPortal';
 import styles from '../GoalDetailModal.module.css';
 
-const TargetManager = lazyWithRetry(() => import('./TargetManager'), 'components/goalDetail/TargetManager');
 const ActivityAssociator = lazyWithRetry(() => import('./ActivityAssociator'), 'components/goalDetail/ActivityAssociator');
 const InlineActivityBuilder = lazyWithRetry(() => import('./InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
-const TargetAnalyticsModal = lazyWithRetry(() => import('./TargetAnalyticsModal'), 'components/goalDetail/TargetAnalyticsModal');
 const GoalOptionsView = lazyWithRetry(() => import('../goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./GoalNotesView'), 'components/goalDetail/GoalNotesView');
 function GoalDetailModalRenderSurface({
-    activeAnalyticsTarget,
     activitiesAssociateAction,
     activityBuilderReturnView,
     activityBuilderTemplate,
     activityDefinitions,
     activityGroups,
     activityPickerFooterActions,
-    allowManualCompletion,
     associatedActivities,
     associatedActivityGroups,
     attachInlineCreatedActivity,
-    builderConfig,
     canAddChildGoal,
     childType,
     completedColor,
     completedSecondaryColor,
     completedTextColor,
-    completedViaChildren,
+    completionCondition,
     completionFooterState,
+    conditionDraft,
+    conditionErrors,
+    conditionSnapshot,
     contentScrollRef,
     deadline,
     description,
@@ -66,7 +67,6 @@ function GoalDetailModalRenderSurface({
     getGoalIcon,
     getGoalSecondaryColor,
     handleAddChildGoal,
-    handleAddTargetFromActivities,
     handleCancel,
     handleCancelActivitiesFlow,
     handleClose,
@@ -79,7 +79,6 @@ function GoalDetailModalRenderSurface({
     onTimelineExplore,
     handleQuickGoalNote,
     handleSave,
-    handleSelectTargetActivity,
     handleUncompletionConfirm,
     inheritParentActivities,
     isActivitiesAssociationMode,
@@ -87,7 +86,6 @@ function GoalDetailModalRenderSurface({
     isCompleted,
     isEditing,
     isPaused,
-    isTargetSelectionMode,
     levelConfig,
     localCompletedAt,
     mode,
@@ -95,16 +93,13 @@ function GoalDetailModalRenderSurface({
     needsLevelPicker,
     onDelete,
     onGoalSelect,
-    onTargetOpen,
     onMobileCollapse,
     onToggleCompletion,
-    onUpdate,
     parentGoal,
     parentGoalColor,
     parentGoalName,
     parentType,
     persistAssociations,
-    persistTargetChanges,
     portalTarget,
     overlayClassName,
     programs,
@@ -120,15 +115,13 @@ function GoalDetailModalRenderSurface({
     relevanceStatement,
     rootId,
     selectedChildType,
-    setActiveAnalyticsTarget,
     setActivityBuilderReturnView,
     setActivityBuilderTemplate,
     setActivityGroups,
     setAssociatedActivities,
     setAssociatedActivityGroups,
-    setAllowManualCompletion,
-    setBuilderConfig,
-    setCompletedViaChildren,
+    setCompletionCondition,
+    setConditionDraft,
     setDeadline,
     setDescription,
     setInheritParentActivities,
@@ -138,16 +131,10 @@ function GoalDetailModalRenderSurface({
     setName,
     setRelevanceStatement,
     setSelectedChildType,
-    setTargetManagerReturnView,
-    setTargetToEdit,
-    setTargets,
-    setTrackActivities,
+    setStartedAt,
+    startedAt,
     setViewState,
-    targetManagerReturnView,
-    targetToEdit,
-    targets,
     textColor,
-    trackActivities,
     treeData,
     validChildTypes,
     viewState,
@@ -164,6 +151,13 @@ function GoalDetailModalRenderSurface({
             referenceDate: completionPreviewDate,
         })
     ), [completionPreviewDate, goalId, programs, treeData]);
+    // The parent whose due date the edit form checks against: the create-mode parent, else the
+    // goal's parent in the tree.
+    const deadlineParentGoal = useMemo(() => {
+        if (mode === 'create') return parentGoal || null;
+        const parentId = goal?.attributes?.parent_id || goal?.parent_id;
+        return parentId && treeData && !Array.isArray(treeData) ? findGoalNodeById(treeData, parentId) : null;
+    }, [goal?.attributes?.parent_id, goal?.parent_id, mode, parentGoal, treeData]);
     const programsAffectedByUncompletion = useMemo(() => (
         getProgramsAffectedByGoalCompletion({
             programs,
@@ -180,8 +174,12 @@ function GoalDetailModalRenderSurface({
         programs,
         treeData,
     ]);
+    const savedConditionActivityId = getGoalCompletionCondition(goal) === 'activity_threshold'
+        ? (getGoalCondition(goal)?.activity_definition_id ?? null)
+        : null;
     const uncompletionCompletedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
     const [completionNoteDraft, setCompletionNoteDraft] = useState('');
+    const sequenceChoice = useSequenceCompletionChoice({ rootId, goalId, goal, viewState, readOnly });
     useEffect(() => {
         if (viewState !== 'complete-confirm') {
             setCompletionNoteDraft('');
@@ -257,6 +255,8 @@ function GoalDetailModalRenderSurface({
                         parentGoal={parentGoal}
                         parentGoalName={parentGoalName}
                         parentGoalColor={parentGoalColor}
+                        deadlineParentGoal={deadlineParentGoal}
+                        levelConfig={levelConfig}
                         isCompleted={isCompleted}
                         validChildTypes={validChildTypes}
                         onLevelChange={setSelectedChildType}
@@ -264,20 +264,15 @@ function GoalDetailModalRenderSurface({
                         description={description} setDescription={setDescription}
                         deadline={deadline} setDeadline={setDeadline}
                         relevanceStatement={relevanceStatement} setRelevanceStatement={setRelevanceStatement}
-                        trackActivities={trackActivities} setTrackActivities={setTrackActivities}
-                        completedViaChildren={completedViaChildren} setCompletedViaChildren={setCompletedViaChildren}
-                        inheritParentActivities={inheritParentActivities} setInheritParentActivities={setInheritParentActivities}
-                        allowManualCompletion={allowManualCompletion} setAllowManualCompletion={setAllowManualCompletion}
-                        targets={targets} setTargets={setTargets}
+                        startedAt={startedAt} setStartedAt={setStartedAt}
+                        completionCondition={completionCondition} setCompletionCondition={setCompletionCondition}
+                        conditionDraft={conditionDraft} setConditionDraft={setConditionDraft}
+                        conditionErrors={conditionErrors}
                         associatedActivities={associatedActivities} setAssociatedActivities={setAssociatedActivities}
                         associatedActivityGroups={associatedActivityGroups} setAssociatedActivityGroups={setAssociatedActivityGroups}
                         activityDefinitions={activityDefinitions}
                         activityGroups={activityGroups} setActivityGroups={setActivityGroups}
-                        setViewState={(view, target) => {
-                            if (target) setTargetToEdit(target);
-                            if (view === 'target-manager') setTargetManagerReturnView('goal');
-                            setViewState(view);
-                        }}
+                        setViewState={setViewState}
                         refreshAssociations={refreshAssociations}
                         handleCancel={handleCancel}
                         handleSave={handleSave}
@@ -298,14 +293,15 @@ function GoalDetailModalRenderSurface({
                         parentGoalColor={parentGoalColor}
                         isCompleted={isCompleted}
                         levelConfig={levelConfig}
-                        allowManualCompletion={allowManualCompletion}
-                        trackActivities={trackActivities}
                         childType={childType}
                         displayMode={displayMode}
                         programs={programs}
-                        targets={targets}
                         associatedActivities={readOnly ? (readOnlyAssociatedActivities || []) : associatedActivities}
                         activityDefinitions={readOnly ? (readOnlyAssociatedActivities || []) : activityDefinitions}
+                        conditionSnapshot={conditionSnapshot}
+                        portalTarget={portalTarget}
+                        overlayClassName={overlayClassName}
+                        onCompleteNow={readOnly || isPaused || !onToggleCompletion ? undefined : () => setViewState('complete-confirm')}
                         treeData={treeData}
                         name={name}
                         description={description}
@@ -317,10 +313,6 @@ function GoalDetailModalRenderSurface({
                         setViewState={setViewState}
                         onClose={handleClose}
                         onGoalSelect={onGoalSelect}
-                        onUpdate={onUpdate}
-                        setTargets={setTargets}
-                        onTargetClick={readOnly ? onTargetOpen : setActiveAnalyticsTarget}
-                        onRequestTargetBuilder={readOnly ? undefined : (target) => setBuilderConfig({ target: target ?? null })}
                         readOnly={readOnly}
                     />
                 )
@@ -329,7 +321,7 @@ function GoalDetailModalRenderSurface({
         );
     };
 
-    const READ_ONLY_VIEW_STATES = ['goal', 'goal-activities', 'goal-notes', 'target-manager'];
+    const READ_ONLY_VIEW_STATES = ['goal', 'goal-activities', 'goal-notes'];
     let content;
     if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
         content = renderGoalContent();
@@ -337,63 +329,32 @@ function GoalDetailModalRenderSurface({
         content = (
             <GoalCompletionModal
                 programs={programsAffectedByCompletion}
-                targets={targets}
+                goal={goal}
                 activityDefinitions={activityDefinitions}
                 completionDate={completionPreviewDate}
                 accentColor={goalColor}
                 goalType={goalType}
                 completionNote={completionNoteDraft}
                 onCompletionNoteChange={setCompletionNoteDraft}
+                sequenceNextStep={sequenceChoice.nextStep}
+                beginNext={sequenceChoice.beginNext}
+                onBeginNextChange={sequenceChoice.setBeginNext}
             />
         );
     } else if (viewState === 'uncomplete-confirm') {
         content = (
             <GoalUncompletionModal
                 programs={programsAffectedByUncompletion}
-                targets={targets}
+                goal={goal}
                 activityDefinitions={activityDefinitions}
                 completedAt={uncompletionCompletedAt}
                 accentColor={completedColor}
                 goalType={goalType}
                 goalCompletionNote={goalCompletionNote}
+                sequenceResumedStep={sequenceChoice.resumedStep}
+                pauseNext={sequenceChoice.pauseNext}
+                onPauseNextChange={sequenceChoice.setPauseNext}
             />
-        );
-    } else if (viewState === 'target-manager') {
-        content = (
-            <Suspense fallback={null}>
-                <TargetManager
-                    targets={targets}
-                    setTargets={setTargets}
-                    activityDefinitions={activityDefinitions}
-                    associatedActivities={readOnly ? (readOnlyAssociatedActivities || []) : associatedActivities}
-                    goalId={goalId}
-                    rootId={rootId}
-                    isEditing={!readOnly}
-                    viewMode="builder"
-                    headerColor="var(--color-text-muted)"
-                    initialTarget={targetToEdit}
-                    readOnly={readOnly}
-                    onCloseBuilder={() => {
-                        setTargetToEdit(null);
-                        setViewState(targetManagerReturnView);
-                    }}
-                    goalType={goalType}
-                    goalCompleted={isCompleted}
-                    onSave={(newTargets) => {
-                        if (onUpdate && goalId) {
-                            onUpdate(goalId, {
-                                name,
-                                description,
-                                deadline,
-                                relevance_statement: relevanceStatement,
-                                targets: newTargets,
-                                inherit_parent_activities: inheritParentActivities,
-                            });
-                        }
-                        setViewState(targetManagerReturnView);
-                    }}
-                />
-            </Suspense>
         );
     } else if (viewState === 'activity-associator') {
         content = (
@@ -410,9 +371,8 @@ function GoalDetailModalRenderSurface({
                     goalId={goalId}
                     parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
                     goalName={name}
-                    setTargets={setTargets}
                     isEditing={true}
-                    targets={targets}
+                    conditionActivityId={savedConditionActivityId}
                     viewMode="selector"
                     onCloseSelector={() => setViewState('goal')}
                     goalType={goalType}
@@ -450,8 +410,6 @@ function GoalDetailModalRenderSurface({
                     goalId={goalId}
                     parentGoalId={goal?.attributes?.parent_id || goal?.parent_id}
                     goalName={name}
-                    setTargets={() => {}}
-                    targets={targets}
                     embedded
                     readOnly
                     inheritParentActivities={inheritParentActivities}
@@ -474,9 +432,8 @@ function GoalDetailModalRenderSurface({
                     goalId={goalId}
                     parentGoalId={mode === 'create' ? (parentGoal?.attributes?.id || parentGoal?.id) : (goal?.attributes?.parent_id || goal?.parent_id)}
                     goalName={name}
-                    setTargets={setTargets}
                     isEditing={true}
-                    targets={targets}
+                    conditionActivityId={savedConditionActivityId}
                     embedded
                     useFooterAssociateAction
                     registerAssociateAction={registerActivitiesAssociateAction}
@@ -491,8 +448,6 @@ function GoalDetailModalRenderSurface({
                     dividerColor={displayGoalColor}
                     onCreateActivity={handleCreateActivityFromActivities}
                     onCopyActivity={handleCopyActivityFromActivities}
-                    isTargetSelectionMode={isTargetSelectionMode}
-                    onSelectTargetActivity={handleSelectTargetActivity}
                 />
             </Suspense>
         );
@@ -613,7 +568,6 @@ function GoalDetailModalRenderSurface({
         && !readOnly;
     const completionConfirmAccentColor = viewState === 'uncomplete-confirm' ? completedColor : goalColor;
     const completionConfirmTextColor = viewState === 'uncomplete-confirm' ? completedTextColor : textColor;
-    const isTargetFlowActive = isTargetSelectionMode;
     const isAssociationFlowActive = isActivitiesAssociationMode;
     const footerContent = (
         <GoalDetailModalFooter
@@ -631,15 +585,12 @@ function GoalDetailModalRenderSurface({
             completionConfirmAccentColor={completionConfirmAccentColor}
             completionConfirmTextColor={completionConfirmTextColor}
             onCancelCompletionConfirm={() => setViewState('goal')}
-            onConfirmCompletion={() => handleCompletionConfirm(completionPreviewDate, completionNoteDraft)}
-            onConfirmUncompletion={handleUncompletionConfirm}
-            isTargetSelectionMode={isTargetSelectionMode}
+            onConfirmCompletion={() => handleCompletionConfirm(completionPreviewDate, completionNoteDraft, sequenceChoice.completionOptions)}
+            onConfirmUncompletion={() => handleUncompletionConfirm(sequenceChoice.uncompletionOptions)}
             isAssociationFlowActive={isAssociationFlowActive}
             activityPickerFooterActions={activityPickerFooterActions}
-            isTargetFlowActive={isTargetFlowActive}
             handleCancelActivitiesFlow={handleCancelActivitiesFlow}
             activitiesAssociateAction={activitiesAssociateAction}
-            handleAddTargetFromActivities={handleAddTargetFromActivities}
             showOptionsFooter={showOptionsFooter}
             onCancelOptions={() => handleGoalViewNavigation('goal')}
             showDetailFooter={showDetailFooter}
@@ -682,61 +633,6 @@ function GoalDetailModalRenderSurface({
             />
         </Suspense>
     ) : null;
-    const targetAnalyticsModal = activeAnalyticsTarget ? (
-        <Suspense fallback={null}>
-            <TargetAnalyticsModal
-                mode="view"
-                rootId={rootId}
-                goalId={goalId}
-                target={activeAnalyticsTarget}
-                goalColor={displayGoalColor}
-                goalType={goalType}
-                goalCompleted={isCompleted}
-                targets={targets}
-                setTargets={setTargets}
-                activityDefinitions={activityDefinitions}
-                associatedActivities={associatedActivities}
-                onSave={(newTargets) => { persistTargetChanges(newTargets); }}
-                onDelete={(targetToDelete) => {
-                    const remaining = (targets || []).filter((t) => t.id !== targetToDelete?.id);
-                    setTargets?.(remaining);
-                    persistTargetChanges(remaining);
-                }}
-                onClose={() => setActiveAnalyticsTarget(null)}
-            />
-        </Suspense>
-    ) : null;
-
-    const targetBuilderModal = (!readOnly && builderConfig) ? (
-        <Suspense fallback={null}>
-            <TargetAnalyticsModal
-                mode={builderConfig.target ? 'edit' : 'add'}
-                rootId={rootId}
-                goalId={goalId}
-                target={builderConfig.target ?? null}
-                goalColor={displayGoalColor}
-                goalType={goalType}
-                goalCompleted={isCompleted}
-                targets={targets}
-                setTargets={setTargets}
-                activityDefinitions={activityDefinitions}
-                associatedActivities={associatedActivities}
-                initialActivityId={builderConfig.activityId ?? null}
-                lockActivitySelection={Boolean(builderConfig.lock)}
-                onSave={(newTargets) => {
-                    persistTargetChanges(newTargets);
-                    setBuilderConfig(null);
-                }}
-                onSaved={({ action }) => {
-                    if (action === 'create') {
-                        setViewState('goal');
-                    }
-                }}
-                onClose={() => setBuilderConfig(null)}
-            />
-        </Suspense>
-    ) : null;
-
     if (displayMode === 'panel') {
         return (
             <>
@@ -751,8 +647,6 @@ function GoalDetailModalRenderSurface({
                     )}
                 </div>
                 {activityBuilderModal}
-                {targetAnalyticsModal}
-                {targetBuilderModal}
             </>
         );
     }
@@ -763,6 +657,9 @@ function GoalDetailModalRenderSurface({
             onClose={handleClose}
         >
             <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={mode === 'create' ? 'New goal' : (goal?.attributes?.name || goal?.name || name || 'Goal details')}
                 onClick={(e) => e.stopPropagation()}
                 className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
                 style={{ '--goal-detail-accent': displayGoalColor }}
@@ -783,8 +680,6 @@ function GoalDetailModalRenderSurface({
     return (
         <>
             <GoalDetailModalPortal portalTarget={portalTarget}>{modalMarkup}</GoalDetailModalPortal>
-            {targetAnalyticsModal}
-            {targetBuilderModal}
         </>
     );
 }

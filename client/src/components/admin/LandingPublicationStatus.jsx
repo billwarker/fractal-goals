@@ -39,7 +39,7 @@ export function LandingPublicDataNotice() {
     return (
         <p className={styles.landingPublicDataNotice}>
             Publishing makes the selected fractals publicly downloadable, including the bounded goal tree,
-            notes, timelines, sessions, activities, programs, targets, and analytics included in the preview.
+            notes, timelines, sessions, activities, programs, completion conditions, and analytics included in the preview.
             Review each example before publishing.
         </p>
     );

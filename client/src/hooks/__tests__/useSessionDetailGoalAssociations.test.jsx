@@ -71,7 +71,8 @@ describe('useSessionDetailGoalAssociations', () => {
                                                 id: 'immediate-1',
                                                 name: 'Immediate Goal',
                                                 type: 'ImmediateGoal',
-                                                targets: [{ activity_id: 'activity-1' }],
+                                                completion_condition: 'activity_threshold',
+                                                condition: { activity_definition_id: 'activity-1', kind: 'single_session' },
                                                 children: [],
                                             },
                                         ],
@@ -149,7 +150,7 @@ describe('useSessionDetailGoalAssociations', () => {
         expect(result.current.allAvailableGoals.some((goal) => goal.id === 'nano-1')).toBe(false);
         expect(result.current.allAvailableGoals.find((goal) => goal.id === 'immediate-1')).toMatchObject({
             parentName: 'Short Goal',
-            hasTargetForActivity: true,
+            completesOnActivity: true,
         });
         expect(result.current.allAvailableGoals.find((goal) => goal.id === 'long-completed')).toMatchObject({
             completed: true,

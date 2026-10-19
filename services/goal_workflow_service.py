@@ -2,7 +2,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import selectinload
 
-from models import Goal, GoalLevel, GoalPauseInterval, validate_root_goal
+from models import COMPLETION_CONDITION_ACTIVITY_THRESHOLD, Goal, GoalLevel, GoalPauseInterval, validate_root_goal
+from services._completion_context import _emit_pending_events
+from services.goal_condition_service import reconcile_goal
+from services.goal_loading import load_fractal_goals_for_serialization
+from services.goal_sequence_service import leave_track
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import ServiceResult
 
@@ -135,7 +139,16 @@ class GoalWorkflowService:
                 GoalPauseInterval.resumed_at.is_(None),
             ).update({GoalPauseInterval.resumed_at: now}, synchronize_session=False)
 
+        pending_events = []
+        if not paused and already_paused and goal.completion_condition == COMPLETION_CONDITION_ACTIVITY_THRESHOLD:
+            # A paused goal cannot complete; evidence from before the pause may already satisfy it.
+            self.db_session.flush()
+            goals_by_id = load_fractal_goals_for_serialization(self.db_session, root_id)
+            reconcile_goal(
+                self.db_session, goals_by_id.get(goal.id, goal), goals_by_id, pending_events, trigger='goal_resumed',
+            )
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         self.db_session.refresh(goal)
         return goal, None, 200
 
@@ -209,8 +222,12 @@ class GoalWorkflowService:
         parent_by_id = {parent.id: parent for parent in parents}
         parent_by_id[current_parent.id].row_version += 1
         parent_by_id[new_parent.id].row_version += 1
+        # A sequence holds siblings of one parent, so a moved goal leaves its track.
+        pending_events = []
+        leave_track(self.db_session, goal, pending_events)
         goal.parent_id = new_parent_id
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         self.db_session.refresh(goal)
         return goal, None, 200
 
@@ -315,7 +332,12 @@ class GoalWorkflowService:
             if child_level and new_level.rank >= child_level.rank:
                 return None, f"New level '{new_level.name}' must be above child level '{child_level.name}'", 400
 
+        # A sequence holds goals of one level, so a converted goal leaves its track.
+        pending_events = []
+        if goal.level_id != level_id:
+            leave_track(self.db_session, goal, pending_events)
         goal.level_id = level_id
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         self.db_session.refresh(goal)
         return goal, None, 200

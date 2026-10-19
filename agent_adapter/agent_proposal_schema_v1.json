@@ -951,29 +951,35 @@
           "default": null,
           "title": "Activity Definition Id"
         },
-        "allow_manual_completion": {
+        "completion_condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "enum": [
+                "activity_threshold",
+                "children",
+                "manual"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": true,
-          "title": "Allow Manual Completion"
+          "default": null,
+          "title": "Completion Condition"
         },
-        "completed_via_children": {
+        "condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "additionalProperties": true,
+              "type": "object"
             },
             {
               "type": "null"
             }
           ],
-          "default": false,
-          "title": "Completed Via Children"
+          "default": null,
+          "title": "Condition"
         },
         "deadline": {
           "anyOf": [
@@ -1055,21 +1061,17 @@
           "default": null,
           "title": "Session Id"
         },
-        "targets": {
+        "started_at": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              "type": "array"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Targets"
+          "title": "Started At"
         },
         "track_activities": {
           "anyOf": [
@@ -1098,18 +1100,6 @@
     "StrictGoalUpdateSchema": {
       "additionalProperties": false,
       "properties": {
-        "allow_manual_completion": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allow Manual Completion"
-        },
         "completed": {
           "anyOf": [
             {
@@ -1122,17 +1112,35 @@
           "default": null,
           "title": "Completed"
         },
-        "completed_via_children": {
+        "completion_condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "enum": [
+                "activity_threshold",
+                "children",
+                "manual"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Completed Via Children"
+          "title": "Completion Condition"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
         },
         "deadline": {
           "anyOf": [
@@ -1223,21 +1231,17 @@
           "default": null,
           "title": "Relevance Statement"
         },
-        "targets": {
+        "started_at": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              "type": "array"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Targets"
+          "title": "Started At"
         },
         "track_activities": {
           "anyOf": [
@@ -2641,7 +2645,7 @@
       "properties": {
         "data": {
           "$ref": "#/$defs/StrictGoalUpdateSchema",
-          "description": "Supported reviewed fields: name, description, deadline, parent_id, targets, child completion, activity inheritance, manual completion, activity tracking, and progress settings."
+          "description": "Supported reviewed fields: name, description, deadline, start date, parent_id, completion condition (activity threshold, children, or manual) with its activity threshold, relevance statement, activity inheritance, activity tracking, and progress settings."
         },
         "goal_id": {
           "description": "Opaque ID of an existing goal in the task's fractal.",

@@ -4,11 +4,10 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import landingContent from '../../content/landingContent';
 import Landing from '../Landing';
 import createLandingIntersectionObserverStub from './landingIntersectionObserverStub';
-const { createBetaSignup, getLandingExamples, connectedGoalDetailModalMock, landingTargetModalMock } = vi.hoisted(() => ({
+const { createBetaSignup, getLandingExamples, connectedGoalDetailModalMock } = vi.hoisted(() => ({
     createBetaSignup: vi.fn(),
     getLandingExamples: vi.fn(),
     connectedGoalDetailModalMock: vi.fn(),
-    landingTargetModalMock: vi.fn(),
 }));
 vi.mock('../../utils/api', () => ({
     API_BASE: '/api',
@@ -118,34 +117,15 @@ vi.mock('../../components/analytics/AnalyticsFiltersSidebar', () => ({
 vi.mock('../../components/ConnectedGoalDetailModal', () => ({
     default: (props) => {
         connectedGoalDetailModalMock(props);
-        const { goal, readOnly, displayMode, onClose, onTargetOpen } = props;
-        const targets = goal.attributes?.targets || [];
+        const { goal, readOnly, displayMode, onClose } = props;
         return (
             <aside aria-label={`${goal.name} details`}>
                 <h3>{goal.name}</h3>
                 <span>{readOnly ? 'Read only' : 'Editable'}</span>
                 <span>{displayMode}</span>
-                {targets.map((target) => (
-                    <button
-                        type="button"
-                        key={target.id}
-                        onClick={() => onTargetOpen?.(target)}
-                    >
-                        {`Open target ${target.name}`}
-                    </button>
-                ))}
                 <button type="button" onClick={onClose} aria-label="Close goal details">Close</button>
             </aside>
         );
-    },
-}));
-vi.mock('../../components/landing/LandingTargetManagerModal', () => ({
-    default: (props) => {
-        landingTargetModalMock(props);
-        return <div role="dialog" aria-label={`Target manager ${props.target.name}`} data-example-id={props.exampleId}>
-            <span>{props.goal.name}</span>
-            <button type="button" onClick={props.onClose}>Close target manager</button>
-        </div>;
     },
 }));
 const publishedExamples = {
@@ -737,21 +717,18 @@ describe('Landing', () => {
     it('uses published Goals copy and opens each configured goal example in the intended view', async () => {
         const configuredExamples = JSON.parse(JSON.stringify(publishedExamples));
         const example = configuredExamples.examples[0];
-        const targetGoal = example.tree.children[0].children[0].children[0];
-        targetGoal.attributes.targets = [{
-            id: 'target-1',
-            name: '120 BPM clean changes',
-            activity_id: 'activity-1',
-            metrics: [{ metric_id: 'metric-1', operator: '>=', value: 120 }],
-        }];
-        example.target_analytics = { 'target-1': { instances: [{ id: 'published-instance' }] } };
-        example.analytics_activity_instances = { 'activity-1': [{ id: 'legacy-instance' }] };
+        const conditionSnapshot = {
+            condition: { activity_definition_id: 'activity-1', kind: 'single_session', rules: [] },
+            progress: { met: false },
+            instances: [{ id: 'published-instance' }],
+        };
+        example.condition_analytics = { 'guitar-caged': conditionSnapshot };
         example.landing_content = {
             goals: {
                 bullets: [
-                    { key: 'break_down', heading: 'Break it down', body: 'Map the work.', goal_id: 'guitar-fretboard', target_id: null },
-                    { key: 'associate_activities', heading: 'Connect the evidence', body: 'See the linked work.', goal_id: 'guitar-caged', target_id: null },
-                    { key: 'set_targets', heading: 'Set measurable targets', body: 'Track a threshold.', goal_id: 'guitar-caged', target_id: 'target-1' },
+                    { key: 'break_down', heading: 'Break it down', body: 'Map the work.', goal_id: 'guitar-fretboard' },
+                    { key: 'associate_activities', heading: 'Connect the evidence', body: 'See the linked work.', goal_id: 'guitar-caged' },
+                    { key: 'set_conditions', heading: 'Know when you’re done', body: 'Track a threshold.', goal_id: 'guitar-caged' },
                 ],
             },
         };
@@ -764,26 +741,15 @@ describe('Landing', () => {
         await waitFor(() => expect(connectedGoalDetailModalMock).toHaveBeenLastCalledWith(expect.objectContaining({
             goal: expect.objectContaining({ id: 'guitar-caged' }),
             initialView: 'goal-activities',
+            conditionSnapshot,
         })));
-        fireEvent.click(screen.getByRole('button', { name: 'Open target 120 BPM clean changes' }));
-        expect(await screen.findByRole('dialog', { name: 'Target manager 120 BPM clean changes' }))
-            .toHaveAttribute('data-example-id', 'guitar-root');
-        expect(landingTargetModalMock).toHaveBeenLastCalledWith(expect.objectContaining({
-            analyticsData: example.target_analytics['target-1'],
-            historicalInstances: example.analytics_activity_instances['activity-1'],
-            portalTarget: expect.any(HTMLElement),
-        }));
-        fireEvent.click(screen.getByRole('button', { name: 'Close target manager' }));
-        fireEvent.click(within(cardsGroup).getByRole('button', { name: /Set measurable targets/ }));
+        fireEvent.click(within(cardsGroup).getByRole('button', { name: /Know when you’re done/ }));
         await waitFor(() => expect(connectedGoalDetailModalMock).toHaveBeenLastCalledWith(expect.objectContaining({
             goal: expect.objectContaining({ id: 'guitar-caged' }),
             initialView: 'goal',
+            conditionSnapshot,
+            portalTarget: expect.any(HTMLElement),
         })));
-        expect(await screen.findByRole('dialog', { name: 'Target manager 120 BPM clean changes' }))
-            .toBeInTheDocument();
-        fireEvent.click(screen.getByRole('tab', { name: 'Become fluent in Chinese' }));
-        expect(screen.queryByRole('dialog', { name: 'Target manager 120 BPM clean changes' }))
-            .not.toBeInTheDocument();
     });
     it('keeps the landing goal viewport interaction locked until the user clicks it', async () => {
         renderLanding();

@@ -15,7 +15,6 @@ from services.serializers import (
     serialize_activity_instance,
     serialize_metric_definition,
     serialize_split_definition,
-    serialize_target,
 )
 from services.session_runtime import get_session_template_color, get_session_template_name
 from services.service_types import JsonDict, ServiceResult
@@ -23,7 +22,6 @@ from services.service_types import JsonDict, ServiceResult
 
 GOAL_TIMELINE_TYPES = {
     'activity',
-    'target',
     'child_goal',
     'goal_lifecycle',
 }
@@ -138,11 +136,10 @@ class GoalTimelineService:
             selected_ids = {entry.id for entry in page}
             instance_ids = {entry.entity_id for entry in page if entry.event_type == 'activity.completed'}
             rich, error, status = self._project_timeline(
-                root_id, goal_id, current_user_id, types=['activity', 'target', 'goal_lifecycle'],
+                root_id, goal_id, current_user_id, types=['activity', 'goal_lifecycle'],
                 include_children=include_children, validated_root=root, preloaded_goals_by_id=goals,
                 entry_filter=in_range, activity_range=activity_range,
                 selected_entry_ids=selected_ids, activity_instance_ids=instance_ids,
-                target_ids={entry.entity_id for entry in page if entry.entity_type == 'target'},
             )
             if error:
                 return None, error, status
@@ -154,7 +151,7 @@ class GoalTimelineService:
         if selected_day:
             payload, error, status = self._project_timeline(
                 root_id, goal_id, current_user_id,
-                types=['activity', 'target', 'goal_lifecycle'], include_children=include_children,
+                types=['activity', 'goal_lifecycle'], include_children=include_children,
                 validated_root=root, preloaded_goals_by_id=goals, entry_filter=in_range,
                 activity_range=activity_range,
             )
@@ -179,7 +176,6 @@ class GoalTimelineService:
         activity_range=None,
         selected_entry_ids=None,
         activity_instance_ids=None,
-        target_ids=None,
         validated_root=None,
         preloaded_goals_by_id=None,
         preloaded_levels_by_name=None,
@@ -405,36 +401,6 @@ class GoalTimelineService:
                     entity_type=association_event.entity_type,
                     source_goal=source_goal,
                     payload=event_payload,
-                )
-
-        if 'target' in requested_types:
-            targets = history.targets(timeline_goal_ids, summary_only=summary_only, target_ids=target_ids)
-            for target in targets:
-                source_goal = goals_by_id.get(target.goal_id, goal)
-                append_entry(
-                    f"target_created:{target.id}",
-                    'target.created',
-                    target.created_at,
-                    f"Created target: {target.name}",
-                    category='target',
-                    entity_id=target.id,
-                    entity_type='target',
-                    source_goal=source_goal,
-                    payload={} if summary_only else serialize_target(target),
-                )
-                if not target.completed or not target.completed_at:
-                    continue
-                append_entry(
-                    f"target_achieved:{target.id}",
-                    'target.achieved',
-                    target.completed_at,
-                    f"Achieved target: {target.name}",
-                    category='target',
-                    subtitle=target.completed_session.name if not summary_only and target.completed_session else None,
-                    entity_id=target.id,
-                    entity_type='target',
-                    source_goal=source_goal,
-                    payload={} if summary_only else serialize_target(target),
                 )
 
         def append_goal_lifecycle_entries(goal_item, *, category, relationship):

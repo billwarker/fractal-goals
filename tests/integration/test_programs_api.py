@@ -484,7 +484,7 @@ class TestProgramCRUD:
         response = authed_client.get(f'{url}?timezone=UTC')
         assert response.status_code == 200
         payload = response.get_json()
-        assert payload['calculation_version'] == 10
+        assert payload['calculation_version'] == 11
         assert payload['window']['timezone'] == 'UTC'
         assert payload['semantics'] == {
             'attribution': 'current_state',
@@ -982,7 +982,7 @@ class TestProgramStructure:
         assert payload['id'] == short_term_goal.id
         assert payload['deadline'][:10] == deadline_date
 
-    def test_set_goal_deadline_for_program_date_returns_structured_parent_deadline_error(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
+    def test_set_goal_deadline_for_program_date_allows_a_date_after_the_parent(self, authed_client, sample_ultimate_goal, sample_program, sample_goal_hierarchy):
         root_id = sample_ultimate_goal.id
         program_id = sample_program['id']
         mid_term_goal = sample_goal_hierarchy['mid_term']
@@ -1009,10 +1009,8 @@ class TestProgramStructure:
             }
         )
 
-        assert response.status_code == 400
-        payload = response.get_json()
-        assert payload['error'] == 'Child deadline cannot be later than parent deadline'
-        assert payload['parent_deadline'] == parent_deadline
+        assert response.status_code == 200
+        assert response.get_json()['deadline'][:10] == child_deadline
 
     def test_duplicate_program_day_copies_its_definition_unscheduled(self, authed_client, sample_ultimate_goal, sample_program, sample_session_template):
         root_id = sample_ultimate_goal.id

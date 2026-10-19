@@ -6,18 +6,28 @@ import {
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
 import NoteCard from '../notes/NoteCard';
-import TargetCard from '../TargetCard';
+import { describeCondition, getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
 import styles from './GoalUncompletionModal.module.css';
 
 function GoalUncompletionModal({
     programs = [],
-    targets = [],
+    goal = null,
     activityDefinitions = [],
     completedAt,
     accentColor,
-    goalType,
     goalCompletionNote,
+    sequenceResumedStep = null,
+    pauseNext = true,
+    onPauseNextChange,
 }) {
+    const completionCondition = getGoalCompletionCondition(goal);
+    const condition = getGoalCondition(goal);
+    const activity = activityDefinitions.find((candidate) => candidate.id === condition?.activity_definition_id) || null;
+    const conditionText = completionCondition === 'activity_threshold' && condition
+        ? describeCondition(condition, activity)
+        : completionCondition === 'children'
+            ? 'When every child goal is complete'
+            : 'Manually';
     const completionStyle = { '--completion-confirm-accent': accentColor };
     return (
         <div
@@ -65,28 +75,28 @@ function GoalUncompletionModal({
                 )}
             </div>
 
-            {/* Associated Targets */}
+            {sequenceResumedStep ? (
+                <label className={styles.sequenceChoice}>
+                    <input
+                        type="checkbox"
+                        checked={pauseNext}
+                        onChange={(event) => onPauseNextChange?.(event.target.checked)}
+                    />
+                    <span>Pause next goal in sequence: <strong>{sequenceResumedStep.name}</strong> again</span>
+                </label>
+            ) : null}
+
+            {/* How this goal completes */}
             <div>
                 <label className={styles.fieldLabel}>
-                    Targets that will be marked incomplete ({targets.length}):
+                    How this goal completes:
                 </label>
-                {targets.length === 0 ? (
-                    <div className={styles.emptyText}>
-                        No targets defined for this goal
-                    </div>
-                ) : (
-                    <div className={styles.list}>
-                        {targets.map(target => (
-                            <TargetCard
-                                key={target.id}
-                                target={target}
-                                activityDefinitions={activityDefinitions}
-                                isCompleted={true}
-                                goalType={goalType}
-                            />
-                        ))}
-                    </div>
-                )}
+                <div className={styles.completedDate}>
+                    <span>{conditionText}</span>
+                </div>
+                {completionCondition !== 'manual' ? (
+                    <p className={styles.emptyText}>The condition stays in place; new activity that meets it completes the goal again.</p>
+                ) : null}
             </div>
 
             {/* Goal Completion Note */}

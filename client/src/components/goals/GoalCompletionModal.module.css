@@ -88,3 +88,20 @@
     font-weight: 500;
     color: color-mix(in srgb, var(--program-accent, var(--completion-confirm-accent, var(--color-brand-success))) 82%, var(--color-text-primary));
 }
+
+.sequenceChoice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.sequenceChoice input {
+    margin-top: 2px;
+}

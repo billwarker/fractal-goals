@@ -177,6 +177,7 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                                 <section className={styles.programSidePaneSection}>
                                     <div className={styles.programSidePaneSectionTitle}>Metrics</div>
                                     <ProgramSidebar
+                                        defaultShowCompleted
                                         program={program}
                                         programMetrics={sidePaneData.programMetrics}
                                         activeBlock={focusedBlock || sidePaneData.activeBlock}
@@ -200,6 +201,7 @@ export default function LandingFeaturePrograms({ example, program, windowStart, 
                                 <section className={styles.programSidePaneSection}>
                                     <div className={styles.programSidePaneSectionTitle}>Program Goals</div>
                                     <ProgramSidebar
+                                        defaultShowCompleted
                                         program={program}
                                         programMetrics={sidePaneData.programMetrics}
                                         activeBlock={focusedBlock || sidePaneData.activeBlock}

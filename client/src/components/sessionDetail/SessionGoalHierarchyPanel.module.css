@@ -146,30 +146,6 @@
     opacity: 0.3;
 }
 
-/* Sub-goal Creation */
-.addSubGoalBtn {
-    background: transparent;
-    border: none;
-    color: var(--text-tertiary);
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-    padding: 0 4px;
-    opacity: 0;
-    transition: opacity 0.2s, color 0.2s;
-    border-radius: 4px;
-    margin-left: 6px;
-}
-
-.hierarchyNode:hover .addSubGoalBtn {
-    opacity: 1;
-}
-
-.addSubGoalBtn:hover {
-    background: var(--bg-tertiary);
-    color: var(--primary-color);
-}
-
 .creationRow {
     display: flex;
     flex-direction: column;
@@ -254,4 +230,34 @@
     opacity: 0.7;
     font-size: 10px;
     text-transform: uppercase;
+}
+
+.conditionCard {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    padding: 10px 12px;
+    text-align: left;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--condition-accent);
+    border-radius: var(--border-radius-md);
+    color: inherit;
+    font: inherit;
+}
+
+button.conditionCard {
+    cursor: pointer;
+}
+
+button.conditionCard:hover,
+button.conditionCard:focus-visible {
+    border-color: var(--condition-accent);
+}
+
+.conditionSentence {
+    margin: 0;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
 }

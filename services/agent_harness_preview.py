@@ -3,7 +3,7 @@
 from typing import Any
 
 from services.activity_service import ActivityService
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 from services.agent_harness_common import AgentHarnessError, harness_validation_error
@@ -16,7 +16,7 @@ class AgentProposalPreviewMixin:
         self._root(task.root_id, user_id)
         if operation["type"] == "update_goal":
             before = operation_restore_payload(self.db_session, task.root_id, operation)
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.update_fractal_goal(
                 task.root_id,
                 operation["goal_id"],
@@ -154,7 +154,7 @@ class AgentProposalPreviewMixin:
             }, {"id": entity_id, "name": entity.get("name"), "root_id": task.root_id,
                 "href": self._app_href(task.root_id, "programs", operation["program_id"])}
         if operation["type"] == "create_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.create_fractal_goal(
                 task.root_id,
                 user_id,

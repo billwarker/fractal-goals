@@ -77,6 +77,23 @@ describe('PlanGoalHierarchyPanel', () => {
         expect(onGoalScopeToggle).not.toHaveBeenCalled();
     });
 
+    it('offers "+" under the scoped goal on editable plans only', () => {
+        const onStartSubGoalCreation = vi.fn();
+        renderPanel({ onStartSubGoalCreation, activityGoalScope: { goal: { id: 'lever' }, activityIds: [] } });
+        fireEvent.click(screen.getByRole('button', { name: 'Add a child goal under Front lever' }));
+        expect(onStartSubGoalCreation).toHaveBeenCalledWith(expect.objectContaining({ id: 'lever' }));
+        expect(screen.queryByRole('button', { name: 'Add a child goal under Handstand push up' })).not.toBeInTheDocument();
+    });
+
+    it('offers no "+" on a past plan', () => {
+        renderPanel({
+            onStartSubGoalCreation: vi.fn(),
+            activityGoalScope: { goal: { id: 'lever' }, activityIds: [] },
+            activePlan: { readOnly: true },
+        });
+        expect(screen.queryByRole('button', { name: /Add a child goal/ })).not.toBeInTheDocument();
+    });
+
     it('asks for a plan when none is active', () => {
         renderPanel({ activePlan: null });
         expect(screen.getByText('Select a plan to see the goals it works toward.')).toBeInTheDocument();
