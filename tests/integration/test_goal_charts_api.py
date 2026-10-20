@@ -63,6 +63,26 @@ class TestGoalCharts:
         assert _attach(authed_client, root, goal, dashboard).status_code == 400
         assert _attach(authed_client, root, goal, 'missing').status_code == 404
 
+    def test_views_saved_in_the_older_grid_shape_attach(self, authed_client, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        goal = _create_goal(authed_client, root, root)['id']
+
+        def grid_view(name, window_states):
+            layout = {'version': 1, 'layout': {'type': 'grid', 'panels': [{'id': 'window-1', 'x': 0, 'y': 0, 'w': 96, 'h': 48}]},
+                      'window_states': window_states, 'selected_window_id': 'window-1'}
+            response = authed_client.post(f"/api/roots/{root}/dashboards", json={'name': name, 'kind': 'view', 'layout': layout})
+            assert response.status_code == 201, response.get_json()
+            return response.get_json()['data']['id']
+
+        weight = grid_view('Weight Over Time', {'window-1': {'selectedCategory': 'activities', 'selectedVisualization': 'lineGraph'}})
+        assert _attach(authed_client, root, goal, weight).status_code == 201
+        assert _charts(authed_client, root, goal)['charts'][0]['category'] == 'activities'
+
+        sessions = grid_view('Old sessions', {'window-1': {'selectedCategory': 'sessions', 'selectedVisualization': 'sessionTrends'}})
+        assert 'session charts' in _attach(authed_client, root, goal, sessions).get_json()['error']
+        empty = grid_view('Empty', {'window-1': {'selectedCategory': None, 'selectedVisualization': None}})
+        assert _attach(authed_client, root, goal, empty).get_json()['error'] == 'This view has no chart yet'
+
     def test_the_default_chart_follows_the_condition(self, authed_client, sample_ultimate_goal, sample_activity_definition):
         root = sample_ultimate_goal.id
         threshold = _create_goal(authed_client, root, root, _threshold(sample_activity_definition))['id']

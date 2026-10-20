@@ -25,14 +25,35 @@ EVIDENCE_LIMIT = 500
 DEFAULT_CHART_CONDITION_PROGRESS = 'condition_progress'
 
 
+def _configured(state: Any) -> bool:
+    return isinstance(state, dict) and bool(state.get('selectedCategory')) and bool(state.get('selectedVisualization'))
+
+
+def _view_window(layout: Any) -> dict | None:
+    """A saved view's one chart window, in either stored shape (as the client's dashboard state reads it).
+
+    Views are stored as `{type: 'analytics_view', profile}`; older ones kept the grid shape with a
+    single configured window in `window_states`.
+    """
+    if not isinstance(layout, dict):
+        return None
+    if layout.get('type') == 'analytics_view':
+        profile = layout.get('profile')
+        return profile if _configured(profile) else None
+    states = layout.get('window_states')
+    if not isinstance(states, dict):
+        return None
+    selected = states.get(layout.get('selected_window_id'))
+    if _configured(selected):
+        return selected
+    configured = [state for state in states.values() if _configured(state)]
+    return configured[0] if len(configured) == 1 else None
+
+
 def view_category(layout: Any) -> str | None:
     """The chart category of a saved view's single window (None for dashboards or empty views)."""
-    if not isinstance(layout, dict) or layout.get('type') != 'analytics_view':
-        return None
-    profile = layout.get('profile')
-    if not isinstance(profile, dict) or not profile.get('selectedVisualization'):
-        return None
-    return profile.get('selectedCategory')
+    window = _view_window(layout)
+    return window.get('selectedCategory') if window else None
 
 
 def attach_problem(view: Any) -> str | None:
@@ -42,6 +63,8 @@ def attach_problem(view: Any) -> str | None:
     if view.kind != 'view':
         return 'Only single-chart analytics views can be added to goals'
     category = view_category(view.layout)
+    if category is None:
+        return 'This view has no chart yet'
     if category not in ATTACHABLE_CATEGORIES:
         return 'Only activity and goal charts can be added to goals; session charts stay in Analytics'
     return None
