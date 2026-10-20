@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import GoalChartsCarousel from '../GoalChartsCarousel';
 import ExpandedGoalChart from '../ExpandedGoalChart';
@@ -92,24 +92,41 @@ describe('GoalChartsCarousel', () => {
         expect(detachMock).toHaveBeenCalledWith('v1');
     });
 
-    it('offers Expand only when the page supports it', () => {
+    it('expands by clicking the chart, only when the page supports it', () => {
         const expand = vi.fn();
         const { unmount } = renderCarousel();
-        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+        expect(screen.getByTestId('goal-chart')).not.toHaveAttribute('role');
+        fireEvent.click(screen.getByTestId('chart-view'));
         unmount();
+
         renderCarousel({ chartExpansion: { goalId: null, expand, collapse: vi.fn() } });
-        fireEvent.click(screen.getByRole('button', { name: 'Expand' }));
+        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByTestId('chart-view'));
         expect(expand).toHaveBeenCalledWith({ goalId: 'goal-1', chartKey: 'condition_progress' });
+
+        fireEvent.keyDown(screen.getByRole('button', { name: /^Expand chart: Progress toward/ }), { key: 'Enter' });
+        expect(expand).toHaveBeenCalledTimes(2);
     });
 
-    it('keeps the controls in place of the chart while it is expanded', () => {
+    it('leaves clicks on controls inside the chart to them', () => {
+        const expand = vi.fn();
+        renderCarousel({ chartExpansion: { goalId: null, expand, collapse: vi.fn() } });
+        const retry = document.createElement('button');
+        screen.getByTestId('chart-view').appendChild(retry);
+        fireEvent.click(retry);
+        expect(expand).not.toHaveBeenCalled();
+    });
+
+    it('puts Collapse in the chart\'s place while it is expanded', () => {
         const collapse = vi.fn();
         renderCarousel({ chartExpansion: { goalId: 'goal-1', expand: vi.fn(), collapse } });
         expect(screen.queryByTestId('chart-view')).not.toBeInTheDocument();
-        expect(screen.getByText('Showing in place of the goal tree.')).toBeInTheDocument();
+        const placeholder = within(screen.getByTestId('goal-chart-placeholder'));
+        expect(placeholder.getByText('Showing in place of the goal tree.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Next chart' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Collapse' }));
+        expect(screen.queryByRole('button', { name: /^Expand chart/ })).not.toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Collapse' })).toHaveLength(1);
+        fireEvent.click(placeholder.getByRole('button', { name: 'Collapse' }));
         expect(collapse).toHaveBeenCalled();
     });
 

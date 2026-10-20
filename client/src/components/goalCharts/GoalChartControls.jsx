@@ -12,7 +12,7 @@ import styles from './GoalCharts.module.css';
  * chart's own name goes on its own line under it (see GoalChartsCarousel).
  */
 export default function GoalChartControls({
-    rootId, goalId, items, cursor, onExpand = null, onCollapse = null, portalTarget = null,
+    rootId, goalId, items, cursor, portalTarget = null,
 }) {
     const { detach, isSaving } = useGoalChartMutations(rootId, goalId);
     const { item, index } = cursor;
@@ -40,10 +40,6 @@ export default function GoalChartControls({
                     onAdded={cursor.select}
                     portalTarget={portalTarget}
                 />
-                {onCollapse ? <Button variant="ghost" size="sm" onClick={onCollapse}>Collapse</Button> : null}
-                {!onCollapse && onExpand && item ? (
-                    <Button variant="ghost" size="sm" onClick={() => onExpand(item.key)}>Expand</Button>
-                ) : null}
                 {item?.kind === 'view' ? (
                     <Button variant="ghost" size="sm" disabled={isSaving} onClick={() => detach(item.dashboardId)} aria-label="Remove from goal">
                         Remove

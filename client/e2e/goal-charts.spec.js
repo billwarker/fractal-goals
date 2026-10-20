@@ -75,8 +75,8 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     await expect(charts.getByText('2 of 2', { exact: true })).toBeVisible();
     await expect(charts.locator('[data-density="compact"] canvas')).toBeVisible();
 
-    // Expand: the chart replaces the flow tree and its controls, at full detail on the page grid.
-    await charts.getByRole('button', { name: 'Expand' }).click();
+    // Clicking the chart expands it: it replaces the flow tree and its controls, at full detail on the page grid.
+    await charts.getByRole('button', { name: /^Expand chart:/ }).click();
     const expanded = page.getByTestId('expanded-goal-chart');
     await expect(expanded).toBeVisible();
     await expect(expanded.locator('[data-density="expanded"] canvas')).toBeVisible();
