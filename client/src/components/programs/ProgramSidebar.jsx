@@ -147,6 +147,7 @@ function ProgramSidebar({
                             getGoalRightSlot={dueToday ? (goal) => (
                                 (goal.completed ?? goal.attributes?.completed) ? null : (
                                     <GoalDueText
+                                        emptyLabel="No deadline"
                                         deadline={goal.deadline ?? goal.attributes?.deadline}
                                         today={dueToday}
                                     />

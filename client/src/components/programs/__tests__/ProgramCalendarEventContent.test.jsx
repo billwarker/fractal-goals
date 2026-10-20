@@ -95,17 +95,21 @@ describe('renderProgramCalendarEventContent', () => {
     it('reads goal badges as "Due:" with the goal icon and name, and completed goals as "Done:"', () => {
         const onGoalActivate = vi.fn();
         const { rerender } = render(renderProgramCalendarEventContent(
-            { event: { title: 'Run a 10k', extendedProps: { type: 'goal', goalCompleted: false } } },
+            { event: { title: 'Run a 10k', extendedProps: { type: 'goal', goalCompleted: false, dueTone: 'soon' } } },
             onGoalActivate,
         ));
         const badge = screen.getByRole('button', { name: 'Open goal: Run a 10k' });
         expect(badge).toHaveTextContent('Due:Run a 10k');
         expect(badge.firstElementChild).toHaveTextContent('Due:');
+        // "Due:" takes the Goals pane's due colour.
+        expect(badge.firstElementChild).toHaveAttribute('data-due-tone', 'soon');
 
         rerender(renderProgramCalendarEventContent(
             { event: { title: 'Run a 10k', extendedProps: { type: 'goal', goalCompleted: true } } },
             onGoalActivate,
         ));
-        expect(screen.getByRole('button', { name: 'Open goal: Run a 10k' })).toHaveTextContent('Done:Run a 10k');
+        const done = screen.getByRole('button', { name: 'Open goal: Run a 10k' });
+        expect(done).toHaveTextContent('Done:Run a 10k');
+        expect(done.firstElementChild).not.toHaveAttribute('data-due-tone');
     });
 });

@@ -20,8 +20,11 @@ describe('GoalDueText', () => {
         expect(screen.getByText('Due: -9d').parentElement).toHaveAttribute('data-due-tone', 'overdue');
     });
 
-    it('renders nothing without a due date', () => {
-        const { container } = render(<GoalDueText deadline={null} today="2026-10-19" />);
+    it('renders nothing without a due date, or the placeholder when given one', () => {
+        const { container, rerender } = render(<GoalDueText deadline={null} today="2026-10-19" />);
         expect(container).toBeEmptyDOMElement();
+
+        rerender(<GoalDueText deadline={null} today="2026-10-19" emptyLabel="No deadline" />);
+        expect(screen.getByText('No deadline')).toHaveAttribute('data-due-empty', 'true');
     });
 });

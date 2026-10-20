@@ -104,11 +104,13 @@ overdue ("-3d"). The text is green, amber within 7 days and red when overdue. Th
 the tooltip and assistive text. Goals without a due date, and completed goals, show none.
 
 The Program calendar page's Goals pane shows it in a right-aligned column right of the tree,
-level with each goal's first line (`GoalHierarchyList` `getGoalRightSlot`). The goal flow tree
+level with each goal's first line (`GoalHierarchyList` `getGoalRightSlot`). Open goals without a due date
+read "No deadline" there, muted and italic. The goal flow tree
 shows it in each goal's metadata line after its age. The Days pane and Session Detail show none.
 
 Calendar cells show non-draggable "Due: [icon] [name]" badges ("Done:" on a completed goal's
-completion date). They open the goal, and busy cells collapse into FullCalendar's "+N more"
+completion date). "Due:"/"Done:" is the same size as the goal name, and "Due:" takes the Goals
+pane's colours (green, amber within 7 days, red overdue). They open the goal, and busy cells collapse into FullCalendar's "+N more"
 popover. On desktop with a fine pointer, open goals in the Goals pane can be dragged onto a day
 to set their due date (FullCalendar `Draggable` and external `drop`). The drop saves at once and
 shows a toast with Undo. The toast lists soft-rule warnings: outside the program, outside the

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildProgramsCalendarEvents } from '../programViewModel';
 
@@ -53,5 +53,25 @@ describe('program calendar goal events', () => {
                 },
             }),
         }));
+    });
+
+    describe('due tone', () => {
+        afterEach(() => vi.useRealTimers());
+
+        it('colours open goals by how soon they are due, and completed goals not at all', () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(new Date('2026-10-19T12:00:00Z'));
+            const helpers = [() => '#000', () => '#fff', 'UTC', { getGoalSecondaryColor: () => '#111', getGoalIcon: () => 'circle' }];
+            const goal = (id, deadline, extra = {}) => ({ id, name: id, type: 'ShortTermGoal', deadline, ...extra });
+            const events = buildProgramsCalendarEvents([], [
+                goal('later', '2026-12-01'),
+                goal('soon', '2026-10-22'),
+                goal('late', '2026-10-10'),
+                goal('done', '2026-10-10', { completed: true, completed_at: '2026-10-09T10:00:00Z' }),
+            ], ...helpers);
+            const tone = (id) => events.find((event) => event.extendedProps.goalId === id).extendedProps.dueTone;
+
+            expect([tone('later'), tone('soon'), tone('late'), tone('done')]).toEqual(['normal', 'soon', 'overdue', null]);
+        });
     });
 });

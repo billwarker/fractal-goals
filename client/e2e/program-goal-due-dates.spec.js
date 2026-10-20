@@ -31,6 +31,8 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     }
 
     await expect(sidebar.getByText(/Drag a goal onto a day to set its due date\./)).toBeVisible();
+    await expect(row.locator('[data-due-empty]')).toHaveText('No deadline');
+    if (process.env.DUE_SCREENSHOT) await sidebar.screenshot({ path: process.env.DUE_SCREENSHOT.replace('.png', '-empty.png') });
     const target = new Date(Date.now() + 3 * 86400000);
     const targetLabel = target.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
     const cell = page.getByRole('gridcell', { name: targetLabel, exact: true }).first();
@@ -48,6 +50,8 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     await expect(toast).toBeVisible();
     const badge = cell.getByRole('button', { name: `Open goal: ${rootName}` });
     await expect(badge).toContainText('Due:');
+    // Three days out reads as "soon" in both the calendar badge and the pane.
+    await expect(badge.locator('[data-due-tone]')).toHaveAttribute('data-due-tone', 'soon');
     // The pane shows the same date in its due column, right of the tree.
     await expect(row.locator('[data-due-tone]')).toHaveText(/Due: 3d/);
     if (process.env.DUE_SCREENSHOT) await page.screenshot({ path: process.env.DUE_SCREENSHOT.replace('.png', `-${testInfo.project.name}.png`) });
@@ -55,5 +59,6 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     await toast.getByRole('button', { name: 'Undo' }).click();
     await expect(badge).toHaveCount(0);
     await expect(row.locator('[data-due-tone]')).toHaveCount(0);
+    await expect(row.locator('[data-due-empty]')).toHaveText('No deadline');
     expect(errors).toEqual([]);
 });

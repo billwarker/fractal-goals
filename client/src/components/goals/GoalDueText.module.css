@@ -16,6 +16,12 @@
     color: var(--color-brand-danger);
 }
 
+.empty {
+    color: var(--color-text-muted);
+    font-style: italic;
+    white-space: nowrap;
+}
+
 .assistive {
     position: absolute;
     width: 1px;

@@ -293,7 +293,9 @@ describe('ProgramSidebar', () => {
             expect(screen.getByText('Soon Mid').parentElement.contains(soonDue)).toBe(false);
             expect(document.querySelector('[data-goal-id="long"] [data-due-tone]')).toHaveTextContent('Due: 1.4mo');
             expect(document.querySelector('[data-goal-id="none"] [data-due-tone]')).toBeNull();
+            expect(document.querySelector('[data-goal-id="none"] [data-due-empty]')).toHaveTextContent('No deadline');
             expect(document.querySelector('[data-goal-id="done"] [data-due-tone]')).toBeNull();
+            expect(document.querySelector('[data-goal-id="done"] [data-due-empty]')).toBeNull();
         });
 
         it('shows no due text elsewhere', () => {

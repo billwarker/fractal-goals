@@ -1,4 +1,5 @@
 import { getDatePart, getISOYMDInTimezone } from './dateUtils';
+import { describeGoalDue } from './goalDueFormat';
 import { getGoalDeadline } from './programGoalAssociations';
 
 function buildGoalPresentation(goal, completed, helpers) {
@@ -30,6 +31,10 @@ export function buildGoalDeadlineCalendarEvent({
     const completed = Boolean(goal.completed || goal.attributes?.completed);
     const completionDate = goal.completed_at || goal.attributes?.completed_at;
     const presentation = buildGoalPresentation(goal, completed, helpers);
+    // Open goals colour their "Due:" like the Goals pane's due text (normal, soon or overdue).
+    const dueTone = completed
+        ? null
+        : describeGoalDue(deadline, getISOYMDInTimezone(new Date(), timezone || 'UTC'))?.tone ?? null;
 
     return {
         id: `${idPrefix}-${goal.id}`,
@@ -48,6 +53,7 @@ export function buildGoalDeadlineCalendarEvent({
             goalId: goal.id,
             goalIcon: presentation.goalIcon,
             goalCompleted: completed,
+            dueTone,
             ...extendedProps,
             sortOrder: 3,
         },
