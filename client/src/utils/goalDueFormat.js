@@ -1,14 +1,15 @@
 // @ts-check
 /**
- * How a goal's due date reads in the Program calendar's Goals pane: relative within 30 days
- * ("Today", "In 5d", "3d overdue"), absolute beyond ("Jan 12", with the year when it differs).
- * Within 7 days is "soon"; past due is "overdue". Dates are calendar days in the user's timezone,
- * so callers pass `today` from that timezone.
+ * How a goal's due date reads beside its name (Program calendar Goals pane, goal flow tree): a
+ * compact relative time ("Today", "5d", "2.4mo", "8.2y"), negative once overdue ("-3d"). Within 7
+ * days is "soon"; past due is "overdue". Dates are calendar days in the user's timezone, so callers
+ * pass `today` from that timezone.
  */
 import { toIsoDate } from './goalDeadlineRules';
 
-const RELATIVE_WINDOW_DAYS = 30;
 const SOON_DAYS = 7;
+const DAYS_PER_MONTH = 30.44;
+const DAYS_PER_YEAR = 365;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** @param {string} iso */
@@ -34,14 +35,13 @@ export function describeGoalDue(deadline, today) {
     const todayIso = toIsoDate(today);
     if (!due || !todayIso) return null;
     const daysUntil = utcDay(due) - utcDay(todayIso);
-    const absolute = absoluteLabel(due, todayIso);
-    let label = absolute;
-    if (Math.abs(daysUntil) < RELATIVE_WINDOW_DAYS) {
-        if (daysUntil === 0) label = 'Today';
-        else if (daysUntil === 1) label = 'Tomorrow';
-        else if (daysUntil === -1) label = 'Yesterday';
-        else label = daysUntil > 0 ? `In ${daysUntil}d` : `${-daysUntil}d overdue`;
-    }
+    const days = Math.abs(daysUntil);
+    const months = (days / DAYS_PER_MONTH).toFixed(1);
+    let span = `${days}d`;
+    // Years once months would round to 12, so it never reads "12.0mo".
+    if (days >= DAYS_PER_YEAR || Number(months) >= 12) span = `${(days / DAYS_PER_YEAR).toFixed(1)}y`;
+    else if (days >= 30) span = `${months}mo`;
+    const label = daysUntil === 0 ? 'Today' : `${daysUntil < 0 ? '-' : ''}${span}`;
     const tone = daysUntil < 0 ? 'overdue' : (daysUntil <= SOON_DAYS ? 'soon' : 'normal');
     const relative = daysUntil === 0
         ? 'today'

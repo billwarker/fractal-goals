@@ -107,7 +107,7 @@ Due dates are soft guidance. `services/goal_deadline_rules.py` (mirrored by
 `client/src/utils/goalDeadlineRules.js`, both checked against `tests/fixtures/goal_deadline_cases.json`)
 warns when a date is after the parent's, before a child's, outside the level's horizon, or outside a
 program. Goal create and update responses carry `deadline_warnings`. Nothing is rejected, and children
-are never rewritten. Program calendar due chips, badges and drag-to-set:
+are never rewritten. Relative due text (Program calendar Goals pane and flow tree), calendar badges and drag-to-set:
 [UI behaviour contracts](planning/ui-contracts-reference.md#goal-due-dates-on-the-program-calendar).
 
 Sequences (`services/goal_sequence_service.py`, `blueprints/goal_sequences_api.py`) order same-level

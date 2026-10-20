@@ -48,8 +48,9 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     await expect(toast).toBeVisible();
     const badge = cell.getByRole('button', { name: `Open goal: ${rootName}` });
     await expect(badge).toContainText('Due:');
-    // The pane shows the same date as a due chip.
-    await expect(row.locator('[data-due-tone]')).toHaveText(/In 3d/);
+    // The pane shows the same date in its due column, right of the tree.
+    await expect(row.locator('[data-due-tone]')).toHaveText(/Due: 3d/);
+    if (process.env.DUE_SCREENSHOT) await page.screenshot({ path: process.env.DUE_SCREENSHOT.replace('.png', `-${testInfo.project.name}.png`) });
 
     await toast.getByRole('button', { name: 'Undo' }).click();
     await expect(badge).toHaveCount(0);

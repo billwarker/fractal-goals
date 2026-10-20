@@ -2,8 +2,12 @@ import { Handle, Position } from 'reactflow';
 
 import AnimatedGoalIcon from '../atoms/AnimatedGoalIcon';
 import GoalIcon from '../atoms/GoalIcon';
+import GoalDueText from '../goals/GoalDueText';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getISOYMDInTimezone } from '../../utils/dateUtils';
+import { describeGoalDue } from '../../utils/goalDueFormat';
 import { getAgeLabel } from '../../utils/goalTiming';
 import styles from '../../FlowTree.module.css';
 
@@ -17,27 +21,6 @@ const hiddenHandleStyle = {
     background: 'transparent',
     pointerEvents: 'none',
 };
-
-function getDueTimeLabel(deadline) {
-    if (!deadline) return null;
-    const deadlineDate = new Date(deadline);
-    const now = new Date();
-    const diffMs = deadlineDate - now;
-    const diffDays = diffMs / (1000 * 60 * 60 * 24);
-    const isPast = diffDays < 0;
-    const absDays = Math.abs(diffDays);
-
-    let timeStr;
-    if (absDays >= 365) {
-        timeStr = `${(absDays / 365).toFixed(1)}y`;
-    } else if (absDays >= 30) {
-        timeStr = `${(absDays / 30.44).toFixed(1)}mo`;
-    } else {
-        timeStr = `${Math.ceil(absDays)}d`;
-    }
-
-    return isPast ? `-${timeStr}` : timeStr;
-}
 
 function getCompletedDateLabel(completedAt) {
     if (!completedAt) return null;
@@ -62,18 +45,15 @@ function hexToRgba(hex, alpha) {
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function GoalTiming({ timingLabel, dueTime, isHierarchyLayout }) {
-    if (!timingLabel && !dueTime) return null;
+function GoalTiming({ timingLabel, deadline, today, isHierarchyLayout }) {
+    const hasDue = Boolean(describeGoalDue(deadline, today));
+    if (!timingLabel && !hasDue) return null;
 
     const content = (
         <>
             {timingLabel && <span>{timingLabel}</span>}
-            {timingLabel && dueTime && <span className={styles.timingSeparator}>|</span>}
-            {dueTime && (
-                <span className={dueTime.startsWith('-') ? styles.dueTimeOverdue : styles.dueTimeOnTime}>
-                    Due: {dueTime}
-                </span>
-            )}
+            {timingLabel && hasDue && <span className={styles.timingSeparator}>|</span>}
+            <GoalDueText deadline={deadline} today={today} />
         </>
     );
 
@@ -115,7 +95,8 @@ export default function FlowTreeNode({ data }) {
     const fillColor = isCompleted ? getCompletionColor() : getGoalColor(goalForDisplay);
     const isUltimate = data.type === 'UltimateGoal';
     const age = getAgeLabel(data.created_at);
-    const dueTime = getDueTimeLabel(data.deadline);
+    const { timezone } = useTimezone();
+    const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
     const timingLabel = age ? `Age: ${age}` : null;
     const smartRingFillColor = isCompleted
         ? getGoalSecondaryColor('Completed')
@@ -180,7 +161,7 @@ export default function FlowTreeNode({ data }) {
                         </div>
                     ) : (
                         <>
-                            <GoalTiming timingLabel={timingLabel} dueTime={dueTime} />
+                            <GoalTiming timingLabel={timingLabel} deadline={data.deadline} today={today} />
                             <AddChildButton data={data} />
                         </>
                     )
@@ -192,7 +173,7 @@ export default function FlowTreeNode({ data }) {
                         </div>
                     ) : (
                         <div className={`${styles.timingContainer} ${styles.hierarchyMetaRow}`}>
-                            <GoalTiming timingLabel={timingLabel} dueTime={dueTime} isHierarchyLayout />
+                            <GoalTiming timingLabel={timingLabel} deadline={data.deadline} today={today} isHierarchyLayout />
                             <AddChildButton data={data} as="span" />
                         </div>
                     )

@@ -93,19 +93,8 @@
 }
 
 /* Due chips sit in a fixed column left of the tree, at the same x for every depth. */
-.withDueColumn {
-    padding-left: 70px;
-}
-
 .goalsScroll [data-goal-due-drag='true'] {
     cursor: grab;
-}
-
-.dueSlot {
-    display: flex;
-    justify-content: flex-end;
-    width: 64px;
-    transform: translateX(calc(-100% - 6px));
 }
 
 .goalsScroll {

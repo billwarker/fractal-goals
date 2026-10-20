@@ -1,11 +1,19 @@
-/* Compact enough to sit beside a hierarchy row. */
 .due {
-    min-height: 0;
-    padding: 1px 6px;
-    font-size: 11px;
-    line-height: 16px;
+    font-weight: 700;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+}
+
+.due[data-due-tone='normal'] {
+    color: var(--color-brand-success);
+}
+
+.due[data-due-tone='soon'] {
+    color: var(--color-brand-warning);
+}
+
+.due[data-due-tone='overdue'] {
+    color: var(--color-brand-danger);
 }
 
 .assistive {

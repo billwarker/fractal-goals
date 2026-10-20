@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Draggable } from '@fullcalendar/interaction';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDurationSeconds } from '../../utils/formatters';
-import GoalDueChip from '../goals/GoalDueChip';
+import GoalDueText from '../goals/GoalDueText';
 import GoalHierarchyList from '../goals/GoalHierarchyList';
 import { useProgramGoalsHierarchyViewModel } from '../../hooks/useProgramGoalsHierarchyViewModel';
 import { hideCompletedBranches } from '../../utils/goalHierarchyFilters';
@@ -136,7 +136,7 @@ function ProgramSidebar({
                             ) : null}
                         </div>
                     ) : null}
-                    <div ref={goalsListRef} className={`${styles.goalsScroll} ${dueToday ? styles.withDueColumn : ''}`}>
+                    <div ref={goalsListRef} className={styles.goalsScroll}>
                         <GoalHierarchyList
                             getGoalRowAttributes={dueDragEnabled ? (goal) => (
                                 (goal.completed ?? goal.attributes?.completed) ? null : {
@@ -144,10 +144,13 @@ function ProgramSidebar({
                                     'data-goal-name': goal.name,
                                 }
                             ) : undefined}
-                            getGoalLeftSlot={dueToday ? (node) => (
-                                <span className={styles.dueSlot}>
-                                    <GoalDueChip deadline={node.completed ? null : node.deadline} today={dueToday} />
-                                </span>
+                            getGoalRightSlot={dueToday ? (goal) => (
+                                (goal.completed ?? goal.attributes?.completed) ? null : (
+                                    <GoalDueText
+                                        deadline={goal.deadline ?? goal.attributes?.deadline}
+                                        today={dueToday}
+                                    />
+                                )
                             ) : undefined}
                             variant="session"
                             nodes={visibleNodes}

@@ -98,12 +98,14 @@ keeping a completed goal while it still leads to open work.
 
 ## Goal due dates on the Program calendar
 
-Only the Program calendar page's Goals pane shows due chips, in a fixed column left of the tree
-(`GoalDueChip`, `utils/goalDueFormat.js`, the user's timezone). Chips read relatively within 30
-days ("Today", "In 5d", "3d overdue") and as dates beyond that, with the year when it differs.
-They are amber within 7 days and red when overdue. Goals without a due date, and completed
-goals, show none. The full date is in the tooltip and assistive text. The Days pane, Session
-Detail and the Goals page show no chips.
+Goal due dates read as inline text, "Due: 2.4mo" (`GoalDueText`, `utils/goalDueFormat.js`, the
+user's timezone): "Today", then days ("5d"), months ("2.4mo") and years ("8.2y"), negative once
+overdue ("-3d"). The text is green, amber within 7 days and red when overdue. The full date is in
+the tooltip and assistive text. Goals without a due date, and completed goals, show none.
+
+The Program calendar page's Goals pane shows it in a right-aligned column right of the tree,
+level with each goal's first line (`GoalHierarchyList` `getGoalRightSlot`). The goal flow tree
+shows it in each goal's metadata line after its age. The Days pane and Session Detail show none.
 
 Calendar cells show non-draggable "Due: [icon] [name]" badges ("Done:" on a completed goal's
 completion date). They open the goal, and busy cells collapse into FullCalendar's "+N more"

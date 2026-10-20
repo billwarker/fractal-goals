@@ -26,7 +26,8 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
         return response.json();
     };
     const first = await create(`First step ${suffix}`);
-    const second = await create(`Second step ${suffix}`);
+    // Long enough to wrap in the Goals pane, so the step number and branch alignment are exercised.
+    const second = await create(`Second step, a longer goal name that wraps ${suffix}`);
     const isPaused = async (goal) => (await (await page.request.get(`/api/${root}/goals/${goal.id}`, { headers })).json()).paused;
 
     await page.goto(`/${root}/programs`);
@@ -54,6 +55,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     if (suffix === 'mobile' && !(await pane.isVisible())) pane = await openPane();
     await expect(pane.getByLabel('Step 2 in sequence')).toBeVisible();
     await expect(pane.getByText(`Paused · waiting on ${first.name}`)).toBeAttached();
+    if (process.env.SEQUENCE_SCREENSHOT) await pane.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', `-pane-${suffix}.png`) });
 
     // Completing the first step begins the second (checked by default)…
     await pane.getByText(first.name, { exact: true }).click();

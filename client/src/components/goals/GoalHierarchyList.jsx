@@ -67,6 +67,7 @@ function GoalHierarchyList({
     isGoalIconSelected,
     getGoalIconActionLabel,
     getGoalLeftSlot,
+    getGoalRightSlot,
     getScopedCharacteristics,
     getGoalColor,
     getGoalSecondaryColor,
@@ -339,6 +340,9 @@ function GoalHierarchyList({
                             </button>
                         )}
                     </div>
+                    {getGoalRightSlot ? (
+                        <div className={styles.sessionRightSlot}>{getGoalRightSlot(originalNode)}</div>
+                    ) : null}
                 </div>
             </div>
         );

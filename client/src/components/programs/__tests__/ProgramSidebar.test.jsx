@@ -285,16 +285,18 @@ describe('ProgramSidebar', () => {
 
         beforeEach(() => { draggableInstances.length = 0; });
 
-        it('shows due chips for open goals only, left of the tree', () => {
+        it('shows due text in a column right of the tree, for open goals only', () => {
             renderSidebar({ dueToday: '2026-10-19' });
-            const soonRow = document.querySelector('[data-goal-id="soon"]');
-            expect(soonRow).toHaveTextContent('In 2d');
-            expect(document.querySelector('[data-goal-id="long"]')).toHaveTextContent('Dec 1');
+            const soonDue = document.querySelector('[data-goal-id="soon"] [data-due-tone]');
+            expect(soonDue).toHaveTextContent('Due: 2d');
+            // A column of its own, not part of the goal name's content.
+            expect(screen.getByText('Soon Mid').parentElement.contains(soonDue)).toBe(false);
+            expect(document.querySelector('[data-goal-id="long"] [data-due-tone]')).toHaveTextContent('Due: 1.4mo');
             expect(document.querySelector('[data-goal-id="none"] [data-due-tone]')).toBeNull();
             expect(document.querySelector('[data-goal-id="done"] [data-due-tone]')).toBeNull();
         });
 
-        it('shows no due chips elsewhere', () => {
+        it('shows no due text elsewhere', () => {
             renderSidebar();
             expect(document.querySelector('[data-due-tone]')).toBeNull();
         });
