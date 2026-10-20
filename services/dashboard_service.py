@@ -1,7 +1,7 @@
 import models
 from sqlalchemy.exc import IntegrityError
 
-from models import AnalyticsDashboard, validate_root_goal
+from models import AnalyticsDashboard, GoalAnalyticsView, validate_root_goal
 from services.serializers import serialize_analytics_dashboard
 from services.service_types import JsonDict, JsonList, ServiceResult
 
@@ -192,6 +192,8 @@ class DashboardService:
             return None, "Analytics saved object not found", 404
 
         dashboard.deleted_at = models.utc_now()
+        # Goals stop showing a deleted view (the client warns with the goals first).
+        self.db_session.query(GoalAnalyticsView).filter_by(dashboard_id=dashboard.id).delete(synchronize_session=False)
         self.db_session.commit()
 
         return {"message": f"{self._label_for_kind(dashboard.kind).title()} deleted successfully"}, None, 200

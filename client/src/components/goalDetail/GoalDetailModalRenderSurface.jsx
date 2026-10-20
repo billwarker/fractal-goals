@@ -103,6 +103,7 @@ function GoalDetailModalRenderSurface({
     onDelete,
     onGoalSelect,
     onSequencingChange,
+    chartExpansion,
     programScope,
     onMobileCollapse,
     onToggleCompletion,
@@ -324,6 +325,7 @@ function GoalDetailModalRenderSurface({
                         portalTarget={portalTarget}
                         overlayClassName={overlayClassName}
                         onCompleteNow={readOnly || isPaused || !onToggleCompletion ? undefined : () => setViewState('complete-confirm')}
+                        chartExpansion={chartExpansion}
                         treeData={treeData}
                         name={name}
                         description={description}

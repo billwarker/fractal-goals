@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
 import EmptyState from '../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from './ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
 
 /**
  * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
@@ -22,6 +22,7 @@ function GoalTimeDistribution({
 }) {
     const { getGoalColor } = useGoalLevels();;
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
 
     // Format duration in hours and minutes
     const formatDuration = (seconds) => {
@@ -289,7 +290,7 @@ function GoalTimeDistribution({
             </div>
 
             <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                <Bar ref={chartRef} data={chartData} options={chartOptions} />
+                <Bar ref={chartRef} data={chartData} options={applyChartDensity(chartOptions, density)} />
             </div>
         </div>
     );

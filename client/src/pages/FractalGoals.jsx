@@ -34,6 +34,8 @@ import { getActivePrograms } from '../utils/programGoalWindow';
 import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '../utils/programScope';
 import { getProgramColor } from '../utils/programViewModel';
 import PageSurface from '../components/surface/PageSurface';
+import GoalTreeChartLayer from '../components/goalCharts/GoalTreeChartLayer';
+import useExpandedGoalChart from '../components/goalCharts/useExpandedGoalChart';
 import { usePageSurfaces } from '../hooks/usePageSurfaceQueries';
 import {
     getDefaultSurfaceConfig,
@@ -132,6 +134,8 @@ function FractalGoals() {
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
+    const fadeOutTree = useCallback(() => flowTreeRef.current?.startFadeOut?.(), []);
+    const expandedChart = useExpandedGoalChart({ isMobile, selectedNodeId, isCreatingGoal: showGoalModal, setSidebarMode, fadeOutTree });
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
@@ -638,7 +642,7 @@ function FractalGoals() {
 
     useEffect(() => {
         const handleTypeToZoomStartKeyDown = (event) => {
-            if (isTypeToZoomOpen) return;
+            if (isTypeToZoomOpen || expandedChart.activeChart) return;
             if (event.defaultPrevented) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
             if (showGoalModal || alertData.isOpen) return;
@@ -655,7 +659,7 @@ function FractalGoals() {
 
         window.addEventListener('keydown', handleTypeToZoomStartKeyDown, true);
         return () => window.removeEventListener('keydown', handleTypeToZoomStartKeyDown, true);
-    }, [alertData.isOpen, isTypeToZoomOpen, showGoalModal]);
+    }, [alertData.isOpen, expandedChart.activeChart, isTypeToZoomOpen, showGoalModal]);
 
     useEffect(() => {
         if (!fractalData || !viewingGoal) return;
@@ -761,6 +765,14 @@ function FractalGoals() {
     }
 
     const shouldShowMobileGoalModal = isMobile && isSidebarOpen;
+    // Goal details for the selected goal: the desktop panel and the mobile modal.
+    const viewGoalDetailProps = {
+        isOpen: true, onClose: handleCloseGoalDetails, goal: viewingGoal, onUpdate: handleUpdateNode,
+        onDelete: handleDelete, onAddChild: handleAddChildClick, onToggleCompletion: handleToggleCompletion,
+        evidenceGoalIds, activityDefinitions: activities, rootId, treeData: fractalData, programs, activityGroups,
+        onGoalSelect: handleGoalNameClick, onSequencingChange: setSequenceDraft,
+        chartExpansion: expandedChart.chartExpansion, programScope: goalDetailProgramScope,
+    };
     const handleToggleViewSetting = (settingKey) => (event) => {
         const nextChecked = event.target.checked;
         const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
@@ -830,41 +842,44 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    <FlowTreeOptionsPane
-                        isMobile={isMobile}
-                        isMinimized={isOptionsPaneMinimized}
-                        onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
-                        goalsViewMode={goalsViewMode}
-                        onGoalsViewModeChange={handleGoalsViewModeChange}
-                        viewSettings={viewSettings}
-                        onToggleViewSetting={handleToggleViewSetting}
-                        inactiveBranchTooltip={inactiveBranchTooltip}
-                        hideInactiveTooltip={hideInactiveTooltip}
-                        hideCompletedTooltip={hideCompletedTooltip}
-                        activePrograms={activePrograms}
-                        scopedProgramId={scopedProgramId}
-                        onProgramScopeChange={handleProgramScopeChange}
-                        isConfigureMode={showSurfaceConfiguration && isConfigureMode}
-                        onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
-                        onCancelConfigureMode={handleCancelConfigureMode}
-                        surfaces={showSurfaceConfiguration ? surfaces : EMPTY_ARRAY}
-                        activeSurfaceId={activeSurfaceId}
-                        isSurfaceDirty={isSurfaceDirty}
-                        onSelectSurface={showSurfaceConfiguration ? ((id) => loadSurfaceConfig(
-                            surfaces.find((s) => s.id === id) || null,
-                            configViewportIsMobile,
-                            { respectStoredPreferences: false }
-                        )) : null}
-                        onSaveSurface={handleSaveSurface}
-                        onSaveSurfaceAs={handleSaveSurfaceAs}
-                        onSetDefaultSurface={handleSetDefaultSurface}
-                        onDeleteSurface={handleDeleteSurface}
-                        surfacePointerCell={surfacePointerCell}
-                        surfaceConfigTarget={configViewportIsMobile ? 'mobile' : 'desktop'}
-                        onSurfaceConfigTargetChange={handleSurfaceConfigTargetChange}
-                        surfaceViewMode={surfaceViewMode}
-                    />
-                    {isTypeToZoomOpen && typeToZoomQuery && (
+                    {/* The tree's controls leave with it while an expanded goal chart replaces it. */}
+                    {!expandedChart.activeChart && (
+                        <FlowTreeOptionsPane
+                            isMobile={isMobile}
+                            isMinimized={isOptionsPaneMinimized}
+                            onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                            goalsViewMode={goalsViewMode}
+                            onGoalsViewModeChange={handleGoalsViewModeChange}
+                            viewSettings={viewSettings}
+                            onToggleViewSetting={handleToggleViewSetting}
+                            inactiveBranchTooltip={inactiveBranchTooltip}
+                            hideInactiveTooltip={hideInactiveTooltip}
+                            hideCompletedTooltip={hideCompletedTooltip}
+                            activePrograms={activePrograms}
+                            scopedProgramId={scopedProgramId}
+                            onProgramScopeChange={handleProgramScopeChange}
+                            isConfigureMode={showSurfaceConfiguration && isConfigureMode}
+                            onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
+                            onCancelConfigureMode={handleCancelConfigureMode}
+                            surfaces={showSurfaceConfiguration ? surfaces : EMPTY_ARRAY}
+                            activeSurfaceId={activeSurfaceId}
+                            isSurfaceDirty={isSurfaceDirty}
+                            onSelectSurface={showSurfaceConfiguration ? ((id) => loadSurfaceConfig(
+                                surfaces.find((s) => s.id === id) || null,
+                                configViewportIsMobile,
+                                { respectStoredPreferences: false }
+                            )) : null}
+                            onSaveSurface={handleSaveSurface}
+                            onSaveSurfaceAs={handleSaveSurfaceAs}
+                            onSetDefaultSurface={handleSetDefaultSurface}
+                            onDeleteSurface={handleDeleteSurface}
+                            surfacePointerCell={surfacePointerCell}
+                            surfaceConfigTarget={configViewportIsMobile ? 'mobile' : 'desktop'}
+                            onSurfaceConfigTargetChange={handleSurfaceConfigTargetChange}
+                            surfaceViewMode={surfaceViewMode}
+                        />
+                    )}
+                    {isTypeToZoomOpen && typeToZoomQuery && !expandedChart.activeChart && (
                         <div className="type-to-zoom-palette" role="status" aria-live="polite">
                             <div className="type-to-zoom-label">Find goal</div>
                             <div className="type-to-zoom-query">{renderTypeToZoomQuery(typeToZoomQuery)}</div>
@@ -891,6 +906,15 @@ function FractalGoals() {
                         onPointerCellChange={setSurfacePointerCell}
                         sharedWidgetData={surfaceSharedData}
                         renderTree={() => (
+                            <GoalTreeChartLayer
+                                chart={expandedChart.activeChart}
+                                isLeaving={expandedChart.isLeaving}
+                                rootId={rootId}
+                                goal={viewingGoal}
+                                activityDefinitions={activities}
+                                isMobile={isMobile}
+                                onClose={expandedChart.collapseChart}
+                            >
                             <FractalView
                                 ref={flowTreeRef}
                                 treeData={flowTreeData}
@@ -913,6 +937,7 @@ function FractalGoals() {
                                 layoutMode={goalsViewMode}
                                 key={`${rootId}-${goalsViewMode}`}
                             />
+                            </GoalTreeChartLayer>
                         )}
                         renderDetail={() => (
                             <div className="surface-detail-window">
@@ -937,28 +962,7 @@ function FractalGoals() {
                                         </Suspense>
                                     ) : (
                                         <ErrorBoundary>
-                                            <GoalDetailModal
-                                                isOpen={true}
-                                                onClose={() => {
-                                                    setSidebarMode(null);
-                                                    setViewingGoal(null);
-                                                }}
-                                                goal={viewingGoal}
-                                                onUpdate={handleUpdateNode}
-                                                onDelete={handleDelete}
-                                                onAddChild={handleAddChildClick}
-                                                onToggleCompletion={handleToggleCompletion}
-                                                evidenceGoalIds={evidenceGoalIds}
-                                                activityDefinitions={activities}
-                                                rootId={rootId}
-                                                treeData={fractalData}
-                                                displayMode="panel"
-                                                programs={programs}
-                                                activityGroups={activityGroups}
-                                                onGoalSelect={handleGoalNameClick}
-                                                onSequencingChange={setSequenceDraft}
-                                                programScope={goalDetailProgramScope}
-                                            />
+                                            <GoalDetailModal {...viewGoalDetailProps} displayMode="panel" />
                                         </ErrorBoundary>
                                     )}
                                 </div>
@@ -987,25 +991,7 @@ function FractalGoals() {
                             }}
                         />
                     ) : (
-                        <GoalDetailModal
-                            isOpen={true}
-                            onClose={handleCloseGoalDetails}
-                            goal={viewingGoal}
-                            onUpdate={handleUpdateNode}
-                            activityDefinitions={activities}
-                            onToggleCompletion={handleToggleCompletion}
-                            onAddChild={handleAddChildClick}
-                            onDelete={handleDelete}
-                            evidenceGoalIds={evidenceGoalIds}
-                            rootId={rootId}
-                            treeData={fractalData}
-                            displayMode="modal"
-                            programs={programs}
-                            activityGroups={activityGroups}
-                            onGoalSelect={handleGoalNameClick}
-                            onSequencingChange={setSequenceDraft}
-                            programScope={goalDetailProgramScope}
-                        />
+                        <GoalDetailModal {...viewGoalDetailProps} displayMode="modal" />
                     )}
                 </Suspense>
             )}

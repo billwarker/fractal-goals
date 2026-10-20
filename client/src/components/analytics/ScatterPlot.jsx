@@ -1,7 +1,7 @@
 import React from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { goalLineAnnotations } from '../../utils/goalConditionLines';
-import { useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
+import { applyChartDensity, useChartDensity, useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
 import { withScatterPointDensity } from './scatterPointProfile';
 import styles from './ScatterPlot.module.css';
 
@@ -12,6 +12,9 @@ import styles from './ScatterPlot.module.css';
  * Requires at least 2 metrics to be meaningful
  * Supports split filtering for split-enabled activities
  */
+// Compact charts keep points small instead of growing them for repeated values.
+const COMPACT_POINT_PROFILE = { baseRadius: 3, radiusStep: 1, hoverOffset: 2, maxRadius: 6 };
+
 function ScatterPlot({
     selectedActivity,
     activityInstances,
@@ -24,6 +27,7 @@ function ScatterPlot({
     goalLines = [],
 }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
     const metrics = activityDef?.metric_definitions || [];
 
@@ -204,7 +208,7 @@ function ScatterPlot({
         aggregation: p.aggregation,
         set_number: p.set_number,
         tag_label: p.tag_label,
-    })));
+    })), density === 'compact' ? COMPACT_POINT_PROFILE : undefined);
 
     const chartData = {
         datasets: [{
@@ -272,7 +276,7 @@ function ScatterPlot({
     return (
         <div className={styles.mainContainer}>
             <div className={styles.chartContainer}>
-                <Scatter ref={chartRef} data={chartData} options={options} />
+                <Scatter ref={chartRef} data={chartData} options={applyChartDensity(options, density)} />
             </div>
         </div>
     );

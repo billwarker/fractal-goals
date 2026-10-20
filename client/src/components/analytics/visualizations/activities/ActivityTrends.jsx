@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const METRIC_OPTIONS = [
     { value: 'instances', label: 'Instances', color: '#3b82f6', type: 'bar' },
@@ -78,6 +78,7 @@ export function getActivityTrendRows(activityInstances = {}) {
 
 export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics = ['instances', 'duration'] }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['instances']), [metrics]);
     const rows = useMemo(() => getActivityTrendRows(activityInstances), [activityInstances]);
 
@@ -112,7 +113,7 @@ export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics 
         <Bar
             ref={chartRef}
             data={chartData}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -171,7 +172,7 @@ export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics 
                         title: { display: true, text: 'Minutes', color: chartTheme.textColor },
                     },
                 },
-            }}
+            }, density)}
         />
     );
 }

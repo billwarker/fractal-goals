@@ -6,6 +6,7 @@ import NoteCard from '../notes/NoteCard';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
+const GoalChartsCarousel = lazyWithRetry(() => import('../goalCharts/GoalChartsCarousel'), 'components/goalCharts/GoalChartsCarousel');
 const CompletionConditionSummary = lazyWithRetry(() => import('../goalDetail/CompletionConditionSummary'), 'components/goalDetail/CompletionConditionSummary');
 
 function GoalViewMode({
@@ -24,6 +25,7 @@ function GoalViewMode({
     // Handlers
     onClose,
     onCompleteNow,
+    chartExpansion = null,
     portalTarget = null,
     overlayClassName = '',
     readOnly = false,
@@ -86,6 +88,19 @@ function GoalViewMode({
                 );
             })()}
 
+            {mode !== 'create' && !readOnly && (
+                <Suspense fallback={null}>
+                    <GoalChartsCarousel
+                        rootId={rootId}
+                        goal={goal}
+                        goalId={goalId}
+                        activityDefinitions={activityDefinitions}
+                        chartExpansion={chartExpansion}
+                        portalTarget={portalTarget}
+                    />
+                </Suspense>
+            )}
+
             {mode !== 'create' && (
                 <Suspense fallback={null}>
                     <CompletionConditionSummary
@@ -98,6 +113,7 @@ function GoalViewMode({
                         readOnly={readOnly}
                         snapshot={conditionSnapshot}
                         onCompleteNow={onCompleteNow}
+                        chartShowsProgress={!readOnly}
                         portalContainer={portalTarget}
                         overlayClassName={overlayClassName}
                     />

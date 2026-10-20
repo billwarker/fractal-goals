@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
-import { DISABLED_CHART_ANIMATION } from './ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity } from './ChartJSWrapper';
 
 const GOAL_TYPES_HIERARCHY = [
     'UltimateGoal',
@@ -19,6 +19,7 @@ const GOAL_TYPES_HIERARCHY = [
  * The x-axis shows the timeline based on completion dates.
  */
 function GoalCompletionTimeline({ goals, chartRef }) {
+    const density = useChartDensity();
     const { getGoalColor } = useGoalLevels();;
     // Goal types in hierarchy order from PARENT (bottom of stack) to CHILD (top of stack)
     // This ensures parent goals form the base of the stacked area chart
@@ -277,7 +278,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
 
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-            <Line ref={chartRef} data={chartData} options={chartOptions} />
+            <Line ref={chartRef} data={chartData} options={applyChartDensity(chartOptions, density)} />
         </div>
     );
 }

@@ -22,6 +22,8 @@ function headline(completionCondition, condition, activity) {
 /**
  * "Completion" section of goal details: how the goal completes, live progress toward it, and the
  * evidence behind an activity threshold. Read-only surfaces pass a published `snapshot`.
+ * With `chartShowsProgress`, an activity threshold's progress is the goal's "Progress toward…"
+ * chart, so only the "Mark complete" prompt stays here.
  */
 function CompletionConditionSummary({
     goal,
@@ -33,6 +35,7 @@ function CompletionConditionSummary({
     readOnly = false,
     snapshot = null,
     onCompleteNow,
+    chartShowsProgress = false,
     portalContainer = null,
     overlayClassName = '',
 }) {
@@ -47,6 +50,13 @@ function CompletionConditionSummary({
     const source = goal?.completion_state?.source ?? goal?.attributes?.completion_state?.source ?? null;
     const paused = Boolean(goal?.paused ?? goal?.attributes?.paused);
     const metButIncomplete = !completed && !paused && Boolean(progress?.met) && Boolean(onCompleteNow);
+    const metPrompt = metButIncomplete ? (
+        <div className={styles.metPrompt} role="status">
+            <span>Your logged activity already meets this.</span>
+            <button type="button" className={styles.metButton} onClick={onCompleteNow}>Mark complete</button>
+        </div>
+    ) : null;
+    if (chartShowsProgress && completionCondition === 'activity_threshold') return metPrompt;
     const canShowEvidence = completionCondition === 'activity_threshold' && condition && (!readOnly || snapshot);
 
     return (
@@ -64,12 +74,7 @@ function CompletionConditionSummary({
                     accentColor={goalColor}
                 />
             ) : null}
-            {metButIncomplete ? (
-                <div className={styles.metPrompt} role="status">
-                    <span>Your logged activity already meets this.</span>
-                    <button type="button" className={styles.metButton} onClick={onCompleteNow}>Mark complete</button>
-                </div>
-            ) : null}
+            {metPrompt}
             {canShowEvidence ? (
                 <button type="button" className={styles.evidenceButton} onClick={() => setEvidenceOpen(true)}>
                     See the evidence

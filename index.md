@@ -345,6 +345,17 @@ Notes support goal/session/activity scoping and safe markdown media rendering. A
 a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 
+**Goal charts** replace the old target manager's per-goal view: saved activity and goal views
+(`analytics_dashboards`, `kind='view'`) attach to goals through `goal_analytics_views` (migration
+`d7e8f9a0b1c2`; `services/goal_chart_service.py`, `blueprints/goal_charts_api.py`; at most 12 a
+goal, session views stay in Analytics). Goals point to the view, so edits flow through; deleting
+a view removes its links after a warning that names its goals. Activity-threshold goals also get
+a derived (never stored) "Progress toward…" chart. `useVisualizationContext` is the one chart
+context for `ProfileWindow`, `AnalyticsWidget` and `SavedViewChart`; small containers render the
+simplified `compact` density (`applyChartDensity`, `useContainerDensity`). Embedded charts read
+bounded data (`/activities/<id>/analytics-evidence`, 500 newest). UI lives in
+`client/src/components/goalCharts/`. See [Goal charts plan](planning/goal-analytics-charts.md).
+
 Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/notes_api.py`,
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
 

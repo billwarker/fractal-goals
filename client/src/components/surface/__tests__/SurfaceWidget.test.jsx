@@ -10,6 +10,22 @@ vi.mock('../../../hooks/useDashboardQueries', () => ({
         analyticsViewItems: [
             { id: 'view-1', name: 'Sessions' },
             { id: 'view-2', name: 'Goals' },
+            {
+                id: 'view-3',
+                name: 'Bench trend',
+                kind: 'view',
+                layout: {
+                    type: 'analytics_view',
+                    version: 1,
+                    profile: {
+                        selectedCategory: 'activities',
+                        selectedVisualization: 'metricTrends',
+                        selectedActivity: { id: 'bench', name: 'Bench' },
+                        visualizationState: { metrics: ['weight'], setsHandling: 'top', selectedSplit: 'all' },
+                    },
+                    global_filters: {},
+                },
+            },
         ],
     }),
 }));
@@ -17,11 +33,25 @@ vi.mock('../../../hooks/useDashboardQueries', () => ({
 vi.mock('../../../hooks/useAnalyticsPageData', () => ({
     useAnalyticsPageData: () => ({
         sessions: [],
-        activities: [],
+        activities: [{ id: 'bench', name: 'Bench', metric_definitions: [{ id: 'weight', name: 'Weight', unit: 'lb' }] }],
         activityGroups: [],
-        activityInstances: {},
+        activityInstances: {
+            bench: [{ id: 'i1', completed: true, session_date: '2026-04-20T12:00:00Z', metrics: [{ metric_id: 'weight', value: '200' }] }],
+        },
         goalAnalytics: {},
     }),
+}));
+
+vi.mock('../../../contexts/GoalLevelsContext', () => ({
+    useGoalLevels: () => ({ getGoalColor: () => '#888' }),
+}));
+
+vi.mock('react-chartjs-2', () => ({
+    Line: ({ data }) => <div data-testid="line-chart">{data.datasets.map((dataset) => dataset.label).join(',')}</div>,
+}));
+
+vi.mock('../../../utils/api', () => ({
+    fractalApi: { getActivityGoalConditions: async () => ({ data: { goals: [] } }) },
 }));
 
 function renderWithQuery(element) {
@@ -74,5 +104,19 @@ describe('SurfaceWidget', () => {
             visualization: null,
         });
         expect(screen.getByRole('button', { name: 'Remove Analytics Panel' })).toBeInTheDocument();
+    });
+
+    it('renders a saved activity view with its selected activity', async () => {
+        renderWithQuery(
+            <SurfaceWidget
+                widgetType="analytics"
+                state={{ savedViewId: 'view-3' }}
+                sharedData={{ rootId: 'root-1' }}
+                configureMode={false}
+            />
+        );
+
+        expect(await screen.findByTestId('line-chart')).toHaveTextContent('Weight');
+        expect(screen.queryByText(/Select an activity/)).not.toBeInTheDocument();
     });
 });

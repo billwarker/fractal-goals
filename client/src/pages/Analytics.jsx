@@ -486,6 +486,8 @@ function Analytics() {
                     onModeChange={setActiveMode}
                     onOpenViewsModal={() => setIsViewsModalOpen(true)}
                     onSaveView={handleSaveView}
+                    rootId={rootId}
+                    savedView={analyticsViews.find((view) => view.id === selectedViewId && view.kind === 'view') || null}
                     isFiltersPaneOpen={isFiltersPaneOpen}
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                     showQueryConsole={showSqlExplorer}

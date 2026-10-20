@@ -27,6 +27,12 @@ export const fractalGoalsApi = {
         axios.put(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`, { goal_ids: goalIds }),
     deleteSequenceTrack: (rootId, trackId) => axios.delete(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`),
     holdSequenceStep: (rootId, goalId) => axios.post(`${API_BASE}/${rootId}/goals/${goalId}/sequence-hold`),
+    getGoalCharts: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/charts`),
+    attachGoalChart: (rootId, goalId, dashboardId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/charts`, { dashboard_id: dashboardId }),
+    detachGoalChart: (rootId, goalId, dashboardId) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/charts/${dashboardId}`),
+    getActivityAnalyticsEvidence: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/analytics-evidence`),
     getActivityGoalConditions: (rootId, activityId) =>
         axios.get(`${API_BASE}/${rootId}/goals/conditions`, { params: { activity_id: activityId } }),
     setGoalCondition: (rootId, goalId, data) =>

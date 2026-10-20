@@ -3,7 +3,8 @@ import { Line } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
 import { goalLineAnnotations } from '../../../../utils/goalConditionLines';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
+import CompactChartFrame from '../../CompactChartFrame';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const palette = ['#3b82f6', '#22c55e'];
 
@@ -125,25 +126,36 @@ export function MetricTrendsChart({
 }) {
     const metricDefinitions = useMemo(() => activity?.metric_definitions || [], [activity?.metric_definitions]);
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
+    // Compact charts plot only the first selected metric; the caption says what else there is.
+    const selectedDefs = useMemo(() => getSelectedMetricDefs(metricDefinitions, metrics), [metricDefinitions, metrics]);
+    const shownMetrics = useMemo(() => (
+        density === 'compact' && selectedDefs.length > 1 ? [selectedDefs[0].id] : metrics
+    ), [density, metrics, selectedDefs]);
     const chartData = useMemo(() => buildMetricTrendData({
         instances: activity ? activityInstances[activity.id] || [] : [],
         metricDefinitions,
-        selectedMetrics: metrics,
+        selectedMetrics: shownMetrics,
         setsHandling,
         selectedSplit,
-    }), [activity, activityInstances, metricDefinitions, metrics, selectedSplit, setsHandling]);
+    }), [activity, activityInstances, metricDefinitions, shownMetrics, selectedSplit, setsHandling]);
+    const hiddenCount = selectedDefs.length - chartData.selectedMetricDefs.length;
+    const caption = density === 'compact' && chartData.selectedMetricDefs[0]
+        ? `${chartData.selectedMetricDefs[0].name} · ${chartData.labels.length} session${chartData.labels.length === 1 ? '' : 's'}${hiddenCount > 0 ? ` · +${hiddenCount} more` : ''}`
+        : null;
 
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
 
     return (
+        <CompactChartFrame caption={caption}>
         <Line
             ref={chartRef}
             data={{
                 labels: chartData.labels,
                 datasets: chartData.datasets,
             }}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -177,7 +189,8 @@ export function MetricTrendsChart({
                         buildYAxis(metric, index, chartTheme),
                     ])),
                 },
-            }}
+            }, density)}
         />
+        </CompactChartFrame>
     );
 }

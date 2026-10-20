@@ -90,6 +90,11 @@ export const queryKeys = {
     goalTimelinesRoot: (rootId) => ['goalTimeline', rootId],
     goalAnalytics: (rootId, options = undefined) => options ? ['goal-analytics', rootId, options] : ['goal-analytics', rootId],
     // Derived condition reads; every write that can change evidence or a condition invalidates the root.
+    goalChartsRoot: (rootId) => ['goalCharts', rootId],
+    goalCharts: (rootId, goalId) => ['goalCharts', rootId, 'goal', goalId],
+    goalChartEvidence: (rootId, activityId) => ['goalCharts', rootId, 'evidence', activityId],
+    goalChartRecentSummary: (rootId) => ['goalCharts', rootId, 'recent-summary'],
+    analyticsViewGoals: (rootId, dashboardId) => ['goalCharts', rootId, 'view', dashboardId],
     goalConditionLines: (rootId, activityId) => ['goalCondition', rootId, 'activity', activityId],
     goalConditionProgress: (rootId, goalIds) => ['goalCondition', rootId, 'progress', [...goalIds].sort().join(',')],
     goalConditionEvidence: (rootId, goalId, since = 'active', activityId = null) => [

@@ -52,6 +52,7 @@ function GoalDetailModal({
     parentGoal,  // Parent goal for context when creating
     onGoalSelect, // Optional host action for selecting goals
     onSequencingChange, // Optional: told the goal id while Options → Sequence is open (null when it closes)
+    chartExpansion, // Optional { goalId, expand, collapse }: the Goals page shows a goal chart in place of the tree
     programScope, // Optional { goalIds: Set, name }: the program the host page is scoped to
     conditionSnapshot = null, // Published landing condition analytics for read-only goals
     onAssociationsChanged, // Callback when activity associations change
@@ -621,6 +622,7 @@ function GoalDetailModal({
             onDelete={onDelete}
             onGoalSelect={onGoalSelect}
             onSequencingChange={onSequencingChange}
+            chartExpansion={chartExpansion}
             programScope={programScope}
             onMobileCollapse={onMobileCollapse}
             onToggleCompletion={onToggleCompletion}

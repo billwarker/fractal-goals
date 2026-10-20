@@ -232,6 +232,21 @@ class GoalSequenceCreateSchema(BaseModel):
     goal_ids: List[str] = Field(..., min_length=2, max_length=50)
 
 
+class GoalChartAttachSchema(BaseModel):
+    """A saved analytics view to show on a goal."""
+    dashboard_id: str = Field(..., min_length=1, max_length=80)
+
+
+class GoalChartOrderSchema(BaseModel):
+    """A goal's attached views, in display order."""
+    dashboard_ids: List[str] = Field(default_factory=list, max_length=12)
+
+
+class DashboardGoalsSchema(BaseModel):
+    """The goals a saved analytics view shows on."""
+    goal_ids: List[str] = Field(default_factory=list, max_length=200)
+
+
 class GoalSequenceStepsSchema(BaseModel):
     """A sequence's steps, in order; fewer than two dissolves it."""
     goal_ids: List[str] = Field(default_factory=list, max_length=50)

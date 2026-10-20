@@ -322,4 +322,97 @@ export function createChartOptions(props) {
     };
 }
 
+/**
+ * Chart density. Charts in small spaces (goal details, narrow panels) render "compact": no title,
+ * legend or axis titles, fewer ticks, smaller points and unlabelled reference lines (tooltips
+ * stay). "expanded" (a goal chart in place of the flow tree) is full detail drawn on the page's
+ * own background grid: the chart draws no gridlines or axis borders of its own. A surrounding
+ * ChartDensityContext.Provider sets it; charts read it with useChartDensity and pass their
+ * options through applyChartDensity.
+ */
+export const ChartDensityContext = React.createContext('full');
+
+export function useChartDensity() {
+    return React.useContext(ChartDensityContext);
+}
+
+const COMPACT_TICKS = { x: 4, y: 3 };
+
+function compactScale(id, scale = {}) {
+    const axis = (scale.axis || id || '').startsWith('x') ? 'x' : 'y';
+    return {
+        ...scale,
+        title: { ...(scale.title || {}), display: false },
+        ticks: {
+            ...(scale.ticks || {}),
+            maxTicksLimit: COMPACT_TICKS[axis],
+            maxRotation: 0,
+            minRotation: 0,
+            autoSkip: true,
+            font: { ...(scale.ticks?.font || {}), size: 10 },
+        },
+    };
+}
+
+const SIDES = ['top', 'right', 'bottom', 'left'];
+
+/** Layout padding the pageGridSnap plugin can adjust (it reads the chart's own as `$pageGridBase`). */
+function pageGridPadding(padding) {
+    const base = Object.fromEntries(SIDES.map((side) => [side, Number(typeof padding === 'number' ? padding : padding?.[side]) || 0]));
+    return ({ chart }) => {
+        chart.$pageGridBase = base;
+        return chart.$pageGridPad || base;
+    };
+}
+
+/**
+ * A chart drawn on the page grid: its scales draw no gridlines (the page grid is the chart's grid)
+ * but draw visible axis lines and keep their ticks, and pageGridSnap (registered by the expanded goal chart)
+ * puts the plot, its points and its primary ticks on the grid's lines.
+ */
+function onPageGrid(options) {
+    return {
+        ...options,
+        layout: { ...(options.layout || {}), padding: pageGridPadding(options.layout?.padding) },
+        plugins: { ...(options.plugins || {}), pageGridSnap: { enabled: true } },
+        scales: Object.fromEntries(Object.entries(options.scales || {}).map(([id, scale]) => [id, {
+            ...scale,
+            grid: { ...(scale?.grid || {}), display: false },
+            // Axis lines in the tick colour: Chart.js's default border all but vanishes on the grid.
+            border: { ...(scale?.border || {}), color: scale?.ticks?.color || 'rgba(148, 163, 184, 0.8)', width: 1, display: true },
+        }])),
+    };
+}
+
+/** A chart's Chart.js options for its density; 'full' returns them unchanged. */
+export function applyChartDensity(options, density) {
+    if (!options) return options;
+    if (density === 'expanded') return onPageGrid(options);
+    if (density !== 'compact') return options;
+    const plugins = options.plugins || {};
+    const annotations = plugins.annotation?.annotations;
+    return {
+        ...options,
+        layout: { ...(options.layout || {}), padding: 4 },
+        elements: {
+            ...(options.elements || {}),
+            point: { ...(options.elements?.point || {}), radius: 2, hoverRadius: 3 },
+        },
+        plugins: {
+            ...plugins,
+            title: { ...(plugins.title || {}), display: false },
+            legend: { ...(plugins.legend || {}), display: false },
+            ...(annotations ? {
+                annotation: {
+                    ...plugins.annotation,
+                    annotations: Object.fromEntries(Object.entries(annotations).map(([key, value]) => [
+                        key, value?.label ? { ...value, label: { ...value.label, display: false } } : value,
+                    ])),
+                },
+            } : {}),
+        },
+        scales: Object.fromEntries(Object.entries(options.scales || {}).map(([id, scale]) => [id, compactScale(id, scale)])),
+    };
+}
+
 export default ChartJS;

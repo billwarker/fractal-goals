@@ -26,6 +26,8 @@ export function useAnalyticsViews(rootId) {
 
     const invalidate = () => {
         queryClient.invalidateQueries({ queryKey });
+        // Goals show saved views by reference: edits and deletes change their charts.
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalChartsRoot(rootId) });
     };
 
     const createMutation = useMutation({

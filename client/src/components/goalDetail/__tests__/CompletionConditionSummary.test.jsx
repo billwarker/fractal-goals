@@ -141,4 +141,24 @@ describe('CompletionConditionSummary', () => {
         renderSummary({ readOnly: true });
         expect(screen.queryByRole('button', { name: 'See the evidence' })).not.toBeInTheDocument();
     });
+
+    it('leaves an activity threshold\'s progress to the goal chart, keeping only Mark complete', () => {
+        useGoalConditionProgressMock.mockReturnValue({ progressByGoalId: { 'goal-1': { met: true, sets: 3, required_sets: 3 } } });
+        const onCompleteNow = vi.fn();
+        const { container, rerender } = renderSummary({ chartShowsProgress: true, onCompleteNow });
+        expect(screen.queryByText('Completion')).not.toBeInTheDocument();
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+        expect(screen.queryByText('See the evidence')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Mark complete' }));
+        expect(onCompleteNow).toHaveBeenCalled();
+
+        useGoalConditionProgressMock.mockReturnValue({ progressByGoalId: {} });
+        rerender(<CompletionConditionSummary goal={thresholdGoal()} goalId="goal-1" rootId="root-1" chartShowsProgress />);
+        expect(container).toBeEmptyDOMElement();
+    });
+
+    it('keeps the section for goals that complete by children', () => {
+        renderSummary({ chartShowsProgress: true, goal: thresholdGoal({ completion_condition: 'children' }) });
+        expect(screen.getByText('Completion')).toBeInTheDocument();
+    });
 });

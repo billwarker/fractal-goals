@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../../ChartJSWrapper';
 
 const palette = {
     instances: '#3b82f6',
@@ -101,8 +101,10 @@ export default function ActivityTotalsChart({
     limit = 15,
 }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const data = useMemo(() => {
-        const normalizedLimit = Math.min(50, Math.max(1, Number(limit) || 15));
+        // Compact charts show the top five.
+        const normalizedLimit = density === 'compact' ? 5 : Math.min(50, Math.max(1, Number(limit) || 15));
         const groupNamesById = new Map(activityGroups.map((group) => [group.id, group.name]));
         const rows = activities
             .map((activity) => {
@@ -136,9 +138,9 @@ export default function ActivityTotalsChart({
                 measure: metric,
             }],
         };
-    }, [activities, activityGroups, activityInstances, limit, metric]);
+    }, [activities, activityGroups, activityInstances, density, limit, metric]);
 
     if (!data.labels.length) return <EmptyChart title="Activity Totals" />;
 
-    return <Bar ref={chartRef} data={data} options={buildOptions({ metric, showGroupNames, chartTheme })} />;
+    return <Bar ref={chartRef} data={data} options={applyChartDensity(buildOptions({ metric, showGroupNames, chartTheme }), density)} />;
 }

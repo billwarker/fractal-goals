@@ -194,6 +194,27 @@ condition, under the analytics goal filter's goal (or the fractal root). Metric 
 draw existing goals on the selected activity as dashed reference lines (amber open, green done),
 from `GET /goals/conditions?activity_id=` (50 at most, open goals first).
 
+## Goal charts
+
+Goal details' Details tab shows the goal's charts above Completion, one at a time
+(`GoalChartsCarousel`): the chart's name, "n of m", ‹ › buttons, and ← → keys while focus is in the
+carousel; an `aria-live` line announces the chart. The order is the threshold chart ("Progress
+toward <condition>", activity-threshold goals only, can't be removed) and then attached views in
+order. The last chart shown is remembered per goal on this device.
+
+- **Add chart** lists the fractal's saved views not yet on the goal; session and empty views are
+  disabled with the reason. **Remove from goal** shows on attached views only.
+- Goal details always use the simplified (compact) chart: no title, legend or axis titles, at most
+  4 x and 3 y ticks, unlabelled reference lines, and a one-line caption. Metric Trends plots its
+  first metric ("+N more" in the caption); Activity Totals shows the top 5. Elsewhere charts go
+  compact below 480 × 260 px.
+- **Expand** (Goals page only) shows the chart at full detail in the flow tree's panel, as glass
+  over the page grid; the tree stays mounted and hidden. Escape, "Back to tree", closing the goal
+  or selecting another returns to the tree. On mobile the goal details step aside and "Back to
+  goal" reopens them.
+- Analytics: with a saved view open, **Add to goal…** picks the goals it shows on (current goals
+  checked); disabled for session views. Deleting a view names the goals it's on.
+
 ## Session Detail mobile hierarchy
 
 At viewport widths up to 768px, Session Detail's main workspace has one 12px page gutter.

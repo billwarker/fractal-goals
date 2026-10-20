@@ -19,6 +19,7 @@ from validators import (
 from blueprints.auth_api import token_required
 from blueprints.goal_history_api import register_goal_history_routes
 from blueprints.goal_conditions_api import error_response, goal_response, register_goal_condition_routes
+from blueprints.goal_charts_api import register_goal_chart_routes
 from blueprints.goal_reviews_api import register_goal_review_routes
 from blueprints.goal_sequences_api import register_goal_sequence_routes
 from blueprints.api_utils import (
@@ -627,3 +628,4 @@ register_goal_history_routes(goals_bp)
 register_goal_condition_routes(goals_bp)
 register_goal_sequence_routes(goals_bp)
 register_goal_review_routes(goals_bp)
+register_goal_chart_routes(goals_bp)

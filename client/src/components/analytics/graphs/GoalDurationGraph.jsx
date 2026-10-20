@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../ChartJSWrapper';
 import { formatDurationSeconds } from '../../../utils/formatters';
 import styles from './GraphProfileModal.module.css';
 
@@ -12,6 +12,7 @@ function formatTooltipMinutes(minutes) {
 
 export default function GoalDurationGraph({ data = {} }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const rawPoints = data.points;
     const points = useMemo(() => (
         Array.isArray(rawPoints) ? rawPoints : []
@@ -108,5 +109,5 @@ export default function GoalDurationGraph({ data = {} }) {
         return <EmptyState compact className={styles.emptyState} description="No time evidence has been recorded for this goal." />;
     }
 
-    return <Bar data={chartData} options={options} />;
+    return <Bar data={chartData} options={applyChartDensity(options, density)} />;
 }
