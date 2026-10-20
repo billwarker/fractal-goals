@@ -110,6 +110,20 @@ class TestConditionWrites:
             activity_goal_associations.c.activity_id == sample_activity_definition.id,
         )).first() is not None
 
+    def test_a_threshold_name_is_optional_and_cleared_by_leaving_it_out(
+        self, authed_client, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        condition = {**_threshold(sample_activity_definition), "name": "  Heavy   triple "}
+        payload = _create_goal(authed_client, root.id, root.id, condition)
+        assert payload["condition"]["name"] == "Heavy triple"
+
+        response = authed_client.put(f"/api/{root.id}/goals/{payload['id']}/condition", json={
+            "completion_condition": "activity_threshold", "condition": _threshold(sample_activity_definition),
+        })
+        assert response.status_code == 200, response.get_json()
+        assert response.get_json()["condition"]["name"] is None
+
     def test_goals_default_to_manual_completion(self, authed_client, sample_ultimate_goal):
         payload = _create_goal(authed_client, sample_ultimate_goal.id, sample_ultimate_goal.id)
         assert payload["completion_condition"] == "manual"
@@ -124,6 +138,8 @@ class TestConditionWrites:
         (lambda c, _: c.update(measure="yield", rules=[], target_value=100), "'Bench Press' has no yield (it needs two or more multiplied metrics)"),
         (lambda c, _: c.update(rules=[{**c["rules"][0], "operator": "!="}]), "Rule 1 has an unknown comparison"),
         (lambda c, _: c.update(rules=[{**c["rules"][0], "value": "heavy"}]), "'Weight' value must be a number"),
+        (lambda c, _: c.update(name="x" * 121), "Name must be at most 120 characters"),
+        (lambda c, _: c.update(name=7), "Name must be text"),
     ])
     def test_invalid_conditions_are_rejected(
         self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition, mutate, message,

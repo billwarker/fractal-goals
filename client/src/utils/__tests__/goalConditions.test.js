@@ -4,6 +4,7 @@ import {
     buildConditionPayload,
     changeDraftActivity,
     changeDraftKind,
+    conditionName,
     conditionToDraft,
     createConditionDraft,
     describeCompletionSource,
@@ -99,6 +100,23 @@ describe('drafts', () => {
         expect(draft.rules[0].value).toBe('225.5');
         expect(buildConditionPayload(draft)).toEqual(saved);
         expect(conditionToDraft(null)).toBeNull();
+    });
+
+    it('carries a trimmed name into the payload, and only when one is set', () => {
+        const named = conditionToDraft({ activity_definition_id: 'bench', name: 'Heavy triple', kind: 'consistency', required_count: 3 });
+        expect(named.name).toBe('Heavy triple');
+        expect(buildConditionPayload({ ...named, name: '  Heavy triple ' }).name).toBe('Heavy triple');
+        expect(buildConditionPayload({ ...named, name: '   ' })).not.toHaveProperty('name');
+        expect(changeDraftActivity(named, run).name).toBe('Heavy triple');
+        expect(validateConditionDraft({ ...setsDraft(), name: 'x'.repeat(121) }, benchPress).name)
+            .toBe('Name must be at most 120 characters');
+    });
+
+    it('names a condition after its goal unless it has its own name', () => {
+        const goal = { name: 'Bench 225', attributes: {} };
+        expect(conditionName({ name: 'Heavy triple' }, goal)).toBe('Heavy triple');
+        expect(conditionName({ name: '  ' }, goal)).toBe('Bench 225');
+        expect(conditionName({}, { attributes: { name: 'From attributes' } })).toBe('From attributes');
     });
 
     it('builds kind-specific payloads without stray fields', () => {

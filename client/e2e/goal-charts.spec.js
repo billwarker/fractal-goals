@@ -67,7 +67,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
         await expect(charts).toBeVisible({ timeout: 2000 });
     }).toPass();
     await expect(charts.getByText('1 of 2', { exact: true })).toBeVisible();
-    await expect(charts.getByTitle(/^Progress toward Guitar practice/)).toBeVisible();
+    await expect(charts.getByTitle(/^Progress toward Heatmap Guitar/)).toBeVisible();
     // Nothing in the goal's active period yet, matching its 0 / 20 progress.
     await expect(charts.getByText('No contributing sessions yet.')).toBeVisible();
     await charts.getByRole('button', { name: 'Next chart' }).click();
@@ -98,14 +98,14 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     if (suffix === 'mobile') {
         await expect(page.getByRole('dialog', { name: goalName })).toHaveCount(0);
         await expanded.getByRole('button', { name: 'Previous chart' }).click();
-        await expect(expanded.getByRole('heading', { name: /^Progress toward Guitar practice/ })).toBeVisible();
+        await expect(expanded.getByRole('heading', { name: /^Progress toward Heatmap Guitar/ })).toBeVisible();
         await expanded.getByRole('button', { name: 'Back to goal' }).click();
         await expect(page.getByRole('region', { name: 'Analytics' })).toBeVisible();
     } else {
         // The controls stay in goal details, in the chart's place.
         await expect(charts.getByText('Showing in place of the goal tree.')).toBeVisible();
         await charts.getByRole('button', { name: 'Previous chart' }).click();
-        await expect(expanded.getByRole('heading', { name: /^Progress toward Guitar practice/ })).toBeVisible();
+        await expect(expanded.getByRole('heading', { name: /^Progress toward Heatmap Guitar/ })).toBeVisible();
         await charts.getByRole('button', { name: 'Collapse' }).click();
         await expect(expanded).toHaveCount(0);
         await expect(page.locator('.react-flow__node').filter({ hasText: goalName }).first()).toBeVisible();

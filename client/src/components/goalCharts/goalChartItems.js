@@ -1,4 +1,4 @@
-import { describeCondition, getGoalCondition } from '../../utils/goalConditions';
+import { conditionName, getGoalCondition } from '../../utils/goalConditions';
 
 export const DEFAULT_CHART_KEY = 'condition_progress';
 const STORAGE_PREFIX = 'fractal-goals:goal-chart:';
@@ -10,15 +10,14 @@ export const viewChartKey = (dashboardId) => `view:${dashboardId}`;
  * A goal's charts in display order: the threshold chart first (when the goal has one), then the
  * attached saved views.
  */
-export function buildGoalChartItems(payload, goal, activityDefinitions = []) {
+export function buildGoalChartItems(payload, goal) {
     const items = [];
     if (payload?.default_chart === DEFAULT_CHART_KEY) {
         const condition = getGoalCondition(goal);
-        const activity = activityDefinitions.find((candidate) => candidate.id === condition?.activity_definition_id) || null;
         items.push({
             key: DEFAULT_CHART_KEY,
             kind: 'default',
-            name: condition ? `Progress toward ${describeCondition(condition, activity)}` : 'Progress toward the goal',
+            name: condition ? `Progress toward ${conditionName(condition, goal)}` : 'Progress toward the goal',
         });
     }
     (payload?.charts || []).forEach((chart) => items.push({

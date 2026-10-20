@@ -22,6 +22,7 @@ from models import (
     COMPLETION_CONDITION_CHILDREN,
     COMPLETION_CONDITION_MANUAL,
     COMPLETION_CONDITIONS,
+    CONDITION_NAME_MAX_LENGTH,
     Goal,
     GoalCompletionCondition,
     GoalConditionMetricRule,
@@ -91,6 +92,18 @@ def _bounded_int(value, label, maximum) -> int:
     return number
 
 
+def _condition_name(value) -> str | None:
+    """An optional display name; blank means the condition is described from its rules."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConditionValidationError('Name must be text')
+    name = ' '.join(value.split())
+    if len(name) > CONDITION_NAME_MAX_LENGTH:
+        raise ConditionValidationError(f'Name must be at most {CONDITION_NAME_MAX_LENGTH} characters')
+    return name or None
+
+
 def active_metric_definitions(activity) -> list[MetricDefinition]:
     return [
         metric for metric in (activity.metric_definitions or [])
@@ -155,7 +168,8 @@ def normalize_condition_payload(db_session, root_id, data) -> dict:
         })
 
     normalized = {
-        'activity_definition_id': activity.id, 'kind': kind, 'measure': measure, 'rules': [],
+        'activity_definition_id': activity.id, 'name': _condition_name(data.get('name')),
+        'kind': kind, 'measure': measure, 'rules': [],
         'min_sets': None, 'required_count': None, 'metric_definition_id': None, 'operator': None,
         'target_value': None,
     }
@@ -236,7 +250,7 @@ def write_condition(db_session, goal, completion_condition, condition_data):
             activity_definition_id=normalized['activity_definition_id'],
         )
         db_session.add(condition)
-    for key in ('kind', 'measure', 'min_sets', 'required_count', 'metric_definition_id', 'operator', 'target_value'):
+    for key in ('name', 'kind', 'measure', 'min_sets', 'required_count', 'metric_definition_id', 'operator', 'target_value'):
         setattr(condition, key, normalized[key])
     db_session.flush()
 

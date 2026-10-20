@@ -65,7 +65,11 @@ function CompletionConditionSummary({
                 <span className={styles.label}>Completion</span>
                 {completed && source ? <span className={styles.source}>{describeCompletionSource(source)}</span> : null}
             </div>
-            <p className={styles.headline}>{headline(completionCondition, condition, activity)}</p>
+            <p className={styles.headline}>
+                {completionCondition === 'activity_threshold' && condition?.name
+                    ? <><strong>{condition.name}</strong>{' · '}</> : null}
+                {headline(completionCondition, condition, activity)}
+            </p>
             {tracksProgress && progress ? (
                 <ConditionProgressBar
                     fraction={completed ? 1 : progressFraction(progress)}

@@ -6,6 +6,7 @@ import ViewToggleTabs from '../common/ViewToggleTabs';
 import {
     COMPLETION_CONDITION_LABELS,
     CONDITION_KINDS,
+    MAX_CONDITION_NAME_LENGTH,
     OPERATOR_SYMBOLS,
     RULE_OPERATORS,
     TOTAL_OPERATORS,
@@ -101,13 +102,16 @@ function CompletionConditionEditor({
     onDraftChange,
     activityDefinitions = [],
     associatedActivityIds = [],
+    goalName = '',
     canCompleteViaChildren = true,
     errors = {},
 }) {
     const associated = useMemo(() => new Set((associatedActivityIds || []).map(String)), [associatedActivityIds]);
-    const linkedActivities = activityDefinitions.filter((activity) => associated.has(String(activity.id)));
-    const otherActivities = activityDefinitions.filter((activity) => !associated.has(String(activity.id)));
     const activity = activityDefinitions.find((candidate) => candidate.id === draft?.activity_definition_id) || null;
+    // Only the goal's own activities, plus a prefilled one that saving will link.
+    const choices = activityDefinitions.filter((candidate) => (
+        associated.has(String(candidate.id)) || candidate.id === activity?.id
+    ));
     const metrics = activeMetricDefinitions(activity);
     const hasYield = yieldMetricIds(activity).length > 0;
 
@@ -117,8 +121,7 @@ function CompletionConditionEditor({
     const chooseCondition = (value) => {
         onCompletionConditionChange(value);
         if (value === 'activity_threshold' && !draft) {
-            const firstActivity = linkedActivities[0] || otherActivities[0] || null;
-            onDraftChange(createConditionDraft(firstActivity));
+            onDraftChange(createConditionDraft(choices[0] || null));
         }
     };
 
@@ -151,8 +154,16 @@ function CompletionConditionEditor({
                 {completionCondition !== 'manual' ? ' You can always complete it yourself.' : ''}
             </p>
 
-            {completionCondition === 'activity_threshold' && draft ? (
+            {completionCondition === 'activity_threshold' && draft && choices.length > 0 ? (
                 <div className={styles.threshold}>
+                    <Input
+                        label="Name"
+                        value={draft.name ?? ''}
+                        placeholder={goalName || 'Defaults to the goal’s name'}
+                        maxLength={MAX_CONDITION_NAME_LENGTH}
+                        error={errors.name}
+                        onChange={(event) => updateDraft({ name: event.target.value })}
+                    />
                     <Select
                         label="Activity"
                         value={draft.activity_definition_id}
@@ -163,16 +174,7 @@ function CompletionConditionEditor({
                         }}
                     >
                         {!activity ? <option value="">Choose an activity…</option> : null}
-                        {linkedActivities.length > 0 ? (
-                            <optgroup label="Linked to this goal">
-                                {linkedActivities.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-                            </optgroup>
-                        ) : null}
-                        {otherActivities.length > 0 ? (
-                            <optgroup label={linkedActivities.length > 0 ? 'Other activities' : 'Activities'}>
-                                {otherActivities.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
-                            </optgroup>
-                        ) : null}
+                        {choices.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                     </Select>
 
                     {activity ? (
@@ -324,8 +326,8 @@ function CompletionConditionEditor({
                     ) : null}
                 </div>
             ) : null}
-            {completionCondition === 'activity_threshold' && activityDefinitions.length === 0 ? (
-                <p className={styles.subtle}>Create an activity first to complete this goal on a threshold.</p>
+            {completionCondition === 'activity_threshold' && choices.length === 0 ? (
+                <p className={styles.subtle}>Link an activity to this goal to complete it on a threshold.</p>
             ) : null}
         </div>
     );

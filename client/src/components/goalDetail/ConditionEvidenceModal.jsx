@@ -38,7 +38,12 @@ function ConditionEvidenceModal({
             overlayClassName={overlayClassName}
         >
             <div className={styles.body} style={{ '--condition-accent': accentColor || 'var(--color-brand-primary)' }}>
-                {condition ? <p className={styles.sentence}>{describeCondition(condition, activity)}</p> : null}
+                {condition ? (
+                    <p className={styles.sentence}>
+                        {condition.name ? <><strong>{condition.name}</strong>{' · '}</> : null}
+                        {describeCondition(condition, activity)}
+                    </p>
+                ) : null}
                 {progress ? (
                     <ConditionProgressBar
                         fraction={progressFraction(progress)}

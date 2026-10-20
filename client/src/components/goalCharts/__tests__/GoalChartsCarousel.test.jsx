@@ -24,6 +24,7 @@ vi.mock('../GoalChartView', () => ({
 
 const goal = {
     id: 'goal-1',
+    name: 'Bench 500',
     completion_condition: 'activity_threshold',
     condition: { activity_definition_id: 'bench', kind: 'cumulative', operator: '>=', target_value: 500, metric_name: 'Reps' },
 };
@@ -31,7 +32,7 @@ const view = (id, name) => ({ dashboard_id: id, name, layout: {}, category: 'act
 const payload = { goal_id: 'goal-1', default_chart: 'condition_progress', charts: [view('v1', 'Bench trend'), view('v2', 'Totals')] };
 
 function renderCarousel(props = {}) {
-    return render(<GoalChartsCarousel rootId="root-1" goal={goal} goalId="goal-1" activityDefinitions={[{ id: 'bench', name: 'Bench' }]} {...props} />);
+    return render(<GoalChartsCarousel rootId="root-1" goal={goal} goalId="goal-1" {...props} />);
 }
 
 beforeEach(() => {
@@ -43,9 +44,14 @@ beforeEach(() => {
 
 describe('buildGoalChartItems', () => {
     it('puts the threshold chart first, then attached views', () => {
-        const items = buildGoalChartItems(payload, goal, [{ id: 'bench', name: 'Bench' }]);
+        const items = buildGoalChartItems(payload, goal);
         expect(items.map((item) => item.key)).toEqual(['condition_progress', 'view:v1', 'view:v2']);
-        expect(items[0].name).toMatch(/^Progress toward Bench:/);
+        expect(items[0].name).toBe('Progress toward Bench 500');
+    });
+
+    it('names the threshold chart after the threshold when it has its own name', () => {
+        const named = { ...goal, condition: { ...goal.condition, name: 'Bench volume' } };
+        expect(buildGoalChartItems(payload, named)[0].name).toBe('Progress toward Bench volume');
     });
 
     it('has no default chart without a threshold', () => {

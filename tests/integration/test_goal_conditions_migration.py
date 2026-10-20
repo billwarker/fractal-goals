@@ -39,6 +39,7 @@ LATER_REVISIONS = (
     'f3c4d5e6a7b8_relax_goal_sequence_pair_check.py',
     'a4b5c6d7e8f9_drop_legacy_targets.py',
     'c6d7e8f9a0b1_retire_relevance_statements.py',
+    'e8f9a0b1c2d3_goal_condition_name.py',
 )
 
 

@@ -93,7 +93,6 @@ export const queryKeys = {
     goalChartsRoot: (rootId) => ['goalCharts', rootId],
     goalCharts: (rootId, goalId) => ['goalCharts', rootId, 'goal', goalId],
     goalChartEvidence: (rootId, activityId) => ['goalCharts', rootId, 'evidence', activityId],
-    goalChartRecentSummary: (rootId) => ['goalCharts', rootId, 'recent-summary'],
     analyticsViewGoals: (rootId, dashboardId) => ['goalCharts', rootId, 'view', dashboardId],
     goalConditionLines: (rootId, activityId) => ['goalCondition', rootId, 'activity', activityId],
     goalConditionProgress: (rootId, goalIds) => ['goalCondition', rootId, 'progress', [...goalIds].sort().join(',')],

@@ -22,6 +22,7 @@ def serialize_goal_condition(condition):
         "id": condition.id,
         "activity_definition_id": condition.activity_definition_id,
         "activity_name": getattr(activity, 'name', None),
+        "name": condition.name,
         "kind": condition.kind,
         "measure": condition.measure,
         "min_sets": condition.min_sets,

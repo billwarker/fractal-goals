@@ -38,7 +38,10 @@ function ConditionCardsSection({
                                     • {getTypeDisplayName(card.goalType).replace(/\s*Goal$/, '')}
                                 </span>
                             </div>
-                            <p className={styles.conditionSentence}>{describeCondition(card.condition, activity)}</p>
+                            <p className={styles.conditionSentence}>
+                                {card.condition.name ? <><strong>{card.condition.name}</strong>{' · '}</> : null}
+                                {describeCondition(card.condition, activity)}
+                            </p>
                             <ConditionProgressBar
                                 compact
                                 fraction={card.completed ? 1 : progressFraction(card.progress)}

@@ -94,7 +94,6 @@ function GoalViewMode({
                         rootId={rootId}
                         goal={goal}
                         goalId={goalId}
-                        activityDefinitions={activityDefinitions}
                         chartExpansion={chartExpansion}
                         portalTarget={portalTarget}
                     />

@@ -29,6 +29,7 @@ const MAX_RULES = 10;
 const MAX_MIN_SETS = 100;
 const MAX_REQUIRED_COUNT = 10000;
 const MAX_VALUE = 9999999999.9999;
+export const MAX_CONDITION_NAME_LENGTH = 120;
 
 /** @param {any} goal */
 export function getGoalCompletionCondition(goal) {
@@ -38,6 +39,16 @@ export function getGoalCompletionCondition(goal) {
 /** @param {any} goal */
 export function getGoalCondition(goal) {
     return goal?.condition ?? goal?.attributes?.condition ?? null;
+}
+
+/**
+ * What a threshold is called: the name the user gave it, otherwise its goal's name.
+ * @param {any} condition
+ * @param {any} goal
+ */
+export function conditionName(condition, goal) {
+    const custom = typeof condition?.name === 'string' ? condition.name.trim() : '';
+    return custom || goal?.name || goal?.attributes?.name || '';
 }
 
 /** @param {any} goal */
@@ -88,6 +99,7 @@ export function createConditionDraft(activity, kind = 'single_session') {
     const firstMetric = metrics[0] || null;
     return {
         activity_definition_id: activity?.id ?? '',
+        name: '',
         kind,
         measure: CONDITION_KINDS[/** @type {keyof typeof CONDITION_KINDS} */ (kind)]?.measures[0] ?? 'sets',
         min_sets: '1',
@@ -109,6 +121,7 @@ export function conditionToDraft(condition) {
     const asText = (/** @type {any} */ value) => (value == null ? '' : String(value));
     return {
         activity_definition_id: condition.activity_definition_id ?? '',
+        name: condition.name ?? '',
         kind: condition.kind ?? 'single_session',
         measure: condition.measure ?? 'sets',
         min_sets: asText(condition.min_sets ?? 1),
@@ -147,7 +160,7 @@ export function changeDraftKind(draft, kind, activity) {
  * @param {any} activity
  */
 export function changeDraftActivity(draft, activity) {
-    const fresh = createConditionDraft(activity, draft.kind);
+    const fresh = { ...createConditionDraft(activity, draft.kind), name: draft.name ?? '' };
     return draft.measure === 'yield' && yieldMetricIds(activity).length > 0
         ? { ...fresh, measure: 'yield', rules: [] }
         : fresh;
@@ -178,6 +191,9 @@ export function validateConditionDraft(draft, activity) {
     if (!draft || !activity) {
         errors.activity = 'Choose an activity in this fractal';
         return errors;
+    }
+    if ((draft.name || '').trim().length > MAX_CONDITION_NAME_LENGTH) {
+        errors.name = `Name must be at most ${MAX_CONDITION_NAME_LENGTH} characters`;
     }
     const metricsById = new Map(activeMetricDefinitions(activity).map((/** @type {any} */ metric) => [metric.id, metric]));
     const usesSets = draft.measure === 'sets';
@@ -219,7 +235,13 @@ export function validateConditionDraft(draft, activity) {
  * @param {any} draft
  */
 export function buildConditionPayload(draft) {
-    const base = { activity_definition_id: draft.activity_definition_id, kind: draft.kind, measure: draft.measure };
+    const name = (draft.name || '').trim();
+    const base = {
+        activity_definition_id: draft.activity_definition_id,
+        ...(name ? { name } : {}),
+        kind: draft.kind,
+        measure: draft.measure,
+    };
     if (draft.measure === 'sets') {
         return {
             ...base,

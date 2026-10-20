@@ -51,7 +51,7 @@ export function AnalyticsWidgetHeaderControls({ state, onStateChange, sharedData
             <span>Saved view</span>
             <span className="surface-analytics-header-select-wrap">
                 <select
-                    className="surface-analytics-header-select"
+                    className="surface-analytics-header-select select-custom-arrow"
                     aria-label="Saved analytics view"
                     value={savedViewId}
                     onMouseDown={(event) => event.stopPropagation()}

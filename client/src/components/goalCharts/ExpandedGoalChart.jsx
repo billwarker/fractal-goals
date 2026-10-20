@@ -21,7 +21,7 @@ ChartJS.register(pageGridSnap);
  * mobile, where the details step aside, it keeps a pager and "Back to goal". Escape closes it.
  */
 export default function ExpandedGoalChart({
-    rootId, goal, goalId, goalName, activityDefinitions = [], initialKey = null, onClose, isMobile = false, isLeaving = false,
+    rootId, goal, goalId, goalName, initialKey = null, onClose, isMobile = false, isLeaving = false,
 }) {
     const rootRef = useRef(null);
     // Fades in after mounting (and out while leaving), like the flow tree.
@@ -31,7 +31,7 @@ export default function ExpandedGoalChart({
         return () => cancelAnimationFrame(frame);
     }, []);
     const { data } = useGoalCharts(rootId, goalId);
-    const items = useMemo(() => buildGoalChartItems(data, goal, activityDefinitions), [activityDefinitions, data, goal]);
+    const items = useMemo(() => buildGoalChartItems(data, goal), [data, goal]);
     const cursor = useGoalChartCursor(goalId, items, initialKey);
 
     useEffect(() => {

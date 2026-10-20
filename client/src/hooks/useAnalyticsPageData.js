@@ -4,8 +4,13 @@ import { useQueries, useInfiniteQuery } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-export function useAnalyticsPageData(rootId, { needsSessionEvidence = true } = {}) {
-    const analyticsSummaryQuery = useInfiniteQuery({
+/**
+ * Every session and completed activity instance in the fractal, read page by page until the
+ * history is complete. The Analytics page and goal charts share this query, so a saved view
+ * shows the same totals wherever it appears.
+ */
+export function useSessionEvidenceHistory(rootId, { enabled = true } = {}) {
+    const query = useInfiniteQuery({
         queryKey: [...queryKeys.analyticsSummary(rootId), 'history'],
         initialPageParam: { session_offset: 0, instance_offset: 0 },
         queryFn: async ({ pageParam }) => {
@@ -20,8 +25,36 @@ export function useAnalyticsPageData(rootId, { needsSessionEvidence = true } = {
             const sessionOffset = page.session_pagination?.next_offset;
             return sessionOffset != null ? { session_offset: sessionOffset, instance_offset: 0 } : undefined;
         },
-        enabled: Boolean(rootId) && needsSessionEvidence,
+        enabled: Boolean(rootId) && enabled,
     });
+
+    const pages = query.data?.pages;
+    const { hasNextPage, isFetching, isError, fetchNextPage } = query;
+    useEffect(() => {
+        if (enabled && hasNextPage && !isFetching && !isError) {
+            void fetchNextPage();
+        }
+    }, [enabled, hasNextPage, isFetching, isError, fetchNextPage, pages]);
+
+    const sessions = useMemo(() => {
+        const byId = new Map();
+        (pages || []).forEach((page) => (page.sessions || []).forEach((session) => byId.set(session.id, session)));
+        return [...byId.values()];
+    }, [pages]);
+    const activityInstances = useMemo(() => {
+        const result = {};
+        (pages || []).forEach((page) => Object.entries(page.activity_instances || {}).forEach(([id, rows]) => {
+            result[id] = [...(result[id] || []), ...rows];
+        }));
+        return result;
+    }, [pages]);
+    return { query, sessions, activityInstances, isComplete: Boolean(query.data) && !hasNextPage };
+}
+
+export function useAnalyticsPageData(rootId, { needsSessionEvidence = true } = {}) {
+    const { query: analyticsSummaryQuery, sessions, activityInstances: instances } = useSessionEvidenceHistory(
+        rootId, { enabled: needsSessionEvidence },
+    );
     const [goalAnalyticsQuery, activitiesQuery, activityGroupsQuery] = useQueries({
         queries: [
             {
@@ -51,26 +84,6 @@ export function useAnalyticsPageData(rootId, { needsSessionEvidence = true } = {
         ],
     });
 
-    const pages = analyticsSummaryQuery.data?.pages;
-    const { hasNextPage, isFetching, isError, fetchNextPage } = analyticsSummaryQuery;
-    useEffect(() => {
-        if (needsSessionEvidence && hasNextPage && !isFetching && !isError) {
-            void fetchNextPage();
-        }
-    }, [needsSessionEvidence, hasNextPage, isFetching, isError, fetchNextPage, pages]);
-
-    const sessions = useMemo(() => {
-        const byId = new Map();
-        (pages || []).forEach((page) => (page.sessions || []).forEach((session) => byId.set(session.id, session)));
-        return [...byId.values()];
-    }, [pages]);
-    const instances = useMemo(() => {
-        const result = {};
-        (pages || []).forEach((page) => Object.entries(page.activity_instances || {}).forEach(([id, rows]) => {
-            result[id] = [...(result[id] || []), ...rows];
-        }));
-        return result;
-    }, [pages]);
     return {
         sessions,
         evidenceLoading: analyticsSummaryQuery.isLoading,

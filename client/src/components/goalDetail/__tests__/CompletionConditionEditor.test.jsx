@@ -28,6 +28,7 @@ function Harness({ initialCondition = 'manual', initialDraft = null, onState, ..
             draft={draft}
             onDraftChange={setDraft}
             activityDefinitions={[run, benchPress]}
+            associatedActivityIds={['run', 'bench']}
             {...props}
         />
     );
@@ -60,7 +61,8 @@ describe('CompletionConditionEditor', () => {
 
         expect(state.completionCondition).toBe('activity_threshold');
         expect(screen.getByLabelText('Activity')).toHaveValue('bench');
-        expect(within(screen.getByLabelText('Activity')).getByRole('group', { name: 'Linked to this goal' })).toBeInTheDocument();
+        expect(within(screen.getByLabelText('Activity')).getAllByRole('option').map((option) => option.textContent))
+            .toEqual(['Bench Press']);
 
         fireEvent.change(screen.getByLabelText('Rule 1 value'), { target: { value: '225' } });
         fireEvent.click(screen.getByRole('button', { name: '+ Add a metric rule' }));
@@ -136,11 +138,42 @@ describe('CompletionConditionEditor', () => {
         expect(screen.getByLabelText('Sets')).toHaveAttribute('aria-invalid', 'true');
     });
 
-    it('asks for an activity first when the fractal has none', () => {
-        render(<Harness activityDefinitions={[]} />);
+    it('asks for a linked activity first when the goal has none', () => {
+        render(<Harness associatedActivityIds={[]} />);
         fireEvent.click(conditionTabs().getByRole('tab', { name: 'Activity threshold' }));
-        expect(screen.getByLabelText('Activity')).toHaveValue('');
+        expect(screen.queryByLabelText('Activity')).not.toBeInTheDocument();
         expect(screen.queryByRole('tablist', { name: 'Threshold kind' })).not.toBeInTheDocument();
-        expect(screen.getByText('Create an activity first to complete this goal on a threshold.')).toBeInTheDocument();
+        expect(screen.getByText('Link an activity to this goal to complete it on a threshold.')).toBeInTheDocument();
+    });
+
+    it('keeps a prefilled activity the goal is not linked to yet', () => {
+        render(
+            <Harness
+                associatedActivityIds={['run']}
+                initialCondition="activity_threshold"
+                initialDraft={{
+                    activity_definition_id: 'bench', name: '', kind: 'consistency', measure: 'sets',
+                    min_sets: '1', required_count: '3', metric_definition_id: '', operator: '>=', target_value: '', rules: [],
+                }}
+            />
+        );
+        expect(screen.getByLabelText('Activity')).toHaveValue('bench');
+        expect(within(screen.getByLabelText('Activity')).getAllByRole('option').map((option) => option.textContent))
+            .toEqual(['Run', 'Bench Press']);
+    });
+
+    it('names the threshold, defaulting to the goal name', () => {
+        let state;
+        render(<Harness goalName="Bench 225" onState={(next) => { state = next; }} />);
+        fireEvent.click(conditionTabs().getByRole('tab', { name: 'Activity threshold' }));
+
+        const name = screen.getByLabelText('Name');
+        expect(name).toHaveValue('');
+        expect(name).toHaveAttribute('placeholder', 'Bench 225');
+
+        fireEvent.change(name, { target: { value: 'Heavy triple' } });
+        expect(state.draft.name).toBe('Heavy triple');
+        fireEvent.change(screen.getByLabelText('Activity'), { target: { value: 'bench' } });
+        expect(state.draft.name).toBe('Heavy triple');
     });
 });

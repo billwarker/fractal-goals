@@ -6,7 +6,7 @@ from .user import User, SignupInviteKey, BetaSignupRequest, PasswordResetToken, 
 from .goal import (
     GoalLevel, Goal, GoalPauseInterval, GoalSequenceTrack, GoalCompletionCondition, GoalConditionMetricRule,
     COMPLETION_CONDITION_ACTIVITY_THRESHOLD, COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL,
-    COMPLETION_CONDITIONS, COMPLETION_SOURCES, PAUSE_REASON_MANUAL, PAUSE_REASON_SEQUENCE,
+    COMPLETION_CONDITIONS, COMPLETION_SOURCES, CONDITION_NAME_MAX_LENGTH, PAUSE_REASON_MANUAL, PAUSE_REASON_SEQUENCE,
     session_goals, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations,
     session_template_goals, program_day_goals,
     get_all_root_goals, get_goal_by_id, get_root_id_for_goal, 

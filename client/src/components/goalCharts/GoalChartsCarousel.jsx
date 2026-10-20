@@ -15,9 +15,9 @@ const NO_IDS = new Set();
  * (Goals page only) shows the chart at full detail in place of the flow tree; while it's there the
  * controls stay here, in the chart's place.
  */
-export default function GoalChartsCarousel({ rootId, goal, goalId, activityDefinitions = [], chartExpansion = null, portalTarget = null }) {
+export default function GoalChartsCarousel({ rootId, goal, goalId, chartExpansion = null, portalTarget = null }) {
     const { data, isLoading, isError } = useGoalCharts(rootId, goalId);
-    const items = useMemo(() => buildGoalChartItems(data, goal, activityDefinitions), [activityDefinitions, data, goal]);
+    const items = useMemo(() => buildGoalChartItems(data, goal), [data, goal]);
     const cursor = useGoalChartCursor(goalId, items);
     const isExpanded = Boolean(chartExpansion?.goalId) && String(chartExpansion.goalId) === String(goalId);
 

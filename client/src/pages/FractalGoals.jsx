@@ -911,7 +911,6 @@ function FractalGoals() {
                                 isLeaving={expandedChart.isLeaving}
                                 rootId={rootId}
                                 goal={viewingGoal}
-                                activityDefinitions={activities}
                                 isMobile={isMobile}
                                 onClose={expandedChart.collapseChart}
                             >

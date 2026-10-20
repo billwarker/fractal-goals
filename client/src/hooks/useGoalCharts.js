@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { sanitizeDashboardLayoutPayload } from '../components/analytics/dashboardState';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
+import { useSessionEvidenceHistory } from './useAnalyticsPageData';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
@@ -93,9 +94,9 @@ function useCachedList(queryKey, load, enabled) {
 }
 
 /**
- * Bounded data for one saved view on a goal. A view about one activity reads that activity's
- * recent evidence; other activity views read one page of the most recent sessions; goal views
- * read the (cached) goal analytics. Never the whole fractal's history.
+ * Data for one saved view on a goal. A view about one activity reads that activity's recent
+ * evidence; other activity views read the same full session history as the Analytics page (so
+ * totals match it); goal views read the (cached) goal analytics.
  */
 export function useGoalChartData(rootId, saved) {
     const category = saved?.category;
@@ -109,12 +110,9 @@ export function useGoalChartData(rootId, saved) {
         enabled: Boolean(rootId && isActivity && activityId),
         staleTime: 60 * 1000,
     });
-    const recent = useQuery({
-        queryKey: queryKeys.goalChartRecentSummary(rootId),
-        queryFn: async () => (await fractalApi.getSessionAnalyticsSummary(rootId, { limit: 50, instance_limit: 500 })).data,
-        enabled: Boolean(rootId && isActivity && !activityId),
-        staleTime: 60 * 1000,
-    });
+    const history = useSessionEvidenceHistory(rootId, { enabled: Boolean(isActivity && !activityId) });
+    // Charted only once every page has arrived, so totals don't grow on screen.
+    const historyLoading = !history.isComplete && !history.query.isError;
     const goalAnalytics = useQuery({
         queryKey: queryKeys.goalAnalytics(rootId),
         queryFn: async () => (await fractalApi.getGoalAnalytics(rootId)).data || null,
@@ -134,17 +132,17 @@ export function useGoalChartData(rootId, saved) {
         return {
             rootId,
             goalAnalytics: null,
-            sessions: activityId ? [] : recent.data?.sessions || [],
+            sessions: activityId ? [] : history.sessions,
             activities: mergedActivities,
             activityGroups: activityGroups.data || [],
-            activityInstances: activityId ? { [activityId]: evidence.data?.instances || [] } : recent.data?.activity_instances || {},
+            activityInstances: activityId ? { [activityId]: evidence.data?.instances || [] } : history.activityInstances,
         };
-    }, [activities.data, activityGroups.data, activityId, category, evidence.data, goalAnalytics.data, recent.data, rootId]);
+    }, [activities.data, activityGroups.data, activityId, category, evidence.data, goalAnalytics.data, history.activityInstances, history.sessions, rootId]);
 
-    const sources = category === 'goals' ? [goalAnalytics] : [activities, activityGroups, activityId ? evidence : recent];
+    const sources = category === 'goals' ? [goalAnalytics] : [activities, activityGroups, activityId ? evidence : history.query];
     return {
         data,
-        isLoading: sources.some((query) => query.isLoading),
+        isLoading: sources.some((query) => query.isLoading) || (isActivity && !activityId && historyLoading),
         isError: sources.some((query) => query.isError),
         retry: () => sources.forEach((query) => query.refetch()),
         truncated: Boolean(evidence.data?.truncated),

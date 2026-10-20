@@ -31,6 +31,12 @@ vi.mock('../../../hooks/useDashboardQueries', () => ({
 }));
 
 vi.mock('../../../hooks/useAnalyticsPageData', () => ({
+    useSessionEvidenceHistory: () => ({
+        query: { isLoading: false, isError: false, refetch: () => {} },
+        sessions: [],
+        activityInstances: {},
+        isComplete: true,
+    }),
     useAnalyticsPageData: () => ({
         sessions: [],
         activities: [{ id: 'bench', name: 'Bench', metric_definitions: [{ id: 'weight', name: 'Weight', unit: 'lb' }] }],

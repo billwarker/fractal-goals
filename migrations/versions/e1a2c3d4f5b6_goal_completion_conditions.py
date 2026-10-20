@@ -51,6 +51,7 @@ def upgrade():
         sa.Column('root_id', sa.String(), sa.ForeignKey('goals.id', ondelete='CASCADE'), nullable=False),
         sa.Column('activity_definition_id', sa.String(),
                   sa.ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('name', sa.String(length=120), nullable=True),
         sa.Column('kind', sa.String(), nullable=False),
         sa.Column('measure', sa.String(), nullable=False),
         sa.Column('min_sets', sa.Integer(), nullable=True),

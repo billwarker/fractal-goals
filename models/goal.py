@@ -13,6 +13,7 @@ COMPLETION_CONDITIONS = (
 # How a completed goal got there. 'manual_override' completes a goal whose own condition is not manual.
 COMPLETION_SOURCES = ('condition', 'children', 'manual', 'manual_override')
 COMPLETION_CONDITIONS_SQL = "('activity_threshold', 'children', 'manual')"
+CONDITION_NAME_MAX_LENGTH = 120
 
 # Periodic reviews (goal_review notes) repeat on a cadence: a level's default, or a goal's own.
 REVIEW_CADENCE_UNITS = ('days', 'weeks', 'months', 'years')
@@ -347,6 +348,7 @@ class GoalCompletionCondition(Base):
     activity_definition_id = Column(
         String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False, index=True,
     )
+    name = Column(String(CONDITION_NAME_MAX_LENGTH), nullable=True)  # None: described from the rules
     kind = Column(String, nullable=False)
     measure = Column(String, nullable=False)
     min_sets = Column(Integer, nullable=True)

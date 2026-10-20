@@ -145,6 +145,7 @@ function GoalEditForm({
                     onDraftChange={setConditionDraft}
                     activityDefinitions={activityDefinitions}
                     associatedActivityIds={(associatedActivities || []).map((activity) => activity.id)}
+                    goalName={name}
                     canCompleteViaChildren={canCompleteViaChildren}
                     errors={conditionErrors}
                 />
