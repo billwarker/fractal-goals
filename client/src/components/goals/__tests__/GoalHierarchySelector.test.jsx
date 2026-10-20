@@ -41,7 +41,8 @@ describe('GoalHierarchySelector', () => {
         );
 
         expect(screen.getByLabelText('Child Goal, Included by session activities')).toBeDisabled();
-        expect(screen.getByText('Included by session activities')).toBeInTheDocument();
+        expect(screen.getByLabelText('Included by session activities')).toHaveTextContent('*');
+        expect(screen.getByText('Included by session activities and cannot be removed.')).toBeInTheDocument();
         fireEvent.click(screen.getByLabelText('Select all descendants of Root Goal'));
         expect(handleSelectionChange).toHaveBeenLastCalledWith(['goal-grandchild']);
     });
@@ -61,6 +62,19 @@ describe('GoalHierarchySelector', () => {
         expect(controlRow).toContainElement(screen.getByLabelText('Select all ancestors of Child Goal'));
         expect(controlRow).toContainElement(screen.getByLabelText('Select all descendants of Child Goal'));
         expect(controlRow.querySelectorAll('input')).toHaveLength(3);
+    });
+
+    it('omits the locked-goal legend when nothing is locked', () => {
+        render(
+            <GoalHierarchySelector
+                goals={goals}
+                selectedGoalIds={[]}
+                lockedGoalLabel="Included by session activities"
+                onSelectionChange={vi.fn()}
+            />
+        );
+
+        expect(screen.queryByText(/cannot be removed/i)).not.toBeInTheDocument();
     });
 
     it('can replace repeated locked-goal labels with an accessible marker', () => {

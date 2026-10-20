@@ -262,6 +262,7 @@ function SessionGoalHierarchyPanel({
                 selectedGoalIds={Array.from(manualGoalIds)}
                 lockedGoalIds={sessionGoalsView?.automatic_goal_ids || []}
                 lockedGoalLabel="Included by session activities"
+                lockedGoalLegend="Included automatically through this session's activities and cannot be removed."
                 initialHideCompletedGoals
                 scopeGoalIds={programScopeGoalIds}
                 scopeLabel={programId ? (programInfo?.program_name || program?.name || 'program') : ''}

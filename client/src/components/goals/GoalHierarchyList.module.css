@@ -45,6 +45,25 @@
     overflow-wrap: anywhere;
 }
 
+/* Names flow as text so markers and meta follow the last word instead of squeezing the name. */
+.sessionListComfortable .sessionNodeContent {
+    display: block;
+    font-size: 14px;
+    line-height: 1.25;
+}
+
+.sessionListComfortable .sessionNodeContent > * + * {
+    margin-left: 6px;
+}
+
+.sessionListComfortable .sessionNodeContent > .sessionNodeName {
+    display: inline;
+}
+
+.sessionListComfortable .sessionNodeMeta {
+    white-space: nowrap;
+}
+
 .sessionListComfortable .addSubGoalBtn {
     min-width: 28px;
     min-height: 28px;

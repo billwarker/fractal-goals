@@ -26,15 +26,10 @@
 }
 
 .optionsRow {
-    position: absolute;
-    top: 62px;
-    right: 4px;
-    left: 4px;
-    z-index: 5;
     display: flex;
-    justify-content: space-between;
-    gap: 16px;
-    margin-top: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 20px;
 }
 
 .hideCompletedControl,
@@ -200,6 +195,21 @@
     cursor: pointer;
 }
 
+.lockedGoalLegend {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.lockedGoalLegend > span:first-child {
+    color: var(--color-brand-primary);
+    font-size: 14px;
+    font-weight: 800;
+}
+
 .lockedGoalMarker {
     flex: 0 0 auto;
     color: var(--color-brand-primary);
@@ -343,5 +353,59 @@
 
     .noAncestorControls .controlRow {
         width: 60px;
+    }
+
+    /* Phone layout for the full selector; the compact landing variant keeps its own layout. */
+    .selector:not(.compactLayout) {
+        flex: 1 1 auto;
+        min-height: 0;
+        gap: 12px;
+    }
+
+    .selector:not(.compactLayout) .hideCompletedControl,
+    .selector:not(.compactLayout) .filterControl {
+        min-height: 36px;
+    }
+
+    /* The tree takes the modal's remaining height so search and filters stay put. */
+    .selector:not(.compactLayout) .treeFrame {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
+        padding: 4px 0 4px 96px;
+    }
+
+    .selector:not(.compactLayout).singleSelect .treeFrame {
+        padding-left: 40px;
+    }
+
+    .selector:not(.compactLayout).noAncestorControls .treeFrame {
+        padding-left: 66px;
+    }
+
+    .selector:not(.compactLayout) .controlRow {
+        grid-template-columns: repeat(3, 26px);
+        gap: 4px;
+        width: 86px;
+        transform: translateX(calc(-100% - 10px));
+    }
+
+    .selector:not(.compactLayout).noAncestorControls .controlRow {
+        grid-template-columns: repeat(2, 26px);
+        width: 56px;
+    }
+
+    .selector:not(.compactLayout).singleSelect .controlRow {
+        width: 26px;
+    }
+
+    .selector:not(.compactLayout) .controlLabel,
+    .selector:not(.compactLayout) .controlLabel input,
+    .selector:not(.compactLayout) .controlLabel span,
+    .selector:not(.compactLayout) .arrowControlLabel,
+    .selector:not(.compactLayout) .arrowControlLabel input,
+    .selector:not(.compactLayout) .arrowControlLabel span {
+        width: 26px;
+        height: 26px;
     }
 }

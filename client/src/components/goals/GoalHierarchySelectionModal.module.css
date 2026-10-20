@@ -32,3 +32,29 @@
     color: var(--color-brand-danger, #ff6b6b);
     font-size: 13px;
 }
+
+@media (max-width: 768px) {
+    /* The modal body already pads on phones; stretch so the tree can fill the height. */
+    .body {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        padding: 0;
+    }
+
+    .footer {
+        gap: 8px;
+        padding: 12px;
+    }
+
+    .footer > .secondaryButton,
+    .footer > .primaryButton {
+        flex: 1 1 0;
+        min-height: 44px;
+        padding: 0 12px;
+    }
+
+    .footer > .primaryButton {
+        flex-grow: 1.4;
+    }
+}
