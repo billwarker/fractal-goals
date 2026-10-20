@@ -2,14 +2,15 @@ import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { sanitizeDashboardLayoutPayload } from '../components/analytics/dashboardState';
+import { formatDuration } from '../components/analytics/formatDuration';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import { useSessionEvidenceHistory } from './useAnalyticsPageData';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
-/** Chart categories a goal can show; session views stay on the Analytics page. */
-export const ATTACHABLE_CATEGORIES = new Set(['activities', 'goals']);
+/** Chart categories a goal can show; query views stay on the Analytics page. */
+export const ATTACHABLE_CATEGORIES = new Set(['activities', 'goals', 'sessions']);
 
 /** A saved view's single window state and filters, from its stored layout. */
 export function readSavedView(layout) {
@@ -25,7 +26,7 @@ export function viewAttachProblem(view) {
     if ((view.kind || 'dashboard') !== 'view') return 'Only single-chart views can be added to goals';
     const saved = readSavedView(view.layout);
     if (!saved?.windowState?.selectedVisualization) return 'This view has no chart yet';
-    if (!ATTACHABLE_CATEGORIES.has(saved.category)) return 'Session charts stay in Analytics';
+    if (!ATTACHABLE_CATEGORIES.has(saved.category)) return 'Query views stay in Analytics';
     return null;
 }
 
@@ -95,22 +96,25 @@ function useCachedList(queryKey, load, enabled) {
 
 /**
  * Data for one saved view on a goal. A view about one activity reads that activity's recent
- * evidence; other activity views read the same full session history as the Analytics page (so
- * totals match it); goal views read the (cached) goal analytics.
+ * evidence; session views and other activity views read the same full session history as the
+ * Analytics page (so totals match it); goal views read the (cached) goal analytics.
  */
 export function useGoalChartData(rootId, saved) {
     const category = saved?.category;
     const activityId = saved?.windowState?.selectedActivity?.id || null;
     const isActivity = category === 'activities';
-    const activities = useCachedList(queryKeys.activities(rootId), () => fractalApi.getActivities(rootId), Boolean(rootId && isActivity));
-    const activityGroups = useCachedList(queryKeys.activityGroups(rootId), () => fractalApi.getActivityGroups(rootId), Boolean(rootId && isActivity));
+    const readsSessions = isActivity || category === 'sessions';
+    // Session views need the full history; activity views only when not about one activity.
+    const readsHistory = category === 'sessions' || (isActivity && !activityId);
+    const activities = useCachedList(queryKeys.activities(rootId), () => fractalApi.getActivities(rootId), Boolean(rootId && readsSessions));
+    const activityGroups = useCachedList(queryKeys.activityGroups(rootId), () => fractalApi.getActivityGroups(rootId), Boolean(rootId && readsSessions));
     const evidence = useQuery({
         queryKey: queryKeys.goalChartEvidence(rootId, activityId),
         queryFn: async () => (await fractalApi.getActivityAnalyticsEvidence(rootId, activityId)).data,
         enabled: Boolean(rootId && isActivity && activityId),
         staleTime: 60 * 1000,
     });
-    const history = useSessionEvidenceHistory(rootId, { enabled: Boolean(isActivity && !activityId) });
+    const history = useSessionEvidenceHistory(rootId, { enabled: readsHistory });
     // Charted only once every page has arrived, so totals don't grow on screen.
     const historyLoading = !history.isComplete && !history.query.isError;
     const goalAnalytics = useQuery({
@@ -121,7 +125,7 @@ export function useGoalChartData(rootId, saved) {
 
     const data = useMemo(() => {
         if (category === 'goals') {
-            return { rootId, goalAnalytics: goalAnalytics.data || null, sessions: [], activities: [], activityGroups: [], activityInstances: {} };
+            return { rootId, formatDuration, goalAnalytics: goalAnalytics.data || null, sessions: [], activities: [], activityGroups: [], activityInstances: {} };
         }
         const definition = evidence.data?.activity_definition;
         const knownActivities = activities.data || [];
@@ -131,18 +135,19 @@ export function useGoalChartData(rootId, saved) {
             : knownActivities;
         return {
             rootId,
+            formatDuration,
             goalAnalytics: null,
-            sessions: activityId ? [] : history.sessions,
+            sessions: readsHistory ? history.sessions : [],
             activities: mergedActivities,
             activityGroups: activityGroups.data || [],
-            activityInstances: activityId ? { [activityId]: evidence.data?.instances || [] } : history.activityInstances,
+            activityInstances: readsHistory ? history.activityInstances : { [activityId]: evidence.data?.instances || [] },
         };
-    }, [activities.data, activityGroups.data, activityId, category, evidence.data, goalAnalytics.data, history.activityInstances, history.sessions, rootId]);
+    }, [activities.data, activityGroups.data, activityId, category, evidence.data, goalAnalytics.data, history.activityInstances, history.sessions, readsHistory, rootId]);
 
-    const sources = category === 'goals' ? [goalAnalytics] : [activities, activityGroups, activityId ? evidence : history.query];
+    const sources = category === 'goals' ? [goalAnalytics] : [activities, activityGroups, readsHistory ? history.query : evidence];
     return {
         data,
-        isLoading: sources.some((query) => query.isLoading) || (isActivity && !activityId && historyLoading),
+        isLoading: sources.some((query) => query.isLoading) || (readsHistory && historyLoading),
         isError: sources.some((query) => query.isError),
         retry: () => sources.forEach((query) => query.refetch()),
         truncated: Boolean(evidence.data?.truncated),

@@ -196,24 +196,33 @@ from `GET /goals/conditions?activity_id=` (50 at most, open goals first).
 
 ## Goal charts
 
-Goal details' Details tab shows the goal's charts above Completion, one at a time
-(`GoalChartsCarousel`): the chart's name, "n of m", ‹ › buttons, and ← → keys while focus is in the
-carousel; an `aria-live` line announces the chart. The order is the threshold chart ("Progress
-toward <condition>", activity-threshold goals only, can't be removed) and then attached views in
-order. The last chart shown is remembered per goal on this device.
+Goal details' Details tab has an **Analytics** section above Completion, showing the goal's charts
+one at a time (`GoalChartsCarousel`). Its header holds "Analytics", ‹ n of m ›, **+ Add chart**
+and, on attached views, **Remove** (named "Remove from goal"). The chart's name sits on its own
+line directly above the chart; on the Goals page, clicking the chart (or Enter on it) expands it.
+← → cycle charts while focus is in the section; an `aria-live` line announces the chart. The
+order is the threshold chart ("Progress toward <condition>", activity-threshold goals only, can't
+be removed), then attached views in order. The last chart shown is remembered per goal on this device.
 
-- **Add chart** lists the fractal's saved views not yet on the goal; session and empty views are
-  disabled with the reason. **Remove from goal** shows on attached views only.
-- Goal details always use the simplified (compact) chart: no title, legend or axis titles, at most
-  4 x and 3 y ticks, unlabelled reference lines, and a one-line caption. Metric Trends plots its
-  first metric ("+N more" in the caption); Activity Totals shows the top 5. Elsewhere charts go
-  compact below 480 × 260 px.
-- **Expand** (Goals page only) shows the chart at full detail in the flow tree's panel, as glass
-  over the page grid; the tree stays mounted and hidden. Escape, "Back to tree", closing the goal
-  or selecting another returns to the tree. On mobile the goal details step aside and "Back to
-  goal" reopens them.
-- Analytics: with a saved view open, **Add to goal…** picks the goals it shows on (current goals
-  checked); disabled for session views. Deleting a view names the goals it's on.
+- **Which views attach:** single-chart activity, goal and session views. Query views stay in
+  Analytics and are listed disabled with the reason, as are empty views.
+- **Compact charts:** goal details always use the simplified chart: no title, legend or axis
+  titles, at most 4 x and 3 y ticks, unlabelled reference lines and a one-line caption. Metric
+  Trends plots its first metric ("+N more" in the caption); Activity Totals shows the top 5.
+  Elsewhere charts go compact below 480 × 260 px.
+- **Threshold goals:** the chart is the goal's progress, so Completion's heading, progress bar and
+  "See the evidence" aren't shown; "Mark complete" still appears when the condition is met.
+  Read-only published pages keep the Completion section.
+- **Expand** (Goals page only) replaces the flow tree and its controls (options pane,
+  type-to-zoom) with the chart at full size, fading like the tree (200 ms): the tree fades out,
+  then the chart fades in, and the reverse on collapse. The chart draws on the page's background
+  grid: no gridlines of its own, axis lines in the tick colour, plot edges on grid lines, with
+  points and ticks snapped to grid lines when that costs at most 10% of the space. Its controls
+  stay in goal details, where the chart's place shows "Showing in place of the goal tree." and
+  **Collapse**. Escape, Collapse, closing the goal or selecting another brings the tree back. On mobile the goal details step
+  aside; the chart keeps a pager and "Back to goal".
+- **Analytics:** with a saved view open, **Add to goal…** picks the goals it shows on (current
+  goals checked); it's disabled for query views. Deleting a view names the goals it's on.
 
 ## Session Detail mobile hierarchy
 

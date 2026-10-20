@@ -12,7 +12,7 @@ async function logIn(page) {
     return token;
 }
 
-async function saveView(page, headers, root, name) {
+async function saveView(page, headers, root, name, profile = { selectedCategory: 'activities', selectedVisualization: 'activityFrequency' }) {
     const existing = await (await page.request.get(`/api/roots/${root}/dashboards`, { headers })).json();
     for (const view of (existing.data || []).filter((item) => item.name === name)) {
         await page.request.delete(`/api/roots/${root}/dashboards/${view.id}`, { headers });
@@ -25,7 +25,7 @@ async function saveView(page, headers, root, name) {
             layout: {
                 type: 'analytics_view',
                 version: 1,
-                profile: { selectedCategory: 'activities', selectedVisualization: 'activityFrequency' },
+                profile,
                 global_filters: {},
             },
         },
@@ -126,5 +126,33 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
         const payload = await (await page.request.get(`/api/${root}/goals/browser-heatmap-goal-${suffix}/charts`, { headers })).json();
         return [payload.default_chart, payload.charts.length];
     }).toEqual(['condition_progress', 0]);
+    expect(errors).toEqual([]);
+});
+
+test('a saved session chart can be added from goal details', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    const goalName = `Heatmap Guitar ${suffix}`;
+    const viewName = `Session trends ${suffix}`;
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const viewId = await saveView(page, headers, root, viewName, { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' });
+
+    await page.goto(`/${root}/goals`);
+    if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
+    const charts = page.getByRole('region', { name: 'Analytics' });
+    await expect(async () => {
+        await page.locator('.react-flow__node').filter({ hasText: goalName }).getByText(goalName, { exact: true }).click();
+        await expect(charts).toBeVisible({ timeout: 2000 });
+    }).toPass();
+    await charts.getByRole('button', { name: '+ Add chart' }).click();
+    await page.getByRole('menuitem', { name: new RegExp(viewName) }).click();
+    await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
+    await expect(charts.locator('[data-density="compact"] canvas')).toBeVisible();
+
+    await charts.getByRole('button', { name: 'Remove from goal' }).click();
+    await expect(charts.getByText(viewName, { exact: true })).toHaveCount(0);
+    await page.request.delete(`/api/roots/${root}/dashboards/${viewId}`, { headers });
     expect(errors).toEqual([]);
 });

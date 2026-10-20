@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const GRAIN_OPTIONS = [
     { value: 'day', label: 'Day' },
@@ -106,6 +106,7 @@ export function getSessionTrendRows(sessions = [], grain = 'week') {
 
 export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', metrics = ['sessions', 'duration'] }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['sessions']), [metrics]);
     const rows = useMemo(() => getSessionTrendRows(sessions, grain), [grain, sessions]);
 
@@ -135,7 +136,7 @@ export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', me
         <Bar
             ref={chartRef}
             data={chartData}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -191,7 +192,7 @@ export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', me
                         title: { display: true, text: 'Minutes', color: chartTheme.textColor },
                     },
                 },
-            }}
+            }, density)}
         />
     );
 }

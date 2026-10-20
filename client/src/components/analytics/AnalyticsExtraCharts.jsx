@@ -61,6 +61,7 @@ function chartScaffoldOptions(title, yAxisLabel, chartTheme, isTimeScale = false
 
 export function SessionSectionPie({ sessions = [], activityInstances = {}, chartRef }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const data = useMemo(() => {
         const instanceDurations = new Map();
         Object.values(activityInstances).flat().forEach((instance) => {
@@ -85,7 +86,7 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
         <Doughnut
             ref={chartRef}
             data={data}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -94,7 +95,7 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
                     title: { display: true, text: 'Time Spent By Session Section', color: chartTheme.textColor },
                     tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDurationSeconds(ctx.raw)}` } },
                 },
-            }}
+            }, density)}
         />
     );
 }
@@ -216,10 +217,11 @@ export function buildSessionTimeDistributionData(sessions = [], markers = DEFAUL
 
 export function SessionStartDistribution({ sessions = [], chartRef, markers = DEFAULT_TIME_MARKERS }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const data = useMemo(() => {
         return buildSessionTimeDistributionData(sessions, markers);
     }, [markers, sessions]);
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Start and End Time Distribution', 'Sessions', chartTheme)} />;
+    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Session Start and End Time Distribution', 'Sessions', chartTheme), density)} />;
 }
 
 function formatMinutesLabel(value) {
@@ -267,10 +269,11 @@ export function buildSessionDurationHistogramData(sessions = [], bucketCount = 5
 
 export function SessionDurationHistogram({ sessions = [], chartRef, bucketCount = 5 }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const data = useMemo(() => {
         return buildSessionDurationHistogramData(sessions, bucketCount);
     }, [bucketCount, sessions]);
-    return <Bar ref={chartRef} data={data} options={chartScaffoldOptions('Session Duration Histogram', 'Sessions', chartTheme)} />;
+    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Session Duration Histogram', 'Sessions', chartTheme), density)} />;
 }
 
 export function ActivityGroupMixChart({ activities = [], activityGroups = [], activityInstances = {}, chartRef }) {

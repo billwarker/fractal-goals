@@ -11,7 +11,7 @@ import styles from './GoalCharts.module.css';
 
 /**
  * "Add chart": the fractal's saved views not yet on this goal. Views that can't show on a goal
- * (session charts, empty views) are listed disabled with the reason.
+ * (query views, empty views) are listed disabled with the reason.
  */
 export default function AddGoalChartMenu({ rootId, goalId, attachedIds, onAdded, label = 'Add chart', portalTarget = null }) {
     const [isOpen, setIsOpen] = useState(false);

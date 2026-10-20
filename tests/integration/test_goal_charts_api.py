@@ -49,17 +49,19 @@ class TestGoalCharts:
         assert [c['name'] for c in _charts(authed_client, root, goal)['charts']] == ['Trends']
         assert authed_client.delete(f"/api/{root}/goals/{goal}/charts/{totals}").status_code == 404
 
-    def test_only_activity_and_goal_views_attach(self, authed_client, sample_ultimate_goal):
+    def test_only_chart_views_attach(self, authed_client, sample_ultimate_goal):
         root = sample_ultimate_goal.id
         goal = _create_goal(authed_client, root, root)['id']
         goals_view = _view(authed_client, root, 'Goal timeline', category='goals', visualization='goalCompletionTimeline')
-        sessions_view = _view(authed_client, root, 'Sessions', category='sessions', visualization='sessionDurations')
+        sessions_view = _view(authed_client, root, 'Sessions', category='sessions', visualization='sessionTrends')
+        query_view = _view(authed_client, root, 'Query', category='query', visualization='sql')
         dashboard = _view(authed_client, root, 'Board', kind='dashboard')
 
         assert _attach(authed_client, root, goal, goals_view).status_code == 201
         assert _attach(authed_client, root, goal, goals_view).status_code == 409
-        session_attempt = _attach(authed_client, root, goal, sessions_view)
-        assert session_attempt.status_code == 400 and 'session charts' in session_attempt.get_json()['error']
+        assert _attach(authed_client, root, goal, sessions_view).status_code == 201
+        query_attempt = _attach(authed_client, root, goal, query_view)
+        assert query_attempt.status_code == 400 and 'query views' in query_attempt.get_json()['error']
         assert _attach(authed_client, root, goal, dashboard).status_code == 400
         assert _attach(authed_client, root, goal, 'missing').status_code == 404
 
@@ -79,7 +81,7 @@ class TestGoalCharts:
         assert _charts(authed_client, root, goal)['charts'][0]['category'] == 'activities'
 
         sessions = grid_view('Old sessions', {'window-1': {'selectedCategory': 'sessions', 'selectedVisualization': 'sessionTrends'}})
-        assert 'session charts' in _attach(authed_client, root, goal, sessions).get_json()['error']
+        assert _attach(authed_client, root, goal, sessions).status_code == 201
         empty = grid_view('Empty', {'window-1': {'selectedCategory': None, 'selectedVisualization': None}})
         assert _attach(authed_client, root, goal, empty).get_json()['error'] == 'This view has no chart yet'
 
@@ -157,13 +159,15 @@ class TestViewGoals:
         assert _charts(authed_client, root, a)['charts'] == []
         assert authed_client.put(f"/api/roots/{root}/dashboards/{view}/goals", json={'goal_ids': ['missing']}).status_code == 404
 
-    def test_session_views_report_why_they_cannot_attach(self, authed_client, sample_ultimate_goal):
+    def test_query_views_report_why_they_cannot_attach(self, authed_client, sample_ultimate_goal):
         root = sample_ultimate_goal.id
-        view = _view(authed_client, root, 'Sessions', category='sessions', visualization='sessionDurations')
+        view = _view(authed_client, root, 'Query', category='query', visualization='sql')
+        sessions = _view(authed_client, root, 'Sessions', category='sessions', visualization='sessionTrends')
 
         payload = authed_client.get(f"/api/roots/{root}/dashboards/{view}/goals").get_json()
 
-        assert payload['attachable'] is False and 'session charts' in payload['reason']
+        assert payload['attachable'] is False and 'query views' in payload['reason']
+        assert authed_client.get(f"/api/roots/{root}/dashboards/{sessions}/goals").get_json()['attachable'] is True
 
 
 @pytest.mark.integration

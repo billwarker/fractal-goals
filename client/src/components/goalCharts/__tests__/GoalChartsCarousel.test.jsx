@@ -15,7 +15,7 @@ const { chartsMock, detachMock, attachMock, viewsMock } = vi.hoisted(() => ({
 vi.mock('../../../hooks/useGoalCharts', () => ({
     useGoalCharts: (...args) => chartsMock(...args),
     useGoalChartMutations: () => ({ attach: attachMock, detach: detachMock, isSaving: false }),
-    viewAttachProblem: (view) => (view.layout?.profile?.selectedCategory === 'sessions' ? 'Session charts stay in Analytics' : null),
+    viewAttachProblem: (view) => (view.layout?.profile?.selectedCategory === 'query' ? 'Query views stay in Analytics' : null),
 }));
 vi.mock('../../../hooks/useDashboardQueries', () => ({ useAnalyticsViews: (...args) => viewsMock(...args) }));
 vi.mock('../GoalChartView', () => ({
@@ -130,20 +130,20 @@ describe('GoalChartsCarousel', () => {
         expect(collapse).toHaveBeenCalled();
     });
 
-    it('adds views, hiding attached ones and disabling session views with the reason', async () => {
+    it('adds views, hiding attached ones and disabling query views with the reason', async () => {
         viewsMock.mockReturnValue({
             isLoading: false,
             analyticsViewItems: [
                 { id: 'v1', name: 'Bench trend', kind: 'view', layout: {} },
-                { id: 'v3', name: 'Weekly sessions', kind: 'view', layout: { profile: { selectedCategory: 'sessions' } } },
+                { id: 'v3', name: 'Session query', kind: 'view', layout: { profile: { selectedCategory: 'query' } } },
                 { id: 'v4', name: 'Squat trend', kind: 'view', layout: {} },
             ],
         });
         renderCarousel();
         fireEvent.click(screen.getByRole('button', { name: '+ Add chart' }));
         expect(screen.queryByRole('menuitem', { name: /Bench trend/ })).not.toBeInTheDocument();
-        expect(screen.getByRole('menuitem', { name: /Weekly sessions/ })).toBeDisabled();
-        expect(screen.getByText('Session charts stay in Analytics')).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', { name: /Session query/ })).toBeDisabled();
+        expect(screen.getByText('Query views stay in Analytics')).toBeInTheDocument();
         await act(async () => fireEvent.click(screen.getByRole('menuitem', { name: /Squat trend/ })));
         expect(attachMock).toHaveBeenCalledWith('v4');
     });

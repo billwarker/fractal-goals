@@ -19,7 +19,7 @@ from models import (
 from services.serializers import format_utc, serialize_activity_instance_for_analytics
 from services.service_types import JsonDict, ServiceResult
 
-ATTACHABLE_CATEGORIES = frozenset({'activities', 'goals'})
+ATTACHABLE_CATEGORIES = frozenset({'activities', 'goals', 'sessions'})
 MAX_CHARTS_PER_GOAL = 12
 EVIDENCE_LIMIT = 500
 DEFAULT_CHART_CONDITION_PROGRESS = 'condition_progress'
@@ -66,7 +66,7 @@ def attach_problem(view: Any) -> str | None:
     if category is None:
         return 'This view has no chart yet'
     if category not in ATTACHABLE_CATEGORIES:
-        return 'Only activity and goal charts can be added to goals; session charts stay in Analytics'
+        return 'Only activity, goal and session charts can be added to goals; query views stay in Analytics'
     return None
 
 

@@ -44,4 +44,17 @@ describe('useGoalChartData', () => {
         expect(result.current.data.sessions.map((session) => session.id)).toEqual(['s1', 's2']);
         expect(result.current.data.activityInstances.handstand.map((row) => row.id)).toEqual(['i1', 'i2']);
     });
+
+    it('charts a session view from the whole history, with a duration formatter', async () => {
+        getSessionAnalyticsSummary
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 's1' }], activity_instances: {}, session_pagination: { next_offset: 50 } } })
+            .mockResolvedValueOnce({ data: { sessions: [{ id: 's2' }], activity_instances: {} } });
+        const saved = { category: 'sessions', windowState: { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' } };
+
+        const { result } = renderHook(() => useGoalChartData('root', saved), { wrapper });
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        expect(result.current.data.sessions.map((session) => session.id)).toEqual(['s1', 's2']);
+        expect(result.current.data.formatDuration(3600)).toBeTruthy();
+    });
 });

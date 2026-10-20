@@ -18,7 +18,8 @@ goal:
 
 Decisions already taken:
 
-- **Which views can attach:** activity and goal views. Session views stay on the Analytics page.
+- **Which views can attach:** activity, goal and session views (session views were added after the
+  first build; they read the same full session history as Analytics). Query views stay on the Analytics page.
 - **Linking:** goals point to the saved view, so edits flow through, and deleting a view warns and
   lists its goals.
 - **Expanding:** the chart shows inline in the Goals page's grid; on mobile, the goal details step
@@ -160,7 +161,7 @@ New `services/goal_chart_service.py`, plus routes in a new `blueprints/goal_char
 - **Header:** the chart name and "2 of 4", with ‹ › buttons. Arrow keys cycle when the carousel is focused, and an `aria-live` region announces the current chart.
 - **Actions:**
   - **Expand.**
-  - **Add chart** (`DropdownMenu`): saved views that can attach. It hides ones already attached; session views appear disabled with the reason.
+  - **Add chart** (`DropdownMenu`): saved views that can attach. It hides ones already attached; query views appear disabled with the reason.
   - **Remove from goal**, on attached views only; the default chart can't be removed.
 - **Memory:** the last chart viewed for each goal is remembered per viewer in `localStorage`, with try/catch.
 - **Empty state:** goals with no charts show an "Add chart" prompt.
@@ -177,7 +178,7 @@ New `services/goal_chart_service.py`, plus routes in a new `blueprints/goal_char
 
 **Analytics page**
 - With a saved view open, `AnalyticsTopBar` gains "Add to goal…". It opens `GoalHierarchySelector` (`selectionMode='multiple'`) in a modal, with current goals pre-checked, and saves through `PUT dashboards/<id>/goals`.
-- It's disabled for session views, with the reason.
+- It's disabled for query views, with the reason.
 - Deleting a view in `AnalyticsViewsModal` shows a confirmation that lists its goals.
 
 **Cache**
@@ -217,7 +218,7 @@ New `services/goal_chart_service.py`, plus routes in a new `blueprints/goal_char
   - A `useVisualizationContext` parity test against current `ProfileWindow` output; `AnalyticsWidget` now renders Metric Trends for a saved activity view.
   - Density: compact under 480px wide or 260px tall, and full otherwise; compact options hide the title, legend and axis titles and cap ticks; the per-chart reductions apply (one metric plus "+N more", top 5 rows).
   - The carousel: cycling by buttons and keys, "n of m", the remembered chart, the default chart first and not removable.
-  - Add chart: filtering and the disabled session views.
+  - Add chart: filtering and the disabled query views.
   - Expand: the tree panel shows the chart in the same grid frame and back; on mobile, details collapse and "Back to goal" reopens them.
   - `SavedViewChart` for each supported category.
 - **Browser (desktop and mobile):**
