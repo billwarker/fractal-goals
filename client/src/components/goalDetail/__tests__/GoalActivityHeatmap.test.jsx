@@ -11,7 +11,8 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => ({
     useGoalLevels: () => ({ goalLevels: [{ id: 'long-term', name: 'Long Term Goal', color: '#ff9800' }], getGoalColor: () => '#ff9800' }),
 }));
 vi.mock('../GoalTimelineEntries', () => ({
-    GoalTimelineEntries: ({ entries }) => <div>{entries.map((entry) => <p key={entry.id}>{entry.title}</p>)}</div>,
+    GoalTimelineEntries: ({ entries }) => <div>{entries.map((entry) => <p key={entry.id} data-timeline-day={entry.day} tabIndex={-1}>{entry.title}</p>)}</div>,
+    timelineEntryDay: (timestamp) => timestamp.slice(0, 10),
 }));
 
 const data = {
@@ -54,6 +55,28 @@ describe('GoalActivityHeatmap', () => {
         expect(screen.getByRole('img', { name: 'Dot: other timeline events' })).toBeInTheDocument();
         expect(screen.getByRole('img', { name: 'Diamond: target or goal achievement' })).toBeInTheDocument();
         expect(screen.getByRole('img', { name: 'Outline: goal paused on this day' })).toBeInTheDocument();
+    });
+
+    it('highlights the day of a hovered or focused recent event on the calendar', () => {
+        mockPages.mockImplementation(() => ({ data: { pages: [{ entries: [{ id: 'e', title: 'Completed scales', day: '2026-07-02' }], pagination: { total: 1 } }] } }));
+        render(<GoalActivityHeatmap {...props} />);
+        const summary = document.querySelector('[aria-live="polite"][aria-atomic="true"]');
+        const event = screen.getByText('Completed scales');
+        fireEvent.pointerOver(event);
+        expect(cell('2026-07-02')).toHaveAttribute('data-highlighted', 'true');
+        expect(cell('2026-07-03')).not.toHaveAttribute('data-highlighted');
+        expect(summary).toHaveTextContent('2026-07-02 · 2 completed activities');
+        fireEvent.pointerLeave(event.parentElement);
+        expect(cell('2026-07-02')).not.toHaveAttribute('data-highlighted');
+        expect(summary).toHaveTextContent('2 days with recorded work');
+        const touch = createEvent.pointerOver(event);
+        Object.defineProperty(touch, 'pointerType', { value: 'touch' });
+        fireEvent(event, touch);
+        expect(cell('2026-07-02')).not.toHaveAttribute('data-highlighted');
+        fireEvent.focus(event);
+        expect(cell('2026-07-02')).toHaveAttribute('data-highlighted', 'true');
+        fireEvent.blur(event);
+        expect(cell('2026-07-02')).not.toHaveAttribute('data-highlighted');
     });
 
     it('shows hovered and focused days, retains selection, and otherwise restores lifetime totals', () => {

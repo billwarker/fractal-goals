@@ -133,9 +133,12 @@ vi.mock('../goals/GoalViewMode', () => ({
             <div>view:{name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
             <button onClick={() => setViewState('goal-options')}>open options</button>
-            <div>goal timeline view</div>
         </div>
     ),
+}));
+
+vi.mock('../goalDetail/GoalActivityHeatmap', () => ({
+    default: ({ snapshotEntries }) => <section aria-label="Timeline">goal timeline view:{snapshotEntries ? 'snapshot' : 'live'}</section>,
 }));
 
 vi.mock('../goalDetail/ActivityAssociator', async () => {
@@ -501,7 +504,7 @@ describe('GoalDetailModal smoke coverage', () => {
         });
     });
 
-    it('keeps goal information and timeline in the same scrolling content', async () => {
+    it('shows the timeline heatmap in its own Timeline tab instead of Details', async () => {
         render(
             <GoalDetailModal
                 isOpen={true}
@@ -524,14 +527,18 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
-
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
-            expect(screen.getByText('goal timeline view')).toBeInTheDocument();
         }, { timeout: 5000 });
-        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+        expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Timeline' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Edit', exact: true })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }));
+
+        expect(await screen.findByText('goal timeline view:live', {}, { timeout: 5000 })).toBeInTheDocument();
+        expect(screen.queryByText('view:Deep Work')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit', exact: true })).not.toBeInTheDocument();
     });
 
     it('shows activities as a tab and moves associate action into the footer', async () => {
@@ -788,9 +795,8 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        // Timeline is integrated into Details, including published snapshots.
         expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
-        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Timeline' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Activities' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
 

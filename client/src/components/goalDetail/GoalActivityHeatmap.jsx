@@ -19,6 +19,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
     const [includeChildren, setIncludeChildren] = useState(true);
     const [selectedDate, setSelectedDate] = useState(null);
     const [previewDay, setPreviewDay] = useState(null);
+    const [highlightedDate, setHighlightedDate] = useState(null);
     const { data, isLoading, isError, refetch } = useGoalActivityHeatmap(rootId, goalId, { includeChildren, timezone, enabled: !isSnapshot });
     useLayoutEffect(() => {
         const block = calendarBlock.current;
@@ -33,7 +34,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
         observer.observe(block);
         return () => observer.disconnect();
     }, [data]);
-    const displayedDay = data?.days.find((day) => day.date === (previewDay?.date || selectedDate));
+    const displayedDay = data?.days.find((day) => day.date === (previewDay?.date || highlightedDate || selectedDate));
     const level = (day) => heatmapIntensity(day.activities);
     const thresholds = ['0', '1', '2–3', '4–6', '7+'];
     const closeDay = () => {
@@ -60,7 +61,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
                     ) : data ? (
                         <>
                             {!data.total_activities && <p className={styles.empty}>No work recorded yet. Timeline events appear as markers.</p>}
-                            <CalendarHeatmap days={data.days} accentColor={goalColor} showYears showPreview={false} compactTouchTargets scrollToLatest getLevel={level} getLabel={dayLabel} selectedDate={selectedDate} onPreviewDayChange={setPreviewDay} onSelectDay={(day) => setSelectedDate(day.date)} />
+                            <CalendarHeatmap days={data.days} accentColor={goalColor} showYears showPreview={false} compactTouchTargets scrollToLatest getLevel={level} getLabel={dayLabel} selectedDate={selectedDate} highlightedDate={highlightedDate} onPreviewDayChange={setPreviewDay} onSelectDay={(day) => setSelectedDate(day.date)} />
                             <div className={styles.legendGroup}>
                                 <div className={styles.legend} role="group" aria-label="Completed activities per day" title="Completed activities per day">
                                     <span className={styles.legendTitle}>Activities/day</span>
@@ -78,7 +79,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
                     ) : null)}
                 </div>
             </div>
-            <GoalTimelineFeed key={`${includeChildren}:${selectedDate || 'all'}`} rootId={rootId} goalId={goalId} goal={goal} timezone={timezone} metric="events" includeChildren={includeChildren} date={selectedDate} calendarDate={data?.range_end} onClearDate={closeDay} snapshotEntries={snapshotEntries} onExplore={onExplore} />
+            <GoalTimelineFeed key={`${includeChildren}:${selectedDate || 'all'}`} rootId={rootId} goalId={goalId} goal={goal} timezone={timezone} metric="events" includeChildren={includeChildren} date={selectedDate} calendarDate={data?.range_end} onClearDate={closeDay} snapshotEntries={snapshotEntries} onExplore={onExplore} onHighlightDay={setHighlightedDate} />
         </section>
     );
 }

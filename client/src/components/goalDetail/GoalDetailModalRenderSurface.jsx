@@ -25,6 +25,7 @@ const ActivityAssociator = lazyWithRetry(() => import('./ActivityAssociator'), '
 const InlineActivityBuilder = lazyWithRetry(() => import('./InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
 const GoalOptionsView = lazyWithRetry(() => import('../goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./GoalNotesView'), 'components/goalDetail/GoalNotesView');
+const GoalActivityHeatmap = lazyWithRetry(() => import('./GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
 function GoalDetailModalRenderSurface({
     activitiesAssociateAction,
     activityBuilderReturnView,
@@ -312,8 +313,6 @@ function GoalDetailModalRenderSurface({
                         deadline={deadline}
                         relevanceStatement={relevanceStatement}
                         goalCompletionNote={goalCompletionNote}
-                        onTimelineExplore={onTimelineExplore}
-                        readOnlyTimelineEntries={readOnlyTimelineEntries}
                         setViewState={setViewState}
                         onClose={handleClose}
                         onGoalSelect={onGoalSelect}
@@ -325,7 +324,7 @@ function GoalDetailModalRenderSurface({
         );
     };
 
-    const READ_ONLY_VIEW_STATES = ['goal', 'goal-activities', 'goal-notes'];
+    const READ_ONLY_VIEW_STATES = ['goal', 'goal-activities', 'goal-notes', ...(Array.isArray(readOnlyTimelineEntries) ? ['goal-timeline'] : [])];
     let content;
     if (readOnly && !READ_ONLY_VIEW_STATES.includes(viewState)) {
         content = renderGoalContent();
@@ -489,19 +488,33 @@ function GoalDetailModalRenderSurface({
                 />
             </Suspense>
         );
+    } else if (viewState === 'goal-timeline') {
+        content = (
+            <Suspense fallback={<p role="status">Loading timeline...</p>}>
+                <GoalActivityHeatmap
+                    key={goalId}
+                    rootId={rootId}
+                    goalId={goalId}
+                    goal={goal}
+                    snapshotEntries={readOnly ? readOnlyTimelineEntries : null}
+                    onExplore={onTimelineExplore}
+                />
+            </Suspense>
+        );
     } else if (needsLevelPicker && selectedChildType === null) {
         content = renderLevelPicker();
     } else {
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (
             <ViewToggleTabs
                 items={[
                     { value: 'goal', label: 'Details' },
+                    ...(!readOnly || Array.isArray(readOnlyTimelineEntries) ? [{ value: 'goal-timeline', label: 'Timeline' }] : []),
                     { value: 'goal-activities', label: 'Activities' },
                     { value: 'goal-notes', label: 'Notes' },
                 ]}

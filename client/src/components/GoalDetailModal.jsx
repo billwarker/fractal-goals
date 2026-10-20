@@ -655,7 +655,7 @@ function GoalDetailModal({
 }
 
 function shouldMeasureStickyHeader(viewState) {
-    return viewState === 'goal' || viewState === 'goal-activities';
+    return viewState === 'goal' || viewState === 'goal-timeline' || viewState === 'goal-activities';
 }
 
 export default GoalDetailModal;

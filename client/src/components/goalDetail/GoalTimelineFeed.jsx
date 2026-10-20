@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Button from '../atoms/Button';
 import { useGoalTimelinePages } from '../../hooks/useGoalTimelinePages';
-import { GoalTimelineEntries } from './GoalTimelineEntries';
+import { GoalTimelineEntries, timelineEntryDay } from './GoalTimelineEntries';
 import styles from './GoalTimelineEntries.module.css';
 import sectionStyles from './GoalActivityHeatmap.module.css';
 
@@ -9,10 +9,10 @@ function matches(entry, metric, includeChildren, date, timezone) {
     if (!includeChildren && entry.relationship === 'descendant') return false;
     if (metric !== 'events' && entry.event_type !== 'activity.completed') return false;
     if (metric === 'duration' && !(entry.payload?.duration_seconds > 0)) return false;
-    return !date || new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(entry.timestamp)) === date;
+    return !date || timelineEntryDay(entry.timestamp, timezone) === date;
 }
 
-export default function GoalTimelineFeed({ rootId, goalId, goal, timezone, metric, includeChildren, date, calendarDate, onClearDate, snapshotEntries = null, onExplore }) {
+export default function GoalTimelineFeed({ rootId, goalId, goal, timezone, metric, includeChildren, date, calendarDate, onClearDate, snapshotEntries = null, onExplore, onHighlightDay }) {
     const isSnapshot = Array.isArray(snapshotEntries);
     const query = useGoalTimelinePages(rootId, goalId, { includeChildren, timezone, metric, date, calendarDate, enabled: !isSnapshot });
     const [visibleCount, setVisibleCount] = useState(20);
@@ -29,6 +29,14 @@ export default function GoalTimelineFeed({ rootId, goalId, goal, timezone, metri
     const entries = isSnapshot ? snapshot.slice(0, visibleCount) : pages.flatMap((page) => page.entries);
     const total = isSnapshot ? snapshot.length : pages[0]?.pagination.total;
     const hasMore = isSnapshot ? visibleCount < total : query.hasNextPage;
+    // Delegate from the list so each card reports its day without needing its own handlers.
+    const highlightFrom = (event) => {
+        if (event.pointerType === 'touch') return;
+        onHighlightDay?.(event.target.closest?.('[data-timeline-day]')?.dataset.timelineDay || null);
+    };
+    const clearHighlight = (event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) onHighlightDay?.(null);
+    };
     return (
         <section className={sectionStyles.dayDetail} aria-label={date ? `Evidence for ${date}` : 'Timeline entries'} onWheel={onExplore} onTouchMove={onExplore} onFocusCapture={onExplore}>
             <div className={sectionStyles.heading}>
@@ -39,7 +47,7 @@ export default function GoalTimelineFeed({ rootId, goalId, goal, timezone, metri
             {!isSnapshot && query.isLoading ? <p role="status">Loading timeline...</p> : null}
             {!isSnapshot && query.isError && !pages.length && <p role="alert">Timeline could not be loaded. <Button variant="secondary" size="sm" onClick={() => query.refetch()}>Retry</Button></p>}
             {!isSnapshot && query.isFetchNextPageError && <p role="alert">More entries could not be loaded. The entries above are still available.</p>}
-            <div className={styles.timeline}>
+            <div className={styles.timeline} onPointerOver={highlightFrom} onPointerLeave={() => onHighlightDay?.(null)} onFocus={highlightFrom} onBlur={clearHighlight}>
                 <GoalTimelineEntries entries={entries} rootId={rootId} timezone={timezone} currentGoal={goal} />
             </div>
             {(isSnapshot || (!query.isLoading && !query.isError)) && !entries.length && <p>No timeline events match these filters{date ? ' on this day' : ''}.</p>}

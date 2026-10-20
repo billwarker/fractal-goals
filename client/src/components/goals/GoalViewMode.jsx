@@ -6,8 +6,6 @@ import NoteCard from '../notes/NoteCard';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
-const GoalActivityHeatmap = lazyWithRetry(() => import('../goalDetail/GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
-
 const CompletionConditionSummary = lazyWithRetry(() => import('../goalDetail/CompletionConditionSummary'), 'components/goalDetail/CompletionConditionSummary');
 
 function GoalViewMode({
@@ -32,8 +30,6 @@ function GoalViewMode({
     portalTarget = null,
     overlayClassName = '',
     readOnly = false,
-    readOnlyTimelineEntries = null,
-    onTimelineExplore,
 }) {
     const navigate = useNavigate();
 
@@ -114,11 +110,6 @@ function GoalViewMode({
                 </Suspense>
             )}
             </div>
-            {goalId && mode !== 'create' && (!readOnly || Array.isArray(readOnlyTimelineEntries)) && (
-                <Suspense fallback={<p role="status">Loading timeline...</p>}>
-                    <GoalActivityHeatmap key={goalId} rootId={rootId} goalId={goalId} goal={goal} snapshotEntries={readOnly ? readOnlyTimelineEntries : null} onExplore={onTimelineExplore} />
-                </Suspense>
-            )}
         </div>
     );
 }

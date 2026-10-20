@@ -16,6 +16,7 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
     await page.goto(`/browser-root-${suffix}/goals`);
     await page.getByText(`Heatmap Guitar ${suffix}`, { exact: true }).click();
+    await page.getByRole('tab', { name: 'Timeline', exact: true }).click();
     const heatmap = page.getByRole('region', { name: 'Timeline', exact: true });
     await expect(heatmap).toBeVisible();
     const expectMatchingBackground = async () => {
@@ -30,7 +31,7 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await expect(heatmap.getByText(/recorded minutes/)).toHaveCount(0);
     await heatmap.getByRole('heading', { name: 'Timeline', exact: true }).hover();
     await expect(heatmap.getByText(/4 days with recorded work · 4 completed activities/)).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(heatmap.getByText('Showing 20 of 32 entries')).toBeAttached();
     await expect(heatmap.getByRole('region', { name: 'Activity calendar' })).toHaveCount(1);
     const accent = await heatmap.evaluate((element) => element.style.getPropertyValue('--heatmap-accent'));
@@ -44,24 +45,6 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         probe.remove();
         return matches;
     })).toBe(true);
-    if (suffix === 'mobile') {
-        const actions = page.getByRole('group', { name: 'Goal actions' });
-        const sizes = await actions.getByRole('button').evaluateAll((buttons) => buttons.map((button) => {
-            const bounds = button.getBoundingClientRect();
-            return { top: bounds.top, height: bounds.height };
-        }));
-        expect(new Set(sizes.map((size) => size.top)).size).toBe(1);
-        expect(sizes.every((size) => size.height >= 44)).toBe(true);
-        // The labelled row sits inside its horizontal scroller; the row itself never scrolls.
-        const scroller = actions.locator('..');
-        expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
-        await page.screenshot({ path: testInfo.outputPath('mobile-footer.png') });
-        const before = await scroller.boundingBox();
-        await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
-        await expect(actions.getByRole('button').last()).toBeInViewport({ ratio: 1 });
-        expect((await scroller.boundingBox()).x).toBe(before.x);
-        await scroller.evaluate((element) => { element.scrollLeft = 0; });
-    }
     const cells = heatmap.getByRole('button', { name: /^\d{4}-\d{2}-\d{2} ·/ });
     await expect(cells).toHaveCount(501);
     // Only the calendar may pan; its modal/panel ancestors retain their margins.
@@ -138,6 +121,10 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     const contentScroll = page.locator('[class*="_panelContent_"], [class*="_modalScrollArea_"]').first();
     await heatmap.getByText('Completed activity: Guitar practice', { exact: true }).first().scrollIntoViewIfNeeded();
     await heatmap.getByText('Completed activity: Guitar practice', { exact: true }).first().hover();
+    const hoveredDay = await heatmap.getByText('Completed activity: Guitar practice', { exact: true }).first()
+        .evaluate((element) => element.closest('[data-timeline-day]').dataset.timelineDay);
+    await expect(heatmap.locator('button[data-highlighted]')).toHaveCount(1);
+    await expect(heatmap.locator('button[data-highlighted]')).toHaveAttribute('aria-label', new RegExp(`^${hoveredDay} ·`));
     await page.mouse.wheel(0, 400);
     const timelineHeading = heatmap.getByRole('heading', { name: 'Timeline', exact: true });
     await expect.poll(() => timelineHeading.evaluate((element) => {
@@ -159,14 +146,13 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await expect(heatmap.getByRole('img', { name: 'Outline: goal paused on this day' })).toBeInViewport({ ratio: 1 });
     await expect(dailySummary).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole('tab', { name: 'Details', exact: true })).toBeInViewport();
+    await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toBeInViewport();
     await expect(page.getByRole('tab', { name: 'Activities', exact: true })).toBeInViewport();
     await expect(page.getByRole('tab', { name: 'Notes', exact: true })).toBeInViewport();
-    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
     await expect(heatmap.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('goal-timeline-pinned.png') });
     await contentScroll.evaluate((element) => { element.scrollTop = 0; });
-    await expect(page.getByRole('tab', { name: 'Details', exact: true })).toBeInViewport();
-    await expect(page.getByText('Build a steady guitar practice habit.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toBeInViewport();
     await expect(heatmap.getByText('Showing 32 of 32 entries')).toBeAttached();
     await calendar.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath('goal-heatmap-dark.png') });
@@ -184,5 +170,27 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await expectMatchingBackground();
     await page.screenshot({ path: testInfo.outputPath('goal-heatmap-light.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+    await page.getByRole('tab', { name: 'Details', exact: true }).click();
+    await expect(page.getByText('Build a steady guitar practice habit.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+    await expect(heatmap).toHaveCount(0);
+    if (suffix === 'mobile') {
+        const actions = page.getByRole('group', { name: 'Goal actions' });
+        const sizes = await actions.getByRole('button').evaluateAll((buttons) => buttons.map((button) => {
+            const bounds = button.getBoundingClientRect();
+            return { top: bounds.top, height: bounds.height };
+        }));
+        expect(new Set(sizes.map((size) => size.top)).size).toBe(1);
+        expect(sizes.every((size) => size.height >= 44)).toBe(true);
+        // The labelled row sits inside its horizontal scroller; the row itself never scrolls.
+        const scroller = actions.locator('..');
+        expect(await scroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+        await page.screenshot({ path: testInfo.outputPath('mobile-footer.png') });
+        const before = await scroller.boundingBox();
+        await scroller.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+        await expect(actions.getByRole('button').last()).toBeInViewport({ ratio: 1 });
+        expect((await scroller.boundingBox()).x).toBe(before.x);
+        await scroller.evaluate((element) => { element.scrollLeft = 0; });
+    }
     expect(errors).toEqual([]);
 });

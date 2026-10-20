@@ -16,7 +16,6 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 vi.mock('../../atoms/GoalIcon', () => ({
     default: () => <span data-testid="goal-icon" />,
 }));
-vi.mock('../../goalDetail/GoalActivityHeatmap', () => ({ default: () => <section aria-label="Timeline" /> }));
 
 const RENDER_OPTIONS = {
     withTheme: false,

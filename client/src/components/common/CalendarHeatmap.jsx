@@ -5,7 +5,7 @@ import styles from './CalendarHeatmap.module.css';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-export default function CalendarHeatmap({ days = [], accentColor, showYears = false, showPreview = true, compactTouchTargets = false, getLevel, getLabel, onSelectDay, onPreviewDayChange, selectedDate, scrollToLatest }) {
+export default function CalendarHeatmap({ days = [], accentColor, showYears = false, showPreview = true, compactTouchTargets = false, getLevel, getLabel, onSelectDay, onPreviewDayChange, selectedDate, highlightedDate, scrollToLatest }) {
     const { columns, months, years } = useMemo(() => buildHeatmapCalendar(days), [days]);
     const ordered = useMemo(() => columns.flat().filter((day) => day.inRange), [columns]);
     const scrollRef = useRef(null);
@@ -23,6 +23,21 @@ export default function CalendarHeatmap({ days = [], accentColor, showYears = fa
     useEffect(() => {
         if (scrollToLatest && scrollRef.current) scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }, [columns.length, scrollToLatest]);
+
+    // Bring an externally highlighted day into view without moving the page vertically.
+    useEffect(() => {
+        const scroller = scrollRef.current;
+        const cell = highlightedDate && buttons.current.get(highlightedDate);
+        if (!scroller || !cell) return;
+        const view = scroller.getBoundingClientRect();
+        const bounds = cell.getBoundingClientRect();
+        if (bounds.left >= view.left && bounds.right <= view.right) return;
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        scroller.scrollTo?.({
+            left: scroller.scrollLeft + bounds.left - view.left - (view.width - bounds.width) / 2,
+            behavior: reduceMotion ? 'auto' : 'smooth',
+        });
+    }, [highlightedDate]);
 
     const navigate = (event, date) => {
         const index = ordered.findIndex((day) => day.date === date);
@@ -61,6 +76,7 @@ export default function CalendarHeatmap({ days = [], accentColor, showYears = fa
                                         className={`${styles.cell} ${day.paused ? styles.paused : ''}`}
                                         data-level={getLevel(day)}
                                         data-selected={selectedDate === day.date || undefined}
+                                        data-highlighted={highlightedDate === day.date || undefined}
                                         aria-label={getLabel(day)}
                                         aria-pressed={onSelectDay ? selectedDate === day.date : undefined}
                                         title={getLabel(day)}

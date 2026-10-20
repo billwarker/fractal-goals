@@ -12,14 +12,20 @@ export function GoalTimelineEntries({ entries, rootId, timezone, currentGoal }) 
     ));
 }
 
+// The entry's calendar day in the viewer's timezone, matching the heatmap's day keys.
+export function timelineEntryDay(timestamp, timezone) {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date(timestamp));
+}
+
 function TimelineItem({ item, rootId, timezone, currentGoal = null }) {
     const { date, time } = formatDateTimeParts(item.timestamp, timezone);
+    const day = timelineEntryDay(item.timestamp, timezone);
     const goalLevelHelpers = useGoalLevels();
     const card = normalizeTimelineEntry(item, goalLevelHelpers, currentGoal);
 
     if (card.activityInstance) {
         return (
-            <div className={styles.activityEvent}>
+            <div className={styles.activityEvent} data-timeline-day={day}>
                 <ActivityTimelineCard
                     instance={card.activityInstance}
                     activityDef={card.activityDef}
@@ -36,7 +42,7 @@ function TimelineItem({ item, rootId, timezone, currentGoal = null }) {
     }
 
     return (
-        <div className={styles.item}>
+        <div className={styles.item} data-timeline-day={day}>
             <div className={styles.cardHeader}>
                 <span className={styles.eventLabel}>{card.eventLabel}</span>
                 <span className={styles.time}>
