@@ -9,6 +9,7 @@ import {
     getGoalCondition,
     progressFraction,
 } from '../../utils/goalConditions';
+import ChildGoalIconRow from './ChildGoalIconRow';
 import ConditionEvidenceModal from './ConditionEvidenceModal';
 import ConditionProgressBar from './ConditionProgressBar';
 import styles from './CompletionConditionSummary.module.css';
@@ -23,7 +24,8 @@ function headline(completionCondition, condition, activity) {
  * "Completion" section of goal details: how the goal completes, live progress toward it, and the
  * evidence behind an activity threshold. Read-only surfaces pass a published `snapshot`.
  * With `chartShowsProgress`, an activity threshold's progress is the goal's "Progress toward…"
- * chart, so only the "Mark complete" prompt stays here.
+ * chart, so only the "Mark complete" prompt stays here. Goals that complete through their children
+ * show one icon per `childGoals` entry, captioned underneath, instead of a headline and bar.
  */
 function CompletionConditionSummary({
     goal,
@@ -32,6 +34,9 @@ function CompletionConditionSummary({
     rootId,
     goalColor,
     activityDefinitions = [],
+    childGoals = [],
+    childType = null,
+    onGoalSelect,
     readOnly = false,
     snapshot = null,
     onCompleteNow,
@@ -57,6 +62,7 @@ function CompletionConditionSummary({
         </div>
     ) : null;
     if (chartShowsProgress && completionCondition === 'activity_threshold') return metPrompt;
+    const showsChildIcons = completionCondition === 'children' && childGoals.length > 0;
     const canShowEvidence = completionCondition === 'activity_threshold' && condition && (!readOnly || snapshot);
 
     return (
@@ -65,12 +71,16 @@ function CompletionConditionSummary({
                 <span className={styles.label}>Completion</span>
                 {completed && source ? <span className={styles.source}>{describeCompletionSource(source)}</span> : null}
             </div>
-            <p className={styles.headline}>
-                {completionCondition === 'activity_threshold' && condition?.name
-                    ? <><strong>{condition.name}</strong>{' · '}</> : null}
-                {headline(completionCondition, condition, activity)}
-            </p>
-            {tracksProgress && progress ? (
+            {showsChildIcons ? (
+                <ChildGoalIconRow childGoals={childGoals} childType={childType} onGoalSelect={onGoalSelect} />
+            ) : (
+                <p className={styles.headline}>
+                    {completionCondition === 'activity_threshold' && condition?.name
+                        ? <><strong>{condition.name}</strong>{' · '}</> : null}
+                    {headline(completionCondition, condition, activity)}
+                </p>
+            )}
+            {!showsChildIcons && tracksProgress && progress ? (
                 <ConditionProgressBar
                     fraction={completed ? 1 : progressFraction(progress)}
                     label={describeProgress(progress, condition)}

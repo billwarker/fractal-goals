@@ -11,6 +11,10 @@ vi.mock('../../../hooks/useGoalConditionQueries', () => ({
     useGoalConditionProgress: (...args) => useGoalConditionProgressMock(...args),
 }));
 
+vi.mock('../ChildGoalIconRow', () => ({
+    default: ({ childGoals }) => <div data-testid="child-icons">{childGoals.length}</div>,
+}));
+
 vi.mock('../ConditionEvidenceModal', () => ({
     default: ({ goalName, snapshot, portalContainer }) => (
         <div data-testid="evidence-modal" data-snapshot={snapshot ? 'yes' : 'no'} data-portal={portalContainer?.id || ''}>
@@ -115,6 +119,22 @@ describe('CompletionConditionSummary', () => {
 
         expect(screen.getByRole('progressbar', { name: 'Progress: 1 / 4 child goals' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'See the evidence' })).not.toBeInTheDocument();
+    });
+
+    it('lines up child goal icons instead of a bar when the children are known', () => {
+        useGoalConditionProgressMock.mockReturnValue({
+            progressByGoalId: {
+                'goal-1': { completion_condition: 'children', children: { completed: 1, total: 2 }, progress: 0.5 },
+            },
+        });
+        renderSummary({
+            goal: { id: 'goal-1', completion_condition: 'children' },
+            childGoals: [{ id: 'c1', completed: true }, { id: 'c2' }],
+        });
+
+        expect(screen.getByTestId('child-icons')).toHaveTextContent('2');
+        expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+        expect(screen.queryByText('Completes when every child goal is complete.')).not.toBeInTheDocument();
     });
 
     it('opens the evidence modal live, or from the published snapshot when read-only', () => {

@@ -1,5 +1,7 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { findGoalById } from '../../utils/goalHelpers';
+import { getGoalNodeChildren } from '../../utils/goalNodeModel';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { FolderIcon } from '../atoms/AppIcons';
 import NoteCard from '../notes/NoteCard';
@@ -21,15 +23,21 @@ function GoalViewMode({
     name,
     goalCompletionNote,
     conditionSnapshot = null,
+    treeData = null,
+    childType = null,
     // Handlers
     onClose,
     onCompleteNow,
+    onGoalSelect,
     chartExpansion = null,
     portalTarget = null,
     overlayClassName = '',
     readOnly = false,
 }) {
     const navigate = useNavigate();
+    const goalNode = (Array.isArray(treeData) ? treeData : [treeData])
+        .reduce((found, root) => found || findGoalById(root, goalId), null);
+    const childGoals = getGoalNodeChildren(goalNode);
 
     return (
         <div className={styles.viewContainer}>
@@ -103,6 +111,9 @@ function GoalViewMode({
                         rootId={rootId}
                         goalColor={goalColor}
                         activityDefinitions={activityDefinitions}
+                        childGoals={childGoals}
+                        childType={childType}
+                        onGoalSelect={onGoalSelect}
                         readOnly={readOnly}
                         snapshot={conditionSnapshot}
                         onCompleteNow={onCompleteNow}
