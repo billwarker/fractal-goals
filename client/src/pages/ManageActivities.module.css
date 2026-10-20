@@ -4,19 +4,6 @@
     color: var(--color-text-primary);
 }
 
-.viewToggle {
-    width: 270px;
-    flex: 0 0 270px;
-    height: 32px;
-    padding: 2px;
-    box-sizing: border-box;
-}
-
-.viewToggle :global([role='tab']) {
-    min-height: 26px;
-    padding-block: 2px;
-}
-
 .headerControl {
     height: 32px;
     min-height: 32px;
@@ -247,19 +234,10 @@
 }
 
 @media (max-width: 768px) {
-    .viewToggle {
-        width: 240px;
-        flex-basis: 240px;
-        height: 36px;
-    }
-
-    .viewToggle :global([role='tab']) {
-        min-height: 30px;
-    }
-
+    /* HeaderButton's 44px mobile height, applied to the search input too. */
     .headerControl {
-        height: 36px;
-        min-height: 36px;
+        height: 44px;
+        min-height: 44px;
     }
 
     .errorMessage {

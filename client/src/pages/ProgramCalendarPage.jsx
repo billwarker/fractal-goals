@@ -702,6 +702,7 @@ function ProgramCalendarPage() {
     const viewToggle = displayProgram ? (
         <ViewToggleTabs
             className={styles.headerViewToggle}
+            size="header"
             items={PROGRAM_VIEW_ITEMS}
             value={viewMode}
             onChange={setViewMode}

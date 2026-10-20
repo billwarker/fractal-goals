@@ -444,7 +444,7 @@ function ManageActivities() {
                 actions={(
                     <>
                         <ViewToggleTabs
-                            className={styles.viewToggle}
+                            size="header"
                             items={CATALOGUE_VIEWS}
                             value={catalogueView}
                             onChange={handleCatalogueViewChange}

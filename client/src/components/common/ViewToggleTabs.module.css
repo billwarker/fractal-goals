@@ -36,3 +36,33 @@
     background: var(--view-toggle-panel-bg);
     color: var(--color-text-primary);
 }
+
+/* Fixed-footprint toggle for page headers, matching HeaderButton's height (32px desktop,
+   44px mobile). Shared by Manage Activities and Programs so both stay identical. */
+.header {
+    width: 270px;
+    min-width: 270px;
+    flex: 0 0 270px;
+    height: 32px;
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+.header .tab {
+    min-height: 26px;
+    padding-block: 2px;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .header {
+        width: 240px;
+        min-width: 240px;
+        flex-basis: 240px;
+        height: 44px;
+    }
+
+    .header .tab {
+        min-height: 38px;
+    }
+}
