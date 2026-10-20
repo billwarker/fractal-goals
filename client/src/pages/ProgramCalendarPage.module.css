@@ -82,6 +82,21 @@
         padding-top: 14px;
         padding-bottom: 14px;
     }
+
+    /* Same footprint as the Manage Activities catalogue toggle: 270px wide, 2px frame, 26px tabs. */
+    .headerViewToggle {
+        width: 270px;
+        min-width: 270px;
+        flex-basis: 270px;
+        height: 32px;
+        padding: 2px;
+    }
+
+    .headerViewToggle :global(button[role="tab"]) {
+        flex: 1 1 0;
+        min-height: 26px;
+        padding-block: 2px;
+    }
 }
 
 
