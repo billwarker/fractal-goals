@@ -22,7 +22,7 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('specific', 'Specific', 'Add a clear description of the result.'),
         tracked('measurable', 'Measurable', 'Open the goal detail modal and go to Activities › Add Target, then select an activity to create a target against. Alternatively, set the goal to complete once its children are complete.'),
         tracked('achievable', 'Achievable', 'Associate an activity or activity group, or use child completion.'),
-        tracked('relevant', 'Relevant', 'Explain how the goal supports its parent or why the ultimate goal matters.'),
+        tracked('reviewed', 'Reviewed', 'Keep reviews on, with a cadence, so the goal gets looked back on.'),
         tracked('time_bound', 'Time-bound', 'Set a deadline.'),
         info('review_badge', 'Review the badge', 'Each highlighted letter in the goal header represents a SMART criterion you have met.'),
     ],

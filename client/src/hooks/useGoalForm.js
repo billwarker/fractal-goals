@@ -16,7 +16,6 @@ function buildInitialGoalFormState(goal, mode, initialCompletion) {
         name: mode === 'create' ? '' : (goal?.name || ''),
         description: mode === 'create' ? '' : (goal?.attributes?.description || goal?.description || ''),
         deadline: mode === 'create' ? '' : deadline,
-        relevanceStatement: mode === 'create' ? '' : (goal?.attributes?.relevance_statement || ''),
         startedAt: mode === 'create' ? '' : getGoalStartedAt(goal),
         completionCondition: mode === 'create'
             ? (initialCompletion?.completionCondition ?? 'manual')
@@ -28,6 +27,14 @@ function buildInitialGoalFormState(goal, mode, initialCompletion) {
             ? false
             : (goal?.attributes?.inherit_parent_activities || false),
         trackActivities: mode === 'create' ? true : (goal?.attributes?.track_activities !== undefined ? goal.attributes.track_activities : true),
+        // The goal's own review cadence; null means its level's.
+        reviewCadence: mode !== 'create' && (goal?.review_cadence_value ?? goal?.attributes?.review_cadence_value)
+            ? {
+                value: goal.review_cadence_value ?? goal.attributes.review_cadence_value,
+                unit: goal.review_cadence_unit ?? goal.attributes.review_cadence_unit,
+            }
+            : null,
+        reviewsOn: mode === 'create' ? true : !(goal?.review_disabled ?? goal?.attributes?.review_disabled ?? false),
     };
 }
 
@@ -44,7 +51,6 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
         name: (val) => !val || !val.trim() ? 'Goal Name is required' : null,
         description: () => null,
         deadline: () => null,
-        relevanceStatement: () => null,
     }), []);
     const formKey = `${mode}:${goal?.attributes?.id || goal?.id || 'new-goal'}:${getGoalNodeRevision(goal)}`;
     const [formStateByKey, setFormStateByKey] = useState({});
@@ -153,11 +159,6 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
             setFieldValue('deadline', value);
             setFieldTouched('deadline');
         },
-        relevanceStatement: currentFormState.values.relevanceStatement,
-        setRelevanceStatement: (value) => {
-            setFieldValue('relevanceStatement', value);
-            setFieldTouched('relevanceStatement');
-        },
         startedAt: currentFormState.values.startedAt,
         setStartedAt: (value) => setFieldValue('startedAt', value),
         completionCondition: currentFormState.values.completionCondition,
@@ -168,6 +169,10 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
         setInheritParentActivities: (value) => setFieldValue('inheritParentActivities', value),
         trackActivities: currentFormState.values.trackActivities,
         setTrackActivities: (value) => setFieldValue('trackActivities', value),
+        reviewCadence: currentFormState.values.reviewCadence,
+        setReviewCadence: (value) => setFieldValue('reviewCadence', value),
+        reviewsOn: currentFormState.values.reviewsOn,
+        setReviewsOn: (value) => setFieldValue('reviewsOn', value),
         errors: currentFormState.errors,
         validateForm,
         resetForm,

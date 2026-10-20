@@ -3,6 +3,7 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import GoalIcon from './atoms/GoalIcon';
+import GoalLevelReviewSettings from './GoalLevelReviewSettings';
 import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
 import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
@@ -306,6 +307,10 @@ const GoalCharacteristicsSettings = () => {
                                             </select>
                                         </div>
                                     </div>
+                                <GoalLevelReviewSettings
+                                    current={current}
+                                    onChange={(field, value) => handleChange(level.id, field, value)}
+                                />
                                 <div>
                                     <label className={styles.inputLabelSecondary}>
                                         Sort Children By

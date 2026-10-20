@@ -15,7 +15,11 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
     await page.goto(`/browser-root-${suffix}/goals`);
-    await page.getByText(`Heatmap Guitar ${suffix}`, { exact: true }).click();
+    // The tree settles its layout as data arrives, so retry the click until the details open.
+    await expect(async () => {
+        await page.getByText(`Heatmap Guitar ${suffix}`, { exact: true }).click();
+        await expect(page.getByRole('tab', { name: 'Timeline', exact: true })).toBeVisible({ timeout: 2000 });
+    }).toPass();
     await page.getByRole('tab', { name: 'Timeline', exact: true }).click();
     const heatmap = page.getByRole('region', { name: 'Timeline', exact: true });
     await expect(heatmap).toBeVisible();

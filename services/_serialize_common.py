@@ -25,6 +25,11 @@ def format_utc_precise(dt):
     return normalized.isoformat(timespec='microseconds').replace('+00:00', 'Z')
 
 
+def _is_reviewed(goal):
+    from services.goal_review_rules import is_reviewed
+    return is_reviewed(goal)
+
+
 def calculate_smart_status(goal):
     """Calculate SMART criteria status for a goal."""
     condition = getattr(goal, 'completion_condition', 'manual')
@@ -45,6 +50,7 @@ def calculate_smart_status(goal):
         "specific": bool(goal.description and goal.description.strip()),
         "measurable": is_measurable,
         "achievable": is_achievable,
-        "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
+        # R is Reviewed: reviews on, with a cadence, and none due. Levels that don't review count as met.
+        "reviewed": _is_reviewed(goal),
         "time_bound": goal.deadline is not None
     }

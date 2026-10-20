@@ -93,9 +93,19 @@ After a manual uncompletion only newer evidence re-completes a goal. Rule values
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
 `CompletionConditionEditor`, `CompletionConditionSummary`, `ConditionEvidenceModal` and Session
 Detail's `ConditionCardsSection` render it, under the `goalCondition` query-key root.
-Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`);
-the target tables are dropped in a separate, later revision.
+Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)
+and their tables and columns dropped by `a4b5c6d7e8f9`.
 See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
+
+SMART's R is **Reviewed** (relevance statements were retired into goal notes by `c6d7e8f9a0b1`).
+Reviewed levels (`goal_levels.uses_reviews`; Ultimate, Long and Mid Term by default) review goals on a
+cadence: the goal's own (`goals.review_cadence_*`) or the level's. `services/goal_review_rules.py`
+schedules the next review one cadence after the latest `goal_review` note (or the start), honouring
+`review_disabled` and `review_deferred_until`, and `is_reviewed` makes R depend on it: a due review
+takes R away until one is written. Goals on those levels serialize a `review` object, with review dates
+batch-loaded by `load_fractal_goals_for_serialization`. Notes carry an explicit
+`note_kind` (`goal_completion | goal_review`, CHECK-constrained). New goals start their due date at the
+level's default horizon.
 
 Goals are created from the Program calendar, Days and Session Detail hierarchies by scoping a goal
 through its icon and using its "+" (`GoalHierarchyList`, `onStartSubGoalCreation`). Every create
@@ -386,7 +396,7 @@ The current implementation contains delegated OAuth/MCP, reviewed proposal execu
 and a fully embedded, persistent chat shell backed by the gated provider worker.
 The September 22 target replaces the handoff-first flow, removes manual entity-focus
 selection, and supports reviewed create/update proposals across goals, sessions,
-activities, metrics, programs, notes and templates. The agent discovers scoped context
+activities, metrics, programs, notes and templates, plus `set_goal_sequence` to order sibling goals. The agent discovers scoped context
 automatically; users preview and accept an immutable proposal before domain writes occur.
 Existing domain services remain canonical. Optional connectors have separate release
 gates. The embedded vertical slice and local correctness fixes are implemented behind

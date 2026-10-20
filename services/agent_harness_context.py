@@ -96,6 +96,10 @@ class AgentContextMixin:
                 "description": row.description,
                 "deadline": row.deadline.isoformat() if row.deadline else None,
                 "completed": bool(row.completed),
+                "paused": bool(row.paused),
+                # Sibling goals sharing a track run in sequence_position order (see set_goal_sequence).
+                "sequence_track_id": row.sequence_track_id,
+                "sequence_position": row.sequence_position,
             }
             for row in goals[:goal_page_limit]
         ]

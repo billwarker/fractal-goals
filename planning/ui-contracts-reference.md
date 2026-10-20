@@ -138,7 +138,9 @@ leaves the others alone.
 
 Completing a step shows "Begin next goal in sequence: X" (checked). Un-completing it shows "Pause
 next goal in sequence: X again" (checked) when its completion began X. Condition and child-goal
-completions apply the defaults. Options → Delete confirms in the modal on every page, typing
+completions apply the defaults. When logging evidence in Session Detail completes a step through its
+condition and the sequence begins the next, a toast says so with Undo, which re-pauses that step as
+waiting (`POST /goals/<id>/sequence-hold`). The completed goal stays complete. Options → Delete confirms in the modal on every page, typing
 "delete" when descendants go too, and shows "Begin next goal in sequence: X" for the active step.
 Move, Convert Level, and a parent change through a goal update take a goal out of its sequence. A goal the sequence held resumes, the rest
 renumber, and a sequence left with one goal ends. Copies never join.
@@ -149,6 +151,48 @@ each step's number in a small badge left of its icon. The tree layout draws one 
 arrow per consecutive pair, from one step's badge to the next, with the arrowhead touching the next
 badge's edge. The arrow sits in the edge layer beneath goal names and metadata, is never used for
 layout, and the initial view fits the badges.
+
+## Goal reviews (SMART's R)
+
+SMART's R is **Reviewed**. Relevance statements are retired: migration `c6d7e8f9a0b1` turned each
+one into a goal note ("Why this matters (was this goal's relevance statement)"). Reviewed levels
+(Ultimate, Long and Mid Term by default; "Review goals at this level" in Goal Characteristics
+settings) review their goals on a cadence. R is met while reviews are on, a cadence applies (the
+goal's or the level's) and no review is due. A due review takes R away until a review is written, so a goal stays SMART only by reviewing it periodically. Levels that don't review goals,
+and completed goals, count R as met.
+
+Goal Details shows the schedule directly under the description, with no heading of its own: "Review every 3
+months · next Jan 12", "· deferred to …", "· review due", "Reviews off" or "No review cadence". In
+edit mode, "Review (SMART)" holds a "Review this goal" checkbox (saved as `review_disabled`); when
+checked, "every [n] [unit]" follows on the same line, with "Use level default".
+
+When a review is due, a "Review due" banner at the top of the goal's details offers one action,
+**Review**: a `goal_review` note starting from the goal's description, progress since the last review,
+child goals complete and the due status. Saving it restarts the cadence (and clears any deferral set
+through the API). Reviews are turned off in edit mode; when they're off, the top of the details offers
+"Turn on". The Notes page filters Goal Reviews and Goal Completions, and cards badge both kinds. The
+Program calendar shows "Review: [icon] [name]" badges on the next review of goals in the displayed
+program's lineage (its goals and their ancestors).
+
+Creating a goal starts its due date at the chosen level's default horizon. It follows the level while
+untouched and never replaces a date the user typed or cleared.
+
+## Goals from analytics
+
+Right-click (desktop) or long-press for 500 ms (touch) a point on Metric Trends, Metric Progress,
+Metric Scatter Plot or Activity Totals for "Set goal here…", with the condition it suggests:
+
+- Metric Trends: the nearest metric's value as a one-session rule.
+- Scatter: both axes' values as two rules met in one session.
+- Metric Progress: "this much better than the latest session" (the latest value moved by the
+  clicked percentage in the metric's better direction).
+- Activity Totals: "N sessions" (a consistency goal). Time totals say they can't become a
+  condition yet.
+
+Operators follow each metric's `higher_is_better`. The goal modal opens in create mode with that
+condition, under the analytics goal filter's goal (or the fractal root). Metric Trends and Scatter
+draw existing goals on the selected activity as dashed reference lines (amber open, green done),
+from `GET /goals/conditions?activity_id=` (50 at most, open goals first).
 
 ## Session Detail mobile hierarchy
 

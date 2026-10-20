@@ -68,7 +68,7 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
                 } : undefined}
             >
                 <span className={styles.eventGoalPrefix} data-due-tone={eventInfo.event.extendedProps.dueTone || undefined}>
-                    {eventInfo.event.extendedProps.goalCompleted ? 'Done:' : 'Due:'}
+                    {eventInfo.event.extendedProps.badgeLabel || (eventInfo.event.extendedProps.goalCompleted ? 'Done:' : 'Due:')}
                 </span>
                 {goalIcon ? (
                     <span className={styles.eventGoalIcon} aria-hidden="true">

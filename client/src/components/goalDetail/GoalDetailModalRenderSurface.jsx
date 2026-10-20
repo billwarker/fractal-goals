@@ -25,6 +25,14 @@ const ActivityAssociator = lazyWithRetry(() => import('./ActivityAssociator'), '
 const InlineActivityBuilder = lazyWithRetry(() => import('./InlineActivityBuilderModal'), 'components/goalDetail/InlineActivityBuilderModal');
 const GoalOptionsView = lazyWithRetry(() => import('../goals/GoalOptionsView'), 'components/goals/GoalOptionsView');
 const GoalNotesView = lazyWithRetry(() => import('./GoalNotesView'), 'components/goalDetail/GoalNotesView');
+const GoalReviewPrompt = lazyWithRetry(
+    () => import('./GoalReviewSection').then((module) => ({ default: module.GoalReviewPrompt })),
+    'components/goalDetail/GoalReviewSection:prompt',
+);
+const GoalReviewComposer = lazyWithRetry(
+    () => import('./GoalReviewSection').then((module) => ({ default: module.GoalReviewComposer })),
+    'components/goalDetail/GoalReviewSection:composer',
+);
 const GoalActivityHeatmap = lazyWithRetry(() => import('./GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
 function GoalDetailModalRenderSurface({
     activitiesAssociateAction,
@@ -115,7 +123,6 @@ function GoalDetailModalRenderSurface({
     registerActivitiesAssociateAction,
     registerActivitiesAssociateCancelAction,
     registerActivityPickerFooterActions,
-    relevanceStatement,
     rootId,
     selectedChildType,
     setActivityBuilderReturnView,
@@ -132,10 +139,13 @@ function GoalDetailModalRenderSurface({
     setIsActivityBuilderOpen,
     setIsEditing,
     setName,
-    setRelevanceStatement,
     setSelectedChildType,
     setStartedAt,
     startedAt,
+    reviewCadence,
+    setReviewCadence,
+    reviewsOn,
+    setReviewsOn,
     setViewState,
     textColor,
     treeData,
@@ -268,8 +278,9 @@ function GoalDetailModalRenderSurface({
                         name={name} setName={setName}
                         description={description} setDescription={setDescription}
                         deadline={deadline} setDeadline={setDeadline}
-                        relevanceStatement={relevanceStatement} setRelevanceStatement={setRelevanceStatement}
                         startedAt={startedAt} setStartedAt={setStartedAt}
+                        reviewCadence={reviewCadence} setReviewCadence={setReviewCadence}
+                        reviewsOn={reviewsOn} setReviewsOn={setReviewsOn}
                         completionCondition={completionCondition} setCompletionCondition={setCompletionCondition}
                         conditionDraft={conditionDraft} setConditionDraft={setConditionDraft}
                         conditionErrors={conditionErrors}
@@ -286,6 +297,12 @@ function GoalDetailModalRenderSurface({
                     />
                 ) : (
                     /* ============ VIEW MODE ============ */
+                    <>
+                    {!readOnly && mode !== 'create' && goalId && levelConfig?.uses_reviews ? (
+                        <Suspense fallback={null}>
+                            <GoalReviewPrompt rootId={rootId} goal={goal} goalId={goalId} onReview={() => setViewState('goal-review')} />
+                        </Suspense>
+                    ) : null}
                     <GoalViewMode
                         mode={mode}
                         goal={goal}
@@ -311,13 +328,13 @@ function GoalDetailModalRenderSurface({
                         name={name}
                         description={description}
                         deadline={deadline}
-                        relevanceStatement={relevanceStatement}
                         goalCompletionNote={goalCompletionNote}
                         setViewState={setViewState}
                         onClose={handleClose}
                         onGoalSelect={onGoalSelect}
                         readOnly={readOnly}
                     />
+                    </>
                 )
                 }
             </>
@@ -488,6 +505,12 @@ function GoalDetailModalRenderSurface({
                 />
             </Suspense>
         );
+    } else if (viewState === 'goal-review') {
+        content = (
+            <Suspense fallback={null}>
+                <GoalReviewComposer rootId={rootId} goal={goal} goalId={goalId} onDone={() => setViewState('goal')} />
+            </Suspense>
+        );
     } else if (viewState === 'goal-timeline') {
         content = (
             <Suspense fallback={<p role="status">Loading timeline...</p>}>
@@ -507,7 +530,7 @@ function GoalDetailModalRenderSurface({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-review' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (

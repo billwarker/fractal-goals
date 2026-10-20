@@ -35,7 +35,7 @@ def goal_serializer_load_options(*, include_group_activities=False):
     return options
 
 
-def load_fractal_goals_for_serialization(db_session, root_id, *, include_group_activities=False):
+def load_fractal_goals_for_serialization(db_session, root_id, *, include_group_activities=False, with_review_dates=True):
     goals = db_session.query(Goal).options(
         *goal_serializer_load_options(include_group_activities=include_group_activities)
     ).filter(
@@ -54,5 +54,9 @@ def load_fractal_goals_for_serialization(db_session, root_id, *, include_group_a
 
     for goal in goals:
         set_committed_value(goal, "children", children_by_parent.get(goal.id, []))
+    # Review schedules need each goal's latest review note; fetch them all at once.
+    if with_review_dates:
+        from services.goal_review_rules import attach_last_review_dates
+        attach_last_review_dates(db_session, goals)
 
     return {goal.id: goal for goal in goals}

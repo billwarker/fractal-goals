@@ -109,6 +109,7 @@ export default function ActivityTotalsChart({
                 const completedInstances = (activityInstances[activity.id] || []).filter(isCompletedActivityInstance);
                 const seconds = completedInstances.reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0);
                 return {
+                    activityId: activity.id,
                     label: activity.name,
                     groupName: activity.group_id ? groupNamesById.get(activity.group_id) || 'Ungrouped' : 'Ungrouped',
                     count: completedInstances.length,
@@ -130,6 +131,9 @@ export default function ActivityTotalsChart({
                 data: rows.map((row) => row.value),
                 backgroundColor: metric === 'duration' ? palette.duration : palette.instances,
                 groupNames: rows.map((row) => row.groupName),
+                // Read by the chart's "Set goal here…" menu.
+                activityIds: rows.map((row) => row.activityId),
+                measure: metric,
             }],
         };
     }, [activities, activityGroups, activityInstances, limit, metric]);

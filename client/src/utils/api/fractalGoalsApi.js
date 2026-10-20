@@ -26,6 +26,9 @@ export const fractalGoalsApi = {
     setSequenceSteps: (rootId, trackId, goalIds) =>
         axios.put(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`, { goal_ids: goalIds }),
     deleteSequenceTrack: (rootId, trackId) => axios.delete(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`),
+    holdSequenceStep: (rootId, goalId) => axios.post(`${API_BASE}/${rootId}/goals/${goalId}/sequence-hold`),
+    getActivityGoalConditions: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/conditions`, { params: { activity_id: activityId } }),
     setGoalCondition: (rootId, goalId, data) =>
         axios.put(`${API_BASE}/${rootId}/goals/${goalId}/condition`, data),
     getGoalConditionProgress: (rootId, goalIds) =>

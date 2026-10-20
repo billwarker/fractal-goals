@@ -13,6 +13,24 @@ COMPLETION_CONDITIONS = (
 # How a completed goal got there. 'manual_override' completes a goal whose own condition is not manual.
 COMPLETION_SOURCES = ('condition', 'children', 'manual', 'manual_override')
 COMPLETION_CONDITIONS_SQL = "('activity_threshold', 'children', 'manual')"
+
+# Periodic reviews (goal_review notes) repeat on a cadence: a level's default, or a goal's own.
+REVIEW_CADENCE_UNITS = ('days', 'weeks', 'months', 'years')
+REVIEW_CADENCE_UNITS_SQL = "('days', 'weeks', 'months', 'years')"
+
+
+def _review_cadence_checks(table):
+    return (
+        CheckConstraint(
+            f"review_cadence_unit IS NULL OR review_cadence_unit IN {REVIEW_CADENCE_UNITS_SQL}",
+            name=f'ck_{table}_review_cadence_unit',
+        ),
+        CheckConstraint(
+            "(review_cadence_value IS NULL) = (review_cadence_unit IS NULL)"
+            " AND (review_cadence_value IS NULL OR review_cadence_value > 0)",
+            name=f'ck_{table}_review_cadence_pair',
+        ),
+    )
 COMPLETION_SOURCES_SQL = "('condition', 'children', 'manual', 'manual_override')"
 PAUSE_REASON_MANUAL = 'manual'
 PAUSE_REASON_SEQUENCE = 'sequence'
@@ -118,10 +136,17 @@ class GoalLevel(Base):
     
     # Display
     sort_children_by = Column(String, nullable=True)  # 'manual', 'deadline', 'created_at', 'completion_rate'
+
+    # Long-horizon levels review their goals (SMART's R), on this default cadence.
+    uses_reviews = Column(Boolean, nullable=False, default=False, server_default=sa.false())
+    review_cadence_value = Column(Integer, nullable=True)
+    review_cadence_unit = Column(String, nullable=True)  # days, weeks, months, years
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = _review_cadence_checks('goal_levels')
 
 class Goal(Base):
     """
@@ -157,7 +182,6 @@ class Goal(Base):
     root_id = Column(String, nullable=True, index=True)
     owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
     
-    relevance_statement = Column(Text, nullable=True)
     is_smart = Column(Boolean, default=False)
     inherit_parent_activities = Column(Boolean, default=False, nullable=False)
     track_activities = Column(Boolean, default=True)
@@ -170,6 +194,11 @@ class Goal(Base):
     )
     # Start of the goal's active period: evidence before it never counts.
     started_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
+    # Reviews: an own cadence overrides the level's; reviews can be turned off or put off to a date.
+    review_cadence_value = Column(Integer, nullable=True)
+    review_cadence_unit = Column(String, nullable=True)
+    review_disabled = Column(Boolean, nullable=False, default=False, server_default=sa.false())
+    review_deferred_until = Column(DateTime, nullable=True)
     sequence_track_id = Column(
         String,
         ForeignKey(
@@ -204,6 +233,7 @@ class Goal(Base):
         CheckConstraint(
             'sequence_track_id IS NULL OR sequence_position IS NOT NULL', name='ck_goals_sequence_pair',
         ),
+        *_review_cadence_checks('goals'),
     )
     __mapper_args__ = {'version_id_col': row_version}
 
@@ -369,7 +399,7 @@ class GoalConditionMetricRule(Base):
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
     operator = Column(String, nullable=False)
     value = Column(sa.Numeric(14, 4), nullable=False)
-    position = Column(Integer, nullable=False, default=0)
+    position = Column(Integer, nullable=False, default=0, server_default=sa.text('0'))
 
     __table_args__ = (
         sa.UniqueConstraint('condition_id', 'metric_definition_id', name='uq_goal_condition_rule_metric'),

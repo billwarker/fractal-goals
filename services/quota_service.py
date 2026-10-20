@@ -277,7 +277,7 @@ class QuotaService:
 
         totals = [
             table_total(
-                text_bytes(Goal.name, Goal.description, Goal.relevance_statement, Goal.completion_reason)
+                text_bytes(Goal.name, Goal.description, Goal.completion_reason)
                 + json_bytes(Goal.progress_settings),
                 goal_filter,
                 Goal.deleted_at.is_(None),

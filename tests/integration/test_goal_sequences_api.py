@@ -266,6 +266,43 @@ class TestAdvancing:
         assert authed_client.delete(f"/api/{root}/sessions/{session.id}/activities/{instance.id}").status_code == 200
         assert _state(db_session, [first, second]) == [(1, False, False), (2, True, False)]
 
+    def test_undoing_an_automatic_begin_holds_the_step_and_keeps_the_completion(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal.id
+        first = _create_goal(authed_client, root, root, _threshold(sample_activity_definition), name="Lift 225")["id"]
+        second = _siblings(authed_client, root, 1)[0]
+        _track(authed_client, root, [first, second])
+        session = _session(db_session, sample_ultimate_goal, started=_now() + timedelta(minutes=1))
+        instance = _instance(db_session, session, sample_activity_definition, [{"Weight": 230}], occurred=_now() + timedelta(minutes=1))
+        _complete(authed_client, root, instance)
+        assert authed_client.get(f"/api/{root}/goals/{second}").get_json()["sequence_begun_by"] == first
+
+        response = authed_client.post(f"/api/{root}/goals/{second}/sequence-hold")
+
+        assert response.status_code == 200, response.get_json()
+        assert _state(db_session, [first, second]) == [(1, False, True), (2, True, False)]
+        payload = authed_client.get(f"/api/{root}/goals/{second}").get_json()
+        assert (payload["pause_reason"], payload["sequence_begun_by"]) == ("sequence", None)
+        # Holding twice, or un-completing the first step afterwards, changes nothing more.
+        assert authed_client.post(f"/api/{root}/goals/{second}/sequence-hold").status_code == 409
+        _set_completed(authed_client, root, first, False)
+        assert _state(db_session, [first, second]) == [(1, False, False), (2, True, False)]
+
+    def test_only_a_step_its_sequence_began_can_be_held(self, authed_client, db_session, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        ids = _siblings(authed_client, root, 3)
+        _track(authed_client, root, ids)
+        # The first step was never held; the third was begun by hand, out of order.
+        authed_client.patch(f"/api/{root}/goals/{ids[2]}/pause", json={"paused": False})
+        loose = _siblings(authed_client, root, 1)[0]
+
+        statuses = [authed_client.post(f"/api/{root}/goals/{goal}/sequence-hold").status_code
+                    for goal in (ids[0], ids[2], loose, "missing")]
+
+        assert statuses == [409, 409, 409, 404]
+        assert _state(db_session, ids) == [(1, False, False), (2, True, False), (3, False, False)]
+
     def test_a_resumed_step_already_meeting_its_condition_completes(
         self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
     ):

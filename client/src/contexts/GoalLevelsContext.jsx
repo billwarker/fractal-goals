@@ -306,6 +306,9 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
             default_deadline_offset_value: level.default_deadline_offset_value,
             default_deadline_offset_unit: level.default_deadline_offset_unit,
             sort_children_by: level.sort_children_by,
+            uses_reviews: level.uses_reviews ?? false,
+            review_cadence_value: level.review_cadence_value ?? null,
+            review_cadence_unit: level.review_cadence_unit ?? null,
         };
     };
 

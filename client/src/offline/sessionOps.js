@@ -117,6 +117,7 @@ const NOTE_TYPE_LABELS = {
 
 function deriveNoteType(contextType, { setIndex = null, activitySetId = null, noteKind = null } = {}) {
     if (contextType === 'goal' && noteKind === 'goal_completion') return 'goal_completion_note';
+    if (contextType === 'goal' && noteKind === 'goal_review') return 'goal_review_note';
     if (contextType === 'activity_instance') {
         return setIndex !== null || activitySetId ? 'activity_set_note' : 'activity_instance_note';
     }

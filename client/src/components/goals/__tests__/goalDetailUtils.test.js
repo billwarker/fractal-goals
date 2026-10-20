@@ -6,8 +6,8 @@ const savedSmartGoal = {
     description: 'Saved description',
     deadline: '2026-12-01T00:00:00Z',
     is_smart: true,
-    smart_status: { specific: true, measurable: true, achievable: true, relevant: true, time_bound: true },
-    attributes: { is_smart: true, smart_status: { specific: true, measurable: true, achievable: true, relevant: true, time_bound: true } },
+    smart_status: { specific: true, measurable: true, achievable: true, reviewed: true, time_bound: true },
+    attributes: { is_smart: true, smart_status: { specific: true, measurable: true, achievable: true, reviewed: true, time_bound: true } },
 };
 
 const edits = (overrides = {}) => ({
@@ -15,7 +15,6 @@ const edits = (overrides = {}) => ({
     completionCondition: 'activity_threshold',
     associatedActivityIds: ['a1'],
     deadline: '2026-12-01T00:00:00Z',
-    relevanceStatement: 'Because',
     inheritParentActivities: false,
     ...overrides,
 });
@@ -39,4 +38,17 @@ describe('buildLiveSmartGoal', () => {
         expect(calculateSMARTStatus(manual).measurable).toBe(false);
         expect(calculateSMARTStatus(viaChildren).measurable).toBe(true);
     });
+
+    it('recomputes R from the review settings being edited', () => {
+        const level = { uses_reviews: true, review_cadence_value: 3 };
+        const upcoming = { ...savedSmartGoal, review: { status: 'upcoming', next_review_on: '2999-01-01' } };
+
+        expect(calculateSMARTStatus(buildLiveSmartGoal(upcoming, edits({ reviewLevel: level }))).reviewed).toBe(true);
+        expect(calculateSMARTStatus(buildLiveSmartGoal(upcoming, edits({ reviewLevel: level, reviewsOn: false }))).reviewed).toBe(false);
+        expect(calculateSMARTStatus(buildLiveSmartGoal(upcoming, edits({ reviewLevel: { uses_reviews: false }, reviewsOn: false }))).reviewed).toBe(true);
+        const due = { ...savedSmartGoal, review: { status: 'due', next_review_on: '2000-01-01' } };
+        // A due review takes R away until one is written.
+        expect(calculateSMARTStatus(buildLiveSmartGoal(due, edits({ reviewLevel: level }))).reviewed).toBe(false);
+    });
 });
+

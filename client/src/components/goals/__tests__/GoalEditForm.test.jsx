@@ -28,8 +28,6 @@ function renderGoalEditForm(overrides = {}) {
             setDescription={noop}
             deadline="2026-12-31"
             setDeadline={noop}
-            relevanceStatement="Qualify as intermediate"
-            setRelevanceStatement={noop}
             trackActivities={false}
             setTrackActivities={noop}
             startedAt="2026-01-01"
@@ -48,18 +46,66 @@ function renderGoalEditForm(overrides = {}) {
 
 describe('GoalEditForm', () => {
     it('uses the goal level color and shows dates and the completion condition', () => {
-        const { container } = renderGoalEditForm();
+        const { container } = renderGoalEditForm({ levelConfig: { uses_reviews: true } });
 
         expect(container.firstElementChild).toHaveStyle({
             '--goal-edit-accent': '#facc15',
         });
 
-        const relevanceTextarea = screen.getByPlaceholderText('Explain how this goal contributes to your higher-level objective...');
-        expect(relevanceTextarea.className).toContain('relevanceTextareaFilled');
+        expect(screen.queryByText(/Relevance/)).toBeNull();
 
         expect(screen.getByText(/Completes on its own when every child goal is complete\./)).toBeInTheDocument();
         expect(screen.getByLabelText('Start date')).toHaveValue('2026-01-01');
         expect(screen.getByLabelText('Deadline')).toHaveAttribute('min', '2026-01-01');
+    });
+
+    it('edits the review cadence in a Review section on reviewed levels', () => {
+        const setReviewCadence = vi.fn();
+        renderGoalEditForm({
+            levelConfig: { uses_reviews: true, review_cadence_value: 1, review_cadence_unit: 'months' },
+            reviewCadence: { value: 2, unit: 'weeks' },
+            setReviewCadence,
+        });
+
+        expect(screen.getByLabelText('Description')).toHaveValue('Complete all foundational courses');
+        const cadence = screen.getByRole('group', { name: 'Review cadence' });
+        expect(screen.getByText('Review (SMART)').closest('div').contains(cadence)).toBe(true);
+        expect(screen.getByLabelText('Review cadence amount')).toHaveValue(2);
+        screen.getByRole('button', { name: 'Use level default (every month)' }).click();
+        expect(setReviewCadence).toHaveBeenCalledWith(null);
+    });
+
+    it('turns reviews on and off with a checkbox that shows the cadence only when on', () => {
+        const setReviewsOn = vi.fn();
+        const props = {
+            levelConfig: { uses_reviews: true, review_cadence_value: 1, review_cadence_unit: 'months' },
+            setReviewCadence: vi.fn(),
+            setReviewsOn,
+        };
+        const { unmount } = renderGoalEditForm({ ...props, reviewsOn: false });
+
+        const checkbox = screen.getByRole('checkbox', { name: 'Review this goal' });
+        expect(checkbox).not.toBeChecked();
+        expect(screen.queryByRole('group', { name: 'Review cadence' })).toBeNull();
+        checkbox.click();
+        expect(setReviewsOn).toHaveBeenCalledWith(true);
+
+        unmount();
+        renderGoalEditForm({ ...props, reviewsOn: true });
+        const checked = screen.getByRole('checkbox', { name: 'Review this goal' });
+        expect(checked).toBeChecked();
+        // The cadence follows the checkbox on the same row: "Review this goal  every [n] [unit]".
+        const cadence = screen.getByRole('group', { name: 'Review cadence' });
+        expect(cadence.parentElement).toBe(checked.closest('label').parentElement);
+        expect(cadence).toHaveTextContent(/^every/);
+    });
+
+    it('shows no Review section on levels without reviews', () => {
+        renderGoalEditForm({ levelConfig: { uses_reviews: false } });
+
+        expect(screen.getByLabelText('Description')).toBeInTheDocument();
+        expect(screen.queryByText('Review (SMART)')).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Review cadence' })).toBeNull();
     });
 
     it('warns, without blocking, when the deadline breaks a soft rule', () => {

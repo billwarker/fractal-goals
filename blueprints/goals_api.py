@@ -19,6 +19,7 @@ from validators import (
 from blueprints.auth_api import token_required
 from blueprints.goal_history_api import register_goal_history_routes
 from blueprints.goal_conditions_api import error_response, goal_response, register_goal_condition_routes
+from blueprints.goal_reviews_api import register_goal_review_routes
 from blueprints.goal_sequences_api import register_goal_sequence_routes
 from blueprints.api_utils import (
     get_db_session,
@@ -625,3 +626,4 @@ def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, valida
 register_goal_history_routes(goals_bp)
 register_goal_condition_routes(goals_bp)
 register_goal_sequence_routes(goals_bp)
+register_goal_review_routes(goals_bp)

@@ -1,6 +1,7 @@
 import React from 'react';
 import Input from '../atoms/Input';
 import CompletionConditionEditor from '../goalDetail/CompletionConditionEditor';
+import GoalReviewCadence from '../goalDetail/GoalReviewCadence';
 import { deadlineContextForGoal, deadlineWarnings, describeDeadlineWarning } from '../../utils/goalDeadlineRules';
 import { formatDueDate } from '../../utils/goalDueFormat';
 import { getValidChildTypes } from '../../utils/goalHelpers';
@@ -14,7 +15,6 @@ function GoalEditForm({
     goalColor,
     textColor,
     parentGoal,
-    parentGoalName,
     deadlineParentGoal = null,
     levelConfig = null,
     // Level selection in create mode
@@ -22,8 +22,9 @@ function GoalEditForm({
     name, setName,
     description, setDescription,
     deadline, setDeadline,
-    relevanceStatement, setRelevanceStatement,
     startedAt, setStartedAt,
+    reviewCadence = null, setReviewCadence,
+    reviewsOn = true, setReviewsOn,
     completionCondition, setCompletionCondition,
     conditionDraft, setConditionDraft,
     conditionErrors = {},
@@ -36,6 +37,10 @@ function GoalEditForm({
     errors = {}
 }) {
     const canCompleteViaChildren = getValidChildTypes(goalType).length > 0;
+    const usesReviews = Boolean(levelConfig?.uses_reviews);
+    const levelCadence = levelConfig?.review_cadence_value && levelConfig?.review_cadence_unit
+        ? { value: levelConfig.review_cadence_value, unit: levelConfig.review_cadence_unit }
+        : null;
     // Due-date rules are soft guidance: the date is saved either way, with these warnings.
     const deadlineIssues = deadlineWarnings(deadline, deadlineContextForGoal(
         { ...(goal?.attributes || goal || {}), started_at: startedAt || goal?.attributes?.started_at || goal?.attributes?.created_at },
@@ -74,24 +79,19 @@ function GoalEditForm({
                 </div>
             )}
 
-            {/* Relevance Statement - SMART "R" Criterion */}
-            {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
+            {/* Review - SMART "R" (Reviewed), on levels that review goals */}
+            {usesReviews && mode !== 'create' && setReviewCadence && (
                 <div className={styles.fieldGroup}>
                     <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
-                        Relevance (SMART)
+                        Review (SMART)
                     </label>
-                    <div className={styles.relevanceInfo}>
-                        {goalType === 'UltimateGoal'
-                            ? "Why does this Ultimate Goal matter to you?"
-                            : <span>How does this goal help you achieve <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
-                        }
-                    </div>
-                    <textarea
-                        value={relevanceStatement}
-                        onChange={(e) => setRelevanceStatement(e.target.value)}
-                        rows={2}
-                        placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
-                        className={`${styles.textarea} ${relevanceStatement?.trim() ? styles.relevanceTextareaFilled : ''}`}
+                    <GoalReviewCadence
+                        editing
+                        enabled={reviewsOn}
+                        onEnabledChange={setReviewsOn}
+                        cadence={reviewCadence}
+                        levelCadence={levelCadence}
+                        onChange={setReviewCadence}
                     />
                 </div>
             )}

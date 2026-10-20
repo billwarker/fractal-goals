@@ -31,18 +31,9 @@ import BodyPortal from '../components/layout/BodyPortal';
 import NotesMobileSheet from '../components/notes/NotesMobileSheet';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
+import { NOTE_TYPE_FILTER_OPTIONS } from '../utils/noteTypes';
 
-const NOTE_TYPE_OPTIONS = [
-    { value: 'fractal_note', label: 'Fractal Notes' },
-    { value: 'goal_note', label: 'Goal Notes' },
-    { value: 'program_note', label: 'Program Notes' },
-    { value: 'session_note', label: 'Session Notes' },
-    { value: 'activity_instance_note', label: 'Activity Notes' },
-    { value: 'activity_set_note', label: 'Activity Set Notes' },
-    { value: 'activity_definition_note', label: 'Activity Definition Notes' },
-    { value: 'circuit_run_note', label: 'Activity Circuit Notes' },
-    { value: 'circuit_round_note', label: 'Circuit Round Notes' },
-];
+const NOTE_TYPE_OPTIONS = NOTE_TYPE_FILTER_OPTIONS;
 
 // ─── Goal Picker Modal ───────────────────────────────────────────────────────
 function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {

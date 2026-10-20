@@ -53,7 +53,6 @@ describe('GoalViewMode', () => {
                 activityDefinitions={[]}
                 name="She's Got It"
                 description="Practice the performance piece cleanly."
-                relevanceStatement=""
                 goalCompletionNote={{
                     id: 'note-1',
                     content: 'This clicked at full speed.',
@@ -117,7 +116,6 @@ describe('GoalViewMode', () => {
                 activityDefinitions={[{ id: 'activity-1', name: 'Front Lever Hold', metric_definitions: [] }]}
                 name="Have a Clean 5 Second Front Lever"
                 description=""
-                relevanceStatement=""
                 readOnly
             />,
             RENDER_OPTIONS

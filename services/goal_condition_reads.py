@@ -28,6 +28,10 @@ from services.serializers import (
 from services.service_types import JsonDict, ServiceResult
 
 
+# Reference lines per chart: open goals first, then the most recent.
+CHART_CONDITION_LIMIT = 50
+
+
 class GoalConditionReadService:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -69,6 +73,35 @@ class GoalConditionReadService:
                 for split in (activity.split_definitions or []) if not split.deleted_at
             ],
         }
+
+    def list_for_activity(self, root_id, current_user_id, activity_id) -> ServiceResult[JsonDict]:
+        """Live goals whose condition is on this activity (charts draw them as reference lines)."""
+        from models import Goal, GoalCompletionCondition, GoalConditionMetricRule
+
+        if not validate_root_goal(self.db_session, root_id, owner_id=current_user_id):
+            return None, 'Fractal not found or access denied', 404
+        if not activity_id:
+            return None, 'activity_id is required', 400
+        rows = self.db_session.query(GoalCompletionCondition, Goal).join(
+            Goal, Goal.id == GoalCompletionCondition.goal_id,
+        ).options(
+            selectinload(GoalCompletionCondition.rules).selectinload(GoalConditionMetricRule.metric),
+            selectinload(GoalCompletionCondition.activity),
+            selectinload(GoalCompletionCondition.metric),
+        ).filter(
+            GoalCompletionCondition.root_id == root_id,
+            GoalCompletionCondition.activity_definition_id == activity_id,
+            GoalCompletionCondition.deleted_at.is_(None),
+            Goal.deleted_at.is_(None),
+            Goal.completion_condition == 'activity_threshold',
+        ).order_by(Goal.completed.asc(), Goal.created_at.desc(), Goal.id).limit(CHART_CONDITION_LIMIT).all()
+        return {'goals': [{
+            'goal_id': goal.id,
+            'goal_name': goal.name,
+            'completed': bool(goal.completed),
+            'deadline': format_utc(goal.deadline),
+            'condition': serialize_goal_condition(condition),
+        } for condition, goal in rows]}, None, 200
 
     def get_progress(self, root_id, current_user_id, goal_ids) -> ServiceResult[JsonDict]:
         try:

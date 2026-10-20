@@ -88,6 +88,8 @@ def derive_note_type(context_type, set_index=None, note_kind=None, activity_set_
     """Derive a semantic note type from the stored note context."""
     if context_type == "goal" and note_kind == "goal_completion":
         return "goal_completion_note"
+    if context_type == "goal" and note_kind == "goal_review":
+        return "goal_review_note"
     if context_type == "root":
         return "fractal_note"
     if context_type == "goal":

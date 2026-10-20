@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { showActionToast } from '../components/atoms/ActionToast';
 import { deadlineWarnings, describeDeadlineWarning, toIsoDate } from '../utils/goalDeadlineRules';
 import { formatDueDate } from '../utils/goalDueFormat';
+import { buildGoalReviewCalendarEvents, programLineageGoalIds } from '../utils/programCalendarGoalEvents';
+import { getProgramMetricScopeGoalIds } from '../utils/programScope';
 import { buildProgramsCalendarEvents } from '../utils/programViewModel';
 
 const FINE_POINTER = '(hover: hover) and (pointer: fine)';
@@ -20,13 +22,22 @@ function useFinePointer() {
 }
 
 /**
- * The calendar's "Due:" badges: one per goal with a due date (completed goals sit on their
- * completion date as "Done:").
+ * The calendar's goal badges: "Due:" for each goal with a due date (completed goals sit on their
+ * completion date as "Done:"), and "Review:" on the next review of goals in the program's lineage.
  */
-export function useGoalDueCalendarEvents(goals, timezone, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon }) {
-    return useMemo(() => buildProgramsCalendarEvents(
-        [], goals, getGoalColor, getGoalTextColor, timezone, { getGoalSecondaryColor, getGoalIcon },
-    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, timezone]);
+export function useGoalDueCalendarEvents(
+    goals, timezone, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon }, program = null,
+) {
+    return useMemo(() => {
+        const dueEvents = buildProgramsCalendarEvents(
+            [], goals, getGoalColor, getGoalTextColor, timezone, { getGoalSecondaryColor, getGoalIcon },
+        );
+        if (!program) return dueEvents;
+        const lineageGoalIds = programLineageGoalIds(goals, getProgramMetricScopeGoalIds(program));
+        return [...dueEvents, ...buildGoalReviewCalendarEvents({
+            goals, lineageGoalIds, getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon,
+        })];
+    }, [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, program, timezone]);
 }
 
 /**

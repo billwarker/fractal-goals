@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { buildGoalReviewCalendarEvents, programLineageGoalIds } from '../programCalendarGoalEvents';
 import { buildProgramsCalendarEvents } from '../programViewModel';
 
 describe('program calendar goal events', () => {
@@ -74,4 +75,30 @@ describe('program calendar goal events', () => {
             expect([tone('later'), tone('soon'), tone('late'), tone('done')]).toEqual(['normal', 'soon', 'overdue', null]);
         });
     });
+
+    describe('review badges', () => {
+        const helpers = { getGoalColor: () => '#000', getGoalTextColor: () => '#fff', getGoalSecondaryColor: () => '#111', getGoalIcon: () => 'circle' };
+        const goal = (id, parentId, review = null) => ({ id, name: id, parent_id: parentId, review });
+        const goals = [
+            goal('ultimate', null, { status: 'due', next_review_on: '2026-10-01' }),
+            goal('long', 'ultimate', { status: 'upcoming', next_review_on: '2026-11-12' }),
+            goal('program-goal', 'long'),
+            goal('elsewhere', 'ultimate', { status: 'upcoming', next_review_on: '2026-11-20' }),
+            goal('off', 'long', { status: 'off', next_review_on: null }),
+        ];
+
+        it('covers the program goals and their ancestors', () => {
+            expect([...programLineageGoalIds(goals, ['program-goal'])].sort()).toEqual(['long', 'program-goal', 'ultimate']);
+        });
+
+        it('puts a "Review:" badge on the next review of each lineage goal that is reviewed', () => {
+            const events = buildGoalReviewCalendarEvents({ goals, lineageGoalIds: programLineageGoalIds(goals, ['program-goal', 'off']), ...helpers });
+
+            expect(events.map((event) => [event.extendedProps.goalId, event.start, event.extendedProps.badgeLabel])).toEqual([
+                ['ultimate', '2026-10-01', 'Review:'],
+                ['long', '2026-11-12', 'Review:'],
+            ]);
+        });
+    });
 });
+

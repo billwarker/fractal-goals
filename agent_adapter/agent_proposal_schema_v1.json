@@ -389,7 +389,7 @@
         "note_kind": {
           "anyOf": [
             {
-              "pattern": "^(goal_completion)$",
+              "pattern": "^(goal_completion|goal_review)$",
               "type": "string"
             },
             {
@@ -501,6 +501,41 @@
         "data"
       ],
       "title": "ScheduleProgramDayOperation",
+      "type": "object"
+    },
+    "SetGoalSequenceOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "goal_ids": {
+          "description": "Sibling goals (same parent, same level) in the order they should run; each begins when the one before completes, and later goals wait paused. Replaces the sequence these goals are already in, or creates one. One goal that is already sequenced ends its sequence. IDs may be $ref:<operation_id> references to goals created earlier in this proposal.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Goal Ids",
+          "type": "array"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "set_goal_sequence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "goal_ids"
+      ],
+      "title": "SetGoalSequenceOperation",
       "type": "object"
     },
     "StrictActivityCreateSchema": {
@@ -1036,19 +1071,6 @@
           "default": null,
           "title": "Parent Id"
         },
-        "relevance_statement": {
-          "anyOf": [
-            {
-              "maxLength": 2000,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Relevance Statement"
-        },
         "session_id": {
           "anyOf": [
             {
@@ -1218,10 +1240,15 @@
           "default": null,
           "title": "Progress Settings"
         },
-        "relevance_statement": {
+        "review_cadence_unit": {
           "anyOf": [
             {
-              "maxLength": 2000,
+              "enum": [
+                "days",
+                "weeks",
+                "months",
+                "years"
+              ],
               "type": "string"
             },
             {
@@ -1229,7 +1256,45 @@
             }
           ],
           "default": null,
-          "title": "Relevance Statement"
+          "title": "Review Cadence Unit"
+        },
+        "review_cadence_value": {
+          "anyOf": [
+            {
+              "maximum": 999,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Cadence Value"
+        },
+        "review_deferred_until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Deferred Until"
+        },
+        "review_disabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Disabled"
         },
         "started_at": {
           "anyOf": [
@@ -2645,7 +2710,7 @@
       "properties": {
         "data": {
           "$ref": "#/$defs/StrictGoalUpdateSchema",
-          "description": "Supported reviewed fields: name, description, deadline, start date, parent_id, completion condition (activity threshold, children, or manual) with its activity threshold, relevance statement, activity inheritance, activity tracking, and progress settings."
+          "description": "Supported reviewed fields: name, description, deadline, start date, parent_id, completion condition (activity threshold, children, or manual) with its activity threshold, activity inheritance, activity tracking, progress settings, and the review schedule (cadence pair, or both null for the level's; review_disabled)."
         },
         "goal_id": {
           "description": "Opaque ID of an existing goal in the task's fractal.",
@@ -2851,6 +2916,7 @@
             "create_session": "#/$defs/CreateSessionOperation",
             "create_template": "#/$defs/CreateTemplateOperation",
             "schedule_program_day": "#/$defs/ScheduleProgramDayOperation",
+            "set_goal_sequence": "#/$defs/SetGoalSequenceOperation",
             "update_activity": "#/$defs/UpdateActivityOperation",
             "update_block": "#/$defs/UpdateBlockOperation",
             "update_goal": "#/$defs/UpdateGoalOperation",
@@ -2876,6 +2942,9 @@
           },
           {
             "$ref": "#/$defs/AssociateActivityGoalsOperation"
+          },
+          {
+            "$ref": "#/$defs/SetGoalSequenceOperation"
           },
           {
             "$ref": "#/$defs/CreateNoteOperation"

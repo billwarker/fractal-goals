@@ -23,15 +23,14 @@ const slimGoal = (overrides = {}) => ({
     completed: false,
     completed_at: null,
     is_smart: false,
-    // relevant: true comes from the server (e.g. inherited context) although relevance_statement is empty.
-    smart_status: { specific: true, measurable: false, achievable: true, relevant: true, time_bound: true },
+    // reviewed: true comes from the server's review schedule, which the slim payload doesn't carry.
+    smart_status: { specific: true, measurable: false, achievable: true, reviewed: true, time_bound: true },
     paused: false,
     paused_at: null,
     attributes: {
         parent_id: 'root',
         root_id: 'root',
         targets: [],
-        relevance_statement: '',
         associated_activity_ids: ['activity-1'],
         associated_activity_group_ids: [],
     },
@@ -75,8 +74,13 @@ describe('slim goal payload contract', () => {
         expect(isSMART(goal)).toBe(false);
         expect(isSMART(slimGoal({ is_smart: true }))).toBe(true);
         expect(calculateSMARTStatus(goal)).toEqual({
-            specific: true, measurable: false, achievable: true, relevant: true, timeBound: true,
+            specific: true, measurable: false, achievable: true, reviewed: true, timeBound: true,
         });
+    });
+
+    it('reads older snapshots whose SMART status still says relevant', () => {
+        const legacy = slimGoal({ smart_status: { specific: true, measurable: true, achievable: true, relevant: false, time_bound: true } });
+        expect(calculateSMARTStatus(legacy).reviewed).toBe(false);
     });
 
     it('counts completion and deadlines from top-level fields', () => {

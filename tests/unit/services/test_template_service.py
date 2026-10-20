@@ -33,7 +33,6 @@ def test_onboarding_derives_smart_completion_from_goal_fields(
     test_user,
 ):
     sample_ultimate_goal.description = 'A specific outcome'
-    sample_ultimate_goal.relevance_statement = 'It supports my long-term direction'
     sample_ultimate_goal.deadline = datetime.now(timezone.utc)
     sample_ultimate_goal.track_activities = False
     db_session.commit()

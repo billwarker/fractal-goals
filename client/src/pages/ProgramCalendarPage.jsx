@@ -165,7 +165,7 @@ function ProgramCalendarPage() {
         () => attachFeedBlocks(programs, calendarFeed.blocks),
         [calendarFeed.blocks, programs],
     );
-    const goalDeadlineEvents = useGoalDueCalendarEvents(goals, timezone, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon });
+    const goalDeadlineEvents = useGoalDueCalendarEvents(goals, timezone, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon }, displayProgram);
     const blockLabels = useMemo(() => (
         calendarPrograms.flatMap((program) => buildProgramBlockLabels({
             program,

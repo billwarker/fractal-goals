@@ -272,7 +272,6 @@ def operation_restore_payload(session, root_id, operation):
             "parent_id": goal.parent_id,
             "completion_condition": goal.completion_condition,
             "condition": serialize_goal_condition(goal.condition),
-            "relevance_statement": goal.relevance_statement,
             "inherit_parent_activities": goal.inherit_parent_activities,
             "track_activities": goal.track_activities,
             "progress_settings": goal.progress_settings,

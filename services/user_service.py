@@ -52,7 +52,7 @@ ONBOARDING_SUBSTEP_DEFAULTS = {
         'specific': False,
         'measurable': False,
         'achievable': False,
-        'relevant': False,
+        'reviewed': False,
         'time_bound': False,
         'review_badge': None,
         'goal_id': None,
@@ -163,7 +163,7 @@ class UserService:
         children = [goal for goal in goals if goal.parent_id is not None]
 
         best_smart_goal = None
-        best_smart_status = {key: False for key in ('specific', 'measurable', 'achievable', 'relevant', 'time_bound')}
+        best_smart_status = {key: False for key in ('specific', 'measurable', 'achievable', 'reviewed', 'time_bound')}
         for goal in goals:
             status = calculate_smart_status(goal)
             if sum(status.values()) > sum(best_smart_status.values()):

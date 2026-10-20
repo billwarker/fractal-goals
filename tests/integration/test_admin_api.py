@@ -347,7 +347,6 @@ def admin_landing_fractal(db_session, admin_user):
         id=str(uuid.uuid4()),
         name='Public Demo Child',
         description='A public-safe child goal',
-        relevance_statement='It ladders up to the demo ultimate goal',
         deadline=datetime(2030, 1, 1),
         level_id=getattr(long_level, 'id', None),
         parent_id=root.id,
@@ -357,7 +356,7 @@ def admin_landing_fractal(db_session, admin_user):
     db_session.add_all([root, child])
     db_session.flush()
 
-    # Make the child a genuinely SMART goal (description, relevance, deadline,
+    # Make the child a genuinely SMART goal (description, deadline,
     # an associated activity, and a completion condition) so the snapshot's canonical SMART
     # computation marks it is_smart — driving the SMART icon styling on landing.
     child.completion_condition = 'activity_threshold'

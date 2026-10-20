@@ -33,9 +33,13 @@ def _migration(filename='e1a2c3d4f5b6_goal_completion_conditions.py'):
     return module
 
 
-# Revisions after migration A that reshape what it creates; re-applied whenever A is rebuilt so
-# later tests see the schema the models describe.
-LATER_REVISIONS = ('f3c4d5e6a7b8_relax_goal_sequence_pair_check.py',)
+# Revisions after migration A that reshape what it creates, or retire what it left behind;
+# re-applied whenever A is rebuilt so later tests see the schema the models describe.
+LATER_REVISIONS = (
+    'f3c4d5e6a7b8_relax_goal_sequence_pair_check.py',
+    'a4b5c6d7e8f9_drop_legacy_targets.py',
+    'c6d7e8f9a0b1_retire_relevance_statements.py',
+)
 
 
 @pytest.mark.integration

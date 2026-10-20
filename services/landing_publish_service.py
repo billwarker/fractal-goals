@@ -163,6 +163,7 @@ class LandingPublishService(
         example_started = perf_counter()
         goals_by_id = load_fractal_goals_for_serialization(
             self.db_session, item["root_id"], include_group_activities=True,
+            with_review_dates=False,  # public snapshots don't show reviews
         )
         root = goals_by_id.get(item["root_id"])
         if not root:

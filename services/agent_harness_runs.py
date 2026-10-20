@@ -36,6 +36,7 @@ def _enabled_run_origins(agent_flags):
 
 class AgentRunsMixin:
     db_session: Any
+    _app_href: Any  # provided by the composed AgentHarnessService
     def _mark_unstarted_operations(
         self, run_id, worker_id, fencing_token, stop_sequence, *, cancelled,
     ):
@@ -346,6 +347,23 @@ class AgentRunsMixin:
                 "name": entity.name,
                 "type": get_canonical_goal_type(entity),
                 "root_id": entity.root_id,
+                "href": self._app_href(locked_run.root_id, "goals"),
+            }
+        elif operation.kind == "set_goal_sequence":
+            from services.goal_sequence_service import GoalSequenceService
+
+            payload, error, status = GoalSequenceService(self.db_session).sequence_goals(
+                locked_run.root_id, locked_run.user_id, input_data["goal_ids"],
+                commit=False, pending_events=pending_events,
+            )
+            if error or payload is None:
+                raise AgentHarnessError(str(error), status, "validation_failed")
+            result = {
+                "id": payload["id"],
+                "name": "Sequence",
+                "root_id": locked_run.root_id,
+                "goal_ids": payload["goal_ids"],
+                "dissolved": bool(payload.get("dissolved")),
                 "href": self._app_href(locked_run.root_id, "goals"),
             }
         elif operation.kind == "create_activity":

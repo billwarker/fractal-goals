@@ -22,7 +22,7 @@ class NoteCreateSchema(BaseModel):
     activity_definition_id: Optional[str] = None
     goal_id: Optional[str] = None
     activity_set_id: Optional[str] = None
-    note_kind: Optional[str] = Field(None, pattern=r'^(goal_completion)$')
+    note_kind: Optional[str] = Field(None, pattern=r'^(goal_completion|goal_review)$')
 
     @field_validator('content')
     @classmethod

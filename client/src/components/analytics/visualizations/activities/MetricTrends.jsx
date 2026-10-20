@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
+import { goalLineAnnotations } from '../../../../utils/goalConditionLines';
 import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const palette = ['#3b82f6', '#22c55e'];
@@ -98,6 +99,7 @@ export function buildMetricTrendData({
     const datasets = selectedMetricDefs.map((metric, index) => ({
         type: 'line',
         label: metric.name,
+        metricId: metric.id, // read by the chart's "Set goal here…" menu
         data: sortedInstances.map((instance) => resolveMetricValue(instance, metric, setsHandling, selectedSplit)),
         borderColor: palette[index],
         backgroundColor: `${palette[index]}33`,
@@ -119,6 +121,7 @@ export function MetricTrendsChart({
     metrics = [],
     setsHandling = 'top',
     selectedSplit = 'all',
+    goalLines = [],
 }) {
     const metricDefinitions = useMemo(() => activity?.metric_definitions || [], [activity?.metric_definitions]);
     const chartTheme = useChartThemeDefaults();
@@ -152,6 +155,11 @@ export function MetricTrendsChart({
                         labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
                     },
                     title: { display: true, text: 'Metric Trends', color: chartTheme.textColor },
+                    annotation: {
+                        annotations: goalLineAnnotations(goalLines, Object.fromEntries(
+                            chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]),
+                        )),
+                    },
                     tooltip: {
                         backgroundColor: chartTheme.tooltipBg,
                         titleColor: chartTheme.tooltipText,

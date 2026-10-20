@@ -281,7 +281,7 @@ class _LandingSettingsMixin:
             AnalyticsDashboard.name.asc(),
         ).all()
 
-        goals = load_fractal_goals_for_serialization(self.db_session, root.id)
+        goals = load_fractal_goals_for_serialization(self.db_session, root.id, with_review_dates=False)
         goal_options = sorted(
             (
                 {

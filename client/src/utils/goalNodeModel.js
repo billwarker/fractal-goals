@@ -75,7 +75,6 @@ export const normalizeGoalNode = (goal, options = {}) => {
         type,
         goalCategory: getGoalNodeCategory(type),
         description: getGoalNodeDescription(goal),
-        relevance_statement: goal.attributes?.relevance_statement ?? goal.relevance_statement,
         deadline: goal.deadline ?? goal.attributes?.deadline ?? null,
         completed: Boolean(goal.completed ?? goal.attributes?.completed),
         completed_at: goal.completed_at ?? goal.attributes?.completed_at ?? null,

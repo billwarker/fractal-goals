@@ -126,7 +126,6 @@ class _GoalLifecycleMixin:
             'description': source.description or '',
             'parent_id': source.parent_id,
             'deadline': source.deadline.isoformat() if source.deadline else None,
-            'relevance_statement': source.relevance_statement,
             'inherit_parent_activities': source.inherit_parent_activities,
             'track_activities': source.track_activities,
             'completion_condition': source.completion_condition,

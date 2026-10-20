@@ -1,0 +1,48 @@
+.banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-brand-warning) 45%, var(--color-border));
+    border-radius: var(--border-radius-md, 8px);
+    background: color-mix(in srgb, var(--color-brand-warning) 10%, var(--color-bg-card));
+}
+
+.text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.text strong {
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.offRow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.inlineAction {
+    color: var(--color-brand-primary);
+    font-size: 12px;
+    text-decoration: underline;
+    cursor: pointer;
+}

@@ -53,6 +53,12 @@ def register_goal_sequence_routes(blueprint):
         """Dissolve a sequence; goals it held paused resume."""
         return _respond(lambda service: service.dissolve_track(root_id, current_user.id, track_id), "Error removing sequence")
 
+    @blueprint.route('/<root_id>/goals/<goal_id>/sequence-hold', methods=['POST'])
+    @token_required
+    def hold_sequence_step(current_user, root_id, goal_id):
+        """Undo an automatic begin: the step waits, paused, on its sequence again."""
+        return _respond(lambda service: service.hold_step(root_id, current_user.id, goal_id), "Error holding sequence step")
+
     @blueprint.route('/<root_id>/goals/<goal_id>/sequence', methods=['GET'])
     @token_required
     def get_goal_sequence(current_user, root_id, goal_id):

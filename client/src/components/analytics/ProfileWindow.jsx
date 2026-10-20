@@ -30,6 +30,7 @@ import {
     normalizeVisualizationState,
 } from './visualizations/state';
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
+import ChartGoalSurface from './ChartGoalSurface';
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
@@ -636,7 +637,9 @@ function ProfileWindow({
         if (!VisualizationChart) return null;
 
         return (
-            <VisualizationChart
+            <ChartGoalSurface
+                Chart={VisualizationChart}
+                rootId={rootId}
                 context={{
                     data,
                     scopedData: {

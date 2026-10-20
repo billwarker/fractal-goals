@@ -16,6 +16,9 @@ class Note(Base):
     
     __table_args__ = (
         sa.Index('ix_notes_root_context_deleted', 'root_id', 'context_type', 'context_id', 'deleted_at'),
+        sa.CheckConstraint(
+            "note_kind IS NULL OR note_kind IN ('goal_completion', 'goal_review')", name='ck_notes_note_kind',
+        ),
     )
     
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)

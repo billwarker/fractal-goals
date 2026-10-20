@@ -49,6 +49,23 @@ def register_goal_condition_routes(blueprint):
         finally:
             db_session.close()
 
+    @blueprint.route('/<root_id>/goals/conditions', methods=['GET'])
+    @token_required
+    def list_activity_goal_conditions(current_user, root_id):
+        """Up to 50 live goals whose condition is on `activity_id` (open goals first)."""
+        db_session = get_db_session()
+        try:
+            payload, error, status = GoalConditionReadService(db_session).list_for_activity(
+                root_id, current_user.id, request.args.get('activity_id', '').strip(),
+            )
+            return (error_response(error, status) if error else (jsonify(payload), status))
+        except SQLAlchemyError:
+            db_session.rollback()
+            logger.exception('Error listing goal conditions')
+            return internal_error(logger, 'Goals API request failed')
+        finally:
+            db_session.close()
+
     @blueprint.route('/<root_id>/goals/<goal_id>/condition/evidence', methods=['GET'])
     @token_required
     def get_goal_condition_evidence(current_user, root_id, goal_id):

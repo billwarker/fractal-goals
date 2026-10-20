@@ -109,6 +109,16 @@ def next_step(db_session, goal: Any) -> Any:
     ), None)
 
 
+def sequence_begun_by_id(goal: Any) -> str | None:
+    """The predecessor whose completion began this open step, while it still runs."""
+    if goal.paused or goal.completed or not goal.sequence_track_id:
+        return None
+    latest = max((goal.pause_intervals or []), key=lambda interval: interval.paused_at, default=None)
+    if latest is None or latest.resumed_at is None:
+        return None
+    return latest.resumed_by_goal_id
+
+
 def step_resumed_by(db_session, goal: Any) -> Any:
     """The step that completing `goal` resumed and that is still open (so un-completing can re-pause it)."""
     if not goal.sequence_track_id:
@@ -233,50 +243,64 @@ class GoalSequenceService:
             raise GoalSequenceError("A goal can be in only one sequence")
         return ordered
 
-    def _finish(self, track_id: str, pending_events: list) -> list[Any]:
+    def _finish(self, track_id: str, pending_events: list, commit: bool) -> list[Any]:
         resumed = apply_track_pauses(self.db_session, track_id)
         _reconcile_resumed(self.db_session, resumed, pending_events)
-        self.db_session.commit()
-        _emit_pending_events(pending_events)
+        if commit:
+            self.db_session.commit()
+            _emit_pending_events(pending_events)
+        else:
+            self.db_session.flush()
         return track_steps(self.db_session, track_id)
 
-    def create_track(self, root_id, current_user_id, parent_goal_id, goal_ids) -> ServiceResult[dict]:
+    def _fail(self, error: GoalSequenceError, commit: bool) -> tuple[None, str, int]:
+        # Inside a caller's transaction (commit=False) the caller decides what to roll back.
+        if commit:
+            self.db_session.rollback()
+        return None, str(error), error.status
+
+    def create_track(
+        self, root_id, current_user_id, parent_goal_id, goal_ids, *, commit=True, pending_events=None,
+    ) -> ServiceResult[dict]:
         try:
             self._authorize(root_id, current_user_id)
             parent = self._lock_parent(root_id, parent_goal_id)
             ordered = self._validated_steps(root_id, parent, list(goal_ids or []), None)
         except GoalSequenceError as error:
-            self.db_session.rollback()
-            return None, str(error), error.status
+            return self._fail(error, commit)
         track: Any = GoalSequenceTrack(root_id=root_id, parent_goal_id=parent.id, level_id=ordered[0].level_id)
         self.db_session.add(track)
         self.db_session.flush()
         for position, goal in enumerate(ordered, start=1):
             goal.sequence_track_id = track.id
             goal.sequence_position = position
-        steps = self._finish(track.id, [])
+        steps = self._finish(track.id, pending_events if pending_events is not None else [], commit)
         return {'id': track.id, 'parent_goal_id': parent.id, 'goal_ids': [goal.id for goal in steps]}, None, 201
 
-    def set_track_steps(self, root_id, current_user_id, track_id, goal_ids) -> ServiceResult[dict]:
+    def set_track_steps(
+        self, root_id, current_user_id, track_id, goal_ids, *, commit=True, pending_events=None,
+    ) -> ServiceResult[dict]:
         """Reorder, add or remove steps; fewer than two steps dissolves the track."""
         track = self.db_session.query(GoalSequenceTrack).filter_by(id=track_id, root_id=root_id, deleted_at=None).first()
         if not track:
             return None, "Sequence not found", 404
         goal_ids = list(goal_ids or [])
+        events = pending_events if pending_events is not None else []
         try:
             self._authorize(root_id, current_user_id)
             parent = self._lock_parent(root_id, track.parent_goal_id)
             if len(goal_ids) < MIN_STEPS:
-                pending_events = []
                 for goal in track_steps(self.db_session, track.id):
-                    leave_track(self.db_session, goal, pending_events)
-                self.db_session.commit()
-                _emit_pending_events(pending_events)
+                    leave_track(self.db_session, goal, events)
+                if commit:
+                    self.db_session.commit()
+                    _emit_pending_events(events)
+                else:
+                    self.db_session.flush()
                 return {'id': track.id, 'parent_goal_id': parent.id, 'goal_ids': [], 'dissolved': True}, None, 200
             ordered = self._validated_steps(root_id, parent, goal_ids, track.id)
         except GoalSequenceError as error:
-            self.db_session.rollback()
-            return None, str(error), error.status
+            return self._fail(error, commit)
         kept = {goal.id for goal in ordered}
         now = _now()
         for goal in track_steps(self.db_session, track.id):
@@ -287,11 +311,49 @@ class GoalSequenceService:
                 goal.sequence_position = None
         self.db_session.flush()
         _renumber(self.db_session, ordered, track.id)
-        steps = self._finish(track.id, [])
+        steps = self._finish(track.id, events, commit)
         return {'id': track.id, 'parent_goal_id': parent.id, 'goal_ids': [goal.id for goal in steps]}, None, 200
+
+    def sequence_goals(self, root_id, current_user_id, goal_ids, *, commit=True, pending_events=None) -> ServiceResult[dict]:
+        """Sequence sibling goals in this order: replaces the sequence they're already in, or creates
+        one under their parent. Used by agent proposals, which name goals rather than tracks."""
+        goal_ids = list(goal_ids or [])
+        goals = self.db_session.query(Goal).filter(
+            Goal.id.in_(goal_ids), Goal.root_id == root_id, Goal.deleted_at.is_(None),
+        ).all() if goal_ids else []
+        if not goals:
+            return None, "Goal not found in this fractal", 404
+        track_ids = {goal.sequence_track_id for goal in goals if goal.sequence_track_id}
+        if len(track_ids) > 1:
+            return None, "These goals are in different sequences; change one sequence at a time", 400
+        if track_ids:
+            return self.set_track_steps(
+                root_id, current_user_id, track_ids.pop(), goal_ids, commit=commit, pending_events=pending_events,
+            )
+        return self.create_track(
+            root_id, current_user_id, goals[0].parent_id, goal_ids, commit=commit, pending_events=pending_events,
+        )
 
     def dissolve_track(self, root_id, current_user_id, track_id) -> ServiceResult[dict]:
         return self.set_track_steps(root_id, current_user_id, track_id, [])
+
+    def hold_step(self, root_id, current_user_id, goal_id) -> ServiceResult[dict]:
+        """Undo an automatic begin: re-pause a step its predecessor's completion began, as waiting
+        on the sequence. The predecessor stays complete."""
+        try:
+            self._authorize(root_id, current_user_id)
+            goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
+            if not goal:
+                raise GoalSequenceError("Goal not found", 404)
+            self._lock_parent(root_id, goal.parent_id)
+        except GoalSequenceError as error:
+            self.db_session.rollback()
+            return None, str(error), error.status
+        if sequence_begun_by_id(goal) is None:
+            return None, "This goal wasn't begun by its sequence, so there's nothing to undo", 409
+        _pause_for_sequence(self.db_session, goal, _now())
+        self.db_session.commit()
+        return {'id': goal.id, 'paused': True, 'pause_reason': PAUSE_REASON_SEQUENCE}, None, 200
 
     def get_goal_sequence(self, root_id, current_user_id, goal_id) -> ServiceResult[dict]:
         """A goal's track, the step completing it would begin, and the step its completion began."""

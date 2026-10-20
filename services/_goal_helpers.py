@@ -232,6 +232,22 @@ class _GoalHelpersMixin:
             )
         return None
 
+    def _apply_review_fields(self, goal, data) -> str | None:
+        """Review schedule fields: a cadence pair (both null = the level's), off, and a deferral."""
+        if 'review_cadence_value' in data or 'review_cadence_unit' in data:
+            goal.review_cadence_value = data.get('review_cadence_value')
+            goal.review_cadence_unit = data.get('review_cadence_unit')
+        if 'review_disabled' in data:
+            goal.review_disabled = bool(data['review_disabled'])
+        if 'review_deferred_until' in data:
+            deferred, error = self._parse_deadline(data['review_deferred_until'])
+            if error:
+                return "Invalid review date format. Use YYYY-MM-DD"
+            if deferred is not None and not isinstance(deferred, datetime):
+                deferred = datetime.combine(deferred, datetime.min.time())
+            goal.review_deferred_until = deferred
+        return None
+
     def _validate_description_required(self, level_obj, description) -> str | None:
         if level_obj and getattr(level_obj, 'description_required', False):
             if not description or not description.strip():
@@ -396,8 +412,9 @@ class _GoalHelpersMixin:
                     parent.row_version += 1
 
         if allow_extended_fields:
-            if 'relevance_statement' in data:
-                goal.relevance_statement = data['relevance_statement']
+            review_error = self._apply_review_fields(goal, data)
+            if review_error:
+                return None, (review_error, 400)
             if 'inherit_parent_activities' in data:
                 goal.inherit_parent_activities = data['inherit_parent_activities']
             if 'track_activities' in data:

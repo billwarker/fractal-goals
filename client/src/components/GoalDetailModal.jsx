@@ -8,6 +8,7 @@ import useInitialGoalDetailView from '../hooks/useInitialGoalDetailView';
 import { useGoalNotes } from '../hooks/useGoalNotes';
 import { useGoalAssociations } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
+import useLevelDefaultDeadline from '../hooks/useLevelDefaultDeadline';
 import { getChildType, getValidChildTypes } from '../utils/goalHelpers';
 import { flattenGoalTree } from '../utils/goalNodeModel';
 import { buildConditionPayload, validateConditionDraft } from '../utils/goalConditions';
@@ -66,6 +67,7 @@ function GoalDetailModal({
         getGoalSecondaryColor = () => '#2e7d32',
         getGoalIcon = () => 'circle',
         getLevelByName = () => null,
+        getLevelCharacteristics = () => ({}),
     } = useGoalLevels() || {};
     // Normalize activityDefinitions to always be an array (handles null case)
     const activityDefinitions = useMemo(() => (Array.isArray(activityDefinitionsRaw) ? activityDefinitionsRaw : []),
@@ -90,12 +92,13 @@ function GoalDetailModal({
         name, setName,
         description, setDescription,
         deadline, setDeadline,
-        relevanceStatement, setRelevanceStatement,
         startedAt, setStartedAt,
         completionCondition, setCompletionCondition,
         conditionDraft, setConditionDraft,
         inheritParentActivities, setInheritParentActivities,
         trackActivities,
+        reviewCadence, setReviewCadence,
+        reviewsOn, setReviewsOn,
         resetForm,
         errors, validateForm
     } = useGoalForm(goal, mode, initialCompletion);
@@ -299,7 +302,6 @@ function GoalDetailModal({
             description,
             deadline: deadline || null,
             type: goalType,
-            relevance_statement: relevanceStatement,
             parent_id: parentGoal?.attributes?.id || parentGoal?.id,
             inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
@@ -308,10 +310,14 @@ function GoalDetailModal({
             name,
             description,
             deadline: deadline || null,
-            relevance_statement: relevanceStatement,
             inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
             ...completionFields,
+            ...(levelConfig.uses_reviews ? {
+                review_cadence_value: reviewCadence?.value ?? null,
+                review_cadence_unit: reviewCadence?.unit ?? null,
+                review_disabled: !reviewsOn,
+            } : {}),
         };
 
         if (mode === 'create') {
@@ -352,7 +358,12 @@ function GoalDetailModal({
     };
 
     const childType = getChildType(goalType);
-    const levelConfig = getLevelByName(goalType) || {};
+    // The goal's own (possibly customised) level; a type key alone only finds the built-in defaults.
+    const levelConfig = {
+        ...(getLevelByName(goalType) || {}),
+        ...getLevelCharacteristics(mode === 'create' ? goalType : goal),
+    };
+    useLevelDefaultDeadline({ mode, levelConfig, deadline, setDeadline });
 
     const parentGoalInfo = getParentGoalInfo({ mode, parentGoal, goal, treeData });
     const parentGoalName = parentGoalInfo?.name;
@@ -526,8 +537,13 @@ function GoalDetailModal({
         completionCondition,
         associatedActivityIds: associatedActivities ? associatedActivities.map((a) => a.id) : [],
         deadline,
-        relevanceStatement,
         inheritParentActivities,
+        reviewsOn,
+        reviewCadence,
+        reviewLevel: {
+            uses_reviews: Boolean(levelConfig.uses_reviews),
+            review_cadence_value: levelConfig.review_cadence_value ?? null,
+        },
     });
 
     // For modal mode, check isOpen
@@ -624,7 +640,6 @@ function GoalDetailModal({
             registerActivitiesAssociateAction={registerActivitiesAssociateAction}
             registerActivitiesAssociateCancelAction={registerActivitiesAssociateCancelAction}
             registerActivityPickerFooterActions={registerActivityPickerFooterActions}
-            relevanceStatement={relevanceStatement}
             rootId={rootId}
             selectedChildType={selectedChildType}
             setActivityBuilderReturnView={setActivityBuilderReturnView}
@@ -636,6 +651,10 @@ function GoalDetailModal({
             setConditionDraft={updateConditionDraft}
             setStartedAt={setStartedAt}
             startedAt={startedAt}
+            reviewCadence={reviewCadence}
+            setReviewCadence={setReviewCadence}
+            reviewsOn={reviewsOn}
+            setReviewsOn={setReviewsOn}
             setDeadline={setDeadline}
             setDescription={setDescription}
             setInheritParentActivities={setInheritParentActivities}
@@ -643,7 +662,6 @@ function GoalDetailModal({
             setIsActivityBuilderOpen={setIsActivityBuilderOpen}
             setIsEditing={setIsEditing}
             setName={setName}
-            setRelevanceStatement={setRelevanceStatement}
             setSelectedChildType={setSelectedChildType}
             setViewState={setViewState}
             textColor={textColor}

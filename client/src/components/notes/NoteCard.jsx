@@ -9,6 +9,7 @@ import GoalIcon from '../atoms/GoalIcon';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
+import { GOAL_NOTE_TYPES, NOTE_KIND_LABELS, NOTE_TYPE_LABELS } from '../../utils/noteTypes';
 function buildPlainTextPreview(content) {
     if (!content) return '';
     return content
@@ -41,29 +42,12 @@ function deriveNoteTypeLabel(note) {
     if (note.note_type_label) {
         return note.note_type_label;
     }
-    const labels = {
-        fractal_note: 'Fractal Note',
-        goal_note: 'Goal Note',
-        goal_completion_note: 'Goal Completion Note',
-        session_note: 'Session Note',
-        program_note: 'Program Note',
-        activity_instance_note: 'Activity Instance Note',
-        activity_set_note: 'Activity Set Note',
-        activity_definition_note: 'Activity Definition Note',
-        circuit_run_note: 'Activity Circuit Note',
-        circuit_round_note: 'Circuit Round Note',
-        note: 'Note',
-    };
-    return labels[deriveNoteType(note)] || 'Note';
+    return NOTE_TYPE_LABELS[deriveNoteType(note)] || 'Note';
 }
 
 function formatMetadataNoteTypeLabel(label) {
     return label.replace(/\s+Note$/i, '');
 }
-
-const NOTE_KIND_LABELS = {
-    goal_completion: 'Goal Completion',
-};
 
 function NoteCard({
     note,
@@ -268,6 +252,7 @@ function NoteCard({
             case 'goal_note':
                 return note.goal_name || note.content || 'Goal';
             case 'goal_completion_note':
+            case 'goal_review_note':
                 return note.goal_name || note.content || 'Goal';
             case 'session_note':
                 return suppressSessionContext
@@ -288,7 +273,7 @@ function NoteCard({
     })();
     const secondaryContextBadges = [];
     if (showContext && resolvedNoteType !== 'fractal_note') {
-        if (resolvedNoteType !== 'goal_note' && resolvedNoteType !== 'goal_completion_note' && note.goal_name) {
+        if (!GOAL_NOTE_TYPES.has(resolvedNoteType) && note.goal_name) {
             secondaryContextBadges.push({ type: 'text', label: note.goal_name });
         }
         if (resolvedNoteType !== 'activity_instance_note' && resolvedNoteType !== 'activity_definition_note' && resolvedNoteType !== 'activity_set_note' && note.activity_definition_name) {

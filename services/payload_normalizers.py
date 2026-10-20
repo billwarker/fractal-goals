@@ -99,8 +99,8 @@ def normalize_goal_payload(data, *, partial=False):
     if 'description' in normalized or not partial:
         normalized['description'] = sanitize_string(normalized.get('description') or '')
 
-    if 'relevance_statement' in normalized or not partial:
-        normalized['relevance_statement'] = _normalize_optional_string(normalized.get('relevance_statement'))
+    # Retired field: older clients may still send it.
+    normalized.pop('relevance_statement', None)
 
     if 'parent_id' in normalized or not partial:
         normalized['parent_id'] = _normalize_optional_string(normalized.get('parent_id'))

@@ -1,0 +1,25 @@
+.surface {
+    display: contents;
+}
+
+.menuAnchor {
+    position: fixed;
+    z-index: 1000;
+}
+
+.menu {
+    top: 4px;
+    min-width: 220px;
+    max-width: min(320px, calc(100vw - 32px));
+}
+
+.itemText {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.itemText span {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}

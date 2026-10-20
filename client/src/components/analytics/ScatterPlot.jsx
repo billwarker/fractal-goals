@@ -1,5 +1,6 @@
 import React from 'react';
 import { Scatter } from 'react-chartjs-2';
+import { goalLineAnnotations } from '../../utils/goalConditionLines';
 import { useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
 import { withScatterPointDensity } from './scatterPointProfile';
 import styles from './ScatterPlot.module.css';
@@ -20,6 +21,7 @@ function ScatterPlot({
     chartRef,
     selectedMetricX = null,
     selectedMetricY = null,
+    goalLines = [],
 }) {
     const chartTheme = useChartThemeDefaults();
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
@@ -207,6 +209,9 @@ function ScatterPlot({
     const chartData = {
         datasets: [{
             label: selectedActivity.name,
+            // Read by the chart's "Set goal here…" menu.
+            metricX: xMetricToPlot?.id,
+            metricY: yMetricToPlot?.id,
             data: chartDataPoints,
             backgroundColor: 'rgba(33, 150, 243, 0.7)',
             borderColor: chartTheme.borderColor,
@@ -223,6 +228,12 @@ function ScatterPlot({
         ...baseOptions,
         plugins: {
             ...baseOptions.plugins,
+            annotation: {
+                annotations: goalLineAnnotations(goalLines, {
+                    ...(xMetricToPlot ? { [xMetricToPlot.id]: 'x' } : {}),
+                    ...(yMetricToPlot ? { [yMetricToPlot.id]: 'y' } : {}),
+                }),
+            },
             tooltip: {
                 ...baseOptions.plugins.tooltip,
                 callbacks: {

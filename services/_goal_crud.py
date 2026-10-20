@@ -29,7 +29,7 @@ class _GoalCrudMixin:
         _, storage_error, storage_status = quota_service.check_storage_available(
             current_user_id,
             QuotaService._payload_size(
-                data.get('name'), data.get('description'), data.get('relevance_statement'),
+                data.get('name'), data.get('description'),
                 data.get('condition'), data.get('progress_settings'),
             ),
         )
@@ -104,7 +104,6 @@ class _GoalCrudMixin:
                 deadline=deadline,
                 completed=False,
                 inherit_parent_activities=inherit_parent_activities,
-                relevance_statement=data.get('relevance_statement'),
                 parent_id=parent_id,
                 owner_id=parent.owner_id if parent else current_user_id,
             )
@@ -192,7 +191,7 @@ class _GoalCrudMixin:
         _, storage_error, storage_status = quota_service.check_storage_available(
             current_user_id,
             QuotaService._payload_size(
-                data.get('name'), data.get('description'), data.get('relevance_statement'),
+                data.get('name'), data.get('description'),
                 data.get('condition'), data.get('progress_settings'),
             ),
         )
@@ -275,7 +274,6 @@ class _GoalCrudMixin:
                 completed=False,
                 inherit_parent_activities=inherit_parent_activities,
                 track_activities=data.get('track_activities', True),
-                relevance_statement=data.get('relevance_statement'),
                 root_id=root_id,
                 owner_id=current_user_id,
             )

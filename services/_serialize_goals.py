@@ -52,6 +52,20 @@ def _pause_reason(goal):
     return getattr(open_interval, 'reason', None) or 'manual'
 
 
+def _review(goal):
+    """The review schedule for levels that review goals (status computed in UTC; the client
+    re-checks next_review_on against the user's today)."""
+    from services.goal_review_rules import goal_review_state
+    return goal_review_state(goal)
+
+
+def _sequence_begun_by(goal):
+    if not getattr(goal, 'sequence_track_id', None):
+        return None
+    from services.goal_sequence_service import sequence_begun_by_id
+    return sequence_begun_by_id(goal)
+
+
 def serialize_goal(goal, include_children=True):
     """Serialize a Goal object."""
     smart_status = calculate_smart_status(goal)
@@ -98,7 +112,6 @@ def serialize_goal(goal, include_children=True):
             "owner_id": getattr(goal, 'owner_id', None),
             "created_at": format_utc(goal.created_at),
             "updated_at": format_utc(goal.updated_at),
-            "relevance_statement": goal.relevance_statement,
             "inherit_parent_activities": goal.inherit_parent_activities,
             "track_activities": goal.track_activities,
             "associated_activity_ids": [a.id for a in goal.associated_activities] if goal.associated_activities else [],
@@ -108,6 +121,19 @@ def serialize_goal(goal, include_children=True):
         "children": []
     }
 
+    if getattr(goal, 'sequence_track_id', None):
+        # The predecessor whose completion began this step, while it runs (Undo can re-pause it).
+        result["sequence_begun_by"] = _sequence_begun_by(goal)
+    review = _review(goal)
+    if review is not None:
+        # Only levels that review goals carry the schedule and its settings.
+        result.update({
+            "review": review,
+            "review_cadence_value": goal.review_cadence_value,
+            "review_cadence_unit": goal.review_cadence_unit,
+            "review_disabled": bool(goal.review_disabled),
+            "review_deferred_until": format_utc(goal.review_deferred_until),
+        })
     if include_children:
         result["children"] = [serialize_goal(child) for child in goal.children if child.deleted_at is None]
 

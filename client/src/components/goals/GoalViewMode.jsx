@@ -13,15 +13,12 @@ function GoalViewMode({
     goal,
     goalId,
     rootId,
-    goalType,
     goalColor,
-    parentGoalName,
-    parentGoalColor,
     displayMode,
     programs,
     activityDefinitions,
     name,
-    relevanceStatement,
+    levelConfig = null,
     goalCompletionNote,
     conditionSnapshot = null,
     // Handlers
@@ -55,11 +52,8 @@ function GoalViewMode({
             <GoalSmartSection
                 goal={goal}
                 goalColor={goalColor}
-                parentGoalName={parentGoalName}
-                parentGoalColor={parentGoalColor}
                 mode={mode}
-                goalType={goalType}
-                relevanceStatement={relevanceStatement}
+                usesReviews={Boolean(levelConfig?.uses_reviews)}
             />
 
             {/* Associated Programs */}

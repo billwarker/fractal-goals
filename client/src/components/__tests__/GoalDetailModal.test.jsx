@@ -238,8 +238,6 @@ describe('GoalDetailModal smoke coverage', () => {
             setDescription: vi.fn(),
             deadline: '2026-04-01',
             setDeadline: vi.fn(),
-            relevanceStatement: 'Build momentum',
-            setRelevanceStatement: vi.fn(),
             trackActivities: true,
             setTrackActivities: vi.fn(),
             startedAt: '',
@@ -846,11 +844,11 @@ describe('GoalDetailModal smoke coverage', () => {
                 name: 'Deep Work',
                 description: 'Focus on leverage work',
                 deadline: '2026-04-01',
-                relevance_statement: 'Build momentum',
                 parent_id: 'parent-1',
                 completion_condition: 'manual',
             }));
         });
+        expect(onCreate.mock.calls[0][0]).not.toHaveProperty('relevance_statement');
         expect(onCreate.mock.calls[0][0]).not.toHaveProperty('condition');
         expect(onCreate.mock.calls[0][0]).not.toHaveProperty('started_at');
 

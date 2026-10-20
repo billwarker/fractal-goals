@@ -103,6 +103,7 @@ export function MetricProgressChart({
                 labels: rows.map((row) => row.label),
                 datasets: [{
                     label: '% improvement',
+                    metricId: selectedMetricId, // read by the chart's "Set goal here…" menu
                     data: rows.map((row) => row.value),
                     backgroundColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
                     borderColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),

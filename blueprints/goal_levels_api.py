@@ -33,6 +33,9 @@ def serialize_goal_level(level):
         "default_deadline_offset_value": level.default_deadline_offset_value,
         "default_deadline_offset_unit": level.default_deadline_offset_unit,
         "sort_children_by": level.sort_children_by,
+        "uses_reviews": bool(getattr(level, 'uses_reviews', False)),
+        "review_cadence_value": getattr(level, 'review_cadence_value', None),
+        "review_cadence_unit": getattr(level, 'review_cadence_unit', None),
         "created_at": format_utc(level.created_at),
         "updated_at": format_utc(level.updated_at)
     }

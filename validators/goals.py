@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field, field_validator, model_validator, ConfigD
 from .core import (
     MAX_NAME_LENGTH,
     MAX_DESCRIPTION_LENGTH,
-    MAX_RELEVANCE_LENGTH,
     VALID_PROGRESS_AGGREGATIONS,
     sanitize_string,
     parse_date_string,
@@ -37,7 +36,6 @@ class GoalCreateSchema(BaseModel):
     started_at: Optional[str] = None
     completion_condition: Optional[Literal['activity_threshold', 'children', 'manual']] = None
     condition: Optional[Dict[str, Any]] = None
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     inherit_parent_activities: Optional[bool] = False
     track_activities: Optional[bool] = True
     session_id: Optional[str] = None  # If provided, link goal to session
@@ -55,13 +53,6 @@ class GoalCreateSchema(BaseModel):
     @field_validator('description')
     @classmethod
     def sanitize_description(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
-
-    @field_validator('relevance_statement')
-    @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
         if v is None:
             return v
         return sanitize_string(v)
@@ -108,12 +99,36 @@ class GoalUpdateSchema(BaseModel):
     started_at: Optional[str] = None
     completion_condition: Optional[Literal['activity_threshold', 'children', 'manual']] = None
     condition: Optional[Dict[str, Any]] = None
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     completed: Optional[bool] = None
     inherit_parent_activities: Optional[bool] = None
     track_activities: Optional[bool] = None
     progress_settings: Optional[Dict[str, Any]] = None
-    
+    # Review schedule: both cadence fields together (both null = use the level's cadence).
+    review_cadence_value: Optional[int] = Field(None, ge=1, le=999)
+    review_cadence_unit: Optional[Literal['days', 'weeks', 'months', 'years']] = None
+    review_disabled: Optional[bool] = None
+    review_deferred_until: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validate_review_cadence_pair(self):
+        sent = self.model_fields_set
+        if ('review_cadence_value' in sent) != ('review_cadence_unit' in sent) or (
+            (self.review_cadence_value is None) != (self.review_cadence_unit is None)
+        ):
+            raise ValueError("Send review_cadence_value and review_cadence_unit together")
+        return self
+
+    @field_validator('review_deferred_until')
+    @classmethod
+    def validate_review_deferred_until(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '':
+            return None
+        try:
+            parse_date_string(v.split('T')[0])
+            return v
+        except ValueError:
+            raise ValueError("Invalid review date format. Use YYYY-MM-DD")
+
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
@@ -128,12 +143,6 @@ class GoalUpdateSchema(BaseModel):
             return v
         return sanitize_string(v)
     
-    @field_validator('relevance_statement')
-    @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
 
     @field_validator('started_at')
     @classmethod
@@ -262,20 +271,12 @@ class FractalCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     type: Optional[str] = Field('UltimateGoal')
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     deadline: Optional[str] = None
     level_styles: Optional[Dict[str, Dict[str, Any]]] = None
     
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: str) -> str:
-        return sanitize_string(v)
-
-    @field_validator('relevance_statement')
-    @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
         return sanitize_string(v)
     
     @field_validator('type')

@@ -311,7 +311,7 @@ Goal creation is scattered and completion is split between two ideas, goals and 
 
 ### Phase 1 (2026-10-19)
 - Migration A (`e1a2c3d4f5b6`) was applied to the local database after a dry run and a backup (`backups/pre-conditions/fractal_goals_20261019.dump`). It produced 16 conditions and 1 sequence track. 7 rule-less targets were left manual with warnings. `--verify` reports 0 drift.
-- Migration B (dropping the target tables and columns) is not written yet, and waits on sign-off.
+- Migration B: see "Migration B" below.
 
 ### Phase 2 (2026-10-19)
 - **No `GoalTreeComposer` wrapper.** The scoped "+" lives in `GoalHierarchyList` behind `onStartSubGoalCreation`, since all three surfaces already render that list and two already scope through goal icons.
@@ -338,4 +338,72 @@ Goal creation is scattered and completion is split between two ideas, goals and 
 - **Agent and MCP operations for sequences are not added yet.** Sequences are managed in the app.
 - **Fixes found along the way:**
   - Migration `f3c4d5e6a7b8` relaxes `ck_goals_sequence_pair` to "a track id needs a position", because the track FK's ON DELETE SET NULL left positions behind and blocked cascading deletes.
+
+### Migration B (2026-10-19)
+- **Rollout decision:** signed off by the owner on 2026-10-19 ("confirmed, just make sure we've got backups").
+- **Revision `a4b5c6d7e8f9`** (destructive contract) drops the tables `targets`, `target_metric_conditions`, `target_contribution_ledgers` and `target_templates`, the `goals` columns `targets`, `completed_via_children` and `allow_manual_completion`, and the `goal_levels` columns `can_have_targets`, `auto_complete_when_children_done` and `allow_manual_completion`. Every drop uses IF EXISTS. The downgrade recreates the schema empty; the rows come back only from a backup.
+- **Backups (local, git-ignored):**
+  - `backups/pre-migration-b/fractal_goals_20261019_pre_b.dump`, taken before the revision existed. It was restored into a scratch database: 31 targets, 14 ledger rows, and the same 119 goals and 16 conditions as the live database.
+  - `backups/pre-migration-b/fractal_goals_20261019_post_b.dump`, taken after.
+  - `backups/pre-conditions/fractal_goals_20261019.dump`, from before migration A.
+- **Discarded locally:** 31 targets and 14 ledger rows, all converted by migration A. `--verify` still reports 0 drift afterwards.
+- **Checks:**
+  - The verification query in the revision's docstring returns no rows on the local database.
+  - A fresh zero-to-head upgrade, `alembic check` (clean on fresh and local databases), and a one-revision downgrade and re-upgrade all pass.
+  - `./run-tests.sh restore-drill` passes.
+  - The full backend suite passes, apart from one analytics timing test that is over budget under full-suite load and passes on its own.
+- **Fixes found along the way:**
+  - The models now declare the server defaults their migrations set (`goal_condition_metric_rules.position`, `idempotency_records.status` and `created_at`), so `alembic check` is clean.
+  - The test database reset (from Phase 1) dropped `alembic_version`, which broke the restore drill. It now keeps that table.
+- **The conversion script** (`scripts/migrate_targets_to_conditions.py`) now reports that targets are retired. Previewing a conversion again needs a pre-B backup restored.
+
+### Open items after the audit (2026-10-19)
+- **Undo after an automatic begin.** When a condition completes a sequenced step, Session Detail shows a toast ("X is complete, so Y has begun.") with Undo. `useSequenceAdvanceUndo` watches the session's goal tree across refetches, so only completions seen happening count, then asks `GET /goals/<id>/sequence` which step began. Undo calls `POST /goals/<id>/sequence-hold`, which re-pauses that step as waiting; the predecessor stays complete. The server only allows this for a step its predecessor's completion began; anything else gets a 409. Goals serialize `sequence_begun_by` for that state.
+- **Agent sequences.** The new `set_goal_sequence` proposal operation (scope `goals:write`, not reversible) takes sibling goal IDs in order, including `$ref`s to goals created earlier in the proposal. It replaces the sequence those goals are in, or creates one; one already-sequenced goal ends its sequence. It runs through `GoalSequenceService.sequence_goals`, which gains a non-committing mode for proposal preview and execution. The goals in the agent's context now include `paused`, `sequence_track_id` and `sequence_position`. `agent_adapter/agent_proposal_schema_v1.json` is regenerated.
+
+### Phase 6 (2026-10-19)
+- **Migration C, `b5c6d7e8f9a0` (additive).**
+  - `goal_levels` gains `uses_success_vision` and `review_cadence_value/unit`. Ultimate (yearly), Long Term (quarterly) and Mid Term (monthly) are seeded by name, wherever a cadence isn't set.
+  - `goals` gains `review_cadence_value/unit`, `review_disabled` and `review_deferred_until`.
+  - `notes.note_kind` is CHECK-limited to `goal_completion | goal_review`.
+- **Schedule on the server only.** `services/goal_review_rules.py` is pure date logic. Goals on reviewed levels serialize a `review` object (cadence and its source, last and next review, deferral, status), and the client words it and re-checks "due" against the user's timezone. With no client mirror, there are no shared fixtures. Review dates are batch-loaded with the goal tree (constant queries, tested). Landing snapshots skip them.
+- **API.**
+  - Goal updates take the cadence pair (both null means use the level's), `review_disabled` and `review_deferred_until`.
+  - `POST /goals/<id>/review/defer` computes the next period.
+  - A `goal_review` note (goal context only) clears any deferral.
+  - Level updates validate the cadence pair and units.
+- **UI.**
+  - Goal Details: "Success vision" with the cadence beside it, editable inline; the relevance statement shown only on vision levels; the "Review due" banner (Review, Defer, Turn off, and Turn on); and a `goal-review` view with a pre-filled composer.
+  - Goal Characteristics: a "Success vision & reviews" toggle and a cadence per level.
+  - Notes: filters and badges for both kinds.
+  - Program calendar: "Review:" badges for the displayed program's lineage.
+  - Creating a goal: the due date starts at the level horizon.
+- **Fixes found along the way.**
+  - Goal Details resolved a goal's level from its type key, which found only the built-in defaults. Custom horizons never reached the due-date warnings. It now resolves the goal's own level.
+  - The goal-tree payload was trimmed so it stays inside the power-account size budgets: review fields appear only on reviewed levels, and `sequence_begun_by` only on sequenced goals.
+
+### Phase 5 (2026-10-19)
+- **`ChartGoalSurface`** wraps the analytics chart in `ProfileWindow`.
+  - Right-click, or a 500 ms touch long-press (cancelled by a 10 px move or release), reads the point off the chart's scales (`chartGoalTargets.js`). The supported charts tag their datasets with the metric and activity ids they plot.
+  - `utils/chartGoalPrefill.js` turns the values into a condition draft (pure, unit-tested per chart). The `DropdownMenu` atom offers "Set goal here…", and `ConnectedGoalDetailModal` opens with that condition.
+  - The parent is the analytics goal filter's goal, or the fractal root.
+- **Departures from the plan.**
+  - Metric Progress plots % improvement, so its point means "this much better than the latest session".
+  - Activity Totals counts become consistency goals; time totals have no condition to map to and say so.
+  - None of the four charts has a time x-axis (Metric Trends is one tick per session), so "a future X sets the due date" doesn't apply. New goals take the level's default horizon instead (Phase 6).
+  - Reference lines draw on Metric Trends and Scatter only. Metric Progress plots percentages, and Activity Totals spans many activities while the conditions read is per activity.
+- **API.** `GET /<root>/goals/conditions?activity_id=` returns up to 50 live goals on the activity, open first, in constant queries (tested). It sits under the `goalCondition` query-key root, so condition writes refresh the lines.
+- **Follow-up (2026-10-20).** The description keeps its "Description" label. The review cadence moved beside the relevance statement, in view and edit mode, and reviews start from that statement. The `uses_success_vision` column keeps its name; in the UI it reads "Relevance & reviews".
+
+### SMART's R becomes Reviewed (2026-10-20)
+- **Relevance statements are retired.** Migration D, `c6d7e8f9a0b1`, turns every non-empty statement into a goal note with id `relevance-<goal id>`: 42 locally, including 3 on deleted goals. It then drops the column and renames `goal_levels.uses_success_vision` to `uses_reviews`. Its downgrade restores the statements from those notes; this was proven on a restored copy, where all 42 came back exactly.
+- **Backup:** `backups/pre-migration-d/fractal_goals_20261020_pre_d.dump`.
+- **R is Reviewed** (`services/goal_review_rules.is_reviewed`; `smartHelpers` mirrors it for live edits). It is met while reviews are on, a cadence applies and no review is due. A due review takes R away until a review is written or deferred. Levels without reviews, and completed goals, count it as met. Older landing snapshots that still say `relevant` are read as `reviewed`.
+- **API.** `relevance_statement` is ignored if an older client sends it. Agent goal updates may set the review cadence and `review_disabled` instead, and the agent schema is regenerated. Onboarding's SMART step tracks `reviewed`.
+- **UI.**
+  - Goal Details shows a "Review" section under the description.
+  - Edit mode shows "Review (SMART)": a "Review this goal" checkbox, then "every [n] [unit]" on the same line.
+  - The relevance fields are gone from goal details and the fractal-creation modal.
+  - Reviews start from the goal's description.
+- **Follow-up (2026-10-20).** The schedule sits under the description without a "Review" heading, and the "Review due" banner offers only Review. Defer and turn-off moved out of the banner: reviews are turned off with the edit-mode checkbox. The server's `POST /goals/<id>/review/defer` stays, but the app no longer calls it.
 

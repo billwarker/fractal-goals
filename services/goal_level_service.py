@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from models import GoalLevel
+from models.goal import REVIEW_CADENCE_UNITS
 from services.service_types import JsonList, JsonDict, ServiceResult
 
 
@@ -83,9 +84,21 @@ class GoalLevelService:
                     default_deadline_offset_value=level.default_deadline_offset_value,
                     default_deadline_offset_unit=level.default_deadline_offset_unit,
                     sort_children_by=level.sort_children_by,
+                    uses_reviews=getattr(level, 'uses_reviews', False),
+                    review_cadence_value=getattr(level, 'review_cadence_value', None),
+                    review_cadence_unit=getattr(level, 'review_cadence_unit', None),
                 )
                 self.db_session.add(level)
                 self.db_session.flush()
+
+        if 'review_cadence_value' in data or 'review_cadence_unit' in data:
+            value, unit = data.get('review_cadence_value'), data.get('review_cadence_unit')
+            if (value is None) != (unit is None):
+                return None, "Send review_cadence_value and review_cadence_unit together", 400
+            if unit is not None and unit not in REVIEW_CADENCE_UNITS:
+                return None, f"review_cadence_unit must be one of: {', '.join(REVIEW_CADENCE_UNITS)}", 400
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 1):
+                return None, "review_cadence_value must be a positive whole number", 400
 
         scalar_fields = (
             'color',
@@ -95,17 +108,20 @@ class GoalLevelService:
             'deadline_max_unit',
             'default_deadline_offset_unit',
             'sort_children_by',
+            'review_cadence_unit',
         )
         bool_fields = (
             'track_activities',
             'requires_smart',
             'description_required',
+            'uses_reviews',
         )
         int_fields = (
             'deadline_min_value',
             'deadline_max_value',
             'max_children',
             'default_deadline_offset_value',
+            'review_cadence_value',
         )
 
         for field in scalar_fields:

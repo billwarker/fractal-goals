@@ -6,7 +6,9 @@
   --verify             After migration A: re-evaluate every activity-threshold condition and list
                        goals whose stored completion no longer matches their evidence.
 
-Point DATABASE_URL at a restored backup copy, never at production, when previewing.
+Point DATABASE_URL at a restored backup copy, never at production, when previewing. After
+migration B (a4b5c6d7e8f9) drops the target tables, --dry-run has nothing left to read; restore a
+pre-B backup to preview again. --verify still works.
 """
 
 import argparse
@@ -30,7 +32,7 @@ def dry_run(as_json: bool) -> int:
     with engine.connect() as connection:
         inputs = load_conversion_inputs(connection)
     if inputs is None:
-        print('No targets table: nothing to convert.')
+        print('No targets table (retired by migration B): nothing to convert.')
         return 0
     goals, targets, metric_conditions, child_sort_start = inputs
     plan = plan_conversion(goals, targets, metric_conditions, child_sort_start=child_sort_start)

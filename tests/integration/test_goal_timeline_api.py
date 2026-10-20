@@ -295,7 +295,6 @@ class TestGoalTimelineApi:
         )
         child_goal.level_id = system_short_level.id
         child_goal.description = 'Specific child goal'
-        child_goal.relevance_statement = 'Relevant child goal'
         child_goal.track_activities = False
         child_goal.completed = False
         child_goal.manually_uncompleted_at = datetime(2026, 7, 7, 13, 1, tzinfo=timezone.utc)

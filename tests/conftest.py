@@ -100,8 +100,9 @@ def test_database_engine():
             connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
             connection.execute(text('DROP TABLE IF EXISTS activity_instance_modes CASCADE'))
         # Drop what the database actually holds, so a schema built by another branch resets cleanly.
+        # alembic_version stays: the backup/restore drill reads the test database's revision stamp.
         existing = MetaData()
-        existing.reflect(engine)
+        existing.reflect(engine, only=lambda name, _metadata: name != 'alembic_version')
         existing.drop_all(engine)
         init_db(engine)
         yield engine

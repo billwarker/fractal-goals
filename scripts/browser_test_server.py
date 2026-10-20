@@ -151,7 +151,7 @@ def _seed_goal_heatmap(db, suffix, user, now):
     db.flush()
     db.add(Goal(id=goal_id, root_id=root_id, parent_id=root_id, owner_id=user.id, level_id=level_id,
                 name=f'Heatmap Guitar {suffix}', created_at=now - timedelta(days=500),
-                description='Build a steady guitar practice habit.', relevance_statement='Develop confident playing.'))
+                description='Build a steady guitar practice habit.'))
     db.add(ActivityDefinition(id=f'browser-heatmap-activity-{suffix}', root_id=root_id,
                               name='Guitar practice', has_metrics=False, has_sets=False))
     db.flush()
@@ -253,6 +253,10 @@ def main():
                 id="browser-ultimate-level",
                 name="Ultimate Goal",
                 rank=0,
+                # As migration b5c6d7e8f9a0 seeds it: reviewed yearly.
+                uses_reviews=True,
+                review_cadence_value=1,
+                review_cadence_unit="years",
             )
             db.add(ultimate_level)
             db.flush()

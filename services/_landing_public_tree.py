@@ -115,7 +115,6 @@ class _LandingPublicTreeMixin:
             "completion_condition": goal.completion_condition,
             "condition": serialize_goal_condition(goal.condition),
             "started_at": format_utc(goal.started_at),
-            "relevance_statement": goal.relevance_statement,
             "inherit_parent_activities": bool(goal.inherit_parent_activities),
             "track_activities": bool(goal.track_activities),
             "is_smart": all(smart_status.values()),
@@ -164,6 +163,7 @@ class _LandingPublicTreeMixin:
                 "default_deadline_offset_unit": level.default_deadline_offset_unit,
                 "sort_children_by": level.sort_children_by,
                 "requires_smart": getattr(level, "requires_smart", False),
+                "uses_reviews": bool(getattr(level, "uses_reviews", False)),
             }
         return result
 
