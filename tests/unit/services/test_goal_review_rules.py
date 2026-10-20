@@ -1,11 +1,14 @@
+import json
 from datetime import date, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from services.goal_review_rules import deferred_review_date, review_cadence, review_state
+from services.goal_review_rules import deferred_review_date, next_review_date, review_cadence, review_state
 
 TODAY = date(2026, 10, 19)
+CASES = json.loads((Path(__file__).parents[2] / 'fixtures' / 'goal_review_cases.json').read_text())
 
 
 def _level(uses=True, value=3, unit='months'):
@@ -16,6 +19,7 @@ def _goal(**overrides):
     fields = dict(
         review_cadence_value=None, review_cadence_unit=None, review_disabled=False, review_deferred_until=None,
         completed=False, started_at=datetime(2026, 7, 19), created_at=datetime(2026, 1, 1),
+        paused=False, pause_intervals=[],
     )
     return SimpleNamespace(**{**fields, **overrides})
 
@@ -30,7 +34,8 @@ class TestReviewState:
         state = review_state(_goal(), _level(), None, TODAY)
         assert state == {
             'cadence': {'value': 3, 'unit': 'months', 'source': 'level'},
-            'last_review_on': None, 'next_review_on': '2026-10-19', 'deferred_until': None, 'status': 'due',
+            'last_review_on': None, 'next_review_on': '2026-10-19', 'deferred_until': None, 'pauses': [],
+            'status': 'due',
         }
         tomorrow_start = _goal(started_at=datetime(2026, 7, 20))
         assert review_state(tomorrow_start, _level(), None, TODAY)['status'] == 'upcoming'
@@ -61,8 +66,35 @@ class TestReviewState:
         state = review_state(goal, level, None, TODAY)
         assert (state['status'], state['next_review_on']) == (status, None)
 
+    def test_days_paused_before_the_review_push_it_back(self):
+        goal = _goal(pause_intervals=[_pause(datetime(2026, 8, 1, 9), datetime(2026, 8, 15, 18))])
+        state = review_state(goal, _level(), None, TODAY)
+        assert (state['next_review_on'], state['status']) == ('2026-11-02', 'upcoming')
+        assert state['pauses'] == [{'paused_on': '2026-08-01', 'resumed_on': '2026-08-15'}]
+
+    def test_a_paused_goal_has_no_review_due_until_it_resumes(self):
+        # Overdue before the pause; pausing quiets it, and it counts as reviewed meanwhile.
+        goal = _goal(started_at=datetime(2026, 1, 1), paused=True, pause_intervals=[_pause(datetime(2026, 9, 1), None)])
+        state = review_state(goal, _level(), None, TODAY)
+        assert (state['status'], state['next_review_on']) == ('paused', None)
+        assert state['pauses'] == [{'paused_on': '2026-09-01', 'resumed_on': None}]
+
     def test_review_cadence_needs_both_parts(self):
         assert review_cadence(_goal(review_cadence_value=2), _level(value=None, unit=None)) is None
+
+
+def _pause(paused_at, resumed_at):
+    return SimpleNamespace(paused_at=paused_at, resumed_at=resumed_at)
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('case', CASES, ids=[case['name'] for case in CASES])
+def test_next_review_date_matches_the_shared_cases(case):
+    pauses = [(date.fromisoformat(start), date.fromisoformat(end) if end else None) for start, end in case['pauses']]
+    next_on, paused_days = next_review_date(
+        date.fromisoformat(case['anchor']), case['cadence'], pauses, date.fromisoformat(case['today']),
+    )
+    assert {'next_review_on': next_on.isoformat() if next_on else None, 'paused_days': paused_days} == case['expected']
 
 
 @pytest.mark.unit

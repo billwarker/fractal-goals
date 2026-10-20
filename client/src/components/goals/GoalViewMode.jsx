@@ -19,7 +19,6 @@ function GoalViewMode({
     programs,
     activityDefinitions,
     name,
-    levelConfig = null,
     goalCompletionNote,
     conditionSnapshot = null,
     // Handlers
@@ -51,12 +50,7 @@ function GoalViewMode({
                 </section>
             )}
 
-            <GoalSmartSection
-                goal={goal}
-                goalColor={goalColor}
-                mode={mode}
-                usesReviews={Boolean(levelConfig?.uses_reviews)}
-            />
+            <GoalSmartSection goal={goal} />
 
             {/* Associated Programs */}
             {programs && (() => {

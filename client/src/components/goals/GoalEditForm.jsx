@@ -3,7 +3,10 @@ import Input from '../atoms/Input';
 import CompletionConditionEditor from '../goalDetail/CompletionConditionEditor';
 import GoalReviewCadence from '../goalDetail/GoalReviewCadence';
 import { deadlineContextForGoal, deadlineWarnings, describeDeadlineWarning } from '../../utils/goalDeadlineRules';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getISOYMDInTimezone } from '../../utils/dateUtils';
 import { formatDueDate } from '../../utils/goalDueFormat';
+import { getGoalReview } from '../../utils/goalReview';
 import { getValidChildTypes } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
@@ -36,6 +39,8 @@ function GoalEditForm({
     showActions = true,
     errors = {}
 }) {
+    const { timezone } = useTimezone();
+    const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
     const canCompleteViaChildren = getValidChildTypes(goalType).length > 0;
     const usesReviews = Boolean(levelConfig?.uses_reviews);
     const levelCadence = levelConfig?.review_cadence_value && levelConfig?.review_cadence_unit
@@ -86,7 +91,11 @@ function GoalEditForm({
                         Review (SMART)
                     </label>
                     <GoalReviewCadence
-                        editing
+                        review={getGoalReview(goal)}
+                        today={today}
+                        startedAt={startedAt}
+                        createdAt={goal?.attributes?.created_at}
+                        paused={Boolean(goal?.paused)}
                         enabled={reviewsOn}
                         onEnabledChange={setReviewsOn}
                         cadence={reviewCadence}

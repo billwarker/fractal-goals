@@ -1,21 +1,18 @@
 import React from 'react';
 
-import { describeCadence, describeReview, REVIEW_CADENCE_UNITS } from '../../utils/goalReview';
+import { describeCadence, describeNextReview, REVIEW_CADENCE_UNITS } from '../../utils/goalReview';
 import Button from '../atoms/Button';
 import styles from './GoalReviewCadence.module.css';
 
 /**
- * A goal's review schedule (SMART's R): "Review every 3 months · next Jan 12" when
- * viewing. In edit mode, a "Review this goal" checkbox; when on, the goal's own cadence (empty = the
- * level's), with "Use level default".
+ * Editing a goal's review schedule (SMART's R): a "Review this goal" checkbox; when on, the goal's
+ * own cadence (empty = the level's), with "Use level default", and when the next review falls under
+ * it, counted from the last review (else the start date) with paused days left out.
  */
 export default function GoalReviewCadence({
-    review, today, editing = false, enabled = true, onEnabledChange, cadence = null, levelCadence = null, onChange,
+    review = null, today, startedAt = null, createdAt = null, paused = false,
+    enabled = true, onEnabledChange, cadence = null, levelCadence = null, onChange,
 }) {
-    if (!editing) {
-        const text = describeReview(review, today);
-        return text ? <span className={styles.summary} data-testid="goal-review-cadence">{text}</span> : null;
-    }
     const shown = cadence || levelCadence || { value: 1, unit: 'months' };
     const set = (patch) => onChange({ ...shown, ...patch });
     const toggle = onEnabledChange ? (
@@ -25,6 +22,7 @@ export default function GoalReviewCadence({
         </label>
     ) : null;
     if (!enabled) return <span className={styles.settings}>{toggle}</span>;
+    const next = describeNextReview({ cadence: shown, review, startedAt, createdAt, paused, today });
     return (
         <span className={styles.settings}>
             {toggle}
@@ -53,6 +51,7 @@ export default function GoalReviewCadence({
                     </Button>
                 ) : <span className={styles.note}>(level default)</span>}
             </span>
+            {next ? <span className={styles.next} data-testid="goal-next-review">{next}</span> : null}
         </span>
     );
 }

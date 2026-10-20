@@ -1,0 +1,66 @@
+[
+    {
+        "name": "one cadence after the anchor when never paused",
+        "anchor": "2026-07-19",
+        "cadence": { "value": 3, "unit": "months" },
+        "pauses": [],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-10-19", "paused_days": 0 }
+    },
+    {
+        "name": "days paused before the review push it back",
+        "anchor": "2026-07-19",
+        "cadence": { "value": 3, "unit": "months" },
+        "pauses": [["2026-08-01", "2026-08-15"]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-11-02", "paused_days": 14 }
+    },
+    {
+        "name": "a pause before the anchor doesn't count",
+        "anchor": "2026-07-19",
+        "cadence": { "value": 1, "unit": "months" },
+        "pauses": [["2026-06-01", "2026-07-01"]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-08-19", "paused_days": 0 }
+    },
+    {
+        "name": "only the part of a pause after the anchor counts",
+        "anchor": "2026-07-19",
+        "cadence": { "value": 1, "unit": "months" },
+        "pauses": [["2026-07-10", "2026-07-29"]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-08-29", "paused_days": 10 }
+    },
+    {
+        "name": "a pause that starts once the review is due doesn't move it",
+        "anchor": "2026-07-19",
+        "cadence": { "value": 1, "unit": "months" },
+        "pauses": [["2026-08-19", "2026-09-30"]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-08-19", "paused_days": 0 }
+    },
+    {
+        "name": "a pause pushed into range by an earlier one counts too",
+        "anchor": "2026-07-01",
+        "cadence": { "value": 2, "unit": "weeks" },
+        "pauses": [["2026-07-05", "2026-07-15"], ["2026-07-20", "2026-07-22"]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-07-27", "paused_days": 12 }
+    },
+    {
+        "name": "an open pause counts up to today",
+        "anchor": "2026-09-19",
+        "cadence": { "value": 2, "unit": "months" },
+        "pauses": [["2026-10-09", null]],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": "2026-11-29", "paused_days": 10 }
+    },
+    {
+        "name": "no cadence, no review",
+        "anchor": "2026-07-19",
+        "cadence": null,
+        "pauses": [],
+        "today": "2026-10-19",
+        "expected": { "next_review_on": null, "paused_days": 0 }
+    }
+]

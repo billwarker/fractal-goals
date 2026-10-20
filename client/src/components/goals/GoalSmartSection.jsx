@@ -1,16 +1,7 @@
 import React from 'react';
-import { useTimezone } from '../../contexts/TimezoneContext';
-import { getISOYMDInTimezone } from '../../utils/dateUtils';
-import { getGoalReview } from '../../utils/goalReview';
 import Linkify from '../atoms/Linkify';
-import GoalReviewCadence from '../goalDetail/GoalReviewCadence';
 
-function GoalSmartSection({ goal, mode, usesReviews = false }) {
-    const { timezone } = useTimezone();
-    const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
-    // Reviewed levels show their review schedule (SMART's R) under the description.
-    const showReview = usesReviews && mode !== 'create';
-
+function GoalSmartSection({ goal }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Description (Specific) */}
@@ -25,13 +16,6 @@ function GoalSmartSection({ goal, mode, usesReviews = false }) {
                     )}
                 </div>
             </div>
-
-            {/* Review schedule (SMART's R) */}
-            {showReview && (
-                <div style={{ marginTop: '-8px' }}>
-                    <GoalReviewCadence review={getGoalReview(goal)} today={today} />
-                </div>
-            )}
         </div>
     );
 }

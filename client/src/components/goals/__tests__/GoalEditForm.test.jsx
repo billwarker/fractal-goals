@@ -100,6 +100,16 @@ describe('GoalEditForm', () => {
         expect(cadence).toHaveTextContent(/^every/);
     });
 
+    it('says when the next review falls under the cadence being edited', () => {
+        renderGoalEditForm({
+            levelConfig: { uses_reviews: true, review_cadence_value: 1, review_cadence_unit: 'months' },
+            setReviewCadence: vi.fn(),
+            startedAt: '2099-01-01',
+            reviewCadence: { value: 2, unit: 'weeks' },
+        });
+        expect(screen.getByTestId('goal-next-review')).toHaveTextContent('Next review Jan 15, 2099 · 2 weeks after the start date (Jan 1, 2099)');
+    });
+
     it('shows no Review section on levels without reviews', () => {
         renderGoalEditForm({ levelConfig: { uses_reviews: false } });
 

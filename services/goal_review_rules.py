@@ -2,11 +2,14 @@
 
 Levels that review goals (`uses_reviews`; Ultimate, Long and Mid Term by default) do so on a cadence:
 the goal's own, else its level's. The next review falls one cadence after the latest goal_review
-note (or, before the first, after the goal's start). A deferral pushes it to a later date; turning
-reviews off or completing the goal stops them. Dates are calendar days.
+note (or, before the first, after the goal's start). Pausing a goal stops the clock: days paused
+before the review falls due push it back by as many days, and a paused goal has no review due until it
+resumes. A deferral pushes it to a later date; turning reviews off or completing the goal stops them.
+Dates are calendar days. `client/src/utils/goalReview.js` mirrors `next_review_date`; both are checked
+against `tests/fixtures/goal_review_cases.json`.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from sqlalchemy import func
@@ -40,10 +43,10 @@ def goal_review_state(goal: Any, today: date | None = None) -> dict | None:
 
 def is_reviewed(goal: Any, today: date | None = None) -> bool:
     """SMART's R: reviews on, with a cadence, and no review due (a due review takes R away until one
-    is written; a deferral moves the due date). Levels that don't review goals, and completed goals,
-    count as met."""
+    is written; a deferral moves the due date). Levels that don't review goals, and completed or
+    paused goals, count as met."""
     state = goal_review_state(goal, today)
-    return state is None or state['status'] in ('upcoming', 'complete')
+    return state is None or state['status'] in ('upcoming', 'paused', 'complete')
 
 
 def review_cadence(goal: Any, level: Any) -> dict | None:
@@ -55,11 +58,38 @@ def review_cadence(goal: Any, level: Any) -> dict | None:
     return None
 
 
+def pause_windows(goal: Any) -> list[tuple[date, date | None]]:
+    """The goal's pause windows as (paused_on, resumed_on) dates, oldest first; resumed_on is None
+    while the goal is paused."""
+    intervals = sorted(getattr(goal, 'pause_intervals', None) or [], key=lambda interval: interval.paused_at)
+    return [(as_date(interval.paused_at), as_date(interval.resumed_at)) for interval in intervals]
+
+
+def next_review_date(
+    anchor: date, cadence: dict | None, pauses: list[tuple[date, date | None]], today: date,
+) -> tuple[date | None, int]:
+    """One cadence after `anchor`, plus the days paused before that date (an open pause counts up to
+    today), and those paused days. A pause that starts once the review is due doesn't move it."""
+    next_on = add_interval(anchor, cadence['value'], cadence['unit']) if cadence else None
+    if next_on is None:
+        return None, 0
+    paused_days = 0
+    for paused_on, resumed_on in sorted(pauses, key=lambda window: window[0]):
+        start = max(paused_on, anchor)
+        if start >= next_on:
+            break
+        days = max(((resumed_on or today) - start).days, 0)
+        next_on += timedelta(days=days)
+        paused_days += days
+    return next_on, paused_days
+
+
 def review_state(goal: Any, level: Any, last_review_at: Any, today: date) -> dict | None:
     """The goal's review schedule, or None when its level doesn't review goals.
 
-    status: 'due' (on or before today), 'upcoming', 'off' (turned off), 'none' (no cadence) or
-    'complete' (completed goals aren't reviewed).
+    status: 'due' (on or before today), 'upcoming', 'paused' (the clock waits for the goal to
+    resume), 'off' (turned off), 'none' (no cadence) or 'complete' (completed goals aren't reviewed).
+    `pauses` lets the client preview the next review while the cadence is edited.
     """
     if level is None or not getattr(level, 'uses_reviews', False):
         return None
@@ -70,6 +100,10 @@ def review_state(goal: Any, level: Any, last_review_at: Any, today: date) -> dic
         'last_review_on': last.isoformat() if last else None,
         'next_review_on': None,
         'deferred_until': None,
+        'pauses': [
+            {'paused_on': paused_on.isoformat(), 'resumed_on': resumed_on.isoformat() if resumed_on else None}
+            for paused_on, resumed_on in pause_windows(goal)
+        ],
     }
     if goal.completed:
         return {**base, 'status': 'complete'}
@@ -77,8 +111,10 @@ def review_state(goal: Any, level: Any, last_review_at: Any, today: date) -> dic
         return {**base, 'status': 'off'}
     if cadence is None:
         return {**base, 'status': 'none'}
+    if getattr(goal, 'paused', False):
+        return {**base, 'status': 'paused'}
     anchor = last or as_date(goal.started_at) or as_date(goal.created_at) or today
-    next_on = add_interval(anchor, cadence['value'], cadence['unit'])
+    next_on, _ = next_review_date(anchor, cadence, pause_windows(goal), today)
     deferred = as_date(goal.review_deferred_until)
     if deferred and next_on and deferred > next_on:
         next_on = deferred

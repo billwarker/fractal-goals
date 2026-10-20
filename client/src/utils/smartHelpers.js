@@ -16,7 +16,7 @@
  */
 /**
  * R: reviews on, with a cadence, and no review due — a due review takes R away until one is
- * written. Levels that don't review goals count as met. While editing, the caller attaches the
+ * written. Levels that don't review goals, and paused goals (their review clock waits), count as met. While editing, the caller attaches the
  * level (`review_level`) so on/off and cadence changes show at once; otherwise the server's schedule
  * is used, with "due" re-checked against today.
  */
@@ -32,7 +32,7 @@ function isReviewed(goal, attrs) {
     }
     if (!review) return true;
     if (review.status === 'complete') return true;
-    return review.status === 'upcoming' && !dueNow;
+    return (review.status === 'upcoming' || review.status === 'paused') && !dueNow;
 }
 
 function localToday() {

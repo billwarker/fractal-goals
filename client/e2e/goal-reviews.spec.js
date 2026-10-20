@@ -33,7 +33,8 @@ test('a due review shows a Review banner and can be written from goal details', 
         await page.locator('.react-flow__node').filter({ hasText: `Browser Planning ${suffix}` }).getByText(`Browser Planning ${suffix}`, { exact: true }).click();
         await expect(details.getByRole('region', { name: 'Review due' })).toBeVisible({ timeout: 2000 });
     }).toPass();
-    await expect(details.getByText('Review every year · review due')).toBeVisible();
+    // The banner alone says a review is due; the details carry no schedule line.
+    await expect(details.getByText(/Review every year/)).toHaveCount(0);
     // SMART's R is Reviewed: the due review takes it away until one is written.
     const smart = async () => (await (await page.request.get(`/api/${root}/goals/${root}`, { headers })).json()).smart_status.reviewed;
     expect(await smart()).toBe(false);
@@ -53,7 +54,8 @@ test('a due review shows a Review banner and can be written from goal details', 
     await page.getByRole('button', { name: 'Save review' }).click();
 
     await expect(page.getByRole('region', { name: 'Review due' })).toHaveCount(0);
-    await expect(page.getByText(/Review every year · next /)).toBeVisible();
+    const goal = await (await page.request.get(`/api/${root}/goals/${root}`, { headers })).json();
+    expect(goal.review.status).toBe('upcoming');
     expect(await smart()).toBe(true);
     const notes = await (await page.request.get(`/api/${root}/goals/${root}/notes`, { headers })).json();
     expect(notes.some((note) => note.note_type === 'goal_review_note')).toBe(true);
