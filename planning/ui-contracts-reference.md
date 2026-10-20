@@ -116,8 +116,17 @@ the same warnings instead of blocking dates after the parent's.
 
 ## Goal sequences
 
-Goal Details → Options → Sequence orders a goal with its same-level siblings. A draft list
-takes ↑/↓, remove and "+ sibling", then Create sequence, Save order, or Stop sequencing. A goal
+Goal Details → Options → Sequence orders a goal with its siblings: goals that share its parent and
+its level. Goals under different parents never share a sequence, even at the same level. Steps and
+siblings are cards with the goal's level icon and name. A draft list takes ↑/↓, remove and a sibling
+card's "+ Add". Steps reorder by drag (a mouse drags from anywhere on the card except its buttons;
+touch drags from the ⠿ grip) or by ↑/↓. The flow tree previews the draft as it changes (step badges and arrows), and nothing
+is saved until the footer's Create sequence (or Save sequence) beside Cancel. Break entire sequence
+(the DeleteButton atom) sits at the bottom of the content for an existing sequence. Completed siblings are listed
+faded and can't be added; completed steps read faded too. While the view is open, the Goals page
+flow tree shows the goal's ancestors, the goal and its same-level siblings, with no children. When
+the Goals page is scoped to a program, siblings outside it stay sequenceable but carry an
+"Outside program" badge, and a note counts them, because the scoped tree doesn't show them. A goal
 outside a sequence can also join a sibling's sequence as its last step. The first incomplete step
 is active, and later steps wait, paused with reason `sequence`. Pause/Resume stays the only manual
 activation control: resuming a later step starts it out of order, and pausing the active step
@@ -127,13 +136,15 @@ Completing a step shows "Begin next goal in sequence: X" (checked). Un-completin
 next goal in sequence: X again" (checked) when its completion began X. Condition and child-goal
 completions apply the defaults. Options → Delete confirms in the modal on every page, typing
 "delete" when descendants go too, and shows "Begin next goal in sequence: X" for the active step.
-Move and Convert Level take a goal out of its sequence. A goal the sequence held resumes, the rest
+Move, Convert Level, and a parent change through a goal update take a goal out of its sequence. A goal the sequence held resumes, the rest
 renumber, and a sequence left with one goal ends. Copies never join.
 
 Hierarchy lists put the step number before the name and keep a sequence's steps together in
-order. Paused goals read muted with "Paused · waiting on X" (or "Paused"). The goal flow tree's
-tree layout draws one dashed arrow per consecutive pair, arcing above the row and never used for
-layout. The hierarchy layout relies on the step numbers instead.
+order. Paused goals read muted with "Paused · waiting on X" (or "Paused"). The goal flow tree shows
+each step's number in a small badge left of its icon. The tree layout draws one straight dashed
+arrow per consecutive pair, from one step's badge to the next, with the arrowhead touching the next
+badge's edge. The arrow sits in the edge layer beneath goal names and metadata, is never used for
+layout, and the initial view fits the badges.
 
 ## Session Detail mobile hierarchy
 

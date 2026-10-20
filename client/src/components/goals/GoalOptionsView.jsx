@@ -44,6 +44,9 @@ function GoalOptionsView({
     onDelete,
     onClose,
     displayMode,
+    onSequencingChange,
+    programScope,
+    registerFooterAction,
 }) {
     const {
         goalLevels = [],
@@ -223,6 +226,9 @@ function GoalOptionsView({
                 goal={goal}
                 goalId={goalId}
                 treeData={treeData}
+                onSequencingChange={onSequencingChange}
+                programScope={programScope}
+                registerFooterAction={registerFooterAction}
                 onBack={() => setSubView('main')}
                 onDone={() => {
                     setSubView('main');

@@ -70,7 +70,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:8001',
+          target: process.env.VITE_API_PROXY_TARGET || 'http://localhost:8001',
           changeOrigin: true,
         },
       },

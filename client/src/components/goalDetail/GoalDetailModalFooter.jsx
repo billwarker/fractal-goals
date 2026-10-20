@@ -32,6 +32,7 @@ function GoalDetailModalFooter({
     activitiesAssociateAction,
     showOptionsFooter,
     onCancelOptions,
+    optionsFooterAction,
     showDetailFooter,
     handleEditDetails,
     handleGoalViewNavigation,
@@ -180,6 +181,20 @@ function GoalDetailModalFooter({
                 >
                     Cancel
                 </button>
+                {optionsFooterAction ? (
+                    <button
+                        type="button"
+                        onClick={optionsFooterAction.onClick}
+                        disabled={optionsFooterAction.disabled}
+                        className={`${styles.completionFooterButton} ${styles.activitiesFooterConfirmButton}`}
+                        style={{
+                            '--completion-accent': displayGoalColor,
+                            '--completion-text': optionsFooterAction.disabled ? 'var(--color-text-secondary)' : displayTextColor,
+                        }}
+                    >
+                        {optionsFooterAction.label}
+                    </button>
+                ) : null}
             </FooterActions>
         </div>
     ) : showDetailFooter ? (

@@ -26,6 +26,21 @@ const getTreeIconCenter = (node, compact = false) => {
     };
 };
 
+// Mirrors .sequenceStepNumber in FlowTree.module.css: 16px tall, at least 16px wide, 6px left of the icon.
+const SEQUENCE_BADGE_GAP = 6;
+const SEQUENCE_BADGE_HEIGHT = 16;
+// Tree-layout icons are 30px on every viewport, so the badge centre doesn't depend on isMobile.
+export const getSequenceBadgeBox = (node) => {
+    const label = String(node.data?.sequencePosition ?? '');
+    const width = Math.max(SEQUENCE_BADGE_HEIGHT, 8 + (label.length * 6));
+    return {
+        x: node.position.x - SEQUENCE_BADGE_GAP - (width / 2),
+        y: getTreeIconCenter(node).y,
+        halfWidth: width / 2,
+        halfHeight: SEQUENCE_BADGE_HEIGHT / 2,
+    };
+};
+
 /** Dashed arrows between consecutive visible steps of each sequence (not used for layout). */
 export const buildSequenceEdges = (orderedChildren, visibleNodeIds) => {
     const byTrack = new Map();
@@ -65,6 +80,7 @@ export const convertTreeToFlow = (
         hiddenInactiveGoalIds = null,
         activeLineageIds = new Set(),
         allowedGoalIds = null,
+        focusGoalIds = null,
         getSortChildrenBy = null,
     } = {}
 ) => {
@@ -74,7 +90,8 @@ export const convertTreeToFlow = (
     const addedNodeIds = new Set();
     const visibleNodeIds = new Set();
 
-    const lineagePath = selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null;
+    // A host-supplied focus (e.g. sequencing) replaces the selected goal's lineage.
+    const lineagePath = focusGoalIds || (selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null);
 
     const traverse = (node, parentId = null) => {
         if (!node) return;
@@ -126,6 +143,7 @@ export const convertTreeToFlow = (
                 completed: normalizedNode.completed,
                 completed_at: normalizedNode.completed_at,
                 paused: normalizedNode.paused,
+                sequencePosition: normalizedNode.sequence_track_id ? (normalizedNode.sequence_position ?? null) : null,
                 created_at: normalizedNode.created_at,
                 deadline: normalizedNode.deadline,
                 hasChildren: normalizedNode.children.length > 0,
@@ -164,6 +182,7 @@ export const prepareGraphPresentation = ({
     viewSettings,
     evidenceGoalIds,
     allowedGoalIds = null,
+    focusGoalIds = null,
     getSortChildrenBy = null,
 }) => {
     if (!treeData) {
@@ -191,6 +210,7 @@ export const prepareGraphPresentation = ({
             hiddenInactiveGoalIds: normalizedSettings.hideInactiveGoals ? inactiveNodeIds : null,
             activeLineageIds,
             allowedGoalIds,
+            focusGoalIds,
             getSortChildrenBy,
         }
     );
@@ -213,6 +233,7 @@ export const buildGraphPresentation = ({
     activityGroups,
     programs,
     allowedGoalIds = null,
+    focusGoalIds = null,
     isMobile,
     layoutMode = 'tree',
     getSortChildrenBy = null,
@@ -221,7 +242,7 @@ export const buildGraphPresentation = ({
 }) => {
     const prepared = structure || prepareGraphPresentation({
         treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor, viewSettings,
-        evidenceGoalIds, allowedGoalIds, getSortChildrenBy,
+        evidenceGoalIds, allowedGoalIds, focusGoalIds, getSortChildrenBy,
     });
     if (!prepared) return { nodes: [], edges: [], metrics: null };
     const { rawNodes, rawEdges, visibleNodeIds, treeMaps, effectiveEvidenceGoalIds,
@@ -375,13 +396,14 @@ export const buildGraphPresentation = ({
         if (!source || !target) return [];
         return [{
             ...edge,
+            // zIndex 0 keeps the arrow in the edge layer, beneath goal names and metadata.
+            zIndex: 0,
             style: { stroke: 'var(--color-text-muted)', strokeWidth: 1.5, strokeDasharray: '5 5', pointerEvents: 'none' },
             markerEnd: { type: 'arrowclosed', color: 'var(--color-text-muted)', width: 14, height: 14 },
             data: {
                 ...edge.data,
-                sourceCenter: getTreeIconCenter(source, isMobile),
-                targetCenter: getTreeIconCenter(target, isMobile),
-                iconRadius: isMobile ? 11 : 15,
+                sourceBox: getSequenceBadgeBox(source),
+                targetBox: getSequenceBadgeBox(target),
             },
         }];
     }) : [];

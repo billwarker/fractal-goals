@@ -141,6 +141,11 @@ export default function FlowTreeNode({ data }) {
                     justifyContent: 'center',
                 }}
             >
+                {data.sequencePosition != null ? (
+                    <span className={styles.sequenceStepNumber} aria-label={`Step ${data.sequencePosition} in sequence`}>
+                        {data.sequencePosition}
+                    </span>
+                ) : null}
                 <IconComponent
                     {...iconProps}
                     className={isCompleted ? styles.nodeCircleCompleted : ''}

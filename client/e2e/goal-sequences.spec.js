@@ -43,7 +43,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     let dialog = page.getByRole('dialog', { name: first.name });
     await dialog.getByRole('button', { name: 'Options', exact: true }).click();
     await dialog.getByRole('button', { name: /^Sequence/ }).click();
-    await dialog.getByRole('button', { name: `+ ${second.name}` }).click();
+    await dialog.getByRole('button', { name: `Add ${second.name}` }).click();
     await dialog.getByRole('button', { name: 'Create sequence' }).click();
     await expect(dialog.getByRole('button', { name: 'Options', exact: true })).toBeVisible();
     await expect.poll(() => isPaused(second)).toBe(true);
@@ -74,8 +74,57 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     // Mobile opens the Goals page in hierarchy layout, where step numbers show order instead.
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
     await expect(page.locator('.react-flow__edge.sequence-edge')).toHaveCount(1);
-    await expect(page.locator('.react-flow__node').filter({ hasText: second.name })).toBeVisible();
+    const secondNode = page.locator('.react-flow__node').filter({ hasText: second.name });
+    await expect(secondNode).toBeVisible();
+    await expect(secondNode.getByLabel('Step 2 in sequence')).toBeVisible();
     if (process.env.SEQUENCE_SCREENSHOT) await page.waitForTimeout(1200);
     if (process.env.SEQUENCE_SCREENSHOT) await page.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', `-${suffix}.png`) });
+
+    // Desktop: while Options → Sequence is open, the tree shows the siblings but not their children,
+    // and a completed sibling is listed faded and can't be added.
+    if (suffix === 'desktop') {
+        const child = (await (await page.request.post(`/api/${root}/goals`, {
+            headers, data: { name: `Child of first ${suffix}`, type: 'MidTermGoal', parent_id: first.id },
+        })).json());
+        const done = await create(`Done sibling ${suffix}`);
+        await page.request.patch(`/api/${root}/goals/${done.id}/complete`, { headers, data: { completed: true } });
+        await page.reload();
+        const panel = page; // Desktop shows goal details in a side panel, not a dialog.
+        // The tree fades in after a reload, so retry the click until the details panel opens.
+        await expect(async () => {
+            await page.locator('.react-flow__node').filter({ hasText: second.name }).getByText(second.name, { exact: true }).click();
+            await expect(panel.getByRole('button', { name: 'Options', exact: true })).toBeVisible({ timeout: 2000 });
+        }).toPass();
+        await panel.getByRole('button', { name: 'Options', exact: true }).click();
+        await panel.getByRole('button', { name: /^Sequence/ }).click();
+        await expect(panel.getByRole('button', { name: `${done.name} (completed)` })).toBeDisabled();
+        await expect(page.locator('.react-flow__node').filter({ hasText: first.name })).toBeVisible();
+        await expect(page.locator('.react-flow__node').filter({ hasText: child.name })).toHaveCount(0);
+        if (process.env.SEQUENCE_SCREENSHOT) await page.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', '-sequencing.png') });
+        // Dragging Second's card above First reorders the draft, and the tree previews it.
+        const steps = panel.getByRole('list', { name: 'Sequence order' }).getByRole('listitem');
+        const target = await steps.nth(0).boundingBox();
+        await steps.nth(1).getByText(second.name, { exact: true }).hover();
+        await page.mouse.down();
+        await page.mouse.move(target.x + 20, target.y + 4, { steps: 6 });
+        await page.mouse.up();
+        await expect(steps.nth(0)).toContainText(second.name);
+        await expect(page.locator('.react-flow__node').filter({ hasText: second.name }).getByLabel('Step 1 in sequence')).toBeVisible();
+        if (process.env.SEQUENCE_SCREENSHOT) await page.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', '-dragged.png') });
+        // Saving locks the new order in: Second becomes the active step and First waits.
+        await page.getByRole('button', { name: 'Save sequence', exact: true }).click();
+        await expect.poll(() => isPaused(first)).toBe(true);
+        await expect.poll(() => isPaused(second)).toBe(false);
+        await panel.getByRole('button', { name: 'Options', exact: true }).click();
+        await panel.getByRole('button', { name: /^Sequence/ }).click();
+        await expect(steps.nth(0)).toContainText(second.name);
+        // The tree previews the draft: removing a step drops its badge before anything is saved.
+        await panel.getByRole('button', { name: `Remove ${first.name} from the sequence` }).click();
+        await expect(page.locator('.react-flow__node').filter({ hasText: first.name }).getByLabel('Step 1 in sequence')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Save (ends the sequence)' })).toBeEnabled();
+        expect(await isPaused(first)).toBe(true);
+        if (process.env.SEQUENCE_SCREENSHOT) await page.waitForTimeout(1200);
+        if (process.env.SEQUENCE_SCREENSHOT) await page.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', '-preview.png') });
+    }
     expect(errors).toEqual([]);
 });

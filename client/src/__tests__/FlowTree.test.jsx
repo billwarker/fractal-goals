@@ -123,7 +123,8 @@ describe('FlowTree', () => {
 
         expect(screen.getByTestId('react-flow')).toBeInTheDocument();
         expect(onInitMock).toHaveBeenCalled();
-        expect(fitViewMock).toHaveBeenCalled();
+        // Tree layout fits to its graph bounds, falling back to fitView when the container has no size.
+        expect(fitViewMock.mock.calls.length + setViewportMock.mock.calls.length).toBeGreaterThan(0);
     });
 
     it('centers the viewport on a search zoom target without selecting the node', () => {

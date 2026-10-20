@@ -93,6 +93,8 @@ function GoalDetailModalRenderSurface({
     needsLevelPicker,
     onDelete,
     onGoalSelect,
+    onSequencingChange,
+    programScope,
     onMobileCollapse,
     onToggleCompletion,
     parentGoal,
@@ -142,6 +144,8 @@ function GoalDetailModalRenderSurface({
     // Intentionally refresh the preview timestamp when entering a new modal subview.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const completionPreviewDate = useMemo(() => new Date(), [viewState]);
+    // An Options sub-view (e.g. Sequence) may put its primary action in the footer beside Cancel.
+    const [optionsFooterAction, setOptionsFooterAction] = useState(null);
     const programsAffectedByCompletion = useMemo(() => (
         getProgramsAffectedByGoalCompletion({
             programs,
@@ -468,6 +472,9 @@ function GoalDetailModalRenderSurface({
                     onDelete={onDelete}
                     onClose={handleClose}
                     displayMode={displayMode}
+                    onSequencingChange={onSequencingChange}
+                    programScope={programScope}
+                    registerFooterAction={setOptionsFooterAction}
                 />
             </Suspense>
         );
@@ -593,6 +600,7 @@ function GoalDetailModalRenderSurface({
             activitiesAssociateAction={activitiesAssociateAction}
             showOptionsFooter={showOptionsFooter}
             onCancelOptions={() => handleGoalViewNavigation('goal')}
+            optionsFooterAction={viewState === 'goal-options' ? optionsFooterAction : null}
             showDetailFooter={showDetailFooter}
             handleEditDetails={handleEditDetails}
             handleGoalViewNavigation={handleGoalViewNavigation}

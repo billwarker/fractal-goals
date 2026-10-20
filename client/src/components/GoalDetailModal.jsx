@@ -50,6 +50,8 @@ function GoalDetailModal({
     onCreate,  // Function to call when creating a new goal
     parentGoal,  // Parent goal for context when creating
     onGoalSelect, // Optional host action for selecting goals
+    onSequencingChange, // Optional: told the goal id while Options → Sequence is open (null when it closes)
+    programScope, // Optional { goalIds: Set, name }: the program the host page is scoped to
     conditionSnapshot = null, // Published landing condition analytics for read-only goals
     onAssociationsChanged, // Callback when activity associations change
     onMobileCollapse,
@@ -602,6 +604,8 @@ function GoalDetailModal({
             needsLevelPicker={needsLevelPicker}
             onDelete={onDelete}
             onGoalSelect={onGoalSelect}
+            onSequencingChange={onSequencingChange}
+            programScope={programScope}
             onMobileCollapse={onMobileCollapse}
             onToggleCompletion={onToggleCompletion}
             parentGoal={parentGoal}

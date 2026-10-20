@@ -4,6 +4,7 @@ Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.orm import selectinload
 
@@ -14,12 +15,15 @@ from services.association_reconciliation import append_goal_association_event
 from services.goal_condition_service import (
     ConditionValidationError, normalize_condition_payload, reconcile_goal, write_condition,
 )
+from services.goal_sequence_service import leave_track
 from validators import parse_date_string
 
 from services._goal_service_common import authorize_goal_access, logger
 
 
 class _GoalHelpersMixin:
+    db_session: Any  # provided by the composed GoalService
+
     def _load_fractal_goals_for_serialization(self, root_id):
         return load_fractal_goals_for_serialization(self.db_session, root_id)
 
@@ -380,6 +384,9 @@ class _GoalHelpersMixin:
                 )
                 if parent_capacity_error:
                     return None, (parent_capacity_error, 400)
+            if new_parent_id != goal.parent_id:
+                # Sequences hold siblings of one parent, so a goal changing parent leaves its track.
+                leave_track(self.db_session, goal, pending_events)
             goal.parent_id = new_parent_id
             if new_parent_id != old_parent_id:
                 parent_ids = sorted(value for value in (old_parent_id, new_parent_id) if value)

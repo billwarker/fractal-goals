@@ -112,6 +112,30 @@ class TestBuildingTracks:
         assert (created.status_code, updated.status_code, read.status_code) == (404, 404, 404)
         assert _state(db_session, ids) == [(1, False, False), (2, True, False)]
 
+    def test_same_level_goals_under_different_parents_cannot_be_sequenced(self, authed_client, db_session, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        parents = [_create_goal(authed_client, root, root, name=name, type="LongTermGoal")["id"] for name in ("A", "B")]
+        cousins = [_siblings(authed_client, root, 1, parent_id=parent, type_="MidTermGoal")[0] for parent in parents]
+
+        responses = [
+            authed_client.post(f"/api/{root}/sequence-tracks", json={"parent_goal_id": parent, "goal_ids": cousins})
+            for parent in parents
+        ]
+
+        assert [response.status_code for response in responses] == [400, 400]
+        assert "sibling" in responses[0].get_json()["error"]
+        assert db_session.query(GoalSequenceTrack).count() == 0
+
+    def test_siblings_cannot_be_sequenced_under_another_parent(self, authed_client, db_session, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        parent, other = [_create_goal(authed_client, root, root, name=name, type="LongTermGoal")["id"] for name in ("A", "B")]
+        ids = _siblings(authed_client, root, 2, parent_id=parent, type_="MidTermGoal")
+
+        response = authed_client.post(f"/api/{root}/sequence-tracks", json={"parent_goal_id": other, "goal_ids": ids})
+
+        assert response.status_code == 400
+        assert db_session.query(GoalSequenceTrack).count() == 0
+
 
 @pytest.mark.integration
 class TestEditingTracks:
@@ -138,6 +162,19 @@ class TestEditingTracks:
         removed = _goal(db_session, ids[1])
         assert (removed.sequence_track_id, removed.paused) == (None, False)
         assert _state(db_session, [ids[0], ids[3], ids[2]]) == [(1, False, False), (2, True, False), (3, True, False)]
+
+    def test_a_cousin_cannot_be_added_to_a_track(self, authed_client, db_session, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        parent, other = [_create_goal(authed_client, root, root, name=name, type="LongTermGoal")["id"] for name in ("A", "B")]
+        ids = _siblings(authed_client, root, 2, parent_id=parent, type_="MidTermGoal")
+        cousin = _siblings(authed_client, root, 1, parent_id=other, type_="MidTermGoal")[0]
+        track = _track(authed_client, root, ids, parent)
+
+        response = authed_client.put(f"/api/{root}/sequence-tracks/{track['id']}", json={"goal_ids": [*ids, cousin]})
+
+        assert response.status_code == 400
+        assert _goal(db_session, cousin).sequence_track_id is None
+        assert _state(db_session, ids) == [(1, False, False), (2, True, False)]
 
     def test_dissolving_resumes_every_held_step(self, authed_client, db_session, sample_ultimate_goal):
         root = sample_ultimate_goal.id
@@ -286,6 +323,19 @@ class TestGoalOptions:
         assert response.status_code == 200, response.get_json()
 
         assert _state(db_session, ids) == [(None, False, False), (1, False, False), (2, True, False)]
+
+    def test_reparenting_through_a_goal_update_leaves_the_track(self, authed_client, db_session, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        parent, new_parent = self._two_parents(authed_client, root)
+        ids = _siblings(authed_client, root, 3, parent_id=parent, type_='MidTermGoal')
+        _track(authed_client, root, ids, parent)
+
+        response = authed_client.put(f"/api/{root}/goals/{ids[1]}", json={"parent_id": new_parent})
+
+        assert response.status_code == 200, response.get_json()
+        moved = _goal(db_session, ids[1])
+        assert (moved.parent_id, moved.sequence_track_id) == (new_parent, None)
+        assert _state(db_session, [ids[0], ids[1], ids[2]]) == [(1, False, False), (None, False, False), (2, True, False)]
 
     def test_converting_a_level_leaves_the_track(self, authed_client, db_session, sample_ultimate_goal):
         root = sample_ultimate_goal.id

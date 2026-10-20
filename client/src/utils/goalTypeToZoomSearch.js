@@ -39,10 +39,11 @@ export function getVisibleGoalSearchCandidates(treeData, {
     hideCompletedGoals = false,
     hiddenInactiveGoalIds = null,
     allowedGoalIds = null,
+    focusGoalIds = null,
 } = {}) {
     if (!treeData) return [];
 
-    const selectedLineage = selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null;
+    const selectedLineage = focusGoalIds || (selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null);
     const candidates = [];
 
     const traverse = (node) => {

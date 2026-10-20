@@ -46,6 +46,63 @@ export const getLineagePath = (treeData, targetNodeId) => {
     return lineageIds;
 };
 
+/**
+ * The flow tree while a goal is being sequenced: its ancestors, itself, and its same-level
+ * siblings, the goals it can share a sequence with. No goal's children are included.
+ */
+export const getSequencingScope = (treeData, targetNodeId) => {
+    const targetId = toId(targetNodeId);
+    const readLevel = (node) => node?.level_id ?? node?.attributes?.level_id ?? null;
+    const find = (node, path = []) => {
+        const nodeId = toId(node?.id || node?.attributes?.id);
+        if (!nodeId) return null;
+        if (nodeId === targetId) return { node, path: [...path, node] };
+        for (const child of node.children || []) {
+            const result = find(child, [...path, node]);
+            if (result) return result;
+        }
+        return null;
+    };
+
+    const result = find(treeData);
+    if (!result) return new Set();
+    const scopeIds = new Set(result.path.map((node) => toId(node.id || node.attributes?.id)));
+    const parent = result.path[result.path.length - 2];
+    const levelId = readLevel(result.node);
+    (parent?.children || []).forEach((sibling) => {
+        if (readLevel(sibling) === levelId) scopeIds.add(toId(sibling.id || sibling.attributes?.id));
+    });
+    return scopeIds;
+};
+
+/**
+ * Overlay a drafted sequence on the goal tree so the flow tree previews it before it's saved.
+ * Drafted steps take positions 1..n; goals that left the edited track lose theirs. A draft of
+ * fewer than two goals is no sequence, so it only clears the edited track.
+ */
+export const applySequenceDraft = (treeData, draft) => {
+    if (!treeData || !draft) return treeData;
+    const draftTrackId = draft.trackId || 'draft-sequence';
+    const positions = new Map((draft.stepIds?.length >= 2 ? draft.stepIds : []).map((id, index) => [toId(id), index + 1]));
+    const withSequence = (node, trackId, position) => {
+        const fields = { sequence_track_id: trackId, sequence_position: position };
+        return { ...node, ...fields, ...(node.attributes ? { attributes: { ...node.attributes, ...fields } } : {}) };
+    };
+    const visit = (node) => {
+        if (!node) return node;
+        const nodeId = toId(node.id || node.attributes?.id);
+        const trackId = toId(node.sequence_track_id ?? node.attributes?.sequence_track_id);
+        let next = node;
+        if (positions.has(nodeId)) next = withSequence(node, draftTrackId, positions.get(nodeId));
+        else if (draft.trackId && trackId === toId(draft.trackId)) next = withSequence(node, null, null);
+        const children = Array.isArray(node.children) ? node.children.map(visit) : node.children;
+        const childrenChanged = Array.isArray(node.children) && children.some((child, index) => child !== node.children[index]);
+        if (next === node && !childrenChanged) return node;
+        return { ...next, children };
+    };
+    return visit(treeData);
+};
+
 export const getGoalLineageScope = (treeData, targetNodeIds = []) => {
     const scopeIds = new Set();
 

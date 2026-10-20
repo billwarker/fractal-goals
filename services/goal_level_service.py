@@ -133,11 +133,17 @@ class GoalLevelService:
             deleted_at=None,
         ).first()
         if system_default:
-            from models.goal import Goal
+            from models.goal import Goal, GoalSequenceTrack
 
             user_goals = self.db_session.query(Goal).filter_by(owner_id=current_user_id, level_id=level.id).all()
             for goal in user_goals:
                 goal.level_id = system_default.id
+            # Every goal on the level moves together, so its sequences stay one level; keep the track in step.
+            track_ids = {goal.sequence_track_id for goal in user_goals if goal.sequence_track_id}
+            if track_ids:
+                self.db_session.query(GoalSequenceTrack).filter(
+                    GoalSequenceTrack.id.in_(track_ids),
+                ).update({GoalSequenceTrack.level_id: system_default.id}, synchronize_session=False)
 
         level.deleted_at = datetime.now(timezone.utc)
         self.db_session.commit()

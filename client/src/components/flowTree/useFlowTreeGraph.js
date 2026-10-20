@@ -22,6 +22,7 @@ export default function useFlowTreeGraph({
     activityGroups,
     programs,
     allowedGoalIds,
+    focusGoalIds = null,
     isMobile,
     layoutMode,
 }) {
@@ -34,9 +35,9 @@ export default function useFlowTreeGraph({
 
     const structure = useMemo(() => prepareGraphPresentation({
         treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor, viewSettings,
-        evidenceGoalIds, allowedGoalIds, getSortChildrenBy,
+        evidenceGoalIds, allowedGoalIds, focusGoalIds, getSortChildrenBy,
     }), [treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor,
-        viewSettings, evidenceGoalIds, allowedGoalIds, getSortChildrenBy]);
+        viewSettings, evidenceGoalIds, allowedGoalIds, focusGoalIds, getSortChildrenBy]);
 
     // Fixed node dimensions make geometry depend only on ordered topology and layout.
     // Selection still changes topology when it narrows the tree to a lineage.

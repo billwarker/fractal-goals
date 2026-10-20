@@ -7,7 +7,7 @@ import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useAuth } from '../contexts/AuthContext';
-import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
+import { applySequenceDraft, buildTreeMaps, getLineagePath, getSequencingScope } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
@@ -100,6 +100,10 @@ function FractalGoals() {
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
+    // Options → Sequence's draft ({ goalId, trackId, stepIds }): the tree shows that goal's siblings
+    // instead of its subtree and previews the drafted order until it's saved.
+    const [sequenceDraft, setSequenceDraft] = useState(null);
+    const sequencingGoalId = sequenceDraft?.goalId ?? null;
 
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedParent, setSelectedParent] = useState(null);
@@ -133,6 +137,15 @@ function FractalGoals() {
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
     }, [evidenceData]);
     const flowtreeMaps = useMemo(() => buildTreeMaps(fractalData), [fractalData]);
+    const sequencingScopeIds = useMemo(() => (
+        fractalData && sequencingGoalId && sequencingGoalId === String(selectedNodeId)
+            ? getSequencingScope(fractalData, sequencingGoalId)
+            : null
+    ), [fractalData, selectedNodeId, sequencingGoalId]);
+    // Only the flow tree previews the draft; goal details keep reading the saved tree.
+    const flowTreeData = useMemo(() => (
+        sequencingScopeIds ? applySequenceDraft(fractalData, sequenceDraft) : fractalData
+    ), [fractalData, sequenceDraft, sequencingScopeIds]);
     const todayInTimezone = useMemo(
         () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
         [timezone]
@@ -155,6 +168,10 @@ function FractalGoals() {
             getProgramMetricScopeGoalIds(scopedProgram, fractalData),
         );
     }, [fractalData, scopedProgram]);
+    // Goal details mark goals outside the program the page is scoped to.
+    const goalDetailProgramScope = useMemo(() => (
+        programScopeGoalIds ? { goalIds: programScopeGoalIds, name: scopedProgram?.name || 'this program' } : null
+    ), [programScopeGoalIds, scopedProgram]);
     const surfaceGoals = useMemo(
         () => Array.from(flowtreeMaps.nodeById.values()),
         [flowtreeMaps.nodeById]
@@ -173,7 +190,8 @@ function FractalGoals() {
             hiddenInactiveGoalIds ? ids.filter((id) => !hiddenInactiveGoalIds.has(id)) : ids
         );
         const scopedIds = programScopeGoalIds || new Set(flowtreeMaps.nodeById.keys());
-        const selectedLineageIds = selectedNodeId ? getLineagePath(fractalData, selectedNodeId) : null;
+        const selectedLineageIds = sequencingScopeIds
+            || (selectedNodeId ? getLineagePath(fractalData, selectedNodeId) : null);
         const ids = Array.from(scopedIds).filter((id) => (
             (!selectedLineageIds || selectedLineageIds.has(id))
             && (!viewSettings.hideCompletedGoals || !(
@@ -182,7 +200,8 @@ function FractalGoals() {
             ))
         ));
         return filterHiddenInactive(ids);
-    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
+    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, sequencingScopeIds,
+        viewSettings.hideCompletedGoals]);
     const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
         rootId,
         visibleGoalIds,
@@ -194,8 +213,10 @@ function FractalGoals() {
             hideCompletedGoals: viewSettings.hideCompletedGoals,
             hiddenInactiveGoalIds,
             allowedGoalIds: programScopeGoalIds,
+            focusGoalIds: sequencingScopeIds,
         })
-    ), [fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
+    ), [fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, sequencingScopeIds,
+        viewSettings.hideCompletedGoals]);
     const typeToZoomResults = useMemo(() => (
         getGoalSearchMatches(typeToZoomCandidates, typeToZoomQuery)
     ), [typeToZoomCandidates, typeToZoomQuery]);
@@ -872,7 +893,7 @@ function FractalGoals() {
                         renderTree={() => (
                             <FractalView
                                 ref={flowTreeRef}
-                                treeData={fractalData}
+                                treeData={flowTreeData}
                                 evidenceGoalIds={evidenceGoalIds}
                                 metricsSummary={flowtreeMetricsSummary}
                                 activeGoalWindowDays={activeGoalWindowDays}
@@ -880,6 +901,7 @@ function FractalGoals() {
                                 activityGroups={activityGroups}
                                 programs={programs}
                                 allowedGoalIds={programScopeGoalIds}
+                                focusGoalIds={sequencingScopeIds}
                                 scopedProgramName={scopedProgram?.name || null}
                                 viewSettings={viewSettings}
                                 scopeTransitionKey={flowTreeScopeTransitionKey}
@@ -934,6 +956,8 @@ function FractalGoals() {
                                                 programs={programs}
                                                 activityGroups={activityGroups}
                                                 onGoalSelect={handleGoalNameClick}
+                                                onSequencingChange={setSequenceDraft}
+                                                programScope={goalDetailProgramScope}
                                             />
                                         </ErrorBoundary>
                                     )}
@@ -979,6 +1003,8 @@ function FractalGoals() {
                             programs={programs}
                             activityGroups={activityGroups}
                             onGoalSelect={handleGoalNameClick}
+                            onSequencingChange={setSequenceDraft}
+                            programScope={goalDetailProgramScope}
                         />
                     )}
                 </Suspense>

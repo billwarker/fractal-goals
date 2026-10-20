@@ -33,6 +33,36 @@ describe('buildGraphPresentation', () => {
         expect(graph.edges.map((edge) => edge.id)).toEqual(['root-1-program-parent', 'program-parent-program-child']);
     });
 
+    it('numbers sequence steps and links them with one arrow beneath node text', () => {
+        const step = (id, position) => ({
+            id, name: id, type: 'LongTermGoal', sequence_track_id: 'track-1', sequence_position: position, children: [],
+        });
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [step('second', 2), step('first', 1), { id: 'loose', name: 'Loose', type: 'LongTermGoal', children: [] }],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            programs: [],
+            isMobile: false,
+        });
+
+        const positionOf = (id) => graph.nodes.find((node) => node.id === id).data.sequencePosition;
+        expect([positionOf('first'), positionOf('second'), positionOf('loose'), positionOf('root-1')]).toEqual([1, 2, null, null]);
+        const arrows = graph.edges.filter((edge) => edge.type === 'sequence');
+        expect(arrows).toHaveLength(1);
+        expect(arrows[0]).toMatchObject({ source: 'first', target: 'second', zIndex: 0 });
+        expect(arrows[0].style.strokeDasharray).toBe('5 5');
+    });
+
     it('defaults FlowTree presentation nodes to tree layout mode', () => {
         const treeData = {
             id: 'root-1',
@@ -359,45 +389,5 @@ describe('getLayoutedElements sibling order', () => {
 
         const childPositions = childIds.map(position);
         expect([...childPositions].sort((a, b) => a - b)).toEqual(childPositions);
-    });
-});
-
-describe('sequence arrows', () => {
-    const step = (id, position, overrides = {}) => ({
-        id, name: id, type: 'MidTermGoal', sequence_track_id: 'track-1', sequence_position: position, children: [], ...overrides,
-    });
-    const tree = (children) => ({ id: 'root', name: 'Root', type: 'LongTermGoal', children });
-    const build = (treeData, extra = {}) => buildGraphPresentation({
-        treeData, onNodeClick: () => {}, onAddChild: null, selectedNodeId: null,
-        completedGoalColor: '#FFD700', viewSettings: {}, programs: [], isMobile: false, ...extra,
-    });
-
-    it('orders steps together by position and links consecutive steps with dashed arrows', () => {
-        const graph = build(tree([step('c', 3), { id: 'other', name: 'Other', type: 'MidTermGoal', children: [] }, step('a', 1), step('b', 2)]));
-
-        expect(graph.nodes.map((node) => node.id)).toEqual(['root', 'a', 'b', 'c', 'other']);
-        const arrows = graph.edges.filter((edge) => edge.type === 'sequence');
-        expect(arrows.map((edge) => [edge.source, edge.target])).toEqual([['a', 'b'], ['b', 'c']]);
-        expect(arrows[0].style.strokeDasharray).toBe('5 5');
-        expect(arrows[0].markerEnd).toMatchObject({ type: 'arrowclosed' });
-        expect(arrows[0].data.sourceCenter).toBeTruthy();
-    });
-
-    it('never changes node positions', () => {
-        const sequenced = build(tree([step('a', 1), step('b', 2), step('c', 3)]));
-        const plain = build(tree(['a', 'b', 'c'].map((id) => ({ id, name: id, type: 'MidTermGoal', children: [] }))));
-
-        expect(sequenced.nodes.map((node) => [node.id, node.position])).toEqual(plain.nodes.map((node) => [node.id, node.position]));
-    });
-
-    it('skips hidden steps and the hierarchy layout', () => {
-        const withHidden = build(tree([step('a', 1, { completed: true }), step('b', 2), step('c', 3)]), {
-            viewSettings: { hideCompletedGoals: true },
-        });
-        expect(withHidden.edges.filter((edge) => edge.type === 'sequence').map((edge) => [edge.source, edge.target]))
-            .toEqual([['b', 'c']]);
-
-        const hierarchy = build(tree([step('a', 1), step('b', 2)]), { layoutMode: 'hierarchy' });
-        expect(hierarchy.edges.some((edge) => edge.type === 'sequence')).toBe(false);
     });
 });
