@@ -74,6 +74,8 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
     await expect(charts.getByText('2 of 2', { exact: true })).toBeVisible();
     await expect(charts.locator('[data-density="compact"] canvas')).toBeVisible();
+    // The mini chart is a preview: its canvas takes no hover, so no data tooltips.
+    expect(await charts.locator('[data-density="compact"] canvas').evaluate((canvas) => getComputedStyle(canvas).pointerEvents)).toBe('none');
 
     // Clicking the chart expands it: it replaces the flow tree and its controls, at full detail on the page grid.
     await charts.getByRole('button', { name: /^Expand chart:/ }).click();
@@ -151,7 +153,7 @@ test('a saved session chart can be added from goal details', async ({ page }, te
     await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
     await expect(charts.locator('[data-density="compact"] canvas')).toBeVisible();
 
-    await charts.getByRole('button', { name: 'Remove from goal' }).click();
+    await charts.getByRole('button', { name: 'Remove this chart' }).click();
     await expect(charts.getByText(viewName, { exact: true })).toHaveCount(0);
     await page.request.delete(`/api/roots/${root}/dashboards/${viewId}`, { headers });
     expect(errors).toEqual([]);

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 
-import { useGoalCharts } from '../../hooks/useGoalCharts';
+import { useGoalChartMutations, useGoalCharts } from '../../hooks/useGoalCharts';
 import Button from '../atoms/Button';
 import AddGoalChartMenu from './AddGoalChartMenu';
 import GoalChartControls, { chartKeyHandler } from './GoalChartControls';
@@ -23,6 +23,7 @@ export default function GoalChartsCarousel({ rootId, goal, goalId, chartExpansio
     const { data, isLoading, isError } = useGoalCharts(rootId, goalId);
     const items = useMemo(() => buildGoalChartItems(data, goal), [data, goal]);
     const cursor = useGoalChartCursor(goalId, items);
+    const { detach, isSaving } = useGoalChartMutations(rootId, goalId);
     const isExpanded = Boolean(chartExpansion?.goalId) && String(chartExpansion.goalId) === String(goalId);
     const canExpand = Boolean(chartExpansion && cursor.item);
     const expand = () => chartExpansion.expand({ goalId, chartKey: cursor.item.key });
@@ -50,7 +51,20 @@ export default function GoalChartsCarousel({ rootId, goal, goalId, chartExpansio
                 cursor={cursor}
                 portalTarget={portalTarget}
             />
-            <p className={styles.chartName} title={cursor.item?.name}>{cursor.item?.name}</p>
+            <div className={styles.nameRow}>
+                <p className={styles.chartName} title={cursor.item?.name}>{cursor.item?.name}</p>
+                {cursor.item?.kind === 'view' ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={styles.removeChart}
+                        disabled={isSaving}
+                        onClick={() => detach(cursor.item.dashboardId)}
+                    >
+                        Remove this chart
+                    </Button>
+                ) : null}
+            </div>
             {isExpanded ? (
                 <div className={`${styles.compactFrame} ${styles.expandedPlaceholder}`} data-testid="goal-chart-placeholder">
                     <p className={styles.expandedNote}>Showing in place of the goal tree.</p>

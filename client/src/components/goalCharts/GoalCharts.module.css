@@ -19,7 +19,31 @@
     color: var(--color-text-primary);
 }
 
+.nameRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* Inline text, muted, red on hover like the app's other delete actions (scoped to beat Button's own). */
+.nameRow .removeChart {
+    flex: 0 0 auto;
+    height: auto;
+    padding: 0;
+    border: none;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.nameRow .removeChart:hover:not(:disabled) {
+    background-color: transparent;
+    color: var(--color-brand-danger);
+}
+
 .chartName {
+    flex: 1 1 auto;
     margin: 0;
     min-width: 0;
     overflow: hidden;
@@ -62,6 +86,12 @@
 
 .compactFrame > * {
     height: 100%;
+}
+
+/* The mini chart is a preview: no hover tooltips on its points (the expanded chart has them), and
+   clicks reach the frame. */
+.compactFrame canvas {
+    pointer-events: none;
 }
 
 /* Clicking the chart expands it (Goals page). */

@@ -86,9 +86,9 @@ describe('GoalChartsCarousel', () => {
 
     it('removes attached views but never the default chart', () => {
         renderCarousel();
-        expect(screen.queryByRole('button', { name: 'Remove from goal' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Remove this chart' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Next chart' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Remove from goal' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Remove this chart' }));
         expect(detachMock).toHaveBeenCalledWith('v1');
     });
 
@@ -176,6 +176,15 @@ describe('ExpandedGoalChart', () => {
         expect(screen.getByTestId('chart-view')).toHaveTextContent('view:v2');
         fireEvent.click(screen.getByRole('button', { name: 'Back to goal' }));
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('returns to the tree once the goal has no charts left', () => {
+        const onClose = vi.fn();
+        const { rerender } = render(<ExpandedGoalChart rootId="root-1" goal={goal} goalId="goal-1" initialKey="view:v1" onClose={onClose} />);
+        expect(onClose).not.toHaveBeenCalled();
+        chartsMock.mockReturnValue({ data: { default_chart: null, charts: [] }, isLoading: false, isError: false });
+        rerender(<ExpandedGoalChart rootId="root-1" goal={goal} goalId="goal-1" initialKey="view:v1" onClose={onClose} />);
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('follows the chart chosen in goal details', () => {

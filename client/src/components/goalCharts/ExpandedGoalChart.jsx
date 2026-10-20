@@ -32,6 +32,11 @@ export default function ExpandedGoalChart({
     }, []);
     const { data } = useGoalCharts(rootId, goalId);
     const items = useMemo(() => buildGoalChartItems(data, goal), [data, goal]);
+    // With its last chart removed, the goal has nothing to show here: back to the tree.
+    const hasNoCharts = Boolean(data) && items.length === 0;
+    useEffect(() => {
+        if (hasNoCharts) onClose();
+    }, [hasNoCharts, onClose]);
     const cursor = useGoalChartCursor(goalId, items, initialKey);
 
     useEffect(() => {
@@ -77,7 +82,6 @@ export default function ExpandedGoalChart({
                 ) : null}
             </div>
             <div className={styles.expandedChart}>
-                {data && items.length === 0 ? <div className={styles.status}>This goal has no charts.</div> : null}
                 <GoalChartView key={cursor.item?.key} rootId={rootId} goalId={goalId} item={cursor.item} density="expanded" />
             </div>
         </section>
