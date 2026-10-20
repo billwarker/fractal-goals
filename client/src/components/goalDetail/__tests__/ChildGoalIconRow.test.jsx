@@ -32,6 +32,21 @@ describe('ChildGoalIconRow', () => {
             .toEqual(['Run a 5k (complete)', 'Run a 10k', 'Half marathon']);
     });
 
+    it('groups sequence steps in order and numbers them', () => {
+        const sequenced = [
+            { id: 'a', name: 'Loose goal' },
+            { id: 's2', name: 'Second', sequence_track_id: 't1', sequence_position: 2 },
+            { id: 'b', name: 'Another loose goal' },
+            { id: 's1', name: 'First', sequence_track_id: 't1', sequence_position: 1 },
+        ];
+        render(<ChildGoalIconRow childGoals={sequenced} childType="ShortTermGoal" />);
+
+        expect(screen.getAllByRole('img').map((icon) => icon.getAttribute('aria-label')))
+            .toEqual(['Loose goal', 'Step 1: First', 'Step 2: Second', 'Another loose goal']);
+        expect(screen.getAllByRole('listitem').map((item) => item.querySelector('[aria-hidden="true"]')?.textContent ?? null))
+            .toEqual([null, '1', '2', null]);
+    });
+
     it('opens a child when its icon is clicked', () => {
         const onGoalSelect = vi.fn();
         render(<ChildGoalIconRow childGoals={children} childType="ShortTermGoal" onGoalSelect={onGoalSelect} />);
