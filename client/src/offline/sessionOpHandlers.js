@@ -65,6 +65,11 @@ function patchRun(run, action, at, value = null) {
 
 const mapList = (updater) => (previous) => (Array.isArray(previous) ? updater(previous) : previous);
 
+const patchInstanceById = (queryClient, meta, instanceId, fields) => queryClient.setQueryData(
+    keysFor(meta).activities,
+    mapList((list) => list.map((instance) => (instance.id === instanceId ? { ...instance, ...fields } : instance))),
+);
+
 const patchRunById = (queryClient, meta, runId, patch) => queryClient.setQueryData(
     keysFor(meta).circuits,
     mapList((runs) => runs.map((run) => (run.id === runId ? patch(run) : run))),
@@ -98,10 +103,7 @@ function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, ru
 
 const OPTIMISTIC = {
     [SESSION_OP.INSTANCE_UPDATE]: (queryClient, op) => {
-        const { instanceId, updates } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id === instanceId ? { ...instance, ...updates } : instance
-        ))));
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, op.meta.updates);
     },
     [SESSION_OP.ACTIVITY_ADD]: (queryClient, op) => {
         const { placeholder } = op.meta;
@@ -223,10 +225,7 @@ const OPTIMISTIC = {
         patchRunById(queryClient, op.meta, op.meta.runId, (run) => applyTagChange(run, op.meta));
     },
     [SESSION_OP.INSTANCE_TAGS]: (queryClient, op) => {
-        const { instanceId, tags } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id === instanceId ? { ...instance, tags } : instance
-        ))));
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, { tags: op.meta.tags });
     },
     [SESSION_OP.SET_TAGS]: (queryClient, op) => {
         const { instanceId, setId, tags } = op.meta;
@@ -236,6 +235,9 @@ const OPTIMISTIC = {
                 sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
             }
         ))));
+    },
+    [SESSION_OP.PROGRESS_COMPARISON]: (queryClient, op) => {
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, { comparison_context: op.meta.comparisonContext });
     },
     [SESSION_OP.INSTANCE_GOAL_LINK]: (queryClient, op) => {
         const { instanceId, goalId, remove } = op.meta;
@@ -342,20 +344,29 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                 if (data?.version == null || outbox.hasPendingEntity(op.meta.setId || instanceId)) break;
                 queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
                     if (instance.id !== instanceId) return instance;
-                    if (!op.meta.setId) return { ...instance, tag_assignment_version: data.version };
+                    // Tags change what the instance compares against, so its progress arrives with the ack.
+                    const progress = data.progress_comparison !== undefined
+                        ? { progress_comparison: data.progress_comparison } : {};
+                    if (!op.meta.setId) return { ...instance, ...progress, tag_assignment_version: data.version };
                     return {
                         ...instance,
+                        ...progress,
                         sets: (instance.sets || []).map((set) => (
                             set.id === op.meta.setId ? { ...set, tag_assignment_version: data.version } : set
                         )),
                     };
                 })));
                 break;
+            case SESSION_OP.PROGRESS_COMPARISON:
+                if (!data?.comparison_context || outbox.hasPendingEntity(instanceId)) break;
+                patchInstanceById(queryClient, op.meta, instanceId, {
+                    comparison_context: data.comparison_context,
+                    progress_comparison: data.progress_comparison,
+                });
+                break;
             case SESSION_OP.INSTANCE_GOAL_LINK:
                 if (Array.isArray(data?.associated_goal_ids) && !outbox.hasPendingEntity(instanceId)) {
-                    queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-                        instance.id === instanceId ? { ...instance, associated_goal_ids: data.associated_goal_ids } : instance
-                    ))));
+                    patchInstanceById(queryClient, op.meta, instanceId, { associated_goal_ids: data.associated_goal_ids });
                 }
                 invalidateQueryKeys(queryClient, [
                     queryKeys.fractalTree(op.meta.rootId),

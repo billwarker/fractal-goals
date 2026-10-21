@@ -163,14 +163,12 @@ export const queryKeys = {
     instagramOembed: (permalink) => ['instagram-oembed', permalink],
     progressRoot: () => ['progress'],
     progressComparison: (instanceId) => ['progress', 'comparison', instanceId],
-    progressHistory: (activityDefId, excludeSessionId = null) => ['progress', 'history', activityDefId, excludeSessionId],
-    progressHistoryRoot: (activityDefId) => ['progress', 'history', activityDefId],
     sessionProgressSummary: (sessionId) => ['progress', 'session', sessionId],
     activityTagCatalog: (rootId) => ['activity-tag-catalog', rootId],
     activityProgressTimelineRoot: (rootId, activityId) => [
         'activity-progress-timeline', rootId, activityId,
     ],
-    activityProgressTimeline: (rootId, activityId, sessionId = null) => [
-        'activity-progress-timeline', rootId, activityId, sessionId,
+    activityProgressTimeline: (rootId, activityId, instanceId = null) => [
+        'activity-progress-timeline', rootId, activityId, instanceId,
     ],
 };

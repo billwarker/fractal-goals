@@ -274,10 +274,11 @@ class Events:
     ACTIVITY_TAG_ARCHIVED = 'activity_tag.archived'
     ACTIVITY_TAG_RESTORED = 'activity_tag.restored'
     ACTIVITY_TAG_ASSIGNMENTS_UPDATED = 'activity_tag.assignments_updated'
-    ACTIVITY_PROGRESS_VIEW_CREATED = 'activity_progress_view.created'
-    ACTIVITY_PROGRESS_VIEW_UPDATED = 'activity_progress_view.updated'
-    ACTIVITY_PROGRESS_VIEW_ACTIVATED = 'activity_progress_view.activated'
-    ACTIVITY_PROGRESS_VIEW_DELETED = 'activity_progress_view.deleted'
+    ACTIVITY_TAG_MERGED = 'activity_tag.merged'
+    ACTIVITY_TAG_FAMILY_CREATED = 'activity_tag_family.created'
+    ACTIVITY_TAG_FAMILY_UPDATED = 'activity_tag_family.updated'
+    ACTIVITY_TAG_FAMILY_DELETED = 'activity_tag_family.deleted'
+    ACTIVITY_PROGRESS_COMPARISON_UPDATED = 'activity_progress_comparison.updated'
 
     # Circuit definition and execution events
     CIRCUIT_CREATED = 'circuit.created'

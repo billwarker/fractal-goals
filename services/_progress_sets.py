@@ -1,12 +1,48 @@
 """Mixin for ProgressService: set-level comparisons and metric value extraction.
 """
 
-from typing import Optional
+from collections import Counter
+from typing import Callable, Optional
 from models import ActivityInstance, MetricDefinition
 from services.activity_instance_data import resolve_metric_id
 
 
 class _ProgressSetsMixin:
+    # Set signature -> the earlier instance its set group compares against (see
+    # ProgressService._payloads); set per comparison.
+    _set_group_previous: dict
+    _sets_for_instance: Callable[[ActivityInstance], list]
+    _coerce_numeric: Callable[[object], Optional[float]]
+
+    def _paired_previous_sets(self, current_instance: ActivityInstance) -> dict:
+        """Current set index -> (previous instance, previous set payload).
+
+        The k-th current set with a given set-tag signature pairs with the k-th set
+        carrying the same signature in that signature group's earlier instance.
+        """
+        ordinals = Counter()
+        paired = {}
+        for current_set in self._sets_for_instance(current_instance):
+            signature = current_set['_tag_signature']
+            ordinal = ordinals[signature]
+            ordinals[signature] += 1
+            previous_instance = self._set_group_previous.get(signature)
+            if previous_instance is None:
+                continue
+            candidates = [
+                previous_set for previous_set in self._sets_for_instance(previous_instance)
+                if previous_set['_tag_signature'] == signature
+            ]
+            if ordinal < len(candidates):
+                paired[current_set['_progress_set_index']] = (previous_instance, candidates[ordinal])
+        return paired
+
+    def _set_metric_value(self, set_payload, metric_def) -> Optional[float]:
+        for metric in set_payload.get('metrics', []):
+            if resolve_metric_id(metric) == metric_def.id:
+                return self._coerce_numeric(metric.get('value'))
+        return None
+
     def _find_best_set_index(
         self,
         instance: ActivityInstance,
@@ -92,6 +128,7 @@ class _ProgressSetsMixin:
             'set_index': current_sets[current_best_index]['_progress_set_index'],
             'comparison_basis': 'best_set',
             'previous_set_index': previous_sets[previous_best_index]['_progress_set_index'],
+            'previous_instance_id': previous_instance.id,
             'current_value': current_value,
             'previous_value': previous_value,
             'delta': delta,
@@ -126,7 +163,7 @@ class _ProgressSetsMixin:
         aggregation: str = 'last',
         all_metric_defs: Optional[list] = None,
     ) -> list:
-        """Build per-set comparison entries aligned by set index."""
+        """Build per-set comparison entries; each set pairs with its tag group's earlier set."""
         if aggregation == 'max':
             return self._build_best_set_comparison(
                 current_instance,
@@ -136,37 +173,57 @@ class _ProgressSetsMixin:
                 all_metric_defs or [metric_def],
             )
 
-        curr_sets = self._extract_set_values(current_instance, metric_def)
-        prev_sets = self._extract_set_values(previous_instance, metric_def)
-        prev_by_index = {idx: val for idx, val in prev_sets}
+        paired = self._paired_previous_sets(current_instance)
         result = []
-        for set_index, curr_val in curr_sets:
-            prev_val = prev_by_index.get(set_index)
-            if prev_val is None:
-                result.append({
-                    'set_index': set_index,
-                    'current_value': curr_val,
-                    'previous_value': None,
-                    'delta': None,
-                    'pct_change': None,
-                    'improved': False,
-                    'regressed': False,
-                })
-                continue
-            delta = curr_val - prev_val
-            pct_change = (delta / prev_val * 100) if prev_val != 0 else None
-            improved = (delta > 0 and higher_is_better) or (delta < 0 and not higher_is_better)
-            regressed = (delta < 0 and higher_is_better) or (delta > 0 and not higher_is_better)
-            result.append({
+        for set_index, curr_val in self._extract_set_values(current_instance, metric_def):
+            previous_instance_for_set, previous_set = paired.get(set_index, (None, None))
+            prev_val = self._set_metric_value(previous_set, metric_def) if previous_set else None
+            entry = {
                 'set_index': set_index,
+                'previous_set_index': previous_set['_progress_set_index'] if previous_set else None,
+                'previous_instance_id': previous_instance_for_set.id if previous_instance_for_set else None,
                 'current_value': curr_val,
                 'previous_value': prev_val,
-                'delta': delta,
-                'pct_change': round(pct_change, 1) if pct_change is not None else None,
-                'improved': improved,
-                'regressed': regressed,
-            })
+                'delta': None,
+                'pct_change': None,
+                'improved': False,
+                'regressed': False,
+            }
+            if prev_val is not None:
+                delta = curr_val - prev_val
+                pct_change = (delta / prev_val * 100) if prev_val != 0 else None
+                entry.update(
+                    delta=delta,
+                    pct_change=round(pct_change, 1) if pct_change is not None else None,
+                    improved=(delta > 0 and higher_is_better) or (delta < 0 and not higher_is_better),
+                    regressed=(delta < 0 and higher_is_better) or (delta > 0 and not higher_is_better),
+                )
+            result.append(entry)
         return result
+
+    def _previous_set_hints(self, current_instance, previous_instance, metric_def) -> list:
+        """"Last X" hints for an in-progress instance, one per current set row.
+
+        Each row shows its paired earlier set; an instance with no set rows yet falls
+        back to the previous instance's sets in order.
+        """
+        current_sets = self._sets_for_instance(current_instance)
+        if not current_sets:
+            return [
+                {'set_index': index, 'previous_set_index': index, 'previous_instance_id': previous_instance.id, 'previous_value': value}
+                for index, value in self._extract_set_values(previous_instance, metric_def)
+            ]
+        hints = []
+        for set_index, (previous_instance_for_set, previous_set) in sorted(self._paired_previous_sets(current_instance).items()):
+            value = self._set_metric_value(previous_set, metric_def)
+            if value is not None:
+                hints.append({
+                    'set_index': set_index,
+                    'previous_set_index': previous_set['_progress_set_index'],
+                    'previous_instance_id': previous_instance_for_set.id,
+                    'previous_value': value,
+                })
+        return hints
 
     def _extract_metric_value(
         self,

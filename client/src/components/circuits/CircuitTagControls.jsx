@@ -45,12 +45,10 @@ export function CircuitMemberTagEditor({
     editable = true,
 }) {
     if (!instance || !definition) return null;
-    const scopeNames = new Set(
-        [...(runTags || []), ...(roundTags || [])].map((tag) => tag.name.toLocaleLowerCase()),
-    );
-    const scopeTags = (definition.tags || []).filter(
-        (tag) => scopeNames.has(tag.name.toLocaleLowerCase()),
-    );
+    // Run and round scopes own their catalog tags; the member shows them as inherited.
+    const scopeTags = [...(runTags || []), ...(roundTags || [])].map((tag) => ({
+        id: tag.definition_id, name: tag.name, color: tag.color,
+    }));
     const inheritedTags = [
         ...(activitySet ? instance.tags || [] : []),
         ...scopeTags,
@@ -66,7 +64,6 @@ export function CircuitMemberTagEditor({
             assignmentVersion={activitySet
                 ? activitySet.tag_assignment_version
                 : instance.tag_assignment_version}
-            availableTags={definition.tags || []}
             tags={activitySet ? activitySet.tags || [] : instance.tags || []}
             inheritedTags={inheritedTags}
             editable={editable}

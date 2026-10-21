@@ -3,22 +3,18 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import TimelinePanel from '../TimelinePanel';
 
-const useActivityProgressTimeline = vi.fn(() => ({
-    data: { items: [], tags: [], views: [], active_view_id: null, included_count: 0, total: 0 },
-    isLoading: false,
-    error: null,
-}));
-const createView = vi.fn();
-const updateView = vi.fn();
-const deleteView = vi.fn();
-const activateView = vi.fn();
+const EMPTY_TIMELINE = { items: [], total: 0, total_all: 0 };
+const useActivityProgressTimeline = vi.fn(() => ({ data: EMPTY_TIMELINE, isLoading: false, error: null }));
+const setComparison = vi.fn();
 
-vi.mock('../../../hooks/useActivityProgressViews', () => ({
-    progressPreviewSignature: (config) => config ? JSON.stringify(config) : null,
+vi.mock('../../../hooks/useActivityTags', () => ({
     useActivityProgressTimeline: (...args) => useActivityProgressTimeline(...args),
-    useActivityProgressViewMutations: () => ({
-        createView, updateView, deleteView, activateView, isPending: false,
-    }),
+    useProgressComparisonMutation: () => ({ setComparison, isPending: false }),
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [
+        { id: 'heavy', name: 'Heavy' }, { id: 'paused', name: 'Paused' },
+    ] } }),
+    useActivityTagCatalogMutations: () => ({ isPending: false }),
+    useActivityTagMutations: () => ({ isPending: false }),
 }));
 
 vi.mock('../NoteTimeline', () => ({
@@ -43,19 +39,20 @@ const sessionActivityDefs = [
     { id: 'activity-def-1', name: 'Scales', metric_definitions: [] },
     { id: 'activity-def-2', name: 'Arpeggios', metric_definitions: [] },
 ];
+const instance = (overrides = {}) => ({
+    id: 'instance-current',
+    activity_definition_id: 'activity-def-1',
+    tags: [{ id: 'heavy', name: 'Heavy' }],
+    comparison_context: { mode: 'same_tags', tag_ids: ['heavy'], tags: [{ id: 'heavy', name: 'Heavy' }], version: 1 },
+    ...overrides,
+});
+const providers = { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false };
 
 describe('TimelinePanel', () => {
     beforeEach(() => {
         useActivityProgressTimeline.mockClear();
-        createView.mockReset().mockResolvedValue({});
-        updateView.mockReset().mockResolvedValue({});
-        deleteView.mockReset().mockResolvedValue({});
-        activateView.mockReset().mockResolvedValue({});
-        useActivityProgressTimeline.mockReturnValue({
-            data: { items: [], tags: [], views: [], active_view_id: null, included_count: 0, total: 0 },
-            isLoading: false,
-            error: null,
-        });
+        setComparison.mockReset().mockResolvedValue({});
+        useActivityProgressTimeline.mockReturnValue({ data: EMPTY_TIMELINE, isLoading: false, error: null });
     });
 
     it('follows the focused session activity without a sync effect', () => {
@@ -63,21 +60,16 @@ describe('TimelinePanel', () => {
             <TimelinePanel
                 rootId="root-1"
                 sessionId="session-1"
-                selectedActivity={{ activity_definition_id: 'activity-def-2' }}
+                selectedActivity={{ id: 'instance-2', activity_definition_id: 'activity-def-2' }}
                 sessionActivityDefs={sessionActivityDefs}
+                sessionInstances={[instance(), instance({ id: 'instance-2', activity_definition_id: 'activity-def-2' })]}
             />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            providers,
         );
 
         expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-2');
         expect(useActivityProgressTimeline).toHaveBeenCalledWith('root-1', 'activity-def-2', {
-            excludeSessionId: 'session-1',
-            draftConfig: null,
+            instanceId: 'instance-2',
             limit: 20,
         });
     });
@@ -145,124 +137,95 @@ describe('TimelinePanel', () => {
         expect(screen.queryByText('Keep the wrist relaxed')).not.toBeInTheDocument();
     });
 
-    it('starts collapsed and adds progress operators incrementally', () => {
+    it('compares with past sessions that have the same tags by default', () => {
+        useActivityProgressTimeline.mockReturnValue({ data: { items: [], total: 3, total_all: 10 }, isLoading: false, error: null });
         renderWithProviders(
-            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
-            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+            <TimelinePanel rootId="root-1" selectedActivity={instance()} sessionActivityDefs={sessionActivityDefs} sessionInstances={[instance()]} />,
+            providers,
         );
 
-        expect(screen.getByLabelText('Progress view')).toHaveValue('');
-        expect(screen.queryByRole('button', { name: 'Save', exact: true })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
-        expect(screen.getByText('No tag operators. This view includes all history.')).toBeInTheDocument();
-        expect(screen.queryByRole('group', { name: 'All of tags' })).not.toBeInTheDocument();
-
-        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Any of' }));
-        expect(screen.getByRole('group', { name: 'Any of tags' })).toBeInTheDocument();
-        expect(screen.queryByRole('group', { name: 'All of tags' })).not.toBeInTheDocument();
+        const controls = screen.getByLabelText('Progress comparison');
+        expect(within(controls).getByRole('radio', { name: 'Same tags' })).toBeChecked();
+        expect(within(controls).getByText('3 of 10 past sessions match')).toBeInTheDocument();
+        expect(within(controls).getByText('Heavy')).toBeInTheDocument();
+        expect(within(controls).queryByRole('button', { name: 'Reset to same tags' })).not.toBeInTheDocument();
+        expect(screen.getByText('No previous sessions match. Try Specific tags or All history.')).toBeInTheDocument();
     });
 
-    it('keeps All History immutable and creates an activated saved view through Save as', async () => {
-        useActivityProgressTimeline.mockReturnValue({
-            data: {
-                items: [],
-                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
-                views: [],
-                active_view_id: null,
-                included_count: 0,
-                total: 0,
-            },
-            isLoading: false,
-            error: null,
-        });
+    it('saves a different comparison on this instance only', async () => {
         renderWithProviders(
-            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
-            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+            <TimelinePanel rootId="root-1" selectedActivity={instance()} sessionActivityDefs={sessionActivityDefs} sessionInstances={[instance()]} />,
+            providers,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
-        expect(screen.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
-        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
-        fireEvent.click(screen.getByRole('button', { name: 'Save as…' }));
-        fireEvent.change(screen.getByLabelText('Progress view name'), { target: { value: 'Meet prep' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-
-        await waitFor(() => expect(createView).toHaveBeenCalledWith({
-            name: 'Meet prep',
-            config: expect.objectContaining({ all_tag_ids: ['tag-1'] }),
-            activate: true,
+        fireEvent.click(screen.getByRole('radio', { name: 'All history' }));
+        await waitFor(() => expect(setComparison).toHaveBeenCalledWith({
+            instanceId: 'instance-current', mode: 'all', tagIds: [], tags: [], version: 1,
+        }));
+        // Specific tags starts from the instance's own tags.
+        fireEvent.click(screen.getByRole('radio', { name: 'Specific tags' }));
+        await waitFor(() => expect(setComparison).toHaveBeenLastCalledWith({
+            instanceId: 'instance-current', mode: 'tags', tagIds: ['heavy'], tags: [], version: 1,
         }));
     });
 
-    it('saves a draft with the selected view version', async () => {
-        useActivityProgressTimeline.mockReturnValue({
-            data: {
-                items: [],
-                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
-                views: [{ id: 'view-1', name: 'Meet prep', version: 4, config: { all_tag_ids: [], any_tag_ids: [], none_tag_ids: [] } }],
-                active_view_id: 'view-1',
-                included_count: 0,
-                total: 0,
-            },
-            isLoading: false,
-            error: null,
-        });
+    it('shows the chosen tags and a reset for an overridden comparison', async () => {
+        const overridden = instance({ comparison_context: {
+            mode: 'tags', tag_ids: ['paused'], tags: [{ id: 'paused', name: 'Paused' }], version: 4,
+        } });
         renderWithProviders(
-            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
-            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+            <TimelinePanel rootId="root-1" selectedActivity={overridden} sessionActivityDefs={sessionActivityDefs} sessionInstances={[overridden]} />,
+            providers,
         );
-        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
-        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
-        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
-        fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
-        await waitFor(() => expect(updateView).toHaveBeenCalledWith({
-            viewId: 'view-1',
-            version: 4,
-            config: expect.objectContaining({ all_tag_ids: ['tag-1'] }),
+
+        const controls = screen.getByLabelText('Progress comparison');
+        expect(within(controls).getByRole('radio', { name: 'Specific tags' })).toBeChecked();
+        expect(within(controls).getByText('Paused')).toBeInTheDocument();
+        fireEvent.click(within(controls).getByRole('button', { name: 'Reset to same tags' }));
+        await waitFor(() => expect(setComparison).toHaveBeenCalledWith({
+            instanceId: 'instance-current', mode: 'same_tags', tagIds: [], tags: [], version: 4,
         }));
     });
 
-    it('preserves a local draft when a saved view has a version conflict', async () => {
-        updateView.mockRejectedValueOnce({
-            response: {
-                status: 409,
-                data: { details: { current: { version: 7, config: { all_tag_ids: [], any_tag_ids: ['tag-1'], none_tag_ids: [] } } } },
-            },
-        });
+    it('highlights the earlier sets this instance is compared with', () => {
+        const current = instance({ progress_comparison: { metric_comparisons: [{
+            metric_id: 'm1',
+            set_comparisons: [{ set_index: 0, previous_instance_id: 'instance-old', previous_set_index: 1 }],
+        }] } });
         useActivityProgressTimeline.mockReturnValue({
-            data: {
-                items: [],
-                tags: [{ id: 'tag-1', name: 'Competition', archived: false }],
-                views: [{ id: 'view-1', name: 'Meet prep', version: 4, config: { all_tag_ids: [], any_tag_ids: [], none_tag_ids: [] } }],
-                active_view_id: 'view-1', included_count: 0, total: 0,
-            },
+            data: { total: 1, total_all: 1, items: [{
+                id: 'instance-old',
+                created_at: '2026-04-10T12:00:00.000Z',
+                metric_values: [],
+                notes: [],
+                sets: [
+                    { metrics: [{ metric_id: 'm1', value: 5 }] },
+                    { metrics: [{ metric_id: 'm1', value: 8 }] },
+                ],
+                progress_comparison: { metric_comparisons: [] },
+            }] },
             isLoading: false,
             error: null,
         });
         renderWithProviders(
-            <TimelinePanel rootId="root-1" sessionId="session-1" selectedActivity={null} sessionActivityDefs={sessionActivityDefs} />,
-            { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+            <TimelinePanel
+                rootId="root-1"
+                selectedActivity={current}
+                sessionActivityDefs={[{ id: 'activity-def-1', name: 'Scales', metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }] }]}
+                sessionInstances={[current]}
+            />,
+            providers,
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Expand progress view editor' }));
-        fireEvent.click(screen.getByRole('button', { name: '+ Add operator' }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'All of' }));
-        fireEvent.click(within(screen.getByRole('group', { name: 'All of tags' })).getByText('Competition'));
-        fireEvent.click(screen.getByRole('button', { name: 'Save', exact: true }));
-
-        expect(await screen.findByRole('alert')).toHaveTextContent('version 7');
-        expect(within(screen.getByRole('group', { name: 'All of tags' })).getByRole('checkbox')).toBeChecked();
-        expect(screen.getByRole('button', { name: 'Save draft as…' })).toBeInTheDocument();
+        const paired = screen.getAllByTitle('Compared with a set in this session');
+        expect(paired).toHaveLength(1);
+        expect(paired[0]).toHaveTextContent('#2');
     });
 
     it('loads older timeline pages on demand', () => {
         const fetchNextPage = vi.fn();
         useActivityProgressTimeline.mockReturnValue({
-            data: { items: [], tags: [], views: [], active_view_id: null, included_count: 20, total: 42 },
+            data: { items: [], total: 42, total_all: 42 },
             isLoading: false,
             error: null,
             hasNextPage: true,
@@ -291,7 +254,6 @@ describe('TimelinePanel', () => {
                     notes: [],
                     progress_comparison: {
                         activity_instance_id: 'instance-1',
-                        included: true,
                         metric_comparisons: [
                             {
                                 metric_id: 'm1',
@@ -303,7 +265,7 @@ describe('TimelinePanel', () => {
                         ],
                     },
                 },
-            ], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
+            ], total: 1, total_all: 1 },
             isLoading: false,
             error: null,
         });
@@ -346,7 +308,6 @@ describe('TimelinePanel', () => {
                     notes: [],
                     progress_comparison: {
                         activity_instance_id: 'instance-1',
-                        included: true,
                         metric_comparisons: [
                             {
                                 metric_id: 'm1',
@@ -358,7 +319,7 @@ describe('TimelinePanel', () => {
                         ],
                     },
                 },
-            ], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
+            ], total: 1, total_all: 1 },
             isLoading: false,
             error: null,
         });
@@ -401,8 +362,8 @@ describe('TimelinePanel', () => {
                 metric_values: [],
                 sets: [],
                 notes: [],
-                progress_comparison: { included: true, metric_comparisons: [] },
-            }], tags: [], views: [], active_view_id: null, included_count: 1, total: 1 },
+                progress_comparison: { metric_comparisons: [] },
+            }], total: 1, total_all: 1 },
             isLoading: false,
             error: null,
         });

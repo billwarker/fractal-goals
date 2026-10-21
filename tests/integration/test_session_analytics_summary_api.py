@@ -92,7 +92,7 @@ def test_session_analytics_summary_returns_lightweight_sessions_and_activity_ins
     assert persisted_instance['session_id'] == sample_practice_session.id
     assert persisted_instance['session_name'] == sample_practice_session.name
     assert persisted_instance['metrics'][0]['metric_id'] == sample_activity_definition.metric_definitions[0].id
-    assert persisted_instance['progress_comparison']['included'] is True
+    assert persisted_instance['progress_comparison']['previous_instance_id'] is None
     assert persisted_instance['progress_comparison']['is_first_instance'] is True
     assert persisted_instance['progress_comparison']['metric_comparisons'] == []
     assert legacy_instance['session_id'] == legacy_session.id

@@ -104,6 +104,11 @@ describe('useSessionSidePaneViewModel', () => {
                 { id: 'activity-1', name: 'Squat' },
                 { id: 'activity-2', name: 'Bench' },
             ],
+            // The live instances carry each one's comparison context to the Timeline pane.
+            sessionInstances: [
+                { id: 'inst-1', activity_definition_id: 'activity-1' },
+                { id: 'inst-2', activity_definition_id: 'activity-2' },
+            ],
         });
     });
     it.each([false, true])('tracks completion transitions from %s with stable inputs', (initial) => {

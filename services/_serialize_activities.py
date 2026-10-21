@@ -3,7 +3,7 @@
 
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
-from .activity_progress_view_service import serialize_activity_tag
+from .activity_tags import serialize_compare_context, serialize_tag as serialize_activity_tag
 from services._serialize_common import format_utc, format_utc_precise
 
 
@@ -124,6 +124,7 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "metrics": metric_values_list,  # Frontend alias
         "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
         "tag_assignment_version": instance.tag_assignment_version,
+        "comparison_context": serialize_compare_context(instance),
         "progress_comparison": getattr(instance, '_dynamic_progress', None),
         "prescription": getattr(instance, 'prescription', None),
     }
@@ -166,7 +167,7 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         comparison = payload['progress_comparison']
         if comparison:
             payload['progress_comparison'] = {key: comparison.get(key) for key in (
-                'included', 'is_first_instance', 'previous_instance_id', 'metric_comparisons',
+                'is_first_instance', 'previous_instance_id', 'metric_comparisons',
             )}
     return payload
 
@@ -333,12 +334,6 @@ def serialize_activity_definition(activity):
         "track_progress": activity.track_progress,
         "progress_aggregation": activity.progress_aggregation,
         "delta_display_mode": activity.delta_display_mode,
-        "active_progress_view_id": getattr(activity, 'active_progress_view_id', None),
-        "tags": [
-            serialize_activity_tag(tag)
-            for tag in (getattr(activity, 'tags', None) or [])
-            if tag.deleted_at is None and not tag.catalog_archived
-        ],
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions if not s.deleted_at],

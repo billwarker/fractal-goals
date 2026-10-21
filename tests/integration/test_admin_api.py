@@ -979,7 +979,7 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     analytics_instances = public_example['analytics_activity_instances'][hidden_activity.id]
     assert analytics_instances[0]['id'] == analytics_instance.id
     assert analytics_instances[0]['session_name'] == 'Analytics-only Session'
-    assert analytics_instances[0]['progress_comparison']['included'] is True
+    assert analytics_instances[0]['progress_comparison']['previous_instance_id'] is None
     assert analytics_instances[0]['progress_comparison']['is_first_instance'] is True
 
 

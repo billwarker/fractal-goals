@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Float
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Float, event
 from sqlalchemy.orm import relationship, backref, column_property
 from .goal import Goal, activity_instance_goal_associations
 import uuid
@@ -81,17 +81,6 @@ class ActivityDefinition(Base):
     track_progress = Column(Boolean, nullable=True)       # null → treat as True (backward compat)
     progress_aggregation = Column(String, nullable=True)  # 'last' | 'sum' | 'max' | 'yield'
     delta_display_mode = Column(String(16), nullable=True)  # null = inherit from root; 'percent' | 'absolute'
-    active_progress_view_id = Column(
-        String,
-        ForeignKey(
-            'activity_progress_views.id',
-            ondelete='SET NULL',
-            use_alter=True,
-            name='fk_activity_definitions_active_progress_view_id',
-        ),
-        nullable=True,
-        index=True,
-    )
     row_version = Column(Integer, nullable=False, default=1, server_default=sa.text('1'))
 
     group = relationship("ActivityGroup", backref="activities")
@@ -102,18 +91,6 @@ class ActivityDefinition(Base):
         order_by=lambda: (MetricDefinition.created_at, MetricDefinition.id),
     )
     split_definitions = relationship("SplitDefinition", backref="activity_definition", cascade="all, delete-orphan")
-    tags = relationship("ActivityTag", back_populates="activity_definition", cascade="all, delete-orphan")
-    progress_views = relationship(
-        "ActivityProgressView",
-        back_populates="activity_definition",
-        cascade="all, delete-orphan",
-        foreign_keys="ActivityProgressView.activity_definition_id",
-    )
-    active_progress_view = relationship(
-        "ActivityProgressView",
-        foreign_keys=[active_progress_view_id],
-        post_update=True,
-    )
     
     associated_goals = relationship(
         "Goal",
@@ -164,36 +141,67 @@ class SplitDefinition(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
 
+# Collapse every whitespace run (tabs and newlines included), then trim.
+TAG_NAME_NORMALIZATION_SQL = "btrim(regexp_replace(lower({column}), '\\s+', ' ', 'g'))"
+
+
+class ActivityTagFamily(Base):
+    """An ordered, named group of tags shown together in tag pickers."""
+
+    __tablename__ = 'activity_tag_families'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String, nullable=False)
+    normalized_name = Column(String, sa.Computed(TAG_NAME_NORMALIZATION_SQL.format(column='name'), persisted=True))
+    sort_order = Column(Integer, nullable=False, default=0, server_default='0')
+    # A "pick one" family: an instance or set holds at most one of its tags directly.
+    single_select = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+
+    tags = relationship("ActivityTagDefinition", back_populates="family", passive_deletes=True)
+
+    __table_args__ = (
+        sa.UniqueConstraint('root_id', 'normalized_name', name='uq_activity_tag_families_root_name'),
+        sa.CheckConstraint('sort_order >= 0', name='ck_activity_tag_families_sort_order_nonnegative'),
+        sa.CheckConstraint('version > 0', name='ck_activity_tag_families_version_positive'),
+    )
+
+
 class ActivityTagDefinition(Base):
-    """Fractal-owned canonical identity for one logical activity tag."""
+    """The one identity of a tag. Any tag in a fractal can be applied to any activity."""
 
     __tablename__ = 'activity_tag_definitions'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     name = Column(String, nullable=False)
+    # Names are unique per fractal for the life of the tag, archived tags included.
+    normalized_name = Column(String, sa.Computed(TAG_NAME_NORMALIZATION_SQL.format(column='name'), persisted=True))
     color = Column(String(7), nullable=True)
-    scope = Column(String(16), nullable=False, default='selected', server_default='selected')
+    family_id = Column(
+        String,
+        ForeignKey('activity_tag_families.id', ondelete='SET NULL'),
+        nullable=True,
+        index=True,
+    )
+    # Order within the family, or within "Other tags" when the tag has no family.
     sort_order = Column(Integer, nullable=False, default=0, server_default='0')
     version = Column(Integer, nullable=False, default=1, server_default='1')
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
     deleted_at = Column(DateTime, nullable=True)
 
-    bindings = relationship(
-        "ActivityTag",
-        back_populates="definition",
-        cascade="all, delete-orphan",
-    )
+    family = relationship("ActivityTagFamily", back_populates="tags")
+
+    @property
+    def archived(self):
+        return self.deleted_at is not None
 
     __table_args__ = (
-        sa.Index(
-            'uq_activity_tag_definitions_global_name',
-            'root_id',
-            sa.text("regexp_replace(lower(btrim(name)), '\\s+', ' ', 'g')"),
-            unique=True,
-            postgresql_where=sa.text("deleted_at IS NULL AND scope = 'global'"),
-        ),
+        sa.UniqueConstraint('root_id', 'normalized_name', name='uq_activity_tag_definitions_root_name'),
         sa.Index(
             'ix_activity_tag_definitions_root_active_order',
             'root_id',
@@ -201,7 +209,6 @@ class ActivityTagDefinition(Base):
             'name',
             postgresql_where=sa.text('deleted_at IS NULL'),
         ),
-        sa.CheckConstraint("scope IN ('selected', 'global')", name='ck_activity_tag_definitions_scope'),
         sa.CheckConstraint('sort_order >= 0', name='ck_activity_tag_definitions_sort_order_nonnegative'),
         sa.CheckConstraint('version > 0', name='ck_activity_tag_definitions_version_positive'),
         sa.CheckConstraint(
@@ -211,103 +218,7 @@ class ActivityTagDefinition(Base):
     )
 
 
-class ActivityTag(Base):
-    """Per-activity binding used by historical and live tag assignments."""
-
-    __tablename__ = 'activity_tags'
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    activity_definition_id = Column(
-        String,
-        ForeignKey('activity_definitions.id', ondelete='CASCADE'),
-        nullable=False,
-        index=True,
-    )
-    definition_id = Column(
-        String,
-        ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'),
-        nullable=False,
-        index=True,
-    )
-    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
-    deleted_at = Column(DateTime, nullable=True)
-
-    activity_definition = relationship("ActivityDefinition", back_populates="tags")
-    definition = relationship("ActivityTagDefinition", back_populates="bindings", lazy="joined")
-
-    @property
-    def name(self):
-        return self.definition.name
-
-    @property
-    def color(self):
-        return self.definition.color
-
-    @property
-    def sort_order(self):
-        return self.definition.sort_order
-
-    @property
-    def catalog_archived(self):
-        return self.definition.deleted_at is not None
-
-    __table_args__ = (
-        sa.UniqueConstraint(
-            'activity_definition_id',
-            'definition_id',
-            name='uq_activity_tags_activity_definition',
-        ),
-        sa.Index(
-            'ix_activity_tags_activity_active',
-            'activity_definition_id',
-            'definition_id',
-            postgresql_where=sa.text('deleted_at IS NULL'),
-        ),
-    )
-
-
-class ActivityProgressView(Base):
-    __tablename__ = 'activity_progress_views'
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    activity_definition_id = Column(
-        String,
-        ForeignKey('activity_definitions.id', ondelete='CASCADE'),
-        nullable=False,
-        index=True,
-    )
-    name = Column(String, nullable=False)
-    config = Column(JSON_TYPE, nullable=False, default=dict, server_default=sa.text("'{}'::jsonb"))
-    version = Column(Integer, nullable=False, default=1, server_default='1')
-    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
-    deleted_at = Column(DateTime, nullable=True)
-
-    activity_definition = relationship(
-        "ActivityDefinition",
-        back_populates="progress_views",
-        foreign_keys=[activity_definition_id],
-    )
-
-    __table_args__ = (
-        sa.Index(
-            'uq_activity_progress_views_active_name',
-            'activity_definition_id',
-            sa.func.lower(name),
-            unique=True,
-            postgresql_where=sa.text('deleted_at IS NULL'),
-        ),
-        sa.Index(
-            'ix_activity_progress_views_active_activity_updated',
-            'activity_definition_id',
-            'updated_at',
-            postgresql_where=sa.text('deleted_at IS NULL'),
-        ),
-        sa.CheckConstraint('version > 0', name='ck_activity_progress_views_version_positive'),
-    )
+TAG_ORDER = (ActivityTagDefinition.sort_order, ActivityTagDefinition.name, ActivityTagDefinition.id)
 
 
 class ActivityInstanceTag(Base):
@@ -318,15 +229,15 @@ class ActivityInstanceTag(Base):
         ForeignKey('activity_instances.id', ondelete='CASCADE'),
         primary_key=True,
     )
-    activity_tag_id = Column(
+    tag_definition_id = Column(
         String,
-        ForeignKey('activity_tags.id', ondelete='CASCADE'),
+        ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'),
         primary_key=True,
     )
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
 
     __table_args__ = (
-        sa.Index('ix_activity_instance_tags_tag', 'activity_tag_id', 'activity_instance_id'),
+        sa.Index('ix_activity_instance_tags_tag', 'tag_definition_id', 'activity_instance_id'),
     )
 
 
@@ -338,16 +249,39 @@ class ActivitySetTag(Base):
         ForeignKey('activity_sets.id', ondelete='CASCADE'),
         primary_key=True,
     )
-    activity_tag_id = Column(
+    tag_definition_id = Column(
         String,
-        ForeignKey('activity_tags.id', ondelete='CASCADE'),
+        ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'),
         primary_key=True,
     )
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
 
     __table_args__ = (
-        sa.Index('ix_activity_set_tags_tag', 'activity_tag_id', 'activity_set_id'),
+        sa.Index('ix_activity_set_tags_tag', 'tag_definition_id', 'activity_set_id'),
     )
+
+
+class ActivityInstanceCompareTag(Base):
+    """The chosen tags when an instance compares against a specific tag set."""
+
+    __tablename__ = 'activity_instance_compare_tags'
+
+    activity_instance_id = Column(
+        String,
+        ForeignKey('activity_instances.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    tag_definition_id = Column(
+        String,
+        ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'),
+        primary_key=True,
+    )
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.Index('ix_activity_instance_compare_tags_tag', 'tag_definition_id'),
+    )
+
 
 class ActivityInstance(Base):
     __tablename__ = 'activity_instances'
@@ -369,6 +303,13 @@ class ActivityInstance(Base):
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     sort_order = Column(Integer, default=0)
     tag_assignment_version = Column(Integer, nullable=False, default=1, server_default='1')
+    # Sorted ids of the instance's own tags (empty when untagged), kept by a database
+    # trigger. A lookup key for "same tags" progress comparisons, never progress itself.
+    tag_signature = Column(String, nullable=False, default='', server_default='')
+    # NULL compares with past instances that have the same tags; 'tags' compares with
+    # the chosen compare_tags; 'all' compares with all history.
+    progress_compare_mode = Column(String(8), nullable=True)
+    progress_compare_version = Column(Integer, nullable=False, default=1, server_default='1')
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
     sets = relationship(
@@ -380,9 +321,17 @@ class ActivityInstance(Base):
     work_intervals = relationship("SessionWorkInterval", back_populates="activity_instance")
     definition = relationship("ActivityDefinition")
     tags = relationship(
-        "ActivityTag",
+        "ActivityTagDefinition",
         secondary="activity_instance_tags",
+        order_by=TAG_ORDER,
         lazy="selectin",
+    )
+    # Read only when progress_compare_mode == 'tags', so it loads on access.
+    compare_tags = relationship(
+        "ActivityTagDefinition",
+        secondary="activity_instance_compare_tags",
+        order_by=TAG_ORDER,
+        lazy="select",
     )
     # Project only IDs in the instance query: no full goal hydration or N+1 reads.
     associated_goal_ids = column_property(
@@ -408,7 +357,18 @@ class ActivityInstance(Base):
             name='ck_activity_instances_target_duration_positive',
         ),
         sa.CheckConstraint('tag_assignment_version > 0', name='ck_activity_instances_tag_assignment_version_positive'),
+        sa.CheckConstraint(
+            "progress_compare_mode IS NULL OR progress_compare_mode IN ('all', 'tags')",
+            name='ck_activity_instances_progress_compare_mode',
+        ),
+        sa.CheckConstraint('progress_compare_version > 0', name='ck_activity_instances_progress_compare_version_positive'),
         sa.Index('ix_activity_instances_session_deleted', 'session_id', 'deleted_at'),
+        sa.Index(
+            'ix_activity_instances_activity_tag_signature',
+            'activity_definition_id',
+            'tag_signature',
+            postgresql_where=sa.text('deleted_at IS NULL'),
+        ),
         sa.Index(
             'ix_activity_instances_root_deleted_activity_session',
             'root_id',
@@ -445,6 +405,8 @@ class ActivitySet(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
     tag_assignment_version = Column(Integer, nullable=False, default=1, server_default='1')
+    # Sorted ids of the set's own tags; see ActivityInstance.tag_signature.
+    tag_signature = Column(String, nullable=False, default='', server_default='')
 
     activity_instance = relationship("ActivityInstance", back_populates="sets")
     metric_values = relationship(
@@ -460,8 +422,9 @@ class ActivitySet(Base):
         foreign_keys="CircuitRoundMember.activity_set_id",
     )
     tags = relationship(
-        "ActivityTag",
+        "ActivityTagDefinition",
         secondary="activity_set_tags",
+        order_by=TAG_ORDER,
         lazy="selectin",
     )
 
@@ -502,3 +465,93 @@ class MetricValue(Base):
             unique=True,
         ),
     )
+
+
+# Tag-link integrity and signatures live in the database so every write path agrees:
+# API assignment, circuit scopes, session creation, merges, cascades, and offline replay.
+TAG_LINK_TRIGGER_SQL = """
+CREATE OR REPLACE FUNCTION enforce_activity_tag_link_root() RETURNS trigger AS $$
+DECLARE owner_root text;
+BEGIN
+    IF TG_TABLE_NAME = 'activity_set_tags' THEN
+        SELECT instance.root_id INTO owner_root
+        FROM activity_sets activity_set
+        JOIN activity_instances instance ON instance.id = activity_set.activity_instance_id
+        WHERE activity_set.id = NEW.activity_set_id;
+    ELSE
+        SELECT root_id INTO owner_root FROM activity_instances WHERE id = NEW.activity_instance_id;
+    END IF;
+    IF owner_root IS NULL OR NOT EXISTS (
+        SELECT 1 FROM activity_tag_definitions WHERE id = NEW.tag_definition_id AND root_id = owner_root
+    ) THEN
+        RAISE EXCEPTION 'tag and tagged activity must share a fractal' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION refresh_activity_tag_signature() RETURNS trigger AS $$
+DECLARE target text;
+BEGIN
+    IF TG_TABLE_NAME = 'activity_set_tags' THEN
+        FOR target IN
+            SELECT DISTINCT id FROM (VALUES
+                (CASE WHEN TG_OP <> 'INSERT' THEN OLD.activity_set_id END),
+                (CASE WHEN TG_OP <> 'DELETE' THEN NEW.activity_set_id END)
+            ) AS changed(id) WHERE id IS NOT NULL
+        LOOP
+            UPDATE activity_sets SET tag_signature = COALESCE((
+                SELECT string_agg(tag_definition_id, ',' ORDER BY tag_definition_id COLLATE "C")
+                FROM activity_set_tags WHERE activity_set_id = target
+            ), '') WHERE id = target;
+        END LOOP;
+    ELSE
+        FOR target IN
+            SELECT DISTINCT id FROM (VALUES
+                (CASE WHEN TG_OP <> 'INSERT' THEN OLD.activity_instance_id END),
+                (CASE WHEN TG_OP <> 'DELETE' THEN NEW.activity_instance_id END)
+            ) AS changed(id) WHERE id IS NOT NULL
+        LOOP
+            UPDATE activity_instances SET tag_signature = COALESCE((
+                SELECT string_agg(tag_definition_id, ',' ORDER BY tag_definition_id COLLATE "C")
+                FROM activity_instance_tags WHERE activity_instance_id = target
+            ), '') WHERE id = target;
+        END LOOP;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+"""
+
+
+def tag_link_triggers_sql(table_name: str, *, signature: bool = True) -> str:
+    statements = [
+        f"DROP TRIGGER IF EXISTS trg_{table_name}_root ON {table_name};",
+        f"CREATE TRIGGER trg_{table_name}_root BEFORE INSERT OR UPDATE ON {table_name} "
+        "FOR EACH ROW EXECUTE FUNCTION enforce_activity_tag_link_root();",
+    ]
+    if signature:
+        statements += [
+            f"DROP TRIGGER IF EXISTS trg_{table_name}_signature ON {table_name};",
+            f"CREATE TRIGGER trg_{table_name}_signature AFTER INSERT OR UPDATE OR DELETE ON {table_name} "
+            "FOR EACH ROW EXECUTE FUNCTION refresh_activity_tag_signature();",
+        ]
+    return "\n".join(statements)
+
+
+def _install_tag_link_triggers(table_name, *, signature=True):
+    def install(_target, connection, **_kwargs):
+        if connection.dialect.name != 'postgresql':
+            return
+        connection.exec_driver_sql(TAG_LINK_TRIGGER_SQL)
+        connection.exec_driver_sql(tag_link_triggers_sql(table_name, signature=signature))
+    return install
+
+
+event.listen(ActivityInstanceTag.__table__, 'after_create', _install_tag_link_triggers('activity_instance_tags'))
+event.listen(ActivitySetTag.__table__, 'after_create', _install_tag_link_triggers('activity_set_tags'))
+event.listen(
+    ActivityInstanceCompareTag.__table__,
+    'after_create',
+    _install_tag_link_triggers('activity_instance_compare_tags', signature=False),
+)

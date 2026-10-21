@@ -4,9 +4,7 @@ import { render, screen, within } from '@testing-library/react';
 import SessionActivityProgressSummary from '../SessionActivityProgressSummary';
 
 
-const excludedMessage = 'Excluded from the active progress view. Metrics remain available as raw session data.';
-
-it('places the excluded indicator inside the total-yield summary section', () => {
+it('shows an overridden comparison inside the total-yield summary section', () => {
     render(
         <SessionActivityProgressSummary
             sets={[{
@@ -19,25 +17,42 @@ it('places the excluded indicator inside the total-yield summary section', () =>
                 { id: 'weight', name: 'Weight', unit: 'lbs', is_multiplicative: true },
                 { id: 'reps', name: 'Reps', unit: 'count', is_multiplicative: true },
             ]}
-            activeProgress={{ included: false }}
+            activeProgress={{ comparison_context: { mode: 'all', tag_ids: [], tags: [] } }}
         />,
     );
 
-    const indicator = screen.getByText(excludedMessage);
+    const indicator = screen.getByRole('note');
+    expect(indicator).toHaveTextContent('Comparing with all history');
     expect(within(indicator.parentElement).getByText('Total yield:')).toBeInTheDocument();
 });
 
-it('retains the excluded indicator when no aggregation can be calculated', () => {
+it('names the chosen tags of a specific-tags comparison even without aggregations', () => {
     render(
         <SessionActivityProgressSummary
             sets={[]}
             metricDefs={[]}
-            activeProgress={{ included: false }}
+            activeProgress={{ comparison_context: {
+                mode: 'tags',
+                tag_ids: ['a', 'b'],
+                tags: [{ id: 'a', name: 'Heavy' }, { id: 'b', name: 'Paused' }],
+            } }}
         />,
     );
 
-    expect(screen.getByText(excludedMessage)).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('Comparing with Heavy + Paused sessions');
     expect(screen.queryByText('Total yield:')).not.toBeInTheDocument();
+});
+
+it('shows no indicator for the default same-tags comparison', () => {
+    const { container } = render(
+        <SessionActivityProgressSummary
+            sets={[]}
+            metricDefs={[]}
+            activeProgress={{ comparison_context: { mode: 'same_tags', tag_ids: [], tags: [] } }}
+        />,
+    );
+
+    expect(container).toBeEmptyDOMElement();
 });
 
 it('derives additive totals for a dual-mode metric from rendered sets when the stored summary is stale', () => {

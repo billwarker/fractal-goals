@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import { useActivityTagCatalog } from '../../hooks/useActivityProgressViews';
+import { useActivityTagCatalog } from '../../hooks/useActivityTags';
 import { getCircuitRoundEntries } from '../../utils/prescriptionModel';
 import { getCircuitNotes, getCircuitNoteTarget } from './circuitNoteTarget';
 
@@ -27,10 +27,7 @@ export default function useCircuitRunDerivedState({
         [activityDefinitions],
     );
     const { data: catalog } = useActivityTagCatalog(rootId);
-    const circuitAvailableTags = useMemo(
-        () => (catalog?.tags || []).map((tag) => ({ ...tag, definition_id: tag.id })),
-        [catalog?.tags],
-    );
+    const circuitAvailableTags = catalog;
     const noteTarget = useMemo(
         () => getCircuitNoteTarget(run, selectedCircuitItem, sessionId),
         [run, selectedCircuitItem, sessionId],

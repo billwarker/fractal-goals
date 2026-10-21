@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import json
 import uuid
 
@@ -204,16 +205,13 @@ def test_client_sent_prescriptions_are_ignored(db_session, sample_goal_hierarchy
     assert instance.sets == []
 
 
-def _tag(db_session, root_id, activity, name):
-    from models import ActivityTag, ActivityTagDefinition
+def _tag(db_session, root_id, name, **fields):
+    from models import ActivityTagDefinition
 
-    definition = ActivityTagDefinition(root_id=root_id, name=name, scope='selected')
+    definition = ActivityTagDefinition(root_id=root_id, name=name, **fields)
     db_session.add(definition)
-    db_session.flush()
-    tag = ActivityTag(root_id=root_id, activity_definition_id=activity.id, definition_id=definition.id)
-    db_session.add(tag)
     db_session.commit()
-    return tag
+    return definition
 
 
 def test_session_from_template_applies_planned_activity_and_set_tags(
@@ -221,8 +219,8 @@ def test_session_from_template_applies_planned_activity_and_set_tags(
 ):
     root_id = sample_goal_hierarchy['ultimate'].id
     weight, reps = _metrics(sample_activity_definition)
-    paused = _tag(db_session, root_id, sample_activity_definition, 'Paused')
-    top = _tag(db_session, root_id, sample_activity_definition, 'Top set')
+    paused = _tag(db_session, root_id, 'Paused')
+    top = _tag(db_session, root_id, 'Top set')
     plan = _set_plan(weight, reps, (100, 5), (105, 3))
     plan['tags'] = [paused.id]
     plan['sets'][1]['tags'] = [top.id]
@@ -241,14 +239,48 @@ def test_session_from_template_applies_planned_activity_and_set_tags(
     assert [[tag.id for tag in activity_set.tags] for activity_set in instance.sets] == [[], [top.id]]
 
 
-def test_planned_tags_must_belong_to_the_activity(db_session, sample_ultimate_goal, sample_activity_definition):
-    other = ActivityDefinition(id=str(uuid.uuid4()), root_id=sample_ultimate_goal.id, name='Row', has_sets=True)
-    db_session.add(other)
-    db_session.commit()
-    foreign = _tag(db_session, sample_ultimate_goal.id, other, 'Row only')
-    weight, reps = _metrics(sample_activity_definition)
-    plan = _set_plan(weight, reps, (100, 5))
-    plan['sets'][0]['tags'] = [foreign.id]
+def test_planned_tags_may_be_any_active_fractal_tag(db_session, sample_ultimate_goal, sample_activity_definition, test_user):
+    from models import Goal
 
-    with pytest.raises(ValueError, match='tags are unavailable'):
-        check_section_prescriptions(db_session, sample_ultimate_goal.id, _sections(sample_activity_definition, plan))
+    weight, reps = _metrics(sample_activity_definition)
+    shared = _tag(db_session, sample_ultimate_goal.id, 'Used elsewhere')
+    plan = _set_plan(weight, reps, (100, 5))
+    plan['sets'][0]['tags'] = [shared.id]
+    check_section_prescriptions(db_session, sample_ultimate_goal.id, _sections(sample_activity_definition, plan))
+
+    archived = _tag(db_session, sample_ultimate_goal.id, 'Archived', deleted_at=datetime.now(timezone.utc))
+    other_root = Goal(id=str(uuid.uuid4()), name='Other', owner_id=test_user.id, level_id=sample_ultimate_goal.level_id)
+    other_root.root_id = other_root.id
+    db_session.add(other_root)
+    db_session.commit()
+    foreign = _tag(db_session, other_root.id, 'Foreign')
+    for tag in (archived, foreign):
+        plan['sets'][0]['tags'] = [tag.id]
+        with pytest.raises(ValueError, match='tags are unavailable'):
+            check_section_prescriptions(db_session, sample_ultimate_goal.id, _sections(sample_activity_definition, plan))
+
+
+def test_merge_and_delete_rewrite_planned_tags_in_stored_plans(db_session, sample_ultimate_goal, sample_activity_definition):
+    from services.tag_reference_rewrites import rewrite_planned_tags
+
+    weight, reps = _metrics(sample_activity_definition)
+    keep, merged, deleted = (_tag(db_session, sample_ultimate_goal.id, name) for name in ('Keep', 'Merged', 'Deleted'))
+    plan = _set_plan(weight, reps, (100, 5))
+    plan['tags'] = [merged.id, keep.id, deleted.id]
+    plan['sets'][0]['tags'] = [deleted.id]
+    # Templates store their document as a JSON string; the rewrite keeps that form.
+    template = SessionTemplate(
+        id=str(uuid.uuid4()), name='Bench day', root_id=sample_ultimate_goal.id,
+        template_data=json.dumps({'sections': _sections(sample_activity_definition, plan)}),
+    )
+    db_session.add(template)
+    db_session.commit()
+
+    changed = rewrite_planned_tags(db_session, sample_ultimate_goal.id, {merged.id: keep.id, deleted.id: None})
+    db_session.commit()
+
+    assert changed == 1
+    stored = json.loads(db_session.get(SessionTemplate, template.id).template_data)
+    prescription = stored['sections'][0]['items'][0]['prescription']
+    assert prescription['tags'] == [keep.id]
+    assert 'tags' not in prescription['sets'][0]

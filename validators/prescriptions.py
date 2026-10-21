@@ -35,7 +35,7 @@ def _validate_note(value: Any, path: str) -> Optional[str]:
 
 
 def _validate_tag_ids(value: Any, path: str) -> List[str]:
-    """Activity tag (binding) ids to apply to the instance or set; de-duplicated, order kept."""
+    """Catalog tag ids to apply to the instance or set; de-duplicated, order kept."""
     if value in (None, ''):
         return []
     if not isinstance(value, list):

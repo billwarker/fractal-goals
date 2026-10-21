@@ -101,11 +101,12 @@ from .activities import (
     ActivityTagVersionSchema,
     ActivityTagHardDeleteSchema,
     ActivityTagMergeSchema,
-    ActivityProgressViewCreateSchema,
-    ActivityProgressViewUpdateSchema,
-    ActivityProgressViewActivateSchema,
-    ActivityProgressQuerySchema,
-    ProgressViewConfigSchema,
+    ActivityTagOrderSchema,
+    ActivityTagFamilyCreateSchema,
+    ActivityTagFamilyUpdateSchema,
+    ActivityTagFamilyDeleteSchema,
+    ActivityTagFamilyOrderSchema,
+    ProgressComparisonSchema,
 )
 from .fractal_metrics import (
     FractalMetricCreateSchema,

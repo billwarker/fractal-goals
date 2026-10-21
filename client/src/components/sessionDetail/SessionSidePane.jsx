@@ -147,6 +147,7 @@ function SessionSidePane({
                         sessionId={timeline?.sessionId}
                         selectedActivity={timeline?.selectedActivity}
                         sessionActivityDefs={timeline?.sessionActivityDefs}
+                        sessionInstances={timeline?.sessionInstances}
                     />
                 )}
             </div>

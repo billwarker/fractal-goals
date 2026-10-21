@@ -10,7 +10,8 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy.orm import selectinload
 
-from models import ActivityDefinition, ActivityTag, CircuitDefinition, CircuitSlot, MetricDefinition
+from models import ActivityDefinition, ActivityTagDefinition, CircuitDefinition, CircuitSlot, MetricDefinition
+from services.ops_log import log_ops_event
 
 
 def iter_activity_items(sections: Iterable[Dict[str, Any]]):
@@ -43,7 +44,6 @@ def _load_activity_definitions(db_session, root_id, activity_ids):
         .options(
             selectinload(ActivityDefinition.metric_definitions).joinedload(MetricDefinition.fractal_metric),
             selectinload(ActivityDefinition.split_definitions),
-            selectinload(ActivityDefinition.tags).joinedload(ActivityTag.definition),
         )
         .filter(
             ActivityDefinition.root_id == root_id,
@@ -122,13 +122,23 @@ def _check_circuit_prescriptions(db_session, root_id, sections) -> None:
                 _check_metric_entries(slot.activity_definition, planned_slot.get('metrics') or [], path)
 
 
-def _check_tag_ids(definition, tag_ids, path: str) -> None:
-    """Planned tags must be active tag bindings of the item's activity."""
+def _active_tag_ids(db_session, root_id, tag_ids) -> set:
     if not tag_ids:
-        return
-    available = {tag.id for tag in (definition.tags or []) if tag.deleted_at is None and not tag.catalog_archived}
-    if any(tag_id not in available for tag_id in tag_ids):
-        raise ValueError(f'{path}: one or more tags are unavailable for {definition.name}')
+        return set()
+    return {
+        row[0]
+        for row in db_session.query(ActivityTagDefinition.id).filter(
+            ActivityTagDefinition.root_id == root_id,
+            ActivityTagDefinition.id.in_(set(tag_ids)),
+            ActivityTagDefinition.deleted_at.is_(None),
+        ).all()
+    }
+
+
+def _check_tag_ids(available, tag_ids, path: str) -> None:
+    """Planned tags must be active tags of the fractal; any tag fits any activity."""
+    if any(tag_id not in available for tag_id in tag_ids or []):
+        raise ValueError(f'{path}: one or more tags are unavailable')
 
 
 def check_section_prescriptions(db_session, root_id, sections) -> None:
@@ -146,6 +156,14 @@ def check_section_prescriptions(db_session, root_id, sections) -> None:
         root_id,
         {item_activity_id(item) for item in prescribed},
     )
+    available_tags = _active_tag_ids(db_session, root_id, {
+        tag_id
+        for item in prescribed
+        for tag_id in [
+            *(item['prescription'].get('tags') or []),
+            *(tag for planned_set in item['prescription'].get('sets') or [] for tag in planned_set.get('tags') or []),
+        ]
+    })
     for item in prescribed:
         definition = definitions.get(item_activity_id(item))
         path = f"{item.get('name') or 'activity'} plan"
@@ -160,9 +178,9 @@ def check_section_prescriptions(db_session, root_id, sections) -> None:
             raise ValueError(f'{path}: {definition.name} is planned per set')
         for set_index, planned_set in enumerate(prescription.get('sets') or []):
             _check_metric_entries(definition, planned_set.get('metrics') or [], f'{path} set {set_index + 1}')
-            _check_tag_ids(definition, planned_set.get('tags'), f'{path} set {set_index + 1}')
+            _check_tag_ids(available_tags, planned_set.get('tags'), f'{path} set {set_index + 1}')
         _check_metric_entries(definition, prescription.get('metrics') or [], path)
-        _check_tag_ids(definition, prescription.get('tags'), path)
+        _check_tag_ids(available_tags, prescription.get('tags'), path)
 
 
 def snapshot_prescription(prescription: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -170,18 +188,21 @@ def snapshot_prescription(prescription: Optional[Dict[str, Any]]) -> Optional[Di
     return copy.deepcopy(prescription) if prescription else None
 
 
-def load_planned_tags(db_session, root_id, activity_definition_id, tag_ids):
-    """Active tag bindings of one activity, by id, for applying planned tags at creation.
+def load_planned_tags(db_session, root_id, tag_ids):
+    """Active fractal tags, by id and in planned order, for applying planned tags at creation.
 
-    Tags archived or removed since planning are skipped rather than failing the session.
+    Tags archived or deleted since planning are skipped rather than failing the session,
+    and reported so dangling plan references stay visible.
     """
     if not tag_ids:
         return []
-    rows = db_session.query(ActivityTag).filter(
-        ActivityTag.root_id == root_id,
-        ActivityTag.activity_definition_id == activity_definition_id,
-        ActivityTag.id.in_(tag_ids),
-        ActivityTag.deleted_at.is_(None),
+    rows = db_session.query(ActivityTagDefinition).filter(
+        ActivityTagDefinition.root_id == root_id,
+        ActivityTagDefinition.id.in_(tag_ids),
+        ActivityTagDefinition.deleted_at.is_(None),
     ).all()
-    by_id = {row.id: row for row in rows if not row.catalog_archived}
+    by_id = {row.id: row for row in rows}
+    missing = [tag_id for tag_id in tag_ids if tag_id not in by_id]
+    if missing:
+        log_ops_event("activity_tag.planned_tags_skipped", level="info", root_id=root_id, tag_ids=missing)
     return [by_id[tag_id] for tag_id in tag_ids if tag_id in by_id]

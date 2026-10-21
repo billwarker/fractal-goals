@@ -9,7 +9,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     ActivitySet,
-    ActivityTag, ActivityTagDefinition,
+    ActivityTagDefinition, ActivityTagFamily,
     CircuitRun,
     Goal,
     MetricDefinition,
@@ -71,9 +71,8 @@ def test_circuit_tags_reuse_catalog_tags_outside_their_member_activities(
 ):
     session = _session(db_session, sample_ultimate_goal, test_user)
     member_activity = _non_set_activity(db_session, sample_ultimate_goal)
-    unrelated = _non_set_activity(db_session, sample_ultimate_goal)
     catalog = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags", json={
-        "name": "Shared", "color": "#123ABC", "scope": "selected", "activity_ids": [unrelated.id],
+        "name": "Shared", "color": "#123ABC",
     })
     assert catalog.status_code == 201, catalog.get_json()
     tag = catalog.get_json()
@@ -83,7 +82,7 @@ def test_circuit_tags_reuse_catalog_tags_outside_their_member_activities(
         json={"circuit_definition_id": definition["id"], "section_index": 0},
     ).get_json()
     url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags"
-    payload = {"name": "Shared", "color": "#FF0000"}
+    payload = {"name": " shared ", "color": "#FF0000"}
     if use_identity:
         payload.update(definition_id=tag["id"], name="Stale client label")
     response = authed_client.patch(url, json=payload)
@@ -92,29 +91,18 @@ def test_circuit_tags_reuse_catalog_tags_outside_their_member_activities(
     assert scope["definition_id"] == tag["id"]
     assert (scope["name"], scope["color"]) == ("Shared", "#123ABC")
     assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 1
-    bindings = db_session.query(ActivityTag).filter_by(definition_id=tag["id"]).all()
-    assert {row.activity_definition_id for row in bindings} == {
-        unrelated.id, sample_activity_definition.id, member_activity.id,
-    }
     removed = authed_client.patch(url, json={"definition_id": tag["id"], "name": "Shared", "assigned": False})
     assert removed.status_code == 200, removed.get_json()
     assert removed.get_json()["tags"] == []
-    assert db_session.query(ActivityTag).filter_by(definition_id=tag["id"]).count() == 3
+    assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 1
 
 
-def test_circuit_catalog_identity_rejects_unavailable_and_conflicting_tags(
+def test_circuit_catalog_identity_rejects_unavailable_tags(
     authed_client, db_session, test_user, sample_ultimate_goal, sample_activity_definition,
 ):
     session = _session(db_session, sample_ultimate_goal, test_user)
     member_activity = _non_set_activity(db_session, sample_ultimate_goal)
-    unrelated = _non_set_activity(db_session, sample_ultimate_goal)
-    tags = []
-    for activity_id in [unrelated.id, member_activity.id]:
-        response = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags", json={
-            "name": "Duplicate", "scope": "selected", "activity_ids": [activity_id],
-        })
-        assert response.status_code == 201, response.get_json()
-        tags.append(response.get_json())
+    tag = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags", json={"name": "Shared"}).get_json()
     definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, member_activity)
     run = authed_client.post(
         f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
@@ -127,27 +115,67 @@ def test_circuit_catalog_identity_rejects_unavailable_and_conflicting_tags(
     other_root.root_id = other_root.id
     db_session.add(other_root)
     db_session.flush()
-    foreign_tag = ActivityTagDefinition(root_id=other_root.id, name="Foreign", scope="selected")
+    foreign_tag = ActivityTagDefinition(root_id=other_root.id, name="Foreign")
     db_session.add(foreign_tag)
     db_session.commit()
     url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/tags"
     for payload, status in [
-        ({"name": "Duplicate"}, 409),
-        ({"name": "Duplicate", "definition_id": tags[0]["id"]}, 409),
-        ({"name": "Duplicate", "definition_id": str(uuid.uuid4())}, 404),
+        ({"name": "Shared", "definition_id": str(uuid.uuid4())}, 404),
         ({"name": "Foreign", "definition_id": foreign_tag.id}, 404),
     ]:
         response = authed_client.patch(url, json=payload)
         assert response.status_code == status, response.get_json()
-    assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 2
-    assert db_session.query(ActivityTag).filter_by(root_id=sample_ultimate_goal.id).count() == 2
+    assert db_session.query(ActivityTagDefinition).filter_by(root_id=sample_ultimate_goal.id).count() == 1
     archived = authed_client.post(
-        f"/api/{sample_ultimate_goal.id}/activity-tags/{tags[0]['id']}/archive",
-        json={"version": tags[0]["version"]},
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{tag['id']}/archive",
+        json={"version": tag["version"]},
     )
     assert archived.status_code == 200, archived.get_json()
-    response = authed_client.patch(url, json={"name": "Duplicate", "definition_id": tags[0]["id"]})
-    assert response.status_code == 409, response.get_json()
+    for payload in ({"name": "Shared", "definition_id": tag["id"]}, {"name": "SHARED"}):
+        response = authed_client.patch(url, json=payload)
+        assert response.status_code == 409, response.get_json()
+        assert "restored" in response.get_json()["error"]
+
+
+def test_run_scope_replaces_and_restores_pick_one_family_siblings(
+    authed_client, db_session, test_user, sample_ultimate_goal, sample_activity_definition,
+):
+    root_id = sample_ultimate_goal.id
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    family = authed_client.post(f"/api/{root_id}/activity-tag-families", json={
+        "name": "Intensity", "single_select": True,
+    }).get_json()
+    easy = authed_client.post(f"/api/{root_id}/activity-tags", json={"name": "Easy", "family_id": family["id"]}).get_json()
+    hard = authed_client.post(f"/api/{root_id}/activity-tags", json={"name": "Hard", "family_id": family["id"]}).get_json()
+    other = authed_client.post(f"/api/{root_id}/activity-tags", json={"name": "Outdoor"}).get_json()
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, non_set)
+    run = authed_client.post(
+        f"/api/{root_id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    setless_id = next(member["activity_instance_id"] for member in run["rounds"][0]["members"] if member["activity_instance_id"])
+    own = authed_client.put(
+        f"/api/{root_id}/activity-instances/{setless_id}/tags",
+        json={"tag_ids": [easy["id"], other["id"]]},
+    )
+    assert own.status_code == 200, own.get_json()
+
+    applied = authed_client.patch(
+        f"/api/{root_id}/circuit-runs/{run['id']}/tags",
+        json={"definition_id": hard["id"], "name": "Hard"},
+    )
+    assert applied.status_code == 200, applied.get_json()
+    db_session.expire_all()
+    assert {tag.name for tag in db_session.get(ActivityInstance, setless_id).tags} == {"Hard", "Outdoor"}
+
+    removed = authed_client.patch(
+        f"/api/{root_id}/circuit-runs/{run['id']}/tags",
+        json={"definition_id": hard["id"], "name": "Hard", "assigned": False},
+    )
+    assert removed.status_code == 200, removed.get_json()
+    db_session.expire_all()
+    assert {tag.name for tag in db_session.get(ActivityInstance, setless_id).tags} == {"Easy", "Outdoor"}
 
 
 def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_rounds(
@@ -179,17 +207,12 @@ def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_round
     assert [tag["name"] for tag in run["tags"]] == ["Competition"]
     assert run["rounds"][0]["tags"] == []
 
-    tags = db_session.query(ActivityTag).filter_by(root_id=sample_ultimate_goal.id).all()
-    competition_by_activity = {
-        tag.activity_definition_id: tag
-        for tag in tags
-        if tag.name == "Competition"
-    }
-    assert set(competition_by_activity) == {sample_activity_definition.id, non_set.id}
-    scoped_activity_tag = competition_by_activity[sample_activity_definition.id]
+    competition = db_session.query(ActivityTagDefinition).filter_by(
+        root_id=sample_ultimate_goal.id, name="Competition",
+    ).one()
     renamed = authed_client.put(
-        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}",
-        json={"name": "Meet", "version": scoped_activity_tag.definition.version},
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{competition.id}",
+        json={"name": "Meet", "version": competition.version},
     )
     assert renamed.status_code == 200
     renamed_run = authed_client.get(
@@ -197,12 +220,12 @@ def test_circuit_and_round_tags_materialize_hierarchically_and_survive_new_round
     ).get_json()
     assert [tag["name"] for tag in renamed_run["tags"]] == ["Meet"]
     restored_name = authed_client.put(
-        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}",
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{competition.id}",
         json={"name": "Competition", "version": renamed.get_json()["version"]},
     )
     assert restored_name.status_code == 200
     blocked_archive = authed_client.post(
-        f"/api/{sample_ultimate_goal.id}/activity-tags/{scoped_activity_tag.definition_id}/archive",
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{competition.id}/archive",
         json={"version": restored_name.get_json()["version"]},
     )
     assert blocked_archive.status_code == 409
@@ -383,10 +406,8 @@ def test_inherited_run_scope_rejects_archived_tag_and_rolls_back_round(
 
     # Archive the setless activity's tag directly; the scope guard covers the
     # API path, so bypass it to simulate a tag archived before the scope existed.
-    archived_tag = db_session.query(ActivityTag).join(ActivityTagDefinition).filter(
-        ActivityTag.root_id == sample_ultimate_goal.id,
-        ActivityTag.activity_definition_id == non_set.id,
-        ActivityTagDefinition.name == "Competition",
+    archived_tag = db_session.query(ActivityTagDefinition).filter_by(
+        root_id=sample_ultimate_goal.id, name="Competition",
     ).one()
     archived_tag.deleted_at = datetime.now(timezone.utc)
     db_session.commit()
@@ -422,16 +443,9 @@ def test_circuit_scope_tags_validate_ownership_archives_and_round_membership(
         f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
         json={"circuit_definition_id": definition["id"], "section_index": 0},
     ).get_json()
-    archived_definition = ActivityTagDefinition(
+    archived = ActivityTagDefinition(
         root_id=sample_ultimate_goal.id,
         name="Archived",
-        scope="selected",
-        deleted_at=datetime.now(timezone.utc),
-    )
-    archived = ActivityTag(
-        root_id=sample_ultimate_goal.id,
-        activity_definition_id=sample_activity_definition.id,
-        definition=archived_definition,
         deleted_at=datetime.now(timezone.utc),
     )
     db_session.add(archived)

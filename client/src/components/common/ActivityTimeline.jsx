@@ -65,7 +65,7 @@ function formatTime(isoString, timezone) {
 export function ActivityTimelineList({
     items,
     activityDef,
-    progressByInstanceId,
+    progressByInstanceId, pairedSetIndexes = null, // instance id -> Set of compared set indexes
     formatDate,
     timezone,
     deltaDisplayMode = 'percent',
@@ -91,6 +91,7 @@ export function ActivityTimelineList({
                     deltaDisplayMode={deltaDisplayMode}
                     showActivityName={showActivityName}
                     sessionHref={getSessionHref?.(instance)}
+                    pairedSetIndexes={pairedSetIndexes?.get(instance.id) || null}
                 />
             ))}
         </div>
@@ -108,7 +109,7 @@ export function ActivityTimelineCard({
     sessionHref = null,
     timestamp = null,
     showTime = false,
-    variant = 'default',
+    variant = 'default', pairedSetIndexes = null,
 }) {
     const sets = useMemo(() => instance.sets || [], [instance.sets]);
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
@@ -162,7 +163,6 @@ export function ActivityTimelineCard({
     const displayTime = showTime ? formatTime(displayTimestamp, timezone) : null;
     const sessionTemplateName = instance.session_template_name || instance.session_name;
     const sessionTemplateColor = instance.session_template_color || instance.template_color;
-    const isExcluded = instance.included === false || progressRecord?.included === false;
 
     const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
         ? progressRecord.metric_comparisons
@@ -259,7 +259,7 @@ export function ActivityTimelineCard({
     };
 
     return (
-        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''} ${isExcluded ? styles.timelineCardExcluded : ''}`}>
+        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`}>
             {isGoalTimeline ? (
                 <div className={styles.timelineCardHeader}>
                     {instance.session_name ? (
@@ -297,7 +297,7 @@ export function ActivityTimelineCard({
             ) : (
                 <>
                     <div className={styles.timelineCardHeader}>
-                        <span className={styles.timelineCardDate}>{displayDate}{isExcluded ? ' · Excluded' : ''}</span>
+                        <span className={styles.timelineCardDate}>{displayDate}</span>
                         {duration && (
                             <span className={styles.timelineCardDuration}>
                                 <ClockIcon size={13} />
@@ -361,8 +361,8 @@ export function ActivityTimelineCard({
                     {sets.map((set, idx) => (
                         <div
                             key={set.instance_id || idx}
-                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''}`}
-                        >
+                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''} ${pairedSetIndexes?.has(idx) ? styles.timelineSetPaired : ''}`}
+                            title={pairedSetIndexes?.has(idx) ? 'Compared with a set in this session' : undefined}>
                             <span className={styles.timelineSetNum}>#{idx + 1}</span>
                             <div className={styles.timelineSetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {

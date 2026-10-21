@@ -313,7 +313,7 @@ it('refetches the canonical session goals view when adding an associated activit
         });
     });
 
-it('invalidates progress history and session summary after activity metric-like updates', async () => {
+it('invalidates the progress timeline and session summary after activity metric-like updates', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: { retry: false },
@@ -347,7 +347,7 @@ it('invalidates progress history and session summary after activity metric-like 
         });
 
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressComparison('inst-1') });
-        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressHistoryRoot('act-1') });
+        expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.activityProgressTimelineRoot('root-1', 'act-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });
     });

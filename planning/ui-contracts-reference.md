@@ -286,3 +286,30 @@ completion checkmark beside completed session badges, and show session start,
 end in the user's selected timezone, and active duration (excluding pauses).
 Metadata groups naturally sized fields with moderate gaps, centered in the space beside the badge.
 On small screens it aligns left and wraps, with an em dash for unavailable values.
+
+## Tag pickers and the tag manager
+
+Every tag picker (session instance and set tags, plan tags, circuit and round scopes, the Timeline's
+"Specific tags") offers the whole fractal catalog, grouped by `utils/tagPickerOptions.js`: families
+in their order, then "Other tags"; archived tags appear only while already assigned. A single-select
+family is labelled and uses radio inputs, and choosing one of its tags replaces the sibling.
+Selected tags stay in place rather than moving to a separate group. The create box never makes a
+copy: an exact (normalized) match turns its button into "Add", or "Restore" for an archived tag,
+with a status line saying why.
+
+The Manage Activity Tags modal lists families as sections, with the empty families still shown, and
+offers ↑/↓ ordering within the whole family, even while filtered. Families have their own editor
+(name, "Single select"). The tag editor flags a name collision while typing: "Edit it" or "Restore it",
+or "Merge into it" while renaming. "Merge…" on any row picks a target and previews the combined usage.
+Row actions carry the tag's name in their accessible labels.
+
+## Timeline progress comparison
+
+The Timeline pane's "Compare with" control (Same tags · Specific tags · All history) belongs to one
+activity instance: the focused one, else the session's first instance of the chosen activity. It
+saves immediately on that instance only, re-basing its ▲/▼ hints. "Reset to same tags" appears
+whenever another mode is active. The count reads "N of M past sessions match". The list shows only
+matching sessions. Earlier sets that the current sets compare with are marked with a left accent,
+titled "Compared with a set in this session". While an instance uses an override, its card summary
+says so ("Comparing with all history" or "Comparing with Heavy + Paused sessions"), so changed hints
+are never unexplained.

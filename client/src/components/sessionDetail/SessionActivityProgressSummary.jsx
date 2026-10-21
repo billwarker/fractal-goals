@@ -17,7 +17,13 @@ import styles from './SessionActivityItem.module.css';
  * Progress summary shown below sets: additive totals, yield, best set.
  */
 function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, displayMode = 'percent' }) {
-    const isExcluded = activeProgress?.included === false;
+    // An overridden comparison is always visible so changed ▲/▼ hints are never a surprise.
+    const context = activeProgress?.comparison_context;
+    const overrideLabel = context?.mode === 'all'
+        ? 'Comparing with all history'
+        : context?.mode === 'tags'
+            ? `Comparing with ${context.tags?.length ? context.tags.map((tag) => tag.name).join(' + ') : 'untagged'} sessions`
+            : null;
     const trackedMetricDefs = useMemo(() => filterTrackedMetricDefs(metricDefs), [metricDefs]);
     const autoAgg = useMemo(() => {
         // The rendered sets are the current editing source of truth. Progress
@@ -32,14 +38,14 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
         return null;
     }, [activeProgress, sets, trackedMetricDefs]);
 
-    if (!autoAgg && !isExcluded) return null;
+    if (!autoAgg && !overrideLabel) return null;
 
     const yieldEligible = canComputeYield(trackedMetricDefs);
     const hasYield = Boolean(autoAgg) && yieldEligible && autoAgg.total_yield != null;
     const hasAdditive = Boolean(autoAgg) && Object.keys(autoAgg.additive_totals).length > 0;
     const hasBestSet = Boolean(autoAgg) && autoAgg.best_set_index != null;
 
-    if (!hasYield && !hasAdditive && !hasBestSet && !isExcluded) return null;
+    if (!hasYield && !hasAdditive && !hasBestSet && !overrideLabel) return null;
 
     // Previous total yield for delta display
     const prevYield = (() => {
@@ -96,9 +102,9 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
     return (
         <div className={styles.progressSummary}>
             <ActivitySummaryRail metrics={summaryMetrics} />
-            {isExcluded && (
-                <div className={styles.progressExcluded}>
-                    Excluded from the active progress view. Metrics remain available as raw session data.
+            {overrideLabel && (
+                <div className={styles.progressExcluded} role="note">
+                    {overrideLabel}. Change it in the Timeline panel.
                 </div>
             )}
         </div>

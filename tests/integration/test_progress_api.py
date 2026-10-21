@@ -174,11 +174,11 @@ class TestProgressApi:
         assert progress_response.status_code == 404
         assert progress_response.get_json()['error'] == 'Activity instance not found'
 
-        history_response = authed_client.get(
-            f'/api/{sample_ultimate_goal.id}/activities/{other_activity.id}/progress-history'
+        timeline_response = authed_client.get(
+            f'/api/{sample_ultimate_goal.id}/activities/{other_activity.id}/progress-timeline'
         )
-        assert history_response.status_code == 404
-        assert history_response.get_json()['error'] == 'Activity not found'
+        assert timeline_response.status_code == 404
+        assert timeline_response.get_json()['error'] == 'Activity not found'
 
         summary_response = authed_client.get(
             f'/api/{sample_ultimate_goal.id}/sessions/{other_session.id}/progress-summary'
@@ -211,7 +211,7 @@ class TestProgressApi:
         assert response.status_code == 200
         payload = response.get_json()
         assert payload['activity_instance_id'] == instance.id
-        assert payload['included'] is True
+        assert payload['comparison_context'] == {'mode': 'same_tags', 'tag_ids': [], 'tags': [], 'version': 1}
         assert payload['is_first_instance'] is True
 
     def test_instance_progress_returns_null_when_root_progress_is_disabled(self, authed_client, db_session, sample_ultimate_goal):

@@ -1,22 +1,11 @@
-"""Mixin for ProgressService: calculation settings, aggregation choice, and metric direction.
+"""Mixin for ProgressService: fractal settings, aggregation choice, and metric direction.
 """
 
 from typing import Optional
 from models import Goal, MetricDefinition
-from services.activity_progress_view_service import ActivityProgressViewService
 
 
 class _ProgressConfigMixin:
-    def _resolve_calculation_config(self, instance, *, view_id=None, config=None):
-        if config is not None:
-            normalized, error = ActivityProgressViewService(self.db)._validate_config_tags(instance.definition, config)
-        else:
-            normalized, error = ActivityProgressViewService(self.db).resolve_config(
-                instance.definition,
-                view_id=view_id,
-            )
-        return normalized, error
-
     @staticmethod
     def _coerce_numeric(value) -> Optional[float]:
         if value is None:

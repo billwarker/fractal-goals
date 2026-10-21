@@ -46,9 +46,10 @@
     padding: 0 var(--spacing-lg, 16px);
 }
 
-.progressViewControls {
+.compareControls {
     display: flex;
     flex-direction: column;
+    gap: 10px;
     margin-bottom: 16px;
     padding: 10px 12px;
     border: 1px solid var(--color-border);
@@ -56,178 +57,86 @@
     background: var(--color-bg-secondary);
 }
 
-.progressViewToolbar,
-.progressViewActions,
-.saveAsField {
+.compareHeader {
     display: flex;
-    align-items: center;
+    align-items: baseline;
+    justify-content: space-between;
     gap: 8px;
     flex-wrap: wrap;
 }
 
-.progressViewToolbar label,
-.logicBucketHeader {
+.compareHeader strong {
     color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 700;
 }
 
-.progressViewToolbar select,
-.saveAsField input {
-    min-height: 32px;
-    padding: 5px 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-bg-input);
-    color: var(--color-text-primary);
-}
-
-.progressViewToolbar select {
-    min-width: 0;
-    max-width: 220px;
-}
-
-.progressViewToggle {
-    margin-left: auto;
-    color: var(--color-text-muted);
-}
-
-.progressViewEditor {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding-top: 10px;
-    margin-top: 10px;
-    border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-}
-
 .cohortCount {
-    align-self: flex-end;
     color: var(--color-text-muted);
     font-size: 12px;
 }
 
-.previewStatus {
-    align-self: flex-end;
-    color: var(--color-text-muted);
-    font-size: 11px;
-}
-
-.conflictNotice {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 8px;
-    border: 1px solid var(--color-warning, #d97706);
-    border-radius: 5px;
-    background: color-mix(in srgb, var(--color-warning, #d97706) 12%, transparent);
-    color: var(--color-text-secondary);
-    font-size: 12px;
-}
-
-.logicBuckets {
+.compareModes {
     display: grid;
-    gap: 8px;
-}
-
-.logicBucket {
-    min-width: 0;
-    padding: 8px;
-    border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-    border-radius: 4px;
-}
-
-.logicBucketHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 7px;
-}
-
-.tagChoices {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
-.tagChoice {
-    display: inline-flex;
-    align-items: center;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 4px;
-    padding: 3px 7px;
-    border: 1px solid var(--tag-color, var(--color-border));
-    border-radius: 999px;
+    margin: 0;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+}
+
+.compareMode {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 4px 6px;
+    border-radius: 4px;
     color: var(--color-text-secondary);
     font-size: 12px;
+    font-weight: 600;
+    text-align: center;
     cursor: pointer;
 }
 
-.tagChoice input {
+.compareMode input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-.tagChoiceSelected {
-    background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 20%, transparent);
+.compareModeSelected {
+    background: var(--color-bg-card);
     color: var(--color-text-primary);
+    box-shadow: 0 0 0 1px var(--color-border);
 }
 
-.tagChoice:focus-within {
-    outline: 2px solid var(--color-focus-ring, var(--color-brand-primary));
+.compareMode:focus-within {
+    outline: 2px solid var(--color-brand-primary);
     outline-offset: 1px;
 }
 
-.noTags {
-    color: var(--color-text-muted);
-    font-size: 12px;
-}
-
-.noOperators {
-    color: var(--color-text-muted);
-    font-size: 12px;
-    font-style: italic;
-}
-
-.operatorAdder {
-    position: relative;
-    align-self: flex-start;
-}
-
-.operatorMenu {
-    position: absolute;
-    z-index: 20;
-    top: calc(100% + 5px);
-    left: 0;
+.compareDetail {
     display: flex;
-    flex-direction: column;
-    min-width: 150px;
-    padding: 5px;
-    border: 1px solid var(--color-border);
-    border-radius: 5px;
-    background: var(--color-bg-secondary);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
-}
-
-.operatorMenu button {
-    padding: 7px 9px;
-    border: 0;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    font: inherit;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 24px;
+    color: var(--color-text-muted);
     font-size: 12px;
-    text-align: left;
 }
 
-.operatorMenu button:hover,
-.operatorMenu button:focus-visible {
-    background: var(--color-bg-card-hover);
-    color: var(--color-text-primary);
-    outline: none;
+.resetComparison {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-brand-primary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .timelineSection {

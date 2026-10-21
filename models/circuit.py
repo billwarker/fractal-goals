@@ -120,7 +120,7 @@ class CircuitRun(Base):
         "CircuitScopeTag",
         back_populates="run",
         cascade="all, delete-orphan",
-        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.name",
+        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.id",
     )
 
     __table_args__ = (
@@ -209,7 +209,7 @@ class CircuitRound(Base):
         "CircuitScopeTag",
         back_populates="round",
         cascade="all, delete-orphan",
-        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.name",
+        order_by="CircuitScopeTag.sort_order, CircuitScopeTag.id",
     )
 
     __table_args__ = (
@@ -219,10 +219,10 @@ class CircuitRound(Base):
 
 
 class CircuitScopeTag(Base):
-    """A logical tag applied across a circuit run or one of its rounds.
+    """A catalog tag applied across a circuit run or one of its rounds.
 
-    Activity-owned ``ActivityTag`` rows remain the canonical progress tags.
-    This row preserves the bulk scope so future rounds can inherit run tags.
+    The canonical progress tags are the instance and set links this scope
+    materializes; this row preserves the bulk scope so future rounds inherit run tags.
     """
 
     __tablename__ = "circuit_scope_tags"
@@ -244,12 +244,12 @@ class CircuitScopeTag(Base):
     activity_tag_definition_id = Column(
         String,
         ForeignKey("activity_tag_definitions.id", ondelete="CASCADE"),
-        nullable=True,
+        nullable=False,
         index=True,
     )
-    name = Column(String, nullable=False)
-    color = Column(String(7), nullable=True)
     sort_order = Column(Integer, nullable=False, default=0, server_default="0")
+    # Targets that already held the tag (or a "pick one" sibling it replaced) before the
+    # scope applied it: "set:<id>" / "instance:<id>", optionally "...:<replaced tag id>".
     preserved_target_keys = Column(JSON_TYPE, nullable=False, default=list, server_default=sa.text("'[]'::jsonb"))
     created_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
     updated_at = Column(
@@ -262,28 +262,30 @@ class CircuitScopeTag(Base):
 
     run = relationship("CircuitRun", back_populates="scope_tags")
     round = relationship("CircuitRound", back_populates="scope_tags")
-    activity_tag_definition = relationship("ActivityTagDefinition")
+    activity_tag_definition = relationship("ActivityTagDefinition", lazy="joined")
+
+    @property
+    def name(self):
+        return self.activity_tag_definition.name
+
+    @property
+    def color(self):
+        return self.activity_tag_definition.color
 
     __table_args__ = (
         Index(
-            "uq_circuit_scope_tags_run_name",
+            "uq_circuit_scope_tags_run_definition",
             "circuit_run_id",
-            sa.func.lower(name),
+            "activity_tag_definition_id",
             unique=True,
             postgresql_where=sa.text("circuit_round_id IS NULL"),
-            sqlite_where=sa.text("circuit_round_id IS NULL"),
         ),
         Index(
-            "uq_circuit_scope_tags_round_name",
+            "uq_circuit_scope_tags_round_definition",
             "circuit_round_id",
-            sa.func.lower(name),
+            "activity_tag_definition_id",
             unique=True,
             postgresql_where=sa.text("circuit_round_id IS NOT NULL"),
-            sqlite_where=sa.text("circuit_round_id IS NOT NULL"),
-        ),
-        CheckConstraint(
-            "color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$'",
-            name="ck_circuit_scope_tags_color",
         ),
         CheckConstraint("sort_order >= 0", name="ck_circuit_scope_tags_sort_order_nonnegative"),
     )

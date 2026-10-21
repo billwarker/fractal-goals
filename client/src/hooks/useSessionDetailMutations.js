@@ -368,7 +368,7 @@ export function useSessionDetailMutations({
             if (updates?.metrics !== undefined || updates?.sets !== undefined) {
                 queryClient.invalidateQueries({ queryKey: queryKeys.progressComparison(instanceId) });
                 if (activityDefinitionId) {
-                    queryClient.invalidateQueries({ queryKey: queryKeys.progressHistoryRoot(activityDefinitionId) });
+                    queryClient.invalidateQueries({ queryKey: queryKeys.activityProgressTimelineRoot(rootId, activityDefinitionId) });
                 }
                 queryClient.invalidateQueries({ queryKey: queryKeys.sessionProgressSummary(sessionId) });
             }

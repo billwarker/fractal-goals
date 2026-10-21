@@ -6,8 +6,8 @@ vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuitRunActions: () => ({ mutateAsync, isPending: false }),
 }));
 
-vi.mock('../../../hooks/useActivityProgressViews', () => ({
-    useActivityTagCatalog: () => ({ data: { tags: [] } }),
+vi.mock('../../../hooks/useActivityTags', () => ({
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [] } }),
 }));
 
 import CircuitRunCard from '../CircuitRunCard';

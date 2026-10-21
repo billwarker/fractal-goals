@@ -94,6 +94,7 @@ export function buildPlaceholderInstance({ id, sessionId, definition, groupName 
         metrics: [],
         tags: [],
         tag_assignment_version: 0,
+        comparison_context: { mode: 'same_tags', tag_ids: [], tags: [], version: 1 },
         progress_comparison: null,
         prescription: null,
         _pendingSync: true,

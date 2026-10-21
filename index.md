@@ -168,12 +168,21 @@ filter; legacy completion URL parameters do not constrain its list or heatmap.
 
 Activity definitions and instances, metrics, sets, circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
 calculated from canonical result data; obsolete snapshot progress is not a competing source.
-Activities, circuit runs, and rounds use one fractal-owned tag catalog (`ActivityTagDefinition`).
-Circuit pickers read the full catalog and assign its identity, extending activity bindings to
-members as needed; they never silently merge same-name definitions. Activity availability controls
-remain catalog-owned. Circuit scopes materialize canonical instance/set links and preserve prior
-or overlapping assignments on removal. All session tag editors share the activity chip styling.
-See [Shared circuit tags audit](planning/shared-circuit-tags-audit.md).
+A tag is one `ActivityTagDefinition` per fractal, and any tag can be used on any activity: instance
+links (`activity_instance_tags`), set links (`activity_set_tags`), circuit run/round scopes
+(`circuit_scope_tags`, pure references) and planned tags all hold its id. Names are unique per
+fractal for the tag's whole life, archived tags included, through the generated `normalized_name`
+column (collapse whitespace, then trim and lowercase); `services/activity_tags.py` and
+`client/src/utils/tagNames.js` mirror it against `tests/fixtures/tag_name_normalization_cases.json`.
+Create and rename return 409 `tag_name_taken` with the existing tag, so pickers offer "Add" or
+"Restore" and the manager offers "Merge into…" instead of ever creating a copy. Tag families
+(`ActivityTagFamily`) order tags in every picker (families by `sort_order`, then "Other tags"); a
+single-select family allows one of its tags directly on an instance or set (422
+`tag_family_single_select`; circuit scopes replace the sibling and restore it on removal). Merge and
+hard delete rewrite planned tags in stored plans (`services/tag_reference_rewrites.py`). Database
+triggers keep each link inside its fractal and maintain `tag_signature` on instances and sets. All
+pickers group options with `client/src/utils/tagPickerOptions.js`.
+See [Tag families and tag-aware progress](planning/tag-families-and-tag-aware-progress.md).
 Metric input type and precision are live settings of the shared fractal metric, including for
 existing active/completed sessions and template prescriptions. Saving a metric refreshes activity
 and circuit definition caches; formatting changes preserve recorded and planned numeric values.
@@ -185,9 +194,9 @@ Primary code: `services/session_*`, `services/activity_*`, `services/progress_se
 
 Template section items carry a stable `item_key` (never `id`, a legacy activity-id alias) and an
 optional `prescription`: planned values per set or per metric, activity and set notes, and planned
-tags (`tags`: activity tag binding ids on the activity and on each set) (`validators/prescriptions.py`
+tags (`tags`: catalog tag ids on the activity and on each set) (`validators/prescriptions.py`
 owns shape; `services/prescriptions.py` checks that metrics and splits belong to the item's activity
-and respect metric bounds, and that tags are active bindings of that activity). Planned tags are
+and respect metric bounds, and that tags are active tags of the fractal). Planned tags are
 applied to the new instance and its planned sets at session creation, like tags added in-session. Templates count content edits in
 `revision`. Session creation snapshots the authoritative template's or dated plan's prescription onto
 `activity_instances.prescription`, looked up by `item_key`; client-sent planned values are ignored.
@@ -310,9 +319,14 @@ Detailed design:
 
 ### Bounded history reads
 
-`ProgressService` resolves one predecessor identity per requested instance in SQL, then
-hydrates only requested instances and those predecessors. Completed predecessors take
-priority, same-session instances are excluded, and tag/set inclusion remains canonical.
+`ProgressService` resolves predecessors for a whole batch in one SQL statement, then hydrates
+only requested instances and those predecessors. An instance compares with the latest earlier
+instance whose own tags match its comparison context: the same tags by default, chosen tags, or
+all history (`activity_instances.progress_compare_mode` plus `activity_instance_compare_tags`,
+set per instance from the Timeline pane; it never changes other instances). Each group of sets
+with the same set tags compares with the latest earlier instance in that context holding such sets,
+k-th set to k-th set. Completed predecessors take priority and same-session instances are excluded.
+Matching uses the trigger-maintained `tag_signature` columns (lookup keys, not stored progress).
 There is no competing full-history comparison cache/calculation.
 
 `goal_evidence_query.py` projects canonical timeline identities; `goal_evidence_read_model.py`

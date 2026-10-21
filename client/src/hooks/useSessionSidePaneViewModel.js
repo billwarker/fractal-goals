@@ -75,6 +75,7 @@ export function useSessionSidePaneViewModel({
             sessionId,
             selectedActivity,
             sessionActivityDefs,
+            sessionInstances: activityInstances,
         },
     }), [
         addNote,
@@ -96,6 +97,7 @@ export function useSessionSidePaneViewModel({
         selectedActivity,
         isCompleted,
         sessionActivityDefs,
+        activityInstances,
         sessionId,
         conditionSnapshots,
         conditionModalHost,

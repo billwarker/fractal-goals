@@ -15,7 +15,8 @@ from .goal import (
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
     SplitDefinition, ActivityInstance, ActivitySet, MetricValue,
-    ActivityTagDefinition, ActivityTag, ActivityProgressView, ActivityInstanceTag, ActivitySetTag,
+    ActivityTagFamily, ActivityTagDefinition, ActivityInstanceTag, ActivitySetTag, ActivityInstanceCompareTag,
+    TAG_ORDER,
 )
 from .circuit import (
     CircuitDefinition, CircuitSlot, CircuitRun, CircuitRunSlot,

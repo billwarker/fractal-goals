@@ -3,25 +3,31 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 
 const mocks = vi.hoisted(() => ({
     archiveTag: vi.fn(),
-    updateCatalogTag: vi.fn(),
+    createTag: vi.fn(),
+    restoreTag: vi.fn(),
     assignInstanceTags: vi.fn(),
     getActivityTagImpact: vi.fn(),
 }));
 
-const definitions = [
-    { id: 'definition-assigned', name: 'Assigned tag', color: '#112233', scope: 'selected', version: 1, archived: false, activity_ids: ['activity'] },
-    { id: 'definition-global', name: 'Global tag', color: '#223344', scope: 'global', version: 2, archived: false, activity_ids: ['activity'] },
-    { id: 'definition-local', name: 'Local tag', color: '#334455', scope: 'selected', version: 3, archived: false, activity_ids: ['activity'] },
-    { id: 'definition-match', name: 'Reusable', color: '#445566', scope: 'selected', version: 4, archived: false, activity_ids: ['other'] },
+const families = [{ id: 'grip', name: 'Grip', single_select: true, sort_order: 0 }];
+const catalogTags = [
+    { id: 'wide', name: 'Wide', color: '#112233', family_id: 'grip', sort_order: 0, version: 1, archived: false },
+    { id: 'narrow', name: 'Narrow', color: '#223344', family_id: 'grip', sort_order: 1, version: 2, archived: false },
+    { id: 'paused', name: 'Paused', color: '#334455', family_id: null, sort_order: 0, version: 3, archived: false },
+    { id: 'old', name: 'Old', color: '#445566', family_id: null, sort_order: 1, version: 4, archived: true },
 ];
 
-vi.mock('../../../hooks/useActivityProgressViews', () => ({
-    useActivityTagCatalog: () => ({ data: { tags: definitions, duplicate_groups: [] } }),
-    useActivityTagMutations: () => ({
-        createTag: vi.fn(),
-        updateCatalogTag: mocks.updateCatalogTag,
-        hardDeleteCatalogTag: vi.fn(),
+vi.mock('../../../hooks/useActivityTags', () => ({
+    useActivityTagCatalog: () => ({ data: { families, tags: catalogTags } }),
+    useActivityTagCatalogMutations: () => ({
+        updateTag: vi.fn(),
+        hardDeleteTag: vi.fn(),
         archiveTag: mocks.archiveTag,
+        isPending: false,
+    }),
+    useActivityTagMutations: () => ({
+        createTag: mocks.createTag,
+        restoreTag: mocks.restoreTag,
         assignInstanceTags: mocks.assignInstanceTags,
         assignSetTags: vi.fn(),
         isPending: false,
@@ -34,59 +40,78 @@ vi.mock('../../../utils/api', () => ({
 
 import ActivityTagEditor from '../ActivityTagEditor';
 
-const availableTags = [
-    { id: 'binding-assigned', definition_id: 'definition-assigned', name: 'Assigned tag', scope: 'selected', color: '#112233' },
-    { id: 'binding-global', definition_id: 'definition-global', name: 'Global tag', scope: 'global', color: '#223344' },
-    { id: 'binding-local', definition_id: 'definition-local', name: 'Local tag', scope: 'selected', color: '#334455' },
-    { id: 'binding-local', definition_id: 'definition-local', name: 'Local tag', scope: 'selected', color: '#334455' },
-];
-
 beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('ResizeObserver', class ResizeObserver { observe() {} disconnect() {} });
     mocks.archiveTag.mockResolvedValue({ data: {} });
     mocks.assignInstanceTags.mockResolvedValue({ data: { version: 2 } });
-    mocks.updateCatalogTag.mockResolvedValue({ data: {
-        ...definitions[3],
-        activity_ids: ['other', 'activity'],
-        bindings: [{ id: 'binding-reusable', definition_id: 'definition-match', activity_definition_id: 'activity', name: 'Reusable', scope: 'selected' }],
-    } });
 });
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('groups and defensively deduplicates assigned, global, and activity-specific choices', () => {
-    render(<ActivityTagEditor rootId="root" activityId="activity" instanceId="instance" availableTags={availableTags} tags={[availableTags[0]]} />);
+const openPicker = (props = {}) => {
+    render(<ActivityTagEditor rootId="root" activityId="activity" instanceId="instance" tags={[]} {...props} />);
     fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    const picker = screen.getByRole('dialog', { name: 'Choose activity tags' });
-    expect(within(picker).getByRole('heading', { name: 'Assigned' })).toBeInTheDocument();
-    expect(within(picker).getByRole('heading', { name: 'Every activity' })).toBeInTheDocument();
-    expect(within(picker).getByRole('heading', { name: 'This activity' })).toBeInTheDocument();
-    expect(within(picker).getAllByText('Local tag')).toHaveLength(1);
+    return screen.getByRole('dialog', { name: 'Choose activity tags' });
+};
+
+it('offers every catalog tag grouped by family, with archived tags hidden', () => {
+    const picker = openPicker();
+    expect(within(picker).getByRole('heading', { name: /Grip/ })).toHaveTextContent('Single select');
+    expect(within(picker).getByRole('heading', { name: 'Other tags' })).toBeInTheDocument();
+    const grip = within(picker).getByRole('region', { name: /Grip/ });
+    expect(within(grip).getAllByRole('radio').map((input) => input.closest('label').textContent)).toEqual(['Wide', 'Narrow']);
+    expect(within(picker).queryByText('Old')).not.toBeInTheDocument();
 });
 
-it('confirms archive and uses the catalog definition version', async () => {
-    render(<ActivityTagEditor rootId="root" activityId="activity" instanceId="instance" availableTags={availableTags} tags={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Archive Global tag' }));
-    expect(screen.getByText('Archive “Global tag”?')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Archive', exact: true }));
-    await waitFor(() => expect(mocks.archiveTag).toHaveBeenCalledWith({ definitionId: 'definition-global', version: 2 }));
-});
-
-it('extends an existing catalog match instead of creating a duplicate', async () => {
-    render(<ActivityTagEditor rootId="root" activityId="activity" instanceId="instance" availableTags={availableTags} tags={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    fireEvent.change(screen.getByLabelText('New tag name'), { target: { value: ' reusable ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
-    await waitFor(() => expect(mocks.updateCatalogTag).toHaveBeenCalledWith({
-        definitionId: 'definition-match', version: 4, activity_ids: ['other', 'activity'], scope: 'selected',
-    }));
-    expect(mocks.assignInstanceTags).toHaveBeenCalledWith({
+it('replaces the sibling when choosing from a single-select family', async () => {
+    const picker = openPicker({ tags: [catalogTags[0], catalogTags[2]] });
+    fireEvent.click(within(picker).getByRole('radio', { name: 'Narrow' }));
+    await waitFor(() => expect(mocks.assignInstanceTags).toHaveBeenCalledWith(expect.objectContaining({
         instanceId: 'instance',
-        tagIds: ['binding-reusable'],
+        tagIds: ['paused', 'narrow'],
+    })));
+});
+
+it('confirms archive and uses the catalog version', async () => {
+    const picker = openPicker();
+    fireEvent.click(within(picker).getByRole('button', { name: 'Archive Paused' }));
+    expect(screen.getByText('Archive “Paused”?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Archive', exact: true }));
+    await waitFor(() => expect(mocks.archiveTag).toHaveBeenCalledWith({ definitionId: 'paused', version: 3 }));
+});
+
+it('adds an existing tag instead of creating a duplicate', async () => {
+    const picker = openPicker();
+    fireEvent.change(within(picker).getByLabelText('New tag name'), { target: { value: ' paused ' } });
+    expect(within(picker).getByRole('status')).toHaveTextContent('“Paused” already exists');
+    fireEvent.click(within(picker).getByRole('button', { name: 'Add' }));
+    await waitFor(() => expect(mocks.assignInstanceTags).toHaveBeenCalledWith({
+        instanceId: 'instance',
+        tagIds: ['paused'],
         version: 1,
-        // The just-extended binding travels with the request so a queued assignment shows at once.
-        tags: [expect.objectContaining({ id: 'binding-reusable', name: 'Reusable' })],
-    });
+        // The tag travels with the request so a queued assignment shows at once.
+        tags: [expect.objectContaining({ id: 'paused', name: 'Paused' })],
+    }));
+    expect(mocks.createTag).not.toHaveBeenCalled();
+});
+
+it('restores an archived tag of the same name rather than creating a new one', async () => {
+    mocks.restoreTag.mockResolvedValue({ data: { ...catalogTags[3], archived: false, version: 5 } });
+    const picker = openPicker();
+    fireEvent.change(within(picker).getByLabelText('New tag name'), { target: { value: 'OLD' } });
+    expect(within(picker).getByRole('status')).toHaveTextContent('archived');
+    fireEvent.click(within(picker).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(mocks.restoreTag).toHaveBeenCalledWith({ definitionId: 'old', version: 4 }));
+    await waitFor(() => expect(mocks.assignInstanceTags).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['old'] })));
+    expect(mocks.createTag).not.toHaveBeenCalled();
+});
+
+it('creates a new catalog tag when the name is unused', async () => {
+    mocks.createTag.mockResolvedValue({ data: { id: 'tempo', name: 'Tempo', archived: false, family_id: null } });
+    const picker = openPicker();
+    fireEvent.change(within(picker).getByLabelText('New tag name'), { target: { value: '  Tempo  ' } });
+    fireEvent.click(within(picker).getByRole('button', { name: 'Create' }));
+    await waitFor(() => expect(mocks.createTag).toHaveBeenCalledWith({ name: 'Tempo' }));
+    await waitFor(() => expect(mocks.assignInstanceTags).toHaveBeenCalledWith(expect.objectContaining({ tagIds: ['tempo'] })));
 });

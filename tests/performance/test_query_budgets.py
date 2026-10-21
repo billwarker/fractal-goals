@@ -10,7 +10,7 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
-    ActivityTag,
+    ActivityInstanceTag,
     ActivityTagDefinition,
     AnalyticsDashboard,
     Goal,
@@ -517,29 +517,13 @@ def test_tag_filtered_progress_timeline_query_budget(
     sample_activity_definition,
     sample_activity_instance,
 ):
-    """Saved-view timelines keep a constant query budget as history grows."""
+    """Same-tags timelines keep a constant query budget as history grows."""
     root_id = sample_practice_session.root_id
     activity_id = sample_activity_definition.id
-    tag_definition = authed_client.post(
-        f"/api/{root_id}/activity-tags",
-        json={
-            "name": "Competition",
-            "scope": "selected",
-            "activity_ids": [activity_id],
-        },
-    ).get_json()
-    tag = next(
-        row
-        for row in tag_definition["bindings"]
-        if row["activity_definition_id"] == activity_id
-    )
+    tag = authed_client.post(f"/api/{root_id}/activity-tags", json={"name": "Competition"}).get_json()
     authed_client.put(
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags",
         json={"tag_ids": [tag["id"]]},
-    )
-    authed_client.post(
-        f"/api/{root_id}/activities/{activity_id}/progress-views",
-        json={"name": "Competition only", "config": {"all_tag_ids": [tag["id"]]}},
     )
 
     for index in range(40):
@@ -553,21 +537,24 @@ def test_tag_filtered_progress_timeline_query_budget(
         )
         db_session.add(session)
         db_session.flush()
-        db_session.add(
-            ActivityInstance(
-                id=str(uuid.uuid4()),
-                session_id=session.id,
-                activity_definition_id=activity_id,
-                root_id=root_id,
-                completed=True,
-            )
+        instance = ActivityInstance(
+            id=str(uuid.uuid4()),
+            session_id=session.id,
+            activity_definition_id=activity_id,
+            root_id=root_id,
+            completed=True,
         )
+        db_session.add(instance)
+        db_session.flush()
+        if index % 2 == 0:
+            db_session.add(ActivityInstanceTag(activity_instance_id=instance.id, tag_definition_id=tag["id"]))
     db_session.commit()
 
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
-        f"/api/{root_id}/activities/{activity_id}/progress-timeline?limit=20&offset=0",
+        f"/api/{root_id}/activities/{activity_id}/progress-timeline"
+        f"?instance_id={sample_activity_instance.id}&limit=20&offset=0",
         query_counter=query_counter,
     )
 
@@ -575,7 +562,8 @@ def test_tag_filtered_progress_timeline_query_budget(
         response, max_bytes=180_000, max_ms=900, elapsed_ms=elapsed_ms
     )
     payload = response.get_json()
-    assert payload["total"] == 41
+    assert payload["total"] == 20
+    assert payload["total_all"] == 40
     assert len(payload["items"]) == 20
     assert query_counter["total"] <= 22
 
@@ -586,24 +574,18 @@ def test_activity_tag_catalog_query_budget_is_constant(
     db_session,
     query_counter,
     sample_ultimate_goal,
-    sample_activity_definition,
+    sample_activity_instance,
 ):
-    definitions = []
-    for index in range(100):
-        definition = ActivityTagDefinition(
-            root_id=sample_ultimate_goal.id,
-            name=f"Catalog tag {index}",
-            sort_order=index,
-            scope="selected",
-        )
-        definition.bindings.append(
-            ActivityTag(
-                root_id=sample_ultimate_goal.id,
-                activity_definition_id=sample_activity_definition.id,
-            )
-        )
-        definitions.append(definition)
+    definitions = [
+        ActivityTagDefinition(root_id=sample_ultimate_goal.id, name=f"Catalog tag {index}", sort_order=index)
+        for index in range(100)
+    ]
     db_session.add_all(definitions)
+    db_session.flush()
+    db_session.add_all([
+        ActivityInstanceTag(activity_instance_id=sample_activity_instance.id, tag_definition_id=definition.id)
+        for definition in definitions[:50]
+    ])
     db_session.commit()
 
     query_counter["total"] = 0

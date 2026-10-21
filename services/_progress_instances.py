@@ -1,54 +1,61 @@
 """Mixin for ProgressService: selecting comparable activity instances.
 
-Tag filters, inclusion rules, effective time ordering, and predecessor lookup.
+An instance compares against the latest earlier instance of the same activity, from a
+different session, whose own tags match its comparison context (its own tags by default,
+chosen tags, or all history). Each group of identically tagged sets additionally compares
+against the latest earlier instance in that context with sets carrying the same set tags.
 """
 
 from typing import Any, Optional
-from sqlalchemy import and_, func, not_, or_, true, select, tuple_
+
+from sqlalchemy import Integer, String, and_, column, exists, func, or_, select, tuple_, values
 from sqlalchemy.orm import joinedload, selectinload
-from models import ActivityDefinition, ActivityInstance, ActivitySet, ActivityTag, Session
+
+from models import ActivityDefinition, ActivityInstance, ActivitySet, Session
 from services.activity_instance_data import load_instance_sets
+from services.activity_tags import tag_signature
+
+ALL_HISTORY = None
 
 
 class _ProgressInstancesMixin:
     db: Any
-    @staticmethod
-    def _matches_tag_config(tag_ids, config) -> bool:
-        present = set(tag_ids or [])
-        required = set(config.get('all_tag_ids') or [])
-        alternatives = set(config.get('any_tag_ids') or [])
-        excluded = set(config.get('none_tag_ids') or [])
-        return required.issubset(present) and (not alternatives or bool(present & alternatives)) and not bool(present & excluded)
+    _sets_cache: dict
 
     @staticmethod
-    def _instance_tag_ids(instance) -> set[str]:
-        return {tag.id for tag in (getattr(instance, 'tags', None) or [])}
+    def _own_signature(row) -> str:
+        return tag_signature(tag.id for tag in (getattr(row, 'tags', None) or []))
+
+    def _compare_signature(self, instance, *, mode=None, tag_ids=None):
+        """The instance-tag signature candidates must match, or ALL_HISTORY."""
+        mode = mode or instance.progress_compare_mode or 'same_tags'
+        if mode == 'all':
+            return ALL_HISTORY
+        if mode == 'tags':
+            chosen = tag_ids if tag_ids is not None else [tag.id for tag in instance.compare_tags or []]
+            return tag_signature(chosen)
+        return self._own_signature(instance)
 
     def _sets_for_instance(self, instance: ActivityInstance) -> list:
+        """Serialized sets with their original index and own-tag signature."""
+        cache = self._sets_cache
+        cached = cache.get(instance.id)
+        if cached is not None:
+            return cached
+        rows = list(getattr(instance, 'sets', None) or [])
         serialized = [
-            {**payload, '_progress_set_index': index}
+            {
+                **payload,
+                '_progress_set_index': index,
+                '_tag_signature': self._own_signature(rows[index]) if index < len(rows) else '',
+            }
             for index, payload in enumerate(load_instance_sets(instance))
         ]
-        config = self._calculation_config
-        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
-            return serialized
-        inherited = self._instance_tag_ids(instance)
-        rows = list(getattr(instance, 'sets', None) or [])
-        filtered = []
-        for index, payload in enumerate(serialized):
-            row = rows[index] if index < len(rows) else None
-            direct = {tag.id for tag in (getattr(row, 'tags', None) or [])}
-            if self._matches_tag_config(inherited | direct, config):
-                filtered.append(payload)
-        return filtered
+        cache[instance.id] = serialized
+        return serialized
 
-    def _instance_included(self, instance: ActivityInstance) -> bool:
-        config = self._calculation_config
-        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
-            return True
-        if getattr(instance.definition, 'has_sets', False) or getattr(instance, 'sets', None):
-            return bool(self._sets_for_instance(instance))
-        return self._matches_tag_config(self._instance_tag_ids(instance), config)
+    def _set_signatures(self, instance) -> list:
+        return list(dict.fromkeys(item['_tag_signature'] for item in self._sets_for_instance(instance)))
 
     def _active_instances_query(self):
         return (
@@ -88,86 +95,62 @@ class _ProgressInstancesMixin:
             .filter(ActivityInstance.deleted_at.is_(None), Session.deleted_at.is_(None))
         )
 
-    @staticmethod
-    def _tag_membership_clause(tag_id, *, include_set_tags):
-        inherited = ActivityInstance.tags.any(ActivityTag.id == tag_id)
-        if not include_set_tags:
-            return inherited
-        direct = ActivitySet.tags.any(ActivityTag.id == tag_id)
-        return or_(inherited, direct)
+    def _load_predecessor_ids(self, requests, *, exclude_session_id=None) -> dict:
+        """Resolve predecessors for (key, instance id, compare signature, set signature) rows.
 
-    def _included_instance_clause(self, activity_def, config):
-        """Return the SQL predicate matching the in-memory tag semantics."""
-        if not any(config.get(key) for key in ('all_tag_ids', 'any_tag_ids', 'none_tag_ids')):
-            return true()
-
-        if activity_def.has_sets:
-            set_clauses = [
-                self._tag_membership_clause(tag_id, include_set_tags=True)
-                for tag_id in config.get('all_tag_ids') or []
-            ]
-            any_clauses = [
-                self._tag_membership_clause(tag_id, include_set_tags=True)
-                for tag_id in config.get('any_tag_ids') or []
-            ]
-            none_clauses = [
-                self._tag_membership_clause(tag_id, include_set_tags=True)
-                for tag_id in config.get('none_tag_ids') or []
-            ]
-            if any_clauses:
-                set_clauses.append(or_(*any_clauses))
-            if none_clauses:
-                set_clauses.append(not_(or_(*none_clauses)))
-            return ActivityInstance.sets.any(and_(*set_clauses))
-
-        clauses = [
-            self._tag_membership_clause(tag_id, include_set_tags=False)
-            for tag_id in config.get('all_tag_ids') or []
-        ]
-        any_clauses = [
-            self._tag_membership_clause(tag_id, include_set_tags=False)
-            for tag_id in config.get('any_tag_ids') or []
-        ]
-        none_clauses = [
-            self._tag_membership_clause(tag_id, include_set_tags=False)
-            for tag_id in config.get('none_tag_ids') or []
-        ]
-        if any_clauses:
-            clauses.append(or_(*any_clauses))
-        if none_clauses:
-            clauses.append(not_(or_(*none_clauses)))
-        return and_(*clauses)
-
-    def _load_predecessor_ids(self, instances, activities, configs, *, exclude_session_id=None):
-        """Return at most one identity per requested instance, entirely in SQL.
-
-        Completed predecessors win over incomplete ones; ties use the instance ID.
-        Candidate history is never hydrated or transferred to Python.
+        One SQL statement for the whole batch. A None compare signature means all
+        history; a None set signature asks for the instance-level predecessor. Completed
+        predecessors win over incomplete ones; ties use the instance ID. Candidate history
+        is never hydrated or transferred to Python.
         """
-        scopes = [
-            and_(ActivityInstance.activity_definition_id == activity_id,
-                 ActivityInstance.root_id == activities[activity_id].root_id,
-                 self._included_instance_clause(activities[activity_id], config))
-            for activity_id, config in configs.items()
-        ]
-        if not instances or not scopes:
+        if not requests:
             return {}
-        targets = self._active_instance_identity_query().filter(
-            ActivityInstance.id.in_([instance.id for instance in instances]),
-        ).add_columns(ActivityInstance.activity_definition_id).subquery('progress_targets')
-        candidates = self._active_instance_identity_query().filter(or_(*scopes))
+        request_rows = values(
+            column('request_key', Integer),
+            column('target_id', String),
+            column('compare_signature', String),
+            column('set_signature', String),
+            name='progress_requests',
+        ).data([tuple(request) for request in requests])
+        targets = (
+            self._active_instance_identity_query()
+            .join(request_rows, request_rows.c.target_id == ActivityInstance.id)
+            .add_columns(
+                ActivityInstance.activity_definition_id,
+                request_rows.c.request_key,
+                request_rows.c.compare_signature,
+                request_rows.c.set_signature,
+            )
+            .subquery('progress_targets')
+        )
+        candidates = self._active_instance_identity_query().add_columns(
+            ActivityInstance.activity_definition_id,
+            ActivityInstance.tag_signature,
+        )
         if exclude_session_id:
             candidates = candidates.filter(ActivityInstance.session_id != exclude_session_id)
-        candidates = candidates.add_columns(ActivityInstance.activity_definition_id).subquery('progress_candidates')
+        candidates = candidates.subquery('progress_candidates')
         earlier = select(candidates.c.id).where(
             candidates.c.activity_definition_id == targets.c.activity_definition_id,
             candidates.c.session_id != targets.c.session_id,
             tuple_(candidates.c.effective_time, candidates.c.id) < tuple_(targets.c.effective_time, targets.c.id),
+            or_(
+                targets.c.compare_signature.is_(None),
+                candidates.c.tag_signature == targets.c.compare_signature,
+            ),
+            or_(
+                targets.c.set_signature.is_(None),
+                # Correlate to the outer target and candidate rows, never re-select them.
+                exists().where(and_(
+                    ActivitySet.activity_instance_id == candidates.c.id,
+                    ActivitySet.tag_signature == targets.c.set_signature,
+                )).correlate_except(ActivitySet),
+            ),
         ).order_by(candidates.c.effective_time.desc(), candidates.c.id.desc()).correlate(targets)
         completed = earlier.where(candidates.c.completed.is_(True)).limit(1).scalar_subquery()
         fallback = earlier.limit(1).scalar_subquery()
         return dict(self.db.execute(select(
-            targets.c.id, func.coalesce(completed, fallback).label('previous_id'),
+            targets.c.request_key, func.coalesce(completed, fallback).label('previous_id'),
         )).all())
 
     def _get_active_instance(self, activity_instance_id: str) -> Optional[ActivityInstance]:

@@ -2,32 +2,29 @@
 Progress Service
 
 Computes progress comparisons on demand from canonical activity data.
-Compares a completed activity instance against the most recent prior
-completed instance of the same activity from a different session.
+Each activity instance compares against the most recent earlier instance of the
+same activity, from a different session, in its comparison context: past instances
+with the same tags by default, or the tags or all history the user chose for it.
 """
 
 import logging
 from typing import Optional
 
 from sqlalchemy import func
+from sqlalchemy.orm import selectinload
 
 from models import (
     ActivityDefinition,
     ActivityInstance,
-    ActivityProgressView,
-    ActivityTag,
+    ActivityTagDefinition,
     Note,
     Session,
 )
-from services.activity_progress_view_service import (
-    ActivityProgressViewService,
-    EMPTY_PROGRESS_VIEW_CONFIG,
-    normalize_progress_view_config,
-)
+from services.activity_tags import serialize_compare_context, serialize_tags, tag_signature
 from services._progress_aggregation import _ProgressAggregationMixin
 from services._progress_comparisons import _ProgressComparisonsMixin
 from services._progress_config import _ProgressConfigMixin
-from services._progress_instances import _ProgressInstancesMixin
+from services._progress_instances import ALL_HISTORY, _ProgressInstancesMixin
 from services._progress_sets import _ProgressSetsMixin
 
 logger = logging.getLogger(__name__)
@@ -42,19 +39,53 @@ class ProgressService(
 ):
     def __init__(self, db_session):
         self.db = db_session
-        self._calculation_config = dict(EMPTY_PROGRESS_VIEW_CONFIG)
         self._root_settings_cache = {}
+        self._sets_cache = {}
+        self._set_group_previous = {}
 
     # ------------------------------------------------------------------
-    # Comparison logic
+    # Batch calculation
     # ------------------------------------------------------------------
+
+    def _payloads(self, targets, *, signatures, contexts, exclude_session_id=None) -> dict:
+        """Comparison payloads for hydrated targets, resolving every predecessor in one query."""
+        requests = []
+        request_keys = {}
+        for target in targets:
+            signature = signatures[target.id]
+            for set_signature in [None, *self._set_signatures(target)]:
+                request_keys[(target.id, set_signature)] = len(requests)
+                requests.append((len(requests), target.id, signature, set_signature))
+        previous_ids = self._load_predecessor_ids(requests, exclude_session_id=exclude_session_id)
+        needed_ids = {previous_id for previous_id in previous_ids.values() if previous_id}
+        previous_by_id = {
+            instance.id: instance
+            for instance in self._active_instances_query().filter(ActivityInstance.id.in_(needed_ids)).all()
+        } if needed_ids else {}
+
+        results = {}
+        for target in targets:
+            previous = previous_by_id.get(previous_ids.get(request_keys[(target.id, None)]))
+            set_group_previous = {}
+            for set_signature in self._set_signatures(target):
+                group_previous = previous_by_id.get(previous_ids.get(request_keys[(target.id, set_signature)]))
+                if group_previous is not None:
+                    set_group_previous[set_signature] = group_previous
+            results[target.id] = self._comparison_payload(
+                target,
+                target.definition,
+                previous,
+                set_group_previous=set_group_previous,
+                context=contexts[target.id],
+            )
+        return results
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def compute_comparisons_for_instances(self, instances, *, preloaded=False) -> dict:
-        """Batch active-view comparisons for session and analytics read models."""
+        """Batch comparisons, each in its instance's own context, for session and analytics reads."""
         target_ids = [instance.id for instance in instances if instance and instance.deleted_at is None]
         if not target_ids:
             return {}
@@ -62,137 +93,68 @@ class ProgressService(
             instance for instance in instances
             if instance.deleted_at is None and instance.session and instance.session.deleted_at is None
         ] if preloaded else self._active_instances_query().filter(ActivityInstance.id.in_(target_ids)).all()
-        if not targets:
-            return {}
-        activities = {instance.definition.id: instance.definition for instance in targets if instance.definition}
-        active_ids = {
-            activity.active_progress_view_id
-            for activity in activities.values()
-            if activity.active_progress_view_id
-        }
-        active_views = {}
-        if active_ids:
-            active_views = {
-                view.id: view
-                for view in self.db.query(ActivityProgressView).filter(
-                    ActivityProgressView.id.in_(active_ids),
-                    ActivityProgressView.deleted_at.is_(None),
-                ).all()
-            }
-        enabled_roots = {
-            root_id: self._is_progress_enabled(root_id)
-            for root_id in {activity.root_id for activity in activities.values()}
-        }
-        configs_by_activity = {}
-        view_ids_by_activity = {}
-        for activity in activities.values():
-            if not enabled_roots.get(activity.root_id, True):
-                continue
-            view = active_views.get(activity.active_progress_view_id)
-            config = normalize_progress_view_config(view.config if view else EMPTY_PROGRESS_VIEW_CONFIG)
-            configs_by_activity[activity.id] = config
-            view_ids_by_activity[activity.id] = view.id if view else None
-        predecessor_ids = self._load_predecessor_ids(targets, activities, configs_by_activity)
-
-        required_previous_ids = {instance_id for instance_id in predecessor_ids.values() if instance_id}
-        previous_by_id = {}
-        if required_previous_ids:
-            previous_by_id = {
-                instance.id: instance
-                for instance in self._active_instances_query().filter(ActivityInstance.id.in_(required_previous_ids)).all()
-            }
-
-        results = {}
-        for target in targets:
-            activity = activities[target.activity_definition_id]
-            config = configs_by_activity.get(activity.id)
-            if config is None:
-                continue
-            previous_id = predecessor_ids.get(target.id)
-            results[target.id] = self._comparison_payload(
-                target,
-                activity,
-                previous_by_id.get(previous_id),
-                view_id=view_ids_by_activity.get(activity.id),
-                config=config,
-            )
+        enabled = [
+            target for target in targets
+            if target.definition and self._is_progress_enabled(target.root_id)
+        ]
+        results = self._payloads(
+            enabled,
+            signatures={target.id: self._compare_signature(target) for target in enabled},
+            contexts={target.id: serialize_compare_context(target) for target in enabled},
+        )
         return {instance.id: results.get(instance.id) for instance in targets}
 
-    def compute_live_comparison(self, activity_instance_id: str, *, view_id=None, config=None) -> Optional[dict]:
+    def compute_live_comparison(self, activity_instance_id: str) -> Optional[dict]:
         """Compute a progress comparison without persisting it.
 
         Returns a comparison payload, or ``None`` when the instance is missing
         or progress is disabled for its fractal.
         """
         instance = self._get_active_instance(activity_instance_id)
-        if not instance:
+        if not instance or not instance.definition or not self._is_progress_enabled(str(instance.root_id)):
             return None
-
-        if not self._is_progress_enabled(instance.root_id):
-            return None
-
-        activity_def = self.db.query(ActivityDefinition).filter_by(
-            id=instance.activity_definition_id
-        ).first()
-        if not activity_def:
-            return None
-
-        resolved_config, config_error = self._resolve_calculation_config(
-            instance,
-            view_id=view_id,
-            config=config,
-        )
-        if config_error:
-            return None
-        normalized = normalize_progress_view_config(resolved_config)
-        selected_view_id = view_id if view_id is not None else activity_def.active_progress_view_id
-        predecessor_ids = self._load_predecessor_ids([instance], {activity_def.id: activity_def}, {activity_def.id: normalized})
-        previous_id = predecessor_ids.get(instance.id)
-        previous = self._get_active_instance(previous_id) if previous_id else None
-        return self._comparison_payload(instance, activity_def, previous, view_id=selected_view_id, config=normalized)
+        return self._payloads(
+            [instance],
+            signatures={instance.id: self._compare_signature(instance)},
+            contexts={instance.id: serialize_compare_context(instance)},
+        )[instance.id]
 
     def get_progress_for_instance(self, activity_instance_id: str) -> Optional[dict]:
-        """Calculate progress from canonical activity data and the active saved view."""
+        """Calculate progress from canonical activity data in the instance's comparison context."""
         return self.compute_live_comparison(activity_instance_id)
 
-    def get_progress_history(
-        self,
-        activity_definition_id: str,
-        root_id: str,
-        limit: int = 20,
-        offset: int = 0,
-        exclude_session_id: str | None = None,
-        view_id: str | None = None,
-        config: dict | None = None,
-    ) -> list:
-        """Return paginated progress history aligned to activity history cards."""
-        timeline = self.get_progress_timeline(
-            activity_definition_id,
-            root_id,
-            limit=limit,
-            offset=offset,
-            exclude_session_id=exclude_session_id,
-            view_id=view_id,
-            config=config,
-        )
-        return [
-            item['progress_comparison']
-            for item in timeline.get('items', [])
-            if item.get('progress_comparison') is not None
-        ]
+    def _preview_context(self, root_id, mode, tag_ids):
+        tags = []
+        if mode == 'tags' and tag_ids:
+            by_id = {
+                tag.id: tag
+                for tag in self.db.query(ActivityTagDefinition).filter(
+                    ActivityTagDefinition.root_id == root_id,
+                    ActivityTagDefinition.id.in_(tag_ids),
+                ).all()
+            }
+            if set(by_id) != set(tag_ids):
+                raise ValueError("One or more tags are unavailable")
+            tags = [by_id[tag_id] for tag_id in tag_ids]
+        return {"mode": mode, "tag_ids": [tag.id for tag in tags], "tags": serialize_tags(tags), "preview": True}
 
     def get_progress_timeline(
         self,
         activity_definition_id: str,
         root_id: str,
         *,
+        instance_id: str | None = None,
+        mode: str | None = None,
+        tag_ids: list | None = None,
         limit: int = 20,
         offset: int = 0,
-        exclude_session_id: str | None = None,
-        view_id: str | None = None,
-        config: dict | None = None,
     ) -> dict:
-        from services.activity_progress_view_service import serialize_activity_tag, serialize_progress_view
+        """Past instances in one comparison context, newest first.
+
+        With ``instance_id`` the context is that instance's saved one (or the previewed
+        ``mode``/``tag_ids``) and its own session is excluded; without it, all history
+        (or the previewed mode) is listed.
+        """
         from services.view_serializers import serialize_activity_history_entry
 
         activity = self.db.query(ActivityDefinition).filter(
@@ -201,35 +163,51 @@ class ProgressService(
             ActivityDefinition.deleted_at.is_(None),
         ).first()
         if not activity:
-            return {"items": [], "total": 0}
+            return {"items": [], "total": 0, "total_all": 0}
 
-        if config is not None:
-            resolved_config, config_error = ActivityProgressViewService(self.db)._validate_config_tags(activity, config)
-        else:
-            resolved_config, config_error = ActivityProgressViewService(self.db).resolve_config(
-                activity,
-                view_id=view_id,
+        instance = None
+        if instance_id:
+            # Only the context is needed here: its tags, override, and session.
+            instance = self.db.query(ActivityInstance).options(selectinload(ActivityInstance.tags)).filter(
+                ActivityInstance.id == instance_id,
+                ActivityInstance.activity_definition_id == activity.id,
+                ActivityInstance.deleted_at.is_(None),
+            ).first()
+            if not instance:
+                raise ValueError("Activity instance not found")
+        if mode is not None:
+            context = self._preview_context(root_id, mode, tag_ids or [])
+            if mode == 'same_tags' and instance is not None:
+                context = {**serialize_compare_context(instance), "mode": mode, "preview": True}
+            signature = (
+                ALL_HISTORY if mode == 'all'
+                else self._own_signature(instance) if mode == 'same_tags' and instance is not None
+                else tag_signature(context["tag_ids"])
             )
-        if config_error:
-            raise ValueError(config_error)
-        normalized_config = normalize_progress_view_config(resolved_config)
-        selected_view_id = view_id if view_id is not None else activity.active_progress_view_id
+        elif instance is not None:
+            context = serialize_compare_context(instance)
+            signature = self._compare_signature(instance)
+        else:
+            context = {"mode": "all", "tag_ids": [], "tags": []}
+            signature = ALL_HISTORY
+        exclude_session_id = instance.session_id if instance else None
+
         base_identity_query = self._active_instance_identity_query().filter(
             ActivityInstance.activity_definition_id == activity.id,
             ActivityInstance.root_id == root_id,
         )
-        if exclude_session_id:
-            base_identity_query = base_identity_query.filter(ActivityInstance.session_id != exclude_session_id)
-
-        total = base_identity_query.count()
-        included_clause = self._included_instance_clause(activity, normalized_config)
-        included_count = base_identity_query.filter(included_clause).count()
         page_query = self._active_instances_query().filter(
             ActivityInstance.activity_definition_id == activity.id,
             ActivityInstance.root_id == root_id,
         )
         if exclude_session_id:
+            base_identity_query = base_identity_query.filter(ActivityInstance.session_id != exclude_session_id)
             page_query = page_query.filter(ActivityInstance.session_id != exclude_session_id)
+        total_all = base_identity_query.count()
+        if signature is not ALL_HISTORY:
+            base_identity_query = base_identity_query.filter(ActivityInstance.tag_signature == signature)
+            page_query = page_query.filter(ActivityInstance.tag_signature == signature)
+        total = base_identity_query.count() if signature is not ALL_HISTORY else total_all
         instances = (
             page_query
             .order_by(self._effective_time_expression().desc(), ActivityInstance.id.desc())
@@ -237,68 +215,33 @@ class ProgressService(
             .limit(limit)
             .all()
         )
-        predecessor_ids = self._load_predecessor_ids(
-            instances, {activity.id: activity}, {activity.id: normalized_config}, exclude_session_id=exclude_session_id,
-        )
-        needed_previous_ids = {row_id for row_id in predecessor_ids.values() if row_id}
-        previous_by_id = {}
-        if needed_previous_ids:
-            previous_by_id = {
-                instance.id: instance
-                for instance in self._active_instances_query().filter(ActivityInstance.id.in_(needed_previous_ids)).all()
-            }
+        comparisons = self._payloads(
+            instances,
+            signatures={row.id: signature for row in instances},
+            contexts={row.id: context for row in instances},
+            exclude_session_id=exclude_session_id,
+        ) if self._is_progress_enabled(root_id) else {}
 
-        comparison_map = {}
-        self._calculation_config = normalized_config
-        for instance in instances:
-            previous_id = predecessor_ids.get(instance.id)
-            comparison_map[instance.id] = self._comparison_payload(
-                instance,
-                activity,
-                previous_by_id.get(previous_id),
-                view_id=selected_view_id,
-                config=normalized_config,
-            )
-        notes = []
-        instance_ids = [instance.id for instance in instances]
+        notes_by_instance = {}
+        instance_ids = [row.id for row in instances]
         if instance_ids:
-            notes = self.db.query(Note).filter(
+            for note in self.db.query(Note).filter(
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
-            ).order_by(Note.pinned_at.desc().nullslast(), Note.created_at.desc()).all()
-        notes_by_instance = {}
-        for note in notes:
-            notes_by_instance.setdefault(note.activity_instance_id, []).append(note)
+            ).order_by(Note.pinned_at.desc().nullslast(), Note.created_at.desc()).all():
+                notes_by_instance.setdefault(note.activity_instance_id, []).append(note)
         items = []
-        for instance in instances:
-            comparison = comparison_map.get(instance.id)
-            payload = serialize_activity_history_entry(instance, notes_by_instance.get(instance.id, []))
-            payload["progress_comparison"] = comparison
-            payload["included"] = comparison is not None and comparison.get("included", True)
+        for row in instances:
+            payload = serialize_activity_history_entry(row, notes_by_instance.get(row.id, []))
+            payload["progress_comparison"] = comparisons.get(row.id)
             items.append(payload)
-
-        from models import ActivityTagDefinition
-        tags = self.db.query(ActivityTag).join(ActivityTagDefinition).filter(
-            ActivityTag.activity_definition_id == activity.id,
-        ).order_by(
-            ActivityTagDefinition.deleted_at.asc(),
-            ActivityTag.deleted_at.asc(),
-            ActivityTagDefinition.sort_order,
-            ActivityTagDefinition.name,
-        ).all()
-        views = self.db.query(ActivityProgressView).filter(
-            ActivityProgressView.activity_definition_id == activity.id,
-            ActivityProgressView.deleted_at.is_(None),
-        ).order_by(ActivityProgressView.updated_at.desc()).all()
         return {
             "activity_definition_id": activity.id,
-            "active_view_id": activity.active_progress_view_id,
-            "selected_view_id": selected_view_id,
-            "tags": [serialize_activity_tag(tag) for tag in tags],
-            "views": [serialize_progress_view(view) for view in views],
+            "instance_id": instance.id if instance else None,
+            "comparison_context": context,
             "items": items,
-            "included_count": included_count,
             "total": total,
+            "total_all": total_all,
             "limit": limit,
             "offset": offset,
         }
