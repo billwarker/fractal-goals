@@ -1,6 +1,6 @@
 /* SessionSectionGrid Styles - Extracted from Sessions.module.css */
 
-/* One horizontal strip: height follows the tallest item, overflow scrolls sideways */
+/* One horizontal strip of sections; overflow scrolls sideways */
 .sectionsGrid {
     display: flex;
     align-items: stretch;
@@ -11,9 +11,20 @@
     padding-bottom: 4px;
 }
 
+/*
+ * Sections share the row in proportion to their stack count, so every stack
+ * ends up roughly the same width. Below the minimum, the row scrolls instead.
+ * min-width = stacks + gaps between them + 12px padding and 1px border per side.
+ */
 .sectionColumn {
-    flex: 1 0 auto;
-    min-width: 0;
+    --stack-min-width: 300px;
+    --stack-gap: 8px;
+    flex: var(--stack-count, 1) 0 0;
+    min-width: calc(
+        var(--stack-count, 1) * var(--stack-min-width)
+        + (var(--stack-count, 1) - 1) * var(--stack-gap)
+        + 26px
+    );
     background: var(--color-bg-card-alt);
     padding: 12px;
     border-radius: 6px;
@@ -40,12 +51,12 @@
     display: flex;
     flex-direction: row;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--stack-gap);
 }
 
 .itemStack {
-    flex: 0 0 360px;
-    width: 360px;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -55,6 +66,11 @@
     .sectionsGrid {
         flex-direction: column;
         overflow-x: visible;
+    }
+
+    .sectionColumn {
+        flex: none;
+        min-width: 0;
     }
 
     .activitiesList {

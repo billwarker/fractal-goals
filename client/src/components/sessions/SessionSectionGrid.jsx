@@ -2,9 +2,9 @@
  * SessionSectionGrid - Grid of session sections with recorded work
  *
  * Renders sections and their work items in a single horizontal strip, so the
- * row is only as tall as its tallest item and overflow scrolls horizontally.
- * Within a section, consecutive items share a vertical stack whenever the stack
- * stays no taller than the tallest single item across all sections.
+ * row stays short and overflow scrolls horizontally. Within a section, items
+ * stack vertically up to STACK_MAX_HEIGHT_PX, then continue in a new stack to
+ * the side. An item taller than the cap sits in a stack of its own.
  * Optimized with React.memo for list rendering performance.
  */
 
@@ -17,6 +17,8 @@ import styles from './SessionSectionGrid.module.css';
 
 // Must match the .activitiesList / .itemStack gap in SessionSectionGrid.module.css
 const STACK_GAP_PX = 8;
+// Height a stack of items may grow to before items continue to the side
+const STACK_MAX_HEIGHT_PX = 480;
 // Absorbs sub-pixel rounding so equal-height items still pair up
 const HEIGHT_TOLERANCE_PX = 1;
 
@@ -119,7 +121,6 @@ const SectionColumn = memo(function SectionColumn({
     deltaDisplayMode = 'percent',
     itemKeyPrefix,
     itemHeights,
-    maxItemHeight,
     registerItem,
     stackItems,
 }) {
@@ -186,8 +187,8 @@ const SectionColumn = memo(function SectionColumn({
     const stacks = useMemo(() => {
         const keys = keyedItems.map((item) => item.key);
         if (!stackItems) return keys.map((key) => ({ keys: [key] }));
-        return packIntoStacks(keys, itemHeights, maxItemHeight);
-    }, [keyedItems, itemHeights, maxItemHeight, stackItems]);
+        return packIntoStacks(keys, itemHeights, STACK_MAX_HEIGHT_PX);
+    }, [keyedItems, itemHeights, stackItems]);
 
     const renderItem = (item) => {
         if (item.type === 'circuit') {
@@ -217,7 +218,10 @@ const SectionColumn = memo(function SectionColumn({
     };
 
     return (
-        <div className={styles.sectionColumn}>
+        <div
+            className={styles.sectionColumn}
+            style={{ '--stack-count': Math.max(stacks.length, 1) }}
+        >
             {/* Section Header */}
             <div className={styles.sectionHeader}>
                 {section.name}
@@ -259,11 +263,6 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
     const isMobile = useIsMobile();
     const { heights, registerItem } = useItemHeights();
 
-    const maxItemHeight = useMemo(() => {
-        const values = Object.values(heights);
-        return values.length ? Math.max(...values) : 0;
-    }, [heights]);
-
     if (!sections || sections.length === 0) {
         return null;
     }
@@ -281,7 +280,6 @@ const SessionSectionGrid = memo(function SessionSectionGrid({
                     deltaDisplayMode={deltaDisplayMode}
                     itemKeyPrefix={String(sectionIndex)}
                     itemHeights={heights}
-                    maxItemHeight={maxItemHeight}
                     registerItem={registerItem}
                     stackItems={!isMobile}
                 />
