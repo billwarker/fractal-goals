@@ -70,6 +70,9 @@ const patchInstanceById = (queryClient, meta, instanceId, fields) => queryClient
     mapList((list) => list.map((instance) => (instance.id === instanceId ? { ...instance, ...fields } : instance))),
 );
 
+// Tags and comparison choices decide which history a timeline lists; refetch once the server has them.
+const invalidateTimelines = (queryClient, rootId) => invalidateQueryKeys(queryClient, [['activity-progress-timeline', rootId]], { refetchType: 'all' });
+
 const patchRunById = (queryClient, meta, runId, patch) => queryClient.setQueryData(
     keysFor(meta).circuits,
     mapList((runs) => runs.map((run) => (run.id === runId ? patch(run) : run))),
@@ -340,6 +343,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                 break;
             case SESSION_OP.INSTANCE_TAGS:
             case SESSION_OP.SET_TAGS:
+                invalidateTimelines(queryClient, op.meta.rootId);
                 // The new assignment version keeps later online edits' concurrency checks valid.
                 if (data?.version == null || outbox.hasPendingEntity(op.meta.setId || instanceId)) break;
                 queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
@@ -358,6 +362,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                 })));
                 break;
             case SESSION_OP.PROGRESS_COMPARISON:
+                invalidateTimelines(queryClient, op.meta.rootId);
                 if (!data?.comparison_context || outbox.hasPendingEntity(instanceId)) break;
                 patchInstanceById(queryClient, op.meta, instanceId, {
                     comparison_context: data.comparison_context,

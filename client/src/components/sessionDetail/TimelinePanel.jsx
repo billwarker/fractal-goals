@@ -111,8 +111,15 @@ function TimelinePanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
         return candidates.find((row) => row.id === selectedActivity?.id) || candidates[0] || null;
     }, [selectedActivity?.id, selectedActivityId, sessionInstances]);
 
+    // Ask for exactly what the panel shows (the instance's tags, chosen tags, or all history), so the
+    // list matches the selected option even while a tag or comparison change is still being saved.
+    const shownContext = instance?.comparison_context;
+    const preview = !instance ? null
+        : shownContext?.mode === 'all' ? { mode: 'all', tagIds: [] }
+            : { mode: 'tags', tagIds: shownContext?.mode === 'tags' ? shownContext.tag_ids || [] : (instance.tags || []).map((tag) => tag.id) };
     const query = useActivityProgressTimeline(rootId, selectedActivityId, {
         instanceId: instance?.id || null,
+        preview,
         limit: HISTORY_LIMIT,
     });
     const timeline = query.data?.combined ?? query.data;

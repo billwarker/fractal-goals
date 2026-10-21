@@ -68,8 +68,10 @@ describe('TimelinePanel', () => {
         );
 
         expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-2');
+        // The request names the shown context: the instance's own tags by default.
         expect(useActivityProgressTimeline).toHaveBeenCalledWith('root-1', 'activity-def-2', {
             instanceId: 'instance-2',
+            preview: { mode: 'tags', tagIds: ['heavy'] },
             limit: 20,
         });
     });
@@ -150,6 +152,23 @@ describe('TimelinePanel', () => {
         expect(within(controls).getByText('Heavy')).toBeInTheDocument();
         expect(within(controls).queryByRole('button', { name: 'Reset to same tags' })).not.toBeInTheDocument();
         expect(screen.getByText('No previous sessions match. Try Specific tags or All history.')).toBeInTheDocument();
+    });
+
+    it('requests the shown comparison so the list matches it before the save syncs', () => {
+        const { rerender } = renderWithProviders(
+            <TimelinePanel rootId="root-1" selectedActivity={instance()} sessionActivityDefs={sessionActivityDefs} sessionInstances={[instance()]} />,
+            providers,
+        );
+        const allHistory = instance({ comparison_context: { mode: 'all', tag_ids: [], tags: [], version: 1 } });
+        rerender(<TimelinePanel rootId="root-1" selectedActivity={allHistory} sessionActivityDefs={sessionActivityDefs} sessionInstances={[allHistory]} />);
+        expect(useActivityProgressTimeline).toHaveBeenLastCalledWith('root-1', 'activity-def-1', {
+            instanceId: 'instance-current', preview: { mode: 'all', tagIds: [] }, limit: 20,
+        });
+        const chosen = instance({ comparison_context: { mode: 'tags', tag_ids: ['paused'], tags: [], version: 1 } });
+        rerender(<TimelinePanel rootId="root-1" selectedActivity={chosen} sessionActivityDefs={sessionActivityDefs} sessionInstances={[chosen]} />);
+        expect(useActivityProgressTimeline).toHaveBeenLastCalledWith('root-1', 'activity-def-1', {
+            instanceId: 'instance-current', preview: { mode: 'tags', tagIds: ['paused'] }, limit: 20,
+        });
     });
 
     it('saves a different comparison on this instance only', async () => {

@@ -196,7 +196,7 @@ export function useProgressComparisonMutation(rootId, activityId) {
                     comparisonContext: { mode, tag_ids: mode === 'tags' ? tagIds : [], tags: mode === 'tags' ? tags : [] },
                 },
             });
-            await invalidateProgress(queryClient, rootId, activityId);
+            // The timeline refetches when the server acknowledges the choice (see sessionOpHandlers).
             return { data: {} };
         }
         return mutation.mutateAsync({ instanceId, mode, tagIds, version });
