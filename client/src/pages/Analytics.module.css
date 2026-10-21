@@ -50,7 +50,7 @@
 .rightPanel {
     position: relative;
     z-index: 1;
-    width: calc(var(--grid-unit) * 16);
+    width: var(--panel-width-details);
     flex-shrink: 0;
     border-left: 1px solid var(--color-border);
     background: var(--color-bg-sidebar);

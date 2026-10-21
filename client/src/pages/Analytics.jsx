@@ -41,7 +41,8 @@ const AnalyticsViewNameModal = lazy(() => import('../components/analytics/Analyt
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
 const MAX_WINDOWS = 4;
-const FILTER_PANE_COLUMNS = 16;
+// The filters pane's width (--panel-width-details, 390px) in grid columns, rounded.
+const FILTER_PANE_COLUMNS = 20;
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
 const DEFAULT_SELECTED_WINDOW_ID = 'window-1';
 const DEFAULT_WINDOW_STATES = {
@@ -124,7 +125,8 @@ function Analytics() {
         const extent = getGridLayoutExtent(incomingLayout);
         const missingColumns = dashboardBounds.columns - extent.columns;
         const looksLikeClosedFilterPaneGap = !isFiltersPaneOpen
-            && missingColumns >= FILTER_PANE_COLUMNS - 2
+            // (down to the 16 columns the pane took before it matched the other pages' sidebars)
+            && missingColumns >= FILTER_PANE_COLUMNS - 6
             && missingColumns <= FILTER_PANE_COLUMNS + 4;
         if (!looksLikeClosedFilterPaneGap) return incomingLayout;
 
@@ -424,6 +426,7 @@ function Analytics() {
                     globalFilters={globalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
+                    onPageGrid
                 />
             </Suspense>
         );
@@ -500,7 +503,7 @@ function Analytics() {
                 {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />
                 ) : (
-                    <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>
+                    <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown} data-page-grid>
                         <div
                             className={`${styles.gridSurface} ${debugMode ? styles.gridSurfaceDebug : ''} ${isDashboardSettling ? styles.gridSurfaceSettling : ''}`}
                             onMouseDown={handleWorkspaceMouseDown}

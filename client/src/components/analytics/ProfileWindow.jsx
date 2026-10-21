@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { Chart as ChartJS } from 'chart.js';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import CloseButton from '../atoms/CloseButton';
@@ -28,6 +29,11 @@ import {
 } from './visualizations/state';
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
 import ChartGoalSurface from './ChartGoalSurface';
+import { ChartDensityContext } from './ChartJSWrapper';
+import pageGridSnap from './pageGridSnap';
+
+// Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
+ChartJS.register(pageGridSnap);
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
@@ -44,6 +50,8 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * @param {function} props.updateWindowState - Callback to update window state
  * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
+ * @param {boolean} props.onPageGrid - Draw the panel on the page's background grid: no fill or outline
+ *   until selected, and charts at 'expanded' density (no gridlines of their own, snapped to the grid)
  */
 function ProfileWindow({
     canSplit = false,
@@ -61,6 +69,7 @@ function ProfileWindow({
     globalFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
+    onPageGrid = false,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { goalAnalytics, rootId } = data;
@@ -534,11 +543,15 @@ function ProfileWindow({
                     onSelect();
                 }
             }}
-            className={`${styles.windowContainer} ${isSelected ? styles.selected : ''}`}
+            className={`${styles.windowContainer} ${onPageGrid ? styles.onPageGrid : ''} ${isSelected ? styles.selected : ''}`}
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderQueryOverlay()}
-            {renderVisualizationContent()}
+            {onPageGrid ? (
+                <ChartDensityContext.Provider value="expanded">
+                    {renderVisualizationContent()}
+                </ChartDensityContext.Provider>
+            ) : renderVisualizationContent()}
         </div>
     );
 }

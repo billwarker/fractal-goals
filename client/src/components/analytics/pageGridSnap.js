@@ -1,9 +1,9 @@
 /**
- * Snaps an "expanded" chart onto the page's background grid (`.content-container`, 20px cells, 16px
- * on mobile): the plot fills its panel with its edges on grid lines, and category points (dates,
+ * Snaps an "expanded" chart onto the page's background grid (the nearest `[data-page-grid]`, else
+ * `.content-container`; 20px cells, 16px on mobile): the plot fills its panel with its edges on grid lines, and category points (dates,
  * bars) and the primary value axis's ticks snap to grid lines when that costs little space. Charts opt in through
  * `plugins.pageGridSnap.enabled` (applyChartDensity's 'expanded' density), and the expanded goal
- * chart registers it, keeping it out of other routes. It works through the chart's scriptable layout
+ * chart and the Analytics page's panels register it, keeping it out of other routes. It works through the chart's scriptable layout
  * padding: each layout measures the plot, and if it's off the grid the padding is adjusted and the
  * chart re-laid out (a few passes at most, since tick counts can shift).
  */
@@ -52,7 +52,8 @@ function divisions(scale, cell) {
 }
 
 function gridFor(canvas) {
-    const container = canvas?.closest?.('.content-container');
+    // A page that draws its own grid (Analytics' workspace) marks it with data-page-grid.
+    const container = canvas?.closest?.('[data-page-grid], .content-container');
     if (!container) return null;
     const cell = parseFloat(getComputedStyle(container).backgroundSize) || 20;
     const origin = container.getBoundingClientRect();

@@ -26,6 +26,30 @@
     box-shadow: 0 0 12px rgba(33, 150, 243, 0.3);
 }
 
+/* On the page grid (Analytics): no fill, outline or shadow until selected, and a selected outline
+   drawn with a ring rather than a wider border so the panel's content (and its grid-snapped chart)
+   doesn't shift. */
+.windowContainer.onPageGrid {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.windowContainer.onPageGrid.selected {
+    border-width: 1px;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px var(--color-brand-primary), 0 0 12px rgba(33, 150, 243, 0.3);
+}
+
+.onPageGrid .header {
+    background: transparent;
+    border-bottom-color: transparent;
+}
+
+.onPageGrid.selected .header {
+    border-bottom-color: var(--color-border);
+}
+
 /* Header */
 .header {
     display: flex;
