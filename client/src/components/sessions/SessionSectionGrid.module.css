@@ -1,12 +1,19 @@
 /* SessionSectionGrid Styles - Extracted from Sessions.module.css */
 
+/* One horizontal strip: height follows the tallest item, overflow scrolls sideways */
 .sectionsGrid {
-    display: grid;
+    display: flex;
+    align-items: stretch;
     gap: 12px;
     margin-bottom: 12px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding-bottom: 4px;
 }
 
 .sectionColumn {
+    flex: 1 0 auto;
+    min-width: 0;
     background: var(--color-bg-card-alt);
     padding: 12px;
     border-radius: 6px;
@@ -31,12 +38,32 @@
 
 .activitiesList {
     display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.itemStack {
+    flex: 0 0 360px;
+    width: 360px;
+    display: flex;
     flex-direction: column;
     gap: 8px;
 }
 
 @media (max-width: 768px) {
     .sectionsGrid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
+        overflow-x: visible;
+    }
+
+    .activitiesList {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .itemStack {
+        flex: none;
+        width: auto;
     }
 }
