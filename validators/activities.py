@@ -189,6 +189,18 @@ class ActivityTagFamilyOrderSchema(BaseModel):
         return _normalized_entity_ids(values)
 
 
+class ProgressChartSchema(BaseModel):
+    """The Progress pane chart for an activity in the instance's template/program day."""
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['goal', 'activity_trend', 'scatter', 'metric_trend']
+    trend_series: Optional[Literal['metric', 'yield']] = None
+    metric_id: Optional[str] = Field(None, max_length=64)
+    x_metric_id: Optional[str] = Field(None, max_length=64)
+    y_metric_id: Optional[str] = Field(None, max_length=64)
+    set_aggregation: Literal['top', 'average', 'total'] = 'top'
+    version: Optional[int] = Field(None, ge=1)
+
+
 class ProgressComparisonSchema(BaseModel):
     """What one activity instance compares against."""
     model_config = ConfigDict(extra='forbid')

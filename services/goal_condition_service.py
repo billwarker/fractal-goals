@@ -114,7 +114,7 @@ def active_metric_definitions(activity) -> list[MetricDefinition]:
 def yield_metric_ids(activity) -> tuple[str, ...]:
     """Metrics whose product is the activity's yield (two or more, all multiplicative)."""
     metrics = [metric for metric in active_metric_definitions(activity) if metric.track_progress is not False]
-    if len(metrics) < 2 or not all(metric.is_multiplicative for metric in metrics):
+    if len(metrics) < 2 or not all(metric.multiplies for metric in metrics):
         return ()
     return tuple(str(metric.id) for metric in sorted(metrics, key=lambda metric: (metric.sort_order or 0, str(metric.id))))
 

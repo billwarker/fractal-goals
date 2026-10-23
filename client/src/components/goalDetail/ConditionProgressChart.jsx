@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import { DISABLED_CHART_ANIMATION, applyChartDensity, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
+import useActiveChartPoint from '../analytics/useActiveChartPoint';
 import { OPERATOR_SYMBOLS, formatConditionNumber } from '../../utils/goalConditions';
 import { buildConditionSeries } from '../../utils/goalConditionSeries';
 import styles from './ConditionProgressChart.module.css';
@@ -49,17 +50,10 @@ function ConditionProgressChart({
     // An instance hovered elsewhere (e.g. a past session in a list) shows as the chart's active
     // point, with its tooltip on full-size charts, as if the pointer were on it.
     const hoverIndex = hoverInstanceId ? points.findIndex((point) => point.instanceId === hoverInstanceId) : -1;
-    useEffect(() => {
-        const chart = chartRef.current;
-        if (!chart) return;
-        const active = hoverIndex < 0 ? [] : series
-            .map((row, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: row.data[hoverIndex] }))
-            .filter((element) => element.value != null)
-            .map(({ datasetIndex, index }) => ({ datasetIndex, index }));
-        chart.setActiveElements(active);
-        if (!compact) chart.tooltip?.setActiveElements(active, { x: 0, y: 0 });
-        chart.update('none');
-    }, [compact, hoverIndex, series]);
+    const activePoints = hoverIndex < 0 ? [] : series
+        .map((row, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: row.data[hoverIndex] }))
+        .filter((element) => element.value != null);
+    useActiveChartPoint(chartRef, activePoints, { tooltip: !compact });
 
     if (points.length === 0) {
         return <p className={styles.empty}>No contributing sessions yet.</p>;

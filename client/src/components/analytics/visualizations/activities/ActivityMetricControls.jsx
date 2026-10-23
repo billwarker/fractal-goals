@@ -1,5 +1,8 @@
 import React from 'react';
 
+import { activityYieldIds, YIELD_METRIC_ID } from './MetricTrends';
+import { MetricChipsField, MetricSelectField, SetsHandlingField } from './ActivityMetricFields';
+
 export default function ActivityMetricControls({ context }) {
     const {
         metricDefinitions,
@@ -18,18 +21,16 @@ export default function ActivityMetricControls({ context }) {
     const selectedTrendMetrics = visualizationState.metrics?.length
         ? visualizationState.metrics
         : metricDefinitions.slice(0, 2).map((metric) => metric.id);
+    // Metric Trends can also plot the activity's yield.
+    const trendOptions = activityYieldIds(selectedActivityDef).length >= 2
+        ? [...metricDefinitions, { id: YIELD_METRIC_ID, name: 'Yield', unit: '' }]
+        : metricDefinitions;
+    const plotsYield = usesMetricTrendMetrics && selectedTrendMetrics.includes(YIELD_METRIC_ID);
     const progressMetricDefinitions = metricDefinitions.filter((metric) => metric.track_progress !== false);
     const selectedProgressMetricId = visualizationState?.metric?.id
         || visualizationState?.metric
         || progressMetricDefinitions[0]?.id
         || '';
-
-    const toggleTrendMetric = (metricId) => {
-        const nextMetrics = selectedTrendMetrics.includes(metricId)
-            ? selectedTrendMetrics.filter((id) => id !== metricId)
-            : [...selectedTrendMetrics, metricId].slice(-2);
-        updateVisualizationState({ metrics: nextMetrics.length ? nextMetrics : selectedTrendMetrics });
-    };
 
     return (
         <>
@@ -46,20 +47,16 @@ export default function ActivityMetricControls({ context }) {
             </div>
 
             {selectedActivityDef?.has_sets && (usesScatterMetrics || usesMetricTrendMetrics) && (
-                <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                    <span>Sets</span>
-                    <select
-                        value={visualizationState.setsHandling || 'top'}
-                        onChange={(event) => updateVisualizationState({ setsHandling: event.target.value })}
-                    >
-                        <option value="top">Top Set</option>
-                        <option value="average">Average</option>
-                    </select>
-                </label>
+                <SetsHandlingField
+                    className="sessions-query-field-spaced"
+                    value={visualizationState.setsHandling || 'top'}
+                    allowTotal={plotsYield}
+                    onChange={(setsHandling) => updateVisualizationState({ setsHandling })}
+                />
             )}
 
             {selectedActivityDef?.has_splits && selectedActivityDef?.split_definitions?.length > 0 && (
-                <label className="sessions-query-field" style={{ marginTop: 12 }}>
+                <label className="sessions-query-field sessions-query-field-spaced">
                     <span>Split</span>
                     <select
                         value={visualizationState.selectedSplit || 'all'}
@@ -75,72 +72,44 @@ export default function ActivityMetricControls({ context }) {
 
             {usesScatterMetrics && metricDefinitions.length > 0 && (
                 <>
-                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                        <span>X Axis</span>
-                        <select
-                            value={selectedMetricXId}
-                            onChange={(event) => {
-                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
-                                updateVisualizationState({ metricX: metric || null });
-                            }}
-                        >
-                            {metricDefinitions.map((metric) => (
-                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                            ))}
-                        </select>
-                    </label>
-                    <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                        <span>Y Axis</span>
-                        <select
-                            value={selectedMetricYId}
-                            onChange={(event) => {
-                                const metric = metricDefinitions.find((item) => item.id === event.target.value);
-                                updateVisualizationState({ metricY: metric || null });
-                            }}
-                        >
-                            {metricDefinitions.map((metric) => (
-                                <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                            ))}
-                        </select>
-                    </label>
+                    <MetricSelectField
+                        className="sessions-query-field-spaced"
+                        label="X Axis"
+                        value={selectedMetricXId}
+                        options={metricDefinitions}
+                        onChange={(metric) => updateVisualizationState({ metricX: metric })}
+                    />
+                    <MetricSelectField
+                        className="sessions-query-field-spaced"
+                        label="Y Axis"
+                        value={selectedMetricYId}
+                        options={metricDefinitions}
+                        onChange={(metric) => updateVisualizationState({ metricY: metric })}
+                    />
                 </>
             )}
 
             {usesMetricTrendMetrics && metricDefinitions.length > 0 && (
-                <>
-                    <div className="sessions-query-sidebar-section-header" style={{ marginTop: 12 }}>
-                        <h4>Metrics</h4>
-                    </div>
-                    <div className="sessions-query-chip-group">
-                        {metricDefinitions.map((metric) => (
-                            <button
-                                key={metric.id}
-                                type="button"
-                                className={`sessions-query-chip ${selectedTrendMetrics.includes(metric.id) ? 'active' : ''}`}
-                                onClick={() => toggleTrendMetric(metric.id)}
-                            >
-                                {metric.name}
-                            </button>
-                        ))}
-                    </div>
-                </>
+                <MetricChipsField
+                    className="sessions-query-field-spaced"
+                    options={trendOptions}
+                    selected={selectedTrendMetrics}
+                    onChange={(metrics) => updateVisualizationState({
+                        metrics,
+                        // Total only applies to yield.
+                        ...(!metrics.includes(YIELD_METRIC_ID) && visualizationState.setsHandling === 'total' ? { setsHandling: 'top' } : {}),
+                    })}
+                />
             )}
 
             {usesMetricProgressMetrics && progressMetricDefinitions.length > 0 && (
-                <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                    <span>Metric</span>
-                    <select
-                        value={selectedProgressMetricId}
-                        onChange={(event) => {
-                            const metric = progressMetricDefinitions.find((item) => item.id === event.target.value);
-                            updateVisualizationState({ metric: metric || null });
-                        }}
-                    >
-                        {progressMetricDefinitions.map((metric) => (
-                            <option key={metric.id} value={metric.id}>{metric.name}{metric.unit ? ` (${metric.unit})` : ''}</option>
-                        ))}
-                    </select>
-                </label>
+                <MetricSelectField
+                    className="sessions-query-field-spaced"
+                    label="Metric"
+                    value={selectedProgressMetricId}
+                    options={progressMetricDefinitions}
+                    onChange={(metric) => updateVisualizationState({ metric })}
+                />
             )}
         </>
     );

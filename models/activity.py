@@ -128,6 +128,18 @@ class MetricDefinition(Base):
 
     fractal_metric = relationship("FractalMetricDefinition", lazy="joined")
 
+    @property
+    def multiplies(self) -> bool:
+        """Whether the metric takes part in yield: the linked fractal metric's flag, else its own.
+
+        The fractal metric is the source of truth once linked (as for name, unit and
+        is_additive); the activity's own column is only a fallback and can be stale.
+        """
+        fractal_metric = self.fractal_metric
+        if fractal_metric is not None and fractal_metric.is_multiplicative is not None:
+            return bool(fractal_metric.is_multiplicative)
+        return self.is_multiplicative is not False
+
 class SplitDefinition(Base):
     __tablename__ = 'split_definitions'
 
@@ -268,6 +280,57 @@ class ActivityProgressDefault(Base):
             name='ck_activity_progress_defaults_has_context',
         ),
         sa.CheckConstraint('version > 0', name='ck_activity_progress_defaults_version_positive'),
+    )
+
+
+class ActivityProgressChart(Base):
+    """The Progress pane chart last chosen for an activity in a session template / program day.
+
+    Both context columns NULL is the activity-wide choice, used by sessions with neither and as
+    the fallback. Metric references fall back to the default when their metric is deleted.
+    Resolved and validated by services/progress_chart_settings.py.
+    """
+
+    __tablename__ = 'activity_progress_charts'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(
+        String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    session_template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), nullable=True, index=True)
+    program_day_id = Column(String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=True, index=True)
+    kind = Column(String(16), nullable=False)
+    trend_series = Column(String(8), nullable=True)
+    metric_id = Column(String, ForeignKey('metric_definitions.id', ondelete='SET NULL'), nullable=True)
+    x_metric_id = Column(String, ForeignKey('metric_definitions.id', ondelete='SET NULL'), nullable=True)
+    y_metric_id = Column(String, ForeignKey('metric_definitions.id', ondelete='SET NULL'), nullable=True)
+    set_aggregation = Column(String(8), nullable=False, default='top', server_default='top')
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+
+    __table_args__ = (
+        sa.Index(
+            'uq_activity_progress_charts_context',
+            'activity_definition_id',
+            sa.func.coalesce(session_template_id, ''),
+            sa.func.coalesce(program_day_id, ''),
+            unique=True,
+        ),
+        sa.CheckConstraint(
+            "kind IN ('goal', 'activity_trend', 'scatter', 'metric_trend')",
+            name='ck_activity_progress_charts_kind',
+        ),
+        sa.CheckConstraint(
+            "trend_series IS NULL OR (kind = 'activity_trend' AND trend_series IN ('metric', 'yield'))",
+            name='ck_activity_progress_charts_trend_series',
+        ),
+        sa.CheckConstraint(
+            "set_aggregation IN ('top', 'average', 'total')"
+            " AND (set_aggregation <> 'total' OR trend_series = 'yield')",
+            name='ck_activity_progress_charts_set_aggregation',
+        ),
     )
 
 

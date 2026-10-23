@@ -28,5 +28,6 @@ export const SESSION_OP = Object.freeze({
     INSTANCE_TAGS: 'session.instance.tags',
     SET_TAGS: 'session.set.tags',
     PROGRESS_COMPARISON: 'session.instance.progress-comparison',
+    PROGRESS_CHART: 'session.instance.progress-chart',
     INSTANCE_GOAL_LINK: 'session.instance.goal-link',
 });

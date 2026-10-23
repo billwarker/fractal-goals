@@ -327,8 +327,15 @@ optionally only within the same session template and/or program day
 (`progress_compare_same_template` / `progress_compare_same_program_day`). It is set per instance
 from the Progress pane and never changes other instances; `activity_progress_defaults` remembers the
 choice per activity × template/program day, and an insert trigger pre-applies it to new instances
-there. `GET …/progress-series` feeds the pane's compact chart (`services/progress_chart_spec.py`:
-the in-scope goal condition, else one synthesized from the metrics). Each group of sets
+there. `GET …/progress-series` feeds the pane's chart: `chart_settings` (resolved by
+`services/progress_chart_settings.py`) says whether it's goal progress (the in-scope goal condition,
+`services/progress_chart_spec.py`), an activity trend (a metric or yield), a scatter or a metric trend,
+with its metrics and set aggregation (top / average / total for yield). The choice is saved in
+`activity_progress_charts` per activity × template/program day (both NULL: activity-wide, the fallback)
+via `PUT …/activity-instances/<id>/progress-chart`; saved fields that no longer apply fall back to the
+default (goal progress, else a scatter for 2+ tracked metrics, else a trend). The client draws it with
+the Analytics charts (`ScatterPlot`, `MetricTrendsChart`) and one set-aggregation utility,
+`utils/setAggregation.js`, shared by every activity chart. Each group of sets
 with the same set tags compares with the latest earlier instance in that context holding such sets,
 k-th set to k-th set. Completed predecessors take priority and same-session instances are excluded.
 Matching uses the trigger-maintained `tag_signature` columns (lookup keys, not stored progress).

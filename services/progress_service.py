@@ -298,6 +298,7 @@ class ProgressService(
     ) -> dict:
         """The scoped instances a compact chart plots (oldest first, the instance last) and what to plot."""
         from services.goal_condition_reads import GoalConditionReadService
+        from services.progress_chart_settings import ProgressChartSettingsService
         from services.progress_chart_spec import chart_spec
         from services.serializers import serialize_activity_instance_for_analytics
 
@@ -333,10 +334,16 @@ class ProgressService(
                 compact=True,
             )
 
+        chart = chart_spec(self.db, activity, instance.session_id if instance else None)
+        chart_settings = ProgressChartSettingsService(self.db).resolve(
+            activity, instance.session if instance else None,
+            has_goal=bool(chart and chart.get("source") == "goal_condition"),
+        )
         return {
             "activity_definition": GoalConditionReadService._activity_payload(activity),
             "comparison_context": context,
-            "chart": chart_spec(self.db, activity, instance.session_id if instance else None),
+            "chart": chart,
+            "chart_settings": chart_settings,
             "instances": [serialize(row) for row in rows],
             "current_instance_id": instance.id if instance else None,
             "truncated": truncated,

@@ -18,7 +18,7 @@ from validators import (
     ActivityTagCatalogCreateSchema, ActivityTagCatalogUpdateSchema,
     ActivityTagVersionSchema, ActivityTagHardDeleteSchema, ActivityTagMergeSchema,
     ActivityTagOrderSchema, ActivityTagFamilyCreateSchema, ActivityTagFamilyUpdateSchema,
-    ActivityTagFamilyDeleteSchema, ActivityTagFamilyOrderSchema, ProgressComparisonSchema,
+    ActivityTagFamilyDeleteSchema, ActivityTagFamilyOrderSchema, ProgressChartSchema, ProgressComparisonSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
@@ -34,6 +34,7 @@ from services.activity_service import (
     ActivityService,
 )
 from services.progress_service import ProgressService
+from services.progress_chart_settings import ProgressChartSettingsService
 from blueprints.activity_instance_goals_api import instance_goals_bp
 from services.activity_tag_assignment_service import ActivityTagAssignmentService
 from services.activity_tag_catalog_service import ActivityTagCatalogService
@@ -258,6 +259,20 @@ def set_activity_instance_progress_comparison(current_user, root_id, instance_id
     session = get_db_session()
     try:
         return _service_response(*ActivityTagAssignmentService(session).set_progress_comparison(
+            root_id, instance_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-instances/<instance_id>/progress-chart', methods=['PUT'])
+@token_required
+@idempotent
+@validate_request(ProgressChartSchema)
+def set_activity_instance_progress_chart(current_user, root_id, instance_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ProgressChartSettingsService(session).save(
             root_id, instance_id, current_user.id, validated_data,
         ))
     finally:

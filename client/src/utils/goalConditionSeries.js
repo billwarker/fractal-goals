@@ -5,6 +5,10 @@
  * conditions chart the running total, and consistency charts the running count of sessions.
  */
 
+import { aggregateYield, evidenceSets, toNumber } from './setAggregation';
+
+export { evidenceSets };
+
 const MAX_RULE_SERIES = 2;
 
 /** @param {any} instance */
@@ -12,35 +16,6 @@ export function evidenceDate(instance) {
     const value = instance?.session_date || instance?.time_start || instance?.created_at;
     const date = value ? new Date(value) : null;
     return date && !Number.isNaN(date.getTime()) ? date : null;
-}
-
-/** @param {unknown} value */
-function toNumber(value) {
-    if (value == null || value === '') return null;
-    const number = Number(value);
-    return Number.isFinite(number) ? number : null;
-}
-
-/**
- * Metric values per set (instance-level metrics count as one set when there are no sets).
- * @param {any} instance
- * @returns {Map<string, number[]>[]}
- */
-export function evidenceSets(instance) {
-    const sets = (instance?.sets || []).filter((/** @type {any} */ set) => set?.status !== 'skipped');
-    const rows = sets.length > 0
-        ? sets.map((/** @type {any} */ set) => set?.metrics || [])
-        : [instance?.metrics || instance?.metric_values || []];
-    return rows.map((/** @type {any[]} */ metrics) => {
-        const values = new Map();
-        metrics.forEach((metric) => {
-            const id = metric?.metric_id || metric?.metric_definition_id;
-            const number = toNumber(metric?.value);
-            if (!id || number == null) return;
-            values.set(id, [...(values.get(id) || []), number]);
-        });
-        return values;
-    }).filter((values) => values.size > 0);
 }
 
 /** @param {string} operator */
@@ -62,21 +37,12 @@ export function bestRuleValue(instance, metricId, operator) {
 }
 
 /**
+ * The session's total yield (sum of its set yields), as goal conditions count it.
  * @param {any} instance
  * @param {string[]} yieldIds
  */
 export function instanceYield(instance, yieldIds) {
-    if (yieldIds.length < 2) return null;
-    const yields = evidenceSets(instance).map((values) => {
-        let product = 1;
-        for (const id of yieldIds) {
-            const metricValues = values.get(id);
-            if (!metricValues || metricValues.length === 0) return null;
-            product *= Math.max(...metricValues);
-        }
-        return product;
-    }).filter((value) => value != null);
-    return yields.length > 0 ? yields.reduce((sum, value) => sum + /** @type {number} */ (value), 0) : null;
+    return aggregateYield(instance, yieldIds, 'total');
 }
 
 /**

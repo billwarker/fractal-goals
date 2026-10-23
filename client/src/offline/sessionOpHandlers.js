@@ -9,6 +9,7 @@ import {
     applyTimerAction,
 } from './sessionOps';
 import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun } from './circuitOps';
+import { patchProgressChartSettings } from './progressChartOps';
 
 // Every queued in-session write has a kind. Each kind knows how to show itself
 // in the cache before the server answers (`optimistic`), which is also re-run
@@ -237,12 +238,10 @@ const OPTIMISTIC = {
             sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
         }));
     },
-    [SESSION_OP.PROGRESS_COMPARISON]: (queryClient, op) => {
-        // Merge: the queued choice keeps the session's template/program day and version.
-        patchInstanceById(queryClient, op.meta, op.meta.instanceId, (instance) => ({
-            comparison_context: { ...instance.comparison_context, ...op.meta.comparisonContext },
-        }));
-    },
+    // Merge: the queued choice keeps the session's template/program day and version.
+    [SESSION_OP.PROGRESS_COMPARISON]: (queryClient, op) => patchInstanceById(queryClient, op.meta, op.meta.instanceId,
+        (instance) => ({ comparison_context: { ...instance.comparison_context, ...op.meta.comparisonContext } })),
+    [SESSION_OP.PROGRESS_CHART]: (queryClient, op) => patchProgressChartSettings(queryClient, op.meta),
     [SESSION_OP.INSTANCE_GOAL_LINK]: (queryClient, op) => {
         const { instanceId, goalId, remove } = op.meta;
         queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
@@ -362,6 +361,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                     };
                 })));
                 break;
+            case SESSION_OP.PROGRESS_CHART: // the series refetches with the timelines
             case SESSION_OP.PROGRESS_COMPARISON:
                 invalidateTimelines(queryClient, op.meta.rootId);
                 if (!data?.comparison_context || outbox.hasPendingEntity(instanceId)) break;

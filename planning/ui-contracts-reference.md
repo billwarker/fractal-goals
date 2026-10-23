@@ -334,8 +334,12 @@ instance: the focused one, else the session's first instance of the chosen activ
   history. It takes no layout space, so the history never jumps; activating it scrolls back to
   the widget and opens it.
 - A compact chart sits directly under the activity select, above "Compare with". It plots the
-  matching sessions ending with this one (highlighted): the in-scope goal condition with its
-  threshold, else the activity's yield or best-set value. Like the goal detail charts, the whole
+  matching sessions ending with this one (highlighted) as one of: **Goal progress** (the in-scope
+  goal condition with its threshold), **Activity trend** (one metric, or yield, over time),
+  **Scatter** (metric X vs metric Y, a point per session) or **Metric trend** (two metrics over
+  time). The default is goal progress when a goal applies, else a scatter for activities with two
+  or more tracked metrics, else a trend. Its heading names what it shows ("Reps vs Distance",
+  "Yield over time"). Like the goal detail charts, the whole
   card is the control: it highlights on hover and focus, and clicking it (or Enter/Space)
   **expands** it. The mini chart has no tooltips of its own.
 - **Expanded** (like the Goals page's expanded goal chart): the session content fades out
@@ -345,8 +349,12 @@ instance: the focused one, else the session's first instance of the chosen activ
   (the same chart with the tag, template and program-day filters) and **Back to session**. It
   follows the pane live: changing the comparison cross-fades it (the old chart fades out in
   200 ms, stays out until the new series loads, then fades in; the compact chart does the same), and choosing another activity
-  switches to that activity's chart. The pane card shows "Showing in place of the session." and
-  **Collapse**. Escape, Collapse, Back to session or another pane mode brings the session back. On
+  switches to that activity's chart. The pane card holds the chart's **controls**: Chart (the
+  available kinds), Plot (a metric or Yield) / X and Y axes / the two metrics, and Sets (Top set,
+  Average, plus Total for yield), then "Showing in place of the session." and **Collapse**. Each
+  change saves at once (queued offline), is remembered for the activity in this session's
+  template/program day (or activity-wide for sessions with neither) and cross-fades the chart.
+  Open in Analytics opens the same kind: a scatter as Metric Scatter Plot, trends as Metric Trends. Escape, Collapse, Back to session or another pane mode brings the session back. On
   mobile the pane sheet steps aside while the chart shows and returns when it closes.
 - While an instance uses an override, its card summary says so, so changed hints are never
   unexplained.
@@ -356,5 +364,9 @@ instance: the focused one, else the session's first instance of the chosen activ
 The Analytics filter sidebar's Global Scope has Tags (chips by family, an "Exact tag set" switch,
 "Any tags" to clear), Session template and Program day sections; options come from the loaded
 history. They apply to activity instances (tags) and sessions (template, program day), are saved
-with views and dashboards, and a Progress pane link (`?activity=&viz=&metrics=&tags=&tagMatch=&template=&programDay=`)
-opens one pre-configured panel and then clears itself.
+with views and dashboards, and a Progress pane link (`?activity=&viz=&metrics=&metricX=&metricY=&sets=&tags=&tagMatch=&template=&programDay=`)
+opens one pre-configured panel and then clears itself. Metric Trends can plot the activity's
+**Yield** (a chip when the activity has two or more multiplicative tracked metrics), with Sets
+offering Total for it. Every activity chart combines sets the same way (`utils/setAggregation.js`):
+Top set follows the metric's direction (lower-is-better metrics take their lowest), so the
+scatter's top set is one real set chosen by its Y metric.

@@ -279,6 +279,7 @@ class Events:
     ACTIVITY_TAG_FAMILY_UPDATED = 'activity_tag_family.updated'
     ACTIVITY_TAG_FAMILY_DELETED = 'activity_tag_family.deleted'
     ACTIVITY_PROGRESS_COMPARISON_UPDATED = 'activity_progress_comparison.updated'
+    ACTIVITY_PROGRESS_CHART_UPDATED = 'activity_progress_chart.updated'
 
     # Circuit definition and execution events
     CIRCUIT_CREATED = 'circuit.created'

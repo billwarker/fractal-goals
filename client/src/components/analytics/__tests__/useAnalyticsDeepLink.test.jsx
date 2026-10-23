@@ -28,6 +28,14 @@ describe('useAnalyticsDeepLink', () => {
         expect(onApply).toHaveBeenCalledTimes(1);
     });
 
+    it('opens a scatter with its axes and set handling', async () => {
+        const { onApply } = setup('/root-1/analytics?activity=act&viz=scatterPlot&metricX=distance&metricY=reps&sets=average', [{ id: 'act', name: 'Pike' }]);
+        await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
+        const { windowState } = onApply.mock.calls[0][0];
+        expect(windowState.selectedVisualization).toBe('scatterPlot');
+        expect(windowState.visualizationState).toEqual(expect.objectContaining({ metricX: 'distance', metricY: 'reps', setsHandling: 'average' }));
+    });
+
     it('ignores pages opened without a link', () => {
         const { onApply } = setup('/root-1/analytics', [{ id: 'act' }]);
         expect(onApply).not.toHaveBeenCalled();

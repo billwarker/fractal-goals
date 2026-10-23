@@ -5,16 +5,19 @@ import { useActivityProgressSeries } from '../../hooks/useActivityTags';
 import useFadeSwap from '../../hooks/useFadeSwap';
 import useProgressHover from '../../hooks/useProgressHover';
 import { buildAnalyticsLink } from '../../utils/analyticsDeepLink';
+import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/MetricTrends';
 import ExpandableChartFrame from '../common/ExpandableChartFrame';
-import ConditionProgressChart from '../goalDetail/ConditionProgressChart';
+import ProgressChartControls from './ProgressChartControls';
+import ProgressChartView from './ProgressChartView';
+import { progressChartTitle, trendMetricIds } from './progressChartSettings';
 import { useProgressChartExpansion } from './useExpandedProgressChart';
 import styles from './ProgressPanel.module.css';
 
-/** The metrics an Analytics trend chart should plot for this chart's condition. */
-function chartMetricIds(chart, activity) {
+/** The metrics an Analytics Metric Trends chart plots for a goal condition (yield as its pseudo-metric). */
+function goalMetricIds(chart) {
     const condition = chart?.condition;
     if (!condition) return [];
-    if (condition.measure === 'yield') return (activity?.yield_metric_ids || []).slice(0, 2);
+    if (condition.measure === 'yield') return [YIELD_METRIC_ID];
     if (condition.measure === 'sets') return (condition.rules || []).slice(0, 2).map((rule) => rule.metric_definition_id);
     return condition.metric_definition_id ? [condition.metric_definition_id] : [];
 }
@@ -26,28 +29,35 @@ const OpenIcon = () => (
     </svg>
 );
 
+const settingsKey = (settings) => (settings
+    ? [settings.kind, settings.trend_series, settings.metric_id, settings.x_metric_id, settings.y_metric_id, settings.set_aggregation].join('|')
+    : '');
+
 /**
- * The series for this comparison, cross-faded when the comparison (or activity) changes: the
- * old chart fades out, and the new one fades in once it has loaded.
+ * The series for this comparison, cross-faded when the comparison, the activity or the chart
+ * changes: the old chart fades out, and the new one fades in once it has loaded. `live` is the
+ * latest payload (for controls, which shouldn't wait for the fade).
  */
 export function useFadingProgressSeries(rootId, activityId, instanceId, choice) {
     const query = useActivityProgressSeries(rootId, activityId, { instanceId, preview: choice });
     const key = [activityId, instanceId, choice?.mode, [...(choice?.tagIds || [])].sort().join(','),
-        Boolean(choice?.sameTemplate), Boolean(choice?.sameProgramDay)].join(':');
+        Boolean(choice?.sameTemplate), Boolean(choice?.sameProgramDay), settingsKey(query.data?.chart_settings)].join(':');
     const fade = useFadeSwap(query.data, key, !query.isLoading && !query.isPlaceholderData);
-    return { data: fade.value, visible: fade.visible, isLoading: query.isLoading };
+    return { data: fade.value, live: query.data, visible: fade.visible, isLoading: query.isLoading };
 }
 
-export const progressChartHeading = (chart) => (
-    chart.source === 'goal_condition' ? `Goal: ${chart.goal_name}` : 'This activity over time'
-);
-
-/** The same chart in Analytics: this activity, metrics, compared tags, template and program day. */
+/** The same chart in Analytics: this activity and chart, compared tags, template and program day. */
 export function progressAnalyticsHref(rootId, activityId, series, instance, choice) {
     const context = instance.comparison_context || {};
+    const settings = series.chart_settings || {};
+    const scatter = settings.kind === 'scatter';
     return buildAnalyticsLink(rootId, {
         activityId,
-        metricIds: chartMetricIds(series.chart, series.activity_definition),
+        viz: scatter ? 'scatterPlot' : 'metricTrends',
+        metricIds: settings.kind === 'goal' ? goalMetricIds(series.chart) : scatter ? [] : trendMetricIds(settings),
+        metricX: scatter ? settings.x_metric_id : null,
+        metricY: scatter ? settings.y_metric_id : null,
+        setsHandling: settings.kind === 'goal' ? null : settings.set_aggregation,
         tagIds: choice.mode === 'all' ? null : choice.tagIds,
         tagMatch: 'exact',
         templateId: choice.sameTemplate ? context.template?.id : null,
@@ -56,15 +66,16 @@ export function progressAnalyticsHref(rootId, activityId, series, instance, choi
 }
 
 /**
- * A compact chart of the sessions this instance compares against, ending with this session:
- * the in-scope goal condition when there is one, else the activity's headline metric.
+ * A compact chart of the sessions this instance compares against, ending with this session. What
+ * it plots (goal progress, an activity or metric trend, a scatter) is remembered for the activity
+ * in this template/program day; while expanded, the card holds the chart's controls.
  */
 export default function ProgressChart({ rootId, activityId, instance, choice }) {
     const navigate = useNavigate();
     const expansion = useProgressChartExpansion();
-    const { data, visible, isLoading } = useFadingProgressSeries(rootId, activityId, instance.id, choice);
+    const { data, live, visible, isLoading } = useFadingProgressSeries(rootId, activityId, instance.id, choice);
     const hoverInstanceId = useProgressHover();
-    const hasChart = Boolean(data?.chart?.condition);
+    const hasChart = Boolean(data?.chart_settings);
     const expanded = expansion?.chart || null;
     // While expanded, the big chart follows the pane's selection, and goes when there's nothing to chart.
     useEffect(() => {
@@ -75,8 +86,7 @@ export default function ProgressChart({ rootId, activityId, instance, choice }) 
         }
     }, [activityId, expanded, expansion, hasChart, instance.id, isLoading]);
     if (isLoading || !hasChart) return null;
-    const { chart, activity_definition: activity } = data;
-    const heading = progressChartHeading(chart);
+    const heading = progressChartTitle(data);
     // In Session Detail the card expands in the session's place; elsewhere it opens Analytics.
     const action = expansion
         ? { label: 'Expand chart', run: () => expansion.expand({ activityId, instanceId: instance.id }) }
@@ -90,18 +100,14 @@ export default function ProgressChart({ rootId, activityId, instance, choice }) 
             icon={expansion ? null : <OpenIcon />}
             isExpanded={Boolean(expanded)}
             expandedNote="Showing in place of the session."
+            expandedContent={live?.chart_settings ? (
+                <ProgressChartControls rootId={rootId} activityId={activityId} instance={instance} series={live} />
+            ) : null}
             onCollapse={expansion?.collapse}
         >
             <div className={styles.progressChartHeader}>{heading}</div>
             <div className={styles.chartFade} data-visible={visible}>
-                <ConditionProgressChart
-                    condition={chart.condition}
-                    instances={data.instances}
-                    activity={activity}
-                    density="compact"
-                    highlightInstanceId={data.current_instance_id}
-                    hoverInstanceId={hoverInstanceId}
-                />
+                <ProgressChartView rootId={rootId} series={data} density="compact" hoverInstanceId={hoverInstanceId} />
             </div>
         </ExpandableChartFrame>
     );

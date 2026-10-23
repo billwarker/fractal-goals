@@ -113,7 +113,11 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
             {selectedActivityId && instance ? (
                 <>
                     <div className={styles.compareDock}>
-                        {docked ? <ProgressCompareBar instance={instance} timeline={timeline} onExpand={showComparison} /> : null}
+                        {docked ? (
+                            <div className={styles.compareDockBackdrop}>
+                                <ProgressCompareBar instance={instance} timeline={timeline} onExpand={showComparison} />
+                            </div>
+                        ) : null}
                     </div>
                     <ProgressChart rootId={rootId} activityId={selectedActivityId} instance={instance} choice={preview} />
                     <ProgressCompareControls

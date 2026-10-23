@@ -12,7 +12,8 @@ const fromInnerControl = (event) => Boolean(event.target.closest?.('button, a, i
  * Progress pane). The whole card is the control: it highlights on hover and focus, Enter or
  * Space activates it, and a corner icon says what clicking does. The mini chart inside is a
  * preview with no tooltips of its own. While the chart is shown elsewhere, the card holds the
- * way back instead: `expandedNote` and Collapse.
+ * way back instead: `expandedNote` and Collapse, after any `expandedContent` (e.g. the chart's
+ * controls, which then act on the expanded chart).
  *
  * Without `onExpand` it is a plain frame. `className` gives the card its box (border, padding).
  */
@@ -24,6 +25,7 @@ export default function ExpandableChartFrame({
     icon = null,
     isExpanded = false,
     expandedNote = null,
+    expandedContent = null,
     onCollapse = null,
     children,
     ...rest
@@ -31,6 +33,7 @@ export default function ExpandableChartFrame({
     if (isExpanded) {
         return (
             <div className={`${styles.frame} ${styles.placeholder} ${className}`} {...rest}>
+                {expandedContent}
                 <p className={styles.note}>{expandedNote}</p>
                 <Button variant="secondary" size="sm" onClick={onCollapse}>Collapse</Button>
             </div>

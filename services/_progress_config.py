@@ -64,10 +64,10 @@ class _ProgressConfigMixin:
 
         has_best_set_anchor = any(md.is_best_set_metric for md in (metric_defs or []))
 
-        if metric_def.is_best_set_metric or (has_best_set_anchor and not metric_def.is_multiplicative):
+        if bool(metric_def.is_best_set_metric) or (has_best_set_anchor and not metric_def.multiplies):
             return 'max'
 
-        if metric_def.is_multiplicative:
+        if metric_def.multiplies:
             # Multiplicative metrics participate in the activity-level yield comparison.
             # Keep per-metric hints on the raw metric values rather than duplicating yield.
             return 'last'
@@ -91,4 +91,4 @@ class _ProgressConfigMixin:
 
     def _can_compute_yield(self, metric_defs: list) -> bool:
         """Yield is valid only when every tracked metric participates multiplicatively."""
-        return bool(metric_defs) and len(metric_defs) >= 2 and all(md.is_multiplicative for md in metric_defs)
+        return bool(metric_defs) and len(metric_defs) >= 2 and all(md.multiplies for md in metric_defs)

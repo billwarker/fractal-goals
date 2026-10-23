@@ -2,6 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 
 import { useOutbox } from '../offline/OutboxContext';
 import { SESSION_OP } from '../offline/opKinds';
+import { patchProgressChartSettings } from '../offline/progressChartOps';
 import { findSessionForActivity } from '../offline/sessionCache';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
@@ -236,4 +237,45 @@ export function useProgressComparisonMutation(rootId, activityId) {
         return mutation.mutateAsync({ instanceId, mode, tagIds, sameTemplate, sameProgramDay, version });
     };
     return { setComparison, isPending: mutation.isPending };
+}
+
+const CHART_FIELDS = ['kind', 'trend_series', 'metric_id', 'x_metric_id', 'y_metric_id', 'set_aggregation'];
+
+/**
+ * Choose the Progress pane chart for an instance's activity in its template/program day. Shown at
+ * once (optimistic), saved online or queued offline like the comparison, and replaced by the
+ * server's resolved settings when saved.
+ */
+export function useProgressChartMutation(rootId, activityId) {
+    const queryClient = useQueryClient();
+    const outbox = useOutbox();
+    const mutation = useMutation({
+        mutationFn: ({ instanceId, body }) => fractalApi.setActivityInstanceProgressChart(rootId, instanceId, body),
+        onSuccess: (response, { instanceId }) => patchProgressChartSettings(queryClient, {
+            rootId, activityId, instanceId, chartSettings: response.data.chart_settings,
+        }),
+        onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.activityProgressTimelineRoot(rootId, activityId) }),
+    });
+    const setChart = async ({ instanceId, settings, version = null }) => {
+        const body = Object.fromEntries(CHART_FIELDS.map((field) => [field, settings[field] ?? null]));
+        body.set_aggregation = body.set_aggregation || 'top';
+        const meta = { rootId, activityId, instanceId, chartSettings: { ...body, source: 'saved' } };
+        patchProgressChartSettings(queryClient, meta);
+        const found = outbox && findSessionForActivity(queryClient, rootId, { instanceId });
+        if (found) {
+            await outbox.submit({
+                scope: found.sessionId,
+                kind: SESSION_OP.PROGRESS_CHART,
+                method: 'put',
+                url: `/${rootId}/activity-instances/${instanceId}/progress-chart`,
+                body,
+                coalesceKey: `progress-chart:${instanceId}`,
+                entityIds: [instanceId],
+                meta: { ...meta, sessionId: found.sessionId },
+            });
+            return { data: {} };
+        }
+        return mutation.mutateAsync({ instanceId, body: { ...body, ...(version ? { version } : {}) } });
+    };
+    return { setChart, isPending: mutation.isPending };
 }

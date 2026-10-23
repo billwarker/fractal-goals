@@ -5,9 +5,10 @@ import { Chart as ChartJS } from 'chart.js';
 import useProgressHover from '../../hooks/useProgressHover';
 import pageGridSnap from '../analytics/pageGridSnap';
 import Button from '../atoms/Button';
-import ConditionProgressChart from '../goalDetail/ConditionProgressChart';
 import { describeComparison, previewChoice } from './ProgressCompareControls';
-import { progressAnalyticsHref, progressChartHeading, useFadingProgressSeries } from './ProgressChart';
+import { progressAnalyticsHref, useFadingProgressSeries } from './ProgressChart';
+import ProgressChartView from './ProgressChartView';
+import { progressChartTitle } from './progressChartSettings';
 import styles from './ExpandedProgressChart.module.css';
 
 // Expanded charts snap to the page grid (see applyChartDensity's 'expanded').
@@ -49,7 +50,7 @@ export default function ExpandedProgressChart({ rootId, chart, instances = [], a
 
     const activityName = activityDefs.find((definition) => definition.id === chart.activityId)?.name
         || data?.activity_definition?.name || 'Activity';
-    const series = data?.chart?.condition ? data : null;
+    const series = data?.chart_settings ? data : null;
     const { scope, summary } = instance ? describeComparison(instance, null) : {};
     return (
         <section
@@ -64,7 +65,7 @@ export default function ExpandedProgressChart({ rootId, chart, instances = [], a
                 <div className={styles.titles}>
                     <h2 className={styles.title}>
                         {activityName}
-                        {series ? <span className={styles.titleDetail}> · {progressChartHeading(series.chart)}</span> : null}
+                        {series ? <span className={styles.titleDetail}> · {progressChartTitle(series)}</span> : null}
                     </h2>
                     {scope ? (
                         <div className={styles.scope}>
@@ -83,16 +84,7 @@ export default function ExpandedProgressChart({ rootId, chart, instances = [], a
                 </div>
             </div>
             <div className={styles.chart} data-visible={visible}>
-                {series ? (
-                    <ConditionProgressChart
-                        condition={series.chart.condition}
-                        instances={series.instances}
-                        activity={series.activity_definition}
-                        density="expanded"
-                        highlightInstanceId={series.current_instance_id}
-                        hoverInstanceId={hoverInstanceId}
-                    />
-                ) : null}
+                {series ? <ProgressChartView rootId={rootId} series={series} density="expanded" hoverInstanceId={hoverInstanceId} /> : null}
             </div>
         </section>
     );

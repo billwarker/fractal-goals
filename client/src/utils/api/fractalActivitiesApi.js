@@ -61,6 +61,8 @@ export const fractalActivitiesApi = {
         axios.put(`${API_BASE}/${rootId}/activity-sets/${setId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
     setActivityInstanceProgressComparison: (rootId, instanceId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress-comparison`, data),
+    setActivityInstanceProgressChart: (rootId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress-chart`, data),
     getActivityProgressTimeline: (rootId, activityId, params = {}) =>
         axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-timeline`, {
             params,

@@ -157,6 +157,11 @@
     width: 100%;
 }
 
+/* A field under another in a stacked control list. */
+.sessions-query-field-spaced {
+    margin-top: 12px;
+}
+
 .sessions-query-duration-row {
     display: flex;
     align-items: center;

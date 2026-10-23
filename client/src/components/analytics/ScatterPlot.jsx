@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { goalLineAnnotations } from '../../utils/goalConditionLines';
+import { topSetPoint } from '../../utils/setAggregation';
 import { applyChartDensity, useChartDensity, useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
+import CompactChartFrame from './CompactChartFrame';
 import { withScatterPointDensity } from './scatterPointProfile';
+import useActiveChartPoint from './useActiveChartPoint';
 import styles from './ScatterPlot.module.css';
 
 /**
@@ -15,6 +18,22 @@ import styles from './ScatterPlot.module.css';
 // Compact charts keep points small instead of growing them for repeated values.
 const COMPACT_POINT_PROFILE = { baseRadius: 3, radiusStep: 1, hoverOffset: 2, maxRadius: 6 };
 
+/** The canvas: a session hovered elsewhere becomes its active point (with tooltip unless compact). */
+function ScatterCanvas({ chartRef, data, options, hoverInstanceId, compact }) {
+    const ownRef = useRef(null);
+    // Ours for the hover highlight, and the caller's (Analytics' chart menu) too.
+    const setRef = useCallback((chart) => {
+        ownRef.current = chart;
+        if (chartRef) chartRef.current = chart;
+    }, [chartRef]);
+    const points = data.datasets[0]?.data || [];
+    const active = hoverInstanceId
+        ? points.flatMap((point, index) => (point.instance_id === hoverInstanceId ? [{ datasetIndex: 0, index }] : []))
+        : [];
+    useActiveChartPoint(ownRef, active, { tooltip: !compact });
+    return <Scatter ref={setRef} data={data} options={options} />;
+}
+
 function ScatterPlot({
     selectedActivity,
     activityInstances,
@@ -25,6 +44,9 @@ function ScatterPlot({
     selectedMetricX = null,
     selectedMetricY = null,
     goalLines = [],
+    highlightInstanceId = null,
+    hoverInstanceId = null,
+    hideTitle = false,
 }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
@@ -51,7 +73,7 @@ function ScatterPlot({
 
     // Use hook for options
     const baseOptions = useChartOptions({
-        title: chartTitle,
+        title: hideTitle ? '' : chartTitle,
         xAxisLabel,
         yAxisLabel,
         isTimeScale: false
@@ -101,6 +123,7 @@ function ScatterPlot({
             ? instance.tags.map((tag) => tag.name).join(', ')
             : null;
         const basePoint = {
+            instance_id: instance.id,
             session_name: instance.session_name,
             session_date: instance.session_date,
             tag_label: tagNames,
@@ -139,11 +162,8 @@ function ScatterPlot({
 
             if (allSets.length > 0) {
                 if (setsHandling === 'top') {
-                    // Find set with highest value of X metric
-                    const topSet = allSets.reduce((max, current) =>
-                        (current[xMetricToPlot.id] || 0) > (max[xMetricToPlot.id] || 0) ? current : max
-                    );
-                    topSet.aggregation = 'Top Set';
+                    // The best set by the Y metric's direction: one real set, not mixed values.
+                    const topSet = { ...topSetPoint(allSets, yMetricToPlot), aggregation: 'Top Set' };
                     dataPoints.push(topSet);
                 } else if (setsHandling === 'average') {
                     const avgPoint = { ...basePoint, aggregation: `Avg of ${allSets.length} sets` };
@@ -201,6 +221,7 @@ function ScatterPlot({
 
     // Prepare chart data
     const chartDataPoints = withScatterPointDensity(dataPoints.map(p => ({
+        instance_id: p.instance_id,
         x: p[xMetricToPlot.id],
         y: p[yMetricToPlot.id],
         session_name: p.session_name,
@@ -220,7 +241,12 @@ function ScatterPlot({
             backgroundColor: 'rgba(33, 150, 243, 0.7)',
             borderColor: chartTheme.borderColor,
             borderWidth: 1,
-            pointRadius: chartDataPoints.map((point) => point.pointRadius),
+            // The highlighted instance (e.g. the session being edited) stands out.
+            pointRadius: chartDataPoints.map((point) => point.pointRadius + (point.instance_id === highlightInstanceId ? 2 : 0)),
+            pointBorderWidth: chartDataPoints.map((point) => (point.instance_id === highlightInstanceId ? 2 : 1)),
+            pointBorderColor: chartDataPoints.map((point) => (
+                point.instance_id === highlightInstanceId ? chartTheme.textColor : chartTheme.borderColor
+            )),
             pointHoverRadius: chartDataPoints.map((point) => point.pointHoverRadius),
             pointHoverBackgroundColor: chartTheme.primaryColor,
             pointHoverBorderColor: '#fff',
@@ -273,10 +299,22 @@ function ScatterPlot({
         }
     };
 
+    const sessions = new Set(chartDataPoints.map((point) => point.instance_id)).size;
+    const caption = density === 'compact'
+        ? `${yMetricToPlot.name} vs ${xMetricToPlot.name} · ${sessions} session${sessions === 1 ? '' : 's'}`
+        : null;
     return (
         <div className={styles.mainContainer}>
             <div className={styles.chartContainer}>
-                <Scatter ref={chartRef} data={chartData} options={applyChartDensity(options, density)} />
+                <CompactChartFrame caption={caption}>
+                    <ScatterCanvas
+                        chartRef={chartRef}
+                        data={chartData}
+                        options={applyChartDensity(options, density)}
+                        hoverInstanceId={hoverInstanceId}
+                        compact={density === 'compact'}
+                    />
+                </CompactChartFrame>
             </div>
         </div>
     );

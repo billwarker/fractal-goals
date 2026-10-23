@@ -106,6 +106,7 @@ from .activities import (
     ActivityTagFamilyUpdateSchema,
     ActivityTagFamilyDeleteSchema,
     ActivityTagFamilyOrderSchema,
+    ProgressChartSchema,
     ProgressComparisonSchema,
 )
 from .fractal_metrics import (

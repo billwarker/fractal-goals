@@ -348,7 +348,7 @@ def serialize_metric_definition(metric):
     # Derive name/unit/is_multiplicative from fractal metric if linked, else fall back to own columns
     name = fm.name if fm else metric.name
     unit = fm.unit if fm else metric.unit
-    is_multiplicative = fm.is_multiplicative if fm else metric.is_multiplicative
+    is_multiplicative = metric.multiplies
     return {
         "id": metric.id,
         "fractal_metric_id": metric.fractal_metric_id,

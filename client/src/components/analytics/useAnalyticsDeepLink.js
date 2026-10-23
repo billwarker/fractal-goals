@@ -10,8 +10,14 @@ import { getVisualizationSelectionUpdate, getVisualizationStateUpdate } from './
 export function analyticsStateFromLink(link, activity) {
     const base = { ...getDefaultWindowState(), selectedCategory: 'activities', selectedActivity: activity };
     const withVisualization = { ...base, ...getVisualizationSelectionUpdate(base, link.viz) };
-    const windowState = link.metricIds.length
-        ? { ...withVisualization, ...getVisualizationStateUpdate(withVisualization, { metrics: link.metricIds }) }
+    const updates = {
+        ...(link.metricIds.length ? { metrics: link.metricIds } : {}),
+        ...(link.metricX ? { metricX: link.metricX } : {}),
+        ...(link.metricY ? { metricY: link.metricY } : {}),
+        ...(link.setsHandling ? { setsHandling: link.setsHandling } : {}),
+    };
+    const windowState = Object.keys(updates).length
+        ? { ...withVisualization, ...getVisualizationStateUpdate(withVisualization, updates) }
         : withVisualization;
     return {
         windowState,

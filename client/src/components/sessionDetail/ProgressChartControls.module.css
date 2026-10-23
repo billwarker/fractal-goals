@@ -1,0 +1,16 @@
+/* The chart's controls, in the pane card's place while the chart is expanded. */
+.controls {
+    display: grid;
+    gap: 10px;
+    width: 100%;
+    margin: 0 0 4px;
+    padding: 0;
+    border: 0;
+    text-align: left;
+}
+
+.fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 10px;
+}

@@ -7,6 +7,8 @@
  * rejects what the server would reject, with the same wording.
  */
 
+import { yieldMetricIds } from './setAggregation';
+
 export const COMPLETION_CONDITIONS = /** @type {const} */ (['activity_threshold', 'children', 'manual']);
 
 export const COMPLETION_CONDITION_LABELS = {
@@ -64,22 +66,8 @@ export function activeMetricDefinitions(activity) {
     );
 }
 
-/**
- * Metrics multiplied into the activity's yield (two or more, all multiplicative), as on the server.
- * @param {any} activity
- * @returns {string[]}
- */
-export function yieldMetricIds(activity) {
-    const metrics = activeMetricDefinitions(activity).filter(
-        (/** @type {any} */ metric) => metric.track_progress !== false,
-    );
-    if (metrics.length < 2 || !metrics.every((/** @type {any} */ metric) => metric.is_multiplicative !== false)) {
-        return [];
-    }
-    return [...metrics]
-        .sort((a, b) => ((a.sort_order || 0) - (b.sort_order || 0)) || String(a.id).localeCompare(String(b.id)))
-        .map((metric) => String(metric.id));
-}
+// Metrics multiplied into the activity's yield (lives with the set aggregation it feeds).
+export { yieldMetricIds };
 
 /**
  * A metric whose lower values are better (time, pace) defaults to "at most".

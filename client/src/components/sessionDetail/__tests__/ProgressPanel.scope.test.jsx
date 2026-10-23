@@ -132,6 +132,7 @@ describe('ProgressPanel tags, scope and chart', () => {
         } });
         useActivityProgressSeries.mockReturnValue({ isLoading: false, data: {
             chart: { source: 'goal_condition', goal_name: 'Front lever', condition: { measure: 'sets', rules: [{ metric_definition_id: 'm1' }] } },
+            chart_settings: { kind: 'goal', set_aggregation: 'top', available: { kinds: ['goal'], metric_ids: [] } },
             activity_definition: { id: 'activity-def-1', yield_metric_ids: [] },
             instances: [{ id: 'a' }, { id: 'instance-current' }],
             current_instance_id: 'instance-current',
@@ -242,7 +243,8 @@ describe('ProgressPanel tags, scope and chart', () => {
             total_all: 1,
         } });
         useActivityProgressSeries.mockReturnValue({ isLoading: false, data: {
-            chart: { source: 'activity', condition: { measure: 'metric', metric_definition_id: 'm1' } },
+            chart: { source: 'goal_condition', goal_name: 'Hold', condition: { measure: 'metric', metric_definition_id: 'm1' } },
+            chart_settings: { kind: 'goal', set_aggregation: 'top', available: { kinds: ['goal'], metric_ids: [] } },
             activity_definition: { id: 'activity-def-1', yield_metric_ids: [] },
             instances: [{ id: 'past-1' }, { id: 'instance-current' }],
             current_instance_id: 'instance-current',
