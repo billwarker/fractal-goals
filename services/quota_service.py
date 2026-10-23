@@ -14,7 +14,7 @@ from account_tiers import (
     TIER_PAID,
 )
 import models
-from models import ActivityDefinition, ActivityGroup, ActivityInstance, ActivityProgressView, ActivityTagDefinition, CircuitDefinition, CircuitSlot, AnalyticsDashboard, AppSetting, FractalMetricDefinition, Goal, MetricDefinition, Note, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramSessionPlan, Session, SessionTemplate, Target, User
+from models import ActivityDefinition, ActivityGroup, ActivityInstance, ActivityTagDefinition, ActivityTagFamily, CircuitDefinition, CircuitSlot, AnalyticsDashboard, AppSetting, FractalMetricDefinition, Goal, MetricDefinition, Note, Program, ProgramBlock, ProgramDay, ProgramDayStatusOverride, ProgramSessionPlan, Session, SessionTemplate, User
 from services.ops_log import log_ops_event
 from services.service_types import JsonDict, ServiceResult
 
@@ -277,8 +277,7 @@ class QuotaService:
 
         totals = [
             table_total(
-                text_bytes(Goal.name, Goal.description, Goal.relevance_statement, Goal.completion_reason)
-                + json_bytes(Goal.targets)
+                text_bytes(Goal.name, Goal.description, Goal.completion_reason)
                 + json_bytes(Goal.progress_settings),
                 goal_filter,
                 Goal.deleted_at.is_(None),
@@ -300,8 +299,8 @@ class QuotaService:
                 ActivityTagDefinition.root_id.in_(roots), ActivityTagDefinition.deleted_at.is_(None),
             ),
             table_total(
-                text_bytes(ActivityProgressView.name) + json_bytes(ActivityProgressView.config),
-                ActivityProgressView.root_id.in_(roots), ActivityProgressView.deleted_at.is_(None),
+                text_bytes(ActivityTagFamily.name),
+                ActivityTagFamily.root_id.in_(roots),
             ),
             table_total(
                 text_bytes(CircuitDefinition.name, CircuitDefinition.description) + compact_slot_list_bytes,
@@ -364,10 +363,6 @@ class QuotaService:
                 AnalyticsDashboard.root_id.in_(roots), AnalyticsDashboard.deleted_at.is_(None),
             ),
             # EventLog rows are platform telemetry, not user-manageable content.
-            table_total(
-                text_bytes(Target.name, Target.type, Target.time_scope),
-                Target.root_id.in_(roots), Target.deleted_at.is_(None),
-            ),
         ]
 
         total = self.db_session.execute(select(sum(totals, literal(0)))).scalar_one()

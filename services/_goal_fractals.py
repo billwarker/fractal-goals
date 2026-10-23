@@ -28,7 +28,6 @@ class _GoalFractalsMixin:
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
             selectinload(Goal.level),
-            selectinload(Goal.targets_rel),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter(
@@ -85,7 +84,7 @@ class _GoalFractalsMixin:
                 return None, quota_error, quota_status
         _, storage_error, storage_status = quota_service.check_storage_available(
             current_user_id,
-            QuotaService._payload_size(data.get('name'), data.get('description'), data.get('relevance_statement')),
+            QuotaService._payload_size(data.get('name'), data.get('description')),
         )
         if storage_error:
             return None, storage_error, storage_status
@@ -115,16 +114,17 @@ class _GoalFractalsMixin:
                 scoped = GoalLevel(
                     name=source.name, rank=source.rank, color=style['color'],
                     secondary_color=style['secondary_color'], icon=style['icon'], owner_id=current_user_id,
-                    allow_manual_completion=source.allow_manual_completion,
                     track_activities=source.track_activities, requires_smart=source.requires_smart,
                     deadline_min_value=source.deadline_min_value, deadline_min_unit=source.deadline_min_unit,
                     deadline_max_value=source.deadline_max_value, deadline_max_unit=source.deadline_max_unit,
                     max_children=source.max_children,
-                    auto_complete_when_children_done=source.auto_complete_when_children_done,
-                    can_have_targets=source.can_have_targets, description_required=source.description_required,
+                    description_required=source.description_required,
                     default_deadline_offset_value=source.default_deadline_offset_value,
                     default_deadline_offset_unit=source.default_deadline_offset_unit,
                     sort_children_by=source.sort_children_by,
+                    uses_reviews=source.uses_reviews,
+                    review_cadence_value=source.review_cadence_value,
+                    review_cadence_unit=source.review_cadence_unit,
                 )
                 self.db_session.add(scoped)
                 scoped_levels[goal_type] = scoped
@@ -137,7 +137,6 @@ class _GoalFractalsMixin:
             level_id=level.id,
             name=data['name'],
             description=data.get('description', ''),
-            relevance_statement=data.get('relevance_statement'),
             deadline=parse_date_string(data['deadline']) if data.get('deadline') else None,
             parent_id=None,
             owner_id=current_user_id,

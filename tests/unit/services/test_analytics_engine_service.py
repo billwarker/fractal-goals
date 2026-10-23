@@ -40,7 +40,7 @@ def test_catalog_exposes_semantic_datasets(db_session, test_user):
     assert error is None
     assert status == 200
     dataset_ids = {dataset["id"] for dataset in payload["datasets"]}
-    assert {"sessions", "goals", "activity_instances", "metric_values", "targets", "notes"}.issubset(dataset_ids)
+    assert {"sessions", "goals", "activity_instances", "metric_values", "goal_completion_conditions", "notes"}.issubset(dataset_ids)
     assert {
         "circuit_definitions",
         "circuit_slots",
@@ -71,8 +71,8 @@ def test_catalog_exposes_database_table_objects(db_session, test_user):
         "program_blocks",
         "program_day_templates",
         "session_goals",
-        "target_contribution_ledgers",
-        "target_metric_conditions",
+        "goal_completion_conditions",
+        "goal_condition_metric_rules",
     }.issubset(dataset_ids)
     assert "analytics_views" not in dataset_ids
 

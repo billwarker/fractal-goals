@@ -3,20 +3,20 @@
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
-from datetime import datetime
 import uuid
 
 from sqlalchemy.orm import selectinload
 
 from models import Goal, GoalLevel, Session, get_goal_by_id, session_goals
 from services.events import event_bus, Event, Events
-from services.goal_domain_rules import resolve_completed_via_children, should_inherit_parent_activities
+from services.goal_domain_rules import should_inherit_parent_activities
 from services.goal_loading import goal_serializer_load_options
 from services.payload_normalizers import normalize_goal_payload
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
 
 from services._goal_service_common import resolve_level_id, session_goal_insert_values
+
 
 
 class _GoalCrudMixin:
@@ -29,8 +29,8 @@ class _GoalCrudMixin:
         _, storage_error, storage_status = quota_service.check_storage_available(
             current_user_id,
             QuotaService._payload_size(
-                data.get('name'), data.get('description'), data.get('relevance_statement'),
-                data.get('targets'), data.get('progress_settings'),
+                data.get('name'), data.get('description'),
+                data.get('condition'), data.get('progress_settings'),
             ),
         )
         if storage_error:
@@ -72,14 +72,11 @@ class _GoalCrudMixin:
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
             return None, deadline_error, 400
-
-        if parent and parent.deadline and deadline:
-            parent_deadline = parent.deadline.date() if isinstance(parent.deadline, datetime) else parent.deadline
-            if deadline > parent_deadline:
-                return None, {
-                    "error": "Child deadline cannot be later than parent deadline",
-                    "parent_deadline": parent_deadline.isoformat(),
-                }, 400
+        if not target_root_id and data.get('completion_condition') == 'activity_threshold':
+            return None, "A new fractal has no activities to complete on yet", 400
+        completion_error = self._validate_completion_payload(target_root_id, data) if target_root_id else None
+        if completion_error:
+            return None, *completion_error
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
         if not level_id:
@@ -106,9 +103,7 @@ class _GoalCrudMixin:
                 description=data.get('description', ''),
                 deadline=deadline,
                 completed=False,
-                completed_via_children=data.get('completed_via_children', False),
                 inherit_parent_activities=inherit_parent_activities,
-                relevance_statement=data.get('relevance_statement'),
                 parent_id=parent_id,
                 owner_id=parent.owner_id if parent else current_user_id,
             )
@@ -126,9 +121,9 @@ class _GoalCrudMixin:
             if not parent:
                 new_goal.root_id = new_goal.id
 
-            if data.get('targets'):
-                self.sync_targets(self.db_session, new_goal, data['targets'])
-                new_goal.targets = None
+            completion_error = self._apply_completion_fields(new_goal, data, [])
+            if completion_error:
+                return None, *completion_error
 
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
@@ -196,8 +191,8 @@ class _GoalCrudMixin:
         _, storage_error, storage_status = quota_service.check_storage_available(
             current_user_id,
             QuotaService._payload_size(
-                data.get('name'), data.get('description'), data.get('relevance_statement'),
-                data.get('targets'), data.get('progress_settings'),
+                data.get('name'), data.get('description'),
+                data.get('condition'), data.get('progress_settings'),
             ),
         )
         if storage_error:
@@ -224,6 +219,9 @@ class _GoalCrudMixin:
         deadline, deadline_error = self._parse_deadline(data.get('deadline'))
         if deadline_error:
             return None, deadline_error, 400
+        completion_error = self._validate_completion_payload(root_id, data)
+        if completion_error:
+            return None, *completion_error
 
         level_id = resolve_level_id(self.db_session, data.get('type'))
         if not level_id:
@@ -257,15 +255,6 @@ class _GoalCrudMixin:
             if monotonicity_error:
                 return None, monotonicity_error, 400
 
-            if parent_goal.deadline and deadline:
-                parent_deadline = parent_goal.deadline.date() if isinstance(parent_goal.deadline, datetime) else parent_goal.deadline
-                if deadline > parent_deadline:
-                    return None, {
-                        "error": "Child deadline cannot be later than parent deadline",
-                        "parent_deadline": parent_deadline.isoformat(),
-                    }, 400
-
-        completed_via_children = resolve_completed_via_children(data, level_obj)
         goal_defaults = Goal(parent_id=parent_id)
         goal_defaults.level = level_obj
         inherit_parent_activities = should_inherit_parent_activities(
@@ -283,11 +272,8 @@ class _GoalCrudMixin:
                 parent_id=parent_id,
                 deadline=deadline,
                 completed=False,
-                completed_via_children=completed_via_children,
                 inherit_parent_activities=inherit_parent_activities,
-                allow_manual_completion=data.get('allow_manual_completion', True),
                 track_activities=data.get('track_activities', True),
-                relevance_statement=data.get('relevance_statement'),
                 root_id=root_id,
                 owner_id=current_user_id,
             )
@@ -296,9 +282,9 @@ class _GoalCrudMixin:
             self.db_session.add(new_goal)
             self.db_session.flush()
 
-            if data.get('targets'):
-                self.sync_targets(self.db_session, new_goal, data['targets'])
-                new_goal.targets = None
+            completion_error = self._apply_completion_fields(new_goal, data, [])
+            if completion_error:
+                return None, *completion_error
 
             if activity:
                 self._associate_goal_with_activity(new_goal.id, activity.id)
@@ -357,12 +343,14 @@ class _GoalCrudMixin:
         if goal.root_id != root_id:
             return None, "Goal not found in this fractal", 404
 
+        condition_events = []
         goal, update_error = self._apply_goal_updates(
             goal,
             data,
             root_id=root_id,
             allow_parent_update=True,
             allow_extended_fields=True,
+            pending_events=condition_events,
         )
         if update_error:
             return None, *update_error
@@ -376,10 +364,7 @@ class _GoalCrudMixin:
             'root_id': goal.root_id or goal.id,
             'updated_fields': list(data.keys()),
         }, source='goal_service.update_fractal_goal')
-        if pending_events is None:
-            event_bus.emit(event)
-        else:
-            pending_events.append(event)
+        self._dispatch_events([event, *condition_events], pending_events)
         return goal, None, 200
 
     def update_global_goal(
@@ -391,12 +376,14 @@ class _GoalCrudMixin:
             return None, *error
 
         root_id = goal.root_id or goal.id
+        condition_events = []
         goal, update_error = self._apply_goal_updates(
             goal,
             data,
             root_id=root_id,
             allow_parent_update=False,
             allow_extended_fields=False,
+            pending_events=condition_events,
         )
         if update_error:
             return None, *update_error
@@ -410,11 +397,16 @@ class _GoalCrudMixin:
             'root_id': goal.root_id or goal.id,
             'updated_fields': list(data.keys()),
         }, source='goal_service.update_global_goal')
-        if pending_events is None:
-            event_bus.emit(event)
-        else:
-            pending_events.append(event)
+        self._dispatch_events([event, *condition_events], pending_events)
         return goal, None, 200
+
+    @staticmethod
+    def _dispatch_events(events, pending_events):
+        if pending_events is None:
+            for event in events:
+                event_bus.emit(event)
+        else:
+            pending_events.extend(events)
 
     def delete_global_goal(self, goal_id, current_user_id) -> ServiceResult[JsonDict]:
         goal, error = self._get_authorized_goal(goal_id, current_user_id)

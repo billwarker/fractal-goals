@@ -2,13 +2,12 @@ import React, { Suspense, useState, useEffect, useMemo, useCallback, useRef } fr
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import FractalView from '../components/FractalView';
 import ErrorBoundary from '../components/ErrorBoundary';
-import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import AlertModal from '../components/modals/AlertModal';
 import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useAuth } from '../contexts/AuthContext';
-import { buildTreeMaps, getLineagePath } from '../components/flowTree/flowTreeTreeUtils';
+import { applySequenceDraft, buildTreeMaps, getLineagePath, getSequencingScope } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { getActiveGoalWindowDaysFromSettings, getInactiveNodeIds } from '../hooks/useFlowTreeMetrics';
@@ -35,6 +34,8 @@ import { getActivePrograms } from '../utils/programGoalWindow';
 import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '../utils/programScope';
 import { getProgramColor } from '../utils/programViewModel';
 import PageSurface from '../components/surface/PageSurface';
+import GoalTreeChartLayer from '../components/goalCharts/GoalTreeChartLayer';
+import useExpandedGoalChart from '../components/goalCharts/useExpandedGoalChart';
 import { usePageSurfaces } from '../hooks/usePageSurfaceQueries';
 import {
     getDefaultSurfaceConfig,
@@ -101,10 +102,13 @@ function FractalGoals() {
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
     const [sidebarMode, setSidebarMode] = useState(null);
     const [viewingGoal, setViewingGoal] = useState(null);
+    // Options → Sequence's draft ({ goalId, trackId, stepIds }): the tree shows that goal's siblings
+    // instead of its subtree and previews the drafted order until it's saved.
+    const [sequenceDraft, setSequenceDraft] = useState(null);
+    const sequencingGoalId = sequenceDraft?.goalId ?? null;
 
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [selectedParent, setSelectedParent] = useState(null);
-    const [fractalToDelete, setFractalToDelete] = useState(null);
 
     const [alertData, setAlertData] = useState({ isOpen: false, title: '', message: '' });
 
@@ -130,11 +134,22 @@ function FractalGoals() {
     const flowTreeRef = useRef(null);
     const flowTreeScopeTransitionTimerRef = useRef(null);
     const selectedNodeId = viewingGoal ? (viewingGoal.attributes?.id || viewingGoal.id) : null;
+    const fadeOutTree = useCallback(() => flowTreeRef.current?.startFadeOut?.(), []);
+    const expandedChart = useExpandedGoalChart({ isMobile, selectedNodeId, isCreatingGoal: showGoalModal, setSidebarMode, fadeOutTree });
     const evidenceGoalIds = useMemo(() => {
         if (!evidenceData) return null;
         return new Set((evidenceData.goal_ids || []).map((goalId) => String(goalId)));
     }, [evidenceData]);
     const flowtreeMaps = useMemo(() => buildTreeMaps(fractalData), [fractalData]);
+    const sequencingScopeIds = useMemo(() => (
+        fractalData && sequencingGoalId && sequencingGoalId === String(selectedNodeId)
+            ? getSequencingScope(fractalData, sequencingGoalId)
+            : null
+    ), [fractalData, selectedNodeId, sequencingGoalId]);
+    // Only the flow tree previews the draft; goal details keep reading the saved tree.
+    const flowTreeData = useMemo(() => (
+        sequencingScopeIds ? applySequenceDraft(fractalData, sequenceDraft) : fractalData
+    ), [fractalData, sequenceDraft, sequencingScopeIds]);
     const todayInTimezone = useMemo(
         () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
         [timezone]
@@ -157,6 +172,10 @@ function FractalGoals() {
             getProgramMetricScopeGoalIds(scopedProgram, fractalData),
         );
     }, [fractalData, scopedProgram]);
+    // Goal details mark goals outside the program the page is scoped to.
+    const goalDetailProgramScope = useMemo(() => (
+        programScopeGoalIds ? { goalIds: programScopeGoalIds, name: scopedProgram?.name || 'this program' } : null
+    ), [programScopeGoalIds, scopedProgram]);
     const surfaceGoals = useMemo(
         () => Array.from(flowtreeMaps.nodeById.values()),
         [flowtreeMaps.nodeById]
@@ -175,7 +194,8 @@ function FractalGoals() {
             hiddenInactiveGoalIds ? ids.filter((id) => !hiddenInactiveGoalIds.has(id)) : ids
         );
         const scopedIds = programScopeGoalIds || new Set(flowtreeMaps.nodeById.keys());
-        const selectedLineageIds = selectedNodeId ? getLineagePath(fractalData, selectedNodeId) : null;
+        const selectedLineageIds = sequencingScopeIds
+            || (selectedNodeId ? getLineagePath(fractalData, selectedNodeId) : null);
         const ids = Array.from(scopedIds).filter((id) => (
             (!selectedLineageIds || selectedLineageIds.has(id))
             && (!viewSettings.hideCompletedGoals || !(
@@ -184,7 +204,8 @@ function FractalGoals() {
             ))
         ));
         return filterHiddenInactive(ids);
-    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
+    }, [flowtreeMaps, fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, sequencingScopeIds,
+        viewSettings.hideCompletedGoals]);
     const { data: flowtreeMetricsSummary } = useFlowtreeSessionMetrics(
         rootId,
         visibleGoalIds,
@@ -196,8 +217,10 @@ function FractalGoals() {
             hideCompletedGoals: viewSettings.hideCompletedGoals,
             hiddenInactiveGoalIds,
             allowedGoalIds: programScopeGoalIds,
+            focusGoalIds: sequencingScopeIds,
         })
-    ), [fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, viewSettings.hideCompletedGoals]);
+    ), [fractalData, hiddenInactiveGoalIds, programScopeGoalIds, selectedNodeId, sequencingScopeIds,
+        viewSettings.hideCompletedGoals]);
     const typeToZoomResults = useMemo(() => (
         getGoalSearchMatches(typeToZoomCandidates, typeToZoomQuery)
     ), [typeToZoomCandidates, typeToZoomQuery]);
@@ -552,7 +575,7 @@ function FractalGoals() {
         const handleTypeToZoomKeyDown = (event) => {
             if (event.defaultPrevented) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
-            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (showGoalModal || alertData.isOpen) return;
             if (shouldIgnoreTypeToZoomKey(event)) return;
 
             if (event.key === 'Escape') {
@@ -609,7 +632,6 @@ function FractalGoals() {
         activeCycleGroup,
         alertData.isOpen,
         clearTypeToZoomSearch,
-        fractalToDelete,
         isTypeToZoomOpen,
         showGoalModal,
         typeToZoomQuery.length,
@@ -620,10 +642,10 @@ function FractalGoals() {
 
     useEffect(() => {
         const handleTypeToZoomStartKeyDown = (event) => {
-            if (isTypeToZoomOpen) return;
+            if (isTypeToZoomOpen || expandedChart.activeChart) return;
             if (event.defaultPrevented) return;
             if (event.metaKey || event.ctrlKey || event.altKey) return;
-            if (showGoalModal || fractalToDelete || alertData.isOpen) return;
+            if (showGoalModal || alertData.isOpen) return;
             if (shouldIgnoreTypeToZoomKey(event)) return;
             if (!isSearchCharacter(event.key)) return;
 
@@ -637,7 +659,7 @@ function FractalGoals() {
 
         window.addEventListener('keydown', handleTypeToZoomStartKeyDown, true);
         return () => window.removeEventListener('keydown', handleTypeToZoomStartKeyDown, true);
-    }, [alertData.isOpen, fractalToDelete, isTypeToZoomOpen, showGoalModal]);
+    }, [alertData.isOpen, expandedChart.activeChart, isTypeToZoomOpen, showGoalModal]);
 
     useEffect(() => {
         if (!fractalData || !viewingGoal) return;
@@ -695,21 +717,21 @@ function FractalGoals() {
         }
     };
 
-    const handleToggleCompletion = async (goalId, currentStatus) => {
+    const handleToggleCompletion = async (goalId, currentStatus, sequenceOptions = null) => {
         try {
-            await toggleGoalCompletion(rootId, goalId, !currentStatus);
+            await toggleGoalCompletion(rootId, goalId, !currentStatus, sequenceOptions);
         } catch (err) {
             showAlert('Update Failed', 'Error updating completion: ' + err.message);
         }
     };
 
-    const handleDelete = async () => {
-        if (!fractalToDelete) return;
+    // The goal modal's Delete option has already confirmed, including any sequence choice.
+    const handleDelete = async (goal, options = {}) => {
+        if (!goal) return;
 
         try {
-            await deleteGoal(rootId, fractalToDelete.id);
+            await deleteGoal(rootId, getGoalNodeId(goal), options);
 
-            setFractalToDelete(null);
             setSidebarMode(null);
             setViewingGoal(null);
         } catch (err) {
@@ -743,6 +765,14 @@ function FractalGoals() {
     }
 
     const shouldShowMobileGoalModal = isMobile && isSidebarOpen;
+    // Goal details for the selected goal: the desktop panel and the mobile modal.
+    const viewGoalDetailProps = {
+        isOpen: true, onClose: handleCloseGoalDetails, goal: viewingGoal, onUpdate: handleUpdateNode,
+        onDelete: handleDelete, onAddChild: handleAddChildClick, onToggleCompletion: handleToggleCompletion,
+        evidenceGoalIds, activityDefinitions: activities, rootId, treeData: fractalData, programs, activityGroups,
+        onGoalSelect: handleGoalNameClick, onSequencingChange: setSequenceDraft,
+        chartExpansion: expandedChart.chartExpansion, programScope: goalDetailProgramScope,
+    };
     const handleToggleViewSetting = (settingKey) => (event) => {
         const nextChecked = event.target.checked;
         const shouldTransitionScope = settingKey === 'hideInactiveGoals' || settingKey === 'hideCompletedGoals';
@@ -812,41 +842,44 @@ function FractalGoals() {
                         position: 'relative'
                     }}
                 >
-                    <FlowTreeOptionsPane
-                        isMobile={isMobile}
-                        isMinimized={isOptionsPaneMinimized}
-                        onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
-                        goalsViewMode={goalsViewMode}
-                        onGoalsViewModeChange={handleGoalsViewModeChange}
-                        viewSettings={viewSettings}
-                        onToggleViewSetting={handleToggleViewSetting}
-                        inactiveBranchTooltip={inactiveBranchTooltip}
-                        hideInactiveTooltip={hideInactiveTooltip}
-                        hideCompletedTooltip={hideCompletedTooltip}
-                        activePrograms={activePrograms}
-                        scopedProgramId={scopedProgramId}
-                        onProgramScopeChange={handleProgramScopeChange}
-                        isConfigureMode={showSurfaceConfiguration && isConfigureMode}
-                        onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
-                        onCancelConfigureMode={handleCancelConfigureMode}
-                        surfaces={showSurfaceConfiguration ? surfaces : EMPTY_ARRAY}
-                        activeSurfaceId={activeSurfaceId}
-                        isSurfaceDirty={isSurfaceDirty}
-                        onSelectSurface={showSurfaceConfiguration ? ((id) => loadSurfaceConfig(
-                            surfaces.find((s) => s.id === id) || null,
-                            configViewportIsMobile,
-                            { respectStoredPreferences: false }
-                        )) : null}
-                        onSaveSurface={handleSaveSurface}
-                        onSaveSurfaceAs={handleSaveSurfaceAs}
-                        onSetDefaultSurface={handleSetDefaultSurface}
-                        onDeleteSurface={handleDeleteSurface}
-                        surfacePointerCell={surfacePointerCell}
-                        surfaceConfigTarget={configViewportIsMobile ? 'mobile' : 'desktop'}
-                        onSurfaceConfigTargetChange={handleSurfaceConfigTargetChange}
-                        surfaceViewMode={surfaceViewMode}
-                    />
-                    {isTypeToZoomOpen && typeToZoomQuery && (
+                    {/* The tree's controls leave with it while an expanded goal chart replaces it. */}
+                    {!expandedChart.activeChart && (
+                        <FlowTreeOptionsPane
+                            isMobile={isMobile}
+                            isMinimized={isOptionsPaneMinimized}
+                            onToggleMinimized={() => setIsOptionsPaneMinimized((prev) => !prev)}
+                            goalsViewMode={goalsViewMode}
+                            onGoalsViewModeChange={handleGoalsViewModeChange}
+                            viewSettings={viewSettings}
+                            onToggleViewSetting={handleToggleViewSetting}
+                            inactiveBranchTooltip={inactiveBranchTooltip}
+                            hideInactiveTooltip={hideInactiveTooltip}
+                            hideCompletedTooltip={hideCompletedTooltip}
+                            activePrograms={activePrograms}
+                            scopedProgramId={scopedProgramId}
+                            onProgramScopeChange={handleProgramScopeChange}
+                            isConfigureMode={showSurfaceConfiguration && isConfigureMode}
+                            onToggleConfigureMode={showSurfaceConfiguration ? handleEnterConfigureMode : null}
+                            onCancelConfigureMode={handleCancelConfigureMode}
+                            surfaces={showSurfaceConfiguration ? surfaces : EMPTY_ARRAY}
+                            activeSurfaceId={activeSurfaceId}
+                            isSurfaceDirty={isSurfaceDirty}
+                            onSelectSurface={showSurfaceConfiguration ? ((id) => loadSurfaceConfig(
+                                surfaces.find((s) => s.id === id) || null,
+                                configViewportIsMobile,
+                                { respectStoredPreferences: false }
+                            )) : null}
+                            onSaveSurface={handleSaveSurface}
+                            onSaveSurfaceAs={handleSaveSurfaceAs}
+                            onSetDefaultSurface={handleSetDefaultSurface}
+                            onDeleteSurface={handleDeleteSurface}
+                            surfacePointerCell={surfacePointerCell}
+                            surfaceConfigTarget={configViewportIsMobile ? 'mobile' : 'desktop'}
+                            onSurfaceConfigTargetChange={handleSurfaceConfigTargetChange}
+                            surfaceViewMode={surfaceViewMode}
+                        />
+                    )}
+                    {isTypeToZoomOpen && typeToZoomQuery && !expandedChart.activeChart && (
                         <div className="type-to-zoom-palette" role="status" aria-live="polite">
                             <div className="type-to-zoom-label">Find goal</div>
                             <div className="type-to-zoom-query">{renderTypeToZoomQuery(typeToZoomQuery)}</div>
@@ -873,9 +906,17 @@ function FractalGoals() {
                         onPointerCellChange={setSurfacePointerCell}
                         sharedWidgetData={surfaceSharedData}
                         renderTree={() => (
+                            <GoalTreeChartLayer
+                                chart={expandedChart.activeChart}
+                                isLeaving={expandedChart.isLeaving}
+                                rootId={rootId}
+                                goal={viewingGoal}
+                                isMobile={isMobile}
+                                onClose={expandedChart.collapseChart}
+                            >
                             <FractalView
                                 ref={flowTreeRef}
-                                treeData={fractalData}
+                                treeData={flowTreeData}
                                 evidenceGoalIds={evidenceGoalIds}
                                 metricsSummary={flowtreeMetricsSummary}
                                 activeGoalWindowDays={activeGoalWindowDays}
@@ -883,6 +924,7 @@ function FractalGoals() {
                                 activityGroups={activityGroups}
                                 programs={programs}
                                 allowedGoalIds={programScopeGoalIds}
+                                focusGoalIds={sequencingScopeIds}
                                 scopedProgramName={scopedProgram?.name || null}
                                 viewSettings={viewSettings}
                                 scopeTransitionKey={flowTreeScopeTransitionKey}
@@ -894,6 +936,7 @@ function FractalGoals() {
                                 layoutMode={goalsViewMode}
                                 key={`${rootId}-${goalsViewMode}`}
                             />
+                            </GoalTreeChartLayer>
                         )}
                         renderDetail={() => (
                             <div className="surface-detail-window">
@@ -918,26 +961,7 @@ function FractalGoals() {
                                         </Suspense>
                                     ) : (
                                         <ErrorBoundary>
-                                            <GoalDetailModal
-                                                isOpen={true}
-                                                onClose={() => {
-                                                    setSidebarMode(null);
-                                                    setViewingGoal(null);
-                                                }}
-                                                goal={viewingGoal}
-                                                onUpdate={handleUpdateNode}
-                                                onDelete={(node) => setFractalToDelete(node)}
-                                                onAddChild={handleAddChildClick}
-                                                onToggleCompletion={handleToggleCompletion}
-                                                evidenceGoalIds={evidenceGoalIds}
-                                                activityDefinitions={activities}
-                                                rootId={rootId}
-                                                treeData={fractalData}
-                                                displayMode="panel"
-                                                programs={programs}
-                                                activityGroups={activityGroups}
-                                                onGoalSelect={handleGoalNameClick}
-                                            />
+                                            <GoalDetailModal {...viewGoalDetailProps} displayMode="panel" />
                                         </ErrorBoundary>
                                     )}
                                 </div>
@@ -966,35 +990,10 @@ function FractalGoals() {
                             }}
                         />
                     ) : (
-                        <GoalDetailModal
-                            isOpen={true}
-                            onClose={handleCloseGoalDetails}
-                            goal={viewingGoal}
-                            onUpdate={handleUpdateNode}
-                            activityDefinitions={activities}
-                            onToggleCompletion={handleToggleCompletion}
-                            onAddChild={handleAddChildClick}
-                            onDelete={(node) => setFractalToDelete(node)}
-                            evidenceGoalIds={evidenceGoalIds}
-                            rootId={rootId}
-                            treeData={fractalData}
-                            displayMode="modal"
-                            programs={programs}
-                            activityGroups={activityGroups}
-                            onGoalSelect={handleGoalNameClick}
-                        />
+                        <GoalDetailModal {...viewGoalDetailProps} displayMode="modal" />
                     )}
                 </Suspense>
             )}
-
-            <DeleteConfirmModal
-                isOpen={!!fractalToDelete}
-                onClose={() => setFractalToDelete(null)}
-                onConfirm={handleDelete}
-                title="Delete Goal?"
-                message={`Are you sure you want to delete "${fractalToDelete?.name}" and all its children?`}
-                requireMatchingText="delete"
-            />
 
             <AlertModal
                 isOpen={alertData.isOpen}

@@ -1,13 +1,12 @@
 import React from 'react';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
-vi.mock('../../../hooks/useActivityProgressViews', () => ({
-    useActivityTagCatalog: () => ({ data: { tags: [], duplicate_groups: [] } }),
+vi.mock('../../../hooks/useActivityTags', () => ({
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [] } }),
+    useActivityTagCatalogMutations: () => ({ isPending: false }),
     useActivityTagMutations: () => ({
         createTag: vi.fn(),
-        updateCatalogTag: vi.fn(),
-        hardDeleteCatalogTag: vi.fn(),
-        archiveTag: vi.fn(),
+        restoreTag: vi.fn(),
         assignInstanceTags: vi.fn(),
         assignSetTags: vi.fn(),
         isPending: false,
@@ -45,7 +44,6 @@ it('replaces assigned tags with a count badge only while their container overflo
             rootId="root"
             activityId="activity"
             instanceId="instance"
-            availableTags={tags}
             tags={tags}
         />,
     );
@@ -77,7 +75,6 @@ it('keeps a single-tag overflow summary stable near the fit boundary', () => {
             rootId="root"
             activityId="activity"
             instanceId="instance"
-            availableTags={tags}
             tags={tags}
         />,
     );
@@ -111,7 +108,6 @@ it('shows assigned tags read-only without an add trigger when editing is inactiv
             rootId="root"
             activityId="activity"
             instanceId="instance"
-            availableTags={tags}
             tags={tags}
             editable={false}
         />,
@@ -130,7 +126,6 @@ it('places a header trigger before its assigned tags', () => {
             rootId="root"
             activityId="activity"
             instanceId="instance"
-            availableTags={tags}
             tags={tags}
             triggerFirst
         />,
@@ -149,7 +144,6 @@ it('portals and viewport-clamps the picker outside narrow session containers', (
                 rootId="root"
                 activityId="activity"
                 instanceId="instance"
-                availableTags={[]}
             />
         </div>,
     );

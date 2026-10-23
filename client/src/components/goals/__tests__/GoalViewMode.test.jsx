@@ -16,7 +16,6 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 vi.mock('../../atoms/GoalIcon', () => ({
     default: () => <span data-testid="goal-icon" />,
 }));
-vi.mock('../../goalDetail/GoalActivityHeatmap', () => ({ default: () => <section aria-label="Timeline" /> }));
 
 const RENDER_OPTIONS = {
     withTheme: false,
@@ -50,13 +49,10 @@ describe('GoalViewMode', () => {
                 trackActivities={false}
                 displayMode="modal"
                 programs={[]}
-                targets={[]}
                 associatedActivities={[]}
                 activityDefinitions={[]}
                 name="She's Got It"
                 description="Practice the performance piece cleanly."
-                relevanceStatement=""
-                setTargets={vi.fn()}
                 goalCompletionNote={{
                     id: 'note-1',
                     content: 'This clicked at full speed.',
@@ -92,11 +88,22 @@ describe('GoalViewMode', () => {
             trackActivities: true,
             levelConfig: { track_activities: false },
         },
-    ])('keeps persisted targets visible when $name', async ({ trackActivities, levelConfig }) => {
+    ])('keeps the completion condition visible when $name', async ({ trackActivities, levelConfig }) => {
         renderWithProviders(
             <GoalViewMode
                 mode="edit"
-                goal={{ id: 'goal-1', type: 'LongTermGoal', attributes: { id: 'goal-1', type: 'LongTermGoal' } }}
+                goal={{
+                    id: 'goal-1',
+                    type: 'LongTermGoal',
+                    completion_condition: 'activity_threshold',
+                    condition: {
+                        activity_definition_id: 'activity-1',
+                        kind: 'consistency',
+                        required_count: 5,
+                        rules: [],
+                    },
+                    attributes: { id: 'goal-1', type: 'LongTermGoal' },
+                }}
                 goalId="goal-1"
                 rootId="root-1"
                 goalType="LongTermGoal"
@@ -105,18 +112,16 @@ describe('GoalViewMode', () => {
                 trackActivities={trackActivities}
                 displayMode="modal"
                 programs={[]}
-                targets={[{ id: 'target-1', name: 'Clean Front Lever' }]}
                 associatedActivities={[]}
-                activityDefinitions={[]}
+                activityDefinitions={[{ id: 'activity-1', name: 'Front Lever Hold', metric_definitions: [] }]}
                 name="Have a Clean 5 Second Front Lever"
                 description=""
-                relevanceStatement=""
-                setTargets={vi.fn()}
                 readOnly
             />,
             RENDER_OPTIONS
         );
 
-        expect(await screen.findByText('Targets', {}, { timeout: 5000 })).toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: 'Completion' }, { timeout: 5000 })).toBeInTheDocument();
+        expect(screen.getByText('Front Lever Hold: 5 sessions')).toBeInTheDocument();
     });
 });

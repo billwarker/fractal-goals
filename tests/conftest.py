@@ -10,7 +10,7 @@ This file contains:
 import os
 import sys
 import pytest
-from sqlalchemy import event, text
+from sqlalchemy import MetaData, event, text
 from datetime import datetime, timedelta, timezone
 import uuid
 import json
@@ -99,7 +99,11 @@ def test_database_engine():
         with engine.begin() as connection:
             connection.execute(text('DROP TABLE IF EXISTS visualization_annotations CASCADE'))
             connection.execute(text('DROP TABLE IF EXISTS activity_instance_modes CASCADE'))
-        Base.metadata.drop_all(engine)
+        # Drop what the database actually holds, so a schema built by another branch resets cleanly.
+        # alembic_version stays: the backup/restore drill reads the test database's revision stamp.
+        existing = MetaData()
+        existing.reflect(engine, only=lambda name, _metadata: name != 'alembic_version')
+        existing.drop_all(engine)
         init_db(engine)
         yield engine
     finally:

@@ -37,6 +37,7 @@ import {
 } from '../hooks/useProgramDayReadModel';
 import { useProgramsCalendarData } from '../hooks/useProgramsCalendarData';
 import useProgramDaysTab from '../hooks/useProgramDaysTab';
+import useGoalDueDateDrop, { useGoalDueCalendarEvents } from '../hooks/useGoalDueDateDrop';
 import { useProgramCalendarFeed } from '../hooks/useProgramCalendarFeed';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -46,7 +47,7 @@ import notify from '../utils/notify';
 import { attachFeedBlocks, buildCalendarFeedEvents } from '../utils/programCalendarFeed';
 import { useCalendarPeriodEditor } from '../hooks/useCalendarPeriods';
 import { createProgramCalendarContext, formatProgramCalendarSelection, getProgramOverviewMetricsRange, programCalendarContextReducer } from '../utils/programCalendarContext';
-import { buildProgramBlockLabels, buildProgramsCalendarEvents, getProgramColor } from '../utils/programViewModel';
+import { buildProgramBlockLabels, getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
 import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 import styles from './ProgramCalendarPage.module.css';
@@ -164,14 +165,7 @@ function ProgramCalendarPage() {
         () => attachFeedBlocks(programs, calendarFeed.blocks),
         [calendarFeed.blocks, programs],
     );
-    const goalDeadlineEvents = useMemo(() => buildProgramsCalendarEvents(
-        [],
-        goals,
-        getGoalColor,
-        getGoalTextColor,
-        timezone,
-        { getGoalSecondaryColor, getGoalIcon },
-    ), [getGoalColor, getGoalIcon, getGoalSecondaryColor, getGoalTextColor, goals, timezone]);
+    const goalDeadlineEvents = useGoalDueCalendarEvents(goals, timezone, { getGoalColor, getGoalTextColor, getGoalSecondaryColor, getGoalIcon }, displayProgram);
     const blockLabels = useMemo(() => (
         calendarPrograms.flatMap((program) => buildProgramBlockLabels({
             program,
@@ -222,6 +216,9 @@ function ProgramCalendarPage() {
         selectedGoal,
         modalMode,
         selectedParent,
+        goalCreateContext,
+        justCreatedGoalId,
+        handleGoalCreated,
         blockCreationMode,
         setBlockCreationMode,
         openGoalModal,
@@ -342,6 +339,7 @@ function ProgramCalendarPage() {
         onBlockSaved: handleProgramBlockSaveSuccess,
         onDaySaved: handleProgramDaySaved,
         onGoalEditorClosed: closeGoalModal,
+        onGoalCreated: handleGoalCreated,
     });
 
     const displayProgramStatus = displayProgram ? getProgramStatus(displayProgram, todayInTimezone) : null;
@@ -704,6 +702,7 @@ function ProgramCalendarPage() {
     const viewToggle = displayProgram ? (
         <ViewToggleTabs
             className={styles.headerViewToggle}
+            size="header"
             items={PROGRAM_VIEW_ITEMS}
             value={viewMode}
             onChange={setViewMode}
@@ -725,6 +724,7 @@ function ProgramCalendarPage() {
         </>
     );
 
+    const dueDateDrop = useGoalDueDateDrop({ goals: displayGoals, program: displayProgram, today: todayInTimezone, updateGoal, isMobile });
     const daysTab = useProgramDaysTab({
         rootId,
         program: displayProgram,
@@ -740,6 +740,8 @@ function ProgramCalendarPage() {
         activities,
         activityGroups,
         onGoalClick: openGoalModal,
+        onStartSubGoalCreation: handleAddChildGoal,
+        justCreatedGoalId,
     });
     useEffect(() => {
         showSavedDayRef.current = daysTab.showDay;
@@ -767,6 +769,7 @@ function ProgramCalendarPage() {
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
                                 calendarEvents={calendarEventsWithSessions}
+                                onGoalDueDrop={dueDateDrop.onGoalDueDrop}
                                 blockLabels={blockLabels}
                                 blockCreationMode={blockCreationMode}
                                 setBlockCreationMode={setMultiDaySelectionMode}
@@ -866,6 +869,9 @@ function ProgramCalendarPage() {
                     ) : null}
                     programGoalSeeds={hierarchyGoalSeeds}
                     onGoalClick={openGoalModal}
+                    onStartSubGoalCreation={handleAddChildGoal}
+                    justCreatedGoalId={justCreatedGoalId}
+                    dueDragEnabled={dueDateDrop.dueDragEnabled}
                     rootId={rootId}
                     scope={selectedTimeframeDates.length ? 'range' : calendarScope}
                     contextDate={contextDate}
@@ -1001,6 +1007,8 @@ function ProgramCalendarPage() {
                         mode={modalMode}
                         onCreate={createGoal}
                         parentGoal={selectedParent}
+                        initialActivities={goalCreateContext?.initialActivities || []}
+                        initialCompletion={goalCreateContext?.initialCompletion || null}
                     />
                 )}
             </Suspense>

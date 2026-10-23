@@ -94,6 +94,10 @@ export function buildPlaceholderInstance({ id, sessionId, definition, groupName 
         metrics: [],
         tags: [],
         tag_assignment_version: 0,
+        comparison_context: {
+            mode: 'same_tags', tag_ids: [], tags: [], same_template: false, same_program_day: false,
+            template: null, program_day: null, remembered_for: null, version: 1,
+        },
         progress_comparison: null,
         prescription: null,
         _pendingSync: true,
@@ -117,6 +121,7 @@ const NOTE_TYPE_LABELS = {
 
 function deriveNoteType(contextType, { setIndex = null, activitySetId = null, noteKind = null } = {}) {
     if (contextType === 'goal' && noteKind === 'goal_completion') return 'goal_completion_note';
+    if (contextType === 'goal' && noteKind === 'goal_review') return 'goal_review_note';
     if (contextType === 'activity_instance') {
         return setIndex !== null || activitySetId ? 'activity_set_note' : 'activity_instance_note';
     }

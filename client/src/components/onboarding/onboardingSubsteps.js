@@ -5,8 +5,8 @@ const info = (id, title, description) => ({ id, title, description, kind: 'info'
 export const ONBOARDING_SUBSTEPS = {
     break_it_down: [
         tracked('goal_detail_modal_opened', 'Open the Goal Detail Modal', 'The Goal Detail Modal is the home for all information about your goals. You can edit their attributes using the Edit or Options buttons in the footer.'),
-        tracked('goal_timeline_viewed', 'Explore your Goal Timeline', 'In Goal Details, explore the Timeline calendar and events. Select a day to inspect its evidence, use Load more for earlier entries, or scroll through the events to keep Timeline at the top.'),
-        tracked('goal_activities_viewed', "Visit your Goal's Activities", "Once you create activities to define how you'll progress towards your goals, you can associate them to your goals. You can then create targets against those activities, giving your goal real conditions for success. You can create and associate activities from this modal, or by visiting Sessions > Manage Activities."),
+        tracked('goal_timeline_viewed', 'Explore your Goal Timeline', 'Open the Timeline tab in the Goal Detail Modal to see your activity calendar and events. Select a day to inspect its evidence, or use Load more for earlier entries.'),
+        tracked('goal_activities_viewed', "Visit your Goal's Activities", "Once you create activities to define how you'll progress towards your goals, you can associate them to your goals. You can then have a goal complete on an activity threshold, giving it a real finish line. You can create and associate activities from this modal, or by visiting Sessions > Manage Activities."),
         tracked('goal_notes_viewed', "Visit your Goal's Notes", 'You can keep track of any thoughts or notes about your goal here. Notes made on activities associated to your goals will also show up here too. Great for collecting links and online videos.'),
         tracked('child_goal_created', 'Create a Child Goal', 'Break your goal down into smaller pieces, giving you a path towards completing your {level} goal.'),
     ],
@@ -22,7 +22,7 @@ export const ONBOARDING_SUBSTEPS = {
         tracked('specific', 'Specific', 'Add a clear description of the result.'),
         tracked('measurable', 'Measurable', 'Open the goal detail modal and go to Activities › Add Target, then select an activity to create a target against. Alternatively, set the goal to complete once its children are complete.'),
         tracked('achievable', 'Achievable', 'Associate an activity or activity group, or use child completion.'),
-        tracked('relevant', 'Relevant', 'Explain how the goal supports its parent or why the ultimate goal matters.'),
+        tracked('reviewed', 'Reviewed', 'Keep reviews on, with a cadence, so the goal gets looked back on.'),
         tracked('time_bound', 'Time-bound', 'Set a deadline.'),
         info('review_badge', 'Review the badge', 'Each highlighted letter in the goal header represents a SMART criterion you have met.'),
     ],

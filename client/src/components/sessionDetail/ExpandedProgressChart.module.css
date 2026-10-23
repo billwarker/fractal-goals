@@ -1,0 +1,121 @@
+/* Fills the session content's place (see SessionDetail.module.css .sessionMainArea). */
+.expanded {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    /* One grid cell of inset, so the chart sits on the page grid's cells. */
+    padding: 20px;
+    box-sizing: border-box;
+    outline: none;
+    opacity: 0;
+    transition: opacity 200ms ease-in-out;
+}
+
+.expanded[data-visible='true'] {
+    opacity: 1;
+}
+
+.header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.titles {
+    display: grid;
+    flex: 1 1 auto;
+    gap: 4px;
+    min-width: 0;
+}
+
+.title {
+    margin: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-md, 15px);
+    font-weight: var(--font-weight-semibold);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.titleDetail {
+    color: var(--color-text-secondary);
+    font-weight: 400;
+}
+
+.scope {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs, 12px);
+}
+
+.scopeTags {
+    display: inline-flex;
+    min-width: 0;
+}
+
+.actions {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.analyticsLink {
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs, 12px);
+    text-decoration: none;
+}
+
+.analyticsLink:hover,
+.analyticsLink:focus-visible {
+    text-decoration: underline;
+}
+
+.chart {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.chart > * {
+    height: 100%;
+}
+
+/* A changed comparison cross-fades the chart (useFadeSwap). */
+.chart {
+    transition: opacity 200ms ease-in-out;
+}
+
+.chart[data-visible='false'] {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .expanded,
+    .chart {
+        transition: none;
+    }
+}
+
+/* On mobile the page scrolls, so the chart holds the viewport between the nav and the dock. */
+@media (max-width: 768px) {
+    .expanded {
+        position: fixed;
+        top: var(--app-nav-height, 0px);
+        bottom: var(--mobile-session-footer-height, 0px);
+        z-index: calc(var(--z-sheet) - 1);
+        padding: 12px;
+    }
+
+    .header {
+        flex-wrap: wrap;
+    }
+}

@@ -29,54 +29,17 @@ export const getGoalNodeChildren = (goal) => (
     Array.isArray(goal?.children) ? goal.children : []
 );
 
-export const parseGoalTargets = (goal) => {
-    if (!goal) return [];
-
-    const rawTargets = goal.attributes?.targets ?? goal.targets;
-    if (!rawTargets) return [];
-
-    try {
-        const parsedTargets = typeof rawTargets === 'string'
-            ? JSON.parse(rawTargets)
-            : rawTargets;
-        return Array.isArray(parsedTargets) ? parsedTargets : [];
-    } catch {
-        return [];
-    }
-};
-
-export const getGoalTargetsSignature = (goal) => {
-    const targets = parseGoalTargets(goal);
-    if (targets.length === 0) return 'targets:[]';
-
-    const normalizedTargets = targets.map((target) => ({
-        id: target?.id ?? null,
-        name: target?.name ?? null,
-        type: target?.type ?? null,
-        activity_id: target?.activity_id ?? null,
-        activity_instance_id: target?.activity_instance_id ?? null,
-        activity_group_id: target?.activity_group_id ?? null,
-        completed: Boolean(target?.completed),
-        completed_at: target?.completed_at ?? null,
-        completed_session_id: target?.completed_session_id ?? null,
-        completed_instance_id: target?.completed_instance_id ?? null,
-        metrics: Array.isArray(target?.metrics) ? target.metrics : [],
-        time_scope: target?.time_scope ?? null,
-        start_date: target?.start_date ?? null,
-        end_date: target?.end_date ?? null,
-        linked_block_id: target?.linked_block_id ?? null,
-        frequency_days: target?.frequency_days ?? null,
-        frequency_count: target?.frequency_count ?? null,
-    }));
-
-    return `targets:${JSON.stringify(normalizedTargets)}`;
+export const getGoalConditionSignature = (goal) => {
+    const completionCondition = goal?.completion_condition ?? goal?.attributes?.completion_condition ?? 'manual';
+    const condition = goal?.condition ?? goal?.attributes?.condition ?? null;
+    return `condition:${completionCondition}:${JSON.stringify(condition)}`;
 };
 
 export const getGoalNodeRevision = (goal) => {
     if (!goal) return 'initial';
     return goal.attributes?.updated_at
         || goal.updated_at
-        || getGoalTargetsSignature(goal)
+        || getGoalConditionSignature(goal)
         || 'initial';
 };
 
@@ -112,12 +75,12 @@ export const normalizeGoalNode = (goal, options = {}) => {
         type,
         goalCategory: getGoalNodeCategory(type),
         description: getGoalNodeDescription(goal),
-        relevance_statement: goal.attributes?.relevance_statement ?? goal.relevance_statement,
         deadline: goal.deadline ?? goal.attributes?.deadline ?? null,
         completed: Boolean(goal.completed ?? goal.attributes?.completed),
         completed_at: goal.completed_at ?? goal.attributes?.completed_at ?? null,
         paused: Boolean(goal.paused ?? goal.attributes?.paused),
         paused_at: goal.paused_at ?? goal.attributes?.paused_at ?? null,
+        pause_reason: goal.pause_reason ?? goal.attributes?.pause_reason ?? null,
         created_at: goal.attributes?.created_at ?? goal.created_at ?? null,
         level_id: goal.level_id ?? goal.attributes?.level_id ?? null,
         level_name: goal.level_name ?? goal.attributes?.level_name ?? null,
@@ -125,7 +88,12 @@ export const normalizeGoalNode = (goal, options = {}) => {
         is_smart: goal.is_smart ?? goal.attributes?.is_smart ?? false,
         depth,
         isLinked,
-        targets: parseGoalTargets(goal),
+        completion_condition: goal.completion_condition ?? goal.attributes?.completion_condition ?? 'manual',
+        condition: goal.condition ?? goal.attributes?.condition ?? null,
+        completion_state: goal.completion_state ?? goal.attributes?.completion_state ?? null,
+        started_at: goal.started_at ?? goal.attributes?.started_at ?? null,
+        sequence_track_id: goal.sequence_track_id ?? goal.attributes?.sequence_track_id ?? null,
+        sequence_position: goal.sequence_position ?? goal.attributes?.sequence_position ?? null,
         attributes: goal.attributes || {},
         children: resolvedChildren,
         childrenIds: resolvedChildren.map((child) => getGoalNodeId(child)).filter(Boolean),

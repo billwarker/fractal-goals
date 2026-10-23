@@ -5,6 +5,7 @@ function TimelineShell({
     bodyClassName,
     composerClassName,
     selector = null,
+    bodyRef = null,
     children,
     composer = null,
 }) {
@@ -12,7 +13,7 @@ function TimelineShell({
         <div className={className}>
             {selector}
 
-            <div className={bodyClassName}>
+            <div ref={bodyRef} className={bodyClassName}>
                 {children}
             </div>
 

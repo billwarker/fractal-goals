@@ -180,10 +180,6 @@ def _get_event_description(event: Event):
         Events.GOAL_DELETED: f"Deleted goal: {name}" if name else "Deleted goal",
         Events.GOAL_BLOCK_ASSOCIATED: f"Associated goal '{event.data.get('goal_name', 'Unknown')}' to block '{event.data.get('block_name', 'Unknown')}'",
         
-        Events.TARGET_ACHIEVED: f"Target achieved: {event.data.get('target_name', 'Unknown')}",
-        Events.TARGET_CREATED: f"Created target: {event.data.get('target_name', 'Unknown')}",
-        Events.TARGET_DELETED: f"Deleted target: {event.data.get('target_name', 'Unknown')}",
-        
         Events.ACTIVITY_INSTANCE_CREATED: f"Started activity: {event.data.get('activity_name', 'Unknown')}",
         Events.ACTIVITY_INSTANCE_DELETED: f"Removed activity: {event.data.get('activity_name', 'Unknown')}",
         Events.ACTIVITY_INSTANCE_UPDATED: f"Updated activity: {event.data.get('activity_name', 'Unknown')}",

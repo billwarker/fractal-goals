@@ -18,6 +18,19 @@ const {
     useActivityHistory: vi.fn(() => ({ history: [], loading: false, error: null })),
 }));
 
+const CATALOG_TAGS = [
+    { id: 'parent-tag', name: 'Parent tag' },
+    { id: 'set-tag', name: 'Set-specific tag' },
+    { id: 'unused-tag', name: 'Available set tag' },
+];
+
+vi.mock('../../../hooks/useActivityTags', () => ({
+    // Any catalog tag is an option for any activity.
+    useActivityTagCatalog: () => ({ data: { families: [], tags: CATALOG_TAGS } }),
+    useActivityTagCatalogMutations: () => ({ isPending: false }),
+    useActivityTagMutations: () => ({ isPending: false }),
+}));
+
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionData: () => ({
         rootId: 'root-1',

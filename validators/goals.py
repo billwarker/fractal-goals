@@ -4,12 +4,11 @@ Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
 import re
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
     MAX_NAME_LENGTH,
     MAX_DESCRIPTION_LENGTH,
-    MAX_RELEVANCE_LENGTH,
     VALID_PROGRESS_AGGREGATIONS,
     sanitize_string,
     parse_date_string,
@@ -25,18 +24,6 @@ VALID_ROOT_GOAL_TYPES = [
 ]
 
 
-class TargetSchema(BaseModel):
-    """Schema for a goal target."""
-    model_config = ConfigDict(extra='allow')  # Allow additional fields for flexibility
-    
-    id: Optional[str] = None
-    activity_id: Optional[str] = None
-    metric_id: Optional[str] = None
-    comparison: Optional[str] = Field(None, pattern=r'^(>=|<=|>|<|=|==)$')
-    target_value: Optional[float] = None
-    description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-
-
 class GoalCreateSchema(BaseModel):
     """Schema for creating a new goal."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -46,11 +33,10 @@ class GoalCreateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     parent_id: Optional[str] = None
     deadline: Optional[str] = None
-    targets: Optional[List[Dict[str, Any]]] = None
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
-    completed_via_children: Optional[bool] = False
+    started_at: Optional[str] = None
+    completion_condition: Optional[Literal['activity_threshold', 'children', 'manual']] = None
+    condition: Optional[Dict[str, Any]] = None
     inherit_parent_activities: Optional[bool] = False
-    allow_manual_completion: Optional[bool] = True
     track_activities: Optional[bool] = True
     session_id: Optional[str] = None  # If provided, link goal to session
     activity_definition_id: Optional[str] = None
@@ -70,13 +56,6 @@ class GoalCreateSchema(BaseModel):
         if v is None:
             return v
         return sanitize_string(v)
-
-    @field_validator('relevance_statement')
-    @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
     
     @field_validator('type')
     @classmethod
@@ -85,6 +64,17 @@ class GoalCreateSchema(BaseModel):
             raise ValueError(f"Invalid goal type. Must be one of: {', '.join(VALID_GOAL_TYPES)}")
         return v
     
+    @field_validator('started_at')
+    @classmethod
+    def validate_started_at(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '':
+            return None
+        try:
+            parse_date_string(v.split('T')[0])
+            return v
+        except ValueError:
+            raise ValueError("Invalid start date format. Use YYYY-MM-DD")
+
     @field_validator('deadline')
     @classmethod
     def validate_deadline(cls, v: Optional[str]) -> Optional[str]:
@@ -106,15 +96,39 @@ class GoalUpdateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     deadline: Optional[str] = None
     parent_id: Optional[str] = None
-    targets: Optional[List[Dict[str, Any]]] = None
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
+    started_at: Optional[str] = None
+    completion_condition: Optional[Literal['activity_threshold', 'children', 'manual']] = None
+    condition: Optional[Dict[str, Any]] = None
     completed: Optional[bool] = None
-    completed_via_children: Optional[bool] = None
     inherit_parent_activities: Optional[bool] = None
-    allow_manual_completion: Optional[bool] = None
     track_activities: Optional[bool] = None
     progress_settings: Optional[Dict[str, Any]] = None
-    
+    # Review schedule: both cadence fields together (both null = use the level's cadence).
+    review_cadence_value: Optional[int] = Field(None, ge=1, le=999)
+    review_cadence_unit: Optional[Literal['days', 'weeks', 'months', 'years']] = None
+    review_disabled: Optional[bool] = None
+    review_deferred_until: Optional[str] = None
+
+    @model_validator(mode='after')
+    def validate_review_cadence_pair(self):
+        sent = self.model_fields_set
+        if ('review_cadence_value' in sent) != ('review_cadence_unit' in sent) or (
+            (self.review_cadence_value is None) != (self.review_cadence_unit is None)
+        ):
+            raise ValueError("Send review_cadence_value and review_cadence_unit together")
+        return self
+
+    @field_validator('review_deferred_until')
+    @classmethod
+    def validate_review_deferred_until(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '':
+            return None
+        try:
+            parse_date_string(v.split('T')[0])
+            return v
+        except ValueError:
+            raise ValueError("Invalid review date format. Use YYYY-MM-DD")
+
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
@@ -129,12 +143,17 @@ class GoalUpdateSchema(BaseModel):
             return v
         return sanitize_string(v)
     
-    @field_validator('relevance_statement')
+
+    @field_validator('started_at')
     @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
+    def validate_started_at(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == '':
+            return None
+        try:
+            parse_date_string(v.split('T')[0])
             return v
-        return sanitize_string(v)
+        except ValueError:
+            raise ValueError("Invalid start date format. Use YYYY-MM-DD")
 
     @field_validator('deadline')
     @classmethod
@@ -202,6 +221,35 @@ class GoalCompletionUpdateSchema(BaseModel):
     """Schema for toggling or explicitly setting goal completion."""
     completed: Optional[bool] = None
     session_id: Optional[str] = None
+    # Sequenced goals: whether completing resumes the next step / un-completing re-pauses it.
+    begin_next: Optional[bool] = None
+    pause_next: Optional[bool] = None
+
+
+class GoalSequenceCreateSchema(BaseModel):
+    """A new sequence of sibling goals, in order."""
+    parent_goal_id: str = Field(..., min_length=1)
+    goal_ids: List[str] = Field(..., min_length=2, max_length=50)
+
+
+class GoalChartAttachSchema(BaseModel):
+    """A saved analytics view to show on a goal."""
+    dashboard_id: str = Field(..., min_length=1, max_length=80)
+
+
+class GoalChartOrderSchema(BaseModel):
+    """A goal's attached views, in display order."""
+    dashboard_ids: List[str] = Field(default_factory=list, max_length=12)
+
+
+class DashboardGoalsSchema(BaseModel):
+    """The goals a saved analytics view shows on."""
+    goal_ids: List[str] = Field(default_factory=list, max_length=200)
+
+
+class GoalSequenceStepsSchema(BaseModel):
+    """A sequence's steps, in order; fewer than two dissolves it."""
+    goal_ids: List[str] = Field(default_factory=list, max_length=50)
 
 
 class GoalPauseSchema(BaseModel):
@@ -219,49 +267,10 @@ class GoalConvertLevelSchema(BaseModel):
     level_id: str = Field(..., min_length=1)
 
 
-class GoalTargetCreateSchema(BaseModel):
-    """Schema for creating a target on a goal."""
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    id: Optional[str] = None
-    name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
-    activity_id: Optional[str] = None
-    activity_instance_id: Optional[str] = None
-    type: Optional[str] = None
-    time_scope: Optional[str] = None
-    start_date: Optional[str] = None
-    end_date: Optional[str] = None
-    linked_block_id: Optional[str] = None
-    frequency_days: Optional[int] = Field(None, ge=0)
-    frequency_count: Optional[int] = Field(None, ge=0)
-    metrics: Optional[List[Dict[str, Any]]] = None
-
-    @field_validator('name')
-    @classmethod
-    def sanitize_name(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        return sanitize_string(v)
-
-    @field_validator('frequency_days', 'frequency_count', mode='before')
-    @classmethod
-    def empty_frequency_to_none(cls, v):
-        if v == '':
-            return None
-        return v
-
-
-class GoalTargetUpdateSchema(GoalTargetCreateSchema):
-    """Schema for updating an existing target on a goal.
-
-    All fields remain optional; only supplied fields are applied.
-    """
-    pass
-
-
-class GoalTargetEvaluationSchema(BaseModel):
-    """Schema for evaluating goal targets against a session."""
-    session_id: str = Field(..., min_length=1)
+class GoalConditionUpdateSchema(BaseModel):
+    """Schema for setting how a goal completes."""
+    completion_condition: Literal['activity_threshold', 'children', 'manual']
+    condition: Optional[Dict[str, Any]] = None
 
 
 class GoalAssociationBatchSchema(BaseModel):
@@ -277,20 +286,12 @@ class FractalCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     type: Optional[str] = Field('UltimateGoal')
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
-    relevance_statement: Optional[str] = Field(None, max_length=MAX_RELEVANCE_LENGTH)
     deadline: Optional[str] = None
     level_styles: Optional[Dict[str, Dict[str, Any]]] = None
     
     @field_validator('name')
     @classmethod
     def sanitize_name(cls, v: str) -> str:
-        return sanitize_string(v)
-
-    @field_validator('relevance_statement')
-    @classmethod
-    def sanitize_relevance(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
         return sanitize_string(v)
     
     @field_validator('type')

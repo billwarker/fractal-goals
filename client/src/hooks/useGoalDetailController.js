@@ -9,7 +9,6 @@ function buildDefaultControllerState(mode, completed, completedAt) {
         isEditing: mode === 'create' || mode === 'edit',
         localCompleted: mode === 'create' ? false : (completed ?? false),
         localCompletedAt: mode === 'create' ? null : (completedAt || null),
-        targetToEdit: null,
         viewState: 'goal',
     };
 }
@@ -66,13 +65,6 @@ export function useGoalDetailController({
         }));
     };
 
-    const setTargetToEdit = (nextValue) => {
-        updateControllerState((prev) => ({
-            ...prev,
-            targetToEdit: resolveNextValue(nextValue, prev.targetToEdit),
-        }));
-    };
-
     const setViewState = (nextValue) => {
         updateControllerState((prev) => ({
             ...prev,
@@ -100,7 +92,8 @@ export function useGoalDetailController({
         });
     };
 
-    const handleCompletionConfirm = async (completionDate, completionNoteContent = '') => {
+    // `sequenceOptions` carries the sequence checkboxes ({ beginNext } / { pauseNext }) to the API.
+    const handleCompletionConfirm = async (completionDate, completionNoteContent = '', sequenceOptions = null) => {
         await onBeforeCompletionConfirm?.({ completionDate, noteContent: completionNoteContent });
         updateControllerState((prev) => ({
             ...prev,
@@ -108,10 +101,10 @@ export function useGoalDetailController({
             localCompletedAt: completionDate.toISOString(),
             viewState: 'goal',
         }));
-        await onToggleCompletion?.(goalId, false);
+        await onToggleCompletion?.(goalId, false, sequenceOptions);
     };
 
-    const handleUncompletionConfirm = async () => {
+    const handleUncompletionConfirm = async (sequenceOptions = null) => {
         await onBeforeUncompletionConfirm?.();
         updateControllerState((prev) => ({
             ...prev,
@@ -119,7 +112,7 @@ export function useGoalDetailController({
             localCompletedAt: null,
             viewState: 'goal',
         }));
-        await onToggleCompletion?.(goalId, true);
+        await onToggleCompletion?.(goalId, true, sequenceOptions);
     };
 
     return {
@@ -127,8 +120,6 @@ export function useGoalDetailController({
         setIsEditing,
         localCompletedAt: controllerState.localCompletedAt,
         isCompleted: controllerState.localCompleted,
-        targetToEdit: controllerState.targetToEdit,
-        setTargetToEdit,
         viewState: controllerState.viewState,
         setViewState,
         handleClose,

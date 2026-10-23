@@ -7,6 +7,7 @@ import useSessionOptionsMutations from './useSessionOptionsMutations';
 import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
 import useSessionDetailUiState from './useSessionDetailUiState';
+import useSequenceAdvanceUndo from './useSequenceAdvanceUndo';
 import useSessionSidePaneViewModel from './useSessionSidePaneViewModel';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
@@ -21,7 +22,9 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         autoSaveStatus,
         localSessionData,
         calculateTotalDuration,
+        sessionGoalsView,
     } = useActiveSessionData();
+    useSequenceAdvanceUndo({ rootId, goalTree: sessionGoalsView?.goal_tree });
     const {
         updateGoal,
         toggleGoalCompletion,

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import event
-from models import ActivityInstance, EventLog, GoalPauseInterval, Session, Target, User, activity_goal_associations
+from models import ActivityInstance, EventLog, Goal, GoalPauseInterval, Session, User, activity_goal_associations
 
 UTC = timezone.utc
 
@@ -42,13 +42,14 @@ def heatmap_evidence(db_session, sample_goal_hierarchy, sample_activity_definiti
             completed=completed, created_at=occurred, time_start=occurred, time_stop=occurred,
             duration_seconds=10000, data={},
         ))
-    target = Target(id=str(uuid.uuid4()), root_id=root.id, goal_id=child.id,
-                    activity_id=sample_activity_definition.id, name='Milestone', completed=True,
-                    created_at=datetime(2026, 7, 2, 12, tzinfo=UTC),
-                    completed_at=datetime(2026, 7, 2, 12, tzinfo=UTC))
-    db_session.add_all(instances + [target])
+    # A descendant goal created and completed the same day is that day's milestone.
+    milestone = Goal(id=str(uuid.uuid4()), root_id=root.id, parent_id=child.id, owner_id=root.owner_id,
+                     name='Milestone', completed=True, completion_source='manual',
+                     created_at=datetime(2026, 7, 2, 12, tzinfo=UTC), started_at=datetime(2026, 7, 2, 12, tzinfo=UTC),
+                     completed_at=datetime(2026, 7, 2, 12, tzinfo=UTC))
+    db_session.add_all(instances + [milestone])
     db_session.commit()
-    return root, parent, child, instances, target
+    return root, parent, child, instances, milestone
 
 
 @pytest.mark.integration
@@ -156,7 +157,7 @@ class TestGoalActivityHeatmap:
         assert len(activities) == 205
         assert all(entry['entity_id'] != instances[0].id for entry in activities)
         assert activities[0]['payload']['activity_definition']
-        assert {entry['event_type'] for entry in entries} == {'activity.completed', 'target.created', 'target.achieved'}
+        assert {entry['event_type'] for entry in entries} == {'activity.completed', 'goal.created', 'goal.completed'}
 
     def test_children_scope_pause_days_and_reopening(self, authed_client, db_session, heatmap_evidence):
         root, parent, child, _, _ = heatmap_evidence

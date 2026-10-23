@@ -116,6 +116,8 @@ def _session_duration_seconds_for_analytics(session):
 
 def serialize_session_for_analytics(session):
     """Serialize the subset of session fields needed by analytics views."""
+    program_day = session.program_day if session.program_day_id else None
+    program = getattr(program_day, 'program', None) if program_day is not None else None
     return {
         "id": session.id,
         "name": session.name,
@@ -125,6 +127,15 @@ def serialize_session_for_analytics(session):
         "completed": bool(session.completed),
         "total_duration_seconds": _session_duration_seconds_for_analytics(session),
         "sections": _serialize_session_sections_for_analytics(session),
+        "template_id": session.template_id,
+        "template_name": get_session_template_name(session) if session.template_id else None,
+        "template_color": get_session_template_color(session) if session.template_id else None,
+        "program_day_id": session.program_day_id,
+        "program_day_name": program_day.name if program_day else None,
+        # The day's program, so filters can group days by program.
+        "program_id": program.id if program else None,
+        "program_name": program.name if program else None,
+        "program_color": program.color if program else None,
     }
 
 

@@ -1,0 +1,91 @@
+[
+    {
+        "name": "fits every rule",
+        "deadline": "2026-05-10",
+        "context": {
+            "parent_deadline": "2026-06-01",
+            "child_deadlines": ["2026-05-01"],
+            "started_at": "2026-05-01",
+            "horizon_min": [1, "days"],
+            "horizon_max": [3, "months"],
+            "program_start": "2026-05-01",
+            "program_end": "2026-05-31"
+        },
+        "expected": []
+    },
+    {
+        "name": "no due date has no warnings",
+        "deadline": null,
+        "context": { "parent_deadline": "2026-01-01" },
+        "expected": []
+    },
+    {
+        "name": "on the parent's due date and program end is allowed",
+        "deadline": "2026-05-31",
+        "context": { "parent_deadline": "2026-05-31", "program_start": "2026-05-01", "program_end": "2026-05-31" },
+        "expected": []
+    },
+    {
+        "name": "a day after the parent and the program",
+        "deadline": "2026-06-01",
+        "context": { "parent_deadline": "2026-05-31", "program_start": "2026-05-01", "program_end": "2026-05-31" },
+        "expected": [
+            { "code": "outside_program", "program_start": "2026-05-01", "program_end": "2026-05-31" },
+            { "code": "after_parent", "parent_deadline": "2026-05-31" }
+        ]
+    },
+    {
+        "name": "before the program starts",
+        "deadline": "2026-04-30",
+        "context": { "program_start": "2026-05-01", "program_end": "2026-05-31" },
+        "expected": [{ "code": "outside_program", "program_start": "2026-05-01", "program_end": "2026-05-31" }]
+    },
+    {
+        "name": "children due later are counted, latest reported",
+        "deadline": "2026-05-10",
+        "context": { "child_deadlines": ["2026-05-10", "2026-05-20", "2026-05-12"] },
+        "expected": [{ "code": "children_after", "count": 2, "latest": "2026-05-20" }]
+    },
+    {
+        "name": "inside a week-to-quarter horizon at both edges",
+        "deadline": "2026-05-08",
+        "context": { "started_at": "2026-05-01", "horizon_min": [1, "weeks"], "horizon_max": [1, "weeks"] },
+        "expected": []
+    },
+    {
+        "name": "sooner than the level's shortest horizon",
+        "deadline": "2026-05-07",
+        "context": { "started_at": "2026-05-01", "horizon_min": [1, "weeks"], "horizon_max": [3, "months"] },
+        "expected": [{ "code": "before_horizon", "earliest": "2026-05-08" }]
+    },
+    {
+        "name": "months clamp to the end of a shorter month",
+        "deadline": "2026-03-01",
+        "context": { "started_at": "2026-01-31", "horizon_max": [1, "months"] },
+        "expected": [{ "code": "after_horizon", "latest": "2026-02-28" }]
+    },
+    {
+        "name": "years and decades use calendar months, including leap days",
+        "deadline": "2034-03-01",
+        "context": { "started_at": "2024-02-29", "horizon_min": [1, "years"], "horizon_max": [1, "decades"] },
+        "expected": [{ "code": "after_horizon", "latest": "2034-02-28" }]
+    },
+    {
+        "name": "sub-day horizons stay on the start date",
+        "deadline": "2026-05-02",
+        "context": { "started_at": "2026-05-01", "horizon_max": [6, "hours"] },
+        "expected": [{ "code": "after_horizon", "latest": "2026-05-01" }]
+    },
+    {
+        "name": "a horizon without a start date is not checked",
+        "deadline": "2030-01-01",
+        "context": { "horizon_max": [1, "days"] },
+        "expected": []
+    },
+    {
+        "name": "a program with only one bound is not checked",
+        "deadline": "2030-01-01",
+        "context": { "program_start": "2026-05-01" },
+        "expected": []
+    }
+]

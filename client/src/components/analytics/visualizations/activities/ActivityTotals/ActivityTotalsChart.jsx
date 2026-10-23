@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../../ChartJSWrapper';
 
 const palette = {
     instances: '#3b82f6',
@@ -101,14 +101,17 @@ export default function ActivityTotalsChart({
     limit = 15,
 }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const data = useMemo(() => {
-        const normalizedLimit = Math.min(50, Math.max(1, Number(limit) || 15));
+        // Compact charts show the top five.
+        const normalizedLimit = density === 'compact' ? 5 : Math.min(50, Math.max(1, Number(limit) || 15));
         const groupNamesById = new Map(activityGroups.map((group) => [group.id, group.name]));
         const rows = activities
             .map((activity) => {
                 const completedInstances = (activityInstances[activity.id] || []).filter(isCompletedActivityInstance);
                 const seconds = completedInstances.reduce((sum, instance) => sum + (instance.duration_seconds || 0), 0);
                 return {
+                    activityId: activity.id,
                     label: activity.name,
                     groupName: activity.group_id ? groupNamesById.get(activity.group_id) || 'Ungrouped' : 'Ungrouped',
                     count: completedInstances.length,
@@ -130,11 +133,14 @@ export default function ActivityTotalsChart({
                 data: rows.map((row) => row.value),
                 backgroundColor: metric === 'duration' ? palette.duration : palette.instances,
                 groupNames: rows.map((row) => row.groupName),
+                // Read by the chart's "Set goal here…" menu.
+                activityIds: rows.map((row) => row.activityId),
+                measure: metric,
             }],
         };
-    }, [activities, activityGroups, activityInstances, limit, metric]);
+    }, [activities, activityGroups, activityInstances, density, limit, metric]);
 
     if (!data.labels.length) return <EmptyChart title="Activity Totals" />;
 
-    return <Bar ref={chartRef} data={data} options={buildOptions({ metric, showGroupNames, chartTheme })} />;
+    return <Bar ref={chartRef} data={data} options={applyChartDensity(buildOptions({ metric, showGroupNames, chartTheme }), density)} />;
 }

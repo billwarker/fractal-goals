@@ -21,7 +21,7 @@ Event Naming Convention:
     Examples:
         - session.completed
         - goal.completed  
-        - target.achieved
+        - goal.uncompleted
         - activity.created
         - program.updated
 """
@@ -243,13 +243,6 @@ class Events:
     GOAL_UNCOMPLETED = 'goal.uncompleted'
     GOAL_DELETED = 'goal.deleted'
     
-    # Target events
-    TARGET_ACHIEVED = 'target.achieved'
-    TARGET_REVERTED = 'target.reverted'
-    TARGET_CREATED = 'target.created'
-    TARGET_UPDATED = 'target.updated'
-    TARGET_DELETED = 'target.deleted'
-    
     # Activity Instance events
     ACTIVITY_INSTANCE_CREATED = 'activity_instance.created'
     ACTIVITY_INSTANCE_DELETED = 'activity_instance.deleted'
@@ -281,10 +274,12 @@ class Events:
     ACTIVITY_TAG_ARCHIVED = 'activity_tag.archived'
     ACTIVITY_TAG_RESTORED = 'activity_tag.restored'
     ACTIVITY_TAG_ASSIGNMENTS_UPDATED = 'activity_tag.assignments_updated'
-    ACTIVITY_PROGRESS_VIEW_CREATED = 'activity_progress_view.created'
-    ACTIVITY_PROGRESS_VIEW_UPDATED = 'activity_progress_view.updated'
-    ACTIVITY_PROGRESS_VIEW_ACTIVATED = 'activity_progress_view.activated'
-    ACTIVITY_PROGRESS_VIEW_DELETED = 'activity_progress_view.deleted'
+    ACTIVITY_TAG_MERGED = 'activity_tag.merged'
+    ACTIVITY_TAG_FAMILY_CREATED = 'activity_tag_family.created'
+    ACTIVITY_TAG_FAMILY_UPDATED = 'activity_tag_family.updated'
+    ACTIVITY_TAG_FAMILY_DELETED = 'activity_tag_family.deleted'
+    ACTIVITY_PROGRESS_COMPARISON_UPDATED = 'activity_progress_comparison.updated'
+    ACTIVITY_PROGRESS_CHART_UPDATED = 'activity_progress_chart.updated'
 
     # Circuit definition and execution events
     CIRCUIT_CREATED = 'circuit.created'

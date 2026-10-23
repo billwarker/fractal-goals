@@ -36,6 +36,7 @@ from services._landing_public_tree import _LandingPublicTreeMixin
 from services._landing_settings import _LandingSettingsMixin
 from services._landing_showcase import _LandingShowcaseMixin
 from services._landing_static_snapshot import _LandingStaticSnapshotMixin
+from services.landing_condition_analytics import build_landing_condition_analytics
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,7 @@ class LandingPublishService(
         example_started = perf_counter()
         goals_by_id = load_fractal_goals_for_serialization(
             self.db_session, item["root_id"], include_group_activities=True,
+            with_review_dates=False,  # public snapshots don't show reviews
         )
         root = goals_by_id.get(item["root_id"])
         if not root:
@@ -182,8 +184,8 @@ class LandingPublishService(
         item["showcase"] = resolved_showcase
         item["landing_content"] = resolved_content
         showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
-        target_analytics = self._build_landing_target_analytics(
-            root, serialized_tree, goals_by_id, history,
+        condition_analytics = build_landing_condition_analytics(
+            self.db_session, root, goals_by_id, self._serialize_landing_activity_ref, history,
         )
         published = {
             "root_id": root.id,
@@ -204,7 +206,7 @@ class LandingPublishService(
             "activity_instantiation_summary": showcase_data["activity_instantiation_summary"],
             "analytics_views": showcase_data["analytics_views"],
             "analytics_activity_instances": showcase_data["analytics_activity_instances"],
-            "target_analytics": target_analytics,
+            "condition_analytics": condition_analytics,
             "session_templates": showcase_data["session_templates"],
         }
         logger.info(

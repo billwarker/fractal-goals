@@ -28,7 +28,7 @@ from models import (
     Session,
     SessionTemplate,
     SignupInviteKey,
-    Target,
+    GoalCompletionCondition,
     User,
     activity_goal_associations,
 )
@@ -347,7 +347,6 @@ def admin_landing_fractal(db_session, admin_user):
         id=str(uuid.uuid4()),
         name='Public Demo Child',
         description='A public-safe child goal',
-        relevance_statement='It ladders up to the demo ultimate goal',
         deadline=datetime(2030, 1, 1),
         level_id=getattr(long_level, 'id', None),
         parent_id=root.id,
@@ -357,15 +356,10 @@ def admin_landing_fractal(db_session, admin_user):
     db_session.add_all([root, child])
     db_session.flush()
 
-    # Make the child a genuinely SMART goal (description, relevance, deadline,
-    # an associated activity, and a target) so the snapshot's canonical SMART
+    # Make the child a genuinely SMART goal (description, deadline,
+    # an associated activity, and a completion condition) so the snapshot's canonical SMART
     # computation marks it is_smart — driving the SMART icon styling on landing.
-    target = Target(
-        id=str(uuid.uuid4()),
-        goal_id=child.id,
-        root_id=root.id,
-        name='Public Demo Target',
-    )
+    child.completion_condition = 'activity_threshold'
 
     # Associate an activity with the child goal and attach a note, so the
     # published snapshot demonstrably carries embedded activities + notes.
@@ -376,7 +370,10 @@ def admin_landing_fractal(db_session, admin_user):
     )
     db_session.add(activity)
     db_session.flush()
-    target.activity_id = activity.id
+    condition = GoalCompletionCondition(
+        id=str(uuid.uuid4()), goal_id=child.id, root_id=root.id, activity_definition_id=activity.id,
+        kind='consistency', measure='sets', required_count=1,
+    )
     # The associated_goals relationship is viewonly, so write the link directly.
     db_session.execute(
         activity_goal_associations.insert().values(
@@ -448,7 +445,7 @@ def admin_landing_fractal(db_session, admin_user):
         goal_id=child.id,
         content='Public-safe demo note',
     )
-    db_session.add_all([target, note])
+    db_session.add_all([condition, note])
     db_session.add(AnalyticsDashboard(
         id=str(uuid.uuid4()),
         root_id=root.id,
@@ -614,20 +611,18 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert [view['name'] for view in public_example['analytics_views']] == [
         'Public Demo Analytics View',
     ]
-    target_id = child_attributes['targets'][0]['id']
-    assert public_example['target_analytics'][target_id]['target']['name'] == (
-        'Public Demo Target'
-    )
-    assert len(public_example['target_analytics'][target_id]['instances']) == 1
-    assert public_example['target_analytics'][target_id][
-        'activity_definition'
-    ]['name'] == 'Public Demo Activity'
+    assert child_attributes['completion_condition'] == 'activity_threshold'
+    condition_analytics = public_example['condition_analytics'][child_attributes['id']]
+    assert condition_analytics['condition']['kind'] == 'consistency'
+    assert len(condition_analytics['instances']) == 1
+    assert condition_analytics['activity_definition']['name'] == 'Public Demo Activity'
+    assert condition_analytics['progress']['required'] == 1
 
     # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 12
-    assert public_payload['schema_version'] == 12
+    assert public_example['schema_version'] == 13
+    assert public_payload['schema_version'] == 13
     assert [bullet['key'] for bullet in public_example['landing_content']['goals']['bullets']] == [
-        'break_down', 'associate_activities', 'set_targets',
+        'break_down', 'associate_activities', 'set_conditions',
     ]
     assert public_example['landing_content']['goals']['bullets'][0]['heading'] == 'Break it down'
 
@@ -655,7 +650,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     cache = db_session.get(AppSetting, 'landing_example_cache')
     assert cache is not None
     assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 12
+    assert cache.value['schema_version'] == 13
 
 
 @pytest.mark.integration
@@ -776,7 +771,6 @@ def test_landing_goals_content_round_trips_and_publishes_selected_examples(
         Goal.root_id == admin_landing_fractal.id,
         Goal.parent_id.is_not(None),
     ).first()
-    target = db_session.query(Target).filter(Target.goal_id == child.id).first()
     landing_content = {
         'goals': {
             'bullets': [
@@ -785,21 +779,18 @@ def test_landing_goals_content_round_trips_and_publishes_selected_examples(
                     'heading': 'Build the path',
                     'body': 'Turn the outcome into achievable steps.',
                     'goal_id': child.id,
-                    'target_id': None,
                 },
                 {
                     'key': 'associate_activities',
                     'heading': 'Connect the work',
                     'body': 'Let evidence roll through the goal lineage.',
                     'goal_id': child.id,
-                    'target_id': None,
                 },
                 {
-                    'key': 'set_targets',
+                    'key': 'set_conditions',
                     'heading': 'Measure the outcome',
-                    'body': 'Track performance against a concrete target.',
+                    'body': 'Complete the goal when the work reaches a concrete threshold.',
                     'goal_id': child.id,
-                    'target_id': target.id,
                 },
             ],
         },
@@ -829,12 +820,9 @@ def test_landing_goals_content_round_trips_and_publishes_selected_examples(
     assert publish_response.status_code == 200
     public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
     assert public_example['landing_content'] == landing_content
-    published_target = next(
-        item for item in public_example['tree']['children'][0]['attributes']['targets']
-        if item['id'] == target.id
-    )
-    assert published_target['activity_id'] == target.activity_id
-    assert 'metrics' in published_target
+    published_child = public_example['tree']['children'][0]['attributes']
+    assert published_child['condition']['activity_definition_id'] == published_child['associated_activity_ids'][0]
+    assert published_child['condition']['required_count'] == 1
 
 
 @pytest.mark.integration
@@ -991,7 +979,7 @@ def test_publish_honors_showcase_selections(admin_client, client, db_session, ad
     analytics_instances = public_example['analytics_activity_instances'][hidden_activity.id]
     assert analytics_instances[0]['id'] == analytics_instance.id
     assert analytics_instances[0]['session_name'] == 'Analytics-only Session'
-    assert analytics_instances[0]['progress_comparison']['included'] is True
+    assert analytics_instances[0]['progress_comparison']['previous_instance_id'] is None
     assert analytics_instances[0]['progress_comparison']['is_first_instance'] is True
 
 
@@ -1096,7 +1084,7 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 12
+    assert static_payload['schema_version'] == 13
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
@@ -1288,8 +1276,8 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert [item['name'] for item in options['programs']] == ['Options Program']
     assert [item['name'] for item in options['analytics_views']] == ['Public Demo Analytics View']
     assert {item['name'] for item in options['goals']} == {'Public Demo Fractal', 'Public Demo Child'}
-    target_goal = next(item for item in options['goals'] if item['targets'])
-    assert target_goal['targets'][0]['name']
+    condition_goal = next(item for item in options['goals'] if item['has_activity_condition'])
+    assert condition_goal['completion_condition'] == 'activity_threshold'
 
     assert admin_client.get('/api/admin/landing-examples/options').status_code == 400
     # Roots not owned by an active admin are rejected.

@@ -7,11 +7,12 @@ function ViewToggleTabs({
     onChange,
     ariaLabel,
     className = '',
+    size = 'fill',
     style,
 }) {
     return (
         <div
-            className={`${styles.tabs} ${className}`.trim()}
+            className={`${styles.tabs} ${size === 'header' ? styles.header : ''} ${className}`.replace(/\s+/g, ' ').trim()}
             style={style}
             role="tablist"
             aria-label={ariaLabel}

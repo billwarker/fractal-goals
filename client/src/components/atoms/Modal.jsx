@@ -30,6 +30,7 @@ const Modal = ({
     closeOnBackdrop = true,
     stackLevel = 0,
     layer = 'default',
+    portalContainer = null,
 }) => {
     const dialogRef = useRef(null);
     const modalId = useId();
@@ -137,7 +138,7 @@ const Modal = ({
 
     // Use portal if document.body exists, else render inline (SSR safety)
     if (typeof document !== 'undefined') {
-        return createPortal(modalContent, document.body);
+        return createPortal(modalContent, portalContainer || document.body);
     }
     return modalContent;
 };

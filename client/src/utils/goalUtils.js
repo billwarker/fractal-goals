@@ -1,20 +1,4 @@
-import { normalizeGoalNode, parseGoalTargets } from './goalNodeModel';
-
-/**
- * Parses targets from a goal node.
- */
-export const parseTargets = (goal) => parseGoalTargets(goal);
-
-/**
- * Formats a target description.
- */
-export const formatTargetDescription = (target) => {
-    if (!target) return '';
-    if (target.description) return target.description;
-    const metrics = target.metrics || [];
-    if (metrics.length === 0) return 'Target';
-    return metrics.map(m => `${m.metric_name || 'Metric'} ≥ ${m.value}`).join(', ');
-};
+import { normalizeGoalNode } from './goalNodeModel';
 
 /**
  * Formats a goal type for display (e.g., ShortTermGoal -> Short Term)

@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
+import { Chart as ChartJS } from 'chart.js';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import Button from '../atoms/Button';
 import CloseButton from '../atoms/CloseButton';
@@ -15,12 +16,9 @@ import {
     TimerIcon,
     VisualizationIcon,
 } from './AnalyticsIcons';
-import useGoalAnalyticsRead from './useGoalAnalyticsRead';
-import { summarizeFilteredGoals } from './filteredGoalSummary';
-import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
+import useVisualizationContext from './useVisualizationContext';
 import styles from './ProfileWindow.module.css';
 import {
-    getVisualization,
     getVisualizationsByCategory,
     VISUALIZATION_CATEGORIES,
 } from './visualizations/registry';
@@ -30,6 +28,12 @@ import {
     normalizeVisualizationState,
 } from './visualizations/state';
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
+import ChartGoalSurface from './ChartGoalSurface';
+import { ChartDensityContext } from './ChartJSWrapper';
+import pageGridSnap from './pageGridSnap';
+
+// Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
+ChartJS.register(pageGridSnap);
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
@@ -46,6 +50,8 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * @param {function} props.updateWindowState - Callback to update window state
  * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
+ * @param {boolean} props.onPageGrid - Draw the panel on the page's background grid: no fill or outline
+ *   until selected, and charts at 'expanded' density (no gridlines of their own, snapped to the grid)
  */
 function ProfileWindow({
     canSplit = false,
@@ -63,9 +69,10 @@ function ProfileWindow({
     globalFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
+    onPageGrid = false,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
-    const { sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId } = data;
+    const { goalAnalytics, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
 
@@ -96,8 +103,6 @@ function ProfileWindow({
     const {
         selectedCategory,
         selectedVisualization,
-        selectedActivity,
-        selectedGoal,
     } = windowState;
     const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
@@ -105,49 +110,19 @@ function ProfileWindow({
     const updateVisualizationState = React.useCallback((updates) => {
         updateWindowState(getVisualizationStateUpdate(windowState, updates));
     }, [updateWindowState, windowState]);
-    const effectiveDateRange = globalDateRange;
-    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
-        filters: globalFilters,
-        goalAnalytics,
-        activities,
-        activityGroups,
-        activityInstances,
-    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics]);
-    const scopedActivities = useMemo(() => (
-        resolvedGlobalFilters.hasActivityFilter
-            ? activities.filter((activity) => resolvedGlobalFilters.activityIds.has(activity.id))
-            : activities
-    ), [activities, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
-    const selectedVisualizationMeta = getVisualization(selectedCategory, selectedVisualization);
-    const effectiveSelectedActivity = useMemo(() => {
-        if (selectedActivity?.id && scopedActivities.some((activity) => activity.id === selectedActivity.id)) {
-            return scopedActivities.find((activity) => activity.id === selectedActivity.id);
-        }
-        if (
-            selectedVisualizationMeta?.selectionRequirements?.activity
-            && resolvedGlobalFilters.hasActivityFilter
-            && scopedActivities.length === 1
-        ) {
-            return scopedActivities[0];
-        }
-        return null;
-    }, [resolvedGlobalFilters.hasActivityFilter, scopedActivities, selectedActivity, selectedVisualizationMeta]);
-    const hasActiveDateRange = Boolean(effectiveDateRange?.start || effectiveDateRange?.end);
-
-    const isDateInRange = React.useCallback((value) => {
-        if (!hasActiveDateRange) return true;
-        const date = value ? new Date(value) : null;
-        if (!date || Number.isNaN(date.getTime())) return false;
-        const start = effectiveDateRange?.start ? new Date(`${effectiveDateRange.start}T00:00:00`) : null;
-        const end = effectiveDateRange?.end ? new Date(`${effectiveDateRange.end}T23:59:59`) : null;
-        if (start && date < start) return false;
-        if (end && date > end) return false;
-        return true;
-    }, [effectiveDateRange, hasActiveDateRange]);
-
-    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
-        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange });
-    const scopedGoalAnalytics = scopedGoalQuery.data || goalAnalytics;
+    const {
+        effectiveDateRange,
+        resolvedGlobalFilters,
+        scopedActivities,
+        selectedVisualizationMeta,
+        effectiveSelectedActivity,
+        scopedGoalQuery,
+        filteredSessions,
+        filteredActivityInstances,
+        filteredGoalAnalyticsGoals,
+        filteredGoalSummary,
+        effectiveSelectedGoal,
+    } = useVisualizationContext({ data, windowState, globalDateRange, globalFilters });
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -235,111 +210,6 @@ function ProfileWindow({
         return getGoalColor(type);
     };
 
-    const filteredSessions = useMemo(() => {
-        const dateFiltered = sessions.filter((session) => {
-            const rawDate = session.session_start || session.created_at;
-            return isDateInRange(rawDate);
-        });
-        if (!resolvedGlobalFilters.hasActivityFilter) {
-            return dateFiltered;
-        }
-        return dateFiltered.filter((session) => resolvedGlobalFilters.sessionIds.has(session.id));
-    }, [isDateInRange, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.sessionIds, sessions]);
-
-    const filteredActivityInstances = useMemo(() => {
-        return Object.fromEntries(Object.entries(activityInstances || {}).map(([activityId, instances]) => [
-            activityId,
-            (instances || []).filter((instance) => {
-                if (resolvedGlobalFilters.hasActivityFilter && !resolvedGlobalFilters.activityIds.has(activityId)) {
-                    return false;
-                }
-                const rawDate = instance.session_date || instance.created_at;
-                return isDateInRange(rawDate);
-            }),
-        ]));
-    }, [activityInstances, isDateInRange, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
-
-    const filteredGoalAnalyticsGoals = useMemo(() => {
-        const goals = scopedGoalAnalytics?.goals || [];
-        const scopedGoals = resolvedGlobalFilters.hasGoalFilter
-            ? goals.filter((goal) => resolvedGlobalFilters.goalIds.has(goal.id))
-            : goals;
-        const allowedActivityNames = resolvedGlobalFilters.hasActivityFilter
-            ? new Set(scopedActivities.map((activity) => activity.name))
-            : null;
-
-        if (scopedGoalAnalytics?.metadata?.aggregated) {
-            return scopedGoals.map((goal) => ({ ...goal, completed: Boolean(goal.completed && isDateInRange(goal.completed_at)) }));
-        }
-        return scopedGoals.map((goal) => {
-            const activityDurations = (goal.activity_durations_by_date || []).filter((item) => (
-                isDateInRange(item.date)
-                && (!allowedActivityNames || allowedActivityNames.has(item.activity_name))
-            ));
-            const sessionDurations = allowedActivityNames
-                ? Object.values(activityDurations.reduce((byDate, item) => {
-                    const key = item.date || 'Unknown';
-                    byDate[key] = byDate[key] || { date: item.date, duration_seconds: 0, session_name: 'Filtered activities' };
-                    byDate[key].duration_seconds += item.duration_seconds || 0;
-                    return byDate;
-                }, {}))
-                : (goal.session_durations_by_date || []).filter((item) => isDateInRange(item.date));
-            const activityBreakdownByName = new Map();
-
-            activityDurations.forEach((item) => {
-                const name = item.activity_name || 'Unknown';
-                const current = activityBreakdownByName.get(name) || {
-                    activity_id: name,
-                    activity_name: name,
-                    instance_count: 0,
-                    total_duration_seconds: 0,
-                };
-                current.instance_count += 1;
-                current.total_duration_seconds += item.duration_seconds || 0;
-                activityBreakdownByName.set(name, current);
-            });
-
-            return {
-                ...goal,
-                completed: Boolean(goal.completed && isDateInRange(goal.completed_at)),
-                session_durations_by_date: sessionDurations,
-                activity_durations_by_date: activityDurations,
-                activity_breakdown: hasActiveDateRange || allowedActivityNames
-                    ? Array.from(activityBreakdownByName.values())
-                    : goal.activity_breakdown,
-                total_duration_seconds: sessionDurations.reduce((sum, item) => sum + (item.duration_seconds || 0), 0),
-                session_count: sessionDurations.length,
-            };
-        });
-    }, [scopedGoalAnalytics, hasActiveDateRange, isDateInRange, resolvedGlobalFilters.goalIds, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.hasGoalFilter, scopedActivities]);
-
-    const filteredGoalSummary = useMemo(() => summarizeFilteredGoals(filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days),
-        [filteredGoalAnalyticsGoals, goalAnalytics?.summary?.avg_goal_age_days]);
-
-    const effectiveSelectedGoal = useMemo(() => {
-        if (selectedGoal?.id && filteredGoalAnalyticsGoals.some((goal) => goal.id === selectedGoal.id)) {
-            return filteredGoalAnalyticsGoals.find((goal) => goal.id === selectedGoal.id);
-        }
-        if (resolvedGlobalFilters.filters.goals.goalIds.length === 1) {
-            const goalId = resolvedGlobalFilters.filters.goals.goalIds[0];
-            return filteredGoalAnalyticsGoals.find((goal) => goal.id === goalId) || null;
-        }
-        if (
-            selectedVisualizationMeta?.selectionRequirements?.goal
-            && (resolvedGlobalFilters.hasGoalFilter || resolvedGlobalFilters.hasActivityFilter)
-            && filteredGoalAnalyticsGoals.length === 1
-        ) {
-            return filteredGoalAnalyticsGoals[0];
-        }
-        return null;
-    }, [
-        filteredGoalAnalyticsGoals,
-        resolvedGlobalFilters.filters.goals.goalIds,
-        resolvedGlobalFilters.hasActivityFilter,
-        resolvedGlobalFilters.hasGoalFilter,
-        selectedGoal,
-        selectedVisualizationMeta,
-    ]);
 
     const queryExplanation = useMemo(() => {
         if (!showQueryInspector) return null;
@@ -636,7 +506,9 @@ function ProfileWindow({
         if (!VisualizationChart) return null;
 
         return (
-            <VisualizationChart
+            <ChartGoalSurface
+                Chart={VisualizationChart}
+                rootId={rootId}
                 context={{
                     data,
                     scopedData: {
@@ -671,11 +543,15 @@ function ProfileWindow({
                     onSelect();
                 }
             }}
-            className={`${styles.windowContainer} ${isSelected ? styles.selected : ''}`}
+            className={`${styles.windowContainer} ${onPageGrid ? styles.onPageGrid : ''} ${isSelected ? styles.selected : ''}`}
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderQueryOverlay()}
-            {renderVisualizationContent()}
+            {onPageGrid ? (
+                <ChartDensityContext.Provider value="expanded">
+                    {renderVisualizationContent()}
+                </ChartDensityContext.Provider>
+            ) : renderVisualizationContent()}
         </div>
     );
 }

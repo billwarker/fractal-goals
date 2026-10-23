@@ -10,7 +10,7 @@ export function invalidateInstanceGoalQueries(queryClient, rootId, sessionId) {
         queryKeys.sessionGoalsView(rootId, sessionId), queryKeys.sessions(rootId),
         queryKeys.fractalTree(rootId), queryKeys.goals(rootId), queryKeys.goalsForSelection(rootId),
         queryKeys.goalTimelinesRoot(rootId), queryKeys.goalAnalytics(rootId), queryKeys.goalMetricsRoot(),
-        queryKeys.targetAnalyticsFractalRoot(rootId), queryKeys.goalActivityInstancesFractalRoot(rootId),
+        queryKeys.goalConditionRoot(rootId),
         queryKeys.programMetricsRoot(rootId), queryKeys.programDayReadModelRoot(rootId),
     ];
     return Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));

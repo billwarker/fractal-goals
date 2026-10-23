@@ -21,7 +21,7 @@ export function useSessionSidePaneViewModel({
     activityGoalScope = null,
     onGoalScopeToggle,
     readOnly = false,
-    targetModal = null,
+    conditionSnapshots = null,
 }) {
     const {
         rootId,
@@ -64,15 +64,16 @@ export function useSessionSidePaneViewModel({
             onGoalClick,
             onGoalCreated,
             readOnly,
-            targetModal,
+            conditionSnapshots,
             activityGoalScope,
             onGoalScopeToggle,
         },
-        timeline: {
+        progress: {
             rootId,
             sessionId,
             selectedActivity,
             sessionActivityDefs,
+            sessionInstances: activityInstances,
         },
     }), [
         addNote,
@@ -94,8 +95,9 @@ export function useSessionSidePaneViewModel({
         selectedActivity,
         isCompleted,
         sessionActivityDefs,
+        activityInstances,
         sessionId,
-        targetModal,
+        conditionSnapshots,
         toggleSessionComplete,
         unpinNote,
         updateNote,

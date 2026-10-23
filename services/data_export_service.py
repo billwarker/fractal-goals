@@ -37,7 +37,6 @@ from models import (
     ProgramDayStatusOverride,
     Session,
     SessionTemplate,
-    Target,
     User,
 )
 from models.product_event import ProductEvent
@@ -56,7 +55,6 @@ from services.serializers import (
     serialize_program_day,
     serialize_session,
     serialize_session_template,
-    serialize_target,
     serialize_user,
 )
 from services.service_types import JsonDict, ServiceResult
@@ -110,7 +108,6 @@ class DataExportService:
             "activity_instances": self._serialize_all(ActivityInstance, root_id, serialize_activity_instance),
             "sessions": self._serialize_all(Session, root_id, serialize_session),
             "session_templates": self._serialize_all(SessionTemplate, root_id, serialize_session_template),
-            "targets": self._serialize_all(Target, root_id, serialize_target),
             "programs": self._serialize_all(Program, root_id, serialize_program),
             "program_blocks": self._serialize_program_children(ProgramBlock, root_id, serialize_program_block),
             "program_days": self._serialize_program_children(ProgramDay, root_id, serialize_program_day),

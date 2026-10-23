@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import useIsMobile from '../../hooks/useIsMobile';
 import GoalHierarchyList from './GoalHierarchyList';
 import styles from './GoalHierarchySelector.module.css';
 import {
@@ -24,7 +25,9 @@ function GoalHierarchySelector({
     compactLayout = false,
     lockedGoalIds = [],
     lockedGoalLabel = 'Included by session activities',
-    lockedGoalMarker = null,
+    // Locked goals carry a compact marker on their row; the legend explains it once above the tree.
+    lockedGoalMarker = '*',
+    lockedGoalLegend = `${lockedGoalLabel} and cannot be removed.`,
     selectionDisabled = false,
     initialHideCompletedGoals = false,
     lockHideCompletedGoals = false,
@@ -39,6 +42,7 @@ function GoalHierarchySelector({
         getGoalIcon,
         getScopedCharacteristics,
     } = useGoalLevels();
+    const isMobile = useIsMobile();
     const [searchTerm, setSearchTerm] = useState('');
     const [hideCompletedGoals, setHideCompletedGoals] = useState(initialHideCompletedGoals);
     const [scopeEnabled, setScopeEnabled] = useState(initialScopeEnabled);
@@ -272,18 +276,15 @@ function GoalHierarchySelector({
 
     const getGoalMetaLabel = useCallback((goal) => {
         if (lockedIdSet.has(String(goal.id))) {
-            if (lockedGoalMarker) {
-                return (
-                    <span
-                        className={styles.lockedGoalMarker}
-                        aria-label={lockedGoalLabel}
-                        title={lockedGoalLabel}
-                    >
-                        {lockedGoalMarker}
-                    </span>
-                );
-            }
-            return lockedGoalLabel;
+            return (
+                <span
+                    className={styles.lockedGoalMarker}
+                    aria-label={lockedGoalLabel}
+                    title={lockedGoalLabel}
+                >
+                    {lockedGoalMarker}
+                </span>
+            );
         }
         if (!showSelectionInheritanceMeta || selectedIdSet.has(String(goal.id))) {
             return null;
@@ -323,7 +324,8 @@ function GoalHierarchySelector({
                         placeholder={searchPlaceholder}
                         onChange={(event) => setSearchTerm(event.target.value)}
                         className={styles.searchInput}
-                        autoFocus
+                        // Focusing on open would raise the phone keyboard over the tree.
+                        autoFocus={!isMobile}
                     />
                 </div>
             )}
@@ -358,10 +360,18 @@ function GoalHierarchySelector({
                 </div>
             )}
 
+            {lockedIdSet.size > 0 && lockedGoalLegend && (
+                <p className={styles.lockedGoalLegend}>
+                    <span aria-hidden="true">{lockedGoalMarker}</span>
+                    <span>{lockedGoalLegend}</span>
+                </p>
+            )}
+
             <div className={styles.treeFrame}>
                 <GoalHierarchyList
                     nodes={visibleGoals}
                     variant="session"
+                    density={isMobile && !compactLayout ? 'comfortable' : 'default'}
                     onGoalClick={(goal) => toggleGoal(String(goal.id))}
                     isGoalSelectable={(goal) => !selectionDisabled && !lockedIdSet.has(String(goal.id))}
                     getGoalLeftSlot={getGoalLeftSlot}

@@ -91,7 +91,6 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
     const initialState = buildInitialModalState(parent, getLevelCharacteristics);
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
-    const [relevanceStatement, setRelevanceStatement] = useState('');
     const [deadline, setDeadline] = useState(initialState.deadline);
     const [goalType, setGoalType] = useState(initialState.goalType);
     const [guidanceType, setGuidanceType] = useState(initialState.goalType);
@@ -101,7 +100,6 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
     const [levelStyles, setLevelStyles] = useState(() => (
         createInitialLevelStyles(parent, getGoalColor, getGoalSecondaryColor)
     ));
-    const [targets] = useState([]);
 
     useEffect(() => {
         if (!openIconPickerType) return undefined;
@@ -162,11 +160,9 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
         onSubmit({
             name,
             description,
-            relevance_statement: relevanceStatement,
             deadline: deadline || null,
             type: goalType,
             parent_id: parent ? (parent.attributes?.id || parent.id) : null,
-            targets,
             ...(!parent ? { level_styles: levelStyles } : {})
         });
     };
@@ -344,26 +340,6 @@ function GoalModalInner({ onClose, onSubmit, parent }) {
                             rows={2}
                             className={styles.textarea}
                             required={descriptionRequired}
-                        />
-                    </div>
-
-                    <div className={styles.formGroup}>
-                        <label htmlFor="goal-relevance" className={styles.label}>
-                            Relevance <span className={styles.optionalLabel}>Optional</span>
-                        </label>
-                        <div className={styles.descriptionLabel}>
-                            {!parent
-                                ? `Why does ${name || 'this goal'} matter?`
-                                : `How does this help achieve "${parent.name}"?`
-                            }
-                        </div>
-                        <textarea
-                            id="goal-relevance"
-                            value={relevanceStatement}
-                            onChange={e => setRelevanceStatement(e.target.value)}
-                            placeholder={!parent ? "Explain the significance..." : "Explain the contribution..."}
-                            rows={2}
-                            className={styles.textarea}
                         />
                     </div>
 

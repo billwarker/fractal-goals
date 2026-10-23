@@ -106,6 +106,27 @@ describe('ProgramCalendarView labels, ranges, and selection', () => {
         expect(props.onTodayClick).toHaveBeenCalledTimes(1);
     });
 
+    it('accepts goal drops from the Goals pane only when a drop handler is given', () => {
+        renderCalendar();
+        expect(mockCalendarState.props.droppable).toBe(false);
+
+        const onGoalDueDrop = vi.fn();
+        renderCalendar({ onGoalDueDrop });
+        expect(mockCalendarState.props.droppable).toBe(true);
+        const draggedEl = document.createElement('div');
+        draggedEl.dataset.goalId = 'goal-7';
+        mockCalendarState.props.drop({ draggedEl, dateStr: '2026-05-21' });
+        expect(onGoalDueDrop).toHaveBeenCalledWith('goal-7', '2026-05-21');
+
+        mockCalendarState.props.drop({ draggedEl: document.createElement('div'), dateStr: '2026-05-21' });
+        expect(onGoalDueDrop).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes no goal drops when read-only', () => {
+        renderCalendar({ onGoalDueDrop: vi.fn(), readOnly: true });
+        expect(mockCalendarState.props.droppable).toBe(false);
+    });
+
     it('owns multi-day gestures itself instead of FullCalendar selection', () => {
         const onDateClick = vi.fn();
         const { container } = renderCalendar({

@@ -10,7 +10,7 @@ from models import (
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
-    ActivityTag,
+    ActivityInstanceTag,
     ActivityTagDefinition,
     AnalyticsDashboard,
     Goal,
@@ -21,7 +21,7 @@ from models import (
     ProgramBlock,
     ProgramDay, ProgramDayOccurrenceSchedule, ProgramDayTemplate,
     SessionTemplate,
-    Target,
+    GoalCompletionCondition,
     User,
     activity_goal_associations,
 )
@@ -352,7 +352,6 @@ def landing_publish_budget_dataset(db_session):
             id=str(uuid.uuid4()),
             name=f"Landing Child {index}",
             description="Budget child",
-            relevance_statement="Public-safe relevance",
             parent_id=root.id,
             root_id=root.id,
             owner_id=admin.id,
@@ -366,12 +365,16 @@ def landing_publish_budget_dataset(db_session):
                 activity_id=activity.id, goal_id=child.id
             )
         )
+        child.completion_condition = "activity_threshold"
         db_session.add(
-            Target(
+            GoalCompletionCondition(
                 id=str(uuid.uuid4()),
                 goal_id=child.id,
                 root_id=root.id,
-                name=f"Landing Target {index}",
+                activity_definition_id=activity.id,
+                kind="consistency",
+                measure="sets",
+                required_count=index + 1,
             )
         )
         db_session.add(
@@ -441,7 +444,6 @@ def landing_publish_budget_dataset(db_session):
             id=str(uuid.uuid4()),
             name=f"Second Landing Child {index}",
             description="Second budget child",
-            relevance_statement="Public-safe relevance",
             parent_id=second_root.id,
             root_id=second_root.id,
             owner_id=admin.id,
@@ -456,13 +458,16 @@ def landing_publish_budget_dataset(db_session):
                 goal_id=child.id,
             )
         )
+        child.completion_condition = "activity_threshold"
         db_session.add(
-            Target(
+            GoalCompletionCondition(
                 id=str(uuid.uuid4()),
                 goal_id=child.id,
                 root_id=second_root.id,
-                name=f"Second Landing Target {index}",
-                activity_id=second_activity.id,
+                activity_definition_id=second_activity.id,
+                kind="consistency",
+                measure="sets",
+                required_count=index + 1,
             )
         )
         db_session.add(
@@ -512,29 +517,13 @@ def test_tag_filtered_progress_timeline_query_budget(
     sample_activity_definition,
     sample_activity_instance,
 ):
-    """Saved-view timelines keep a constant query budget as history grows."""
+    """Same-tags timelines keep a constant query budget as history grows."""
     root_id = sample_practice_session.root_id
     activity_id = sample_activity_definition.id
-    tag_definition = authed_client.post(
-        f"/api/{root_id}/activity-tags",
-        json={
-            "name": "Competition",
-            "scope": "selected",
-            "activity_ids": [activity_id],
-        },
-    ).get_json()
-    tag = next(
-        row
-        for row in tag_definition["bindings"]
-        if row["activity_definition_id"] == activity_id
-    )
+    tag = authed_client.post(f"/api/{root_id}/activity-tags", json={"name": "Competition"}).get_json()
     authed_client.put(
         f"/api/{root_id}/activity-instances/{sample_activity_instance.id}/tags",
         json={"tag_ids": [tag["id"]]},
-    )
-    authed_client.post(
-        f"/api/{root_id}/activities/{activity_id}/progress-views",
-        json={"name": "Competition only", "config": {"all_tag_ids": [tag["id"]]}},
     )
 
     for index in range(40):
@@ -548,21 +537,24 @@ def test_tag_filtered_progress_timeline_query_budget(
         )
         db_session.add(session)
         db_session.flush()
-        db_session.add(
-            ActivityInstance(
-                id=str(uuid.uuid4()),
-                session_id=session.id,
-                activity_definition_id=activity_id,
-                root_id=root_id,
-                completed=True,
-            )
+        instance = ActivityInstance(
+            id=str(uuid.uuid4()),
+            session_id=session.id,
+            activity_definition_id=activity_id,
+            root_id=root_id,
+            completed=True,
         )
+        db_session.add(instance)
+        db_session.flush()
+        if index % 2 == 0:
+            db_session.add(ActivityInstanceTag(activity_instance_id=instance.id, tag_definition_id=tag["id"]))
     db_session.commit()
 
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
-        f"/api/{root_id}/activities/{activity_id}/progress-timeline?limit=20&offset=0",
+        f"/api/{root_id}/activities/{activity_id}/progress-timeline"
+        f"?instance_id={sample_activity_instance.id}&limit=20&offset=0",
         query_counter=query_counter,
     )
 
@@ -570,8 +562,51 @@ def test_tag_filtered_progress_timeline_query_budget(
         response, max_bytes=180_000, max_ms=900, elapsed_ms=elapsed_ms
     )
     payload = response.get_json()
-    assert payload["total"] == 41
+    assert payload["total"] == 20
+    assert payload["total_all"] == 40
     assert len(payload["items"]) == 20
+    assert query_counter["total"] <= 22
+
+
+@pytest.mark.integration
+def test_progress_series_query_budget_is_constant(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_practice_session,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    """The Progress pane chart reads a bounded window in a constant number of queries."""
+    root_id = sample_practice_session.root_id
+    for index in range(80):
+        session = PracticeSession(
+            id=str(uuid.uuid4()),
+            owner_id=sample_practice_session.owner_id,
+            root_id=root_id,
+            name=f"Chart history {index}",
+            session_start=datetime.now(timezone.utc) - timedelta(days=index + 1),
+            completed=True,
+        )
+        db_session.add(session)
+        db_session.flush()
+        db_session.add(ActivityInstance(
+            id=str(uuid.uuid4()), session_id=session.id, activity_definition_id=sample_activity_definition.id,
+            root_id=root_id, completed=True,
+        ))
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/activities/{sample_activity_definition.id}/progress-series"
+        f"?instance_id={sample_activity_instance.id}&limit=60",
+        query_counter=query_counter,
+    )
+    assert_response_budget(response, max_bytes=250_000, max_ms=900, elapsed_ms=elapsed_ms)
+    payload = response.get_json()
+    assert len(payload["instances"]) == 61
+    assert payload["truncated"] is True
     assert query_counter["total"] <= 22
 
 
@@ -581,24 +616,18 @@ def test_activity_tag_catalog_query_budget_is_constant(
     db_session,
     query_counter,
     sample_ultimate_goal,
-    sample_activity_definition,
+    sample_activity_instance,
 ):
-    definitions = []
-    for index in range(100):
-        definition = ActivityTagDefinition(
-            root_id=sample_ultimate_goal.id,
-            name=f"Catalog tag {index}",
-            sort_order=index,
-            scope="selected",
-        )
-        definition.bindings.append(
-            ActivityTag(
-                root_id=sample_ultimate_goal.id,
-                activity_definition_id=sample_activity_definition.id,
-            )
-        )
-        definitions.append(definition)
+    definitions = [
+        ActivityTagDefinition(root_id=sample_ultimate_goal.id, name=f"Catalog tag {index}", sort_order=index)
+        for index in range(100)
+    ]
     db_session.add_all(definitions)
+    db_session.flush()
+    db_session.add_all([
+        ActivityInstanceTag(activity_instance_id=sample_activity_instance.id, tag_definition_id=definition.id)
+        for definition in definitions[:50]
+    ])
     db_session.commit()
 
     query_counter["total"] = 0
@@ -645,11 +674,12 @@ def test_publish_landing_examples_query_budget(
 
     # Reusing the validated/preloaded goal graph across enrichment phases keeps
     # this production-shaped 17-goal snapshot below one second locally while
-    # retaining CI headroom and a strict regression ceiling.
+    # retaining CI headroom and a strict regression ceiling. Condition analytics
+    # load each example root's watched activity once (constant per root, not per goal).
     assert_response_budget(
         response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 65
+    assert query_counter["total"] <= 66
 
 
 @pytest.mark.integration
@@ -1109,7 +1139,7 @@ def test_get_goal_timeline_query_budget(
     query_counter["total"] = 0
     response, elapsed_ms = timed_get(
         authed_client,
-        f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,target,child_goal",
+        f"/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,child_goal",
         query_counter=query_counter,
     )
 

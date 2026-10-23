@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session as DatabaseSession
 
 from models import (
-    ActivityInstance, EventLog, GoalPauseInterval, Session, Target,
+    ActivityInstance, EventLog, Goal, GoalCompletionCondition, GoalConditionMetricRule, GoalPauseInterval, Session,
     activity_goal_associations, activity_instance_goal_associations,
 )
 from services.activity_instance_goal_service import ActivityInstanceGoalService
@@ -34,6 +34,29 @@ def one_off(db_session, sample_goal_hierarchy, sample_activity_definition):
     return root, goal, parent, session, instances
 
 
+def add_condition(db_session, goal, activity_id, kind='consistency', *, measure='sets', required_count=1,
+                  min_sets=None, metric_id=None, value=None, rule_metric_id=None):
+    """Give `goal` an activity threshold without associating the activity (one-off evidence only)."""
+    goal.completion_condition = 'activity_threshold'
+    goal.started_at = goal.created_at
+    condition = GoalCompletionCondition(
+        id=str(uuid4()), goal_id=goal.id, root_id=goal.root_id, activity_definition_id=activity_id, kind=kind,
+        measure=measure, required_count=required_count if kind == 'consistency' else None, min_sets=min_sets,
+        metric_definition_id=metric_id, operator='>=' if value is not None and rule_metric_id is None else None,
+        target_value=value if rule_metric_id is None else None,
+    )
+    if rule_metric_id:
+        condition.rules.append(GoalConditionMetricRule(metric_definition_id=rule_metric_id, operator='>=', value=value))
+    db_session.add(condition)
+    db_session.commit()
+    return condition
+
+
+def completed(db_session, goal):
+    db_session.expire_all()
+    return db_session.get(Goal, goal.id).completed
+
+
 def url_for(one_off, index=0):
     root, _, _, _, instances = one_off
     return f'/api/{root.id}/activity-instances/{instances[index].id}/goals'
@@ -46,7 +69,7 @@ def test_only_linked_execution_contributes_and_rolls_up(authed_client, db_sessio
     assert response.status_code == 200
     assert response.get_json()['associated_goal_ids'] == [goal.id]
     for scoped in [goal, parent]:
-        rows = authed_client.get(f'/api/{root.id}/goals/{scoped.id}/activities/{instances[0].activity_definition_id}/instances').get_json()
+        rows = authed_client.get(f'/api/{root.id}/goals/{scoped.id}/condition/evidence', query_string={'activity_id': instances[0].activity_definition_id, 'since': 'all'}).get_json()
         assert [row['id'] for row in rows['instances']] == [instances[0].id]
         metrics = GoalMetricsService(db_session).get_metrics_for_goal(scoped.id)['recursive']
         assert metrics['activities_count'] == 1
@@ -132,9 +155,9 @@ def test_concurrent_duplicate_requests_create_one_link(db_session, one_off):
 @pytest.mark.integration
 def test_recalculation_failure_rolls_back_link_and_event(db_session, one_off, monkeypatch):
     root, goal, _, _, instances = one_off
-    def fail(*args):
+    def fail(*args, **kwargs):
         raise RuntimeError('recalculation failed')
-    monkeypatch.setattr('services.activity_instance_goal_service.recalculate_instance_goal_targets', fail)
+    monkeypatch.setattr('services.activity_instance_goal_service.reconcile_activity_conditions', fail)
     with pytest.raises(RuntimeError):
         ActivityInstanceGoalService(db_session).set_goal(root.id, instances[0].id, goal.id, root.owner_id)
     db_session.rollback()
@@ -143,23 +166,18 @@ def test_recalculation_failure_rolls_back_link_and_event(db_session, one_off, mo
 
 
 @pytest.mark.integration
-def test_completion_target_is_recalculated_on_link_and_removal(authed_client, db_session, one_off):
-    root, goal, _, _, instances = one_off
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id,
-                    activity_id=instances[0].activity_definition_id, type='completion', name='Do it once',
-                    created_at=goal.created_at)
-    db_session.add(target)
-    db_session.commit()
+def test_condition_is_reconciled_on_link_and_removal(authed_client, db_session, one_off):
+    root, goal, _, session, instances = one_off
+    add_condition(db_session, goal, instances[0].activity_definition_id)
     url = url_for(one_off)
     assert authed_client.post(url, json={'goal_id': goal.id}).status_code == 200
-    db_session.refresh(target)
-    assert target.completed is True
-    assert target.completed_instance_id == instances[0].id
+    db_session.expire_all()
+    stored = db_session.get(Goal, goal.id)
+    assert stored.completed is True
+    assert stored.completion_source == 'condition'
+    assert stored.completed_session_id == session.id
     assert authed_client.delete(f'{url}/{goal.id}').status_code == 200
-    db_session.refresh(target)
-    assert target.completed is False
-    db_session.refresh(goal)
-    assert goal.completed is False
+    assert completed(db_session, goal) is False
 
 
 @pytest.mark.integration
@@ -182,90 +200,70 @@ def test_one_off_evidence_exclusions(authed_client, db_session, one_off, exclude
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('target_type', ['threshold', 'sum', 'frequency'])
-def test_target_types_use_only_associated_instance(authed_client, db_session, one_off, sample_activity_definition, target_type):
-    from models import MetricValue, TargetMetricCondition
+@pytest.mark.parametrize('kind', ['single_session', 'cumulative', 'consistency'])
+def test_conditions_use_only_linked_instances(authed_client, db_session, one_off, sample_activity_definition, kind):
+    from models import MetricValue
     root, goal, _, _, instances = one_off
     metric = sample_activity_definition.metric_definitions[0]
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id,
-        activity_id=sample_activity_definition.id, type=target_type, name='One-off target',
-        created_at=goal.created_at, frequency_count=1)
-    db_session.add(target)
-    db_session.flush()
-    if target_type != 'frequency':
-        db_session.add(TargetMetricCondition(id=str(uuid4()), target_id=target.id,
-            metric_definition_id=metric.id, operator='>=', target_value=10))
-        # The unlinked instance exceeds the target; linking the smaller instance must not achieve it.
-        db_session.add_all([MetricValue(id=str(uuid4()), activity_instance_id=instance.id,
-            metric_definition_id=metric.id, value=value) for instance, value in zip(instances, [5, 100])])
+    if kind == 'single_session':
+        add_condition(db_session, goal, sample_activity_definition.id, kind, min_sets=1, value=10, rule_metric_id=metric.id)
+    elif kind == 'cumulative':
+        add_condition(db_session, goal, sample_activity_definition.id, kind, measure='metric', metric_id=metric.id, value=10)
+    else:
+        add_condition(db_session, goal, sample_activity_definition.id, kind)
+    # The unlinked instance exceeds the threshold; linking the smaller instance must not achieve it.
+    db_session.add_all([MetricValue(id=str(uuid4()), activity_instance_id=instance.id,
+        metric_definition_id=metric.id, value=value) for instance, value in zip(instances, [5, 100])])
     db_session.commit()
     assert authed_client.post(url_for(one_off), json={'goal_id': goal.id}).status_code == 200
-    db_session.refresh(target)
-    assert target.completed is (target_type == 'frequency')
+    assert completed(db_session, goal) is (kind == 'consistency')
     assert authed_client.post(url_for(one_off, 1), json={'goal_id': goal.id}).status_code == 200
-    db_session.refresh(target)
-    assert target.completed is True
+    assert completed(db_session, goal) is True
     assert authed_client.delete(f'{url_for(one_off, 1)}/{goal.id}').status_code == 200
-    if target_type == 'frequency':
+    if kind == 'consistency':
         assert authed_client.delete(f'{url_for(one_off)}/{goal.id}').status_code == 200
-    db_session.refresh(target)
-    assert target.completed is False
+    assert completed(db_session, goal) is False
 
 
 @pytest.mark.integration
-def test_linked_incomplete_instance_achieves_target_when_completed(authed_client, db_session, one_off):
+def test_linked_incomplete_instance_completes_the_goal_when_completed(authed_client, db_session, one_off):
     root, goal, _, session, instances = one_off
     instances[0].completed = False
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id, type='completion',
-        activity_id=instances[0].activity_definition_id, name='Complete later', created_at=goal.created_at)
-    db_session.add(target)
-    db_session.commit()
+    add_condition(db_session, goal, instances[0].activity_definition_id)
     assert authed_client.post(url_for(one_off), json={'goal_id': goal.id}).status_code == 200
+    assert completed(db_session, goal) is False
     response = authed_client.put(f'/api/{root.id}/sessions/{session.id}/activities/{instances[0].id}', json={'completed': True})
     assert response.status_code == 200
-    db_session.refresh(target)
-    assert target.completed is True
-    assert target.completed_instance_id == instances[0].id
+    assert completed(db_session, goal) is True
 
 
 @pytest.mark.integration
-def test_target_window_and_instance_binding_are_preserved(authed_client, db_session, one_off):
+@pytest.mark.parametrize('bound', ['start_after_evidence', 'due_before_evidence'])
+def test_the_goals_active_period_bounds_one_off_evidence(authed_client, db_session, one_off, bound):
     root, goal, _, _, instances = one_off
-    targets = [Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id, type='completion',
-        activity_id=instances[0].activity_definition_id, name='Bound target',
-        created_at=goal.created_at, **options) for options in [
-            {'start_date': instances[0].time_stop + timedelta(days=1)},
-            {'end_date': instances[0].time_start - timedelta(days=1)},
-            {'activity_instance_id': instances[1].id},
-        ]]
-    db_session.add_all(targets)
+    add_condition(db_session, goal, instances[0].activity_definition_id)
+    if bound == 'start_after_evidence':
+        goal.started_at = instances[0].time_stop + timedelta(days=1)
+    else:
+        goal.deadline = instances[0].time_start - timedelta(days=1)
     db_session.commit()
     assert authed_client.post(url_for(one_off), json={'goal_id': goal.id}).status_code == 200
-    db_session.expire_all()
-    assert all(not target.completed for target in targets)
+    assert completed(db_session, goal) is False
 
 
 @pytest.mark.integration
 def test_removal_retains_other_evidence_and_manual_goal_completion(authed_client, db_session, one_off):
     root, goal, _, _, instances = one_off
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id, type='completion',
-        activity_id=instances[0].activity_definition_id, name='Either instance', created_at=goal.created_at)
-    db_session.add(target)
-    db_session.commit()
+    add_condition(db_session, goal, instances[0].activity_definition_id)
     for index in range(2):
         assert authed_client.post(url_for(one_off, index), json={'goal_id': goal.id}).status_code == 200
     assert authed_client.delete(f'{url_for(one_off)}/{goal.id}').status_code == 200
-    db_session.refresh(target)
-    assert target.completed is True
-    assert target.completed_instance_id == instances[1].id
-    db_session.refresh(goal)
-    goal.completion_source = 'manual'
+    assert completed(db_session, goal) is True
+    stored = db_session.get(Goal, goal.id)
+    stored.completion_source = 'manual_override'
     db_session.commit()
     assert authed_client.delete(f'{url_for(one_off, 1)}/{goal.id}').status_code == 200
-    db_session.refresh(target)
-    db_session.refresh(goal)
-    assert target.completed is False
-    assert goal.completed is True
+    assert completed(db_session, goal) is True
 
 
 @pytest.mark.integration
@@ -298,7 +296,7 @@ def test_explicit_parent_link_is_not_inherited_downward(authed_client, db_sessio
     goal.inherit_parent_activities = True
     db_session.commit()
     assert authed_client.post(url_for(one_off), json={'goal_id': parent.id}).status_code == 200
-    rows = authed_client.get(f'/api/{root.id}/goals/{goal.id}/activities/{instances[0].activity_definition_id}/instances').get_json()
+    rows = authed_client.get(f'/api/{root.id}/goals/{goal.id}/condition/evidence', query_string={'activity_id': instances[0].activity_definition_id, 'since': 'all'}).get_json()
     assert rows['instances'] == []
     assert GoalMetricsService(db_session).get_metrics_for_goal(goal.id)['direct']['activities_duration_seconds'] == 0
 
@@ -324,21 +322,15 @@ def test_instance_association_serialization_has_constant_query_count(authed_clie
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('target_type', ['completion', 'frequency'])
-def test_completed_session_corrections_preserve_alternative_instance_evidence(authed_client, db_session, one_off, target_type):
+def test_completed_session_corrections_preserve_alternative_instance_evidence(authed_client, db_session, one_off):
     root, goal, _, _, instances = one_off
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id,
-        activity_id=instances[0].activity_definition_id, type=target_type, name='Correctable target',
-        created_at=goal.created_at, frequency_count=1)
-    db_session.add(target)
-    db_session.commit()
+    add_condition(db_session, goal, instances[0].activity_definition_id)
     for index in [0, 1]:
         assert authed_client.post(url_for(one_off, index), json={'goal_id': goal.id}).status_code == 200
     for index, expected in [(0, True), (1, False)]:
         response = authed_client.put(f'/api/{root.id}/activity-instances/{instances[index].id}', json={'completed': False})
         assert response.status_code == 200
-        db_session.refresh(target)
-        assert target.completed is expected
+        assert completed(db_session, goal) is expected
 
 
 @pytest.mark.integration
@@ -363,18 +355,12 @@ def test_related_session_filters_preserve_ancestor_rollups(authed_client, one_of
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize('target_type', ['completion', 'frequency'])
-def test_deleted_instance_preserves_alternative_target_evidence(authed_client, db_session, one_off, target_type):
+def test_deleted_instance_preserves_alternative_evidence(authed_client, db_session, one_off):
     root, goal, _, session, instances = one_off
-    target = Target(id=str(uuid4()), root_id=root.id, goal_id=goal.id,
-        activity_id=instances[0].activity_definition_id, type=target_type, name='Correctable target',
-        created_at=goal.created_at, frequency_count=1)
-    db_session.add(target)
-    db_session.commit()
+    add_condition(db_session, goal, instances[0].activity_definition_id)
     for index in [0, 1]:
         assert authed_client.post(url_for(one_off, index), json={'goal_id': goal.id}).status_code == 200
     for index, expected in [(0, True), (1, False)]:
         response = authed_client.delete(f'/api/{root.id}/sessions/{session.id}/activities/{instances[index].id}')
         assert response.status_code == 200
-        db_session.refresh(target)
-        assert target.completed is expected
+        assert completed(db_session, goal) is expected

@@ -8,24 +8,41 @@ export const fractalGoalsApi = {
     }),
     createGoal: (rootId, data) => axios.post(`${API_BASE}/${rootId}/goals`, data),
     updateGoal: (rootId, goalId, data) => axios.put(`${API_BASE}/${rootId}/goals/${goalId}`, data),
-    deleteGoal: (rootId, goalId) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}`),
-    toggleGoalCompletion: (rootId, goalId, completed, sessionId = null) =>
+    // `beginNext: false` keeps the next goal in a sequence waiting when this one was its active step.
+    deleteGoal: (rootId, goalId, { beginNext = true } = {}) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}`, {
+        params: beginNext === false ? { begin_next: 'false' } : undefined,
+    }),
+    // `sequenceOptions`: { beginNext } when completing / { pauseNext } when un-completing a sequenced goal.
+    toggleGoalCompletion: (rootId, goalId, completed, sessionId = null, sequenceOptions = null) =>
         axios.patch(`${API_BASE}/${rootId}/goals/${goalId}/complete`, {
             completed,
             ...(sessionId ? { session_id: sessionId } : {}),
+            ...(sequenceOptions?.beginNext === false ? { begin_next: false } : {}),
+            ...(sequenceOptions?.pauseNext === false ? { pause_next: false } : {}),
         }),
-    evaluateGoalTargets: (rootId, goalId, sessionId) =>
-        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/evaluate-targets`, { session_id: sessionId }),
-    createGoalTarget: (goalId, data) =>
-        axios.post(`${API_BASE}/goals/${goalId}/targets`, data),
-    updateGoalTarget: (goalId, targetId, data) =>
-        axios.patch(`${API_BASE}/goals/${goalId}/targets/${targetId}`, data),
-    deleteGoalTarget: (goalId, targetId) =>
-        axios.delete(`${API_BASE}/goals/${goalId}/targets/${targetId}`),
-    getTargetAnalytics: (rootId, targetId, since = 'creation') =>
-        axios.get(`${API_BASE}/${rootId}/targets/${targetId}/analytics${since === 'all' ? '?since=all' : ''}`),
-    getGoalActivityInstances: (rootId, goalId, activityId) =>
-        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities/${activityId}/instances`),
+    getGoalSequence: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/sequence`),
+    createSequenceTrack: (rootId, parentGoalId, goalIds) =>
+        axios.post(`${API_BASE}/${rootId}/sequence-tracks`, { parent_goal_id: parentGoalId, goal_ids: goalIds }),
+    setSequenceSteps: (rootId, trackId, goalIds) =>
+        axios.put(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`, { goal_ids: goalIds }),
+    deleteSequenceTrack: (rootId, trackId) => axios.delete(`${API_BASE}/${rootId}/sequence-tracks/${trackId}`),
+    holdSequenceStep: (rootId, goalId) => axios.post(`${API_BASE}/${rootId}/goals/${goalId}/sequence-hold`),
+    getGoalCharts: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/charts`),
+    attachGoalChart: (rootId, goalId, dashboardId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/charts`, { dashboard_id: dashboardId }),
+    detachGoalChart: (rootId, goalId, dashboardId) => axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/charts/${dashboardId}`),
+    getActivityAnalyticsEvidence: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/analytics-evidence`),
+    getActivityGoalConditions: (rootId, activityId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/conditions`, { params: { activity_id: activityId } }),
+    setGoalCondition: (rootId, goalId, data) =>
+        axios.put(`${API_BASE}/${rootId}/goals/${goalId}/condition`, data),
+    getGoalConditionProgress: (rootId, goalIds) =>
+        axios.get(`${API_BASE}/${rootId}/goals/condition-progress`, { params: { goal_ids: goalIds.join(',') } }),
+    getGoalConditionEvidence: (rootId, goalId, { since = 'active', activityId = null } = {}) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/condition/evidence`, {
+            params: { ...(since === 'all' ? { since } : {}), ...(activityId ? { activity_id: activityId } : {}) },
+        }),
     getGoalAnalytics: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/goals/analytics${buildQueryString(options)}`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),

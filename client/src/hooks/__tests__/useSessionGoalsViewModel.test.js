@@ -36,8 +36,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG', 'IG']);
@@ -76,8 +74,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.activityHierarchy.map((node) => node.name)).toEqual(['Root', 'STG']);
@@ -116,8 +112,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         const names = result.current.activityHierarchy.map((node) => node.name);
@@ -162,8 +156,6 @@ describe('useSessionGoalsViewModel', () => {
                 { id: 'inst-1', activity_definition_id: 'learning-intro' },
                 { id: 'inst-2', activity_definition_id: 'jamming' },
             ],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.sessionHierarchy.map((node) => node.name)).toEqual([
@@ -217,8 +209,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: null,
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         const names = result.current.sessionHierarchy.map((node) => node.name);
@@ -255,8 +245,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: null,
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.sessionHierarchy.map((node) => node.name)).toEqual([
@@ -265,7 +253,7 @@ describe('useSessionGoalsViewModel', () => {
         ]);
     });
 
-    it('does not derive canonical goal completion from completed targets', () => {
+    it('does not derive canonical goal completion from a met condition', () => {
         const sessionGoalsView = {
             goal_tree: {
                 id: 'root',
@@ -277,16 +265,12 @@ describe('useSessionGoalsViewModel', () => {
                         type: 'MidTermGoal',
                         name: 'Achieve Proper Handstand Form',
                         completed: false,
-                        targets: [
-                            {
-                                id: 'target-1',
-                                activity_id: 'activity-1',
-                                type: 'threshold',
-                                completed: true,
-                                completed_session_id: 'session-1',
-                                metrics: [{ metric_id: 'form', value: 9 }],
-                            },
-                        ],
+                        completion_condition: 'activity_threshold',
+                        condition: {
+                            activity_definition_id: 'activity-1',
+                            kind: 'single_session',
+                            rules: [{ metric_definition_id: 'form', operator: '>=', value: 9 }],
+                        },
                         children: [],
                     },
                 ],
@@ -301,17 +285,13 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: null,
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1', completed: true }],
-            targetAchievements: new Map([
-                ['target-1', { achieved: true }],
-            ]),
-            achievedTargetIds: new Set(['target-1']),
+            conditionProgressByGoalId: { handstand: { met: true, completed: false } },
         }));
 
         const handstand = result.current.sessionHierarchy.find((node) => node.id === 'handstand');
         expect(handstand.status.completed).toBe(false);
-        expect(handstand.status.allTargetsSatisfied).toBe(true);
         expect(handstand.status.readyForCompletion).toBe(true);
-        expect(handstand.status.reason).toBe('targets_satisfied');
+        expect(handstand.status.reason).toBe('pending');
     });
 
     it('returns an empty session hierarchy when the current session has no activities', () => {
@@ -338,8 +318,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: null,
             activityInstances: [],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.sessionHierarchy).toEqual([]);
@@ -371,8 +349,6 @@ describe('useSessionGoalsViewModel', () => {
             selectedActivity: null,
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
             localSessionData: { sections: [{ activity_ids: [] }] },
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         expect(result.current.sessionHierarchy).toEqual([]);
@@ -414,8 +390,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         const names = result.current.activityHierarchy.map((node) => node.name);
@@ -454,8 +428,6 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: null,
             activityInstances: [{ id: 'inst-1', activity_definition_id: 'activity-1' }],
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
         }));
 
         const names = result.current.sessionHierarchy.map((node) => node.name);
@@ -473,13 +445,8 @@ describe('useSessionGoalsViewModel', () => {
                     type: depth >= maxDepth - 1 ? 'ImmediateGoal' : 'ShortTermGoal',
                     name: `Goal ${id}`,
                     children: childrenFor(id, depth + 1, maxDepth),
-                    targets: [
-                        {
-                            id: `target-${id}`,
-                            name: `Target ${id}`,
-                            activity_id: `activity-${index % 12}`,
-                        }
-                    ]
+                    completion_condition: 'activity_threshold',
+                    condition: { activity_definition_id: `activity-${index % 12}`, kind: 'consistency', required_count: 3 },
                 };
             });
         };
@@ -520,14 +487,12 @@ describe('useSessionGoalsViewModel', () => {
             sessionGoalsView,
             selectedActivity: activityInstances[0],
             activityInstances,
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
+            conditionProgressByGoalId: {},
         }));
         const elapsedMs = performance.now() - startedAt;
 
         expect(result.current.sessionHierarchy.length).toBeGreaterThan(100);
         expect(result.current.activityHierarchy.length).toBeGreaterThan(10);
-        expect(result.current.targetCards.length).toBeGreaterThan(0);
         expect(elapsedMs).toBeLessThan(250);
     });
 

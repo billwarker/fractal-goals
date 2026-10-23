@@ -1,50 +1,41 @@
 import React, { Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { findGoalById } from '../../utils/goalHelpers';
+import { getGoalNodeChildren } from '../../utils/goalNodeModel';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { FolderIcon } from '../atoms/AppIcons';
 import NoteCard from '../notes/NoteCard';
 import GoalSmartSection from './GoalSmartSection';
 import styles from '../GoalDetailModal.module.css';
 
-const GoalActivityHeatmap = lazyWithRetry(() => import('../goalDetail/GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
-
-const TargetManager = lazyWithRetry(() => import('../goalDetail/TargetManager'), 'components/goalDetail/TargetManager');
+const GoalChartsCarousel = lazyWithRetry(() => import('../goalCharts/GoalChartsCarousel'), 'components/goalCharts/GoalChartsCarousel');
+const CompletionConditionSummary = lazyWithRetry(() => import('../goalDetail/CompletionConditionSummary'), 'components/goalDetail/CompletionConditionSummary');
 
 function GoalViewMode({
     mode,
     goal,
     goalId,
     rootId,
-    goalType,
     goalColor,
-    parentGoalName,
-    parentGoalColor,
-    isCompleted,
-    levelConfig,
-    trackActivities,
     displayMode,
     programs,
-    targets,
-    associatedActivities,
     activityDefinitions,
-    name,
-    description,
-    deadline,
-    relevanceStatement,
     goalCompletionNote,
+    conditionSnapshot = null,
+    treeData = null,
+    childType = null,
     // Handlers
     onClose,
-    onUpdate,
-    setTargets,
-    onTargetClick,
-    onRequestTargetBuilder,
+    onCompleteNow,
+    onGoalSelect,
+    chartExpansion = null,
+    portalTarget = null,
     readOnly = false,
-    readOnlyTimelineEntries = null,
-    onTimelineExplore,
 }) {
     const navigate = useNavigate();
-    const hasTargets = Array.isArray(targets) && targets.length > 0;
-    const canTrackActivities = trackActivities && levelConfig.track_activities !== false;
+    const goalNode = (Array.isArray(treeData) ? treeData : [treeData])
+        .reduce((found, root) => found || findGoalById(root, goalId), null);
+    const childGoals = getGoalNodeChildren(goalNode);
 
     return (
         <div className={styles.viewContainer}>
@@ -65,15 +56,7 @@ function GoalViewMode({
                 </section>
             )}
 
-            <GoalSmartSection
-                goal={goal}
-                goalColor={goalColor}
-                parentGoalName={parentGoalName}
-                parentGoalColor={parentGoalColor}
-                mode={mode}
-                goalType={goalType}
-                relevanceStatement={relevanceStatement}
-            />
+            <GoalSmartSection goal={goal} />
 
             {/* Associated Programs */}
             {programs && (() => {
@@ -105,44 +88,37 @@ function GoalViewMode({
                 );
             })()}
 
-            {/* Targets Section - View Mode (Read-only) */}
-            {(hasTargets || canTrackActivities) && (
+            {mode !== 'create' && !readOnly && (
                 <Suspense fallback={null}>
-                    <TargetManager
-                        targets={targets}
-                        setTargets={setTargets}
-                        activityDefinitions={activityDefinitions}
-                        associatedActivities={associatedActivities}
+                    <GoalChartsCarousel
+                        rootId={rootId}
+                        goal={goal}
+                        goalId={goalId}
+                        chartExpansion={chartExpansion}
+                        portalTarget={portalTarget}
+                    />
+                </Suspense>
+            )}
+
+            {mode !== 'create' && (
+                <Suspense fallback={null}>
+                    <CompletionConditionSummary
+                        goal={goal}
                         goalId={goalId}
                         rootId={rootId}
-                        isEditing={false}
-                        viewMode="list"
-                        onSave={readOnly ? undefined : (newTargets) => {
-                            if (onUpdate && goalId) {
-                                onUpdate(goalId, {
-                                    name,
-                                    description,
-                                    deadline,
-                                    relevance_statement: relevanceStatement,
-                                    targets: newTargets
-                                });
-                            }
-                        }}
-                        headerColor="var(--color-text-primary)"
-                        goalType={goalType}
-                        goalCompleted={isCompleted}
-                        onTargetClick={onTargetClick}
-                        onRequestBuilder={readOnly ? undefined : onRequestTargetBuilder}
+                        goalColor={goalColor}
+                        activityDefinitions={activityDefinitions}
+                        childGoals={childGoals}
+                        childType={childType}
+                        onGoalSelect={onGoalSelect}
                         readOnly={readOnly}
+                        snapshot={conditionSnapshot}
+                        onCompleteNow={onCompleteNow}
+                        chartShowsProgress={!readOnly}
                     />
                 </Suspense>
             )}
             </div>
-            {goalId && mode !== 'create' && (!readOnly || Array.isArray(readOnlyTimelineEntries)) && (
-                <Suspense fallback={<p role="status">Loading timeline...</p>}>
-                    <GoalActivityHeatmap key={goalId} rootId={rootId} goalId={goalId} goal={goal} snapshotEntries={readOnly ? readOnlyTimelineEntries : null} onExplore={onTimelineExplore} />
-                </Suspense>
-            )}
         </div>
     );
 }

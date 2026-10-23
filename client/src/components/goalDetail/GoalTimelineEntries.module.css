@@ -6,10 +6,12 @@
 }
 
 .activityEvent {
+    position: relative;
     min-width: 0;
 }
 
 .item {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -109,4 +111,67 @@
 @media (max-width: 560px) {
     .cardHeader { flex-wrap: wrap; }
     .time { align-items: center; text-align: left; }
+}
+
+/* Hover/focus highlight: an accent ring and tint fade in, with one soft sheen sweep on entry.
+   Drawn as overlays so it works over both plain event cards and activity cards. */
+.item::before,
+.item::after,
+.activityEvent::before,
+.activityEvent::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.item::after,
+.activityEvent::after {
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--heatmap-accent, var(--color-text-primary)) 55%, transparent);
+    background: color-mix(in srgb, var(--heatmap-accent, var(--color-text-primary)) 6%, transparent);
+    transition: opacity 180ms ease-out;
+}
+
+.item::before,
+.activityEvent::before {
+    background: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--heatmap-accent, var(--color-text-primary)) 10%, transparent) 50%, transparent 70%) no-repeat;
+    background-size: 250% 100%;
+    background-position: 100% 0;
+}
+
+.item:focus-within::after,
+.activityEvent:focus-within::after {
+    opacity: 1;
+}
+
+@media (hover: hover) {
+    .item:hover::after,
+    .activityEvent:hover::after {
+        opacity: 1;
+    }
+
+    .item:hover::before,
+    .activityEvent:hover::before {
+        animation: timelineSheen 650ms ease-out;
+    }
+}
+
+@keyframes timelineSheen {
+    0% { opacity: 1; background-position: 100% 0; }
+    100% { opacity: 0; background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .item::after,
+    .activityEvent::after {
+        transition: none;
+    }
+
+    .item:hover::before,
+    .activityEvent:hover::before {
+        animation: none;
+    }
 }

@@ -304,7 +304,6 @@ function SessionActivityItemView({
                                                     activityId={activityDefinition.id}
                                                     instanceId={exercise.id}
                                                     assignmentVersion={exercise.tag_assignment_version}
-                                                    availableTags={activityDefinition.tags || []}
                                                     tags={exercise.tags || []}
                                                     editable={isSelected}
                                                     triggerFirst
@@ -676,7 +675,6 @@ function SessionActivityItemView({
                                                         activityId={activityDefinition.id}
                                                         setId={set.id}
                                                         assignmentVersion={set.tag_assignment_version}
-                                                        availableTags={activityDefinition.tags || []}
                                                         tags={set.tags || []}
                                                         inheritedTags={set.inherited_tags ?? exercise.tags ?? []}
                                                         editable={isSelected && selectedSetIndex === setIdx}

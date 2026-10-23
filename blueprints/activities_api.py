@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
 import logging
-from time import perf_counter
 from pydantic import ValidationError
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,8 +17,8 @@ from validators import (
     ActivityTagAssignmentSchema,
     ActivityTagCatalogCreateSchema, ActivityTagCatalogUpdateSchema,
     ActivityTagVersionSchema, ActivityTagHardDeleteSchema, ActivityTagMergeSchema,
-    ActivityProgressViewCreateSchema, ActivityProgressViewUpdateSchema,
-    ActivityProgressViewActivateSchema, ActivityProgressQuerySchema,
+    ActivityTagOrderSchema, ActivityTagFamilyCreateSchema, ActivityTagFamilyUpdateSchema,
+    ActivityTagFamilyDeleteSchema, ActivityTagFamilyOrderSchema, ProgressChartSchema, ProgressComparisonSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
@@ -35,10 +34,11 @@ from services.activity_service import (
     ActivityService,
 )
 from services.progress_service import ProgressService
+from services.progress_chart_settings import ProgressChartSettingsService
 from blueprints.activity_instance_goals_api import instance_goals_bp
-from services.activity_progress_view_service import ActivityProgressViewService
+from services.activity_tag_assignment_service import ActivityTagAssignmentService
 from services.activity_tag_catalog_service import ActivityTagCatalogService
-from services.ops_log import log_ops_event
+from services.activity_tag_family_service import ActivityTagFamilyService
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ def _parse_activity_payload(schema_class):
 
 
 # ============================================================================
-# ACTIVITY TAGS AND SAVED PROGRESS VIEWS
+# ACTIVITY TAGS, TAG FAMILIES, AND PROGRESS COMPARISON
 # ============================================================================
 
 @activities_bp.route('/<root_id>/activity-tags', methods=['GET'])
@@ -230,7 +230,7 @@ def preview_activity_tag_catalog_merge(current_user, root_id, validated_data):
 def replace_activity_instance_tags(current_user, root_id, instance_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).replace_instance_tags(
+        return _service_response(*ActivityTagAssignmentService(session).replace_instance_tags(
             root_id, instance_id, current_user.id, validated_data['tag_ids'], version=validated_data.get('version')
         ))
     finally:
@@ -244,95 +244,86 @@ def replace_activity_instance_tags(current_user, root_id, instance_id, validated
 def replace_activity_set_tags(current_user, root_id, set_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).replace_set_tags(
+        return _service_response(*ActivityTagAssignmentService(session).replace_set_tags(
             root_id, set_id, current_user.id, validated_data['tag_ids'], version=validated_data.get('version')
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views', methods=['GET'])
+@activities_bp.route('/<root_id>/activity-instances/<instance_id>/progress-comparison', methods=['PUT'])
 @token_required
-def list_activity_progress_views(current_user, root_id, activity_id):
+@idempotent
+@validate_request(ProgressComparisonSchema)
+def set_activity_instance_progress_comparison(current_user, root_id, instance_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).list_views(
-            root_id, activity_id, current_user.id
+        return _service_response(*ActivityTagAssignmentService(session).set_progress_comparison(
+            root_id, instance_id, current_user.id, validated_data,
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views', methods=['POST'])
+@activities_bp.route('/<root_id>/activity-instances/<instance_id>/progress-chart', methods=['PUT'])
 @token_required
-@validate_request(ActivityProgressViewCreateSchema)
-def create_activity_progress_view(current_user, root_id, activity_id, validated_data):
+@idempotent
+@validate_request(ProgressChartSchema)
+def set_activity_instance_progress_chart(current_user, root_id, instance_id, validated_data):
     session = get_db_session()
     try:
-        return _service_response(*ActivityProgressViewService(session).create_view(
-            root_id, activity_id, current_user.id, validated_data
+        return _service_response(*ProgressChartSettingsService(session).save(
+            root_id, instance_id, current_user.id, validated_data,
         ))
     finally:
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views/<view_id>', methods=['PUT'])
-@token_required
-@validate_request(ActivityProgressViewUpdateSchema)
-def update_activity_progress_view(current_user, root_id, activity_id, view_id, validated_data):
-    session = get_db_session()
-    try:
-        return _service_response(*ActivityProgressViewService(session).update_view(
-            root_id, activity_id, view_id, current_user.id, validated_data
-        ))
-    finally:
-        session.close()
+def _progress_scope_args():
+    """Previewed comparison criteria from the query string; None leaves the saved value."""
+    mode = request.args.get('mode') or None
+    if mode not in (None, 'same_tags', 'tags', 'all'):
+        raise ValueError("mode must be same_tags, tags, or all")
+
+    def flag(name):
+        raw = request.args.get(name)
+        if raw is None or raw == '':
+            return None
+        if raw.lower() not in ('true', 'false', '1', '0'):
+            raise ValueError(f"{name} must be true or false")
+        return raw.lower() in ('true', '1')
+
+    return {
+        'instance_id': request.args.get('instance_id') or None,
+        'mode': mode,
+        'tag_ids': [tag_id for tag_id in request.args.getlist('tag_ids') if tag_id],
+        'same_template': flag('same_template'),
+        'same_program_day': flag('same_program_day'),
+    }
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/progress-views/<view_id>', methods=['DELETE'])
-@token_required
-def delete_activity_progress_view(current_user, root_id, activity_id, view_id):
-    session = get_db_session()
-    try:
-        return _service_response(*ActivityProgressViewService(session).delete_view(
-            root_id, activity_id, view_id, current_user.id
-        ))
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/activities/<activity_id>/active-progress-view', methods=['PUT'])
-@token_required
-@validate_request(ActivityProgressViewActivateSchema)
-def activate_activity_progress_view(current_user, root_id, activity_id, validated_data):
-    session = get_db_session()
-    try:
-        return _service_response(*ActivityProgressViewService(session).activate_view(
-            root_id, activity_id, current_user.id, validated_data.get('view_id')
-        ))
-    finally:
-        session.close()
+def _owned_activity_or_error(session, root_id, activity_id, current_user):
+    if not require_owned_root(session, root_id, current_user.id):
+        return jsonify({"error": "Fractal not found or access denied"}), 404
+    if not get_owned_activity_definition(session, root_id, activity_id):
+        return jsonify({"error": "Activity not found"}), 404
+    return None
 
 
 @activities_bp.route('/<root_id>/activities/<activity_id>/progress-timeline', methods=['GET'])
 @token_required
 def get_activity_progress_timeline(current_user, root_id, activity_id):
+    """Past instances in one comparison context; query params preview an unsaved one."""
     session = get_db_session()
     try:
-        if not require_owned_root(session, root_id, current_user.id):
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        if not get_owned_activity_definition(session, root_id, activity_id):
-            return jsonify({"error": "Activity not found"}), 404
+        failure = _owned_activity_or_error(session, root_id, activity_id, current_user)
+        if failure:
+            return failure
         limit = min(max(request.args.get('limit', 20, type=int), 1), 100)
         offset = max(request.args.get('offset', 0, type=int), 0)
         try:
             payload = ProgressService(session).get_progress_timeline(
-                activity_id,
-                root_id,
-                limit=limit,
-                offset=offset,
-                exclude_session_id=request.args.get('exclude_session_id'),
-                view_id=request.args.get('view_id') or None,
+                activity_id, root_id, limit=limit, offset=offset, **_progress_scope_args(),
             )
         except ValueError as error:
             return jsonify({"error": str(error)}), 400
@@ -341,42 +332,94 @@ def get_activity_progress_timeline(current_user, root_id, activity_id):
         session.close()
 
 
-@activities_bp.route('/<root_id>/activities/<activity_id>/progress-query', methods=['POST'])
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-series', methods=['GET'])
 @token_required
-@validate_request(ActivityProgressQuerySchema)
-def query_activity_progress(current_user, root_id, activity_id, validated_data):
+def get_activity_progress_series(current_user, root_id, activity_id):
+    """Scoped instances for the Progress pane's compact chart, and what it plots."""
     session = get_db_session()
-    started_at = perf_counter()
     try:
-        if not require_owned_root(session, root_id, current_user.id):
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        if not get_owned_activity_definition(session, root_id, activity_id):
-            return jsonify({"error": "Activity not found"}), 404
+        failure = _owned_activity_or_error(session, root_id, activity_id, current_user)
+        if failure:
+            return failure
+        limit = min(max(request.args.get('limit', 60, type=int), 1), 200)
         try:
-            payload = ProgressService(session).get_progress_timeline(
-                activity_id,
-                root_id,
-                limit=validated_data['limit'],
-                offset=validated_data['offset'],
-                exclude_session_id=validated_data.get('exclude_session_id'),
-                view_id=validated_data.get('view_id'),
-                config=validated_data.get('config'),
+            payload = ProgressService(session).get_progress_series(
+                activity_id, root_id, limit=limit, **_progress_scope_args(),
             )
         except ValueError as error:
             return jsonify({"error": str(error)}), 400
-        elapsed_ms = round((perf_counter() - started_at) * 1000, 1)
-        log_ops_event(
-            "activity_progress_view.preview_calculated",
-            level="warning" if elapsed_ms >= 500 else "info",
-            root_id=root_id,
-            activity_id=activity_id,
-            elapsed_ms=elapsed_ms,
-            returned_items=len(payload.get("items", [])),
-            total=payload.get("total", 0),
-        )
         return jsonify(payload)
     finally:
         session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tags/order', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagOrderSchema)
+def reorder_activity_tags(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagCatalogService(session).reorder(
+            root_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tag-families', methods=['POST'])
+@token_required
+@validate_request(ActivityTagFamilyCreateSchema)
+def create_activity_tag_family(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagFamilyService(session).create(
+            root_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tag-families/order', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagFamilyOrderSchema)
+def reorder_activity_tag_families(current_user, root_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagFamilyService(session).reorder(
+            root_id, current_user.id, validated_data['family_ids'],
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tag-families/<family_id>', methods=['PUT'])
+@token_required
+@validate_request(ActivityTagFamilyUpdateSchema)
+def update_activity_tag_family(current_user, root_id, family_id, validated_data):
+    session = get_db_session()
+    try:
+        return _service_response(*ActivityTagFamilyService(session).update(
+            root_id, family_id, current_user.id, validated_data,
+        ))
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activity-tag-families/<family_id>', methods=['DELETE'])
+@token_required
+def delete_activity_tag_family(current_user, root_id, family_id):
+    session = get_db_session()
+    try:
+        try:
+            body = ActivityTagFamilyDeleteSchema(**(request.get_json(silent=True) or {}))
+        except ValidationError as exc:
+            return jsonify({"error": "Validation failed", "details": _format_validation_errors(exc)}), 400
+        return _service_response(*ActivityTagFamilyService(session).delete(
+            root_id, family_id, current_user.id, body.version,
+        ))
+    finally:
+        session.close()
+
 
 # ============================================================================
 # ============================================================================
@@ -592,7 +635,6 @@ def get_activities(current_user, root_id):
             selectinload(ActivityDefinition.metric_definitions).selectinload(MetricDefinition.fractal_metric),
             selectinload(ActivityDefinition.split_definitions),
             selectinload(ActivityDefinition.associated_goals),
-            selectinload(ActivityDefinition.tags),
         ).filter_by(root_id=root_id).filter(
             ActivityDefinition.deleted_at.is_(None)
         ).order_by(ActivityDefinition.name)
@@ -864,44 +906,6 @@ def get_activity_instance_progress(current_user, root_id, instance_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting activity instance progress")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/activities/<activity_def_id>/progress-history', methods=['GET'])
-@token_required
-def get_activity_progress_history(current_user, root_id, activity_def_id):
-    """Get paginated progress history for an activity definition."""
-    session = get_db_session()
-    try:
-        root = require_owned_root(session, root_id, current_user.id)
-        if not root:
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-
-        activity = get_owned_activity_definition(session, root_id, activity_def_id)
-        if not activity:
-            return jsonify({"error": "Activity not found"}), 404
-
-        try:
-            limit = min(int(request.args.get('limit', 20)), 100)
-            offset = int(request.args.get('offset', 0))
-            exclude_session_id = request.args.get('exclude_session')
-        except ValueError:
-            return jsonify({"error": "Invalid pagination parameters"}), 400
-
-        service = ProgressService(session)
-        records = service.get_progress_history(
-            activity.id,
-            root_id,
-            limit=limit,
-            offset=offset,
-            exclude_session_id=exclude_session_id,
-        )
-        return jsonify(records)
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error getting activity progress history")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

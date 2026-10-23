@@ -10,11 +10,11 @@ from typing import List, Dict, Any
 
 from sqlalchemy.orm import selectinload
 
-from models import Program, ProgramDay, ProgramDayTemplate, Goal, SessionTemplate, Target, validate_root_goal, program_goals
+from models import Program, ProgramDay, ProgramDayTemplate, Goal, GoalCompletionCondition, SessionTemplate, validate_root_goal, program_goals
 from models.base import utc_now
 from models.goal import program_day_goals
 from services import event_bus
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.program_scope import resolve_program_scope
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class _ProgramHelpersMixin:
             day_load.selectinload(ProgramDay.goals),
             day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
             template_goal_load.selectinload(Goal.level),
-            template_goal_load.selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+            template_goal_load.selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
             template_goal_load.selectinload(Goal.associated_activities),
             template_goal_load.selectinload(Goal.associated_activity_groups),
             day_load.selectinload(ProgramDay.completed_sessions),
@@ -247,7 +247,7 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _apply_goal_deadline_with_program_rules(cls, session, root_id: str, current_user_id: str | None, goal: Goal, deadline_value: str):
-        goal_service = GoalService(session, sync_targets=sync_goal_targets)
+        goal_service = GoalService(session)
         _, update_error = goal_service._apply_goal_updates(
             goal,
             {'deadline': deadline_value},

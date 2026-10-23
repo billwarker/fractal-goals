@@ -1,49 +1,10 @@
-"""Serializers for activities, metrics, sets, targets, circuits, and work intervals.
+"""Serializers for activities, metrics, sets, circuits, and work intervals.
 """
 
 from models import _safe_load_json
 from .goal_type_utils import get_canonical_goal_type
-from .activity_progress_view_service import serialize_activity_tag
+from .activity_tags import serialize_compare_context, serialize_tag as serialize_activity_tag
 from services._serialize_common import format_utc, format_utc_precise
-
-
-def serialize_target(target):
-    """Serialize a Target object."""
-    metrics_json = []
-    if getattr(target, 'metric_conditions', None):
-        for condition in target.metric_conditions:
-            metrics_json.append({
-                "metric_id": condition.metric_definition_id,
-                "metric_definition_id": condition.metric_definition_id,
-                "operator": condition.operator,
-                "value": condition.target_value,
-                "target_value": condition.target_value
-            })
-            
-    return {
-        "id": target.id,
-        "goal_id": target.goal_id,
-        "root_id": target.root_id,
-        "activity_id": target.activity_id,
-        "activity_instance_id": getattr(target, 'activity_instance_id', None),
-        "activity_group_id": getattr(target, 'activity_group_id', None),
-        "template_id": getattr(target, 'template_id', None),
-        "name": target.name,
-        "type": target.type or "threshold",
-        "metrics": metrics_json,
-        "time_scope": target.time_scope or "all_time",
-        "start_date": format_utc(target.start_date),
-        "end_date": format_utc(target.end_date),
-        "linked_block_id": target.linked_block_id,
-        "frequency_days": target.frequency_days,
-        "frequency_count": target.frequency_count,
-        "completed": target.completed or False,
-        "completed_at": format_utc(target.completed_at),
-        "completed_session_id": getattr(target, 'completed_session_id', None),
-        "completed_instance_id": getattr(target, 'completed_instance_id', None),
-        "created_at": format_utc(target.created_at),
-        "updated_at": format_utc(target.updated_at)
-    }
 
 
 def serialize_metric_value(metric):
@@ -163,6 +124,7 @@ def serialize_activity_instance(instance, *, has_open_work_interval=False):
         "metrics": metric_values_list,  # Frontend alias
         "tags": [serialize_activity_tag(tag) for tag in (getattr(instance, 'tags', None) or [])],
         "tag_assignment_version": instance.tag_assignment_version,
+        "comparison_context": serialize_compare_context(instance),
         "progress_comparison": getattr(instance, '_dynamic_progress', None),
         "prescription": getattr(instance, 'prescription', None),
     }
@@ -205,7 +167,7 @@ def serialize_activity_instance_for_analytics(instance, *, session_name=None, se
         comparison = payload['progress_comparison']
         if comparison:
             payload['progress_comparison'] = {key: comparison.get(key) for key in (
-                'included', 'is_first_instance', 'previous_instance_id', 'metric_comparisons',
+                'is_first_instance', 'previous_instance_id', 'metric_comparisons',
             )}
     return payload
 
@@ -372,12 +334,6 @@ def serialize_activity_definition(activity):
         "track_progress": activity.track_progress,
         "progress_aggregation": activity.progress_aggregation,
         "delta_display_mode": activity.delta_display_mode,
-        "active_progress_view_id": getattr(activity, 'active_progress_view_id', None),
-        "tags": [
-            serialize_activity_tag(tag)
-            for tag in (getattr(activity, 'tags', None) or [])
-            if tag.deleted_at is None and not tag.catalog_archived
-        ],
         "created_at": format_utc(activity.created_at),
         "metric_definitions": [serialize_metric_definition(m) for m in activity.metric_definitions if not m.deleted_at],
         "split_definitions": [serialize_split_definition(s) for s in activity.split_definitions if not s.deleted_at],
@@ -392,7 +348,7 @@ def serialize_metric_definition(metric):
     # Derive name/unit/is_multiplicative from fractal metric if linked, else fall back to own columns
     name = fm.name if fm else metric.name
     unit = fm.unit if fm else metric.unit
-    is_multiplicative = fm.is_multiplicative if fm else metric.is_multiplicative
+    is_multiplicative = metric.multiplies
     return {
         "id": metric.id,
         "fractal_metric_id": metric.fractal_metric_id,

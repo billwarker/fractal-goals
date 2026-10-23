@@ -44,11 +44,7 @@ class ActivityTagCreateSchema(BaseModel):
     @field_validator('color')
     @classmethod
     def validate_color(cls, value: Optional[str]) -> Optional[str]:
-        if value in (None, ''):
-            return None
-        if not HEX_COLOR_RE.match(value):
-            raise ValueError('color must be a valid #RRGGBB hex color')
-        return value
+        return _hex_color(value)
 
 
 class ActivityTagAssignmentSchema(BaseModel):
@@ -62,14 +58,27 @@ class ActivityTagAssignmentSchema(BaseModel):
         return _normalized_entity_ids(values)
 
 
-class ActivityTagCatalogCreateSchema(ActivityTagCreateSchema):
-    scope: Literal['selected', 'global'] = 'selected'
-    activity_ids: List[str] = Field(default_factory=list, max_length=500)
+def _hex_color(value: Optional[str]) -> Optional[str]:
+    if value in (None, ''):
+        return None
+    if not HEX_COLOR_RE.match(value):
+        raise ValueError('color must be a valid #RRGGBB hex color')
+    return value
 
-    @field_validator('activity_ids')
+
+def _entity_id(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return None
+    return _normalized_entity_ids([value])[0]
+
+
+class ActivityTagCatalogCreateSchema(ActivityTagCreateSchema):
+    family_id: Optional[str] = Field(None, max_length=MAX_ENTITY_ID_LENGTH)
+
+    @field_validator('family_id')
     @classmethod
-    def validate_activity_ids(cls, values: List[str]) -> List[str]:
-        return _normalized_entity_ids(values)
+    def validate_family_id(cls, value: Optional[str]) -> Optional[str]:
+        return _entity_id(value)
 
 
 class ActivityTagCatalogUpdateSchema(BaseModel):
@@ -78,8 +87,7 @@ class ActivityTagCatalogUpdateSchema(BaseModel):
     version: int = Field(..., ge=1)
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     color: Optional[str] = Field(None, max_length=7)
-    scope: Optional[Literal['selected', 'global']] = None
-    activity_ids: Optional[List[str]] = Field(None, max_length=500)
+    family_id: Optional[str] = Field(None, max_length=MAX_ENTITY_ID_LENGTH)
     sort_order: Optional[int] = Field(None, ge=0)
 
     @field_validator('name')
@@ -90,16 +98,29 @@ class ActivityTagCatalogUpdateSchema(BaseModel):
     @field_validator('color')
     @classmethod
     def validate_color(cls, value: Optional[str]) -> Optional[str]:
-        if value in (None, ''):
-            return None
-        if not HEX_COLOR_RE.match(value):
-            raise ValueError('color must be a valid #RRGGBB hex color')
-        return value
+        return _hex_color(value)
 
-    @field_validator('activity_ids')
+    @field_validator('family_id')
     @classmethod
-    def validate_activity_ids(cls, values: Optional[List[str]]) -> Optional[List[str]]:
-        return _normalized_entity_ids(values) if values is not None else None
+    def validate_family_id(cls, value: Optional[str]) -> Optional[str]:
+        return _entity_id(value)
+
+
+class ActivityTagOrderSchema(BaseModel):
+    """Place tags, in order, into one family; a null family_id means "Other tags"."""
+    model_config = ConfigDict(extra='forbid')
+    family_id: Optional[str] = Field(None, max_length=MAX_ENTITY_ID_LENGTH)
+    tag_ids: List[str] = Field(..., max_length=1000)
+
+    @field_validator('family_id')
+    @classmethod
+    def validate_family_id(cls, value: Optional[str]) -> Optional[str]:
+        return _entity_id(value)
+
+    @field_validator('tag_ids')
+    @classmethod
+    def validate_tag_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
 
 
 class ActivityTagVersionSchema(BaseModel):
@@ -118,7 +139,6 @@ class ActivityTagMergeSchema(BaseModel):
     versions: Dict[str, int]
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     color: Optional[str] = Field(None, max_length=7)
-    scope: Optional[Literal['selected', 'global']] = None
 
     @field_validator('source_ids')
     @classmethod
@@ -128,68 +148,79 @@ class ActivityTagMergeSchema(BaseModel):
     @field_validator('color')
     @classmethod
     def validate_color(cls, value: Optional[str]) -> Optional[str]:
-        if value in (None, ''):
-            return None
-        if not HEX_COLOR_RE.match(value):
-            raise ValueError('color must be a valid #RRGGBB hex color')
-        return value
+        return _hex_color(value)
 
 
-class ProgressViewConfigSchema(BaseModel):
+class ActivityTagFamilyCreateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
+    single_select: bool = False
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, value: str) -> str:
+        return sanitize_string(value)
+
+
+class ActivityTagFamilyUpdateSchema(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
+    version: int = Field(..., ge=1)
+    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
+    single_select: Optional[bool] = None
+
+    @field_validator('name')
+    @classmethod
+    def sanitize_name(cls, value: Optional[str]) -> Optional[str]:
+        return sanitize_string(value) if value is not None else None
+
+
+class ActivityTagFamilyDeleteSchema(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    schema_version: int = Field(1, ge=1, le=1)
-    all_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
-    any_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
-    none_tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    version: Optional[int] = Field(None, ge=1)
 
-    @field_validator('all_tag_ids', 'any_tag_ids', 'none_tag_ids')
+
+class ActivityTagFamilyOrderSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    family_ids: List[str] = Field(..., max_length=500)
+
+    @field_validator('family_ids')
+    @classmethod
+    def validate_family_ids(cls, values: List[str]) -> List[str]:
+        return _normalized_entity_ids(values)
+
+
+class ProgressChartSchema(BaseModel):
+    """The Progress pane chart for an activity in the instance's template/program day."""
+    model_config = ConfigDict(extra='forbid')
+    kind: Literal['goal', 'activity_trend', 'scatter', 'metric_trend']
+    trend_series: Optional[Literal['metric', 'yield']] = None
+    metric_id: Optional[str] = Field(None, max_length=64)
+    x_metric_id: Optional[str] = Field(None, max_length=64)
+    y_metric_id: Optional[str] = Field(None, max_length=64)
+    set_aggregation: Literal['top', 'average', 'total'] = 'top'
+    version: Optional[int] = Field(None, ge=1)
+
+
+class ProgressComparisonSchema(BaseModel):
+    """What one activity instance compares against."""
+    model_config = ConfigDict(extra='forbid')
+    mode: Literal['same_tags', 'tags', 'all']
+    tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    same_template: bool = False
+    same_program_day: bool = False
+    version: Optional[int] = Field(None, ge=1)
+
+    @field_validator('tag_ids')
     @classmethod
     def validate_tag_ids(cls, values: List[str]) -> List[str]:
         return _normalized_entity_ids(values)
 
     @model_validator(mode='after')
-    def reject_overlapping_buckets(self):
-        buckets = {
-            'All of': set(self.all_tag_ids),
-            'Any of': set(self.any_tag_ids),
-            'None of': set(self.none_tag_ids),
-        }
-        names = list(buckets)
-        for index, left_name in enumerate(names):
-            for right_name in names[index + 1:]:
-                if buckets[left_name] & buckets[right_name]:
-                    raise ValueError(f'A tag cannot appear in both {left_name} and {right_name}')
+    def tags_only_for_tag_mode(self):
+        if self.mode != 'tags' and self.tag_ids:
+            raise ValueError('tag_ids are only used when mode is "tags"')
         return self
 
-
-class ActivityProgressViewCreateSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
-
-    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
-    config: ProgressViewConfigSchema = Field(default_factory=ProgressViewConfigSchema)
-    activate: bool = True
-
-
-class ActivityProgressViewUpdateSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
-
-    version: int = Field(..., ge=1)
-    name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
-    config: Optional[ProgressViewConfigSchema] = None
-
-
-class ActivityProgressViewActivateSchema(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    view_id: Optional[str] = None
-
-
-class ActivityProgressQuerySchema(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    view_id: Optional[str] = None
-    config: Optional[ProgressViewConfigSchema] = None
-    limit: int = Field(20, ge=1, le=100)
-    offset: int = Field(0, ge=0)
-    exclude_session_id: Optional[str] = None
 
 class ActivityInstanceCreateSchema(BaseModel):
     """Schema for creating an activity instance in a session."""

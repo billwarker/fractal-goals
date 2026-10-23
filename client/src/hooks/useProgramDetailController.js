@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 
+import useJustCreatedGoal from './useJustCreatedGoal';
+
 export function useProgramDetailController({ goals = [] }) {
     const [showEditBuilder, setShowEditBuilder] = useState(false);
     const [viewMode, setViewMode] = useState('calendar');
@@ -18,6 +20,14 @@ export function useProgramDetailController({ goals = [] }) {
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [modalMode, setModalMode] = useState('view');
     const [selectedParent, setSelectedParent] = useState(null);
+    // Optional extras for a goal created from a hierarchy: initial activities, an initial
+    // completion condition, and a callback with the created goal.
+    const [goalCreateContext, setGoalCreateContext] = useState(null);
+    const [justCreatedGoalId, markGoalCreated] = useJustCreatedGoal();
+    const handleGoalCreated = useCallback((goal) => {
+        markGoalCreated(goal);
+        goalCreateContext?.onCreated?.(goal);
+    }, [goalCreateContext, markGoalCreated]);
 
     const openGoalModal = useCallback((goal, mode = 'view', parentGoal = null) => {
         setSelectedGoal(goal);
@@ -30,6 +40,7 @@ export function useProgramDetailController({ goals = [] }) {
         setShowGoalModal(false);
         setModalMode('view');
         setSelectedParent(null);
+        setGoalCreateContext(null);
     }, []);
 
     const handleAddBlockClick = useCallback((initialBlockData = null) => {
@@ -109,8 +120,10 @@ export function useProgramDetailController({ goals = [] }) {
         }
     }, [goals, openGoalModal]);
 
-    const handleAddChildGoal = useCallback((parentGoal) => {
-        setSelectedParent(parentGoal);
+    const handleAddChildGoal = useCallback((parentGoal, createContext = null) => {
+        setGoalCreateContext(createContext);
+        setSelectedGoal(null);
+        setSelectedParent(parentGoal?.originalGoal || parentGoal);
         setModalMode('create');
         setShowGoalModal(true);
     }, []);
@@ -132,6 +145,9 @@ export function useProgramDetailController({ goals = [] }) {
         selectedGoal,
         modalMode,
         selectedParent,
+        goalCreateContext,
+        justCreatedGoalId,
+        handleGoalCreated,
         openGoalModal,
         closeGoalModal,
         handleAddBlockClick,

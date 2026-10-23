@@ -11,6 +11,8 @@ vi.mock('react-chartjs-2', () => ({
 }));
 
 vi.mock('../ChartJSWrapper', () => ({
+    applyChartDensity: (options) => options,
+    useChartDensity: () => 'full',
     useChartThemeDefaults: () => ({
         textColor: '#ddd',
         gridColor: '#333',

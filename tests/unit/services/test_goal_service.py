@@ -2,8 +2,8 @@ import uuid
 
 from datetime import datetime, timezone
 
-from models import Goal, GoalLevel, Target, TargetContributionLedger, TargetMetricCondition
-from services.goal_service import GoalService, sync_goal_targets
+from models import Goal, GoalLevel
+from services.goal_service import GoalService
 
 
 def test_update_goal_completion_sets_and_clears_completed_session_id(
@@ -12,7 +12,7 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     sample_ultimate_goal,
     sample_practice_session,
 ):
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     completed_goal, error, status = service.update_goal_completion(
         sample_ultimate_goal.id,
@@ -50,66 +50,43 @@ def test_update_goal_completion_sets_and_clears_completed_session_id(
     assert uncompleted_goal.manually_uncompleted_at is not None
 
 
-def test_update_goal_completion_clears_completed_targets_when_manually_uncompleted(
+def test_manual_completion_of_a_goal_with_its_own_condition_is_an_override(
     db_session,
     test_user,
     sample_ultimate_goal,
-    sample_practice_session,
-    sample_activity_definition,
-    sample_activity_instance,
+    sample_goal_hierarchy,
 ):
-    target = Target(
-        id=str(uuid.uuid4()),
-        goal_id=sample_ultimate_goal.id,
-        root_id=sample_ultimate_goal.id,
-        activity_id=sample_activity_definition.id,
-        name='Form target',
-        type='threshold',
-        completed=True,
-        completed_at=datetime.now(timezone.utc),
-        completed_session_id=sample_practice_session.id,
-        completed_instance_id=sample_activity_instance.id,
-    )
-    condition = TargetMetricCondition(
-        id=str(uuid.uuid4()),
-        target_id=target.id,
-        metric_definition_id=sample_activity_definition.metric_definitions[0].id,
-        operator='>=',
-        target_value=9,
-    )
-    ledger = TargetContributionLedger(
-        id=str(uuid.uuid4()),
-        target_id=target.id,
-        activity_instance_id=sample_activity_instance.id,
-        metric_condition_id=condition.id,
-        contributed_value=9,
-    )
-    target.metric_conditions = [condition]
-    sample_ultimate_goal.completed = True
-    sample_ultimate_goal.completed_at = datetime.now(timezone.utc)
-    sample_ultimate_goal.completed_session_id = sample_practice_session.id
-    db_session.add(target)
-    db_session.add(ledger)
+    mid_goal = sample_goal_hierarchy['mid_term']
+    mid_goal.completion_condition = 'children'
     db_session.commit()
 
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
-
-    uncompleted_goal, error, status = service.update_goal_completion(
-        sample_ultimate_goal.id,
-        test_user.id,
-        {'completed': False},
-        root_id=sample_ultimate_goal.id,
+    completed_goal, error, status = GoalService(db_session).update_goal_completion(
+        mid_goal.id, test_user.id, {'completed': True}, root_id=sample_ultimate_goal.id,
     )
 
-    assert error is None
-    assert status == 200
-    assert uncompleted_goal.completed is False
-    db_session.refresh(target)
-    assert target.completed is False
-    assert target.completed_at is None
-    assert target.completed_session_id is None
-    assert target.completed_instance_id is None
-    assert db_session.query(TargetContributionLedger).filter_by(id=ledger.id).first() is not None
+    assert (error, status) == (None, 200)
+    assert completed_goal.completion_source == 'manual_override'
+    assert completed_goal.completion_reason == 'manual_override'
+
+
+def test_confirming_a_met_children_condition_records_it_as_the_source(
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_goal_hierarchy,
+):
+    short_goal = sample_goal_hierarchy['short_term']
+    short_goal.completed = True
+    short_goal.completed_at = datetime.now(timezone.utc)
+    mid_goal = sample_goal_hierarchy['mid_term']
+    mid_goal.completion_condition = 'children'
+    db_session.commit()
+
+    completed_goal, _, _ = GoalService(db_session).update_goal_completion(
+        mid_goal.id, test_user.id, {'completed': True}, root_id=sample_ultimate_goal.id,
+    )
+
+    assert completed_goal.completion_source == 'children'
 
 
 def test_update_goal_completion_rejects_paused_goal(
@@ -120,7 +97,7 @@ def test_update_goal_completion_rejects_paused_goal(
     sample_ultimate_goal.paused = True
     db_session.commit()
 
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     goal, error, status = service.update_goal_completion(
         sample_ultimate_goal.id,
@@ -172,7 +149,7 @@ def test_move_goal_allows_flexible_hierarchy_and_rejects_non_monotonic_path(
     db_session.add(sibling_short)
     db_session.commit()
 
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     # Flexible hierarchy: moving short_term directly under root (skipping long+mid) is allowed.
     moved_goal, error, status = service.move_goal(
@@ -221,7 +198,7 @@ def test_convert_goal_level_rejects_root_tier(
     short_term.level_id = short_level.id
     db_session.commit()
 
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     goal, error, status = service.convert_goal_level(
         root.id,
@@ -263,7 +240,7 @@ def _setup_convert_levels(db_session, hierarchy):
 def test_convert_goal_level_success(db_session, test_user, sample_goal_hierarchy):
     """A long-term goal with no children constraints can be converted to mid-term."""
     levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     root = sample_goal_hierarchy['ultimate']
     # long_term's parent is ultimate (rank 0), its child is mid_term (rank 2).
@@ -284,7 +261,7 @@ def test_convert_goal_level_success(db_session, test_user, sample_goal_hierarchy
 def test_convert_goal_level_rejects_parent_rank_violation(db_session, test_user, sample_goal_hierarchy):
     """Cannot convert a goal to a level equal to or above its parent."""
     levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     root = sample_goal_hierarchy['ultimate']
     mid_term = sample_goal_hierarchy['mid_term']  # parent is long_term (rank 1)
@@ -302,7 +279,7 @@ def test_convert_goal_level_rejects_parent_rank_violation(db_session, test_user,
 def test_convert_goal_level_rejects_child_rank_violation(db_session, test_user, sample_goal_hierarchy):
     """Cannot convert a goal to a level equal to or below one of its children."""
     levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     root = sample_goal_hierarchy['ultimate']
     mid_term = sample_goal_hierarchy['mid_term']  # has short_term child (rank 3)
@@ -321,7 +298,7 @@ def test_convert_goal_level_rejects_child_rank_violation(db_session, test_user, 
 def test_convert_goal_level_rejects_execution_tier_goal(db_session, test_user, sample_goal_hierarchy):
     """Execution-tier goals cannot be converted."""
     levels = _setup_convert_levels(db_session, sample_goal_hierarchy)
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     root = sample_goal_hierarchy['ultimate']
     # Temporarily assign immediate level to short_term for this test
@@ -341,7 +318,7 @@ def test_convert_goal_level_rejects_execution_tier_goal(db_session, test_user, s
 def test_create_fractal_goal_record_rejects_removed_goal_types(db_session, test_user, sample_goal_hierarchy):
     """Direct service calls cannot recreate removed Micro/Nano levels."""
     _setup_convert_levels(db_session, sample_goal_hierarchy)
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
 
     root = sample_goal_hierarchy['ultimate']
     for removed_type in ['MicroGoal', 'NanoGoal']:

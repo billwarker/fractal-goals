@@ -13,6 +13,7 @@ OPERATION_REGISTRY = {
     "create_activity": {"scope": "activities:write", "label": "Create activity", "reversible": False},
     "update_activity": {"scope": "activities:write", "label": "Update activity", "reversible": True},
     "associate_activity_goals": {"scope": "activities:write", "label": "Change activity goal links", "reversible": False},
+    "set_goal_sequence": {"scope": "goals:write", "label": "Sequence goals", "reversible": False},
     "create_note": {"scope": "notes:write", "label": "Create note", "reversible": False},
     "create_session": {"scope": "sessions:write", "label": "Create session", "reversible": False},
     "update_session": {"scope": "sessions:write", "label": "Update session", "reversible": True},

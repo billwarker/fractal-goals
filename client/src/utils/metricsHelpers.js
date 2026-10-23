@@ -12,9 +12,6 @@ export const calculateMetrics = (goalNode) => {
             totalDeadlines: 0,
             missedDeadlines: 0,
             deadlineMissedPercentage: 0,
-            totalTargets: 0,
-            completedTargets: 0,
-            targetCompletionPercentage: 0
         };
     }
 
@@ -22,8 +19,6 @@ export const calculateMetrics = (goalNode) => {
     let completedGoals = 0;
     let totalDeadlines = 0;
     let missedDeadlines = 0;
-    let totalTargets = 0;
-    let completedTargets = 0;
 
     const now = new Date();
 
@@ -46,17 +41,6 @@ export const calculateMetrics = (goalNode) => {
             }
         }
 
-        // Count targets
-        const targets = node.attributes?.targets || [];
-        if (Array.isArray(targets)) {
-            targets.forEach(target => {
-                totalTargets++;
-                if (target.completed || target.achieved) {
-                    completedTargets++;
-                }
-            });
-        }
-
         if (node.children && node.children.length > 0) {
             node.children.forEach(child => traverse(child));
         }
@@ -72,10 +56,6 @@ export const calculateMetrics = (goalNode) => {
         ? Math.round((missedDeadlines / totalDeadlines) * 100)
         : 0;
 
-    const targetCompletionPercentage = totalTargets > 0
-        ? Math.round((completedTargets / totalTargets) * 100)
-        : 0;
-
     return {
         totalGoals,
         completedGoals,
@@ -84,9 +64,6 @@ export const calculateMetrics = (goalNode) => {
         completionPercentage: goalCompletionPercentage,
         totalDeadlines,
         missedDeadlines,
-        deadlineMissedPercentage,
-        totalTargets,
-        completedTargets,
-        targetCompletionPercentage
+        deadlineMissedPercentage
     };
 };

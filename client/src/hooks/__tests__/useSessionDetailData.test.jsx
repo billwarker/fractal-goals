@@ -12,18 +12,14 @@ const {
     getActivities,
     getActivityGroups,
     getSessionGoalsView,
-    useTargetAchievementsMock,
+    useGoalConditionProgressMock,
 } = vi.hoisted(() => ({
     getSession: vi.fn(),
     getSessionActivities: vi.fn(),
     getActivities: vi.fn(),
     getActivityGroups: vi.fn(),
     getSessionGoalsView: vi.fn(),
-    useTargetAchievementsMock: vi.fn(() => ({
-        targetAchievements: new Map(),
-        achievedTargetIds: new Set(),
-        goalAchievements: new Map(),
-    })),
+    useGoalConditionProgressMock: vi.fn(() => ({ progressByGoalId: {} })),
 }));
 
 vi.mock('../../utils/api', () => ({
@@ -36,8 +32,8 @@ vi.mock('../../utils/api', () => ({
     },
 }));
 
-vi.mock('../useTargetAchievements', () => ({
-    useTargetAchievements: (...args) => useTargetAchievementsMock(...args),
+vi.mock('../useGoalConditionQueries', () => ({
+    useGoalConditionProgress: (...args) => useGoalConditionProgressMock(...args),
 }));
 
 function createWrapper(queryClient) {
@@ -53,11 +49,7 @@ function createWrapper(queryClient) {
 describe('useSessionDetailData', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        useTargetAchievementsMock.mockImplementation(() => ({
-            targetAchievements: new Map(),
-            achievedTargetIds: new Set(),
-            goalAchievements: new Map(),
-        }));
+        useGoalConditionProgressMock.mockImplementation(() => ({ progressByGoalId: {} }));
     });
 
     it('hydrates session detail data under canonical query keys and normalizes section activity ids', async () => {
@@ -150,7 +142,7 @@ describe('useSessionDetailData', () => {
         expect(result.current.normalizedSessionData).toBeNull();
     });
 
-    it('derives live target evaluation inputs from sessionGoalsView when available', async () => {
+    it('requests condition progress only for session goals that complete on their own', async () => {
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: { retry: false },
@@ -178,27 +170,33 @@ describe('useSessionDetailData', () => {
                     children: [
                         {
                             id: 'immediate-goal',
-                            attributes: {
-                                targets: [{ id: 'target-1', activity_id: 'activity-1' }],
-                            },
+                            completion_condition: 'activity_threshold',
+                            condition: { activity_definition_id: 'activity-1', kind: 'single_session' },
                             children: [],
                         },
+                        { id: 'children-goal', completion_condition: 'children', children: [] },
+                        { id: 'manual-goal', completion_condition: 'manual', children: [] },
                     ],
                 },
             },
         });
 
-        renderHook(
+        useGoalConditionProgressMock.mockImplementation((_rootId, goalIds) => ({
+            progressByGoalId: Object.fromEntries(goalIds.map((goalId) => [goalId, { met: false }])),
+        }));
+
+        const { result } = renderHook(
             () => useSessionDetailData({ rootId: 'root-1', sessionId: 'session-1', isDeletingSession: false }),
             { wrapper: createWrapper(queryClient) }
         );
 
         await waitFor(() => {
-            const [, goalsArg] = useTargetAchievementsMock.mock.lastCall || [];
-            expect(goalsArg?.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal']);
+            const [, goalIds] = useGoalConditionProgressMock.mock.lastCall || [];
+            expect(goalIds).toEqual(['immediate-goal', 'children-goal']);
         });
 
-        const [, goalsArg] = useTargetAchievementsMock.mock.lastCall;
-        expect(goalsArg.map((goal) => goal.id)).toEqual(['root-goal', 'immediate-goal']);
+        const [rootIdArg] = useGoalConditionProgressMock.mock.lastCall;
+        expect(rootIdArg).toBe('root-1');
+        expect(Object.keys(result.current.conditionProgressByGoalId)).toEqual(['immediate-goal', 'children-goal']);
     });
 });

@@ -142,7 +142,7 @@ function getSplitInfo(splitId, activityDefinition) {
 /**
  * Renders a single set with metrics
  */
-function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison, setYield, displayMode = 'percent' }) {
+function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison, setYield, activityTags = [], displayMode = 'percent' }) {
     const metricsToDisplay = useMemo(() => {
         return set.metrics?.filter(m => {
             const mInfo = getMetricInfo(m.metric_id, activityDefinition);
@@ -195,7 +195,7 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
                         );
                     })}
                 </div>
-                <ActivityTagBadges tags={set.tags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
+                <ActivityTagBadges tags={set.tags} hideTags={activityTags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
             </div>
         );
     }
@@ -204,22 +204,24 @@ function SetRow({ set, setIdx, activityDefinition, hasSplits, progressComparison
     return (
         <div className={styles.setRow}>
             <span className={styles.setLabel}>SET {setIdx + 1}</span>
-            {metricsToDisplay.map(m => {
-                const mInfo = getMetricInfo(m.metric_id, activityDefinition);
-                return (
-                    <div key={m.metric_id} className={styles.metricItem}>
-                        <span className={styles.metricName}>{mInfo.name}:</span>
-                        <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
-                        <ProgressHint
-                            metricId={m.metric_id}
-                            setIndex={setIdx}
-                            progressComparison={progressComparison}
-                            displayMode={displayMode}
-                        />
-                    </div>
-                );
-            })}
-            <ActivityTagBadges tags={set.tags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
+            <div className={styles.setMetrics}>
+                {metricsToDisplay.map(m => {
+                    const mInfo = getMetricInfo(m.metric_id, activityDefinition);
+                    return (
+                        <div key={m.metric_id} className={styles.metricItem}>
+                            <span className={styles.metricName}>{mInfo.name}:</span>
+                            <span className={styles.metricValue}>{m.value} {mInfo.unit}</span>
+                            <ProgressHint
+                                metricId={m.metric_id}
+                                setIndex={setIdx}
+                                progressComparison={progressComparison}
+                                displayMode={displayMode}
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+            <ActivityTagBadges tags={set.tags} hideTags={activityTags} className={styles.setTags} ariaLabel={`Set ${setIdx + 1} tags`} />
             {setYield != null && (
                 <span className={styles.setYieldInline}>= {formatAggValue(setYield)}</span>
             )}
@@ -390,6 +392,7 @@ const ActivityCard = memo(function ActivityCard({
                                             hasSplits={hasSplits}
                                             progressComparison={progressComparison}
                                             setYield={yieldBySetIndex?.[setIdx] ?? null}
+                                            activityTags={activity.tags}
                                             displayMode={effectiveDeltaDisplayMode}
                                         />
                                     ))}

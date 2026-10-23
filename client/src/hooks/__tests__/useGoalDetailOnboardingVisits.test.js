@@ -22,7 +22,7 @@ describe('useGoalDetailOnboardingVisits', () => {
         }));
         expect(markVisited).toHaveBeenCalledWith('goal_detail_modal');
 
-        act(() => result.current('timeline'));
+        act(() => result.current('goal-timeline'));
         act(() => result.current('goal-activities'));
         act(() => result.current('goal-notes'));
         expect(markVisited.mock.calls.slice(1).map(([key]) => key)).toEqual([

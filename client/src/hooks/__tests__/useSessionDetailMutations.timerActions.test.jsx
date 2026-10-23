@@ -299,7 +299,7 @@ it('marks manual goal completion as completed in the active session and refreshe
             await result.current.toggleGoalCompletion({ goalId: 'goal-1', completed: true });
         });
 
-        expect(toggleGoalCompletion).toHaveBeenCalledWith('root-1', 'goal-1', true, 'session-1');
+        expect(toggleGoalCompletion).toHaveBeenCalledWith('root-1', 'goal-1', true, 'session-1', null);
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.session('root-1', 'session-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionGoalsView('root-1', 'session-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessions('root-1') });

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from models import Goal, Program, ProgramDay, program_block_goals, program_goals
 from models.goal import program_day_goals
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.program_focus import DAY_GOAL_OUT_OF_SCOPE, FocusScopes, resolve_focus_scopes
 from services.program_service_errors import ProgramServiceValidationError
 from services.programs import ProgramService
@@ -225,18 +225,18 @@ def test_legacy_out_of_scope_day_goals_do_not_block_unrelated_program_edits(db_s
 
 # ---------------------------------------------------------------- goal deadlines
 
-def test_fractal_goal_create_caps_child_deadline_at_parent(db_session, tree, test_user):
+def test_fractal_goal_create_allows_child_deadline_after_parent(db_session, tree, test_user):
     parent = db_session.get(Goal, tree['mid_term'])
     parent.deadline = datetime.combine(START + timedelta(days=5), datetime.min.time())
     db_session.commit()
-    service = GoalService(db_session, sync_targets=sync_goal_targets)
+    service = GoalService(db_session)
     base = {'name': 'Child', 'type': 'ShortTermGoal', 'parent_id': parent.id}
 
-    _, error, status = service.create_fractal_goal(
+    later, error, status = service.create_fractal_goal(
         tree['ultimate'], test_user.id, {**base, 'deadline': (START + timedelta(days=6)).isoformat()},
     )
-    assert status == 400
-    assert error['parent_deadline'] == (START + timedelta(days=5)).isoformat()
+    assert status == 201 and error is None
+    assert later.deadline.date() == START + timedelta(days=6)
 
     created, error, status = service.create_fractal_goal(
         tree['ultimate'], test_user.id, {**base, 'deadline': (START + timedelta(days=5)).isoformat()},

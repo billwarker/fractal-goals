@@ -4,7 +4,9 @@ from .base import (
 )
 from .user import User, SignupInviteKey, BetaSignupRequest, PasswordResetToken, EmailDeliveryEvent, EmailWebhookEvent, AdminAuditEvent
 from .goal import (
-    GoalLevel, Goal, GoalPauseInterval, TargetTemplate, Target, TargetMetricCondition, TargetContributionLedger,
+    GoalLevel, Goal, GoalPauseInterval, GoalSequenceTrack, GoalCompletionCondition, GoalConditionMetricRule,
+    COMPLETION_CONDITION_ACTIVITY_THRESHOLD, COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL,
+    COMPLETION_CONDITIONS, COMPLETION_SOURCES, CONDITION_NAME_MAX_LENGTH, PAUSE_REASON_MANUAL, PAUSE_REASON_SEQUENCE,
     session_goals, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations,
     session_template_goals, program_day_goals,
     get_all_root_goals, get_goal_by_id, get_root_id_for_goal, 
@@ -13,7 +15,9 @@ from .goal import (
 from .activity import (
     ActivityGroup, ActivityDefinition, MetricDefinition, FractalMetricDefinition,
     SplitDefinition, ActivityInstance, ActivitySet, MetricValue,
-    ActivityTagDefinition, ActivityTag, ActivityProgressView, ActivityInstanceTag, ActivitySetTag,
+    ActivityTagFamily, ActivityTagDefinition, ActivityInstanceTag, ActivitySetTag, ActivityInstanceCompareTag,
+    ActivityProgressChart, ActivityProgressDefault, ActivityProgressDefaultTag,
+    TAG_ORDER,
 )
 from .circuit import (
     CircuitDefinition, CircuitSlot, CircuitRun, CircuitRunSlot,
@@ -30,7 +34,7 @@ from .program import (
     program_day_templates, program_goals, program_block_goals
 )
 from .calendar_period import CalendarPeriod, CALENDAR_PERIOD_KINDS
-from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, Note, EventLog, PageSurfaceLayout
+from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, GoalAnalyticsView, Note, EventLog, PageSurfaceLayout
 from .product_event import ProductEvent
 from .idempotency import IdempotencyRecord
 from .agent import (

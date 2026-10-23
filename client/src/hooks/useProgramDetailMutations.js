@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
@@ -7,6 +8,8 @@ import { useProgramLogic } from './useProgramLogic';
 import { logError } from '../utils/logger';
 import { calendarConflictMessage } from '../utils/programCalendarConflicts';
 import { focusError } from '../utils/programFocus';
+import { applyCreatedGoal, refreshGoalReadModels } from '../utils/goalTreeCache';
+import { queryKeys } from './queryKeys';
 
 function formatGoalTypeLabel(type) {
     if (!type) return 'Goal';
@@ -24,7 +27,9 @@ export function useProgramDetailMutations({
     onDaySaved,
     onScheduleDaySaved,
     onGoalEditorClosed,
+    onGoalCreated,
 }) {
+    const queryClient = useQueryClient();
     const resolvedRefreshers = useMemo(() => (
         refreshers || {
             all: refreshData,
@@ -148,19 +153,27 @@ export function useProgramDetailMutations({
     const updateGoal = useCallback(async (goalId, payload) => {
         try {
             const response = await fractalApi.updateGoal(rootId, goalId, payload);
-            await resolvedRefreshers.programGoals();
+            // The calendar's due badges read the fractal tree, so refresh every goal read model.
+            await Promise.all([
+                resolvedRefreshers.programGoals(),
+                refreshGoalReadModels(queryClient, queryKeys, rootId),
+            ]);
             return response?.data || null;
         } catch (error) {
             logError('Failed to update goal:', error);
             notify.error(`Failed to update goal: ${formatError(error)}`);
             throw error;
         }
-    }, [resolvedRefreshers, rootId]);
+    }, [queryClient, resolvedRefreshers, rootId]);
 
-    const toggleGoalCompletion = useCallback(async (goalId, currentStatus) => {
+    const toggleGoalCompletion = useCallback(async (goalId, currentStatus, sequenceOptions = null) => {
         try {
-            const response = await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus);
-            await resolvedRefreshers.programGoals();
+            const response = await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus, null, sequenceOptions);
+            // Completing a sequenced goal can resume or re-pause its sibling, so refresh every goal view.
+            await Promise.all([
+                resolvedRefreshers.programGoals(),
+                refreshGoalReadModels(queryClient, queryKeys, rootId),
+            ]);
             const goalResponse = response?.data;
             const goalType = formatGoalTypeLabel(goalResponse?.attributes?.type || goalResponse?.type);
             const action = currentStatus ? 'Uncompleted' : 'Completed';
@@ -170,35 +183,42 @@ export function useProgramDetailMutations({
             logError('Failed to toggle goal completion:', error);
             notify.error(`Failed to toggle goal completion: ${formatError(error)}`);
         }
-    }, [resolvedRefreshers, rootId]);
+    }, [queryClient, resolvedRefreshers, rootId]);
 
-    const deleteGoal = useCallback(async (goal) => {
-        if (!window.confirm(`Are you sure you want to delete "${goal.name}" and all its children?`)) {
-            return;
-        }
-
+    // The goal modal's Delete option confirms (and asks about a sequence's next goal) before this runs.
+    const deleteGoal = useCallback(async (goal, { beginNext = true } = {}) => {
         try {
-            await fractalApi.deleteGoal(rootId, goal.id);
+            await fractalApi.deleteGoal(rootId, goal.id, { beginNext });
             onGoalEditorClosed?.();
-            await resolvedRefreshers.programGoals();
+            await Promise.all([
+                resolvedRefreshers.programGoals(),
+                refreshGoalReadModels(queryClient, queryKeys, rootId),
+            ]);
             notify.success('Goal deleted');
         } catch (error) {
             logError('Failed to delete goal:', error);
             notify.error(`Failed to delete goal: ${formatError(error)}`);
         }
-    }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
+    }, [onGoalEditorClosed, queryClient, resolvedRefreshers, rootId]);
 
+    // Returns the created goal so the goal modal can attach its pending activities, and leaves
+    // success and failure toasts to the modal.
     const createGoal = useCallback(async (payload) => {
+        let goal;
         try {
-            await fractalApi.createGoal(rootId, payload);
-            onGoalEditorClosed?.();
-            await resolvedRefreshers.programGoals();
-            notify.success('Goal created');
+            goal = (await fractalApi.createGoal(rootId, payload)).data;
         } catch (error) {
             logError('Failed to create goal:', error);
-            notify.error(`Failed to create goal: ${formatError(error)}`);
+            throw error;
         }
-    }, [onGoalEditorClosed, resolvedRefreshers, rootId]);
+        onGoalEditorClosed?.();
+        onGoalCreated?.(goal);
+        await Promise.all([
+            applyCreatedGoal(queryClient, queryKeys, rootId, goal),
+            resolvedRefreshers.programGoals(),
+        ]);
+        return goal;
+    }, [onGoalCreated, onGoalEditorClosed, queryClient, resolvedRefreshers, rootId]);
 
     return {
         saveProgram,

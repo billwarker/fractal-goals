@@ -16,6 +16,9 @@ class Note(Base):
     
     __table_args__ = (
         sa.Index('ix_notes_root_context_deleted', 'root_id', 'context_type', 'context_id', 'deleted_at'),
+        sa.CheckConstraint(
+            "note_kind IS NULL OR note_kind IN ('goal_completion', 'goal_review')", name='ck_notes_note_kind',
+        ),
     )
     
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -58,6 +61,24 @@ class AnalyticsDashboard(Base):
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+
+
+class GoalAnalyticsView(Base):
+    """A saved analytics view shown on a goal (in order). Links point at the view, so edits to the
+    view show on every goal; deleting the view removes its links."""
+    __tablename__ = 'goal_analytics_views'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False)
+    dashboard_id = Column(String, ForeignKey('analytics_dashboards.id', ondelete='CASCADE'), nullable=False, index=True)
+    position = Column(Integer, nullable=False, default=0, server_default=sa.text('0'))
+    created_at = Column(DateTime, default=utc_now)
+
+    __table_args__ = (
+        sa.UniqueConstraint('goal_id', 'dashboard_id', name='uq_goal_analytics_views_goal_dashboard'),
+        sa.Index('ix_goal_analytics_views_goal_position', 'goal_id', 'position'),
+    )
 
 
 class PageSurfaceLayout(Base):

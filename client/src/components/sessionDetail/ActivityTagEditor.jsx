@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-import { useActivityTagCatalog, useActivityTagMutations } from '../../hooks/useActivityProgressViews';
+import { useActivityTagCatalog, useActivityTagCatalogMutations, useActivityTagMutations } from '../../hooks/useActivityTags';
 import { fractalApi } from '../../utils/api';
 import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import { canonicalTagName, findTagByName } from '../../utils/tagNames';
+import { familiesWithMembers, groupTagsForPicker, toggleTagSelection } from '../../utils/tagPickerOptions';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import CloseButton from '../atoms/CloseButton';
@@ -19,13 +21,12 @@ function ActivityTagEditor({
     instanceId = null,
     setId = null,
     assignmentVersion = 1,
-    availableTags = [],
     tags = [],
     inheritedTags = [],
     editable = true,
     triggerFirst = false,
-    // Controlled mode (planned tags): the ids live in the caller's draft and nothing is
-    // assigned through the API. Creating a tag still adds it to the activity's catalog.
+    // Controlled mode (planned tags, comparison choices): the ids live in the caller's draft
+    // and nothing is assigned through the API. Creating a tag still adds it to the catalog.
     selectedTagIds = null,
     onChangeTags = null,
     setScope = false,
@@ -39,10 +40,9 @@ function ActivityTagEditor({
     const assignmentGenerationRef = useRef(0);
     const assignmentVersionRef = useRef(assignmentVersion);
     const [optimisticSelection, setOptimisticSelection] = useState(null);
-    const [createdTags, setCreatedTags] = useState({ activityId, tags: [] });
+    const [createdTags, setCreatedTags] = useState([]);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [name, setName] = useState('');
-    const [createScope, setCreateScope] = useState('selected');
     const [search, setSearch] = useState('');
     const [editingDefinition, setEditingDefinition] = useState(null);
     const [archiveTarget, setArchiveTarget] = useState(null);
@@ -50,40 +50,34 @@ function ActivityTagEditor({
     const [editColor, setEditColor] = useState('#64748B');
     const [deleteState, setDeleteState] = useState(null);
     const [deleteConfirmation, setDeleteConfirmation] = useState('');
-    const { data: catalog = { tags: [] } } = useActivityTagCatalog(rootId);
+    const { data: catalog } = useActivityTagCatalog(rootId);
+    const { createTag, restoreTag, assignInstanceTags, assignSetTags, isPending: isAssigning } = useActivityTagMutations(rootId, activityId);
     const {
-        createTag,
-        updateCatalogTag,
-        hardDeleteCatalogTag,
+        updateTag: updateCatalogTag,
+        hardDeleteTag: hardDeleteCatalogTag,
         archiveTag,
-        assignInstanceTags,
-        assignSetTags,
-        isPending,
-    } = useActivityTagMutations(rootId, activityId);
+        isPending: isManaging,
+    } = useActivityTagCatalogMutations(rootId);
+    const isPending = isAssigning || isManaging;
     const isControlled = typeof onChangeTags === 'function';
     const selectedIds = isControlled
         ? (selectedTagIds || [])
         : optimisticSelection?.assignmentKey === assignmentKey
             ? optimisticSelection.ids
             : tags.map((tag) => tag.id);
-    const pendingCreatedTags = createdTags.activityId === activityId ? createdTags.tags : [];
-    const availableTagIds = new Set(availableTags.map((tag) => tag.id));
-    const knownTagIds = new Set([...availableTagIds, ...pendingCreatedTags.map((tag) => tag.id)]);
-    const localTagCandidates = [
-        ...availableTags,
-        ...pendingCreatedTags.filter((tag) => !availableTagIds.has(tag.id)),
-        ...tags.filter((tag) => !knownTagIds.has(tag.id)),
-    ];
-    const localTags = [...new Map(localTagCandidates.map((tag) => [tag.id, tag])).values()];
+    // The catalog is the source of options; tags created this moment and assigned tags
+    // fill in until the catalog refetches.
+    const tagsById = new Map([...tags, ...createdTags, ...catalog.tags].map((tag) => [tag.id, tag]));
+    const pickerCatalog = { families: catalog.families, tags: [...tagsById.values()] };
+    const families = familiesWithMembers(pickerCatalog);
     const inheritedIds = new Set(inheritedTags.map((tag) => tag.id));
-    const assignableTags = localTags.filter((tag) => !tag.archived && !inheritedIds.has(tag.id));
-    const filteredAssignableTags = assignableTags.filter((tag) => tag.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-    const pickerGroups = [
-        { key: 'assigned', label: 'Assigned', tags: filteredAssignableTags.filter((tag) => selectedIds.includes(tag.id)) },
-        { key: 'global', label: 'Every activity', tags: filteredAssignableTags.filter((tag) => !selectedIds.includes(tag.id) && tag.scope === 'global') },
-        { key: 'activity', label: 'This activity', tags: filteredAssignableTags.filter((tag) => !selectedIds.includes(tag.id) && tag.scope !== 'global') },
-    ].filter((group) => group.tags.length);
-    const selectedTags = localTags.filter((tag) => selectedIds.includes(tag.id) && !inheritedIds.has(tag.id));
+    const assignableCount = pickerCatalog.tags.filter((tag) => !tag.archived && !inheritedIds.has(tag.id)).length;
+    const pickerGroups = groupTagsForPicker(pickerCatalog, { keepIds: selectedIds, search })
+        .map((group) => ({ ...group, tags: group.tags.filter((tag) => !inheritedIds.has(tag.id)) }))
+        .filter((group) => group.tags.length);
+    const selectedTags = selectedIds.map((id) => tagsById.get(id)).filter((tag) => tag && !inheritedIds.has(tag.id));
+    const nameMatch = findTagByName(pickerCatalog.tags, name);
+    const toggle = (tag) => toggleTagSelection(selectedIds, tag, families);
     const tagOverflow = useTagCountOverflow(selectedTags, editable);
 
     useAnchoredPortalPosition({
@@ -114,7 +108,7 @@ function ActivityTagEditor({
 
     useEffect(() => {
         if (!isPickerOpen) return undefined;
-        requestAnimationFrame(() => (assignableTags.length > 5 ? searchRef.current : pickerRef.current?.querySelector('input, button'))?.focus());
+        requestAnimationFrame(() => (assignableCount > 5 ? searchRef.current : pickerRef.current?.querySelector('input, button'))?.focus());
         const closeOnOutsideClick = (event) => {
             if (!editorRef.current?.contains(event.target) && !pickerRef.current?.contains(event.target)) {
                 closePicker({ restoreFocus: false });
@@ -142,9 +136,9 @@ function ActivityTagEditor({
             document.removeEventListener('pointerdown', closeOnOutsideClick);
             document.removeEventListener('keydown', closeOnEscape);
         };
-    }, [assignableTags.length, closePicker, isPickerOpen]);
+    }, [assignableCount, closePicker, isPickerOpen]);
 
-    // ``newTags``: tags created this moment, not yet in ``localTags`` until the next render.
+    // ``newTags``: tags created this moment, not yet in the catalog until it refetches.
     const persist = async (nextIds, newTags = []) => {
         if (isControlled) {
             onChangeTags(nextIds);
@@ -154,8 +148,8 @@ function ActivityTagEditor({
         assignmentGenerationRef.current = generation;
         setOptimisticSelection({ assignmentKey, ids: nextIds });
         // Full tag objects let an offline (queued) assignment show immediately.
-        const tagsById = new Map([...localTags, ...newTags].map((tag) => [tag.id, tag]));
-        const nextTags = nextIds.map((id) => tagsById.get(id)).filter(Boolean);
+        const known = new Map([...tagsById.values(), ...newTags].map((tag) => [tag.id, tag]));
+        const nextTags = nextIds.map((id) => known.get(id)).filter(Boolean);
         const execute = async () => {
             const response = setId
                 ? await assignSetTags({ setId, tagIds: nextIds, version: assignmentVersionRef.current, tags: nextTags })
@@ -180,42 +174,27 @@ function ActivityTagEditor({
     };
 
     const handleCreate = async () => {
-        const trimmed = name.trim();
+        const trimmed = canonicalTagName(name);
         if (!trimmed) return;
         try {
-            const normalized = trimmed.toLocaleLowerCase();
-            const availableMatch = assignableTags.find((tag) => tag.name.trim().toLocaleLowerCase() === normalized);
-            if (availableMatch) {
-                if (!selectedIds.includes(availableMatch.id)) await persist([...selectedIds, availableMatch.id]);
+            // Names are unique per fractal: a matching tag is selected (or restored), never duplicated.
+            if (nameMatch && !nameMatch.archived) {
+                if (!selectedIds.includes(nameMatch.id)) await persist(toggle(nameMatch));
                 setName('');
-                notify.success(`Assigned existing tag “${availableMatch.name}”`);
+                notify.success(`Assigned existing tag “${nameMatch.name}”`);
                 return;
             }
-            const catalogMatch = catalog.tags.find((tag) => !tag.archived && tag.name.trim().toLocaleLowerCase() === normalized);
-            let response;
-            if (catalogMatch && createScope !== 'global') {
-                response = await updateCatalogTag({
-                    definitionId: catalogMatch.id,
-                    version: catalogMatch.version,
-                    activity_ids: [...new Set([...catalogMatch.activity_ids, activityId])],
-                    scope: catalogMatch.scope,
-                });
-            } else {
-                response = await createTag({ name: trimmed, scope: createScope });
-            }
-            const definition = response.data;
-            const tag = definition.bindings?.find((binding) => binding.activity_definition_id === activityId) || definition;
-            setCreatedTags((current) => ({
-                activityId,
-                tags: current.activityId === activityId ? [...current.tags, tag] : [tag],
-            }));
+            const response = nameMatch
+                ? await restoreTag({ definitionId: nameMatch.id, version: nameMatch.version })
+                : await createTag({ name: trimmed });
+            const tag = response.data;
+            setCreatedTags((current) => [...current.filter((item) => item.id !== tag.id), tag]);
             setName('');
-            setCreateScope('selected');
             try {
-                await persist([...selectedIds, tag.id], [tag]);
-                notify.success(`Created and assigned “${tag.name}”`);
+                await persist(toggleTagSelection(selectedIds, tag, families), [tag]);
+                notify.success(`${nameMatch ? 'Restored' : 'Created'} and assigned “${tag.name}”`);
             } catch {
-                notify.warning(`Created “${tag.name}”, but it could not be assigned. You can retry from the picker.`);
+                notify.warning(`Saved “${tag.name}”, but it could not be assigned. You can retry from the picker.`);
             }
         } catch (error) {
             notify.error(`Failed to create tag: ${formatError(error)}`);
@@ -223,7 +202,7 @@ function ActivityTagEditor({
     };
 
     const beginEdit = (tag) => {
-        const definition = catalog.tags.find((item) => item.id === tag.definition_id);
+        const definition = catalog.tags.find((item) => item.id === tag.id);
         if (!definition) return;
         setEditingDefinition(definition);
         setEditName(definition.name);
@@ -232,12 +211,17 @@ function ActivityTagEditor({
     };
 
     const saveEdit = async () => {
-        if (!editingDefinition || !editName.trim()) return;
+        if (!editingDefinition || !canonicalTagName(editName)) return;
+        const collision = findTagByName(catalog.tags, editName);
+        if (collision && collision.id !== editingDefinition.id) {
+            notify.error(`“${collision.name}” already exists. Merge tags from Manage Tags.`);
+            return;
+        }
         try {
             await updateCatalogTag({
                 definitionId: editingDefinition.id,
                 version: editingDefinition.version,
-                name: editName.trim(),
+                name: canonicalTagName(editName),
                 color: editColor,
             });
             notify.success(`Updated “${editName.trim()}”`);
@@ -248,7 +232,7 @@ function ActivityTagEditor({
     };
 
     const prepareDelete = async (tag) => {
-        const definition = catalog.tags.find((item) => item.id === tag.definition_id);
+        const definition = catalog.tags.find((item) => item.id === tag.id);
         if (!definition) return;
         try {
             const response = await fractalApi.getActivityTagImpact(rootId, definition.id);
@@ -276,7 +260,7 @@ function ActivityTagEditor({
     };
 
     const performArchive = async (tag) => {
-        const definition = catalog.tags.find((item) => item.id === tag.definition_id);
+        const definition = catalog.tags.find((item) => item.id === tag.id);
         if (!definition) return;
         try {
             await archiveTag({ definitionId: definition.id, version: definition.version });
@@ -337,7 +321,7 @@ function ActivityTagEditor({
                             type="checkbox"
                             checked={selectedIds.includes(tag.id)}
                             disabled={isPending || !editable}
-                            onChange={() => void persist(selectedIds.includes(tag.id) ? selectedIds.filter((id) => id !== tag.id) : [...selectedIds, tag.id]).catch(() => undefined)}
+                            onChange={() => void persist(toggle(tag)).catch(() => undefined)}
                         />
                         {tag.name}{tag.archived ? ' (archived)' : ''}
                     </label>
@@ -350,7 +334,7 @@ function ActivityTagEditor({
                         <span>Choose tags</span>
                         <CloseButton size={14} buttonSize="sm" className={styles.pickerClose} aria-label="Close tag picker" onClick={() => closePicker()} />
                     </div>
-                    {assignableTags.length > 5 ? (
+                    {assignableCount > 5 ? (
                         <input
                             ref={searchRef}
                             className={styles.pickerSearch}
@@ -364,20 +348,24 @@ function ActivityTagEditor({
                     <div className={styles.pickerOptions}>
                         {pickerGroups.length ? pickerGroups.map((group) => (
                             <section key={group.key} className={styles.pickerGroup} aria-labelledby={`tag-group-${group.key}`}>
-                                <h4 id={`tag-group-${group.key}`}>{group.label}</h4>
+                                <h4 id={`tag-group-${group.key}`}>
+                                    {group.label}
+                                    {group.singleSelect ? <span className={styles.pickOne}>Single select</span> : null}
+                                </h4>
                                 {group.tags.map((tag) => (
                                     <div key={`picker-${tag.id}`} className={styles.pickerOptionRow} style={tag.color ? { '--tag-color': tag.color } : undefined}>
                                         <label className={styles.pickerOption}>
                                             <input
-                                                type="checkbox"
                                                 checked={selectedIds.includes(tag.id)}
                                                 disabled={isPending}
-                                                onChange={() => void persist(selectedIds.includes(tag.id)
-                                                    ? selectedIds.filter((id) => id !== tag.id)
-                                                    : [...selectedIds, tag.id]).catch(() => undefined)}
+                                                type={group.singleSelect ? 'radio' : 'checkbox'}
+                                                name={group.singleSelect ? `tag-family-${assignmentKey || 'plan'}-${group.key}` : undefined}
+                                                onClick={group.singleSelect && selectedIds.includes(tag.id)
+                                                    ? () => void persist(toggle(tag)).catch(() => undefined) : undefined}
+                                                onChange={() => void persist(toggle(tag)).catch(() => undefined)}
                                             />
                                             <span className={styles.pickerOptionDot} aria-hidden="true" />
-                                            <span>{tag.name}</span>
+                                            <span>{tag.name}{tag.archived ? ' (archived)' : ''}</span>
                                         </label>
                                         <div className={styles.optionActions}>
                                             <button type="button" aria-label={`Edit ${tag.name}`} onClick={() => beginEdit(tag)}>Edit</button>
@@ -401,18 +389,23 @@ function ActivityTagEditor({
                                 if (event.key === 'Enter') handleCreate();
                             }}
                         />
-                        <Button size="sm" onClick={handleCreate} disabled={!name.trim() || isPending}>Create</Button>
+                        <Button size="sm" onClick={handleCreate} disabled={!canonicalTagName(name) || isPending}>
+                            {!nameMatch ? 'Create' : nameMatch.archived ? 'Restore' : selectedIds.includes(nameMatch.id) ? 'Added' : 'Add'}
+                        </Button>
                     </div>
-                    <label className={styles.createScope}>
-                        <input type="checkbox" checked={createScope === 'global'} onChange={(event) => setCreateScope(event.target.checked ? 'global' : 'selected')} />
-                        Available to every activity
-                    </label>
+                    {nameMatch ? (
+                        <p className={styles.creatorHint} role="status">
+                            {nameMatch.archived
+                                ? `“${nameMatch.name}” is archived. Restore it to use it again.`
+                                : `“${nameMatch.name}” already exists${selectedIds.includes(nameMatch.id) ? ' and is assigned.' : '. Add it instead of creating a copy.'}`}
+                        </p>
+                    ) : null}
                     {editingDefinition ? (
                         <div className={styles.inlineManager}>
                             <strong>Edit tag</strong>
                             <input aria-label="Edit tag name" value={editName} onChange={(event) => setEditName(event.target.value)} />
                             <input aria-label="Edit tag color" type="color" value={editColor} onChange={(event) => setEditColor(event.target.value.toUpperCase())} />
-                            <div><Button size="sm" onClick={saveEdit} disabled={!editName.trim() || isPending}>Save</Button><Button size="sm" variant="secondary" onClick={() => setEditingDefinition(null)}>Cancel</Button></div>
+                            <div><Button size="sm" onClick={saveEdit} disabled={!canonicalTagName(editName) || isPending}>Save</Button><Button size="sm" variant="secondary" onClick={() => setEditingDefinition(null)}>Cancel</Button></div>
                         </div>
                     ) : null}
                     {archiveTarget ? (

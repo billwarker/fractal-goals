@@ -1,17 +1,20 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
 import DateRangeFilter from '../common/DateRangeFilter';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
-import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
+import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters, scopeFilterRelevance } from './analyticsGlobalFilters';
 import { getVisualization } from './visualizations/registry';
 import {
     getVisualizationStateUpdate,
     normalizeVisualizationState,
 } from './visualizations/state';
 import '../sessions/SessionsQuerySidebar.css';
+
+// Loaded with the sidebar's content rather than the route, to keep the Analytics bundle in budget.
+const AnalyticsScopeFilters = lazy(() => import('./AnalyticsScopeFilters'));
 
 const SIDEBAR_DATE_RANGE_CLASSES = {
     chipGroup: 'sessions-query-chip-group',
@@ -22,6 +25,8 @@ const SIDEBAR_DATE_RANGE_CLASSES = {
 };
 
 function AnalyticsFiltersSidebar({
+    rootId,
+    sessions = [],
     filters,
     dateRange,
     goals = [],
@@ -29,6 +34,8 @@ function AnalyticsFiltersSidebar({
     activityGroups = [],
     activityInstances = {},
     selectedWindowState = null,
+    // Every panel's state, so scope filters only show for charts they affect.
+    windowStates = null,
     onUpdateSelectedWindowState,
     onChange,
     onDateRangeChange,
@@ -47,6 +54,8 @@ function AnalyticsFiltersSidebar({
         Boolean(dateRange?.start || dateRange?.end),
         normalized.goals.goalIds.length > 0,
         normalized.activities.activityIds.length > 0 || normalized.activities.groupIds.length > 0,
+        Boolean(normalized.tags),
+        normalized.sessions.templateIds.length > 0 || normalized.sessions.programDayIds.length > 0,
     ].filter(Boolean).length;
 
     const selectedGoalNames = useMemo(
@@ -263,6 +272,15 @@ function AnalyticsFiltersSidebar({
                                 : 'All activities'}
                         </div>
                     </section>
+                    <Suspense fallback={null}>
+                        <AnalyticsScopeFilters
+                            rootId={rootId}
+                            filters={normalized}
+                            sessions={sessions}
+                            onUpdate={updateFilters}
+                            relevance={scopeFilterRelevance(windowStates)}
+                        />
+                    </Suspense>
                     </>
                     )}
                 </div>

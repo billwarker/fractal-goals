@@ -152,6 +152,36 @@ describe('session op handlers', () => {
         expect(findSessionForActivity(env.queryClient, rootId, { instanceId: 'nope' })).toBeNull();
     });
 
+    it('refetches timelines only once the server has a queued tag or comparison change', async () => {
+        const { queryClient, outbox, goOnline } = env;
+        const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+        const timelineFilter = { queryKey: ['activity-progress-timeline', rootId], refetchType: 'all' };
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.INSTANCE_TAGS,
+            entityIds: ['i1'],
+            meta: { instanceId: 'i1', tags: [], serverResponse: { tags: [], version: 2, progress_comparison: { previous_instance_id: 'p1' } } },
+        });
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.PROGRESS_COMPARISON,
+            entityIds: ['i1'],
+            coalesceKey: 'progress-comparison:i1',
+            meta: {
+                instanceId: 'i1',
+                comparisonContext: { mode: 'all', tag_ids: [], tags: [] },
+                serverResponse: { comparison_context: { mode: 'all', tag_ids: [], tags: [], version: 2 }, progress_comparison: { previous_instance_id: 'p2' } },
+            },
+        });
+        // While queued, the server still answers with the old context, so nothing refetches yet.
+        expect(invalidate).not.toHaveBeenCalledWith(timelineFilter);
+
+        await goOnline();
+
+        expect(invalidate).toHaveBeenCalledWith(timelineFilter);
+        const [instance] = queryClient.getQueryData(activitiesKey);
+        expect(instance.comparison_context.version).toBe(2);
+        expect(instance.progress_comparison.previous_instance_id).toBe('p2');
+    });
+
     it('shows queued tag and goal-link changes on the instance', async () => {
         const { queryClient, outbox } = env;
         await enqueue(outbox, queryClient, {

@@ -4,11 +4,13 @@ import { CircuitRoundTagControl, CircuitRunTagControl } from '../CircuitTagContr
 import styles from '../../sessionDetail/ActivityTagEditor.module.css';
 
 
+const catalog = (tags, families = []) => ({ families, tags });
+
 describe('circuit scope tag controls', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('uses the activity chip style for assigned circuit tags', () => {
-        render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', name: 'Strength', color: '#FF0000' }] }} availableTags={[]} onPerform={vi.fn()} />);
+        render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', name: 'Strength', color: '#FF0000' }] }} availableTags={catalog([])} onPerform={vi.fn()} />);
         const chip = screen.getByText('Strength').closest('label');
         expect(chip).toHaveClass(styles.choice, styles.selected);
         expect(chip).toHaveStyle({ '--tag-color': '#FF0000' });
@@ -19,7 +21,7 @@ describe('circuit scope tag controls', () => {
         render(
             <CircuitRunTagControl
                 run={{ id: 'run-1', tags: [] }}
-                availableTags={[{ id: 'tag-a', name: 'Competition', archived: false }]}
+                availableTags={catalog([{ id: 'tag-a', name: 'Competition', archived: false }])}
                 onPerform={onPerform}
             />,
         );
@@ -30,21 +32,49 @@ describe('circuit scope tag controls', () => {
 
         await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
             action: 'updateRunTag',
-            value: { name: 'Competition', color: null, assigned: true },
+            value: { name: 'Competition', color: null, assigned: true, definition_id: 'tag-a' },
             inlineError: true,
         }));
     });
 
-    it('assigns catalog identity and retains distinct same-name options', async () => {
+    it('groups options by family and marks assigned catalog tags', async () => {
         const onPerform = vi.fn().mockResolvedValue(true);
-        render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', definition_id: 'catalog-a', name: 'Shared' }] }} availableTags={[{ id: 'catalog-a', definition_id: 'catalog-a', name: 'Shared' }, { id: 'catalog-b', definition_id: 'catalog-b', name: 'Shared' }]} onPerform={onPerform} />);
+        render(
+            <CircuitRunTagControl
+                run={{ tags: [{ id: 'scope', definition_id: 'easy', name: 'Easy' }] }}
+                availableTags={catalog([
+                    { id: 'outdoor', name: 'Outdoor', sort_order: 0 },
+                    { id: 'hard', name: 'Hard', family_id: 'intensity', sort_order: 1 },
+                    { id: 'easy', name: 'Easy', family_id: 'intensity', sort_order: 0 },
+                ], [{ id: 'intensity', name: 'Intensity', single_select: true, sort_order: 0 }])}
+                onPerform={onPerform}
+            />,
+        );
         fireEvent.click(screen.getByRole('button', { name: 'Add circuit tags' }));
-        const options = within(screen.getByRole('dialog')).getAllByRole('checkbox');
-        expect(options).toHaveLength(2);
+        const dialog = screen.getByRole('dialog');
+        const intensity = within(dialog).getByRole('region', { name: 'Intensity' });
+        expect(intensity).toHaveTextContent('Single select');
+        const options = within(intensity).getAllByRole('checkbox');
+        expect(options.map((option) => option.closest('label').textContent)).toEqual(['Easy', 'Hard']);
         expect(options[0]).toBeChecked();
-        expect(options[1]).not.toBeChecked();
+        expect(within(within(dialog).getByRole('region', { name: 'Other tags' })).getByText('Outdoor')).toBeInTheDocument();
         fireEvent.click(options[1]);
-        await waitFor(() => expect(onPerform).toHaveBeenCalledWith({ action: 'updateRunTag', value: { name: 'Shared', color: null, assigned: true, definition_id: 'catalog-b' }, inlineError: true }));
+        await waitFor(() => expect(onPerform).toHaveBeenCalledWith({ action: 'updateRunTag', value: { name: 'Hard', color: null, assigned: true, definition_id: 'hard' }, inlineError: true }));
+    });
+
+    it('adds the existing tag instead of creating a same-name copy', async () => {
+        const onPerform = vi.fn().mockResolvedValue(true);
+        render(<CircuitRunTagControl run={{ id: 'run-1', tags: [] }} availableTags={catalog([{ id: 'tag-a', name: 'Competition' }])} onPerform={onPerform} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Add circuit tags' }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'New circuit tags name' }), { target: { value: '  competition ' } });
+        const dialog = screen.getByRole('dialog', { name: 'Choose circuit tags' });
+        expect(within(dialog).getByRole('status')).toHaveTextContent('“Competition” already exists');
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+        await waitFor(() => expect(onPerform).toHaveBeenCalledWith({
+            action: 'updateRunTag',
+            value: { name: 'competition', color: '#64748B', assigned: true, definition_id: 'tag-a' },
+            inlineError: true,
+        }));
     });
 
     it('creates a logical tag for one round', async () => {
@@ -52,7 +82,7 @@ describe('circuit scope tag controls', () => {
         render(
             <CircuitRoundTagControl
                 round={{ id: 'round-1', round_number: 1, tags: [] }}
-                availableTags={[]}
+                availableTags={catalog([])}
                 onPerform={onPerform}
             />,
         );
@@ -77,7 +107,7 @@ describe('circuit scope tag controls', () => {
         render(
             <CircuitRunTagControl
                 run={{ id: 'run-1', tags: [] }}
-                availableTags={[]}
+                availableTags={catalog([])}
                 onPerform={onPerform}
             />,
         );
@@ -103,7 +133,7 @@ describe('circuit scope tag controls', () => {
         render(
             <CircuitRoundTagControl
                 round={{ id: 'round-1', round_number: 1, tags: [{ id: 'tag-a', name: 'Sprint' }] }}
-                availableTags={[{ id: 'tag-a', name: 'Sprint', archived: false }]}
+                availableTags={catalog([{ id: 'tag-a', name: 'Sprint', archived: false }])}
                 editable={false}
                 onPerform={vi.fn()}
             />,
@@ -129,7 +159,7 @@ describe('circuit scope tag controls', () => {
         render(
             <CircuitRunTagControl
                 run={{ id: 'run-1', tags }}
-                availableTags={tags}
+                availableTags={catalog(tags)}
                 onPerform={vi.fn()}
             />,
         );

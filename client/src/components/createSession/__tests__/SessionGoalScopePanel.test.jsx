@@ -30,12 +30,11 @@ describe('SessionGoalScopePanel', () => {
 
         expect(screen.getByRole('heading', { name: 'Session Goals' })).toBeInTheDocument();
         expect(screen.getByText('Optional')).toBeInTheDocument();
-        expect(screen.getByText(/Included automatically through template activities/i)).toBeInTheDocument();
         expect(screen.getByTestId('goal-hierarchy-selector')).toBeInTheDocument();
         expect(selectorProps).toHaveBeenCalledWith(expect.objectContaining({
             selectedGoalIds: ['goal-1'],
             lockedGoalIds: ['goal-2'],
-            lockedGoalMarker: '*',
+            lockedGoalLegend: expect.stringMatching(/Included automatically through template activities/i),
             compactLayout: true,
             initialHideCompletedGoals: true,
             lockHideCompletedGoals: true,
@@ -58,7 +57,6 @@ describe('SessionGoalScopePanel', () => {
 
         expect(screen.getByText('Read only')).toBeInTheDocument();
         expect(screen.getByText(/cannot be edited/i)).toBeInTheDocument();
-        expect(screen.queryByText(/Included automatically through template activities/i)).not.toBeInTheDocument();
         expect(selectorProps).toHaveBeenCalledWith(expect.objectContaining({
             selectionDisabled: true,
         }));

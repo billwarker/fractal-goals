@@ -75,6 +75,21 @@ class CreateGoalOperation(BaseModel):
     data: "StrictGoalCreateSchema" = Field(description="Goal fields to create. parent_id may refer to a goal created earlier in this proposal using $ref:<operation_id>. Allowed goal types are UltimateGoal, LongTermGoal, MidTermGoal, ShortTermGoal, and ImmediateGoal.")
 
 
+class SetGoalSequenceOperation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: OperationId
+    type: Literal["set_goal_sequence"]
+    goal_ids: list[str] = Field(
+        min_length=1, max_length=50,
+        description=(
+            "Sibling goals (same parent, same level) in the order they should run; each begins when the one "
+            "before completes, and later goals wait paused. Replaces the sequence these goals are already in, "
+            "or creates one. One goal that is already sequenced ends its sequence. IDs may be "
+            "$ref:<operation_id> references to goals created earlier in this proposal."
+        ),
+    )
+
+
 class StrictGoalCreateSchema(GoalCreateSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
@@ -85,10 +100,10 @@ class StrictGoalUpdateSchema(GoalUpdateSchema):
     @model_validator(mode="after")
     def only_supported_goal_fields(self):
         unsupported = self.model_fields_set - {
-            "name", "description", "deadline", "parent_id", "targets",
-            "completed_via_children", "relevance_statement",
-            "inherit_parent_activities", "allow_manual_completion",
-            "track_activities", "progress_settings",
+            "name", "description", "deadline", "started_at", "parent_id",
+            "completion_condition", "condition",
+            "inherit_parent_activities", "track_activities", "progress_settings",
+            "review_cadence_value", "review_cadence_unit", "review_disabled",
         }
         if unsupported:
             raise ValueError("These goal fields are not supported by reviewed updates: " + ", ".join(sorted(unsupported)))
@@ -100,7 +115,7 @@ class UpdateGoalOperation(BaseModel):
     operation_id: OperationId
     type: Literal["update_goal"]
     goal_id: str = Field(min_length=1, max_length=80, description="Opaque ID of an existing goal in the task's fractal.")
-    data: StrictGoalUpdateSchema = Field(description="Supported reviewed fields: name, description, deadline, parent_id, targets, child completion, activity inheritance, manual completion, activity tracking, and progress settings.")
+    data: StrictGoalUpdateSchema = Field(description="Supported reviewed fields: name, description, deadline, start date, parent_id, completion condition (activity threshold, children, or manual) with its activity threshold, activity inheritance, activity tracking, progress settings, and the review schedule (cadence pair, or both null for the level's; review_disabled).")
 
 
 class CreateActivityOperation(BaseModel):
@@ -333,6 +348,7 @@ AgentProposalOperation = Annotated[
         CreateActivityOperation,
         UpdateActivityOperation,
         AssociateActivityGoalsOperation,
+        SetGoalSequenceOperation,
         CreateNoteOperation,
         CreateSessionOperation,
         UpdateSessionOperation,

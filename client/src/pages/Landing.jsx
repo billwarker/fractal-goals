@@ -13,7 +13,6 @@ import useActiveLandingSection from '../hooks/useActiveLandingSection';
 import useDeferredSection from '../hooks/useDeferredSection';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import useMediaQuery from '../hooks/useMediaQuery';
-import useLandingTargetManager from '../hooks/useLandingTargetManager';
 import useLandingTreeViewSettings from '../hooks/useLandingTreeViewSettings';
 import { queryKeys } from '../hooks/queryKeys';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
@@ -27,6 +26,7 @@ import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
 import './FractalGoals.css';
+import scopedModalStyles from '../components/landing/LandingScopedModal.module.css';
 
 const loadFlowTree = () => import('../FlowTree');
 const loadLandingFeatures = () => import('../components/landing/LandingFeaturesSection');
@@ -35,7 +35,6 @@ const LandingFeaturesSection = lazy(loadLandingFeatures);
 const warmFlowTree = () => loadFlowTree().catch(() => {});
 const warmLandingFeatures = () => loadLandingFeatures().catch(() => {});
 const GoalDetailModal = lazy(() => import('../components/ConnectedGoalDetailModal'));
-const LandingTargetManagerModal = lazy(() => import('../components/landing/LandingTargetManagerModal'));
 const LandingExplorerTakeover = lazy(() => import('../components/landing/LandingExplorerTakeover'));
 
 // Above this width the landing is the horizontal snap-section experience; at
@@ -201,7 +200,7 @@ function Landing() {
                 activityInstantiationSummary: example.activity_instantiation_summary || {},
                 analyticsViews: Array.isArray(example.analytics_views) ? example.analytics_views : [],
                 analyticsActivityInstances: example.analytics_activity_instances || {},
-                targetAnalytics: example.target_analytics || {},
+                conditionAnalytics: example.condition_analytics || {},
                 sessionTemplates: Array.isArray(example.session_templates) ? example.session_templates : [],
                 // Admin-curated feature picks (schema v6+); null on older
                 // snapshots, in which case the Features section auto-derives.
@@ -235,8 +234,6 @@ function Landing() {
         [publishedExamples, selectedExampleId]
     );
     const [viewSettings, setViewSettings] = useLandingTreeViewSettings(selectedExample);
-    const { activeSelection: activeTargetManagerSelection, close: closeTargetManager,
-        open: openTargetManager } = useLandingTargetManager(selectedExample);
     const selectedGoal = useMemo(
         () => findGoalNodeById(selectedExample?.tree, selectedGoalId),
         [selectedExample, selectedGoalId]
@@ -334,7 +331,6 @@ function Landing() {
         setSelectedExampleId(exampleId);
         setSelectedGoalId(null);
         setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
-        closeTargetManager();
         setHoveredHeroExampleId(null);
         setIsGoalTreeInteractionLocked(true);
         setFlowTreeScopeKey((current) => current + 1);
@@ -347,7 +343,6 @@ function Landing() {
         const goalId = getGoalNodeId(goal);
         setSelectedGoalId(goalId);
         setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
-        closeTargetManager();
         // Bump the scope transition key so FlowTree re-filters to this goal's
         // lineage and re-centers smoothly, matching the authenticated goals page.
         setFlowTreeScopeKey((current) => current + 1);
@@ -356,7 +351,6 @@ function Landing() {
     const clearSelectedGoal = () => {
         setSelectedGoalId(null);
         setGoalDetailEntry((current) => ({ view: 'goal', key: current.key + 1 }));
-        closeTargetManager();
         setFlowTreeScopeKey((current) => current + 1);
     };
 
@@ -392,7 +386,7 @@ function Landing() {
     const goalDemos = buildLandingGoalDemos({ clearSelectedGoal, fallbackCards: goalViewCards,
         findGoalById: findGoalNodeById, findGoalByType: findFirstGoalByType, goalsViewMode,
         handleGoalSelect, selectedExample, selectedGoal, selectedGoalId, setFlowTreeScopeKey,
-        openTargetManager, setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId,
+        setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId,
         setViewSettings, viewSettings });
 
     const isHeaderNavItemActive = (href) => {
@@ -787,7 +781,9 @@ function Landing() {
                                                             initialView={goalDetailEntry.view}
                                                             initialViewKey={goalDetailEntry.key}
                                                             onGoalSelect={handleGoalSelect}
-                                                            onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
+                                                            conditionSnapshot={selectedExample.conditionAnalytics?.[selectedGoalId] || null}
+                                                            portalTarget={goalExampleSpaceElement}
+                                                            overlayClassName={scopedModalStyles.scopedOverlay}
                                                         />
                                                     </GoalLevelsProvider>
                                                 </Suspense>
@@ -803,22 +799,6 @@ function Landing() {
                         )}
                     </div>
                 </div>
-                {activeTargetManagerSelection && (
-                    <Suspense fallback={null}>
-                        <LandingTargetManagerModal
-                            exampleId={selectedExample.id}
-                            goal={activeTargetManagerSelection.goal}
-                            target={activeTargetManagerSelection.target}
-                            activityDefinitions={selectedExample.activityDefinitions}
-                            analyticsData={selectedExample.targetAnalytics?.[activeTargetManagerSelection.target.id]}
-                            historicalInstances={selectedExample.analyticsActivityInstances?.[
-                                activeTargetManagerSelection.target.activity_id
-                            ]}
-                            portalTarget={takeoverCanvasElement || goalExampleSpaceElement}
-                            onClose={closeTargetManager}
-                        />
-                    </Suspense>
-                )}
                 {!isDesktopLanding && isExplorerTakeoverOpen && selectedExample && (
                     <Suspense fallback={null}>
                         <LandingExplorerTakeover
@@ -835,11 +815,11 @@ function Landing() {
                             seedLevels={snapshotLevels}
                             onNodeClick={handleGoalSelect}
                             onClearSelectedGoal={clearSelectedGoal}
-                            onTargetOpen={(target) => openTargetManager(selectedGoal, target)}
+                            conditionSnapshot={selectedExample.conditionAnalytics?.[selectedGoalId] || null}
+                            evidencePortalTarget={takeoverCanvasElement}
                             goalDemos={goalDemos}
                             cardStyles={styles}
                             onCanvasElement={setTakeoverCanvasElement}
-                            escapeDisabled={Boolean(activeTargetManagerSelection)}
                             onEscape={() => {
                                 // Step back through takeover state: close the
                                 // goal-detail sheet first, then the takeover.

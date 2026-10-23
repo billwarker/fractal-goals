@@ -9,16 +9,27 @@ TIMESTAMP="$(date +"%Y%m%d_%H%M%S")"
 DUMP_FILE="$BACKUP_DIR/source_${TIMESTAMP}.sql"
 LOCAL_BACKUP_FILE="$BACKUP_DIR/local_before_sync_${TIMESTAMP}.dump"
 
+# Extensions the schema depends on. Hosted sources (e.g. Supabase) keep them outside
+# `public`, so a public-only dump omits them. Without btree_gist the program-block
+# exclusion constraint fails, and every primary and foreign key after it is skipped.
+REQUIRED_EXTENSIONS_SQL='
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA public;
+'
+
 usage() {
     cat <<'EOF'
 Usage:
   ./scripts/sync_postgres_to_local.sh [SOURCE_DATABASE_URL]
+  ./scripts/sync_postgres_to_local.sh --from-dump PATH_TO_SOURCE_SQL
 
 Sync a remote/source PostgreSQL database into the local development database.
+--from-dump restores a plain dump written by an earlier sync instead of dumping again.
 
 Only the source public schema is synced. This avoids provider-managed schemas
 and extensions such as Supabase vault/auth/storage that do not belong in local
-development.
+development. Required extensions are created locally before the restore, and the
+sync fails unless every primary and foreign key in the dump was restored.
 
 Environment:
   LOCAL_DATABASE_URL  Override the local restore target.
@@ -75,10 +86,38 @@ load_default_target_url() {
     fi
 }
 
+count_restored_constraints() {
+    psql --dbname "$TARGET_DATABASE_URL" -Atc "
+        SELECT count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
+        WHERE n.nspname = 'public' AND c.contype = '$1'"
+}
+
+verify_restored_schema() {
+    local expected_pk expected_fk actual_pk actual_fk
+    expected_pk="$(grep -c 'PRIMARY KEY' "$DUMP_FILE" || true)"
+    expected_fk="$(grep -c 'FOREIGN KEY' "$DUMP_FILE" || true)"
+    actual_pk="$(count_restored_constraints p)"
+    actual_fk="$(count_restored_constraints f)"
+    echo "Primary keys: $actual_pk/$expected_pk  Foreign keys: $actual_fk/$expected_fk"
+    if [ "$actual_pk" != "$expected_pk" ] || [ "$actual_fk" != "$expected_fk" ]; then
+        echo "Restored schema is incomplete. Restore $LOCAL_BACKUP_FILE and investigate." >&2
+        exit 1
+    fi
+}
+
 main() {
     if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
         usage
         exit 0
+    fi
+
+    SOURCE_DUMP=""
+    if [ "${1:-}" = "--from-dump" ]; then
+        SOURCE_DUMP="${2:-}"
+        if [ ! -f "$SOURCE_DUMP" ]; then
+            echo "Dump file not found: $SOURCE_DUMP" >&2
+            exit 1
+        fi
     fi
 
     require_command pg_dump
@@ -87,23 +126,27 @@ main() {
 
     load_default_target_url
 
-    SOURCE_DATABASE_URL="${1:-}"
-    if [ -z "$SOURCE_DATABASE_URL" ]; then
-        printf "Source PostgreSQL connection URL: "
-        read -r SOURCE_DATABASE_URL
+    if [ -z "$SOURCE_DUMP" ]; then
+        SOURCE_DATABASE_URL="${1:-}"
+        if [ -z "$SOURCE_DATABASE_URL" ]; then
+            printf "Source PostgreSQL connection URL: "
+            read -r SOURCE_DATABASE_URL
+        fi
+
+        if [ -z "$SOURCE_DATABASE_URL" ]; then
+            echo "Source PostgreSQL connection URL is required." >&2
+            exit 1
+        fi
+
+        if [ "$SOURCE_DATABASE_URL" = "$TARGET_DATABASE_URL" ]; then
+            echo "Source and local target URLs are identical. Refusing to continue." >&2
+            exit 1
+        fi
+        echo "Source: $(mask_url "$SOURCE_DATABASE_URL")"
+    else
+        echo "Source dump: $SOURCE_DUMP"
     fi
 
-    if [ -z "$SOURCE_DATABASE_URL" ]; then
-        echo "Source PostgreSQL connection URL is required." >&2
-        exit 1
-    fi
-
-    if [ "$SOURCE_DATABASE_URL" = "$TARGET_DATABASE_URL" ]; then
-        echo "Source and local target URLs are identical. Refusing to continue." >&2
-        exit 1
-    fi
-
-    echo "Source: $(mask_url "$SOURCE_DATABASE_URL")"
     echo "Target: $(mask_url "$TARGET_DATABASE_URL")"
     echo ""
     echo "This will replace all data and schema objects in the local target database."
@@ -121,32 +164,37 @@ main() {
     pg_dump --format=custom --no-owner --no-acl --file "$LOCAL_BACKUP_FILE" "$TARGET_DATABASE_URL"
     echo "Local backup written to: $LOCAL_BACKUP_FILE"
 
-    echo "Dumping source public schema..."
-    pg_dump \
-        --format=plain \
-        --schema=public \
-        --no-owner \
-        --no-acl \
-        --file "$DUMP_FILE.tmp" \
-        "$SOURCE_DATABASE_URL"
+    if [ -z "$SOURCE_DUMP" ]; then
+        echo "Dumping source public schema..."
+        pg_dump \
+            --format=plain \
+            --schema=public \
+            --no-owner \
+            --no-acl \
+            --file "$DUMP_FILE.tmp" \
+            "$SOURCE_DATABASE_URL"
+    else
+        cp "$SOURCE_DUMP" "$DUMP_FILE.tmp"
+    fi
 
     # Supabase may run a newer Postgres than local Docker. PostgreSQL 16 does
     # not recognize this setting, and it is not relevant to restored app data.
-    sed '/^SET transaction_timeout = 0;$/d' "$DUMP_FILE.tmp" > "$DUMP_FILE"
+    # The public schema itself is recreated below, together with its extensions.
+    sed -e '/^SET transaction_timeout = 0;$/d' -e '/^CREATE SCHEMA public;$/d' "$DUMP_FILE.tmp" > "$DUMP_FILE"
     rm "$DUMP_FILE.tmp"
 
-    echo "Clearing local public schema..."
-    psql --set ON_ERROR_STOP=1 --dbname "$TARGET_DATABASE_URL" <<'SQL'
+    echo "Recreating local public schema and extensions..."
+    psql --set ON_ERROR_STOP=1 --dbname "$TARGET_DATABASE_URL" <<SQL
 DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+$REQUIRED_EXTENSIONS_SQL
 SQL
 
     echo "Restoring source dump into local database..."
     psql --set ON_ERROR_STOP=1 --dbname "$TARGET_DATABASE_URL" --file "$DUMP_FILE"
 
-    echo "Ensuring local extensions..."
-    psql --set ON_ERROR_STOP=1 --dbname "$TARGET_DATABASE_URL" <<'SQL'
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
-SQL
+    echo "Verifying restored constraints..."
+    verify_restored_schema
 
     echo "Sync complete."
     echo "Source dump retained at: $DUMP_FILE"

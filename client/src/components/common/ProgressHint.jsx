@@ -24,7 +24,7 @@ function formatProgressValue(comparison, displayMode) {
 }
 
 export default function ProgressHint({ metricId, setIndex = null, progressComparison, displayMode = 'percent' }) {
-    if (!progressComparison || progressComparison.included === false || progressComparison.is_first_instance) return null;
+    if (!progressComparison || progressComparison.is_first_instance) return null;
     const metricComparison = progressComparison.metric_comparisons?.find((item) => item.metric_id === metricId);
     if (!metricComparison) return null;
 

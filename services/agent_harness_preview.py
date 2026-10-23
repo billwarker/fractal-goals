@@ -2,8 +2,9 @@
 
 from typing import Any
 
+from models import Goal
 from services.activity_service import ActivityService
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 from services.agent_harness_common import AgentHarnessError, harness_validation_error
@@ -12,11 +13,14 @@ from services.agent_operation_versions import operation_restore_payload
 
 class AgentProposalPreviewMixin:
     db_session: Any
+    # Provided by the composed AgentHarnessService.
+    _app_href: Any
+    _goal_names: Any
     def _validate_and_preview_operation(self, task, user_id, operation):
         self._root(task.root_id, user_id)
         if operation["type"] == "update_goal":
             before = operation_restore_payload(self.db_session, task.root_id, operation)
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.update_fractal_goal(
                 task.root_id,
                 operation["goal_id"],
@@ -154,7 +158,7 @@ class AgentProposalPreviewMixin:
             }, {"id": entity_id, "name": entity.get("name"), "root_id": task.root_id,
                 "href": self._app_href(task.root_id, "programs", operation["program_id"])}
         if operation["type"] == "create_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.create_fractal_goal(
                 task.root_id,
                 user_id,
@@ -179,6 +183,29 @@ class AgentProposalPreviewMixin:
                 "parent_id": entity.parent_id,
                 "deadline": entity.deadline.isoformat() if entity.deadline else None,
             }, result
+        if operation["type"] == "set_goal_sequence":
+            from services.goal_sequence_service import GoalSequenceService
+
+            goal_ids = list(operation["goal_ids"])
+            before = {goal_id: track for goal_id, track in self.db_session.query(Goal.id, Goal.sequence_track_id).filter(
+                Goal.root_id == task.root_id, Goal.id.in_(goal_ids),
+            ).all()}
+            payload, error, status = GoalSequenceService(self.db_session).sequence_goals(
+                task.root_id, user_id, goal_ids, commit=False, pending_events=[],
+            )
+            if error or payload is None:
+                raise AgentHarnessError(str(error), status, "validation_failed")
+            dissolved = bool(payload.get("dissolved"))
+            return {
+                "operation_id": operation["operation_id"],
+                "type": operation["type"],
+                "action": "End sequence" if dissolved else (
+                    "Change sequence" if any(before.values()) else "Create sequence"
+                ),
+                "goal_ids": [] if dissolved else payload["goal_ids"],
+                "goal_names": [] if dissolved else self._goal_names(task.root_id, payload["goal_ids"]),
+            }, {"id": payload["id"], "name": "Sequence", "root_id": task.root_id,
+                "href": self._app_href(task.root_id, "goals")}
         if operation["type"] == "create_activity":
             service = ActivityService(self.db_session)
             entity, error, status = service.create_activity_definition(

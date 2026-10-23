@@ -24,7 +24,7 @@ _landing_publish_process_lock = threading.Lock()
 
 # Bump when the published landing snapshot shape changes so the frontend / future
 # migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 12
+LANDING_EXAMPLE_SCHEMA_VERSION = 13
 
 
 # Match the production goal timeline's first-page depth so the landing modal
@@ -90,8 +90,8 @@ LANDING_GOAL_BULLET_DEFAULTS = (
         "body": "Attach activities as evidence of progress. Each completed activity advances the goal it supports and carries that evidence up through its lineage.",
     },
     {
-        "key": "set_targets",
-        "heading": "Set measurable targets",
-        "body": "Define performance targets for the activities behind each goal, then see your progress build over time.",
+        "key": "set_conditions",
+        "heading": "Know when you're done",
+        "body": "Give each goal a clear finish line: an activity threshold, all of its child goals, or your call. Progress builds toward it on its own.",
     },
 )

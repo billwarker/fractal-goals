@@ -1,11 +1,13 @@
 """Mixin for ProgressService: building comparisons, summaries, and per-activity comparison maps.
 """
 
-from typing import Optional
+from typing import Callable, Optional
 from models import ActivityInstance
 
 
 class _ProgressComparisonsMixin:
+    _previous_set_hints: Callable[[ActivityInstance, ActivityInstance, object], list]
+
     def _build_comparison(
         self,
         current_instance: ActivityInstance,
@@ -120,18 +122,16 @@ class _ProgressComparisonsMixin:
                 if curr_val is None:
                     # Build per-set hints from previous instance so each set row
                     # can show its own "last N" placeholder, not just the aggregate.
-                    prev_set_values = self._extract_set_values(previous_instance, md)
                     in_progress_set_comparisons = [
                         {
-                            'set_index': idx,
+                            **hint,
                             'current_value': None,
-                            'previous_value': val,
                             'delta': None,
                             'pct_change': None,
                             'improved': False,
                             'regressed': False,
                         }
-                        for idx, val in prev_set_values
+                        for hint in self._previous_set_hints(current_instance, previous_instance, md)
                     ]
                     metric_comparisons.append({
                         'metric_id': md.id,
@@ -245,26 +245,8 @@ class _ProgressComparisonsMixin:
             return f'{regressed} metric(s) regressed'
         return 'Mixed results'
 
-    def _comparison_payload(self, instance, activity_def, previous, *, view_id, config):
-        self._calculation_config = config
-        if not self._instance_included(instance):
-            return {
-                'activity_instance_id': instance.id,
-                'activity_definition_id': instance.activity_definition_id,
-                'session_id': instance.session_id,
-                'previous_instance_id': None,
-                'included': False,
-                'is_first_instance': False,
-                'has_change': False,
-                'has_improvement': False,
-                'has_regression': False,
-                'comparison_type': 'excluded',
-                'metric_comparisons': [],
-                'derived_summary': {'summary_line': 'Excluded from current progress view'},
-                'progress_view_id': view_id,
-                'progress_view_config': config,
-            }
-
+    def _comparison_payload(self, instance, activity_def, previous, *, set_group_previous, context):
+        self._set_group_previous = set_group_previous
         metric_defs = [
             metric for metric in activity_def.metric_definitions
             if metric.deleted_at is None and metric.is_active
@@ -282,14 +264,13 @@ class _ProgressComparisonsMixin:
             'activity_definition_id': instance.activity_definition_id,
             'session_id': instance.session_id,
             'previous_instance_id': previous.id if previous else None,
-            'included': True,
+            'previous_session_id': previous.session_id if previous else None,
             'is_first_instance': previous is None,
             'has_change': changed,
             'has_improvement': improved,
             'has_regression': regressed,
             'comparison_type': comparison_type,
+            'comparison_context': context,
             'metric_comparisons': metric_comparisons,
             'derived_summary': derived_summary,
-            'progress_view_id': view_id,
-            'progress_view_config': config,
         }

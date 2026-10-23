@@ -14,11 +14,14 @@ from validators import (
     GoalConvertLevelSchema,
     GoalPauseSchema,
     GoalMoveSchema,
-    GoalTargetCreateSchema, GoalTargetUpdateSchema, GoalTargetEvaluationSchema,
     FractalCreateSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.goal_history_api import register_goal_history_routes
+from blueprints.goal_conditions_api import error_response, goal_response, register_goal_condition_routes
+from blueprints.goal_charts_api import register_goal_chart_routes
+from blueprints.goal_reviews_api import register_goal_review_routes
+from blueprints.goal_sequences_api import register_goal_sequence_routes
 from blueprints.api_utils import (
     get_db_session,
     internal_error,
@@ -27,13 +30,12 @@ from blueprints.api_utils import (
 )
 from services.serializers import (
     serialize_goal,
-    serialize_target,
 )
 from extensions import limiter
 from services.goal_analytics_service import GoalAnalyticsService
+from services.goal_deadline_rules import warnings_for_goal
 from services.goal_service import (
     GoalService,
-    sync_goal_targets as _sync_targets,
 )
 
 # Create blueprint
@@ -51,7 +53,7 @@ def get_goals(current_user):
     db_session = get_db_session()
     try:
         limit, offset = parse_optional_pagination(request, max_limit=200)
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         payload, error, status = service.list_global_goals(current_user.id, limit, offset or 0)
         if error:
             return jsonify({"error": error}), status
@@ -70,7 +72,7 @@ def create_goal(current_user, validated_data):
     """Create a new goal."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         new_goal, error, status = service.create_global_goal(current_user.id, validated_data)
         if error:
             if isinstance(error, dict):
@@ -81,6 +83,7 @@ def create_goal(current_user, validated_data):
 
         # Return the goal with its tree
         result = serialize_goal(new_goal)
+        result['deadline_warnings'] = warnings_for_goal(new_goal)
         return jsonify(result), 201
         
     except SQLAlchemyError:
@@ -120,7 +123,7 @@ def delete_goal_endpoint(current_user, goal_id: str):
     
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         payload, error, status = service.delete_global_goal(goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -144,7 +147,7 @@ def get_goal_endpoint(current_user, goal_id: str):
     """Get a goal by ID."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.get_global_goal(goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -162,142 +165,21 @@ def update_goal_endpoint(current_user, goal_id: str, validated_data):
     
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.update_global_goal(goal_id, current_user.id, data)
         if error:
             if isinstance(error, dict):
                 return jsonify(error), status
             return jsonify({"error": error}), status
 
-        logger.debug(
-            "Committed changes. Goal has %s active targets",
-            len([t for t in goal.targets_rel if t.deleted_at is None])
-        )
-
-        return jsonify(serialize_goal(goal, include_children=False)), status
+        return jsonify({
+            **serialize_goal(goal, include_children=False),
+            'deadline_warnings': warnings_for_goal(goal),
+        }), status
         
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error in update_goal_endpoint")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/goals/<goal_id>/targets', methods=['POST'])
-@token_required
-@validate_request(GoalTargetCreateSchema)
-def add_goal_target(current_user, goal_id, validated_data):
-    """Add a target to a goal using relational Target model."""
-    data = validated_data
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.add_goal_target(goal_id, current_user.id, data)
-        if error:
-            return jsonify({"error": error}), status
-        goal = payload["goal"]
-        new_target = payload["target"]
-
-        # Return all current targets
-        all_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
-        return jsonify({"targets": all_targets, "id": new_target.id}), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error adding goal target")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['DELETE'])
-@token_required
-def remove_goal_target(current_user, goal_id, target_id):
-    """Remove a target from a goal (soft delete)."""
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.remove_goal_target(goal_id, target_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        goal = payload["goal"]
-
-        # Return remaining targets
-        remaining_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
-        return jsonify({"targets": remaining_targets}), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error removing goal target")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/goals/<goal_id>/targets/<target_id>', methods=['PATCH'])
-@token_required
-@validate_request(GoalTargetUpdateSchema)
-def update_goal_target(current_user, goal_id, target_id, validated_data):
-    """Update a single existing target on a goal."""
-    data = validated_data
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.update_goal_target(goal_id, target_id, current_user.id, data)
-        if error:
-            return jsonify({"error": error}), status
-        goal = payload["goal"]
-        updated_target = payload["target"]
-
-        all_targets = [serialize_target(t) for t in goal.targets_rel if t.deleted_at is None]
-        return jsonify({"targets": all_targets, "id": updated_target.id, "target": serialize_target(updated_target)}), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error updating goal target")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/<root_id>/targets/<target_id>/analytics', methods=['GET'])
-@token_required
-def get_target_analytics(current_user, root_id, target_id):
-    """Return analytics (contributing instances + progress summary) for a target.
-
-    `since=all` returns the full activity history; `since=creation` (default)
-    bounds instances to the target's effective start.
-    """
-    since = 'all' if request.args.get('since') == 'all' else 'creation'
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.get_target_analytics(root_id, target_id, current_user.id, since=since)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error fetching target analytics")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/<root_id>/goals/<goal_id>/activities/<activity_id>/instances', methods=['GET'])
-@token_required
-def get_goal_activity_instances(current_user, root_id, goal_id, activity_id):
-    """Return contributing completed instances + activity definition for a
-    goal/activity pair. Powers the live target-builder graph preview before a
-    target is saved."""
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.get_goal_activity_instances(root_id, goal_id, activity_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error fetching goal activity instances")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()
@@ -309,7 +191,7 @@ def get_goal_metrics(current_user, goal_id: str):
     """Get calculated metrics for a goal (direct and recursive)."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         payload, error, status = service.get_goal_metrics(goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -328,7 +210,7 @@ def get_goal_daily_durations(current_user, goal_id: str):
     """Get daily duration metrics for a goal (recursive)."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         payload, error, status = service.get_goal_daily_durations(goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -349,7 +231,7 @@ def update_goal_completion_endpoint(current_user, goal_id: str, root_id=None, va
     """Update goal completion status."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.update_goal_completion(
             goal_id,
             current_user.id,
@@ -380,7 +262,7 @@ def get_all_fractals(current_user):
     """Get all fractals (root goals) for the selection page, filtered by user."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         fractals, _, _ = service.list_fractals(current_user.id)
         return jsonify(fractals)
     finally:
@@ -395,7 +277,7 @@ def create_fractal(current_user, validated_data):
     """Create a new fractal (root goal) owned by current user."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         new_fractal, error, status = service.create_fractal(current_user.id, validated_data)
         if error:
             return jsonify({"error": error}), status
@@ -415,7 +297,7 @@ def delete_fractal(current_user, root_id):
     """Delete an entire fractal if owned by user."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         result, error, status = service.delete_fractal(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -435,7 +317,7 @@ def get_fractal_goals(current_user, root_id):
     """Get the complete goal tree for a specific fractal if owned by user."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         root, error, status = service.get_fractal_tree(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -458,7 +340,7 @@ def get_active_goals_for_selection(current_user, root_id):
     """
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         result, error, status = service.get_active_goals_for_selection(root_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -479,13 +361,11 @@ def create_fractal_goal(current_user, root_id, validated_data):
     """Create a new goal within a fractal."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         new_goal, error, status = service.create_fractal_goal(root_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
-
-        # Return the created goal
-        return jsonify(serialize_goal(new_goal, include_children=False)), 201
+            return error_response(error, status)
+        return goal_response(db_session, new_goal, 201, check_pending=True)
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -502,7 +382,7 @@ def get_fractal_goal(current_user, root_id, goal_id):
     db_session = get_db_session()
     try:
         include_children = request.args.get('include_children', 'true').lower() not in ('false', '0', 'no')
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.get_fractal_goal(
             root_id,
             goal_id,
@@ -523,8 +403,9 @@ def delete_fractal_goal(current_user, root_id, goal_id):
     """Delete a goal within a fractal."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        goal, error, status = service.delete_fractal_goal(root_id, goal_id, current_user.id)
+        service = GoalService(db_session)
+        begin_next = request.args.get('begin_next', 'true').lower() not in ('false', '0', 'no')
+        goal, error, status = service.delete_fractal_goal(root_id, goal_id, current_user.id, begin_next=begin_next)
         if error:
             return jsonify({"error": error}), status
 
@@ -546,12 +427,12 @@ def update_fractal_goal(current_user, root_id, goal_id, validated_data):
     db_session = get_db_session()
     try:
         data = validated_data
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.update_fractal_goal(root_id, goal_id, current_user.id, data)
         if error:
-            return jsonify({"error": error}), status
-
-        return jsonify(serialize_goal(goal, include_children=False)), status
+            return error_response(error, status)
+        check_pending = bool({'completion_condition', 'condition', 'started_at', 'deadline'} & set(data))
+        return goal_response(db_session, goal, status, check_pending=check_pending)
         
     except SQLAlchemyError:
         db_session.rollback()
@@ -598,58 +479,6 @@ def get_goal_analytics(current_user, root_id):
 
 
 # ============================================================================
-# TARGET EVALUATION ENDPOINTS
-# ============================================================================
-
-@goals_bp.route('/<root_id>/goals/<goal_id>/evaluate-targets', methods=['POST'])
-@token_required
-@validate_request(GoalTargetEvaluationSchema)
-def evaluate_goal_targets(current_user, root_id, goal_id, validated_data):
-    """
-    Evaluate targets for a goal against a session's activity instances.
-    
-    This is called when a session is completed. It:
-    1. Fetches the session's activity instances with their metrics
-    2. Evaluates each target against the activity instances
-    3. Persists target completion status (completed, completed_at, completed_session_id)
-    4. Auto-completes the goal if ALL targets are met
-    
-    Request body:
-    {
-        "session_id": "uuid of the session"
-    }
-    
-    Returns:
-    {
-        "goal": {...},  // Updated goal data
-        "targets_evaluated": int,
-        "targets_completed": int,
-        "newly_completed_targets": [...],  // Targets that were just completed
-        "goal_completed": bool  // Whether the goal was auto-completed
-    }
-    """
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
-        payload, error, status = service.evaluate_goal_targets(
-            root_id,
-            goal_id,
-            current_user.id,
-            validated_data['session_id'],
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-        
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error evaluating targets")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-# ============================================================================
 # GOAL OPTIONS ENDPOINTS
 # ============================================================================
 
@@ -659,7 +488,7 @@ def copy_goal_endpoint(current_user, root_id: str, goal_id: str):
     """Create a copy of an existing goal."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.copy_goal(root_id, goal_id, current_user.id)
         if error:
             return jsonify({"error": error}), status
@@ -679,7 +508,7 @@ def pause_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data
     """Toggle paused state on a goal."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.toggle_pause(
             root_id,
             goal_id,
@@ -704,7 +533,7 @@ def get_eligible_move_parents(current_user, root_id: str, goal_id: str):
     db_session = get_db_session()
     try:
         search = request.args.get('search', '').strip() or None
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         result, error, status = service.get_eligible_move_parents(
             root_id, goal_id, current_user.id, search=search
         )
@@ -722,7 +551,7 @@ def move_goal_endpoint(current_user, root_id: str, goal_id: str, validated_data)
     """Move a goal to a new parent."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         _, root_error = service._validate_owned_root(root_id, current_user.id)
         if root_error:
             error, status = root_error
@@ -776,7 +605,7 @@ def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, valida
     """Convert a goal to a different level."""
     db_session = get_db_session()
     try:
-        service = GoalService(db_session, sync_targets=_sync_targets)
+        service = GoalService(db_session)
         goal, error, status = service.convert_goal_level(
             root_id,
             goal_id,
@@ -796,3 +625,7 @@ def convert_goal_level_endpoint(current_user, root_id: str, goal_id: str, valida
 
 # History routes share this blueprint while keeping the mutation module bounded.
 register_goal_history_routes(goals_bp)
+register_goal_condition_routes(goals_bp)
+register_goal_sequence_routes(goals_bp)
+register_goal_review_routes(goals_bp)
+register_goal_chart_routes(goals_bp)

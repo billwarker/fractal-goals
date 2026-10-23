@@ -1,7 +1,7 @@
 /**
  * SessionCardExpanded - Full session card with all details
  * 
- * Displays session header, goals, targets achieved, and sections/activities.
+ * Displays session header, goals completed, and sections/activities.
  * This is the main session card component for the Sessions page.
  * Optimized with React.memo for list rendering performance.
  */

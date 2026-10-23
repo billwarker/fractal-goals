@@ -24,6 +24,8 @@ export default function PlanGoalHierarchyPanel({
     onGoalScopeToggle,
     onGoalClick,
     onEditDayGoals = null,
+    onStartSubGoalCreation = null,
+    justCreatedGoalId = null,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon, getLevelByName } = useGoalLevels();
     const selectedActivityId = activePlan?.selectedActivityId || null;
@@ -93,6 +95,8 @@ export default function PlanGoalHierarchyPanel({
                 {...highlights}
                 adjustScopeLabel="Edit day goals"
                 onAdjustScope={onEditDayGoals || undefined}
+                onStartSubGoalCreation={canScope && onStartSubGoalCreation ? onStartSubGoalCreation : undefined}
+                justCreatedGoalId={justCreatedGoalId}
             />
             {sessionHierarchy.length === 0 ? (
                 <p className={sessionStyles.emptyState}>

@@ -1,0 +1,165 @@
+.editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.conditionTabs,
+.kindTabs {
+    --view-toggle-panel-bg: var(--color-bg-card-alt);
+}
+
+.hint {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+.subtle {
+    margin: 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    font-style: italic;
+}
+
+.threshold {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    padding: 12px;
+    background: var(--color-bg-card-alt);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+}
+
+.measureRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.measureOption {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.measureDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.rules {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs, 6px);
+}
+
+.countRow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+}
+
+.countInput {
+    width: 72px;
+}
+
+.ruleRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) 64px minmax(0, 1fr) 28px;
+    align-items: center;
+    gap: 8px;
+}
+
+.valueField {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.unit {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+.removeRule {
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+}
+
+.removeRule:hover {
+    color: var(--color-brand-danger);
+    border-color: var(--color-brand-danger);
+}
+
+.removeRulePlaceholder {
+    width: 28px;
+}
+
+.ruleError {
+    grid-column: 1 / -1;
+    color: var(--color-brand-danger);
+    font-size: 12px;
+}
+
+.addRule {
+    align-self: flex-start;
+    padding: 4px 0;
+    border: none;
+    background: none;
+    color: var(--goal-edit-accent, var(--color-brand-primary));
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.totalRow {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+}
+
+.totalLabel {
+    font-size: var(--font-size-sm);
+}
+
+.totalRow .error {
+    grid-column: 1 / -1;
+}
+
+.error {
+    color: var(--color-brand-danger);
+    font-size: 12px;
+}
+
+.preview {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 55%, var(--color-border));
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+}
+
+@media (max-width: 480px) {
+    .ruleRow {
+        grid-template-columns: minmax(0, 1fr) 64px 28px;
+    }
+
+    .ruleRow .valueField {
+        grid-column: 1 / 3;
+    }
+}

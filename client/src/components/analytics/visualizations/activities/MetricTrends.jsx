@@ -1,8 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { goalLineAnnotations } from '../../../../utils/goalConditionLines';
+import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
+import CompactChartFrame from '../../CompactChartFrame';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
+import useActiveChartPoint from '../../useActiveChartPoint';
 
 const palette = ['#3b82f6', '#22c55e'];
 
@@ -18,39 +22,19 @@ function formatInstanceLabel(instance, index) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function coerceNumber(value) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : null;
+/** The pseudo-metric for the activity's yield (the product of its multiplicative metrics). */
+export const YIELD_METRIC_ID = 'yield';
+const YIELD_METRIC = { id: YIELD_METRIC_ID, name: 'Yield', unit: '', higher_is_better: true };
+
+/** The activity's yield metric ids: from the payload when present, else derived like the server. */
+export function activityYieldIds(activity) {
+    return activity?.yield_metric_ids || yieldMetricIds(activity);
 }
 
-function metricId(metric) {
-    return metric?.metric_id || metric?.metric_definition_id || null;
-}
-
-function getMetricValuesFromMetricList(metrics = [], selectedMetricId, selectedSplit = 'all') {
-    return (Array.isArray(metrics) ? metrics : [])
-        .filter((metric) => metricId(metric) === selectedMetricId)
-        .filter((metric) => selectedSplit === 'all' || !metric.split_id || metric.split_id === selectedSplit)
-        .map((metric) => coerceNumber(metric.value))
-        .filter((value) => value != null);
-}
-
-function getMetricValues(instance, selectedMetricId, selectedSplit = 'all') {
-    const directValues = getMetricValuesFromMetricList(instance?.metrics || instance?.metric_values || [], selectedMetricId, selectedSplit);
-    const setValues = (Array.isArray(instance?.sets) ? instance.sets : [])
-        .flatMap((set) => getMetricValuesFromMetricList(set?.metrics || [], selectedMetricId, selectedSplit));
-    return [...directValues, ...setValues];
-}
-
-function resolveMetricValue(instance, metricDef, setsHandling = 'top', selectedSplit = 'all') {
-    const values = getMetricValues(instance, metricDef?.id, selectedSplit);
-    if (!values.length) return null;
-    if (setsHandling === 'average') {
-        return values.reduce((sum, value) => sum + value, 0) / values.length;
-    }
-    return metricDef?.higher_is_better === false
-        ? Math.min(...values)
-        : Math.max(...values);
+/** One plotted value per instance: a metric's top set or average, or the yield (top, average, total). */
+function resolveValue(instance, metric, setsHandling, selectedSplit, yieldIds) {
+    if (metric.id === YIELD_METRIC_ID) return aggregateYield(instance, yieldIds, setsHandling);
+    return aggregateMetric(instance, metric, setsHandling === 'average' ? 'average' : 'top', selectedSplit);
 }
 
 function EmptyMetricTrends({ children = 'Metric trends appear once the selected activity has metric values.' }) {
@@ -72,12 +56,13 @@ function buildYAxis(metric, index, chartTheme) {
     };
 }
 
-export function getSelectedMetricDefs(metricDefinitions = [], selectedMetrics = []) {
+export function getSelectedMetricDefs(metricDefinitions = [], selectedMetrics = [], yieldIds = []) {
+    const candidates = yieldIds.length >= 2 ? [...metricDefinitions, YIELD_METRIC] : metricDefinitions;
     const metricIds = selectedMetrics.filter(Boolean);
     const fallbackIds = metricDefinitions.slice(0, 2).map((metric) => metric.id);
     const ids = (metricIds.length ? metricIds : fallbackIds).slice(0, 2);
     return ids
-        .map((id) => metricDefinitions.find((metric) => metric.id === id))
+        .map((id) => candidates.find((metric) => metric.id === id))
         .filter(Boolean);
 }
 
@@ -87,29 +72,35 @@ export function buildMetricTrendData({
     selectedMetrics = [],
     setsHandling = 'top',
     selectedSplit = 'all',
+    yieldIds = [],
+    highlightInstanceId = null,
 }) {
     const sortedInstances = [...instances].sort((a, b) => {
         const aDate = getInstanceDate(a);
         const bDate = getInstanceDate(b);
         return (aDate?.getTime() || 0) - (bDate?.getTime() || 0);
     });
-    const selectedMetricDefs = getSelectedMetricDefs(metricDefinitions, selectedMetrics);
+    const selectedMetricDefs = getSelectedMetricDefs(metricDefinitions, selectedMetrics, yieldIds);
+    const instanceIds = sortedInstances.map((instance) => instance.id);
     const labels = sortedInstances.map(formatInstanceLabel);
     const datasets = selectedMetricDefs.map((metric, index) => ({
         type: 'line',
         label: metric.name,
-        data: sortedInstances.map((instance) => resolveMetricValue(instance, metric, setsHandling, selectedSplit)),
+        metricId: metric.id, // read by the chart's "Set goal here…" menu
+        data: sortedInstances.map((instance) => resolveValue(instance, metric, setsHandling, selectedSplit, yieldIds)),
         borderColor: palette[index],
         backgroundColor: `${palette[index]}33`,
         borderWidth: 2,
-        pointRadius: 3,
-        pointHoverRadius: 4,
+        // The highlighted instance (e.g. the session being edited) stands out.
+        pointRadius: highlightInstanceId ? instanceIds.map((id) => (id === highlightInstanceId ? 5 : 3)) : 3,
+        pointHoverRadius: 6,
+        pointHoverBorderWidth: 2,
         spanGaps: true,
         tension: 0.2,
         yAxisID: `metric${index + 1}`,
     })).filter((dataset) => dataset.data.some((value) => value != null));
 
-    return { labels, datasets, selectedMetricDefs };
+    return { labels, datasets, selectedMetricDefs, instanceIds };
 }
 
 export function MetricTrendsChart({
@@ -119,28 +110,57 @@ export function MetricTrendsChart({
     metrics = [],
     setsHandling = 'top',
     selectedSplit = 'all',
+    goalLines = [],
+    highlightInstanceId = null,
+    hoverInstanceId = null,
+    hideTitle = false,
 }) {
+    const ownChartRef = useRef(null);
+    // Ours for the hover highlight, and the caller's (Analytics' chart menu) too.
+    const setChartRef = useCallback((chart) => {
+        ownChartRef.current = chart;
+        if (chartRef) chartRef.current = chart;
+    }, [chartRef]);
     const metricDefinitions = useMemo(() => activity?.metric_definitions || [], [activity?.metric_definitions]);
+    const yieldIds = useMemo(() => activityYieldIds(activity), [activity]);
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
+    // Compact charts plot only the first selected metric; the caption says what else there is.
+    const selectedDefs = useMemo(() => getSelectedMetricDefs(metricDefinitions, metrics, yieldIds), [metricDefinitions, metrics, yieldIds]);
+    const shownMetrics = useMemo(() => (
+        density === 'compact' && selectedDefs.length > 1 ? [selectedDefs[0].id] : metrics
+    ), [density, metrics, selectedDefs]);
     const chartData = useMemo(() => buildMetricTrendData({
         instances: activity ? activityInstances[activity.id] || [] : [],
         metricDefinitions,
-        selectedMetrics: metrics,
+        selectedMetrics: shownMetrics,
         setsHandling,
         selectedSplit,
-    }), [activity, activityInstances, metricDefinitions, metrics, selectedSplit, setsHandling]);
+        yieldIds,
+        highlightInstanceId,
+    }), [activity, activityInstances, highlightInstanceId, metricDefinitions, shownMetrics, selectedSplit, setsHandling, yieldIds]);
+    // A session hovered elsewhere becomes the active point on each line.
+    const hoverIndex = hoverInstanceId ? chartData.instanceIds.indexOf(hoverInstanceId) : -1;
+    useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : chartData.datasets
+        .map((dataset, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: dataset.data[hoverIndex] }))
+        .filter((element) => element.value != null), { tooltip: density !== 'compact' });
+    const hiddenCount = selectedDefs.length - chartData.selectedMetricDefs.length;
+    const caption = density === 'compact' && chartData.selectedMetricDefs[0]
+        ? `${chartData.selectedMetricDefs[0].name} · ${chartData.labels.length} session${chartData.labels.length === 1 ? '' : 's'}${hiddenCount > 0 ? ` · +${hiddenCount} more` : ''}`
+        : null;
 
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
 
     return (
+        <CompactChartFrame caption={caption}>
         <Line
-            ref={chartRef}
+            ref={setChartRef}
             data={{
                 labels: chartData.labels,
                 datasets: chartData.datasets,
             }}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -151,7 +171,12 @@ export function MetricTrendsChart({
                         position: 'top',
                         labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
                     },
-                    title: { display: true, text: 'Metric Trends', color: chartTheme.textColor },
+                    title: { display: !hideTitle, text: 'Metric Trends', color: chartTheme.textColor },
+                    annotation: {
+                        annotations: goalLineAnnotations(goalLines, Object.fromEntries(
+                            chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]),
+                        )),
+                    },
                     tooltip: {
                         backgroundColor: chartTheme.tooltipBg,
                         titleColor: chartTheme.tooltipText,
@@ -169,7 +194,8 @@ export function MetricTrendsChart({
                         buildYAxis(metric, index, chartTheme),
                     ])),
                 },
-            }}
+            }, density)}
         />
+        </CompactChartFrame>
     );
 }

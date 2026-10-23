@@ -6,11 +6,11 @@ import pytest
 from models import (
     ActivityInstance,
     ActivitySet,
+    Goal,
     GoalLevel,
     GoalPauseInterval,
     MetricValue,
     Session,
-    Target,
     activity_goal_associations,
 )
 
@@ -36,7 +36,7 @@ def timeline_read_mode(request, monkeypatch):
 
 @pytest.mark.integration
 class TestGoalTimelineApi:
-    def test_timeline_includes_child_activity_completion_and_target(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):
+    def test_timeline_includes_child_activity_completion_and_descendant_milestones(self, authed_client, db_session, sample_goal_hierarchy, sample_activity_definition):
         root_id = sample_goal_hierarchy['ultimate'].id
         parent_goal = sample_goal_hierarchy['mid_term']
         child_goal = sample_goal_hierarchy['short_term']
@@ -82,29 +82,29 @@ class TestGoalTimelineApi:
             metric_definition_id=sample_activity_definition.metric_definitions[0].id,
             value=135,
         )
-        target = Target(
+        milestone = Goal(
             id=str(uuid.uuid4()),
             root_id=root_id,
-            goal_id=child_goal.id,
-            activity_id=sample_activity_definition.id,
+            parent_id=child_goal.id,
+            owner_id=sample_goal_hierarchy['ultimate'].owner_id,
             name='First clean rep',
             completed=True,
+            completion_source='condition',
             completed_at=datetime.now(timezone.utc),
             created_at=datetime.now(timezone.utc),
         )
-        db_session.add_all([session, instance, activity_set, metric_value, target])
+        db_session.add_all([session, instance, activity_set, metric_value, milestone])
         db_session.commit()
 
         response = authed_client.get(
-            f'/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,target'
+            f'/api/{root_id}/goals/{parent_goal.id}/timeline?types=activity,child_goal'
         )
 
         assert response.status_code == 200
         entries = response.get_json()['entries']
         assert any(entry['event_type'] == 'activity.completed' and entry['entity_id'] == instance.id for entry in entries)
         assert any(entry['event_type'] == 'activity.associated' and entry['entity_id'] == sample_activity_definition.id for entry in entries)
-        assert any(entry['event_type'] == 'target.created' and entry['entity_id'] == target.id for entry in entries)
-        assert any(entry['event_type'] == 'target.achieved' and entry['entity_id'] == target.id for entry in entries)
+        assert any(entry['event_type'] == 'goal.completed' and entry['entity_id'] == milestone.id for entry in entries)
         activity_entry = next(entry for entry in entries if entry['entity_id'] == instance.id)
         assert activity_entry['type'] == 'activity'
         assert activity_entry['relationship'] == 'descendant'
@@ -295,7 +295,6 @@ class TestGoalTimelineApi:
         )
         child_goal.level_id = system_short_level.id
         child_goal.description = 'Specific child goal'
-        child_goal.relevance_statement = 'Relevant child goal'
         child_goal.track_activities = False
         child_goal.completed = False
         child_goal.manually_uncompleted_at = datetime(2026, 7, 7, 13, 1, tzinfo=timezone.utc)

@@ -11,9 +11,11 @@ import {
     getGoalNodeType,
 } from '../../utils/goalNodeModel';
 import notify from '../../utils/notify';
+import GoalDeleteConfirmSubView from './GoalDeleteConfirmSubView';
 import GoalHierarchyList from './GoalHierarchyList';
+import GoalSequenceSubView, { sequenceCandidates } from './GoalSequenceSubView';
+import GoalConvertSubView from './GoalConvertSubView';
 import GoalIcon from '../atoms/GoalIcon';
-import { getTypeDisplayName } from '../../utils/goalHelpers';
 import styles from '../GoalDetailModal.module.css';
 
 const toId = (value) => (value == null ? null : String(value));
@@ -42,6 +44,9 @@ function GoalOptionsView({
     onDelete,
     onClose,
     displayMode,
+    onSequencingChange,
+    programScope,
+    registerFooterAction,
 }) {
     const {
         goalLevels = [],
@@ -190,7 +195,7 @@ function GoalOptionsView({
         );
     }
 
-    const handleDelete = () => {
+    const handleDelete = (deleteOptions = {}) => {
         if (!onDelete) {
             return;
         }
@@ -198,8 +203,43 @@ function GoalOptionsView({
         if (displayMode === 'modal' && onClose) {
             onClose();
         }
-        onDelete(goal);
+        onDelete(goal, deleteOptions);
     };
+
+    if (subView === 'delete') {
+        return (
+            <GoalDeleteConfirmSubView
+                rootId={rootId}
+                goal={goal}
+                goalId={goalId}
+                childCount={((treeData && findGoalNodeById(treeData, goalId))?.children || goal?.children || []).length}
+                onBack={() => setSubView('main')}
+                onConfirm={handleDelete}
+            />
+        );
+    }
+
+    if (subView === 'sequence') {
+        return (
+            <GoalSequenceSubView
+                rootId={rootId}
+                goal={goal}
+                goalId={goalId}
+                treeData={treeData}
+                onSequencingChange={onSequencingChange}
+                programScope={programScope}
+                registerFooterAction={registerFooterAction}
+                onBack={() => setSubView('main')}
+                onDone={() => {
+                    setSubView('main');
+                    setViewState('goal');
+                }}
+            />
+        );
+    }
+
+    const sequencePosition = goal?.sequence_position ?? goal?.attributes?.sequence_position;
+    const sequenceSiblingCount = sequenceCandidates(treeData, goal, goalId).length - 1;
 
     const options = [
         {
@@ -223,6 +263,16 @@ function GoalOptionsView({
             description: 'Choose any eligible parent from the hierarchy.',
             onClick: () => setSubView('move'),
         },
+        {
+            label: 'Sequence',
+            description: sequencePosition
+                ? `Step ${sequencePosition} of a sequence. Reorder it or change its steps.`
+                : sequenceSiblingCount > 0
+                    ? 'Order this goal with same-level siblings so each begins when the one before completes.'
+                    : 'No sibling goals at this level to sequence with.',
+            onClick: () => setSubView('sequence'),
+            disabled: !sequencePosition && sequenceSiblingCount < 1,
+        },
         convertState.isConvertible ? {
             label: 'Convert Level',
             description: convertState.eligibleLevels.length > 0
@@ -234,7 +284,7 @@ function GoalOptionsView({
         {
             label: 'Delete Goal',
             description: 'Remove this goal and its descendants.',
-            onClick: handleDelete,
+            onClick: () => setSubView('delete'),
             disabled: !onDelete,
             borderColor: '#d32f2f',
             textColor: '#d32f2f',
@@ -394,123 +444,6 @@ function GoalMoveSubView({
                 >
                     {loading ? 'Moving...' : 'Confirm Move'}
                 </button>
-            )}
-        </div>
-    );
-}
-
-function GoalConvertSubView({
-    currentLevelId,
-    eligibleLevels,
-    loading,
-    getGoalColor,
-    getGoalSecondaryColor,
-    getGoalIcon,
-    onBack,
-    onSelect,
-}) {
-    const [pendingLevelId, setPendingLevelId] = useState(null);
-
-    const pendingLevel = pendingLevelId
-        ? eligibleLevels.find((l) => l.id === pendingLevelId)
-        : null;
-
-    if (pendingLevel) {
-        const canonicalType = toCanonicalType(pendingLevel.name);
-        const color = getGoalColor(canonicalType);
-        const secondaryColor = getGoalSecondaryColor(canonicalType);
-        const icon = getGoalIcon(canonicalType);
-        return (
-            <div className={styles.optionsSubView}>
-                <button
-                    type="button"
-                    onClick={() => setPendingLevelId(null)}
-                    className={styles.optionsBackButton}
-                >
-                    ← Back
-                </button>
-                <div className={styles.optionsSectionHeader}>Confirm Conversion</div>
-                <div className={styles.optionsSectionHint}>
-                    This will change the goal&apos;s level. Any children will remain at their current levels.
-                </div>
-                <div className={styles.levelPickerGrid} style={{ marginTop: 8 }}>
-                    <button
-                        type="button"
-                        disabled
-                        className={styles.levelPickerOption}
-                        style={{ borderColor: color, color, opacity: 1, cursor: 'default' }}
-                    >
-                        <GoalIcon shape={icon} color={color} secondaryColor={secondaryColor} size={20} />
-                        {getTypeDisplayName(canonicalType)}
-                    </button>
-                </div>
-                <button
-                    type="button"
-                    onClick={() => onSelect(pendingLevelId)}
-                    disabled={loading}
-                    className={styles.btnAction}
-                    style={{
-                        marginTop: 12,
-                        background: color,
-                        color: 'white',
-                        border: 'none',
-                        fontWeight: 'bold',
-                        opacity: loading ? 0.6 : 1,
-                    }}
-                >
-                    {loading ? 'Converting...' : 'Confirm Convert'}
-                </button>
-            </div>
-        );
-    }
-
-    return (
-        <div className={styles.optionsSubView}>
-            <button
-                type="button"
-                onClick={onBack}
-                className={styles.optionsBackButton}
-            >
-                ← Back
-            </button>
-
-            <div className={styles.optionsSectionHeader}>Convert Level</div>
-            <div className={styles.optionsSectionHint}>
-                Compatible levels only. The fractal root tier is excluded.
-            </div>
-
-            {eligibleLevels.length === 0 ? (
-                <div className={styles.optionsEmptyState}>
-                    No compatible level conversions are available right now.
-                </div>
-            ) : (
-                <div className={styles.levelPickerGrid}>
-                    {eligibleLevels.map((level) => {
-                        const isCurrent = level.id === currentLevelId;
-                        const canonicalType = toCanonicalType(level.name);
-                        const color = getGoalColor(canonicalType);
-                        const secondaryColor = getGoalSecondaryColor(canonicalType);
-                        const icon = getGoalIcon(canonicalType);
-                        return (
-                            <button
-                                key={level.id}
-                                type="button"
-                                onClick={() => setPendingLevelId(level.id)}
-                                disabled={loading || isCurrent}
-                                className={styles.levelPickerOption}
-                                style={{
-                                    borderColor: color,
-                                    color: color,
-                                    opacity: loading || isCurrent ? 0.5 : 1,
-                                    cursor: isCurrent ? 'default' : 'pointer',
-                                }}
-                            >
-                                <GoalIcon shape={icon} color={color} secondaryColor={secondaryColor} size={20} />
-                                {getTypeDisplayName(canonicalType)}
-                            </button>
-                        );
-                    })}
-                </div>
             )}
         </div>
     );

@@ -4,6 +4,8 @@ import { createPortal } from 'react-dom';
 import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import { canonicalTagName, findTagByName } from '../../utils/tagNames';
+import { groupTagsForPicker } from '../../utils/tagPickerOptions';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import CloseButton from '../atoms/CloseButton';
@@ -17,7 +19,8 @@ function CircuitScopeTagEditor({
     className = '',
     scopeLabel,
     tags = [],
-    availableTags = [],
+    // The fractal tag catalog ({families, tags}); any tag can scope any circuit.
+    availableTags = null,
     disabled = false,
     editable = true,
     triggerFirst = false,
@@ -30,25 +33,20 @@ function CircuitScopeTagEditor({
     const [color, setColor] = useState(DEFAULT_TAG_COLOR);
     const [search, setSearch] = useState('');
     const [isSaving, setIsSaving] = useState(false);
-    const selectedNames = useMemo(
-        () => new Set(tags.map((tag) => tag.name.toLocaleLowerCase())),
-        [tags],
-    );
-    const logicalTags = useMemo(() => {
-        const byDefinition = new Map();
-        availableTags.forEach((tag) => {
-            const key = tag.definition_id || tag.name.toLocaleLowerCase();
-            if (!tag.archived && !byDefinition.has(key)) byDefinition.set(key, tag);
-        });
+    const selectedIds = useMemo(() => new Set(tags.map((tag) => tag.definition_id)), [tags]);
+    const catalogTags = useMemo(() => {
+        const byId = new Map((availableTags?.tags || []).map((tag) => [tag.id, tag]));
         tags.forEach((tag) => {
-            const key = tag.definition_id || tag.name.toLocaleLowerCase();
-            if (!byDefinition.has(key)) byDefinition.set(key, tag);
+            if (!byId.has(tag.definition_id)) byId.set(tag.definition_id, { id: tag.definition_id, name: tag.name, color: tag.color });
         });
-        return [...byDefinition.values()].sort((left, right) => left.name.localeCompare(right.name));
+        return [...byId.values()];
     }, [availableTags, tags]);
-    const filtered = logicalTags.filter((tag) => tag.name.toLocaleLowerCase().includes(
-        search.trim().toLocaleLowerCase(),
-    ));
+    const groups = useMemo(() => groupTagsForPicker(
+        { families: availableTags?.families || [], tags: catalogTags },
+        { keepIds: selectedIds, search },
+    ), [availableTags, catalogTags, search, selectedIds]);
+    const assignableCount = catalogTags.filter((tag) => !tag.archived).length;
+    const nameMatch = findTagByName(catalogTags, name);
     const tagOverflow = useTagCountOverflow(tags, editable);
 
     useAnchoredPortalPosition({
@@ -198,7 +196,7 @@ function CircuitScopeTagEditor({
                             onClick={() => close()}
                         />
                     </div>
-                    {logicalTags.length > 5 && (
+                    {assignableCount > 5 && (
                         <input
                             className={styles.pickerSearch}
                             type="search"
@@ -209,27 +207,33 @@ function CircuitScopeTagEditor({
                         />
                     )}
                     <div className={styles.pickerOptions}>
-                        {filtered.length ? filtered.map((tag) => {
-                            const selected = tag.definition_id
-                                ? tags.some((assigned) => assigned.definition_id === tag.definition_id)
-                                : selectedNames.has(tag.name.toLocaleLowerCase());
-                            return (
-                                <label
-                                    key={tag.definition_id || tag.id || tag.name}
-                                    className={styles.pickerOption}
-                                    style={tag.color ? { '--tag-color': tag.color } : undefined}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        disabled={disabled || isSaving}
-                                        onChange={() => void persist(tag.name, !selected, tag.color, tag.definition_id)}
-                                    />
-                                    <span className={styles.pickerOptionDot} aria-hidden="true" />
-                                    <span>{tag.name}</span>
-                                </label>
-                            );
-                        }) : <span className={styles.pickerEmpty}>No matching tags</span>}
+                        {groups.length ? groups.map((group) => (
+                            <section key={group.key} className={styles.pickerGroup} aria-label={group.label}>
+                                <h4>
+                                    {group.label}
+                                    {group.singleSelect ? <span className={styles.pickOne}>Single select · replaces its sibling</span> : null}
+                                </h4>
+                                {group.tags.map((tag) => {
+                                    const selected = selectedIds.has(tag.id);
+                                    return (
+                                        <label
+                                            key={tag.id}
+                                            className={styles.pickerOption}
+                                            style={tag.color ? { '--tag-color': tag.color } : undefined}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selected}
+                                                disabled={disabled || isSaving}
+                                                onChange={() => void persist(tag.name, !selected, tag.color, tag.id)}
+                                            />
+                                            <span className={styles.pickerOptionDot} aria-hidden="true" />
+                                            <span>{tag.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </section>
+                        )) : <span className={styles.pickerEmpty}>{search ? 'No matching tags' : 'No existing tags'}</span>}
                     </div>
                     <div className={styles.creator}>
                         <input
@@ -238,7 +242,7 @@ function CircuitScopeTagEditor({
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             onKeyDown={(event) => {
-                                if (event.key === 'Enter' && name.trim()) void persist(name.trim(), true, color);
+                                if (event.key === 'Enter' && canonicalTagName(name)) void persist(canonicalTagName(name), true, color, nameMatch?.id);
                             }}
                         />
                         <input
@@ -250,12 +254,19 @@ function CircuitScopeTagEditor({
                         />
                         <Button
                             size="sm"
-                            disabled={!name.trim() || disabled || isSaving}
-                            onClick={() => void persist(name.trim(), true, color)}
+                            disabled={!canonicalTagName(name) || disabled || isSaving || Boolean(nameMatch?.archived)}
+                            onClick={() => void persist(canonicalTagName(name), true, color, nameMatch?.id)}
                         >
-                            Create
+                            {nameMatch ? 'Add' : 'Create'}
                         </Button>
                     </div>
+                    {nameMatch ? (
+                        <p className={styles.creatorHint} role="status">
+                            {nameMatch.archived
+                                ? `“${nameMatch.name}” is archived. Restore it from Manage Tags to use it again.`
+                                : `“${nameMatch.name}” already exists and will be added.`}
+                        </p>
+                    ) : null}
                 </div>,
                 document.body,
             )}

@@ -7,8 +7,7 @@ import {
     getGoalNodeCategory,
     isExecutionGoalNode,
     normalizeGoalNode,
-    getGoalTargetsSignature,
-    parseGoalTargets,
+    getGoalConditionSignature,
 } from '../goalNodeModel';
 
 describe('goalNodeModel', () => {
@@ -25,7 +24,9 @@ describe('goalNodeModel', () => {
                 completed: true,
                 created_at: '2026-03-01T00:00:00Z',
                 completed_at: '2026-03-02T00:00:00Z',
-                targets: JSON.stringify([{ id: 'target-1' }]),
+                completion_condition: 'activity_threshold',
+                condition: { id: 'condition-1', kind: 'single_session' },
+                started_at: '2026-03-01T00:00:00Z',
             },
             children: [{ id: 'child-1', type: 'ShortTermGoal', children: [] }],
         };
@@ -42,7 +43,9 @@ describe('goalNodeModel', () => {
             activity_definition_id: 'activity-1',
             parent_id: 'parent-1',
             childrenIds: ['child-1'],
-            targets: [{ id: 'target-1' }],
+            completion_condition: 'activity_threshold',
+            condition: { id: 'condition-1', kind: 'single_session' },
+            started_at: '2026-03-01T00:00:00Z',
         }));
     });
 
@@ -86,50 +89,46 @@ describe('goalNodeModel', () => {
         expect(isExecutionGoalNode({ type: 'UltimateGoal' })).toBe(false);
     });
 
-    it('finds nodes by canonical goal id and safely parses target payloads', () => {
+    it('finds nodes by canonical goal id and defaults missing conditions to manual', () => {
         const tree = {
             id: 'root',
             children: [
                 {
                     id: 'child',
-                    attributes: {
-                        type: 'ShortTermGoal',
-                        targets: 'not-json',
-                    },
+                    attributes: { type: 'ShortTermGoal' },
                     children: [],
                 },
             ],
         };
 
         expect(findGoalNodeById(tree, 'child')).toBe(tree.children[0]);
-        expect(parseGoalTargets(tree.children[0])).toEqual([]);
+        expect(normalizeGoalNode(tree.children[0])).toEqual(expect.objectContaining({
+            completion_condition: 'manual',
+            condition: null,
+        }));
     });
 
-    it('builds target signatures from full target content, not only ids', () => {
+    it('builds condition signatures from full condition content, not only ids', () => {
         const baseGoal = {
             id: 'goal-1',
-            targets: [
-                {
-                    id: 'target-1',
-                    name: 'Section 1',
-                    completed: false,
-                    metrics: [{ metric_id: 'speed', value: 80 }],
-                },
-            ],
+            completion_condition: 'activity_threshold',
+            condition: {
+                id: 'condition-1',
+                kind: 'single_session',
+                rules: [{ metric_definition_id: 'speed', operator: '>=', value: 80 }],
+            },
         };
         const editedGoal = {
             ...baseGoal,
-            targets: [
-                {
-                    id: 'target-1',
-                    name: 'Section 1',
-                    completed: false,
-                    metrics: [{ metric_id: 'speed', value: 90 }],
-                },
-            ],
+            condition: {
+                ...baseGoal.condition,
+                rules: [{ metric_definition_id: 'speed', operator: '>=', value: 90 }],
+            },
         };
 
-        expect(getGoalTargetsSignature(baseGoal)).not.toEqual(getGoalTargetsSignature(editedGoal));
+        expect(getGoalConditionSignature(baseGoal)).not.toEqual(getGoalConditionSignature(editedGoal));
+        expect(getGoalConditionSignature({ ...baseGoal, completion_condition: 'manual', condition: null }))
+            .not.toEqual(getGoalConditionSignature(baseGoal));
     });
 
     it('flattens sessionGoalsView into a deduplicated canonical goal list', () => {

@@ -3,9 +3,9 @@
  * 
  * SMART goals are:
  * - Specific: Has a description
- * - Measurable: Has targets attached
+ * - Measurable: Completes on its own (an activity threshold or its child goals)
  * - Achievable: Has activities associated
- * - Relevant: Has relevance statement explaining connection to parent goal
+ * - Reviewed: Reviewed on a cadence (levels that don't review goals count as met)
  * - Time-bound: Has a deadline
  */
 
@@ -14,13 +14,39 @@
  * @param {Object} goal - Goal object with attributes
  * @returns {Object} Status for each SMART criterion
  */
+/**
+ * R: reviews on, with a cadence, and no review due — a due review takes R away until one is
+ * written. Levels that don't review goals, and paused goals (their review clock waits), count as met. While editing, the caller attaches the
+ * level (`review_level`) so on/off and cadence changes show at once; otherwise the server's schedule
+ * is used, with "due" re-checked against today.
+ */
+function isReviewed(goal, attrs) {
+    const review = goal.review ?? attrs.review;
+    const dueNow = Boolean(review?.next_review_on && review.next_review_on.slice(0, 10) <= localToday());
+    const level = goal.review_level ?? attrs.review_level;
+    if (level) {
+        if (!level.uses_reviews) return true;
+        if (goal.review_disabled ?? attrs.review_disabled) return false;
+        if (!((goal.review_cadence_value ?? attrs.review_cadence_value) || level.review_cadence_value)) return false;
+        return !dueNow;
+    }
+    if (!review) return true;
+    if (review.status === 'complete') return true;
+    return (review.status === 'upcoming' || review.status === 'paused') && !dueNow;
+}
+
+function localToday() {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 export function calculateSMARTStatus(goal) {
     if (!goal) {
         return {
             specific: false,
             measurable: false,
             achievable: false,
-            relevant: false,
+            reviewed: false,
             timeBound: false
         };
     }
@@ -29,11 +55,10 @@ export function calculateSMARTStatus(goal) {
 
     // Get values from either attributes or directly
     const description = attrs.description || goal.description || '';
-    const targets = attrs.targets || goal.targets || [];
-    const relevanceStatement = attrs.relevance_statement || goal.relevance_statement || '';
+    const completionCondition = goal.completion_condition ?? attrs.completion_condition ?? 'manual';
     const deadline = attrs.deadline || goal.deadline;
     const associatedActivityIds = attrs.associated_activity_ids || goal.associated_activity_ids || [];
-    const completedViaChildren = attrs.completed_via_children || goal.completed_via_children || false;
+    const completedViaChildren = completionCondition === 'children';
 
     const trackActivities = attrs.track_activities !== undefined ? attrs.track_activities : (goal.track_activities !== undefined ? goal.track_activities : true);
 
@@ -44,16 +69,17 @@ export function calculateSMARTStatus(goal) {
             specific: serverSmartStatus.specific,
             measurable: serverSmartStatus.measurable,
             achievable: serverSmartStatus.achievable,
-            relevant: serverSmartStatus.relevant,
+            // Older published landing snapshots still say `relevant`.
+            reviewed: serverSmartStatus.reviewed ?? serverSmartStatus.relevant,
             timeBound: serverSmartStatus.time_bound
         };
     }
 
     return {
         specific: !!(description && description.trim().length > 0),
-        measurable: !trackActivities || (Array.isArray(targets) && targets.length > 0) || completedViaChildren,
+        measurable: !trackActivities || completionCondition !== 'manual',
         achievable: !trackActivities || (Array.isArray(associatedActivityIds) && associatedActivityIds.length > 0) || completedViaChildren,
-        relevant: !!(relevanceStatement && relevanceStatement.trim().length > 0),
+        reviewed: isReviewed(goal, attrs),
         timeBound: !!deadline
     };
 }
@@ -72,7 +98,7 @@ export function isSMART(goal) {
 
     const status = calculateSMARTStatus(goal);
     return status.specific && status.measurable && status.achievable &&
-        status.relevant && status.timeBound;
+        status.reviewed && status.timeBound;
 }
 
 /**
@@ -97,17 +123,17 @@ export const SMART_CRITERIA = {
     measurable: {
         letter: 'M',
         label: 'Measurable',
-        description: 'Has targets attached'
+        description: 'Completes on an activity threshold or its child goals'
     },
     achievable: {
         letter: 'A',
         label: 'Achievable',
         description: 'Has activities associated'
     },
-    relevant: {
+    reviewed: {
         letter: 'R',
-        label: 'Relevant',
-        description: 'Explains connection to parent goal'
+        label: 'Reviewed',
+        description: 'Reviews are on and up to date'
     },
     timeBound: {
         letter: 'T',

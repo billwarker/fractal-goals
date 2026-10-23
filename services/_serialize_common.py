@@ -2,7 +2,6 @@
 """
 
 from datetime import datetime, timezone, date
-from .goal_domain_rules import goal_uses_child_completion
 
 
 def format_utc(dt):
@@ -26,26 +25,32 @@ def format_utc_precise(dt):
     return normalized.isoformat(timespec='microseconds').replace('+00:00', 'Z')
 
 
+def _is_reviewed(goal):
+    from services.goal_review_rules import is_reviewed
+    return is_reviewed(goal)
+
+
 def calculate_smart_status(goal):
     """Calculate SMART criteria status for a goal."""
-    # Source of truth: relational targets.
-    targets = [t for t in (goal.targets_rel or []) if t.deleted_at is None]
-    
-    # Achievable: has associated activities OR has associated activity groups OR completed via children
+    condition = getattr(goal, 'completion_condition', 'manual')
+    uses_child_completion = condition == 'children'
+
+    # Achievable: has associated activities OR activity groups OR completes via children.
+    # Measurable: completes on its own (an activity threshold or its children).
     if goal.track_activities:
         has_activities = len(goal.associated_activities) > 0 if goal.associated_activities else False
         has_groups = len(goal.associated_activity_groups) > 0 if goal.associated_activity_groups else False
-        uses_child_completion = goal_uses_child_completion(goal)
         is_achievable = has_activities or has_groups or uses_child_completion
-        is_measurable = len(targets) > 0 or uses_child_completion
+        is_measurable = condition in ('activity_threshold', 'children')
     else:
         is_achievable = True
         is_measurable = True
-    
+
     return {
         "specific": bool(goal.description and goal.description.strip()),
         "measurable": is_measurable,
         "achievable": is_achievable,
-        "relevant": bool(goal.relevance_statement and goal.relevance_statement.strip()),
+        # R is Reviewed: reviews on, with a cadence, and none due. Levels that don't review count as met.
+        "reviewed": _is_reviewed(goal),
         "time_bound": goal.deadline is not None
     }

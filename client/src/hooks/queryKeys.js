@@ -9,8 +9,9 @@ export const queryKeys = {
     aiEmbeddedConversations: (rootId) => ['ai-agent', 'embedded-conversations', rootId],
     aiEmbeddedConversation: (conversationId) => ['ai-agent', 'embedded-conversation', conversationId],
     instanceGoalMutation: (rootId, instanceId) => ['instance-goal', rootId, instanceId],
-    targetAnalyticsFractalRoot: (rootId) => ['targetAnalytics', rootId],
-    goalActivityInstancesFractalRoot: (rootId) => ['goalActivityInstances', rootId],
+    goalConditionRoot: (rootId) => ['goalCondition', rootId],
+    goalSequenceRoot: (rootId) => ['goalSequence', rootId],
+    goalSequence: (rootId, goalId) => ['goalSequence', rootId, goalId],
     activities: (rootId) => ['activities', rootId],
     circuitsRoot: (rootId) => ['circuits', rootId],
     circuits: (rootId, includeArchived = false) => ['circuits', rootId, { includeArchived }],
@@ -25,7 +26,7 @@ export const queryKeys = {
         ? ['program-day-read-model', rootId, programId]
         : ['program-day-read-model', rootId],
     // The calendar feed is a root-wide day read model, so every root-level read-model
-    // invalidation (sessions, activities, periods, targets) refreshes it too.
+    // invalidation (sessions, activities, periods, goal conditions) refreshes it too.
     programCalendarFeedRoot: (rootId) => ['program-day-read-model', rootId, 'calendar-feed'],
     programCalendarFeed: (rootId, timezone, month) => [
         'program-day-read-model', rootId, 'calendar-feed', { timezone, month },
@@ -88,10 +89,16 @@ export const queryKeys = {
     goalTimelineRoot: (rootId, goalId) => ['goalTimeline', rootId, goalId],
     goalTimelinesRoot: (rootId) => ['goalTimeline', rootId],
     goalAnalytics: (rootId, options = undefined) => options ? ['goal-analytics', rootId, options] : ['goal-analytics', rootId],
-    targetAnalytics: (rootId, targetId, since = 'creation') => ['targetAnalytics', rootId, targetId, since],
-    targetAnalyticsRoot: (rootId, targetId) => ['targetAnalytics', rootId, targetId],
-    goalActivityInstances: (rootId, goalId, activityId) => ['goalActivityInstances', rootId, goalId, activityId],
-    goalActivityInstancesRoot: (rootId, goalId) => ['goalActivityInstances', rootId, goalId],
+    // Derived condition reads; every write that can change evidence or a condition invalidates the root.
+    goalChartsRoot: (rootId) => ['goalCharts', rootId],
+    goalCharts: (rootId, goalId) => ['goalCharts', rootId, 'goal', goalId],
+    goalChartEvidence: (rootId, activityId) => ['goalCharts', rootId, 'evidence', activityId],
+    analyticsViewGoals: (rootId, dashboardId) => ['goalCharts', rootId, 'view', dashboardId],
+    goalConditionLines: (rootId, activityId) => ['goalCondition', rootId, 'activity', activityId],
+    goalConditionProgress: (rootId, goalIds) => ['goalCondition', rootId, 'progress', [...goalIds].sort().join(',')],
+    goalConditionEvidence: (rootId, goalId, since = 'active', activityId = null) => [
+        'goalCondition', rootId, 'evidence', goalId, since, activityId,
+    ],
     goalMetrics: (goalId) => ['goalMetrics', goalId],
     goalMetricsRoot: () => ['goalMetrics'],
     eligibleMoveParents: (rootId, goalId) => ['goals', rootId, 'eligibleMoveParents', goalId],
@@ -156,14 +163,12 @@ export const queryKeys = {
     instagramOembed: (permalink) => ['instagram-oembed', permalink],
     progressRoot: () => ['progress'],
     progressComparison: (instanceId) => ['progress', 'comparison', instanceId],
-    progressHistory: (activityDefId, excludeSessionId = null) => ['progress', 'history', activityDefId, excludeSessionId],
-    progressHistoryRoot: (activityDefId) => ['progress', 'history', activityDefId],
     sessionProgressSummary: (sessionId) => ['progress', 'session', sessionId],
     activityTagCatalog: (rootId) => ['activity-tag-catalog', rootId],
     activityProgressTimelineRoot: (rootId, activityId) => [
         'activity-progress-timeline', rootId, activityId,
     ],
-    activityProgressTimeline: (rootId, activityId, sessionId = null) => [
-        'activity-progress-timeline', rootId, activityId, sessionId,
+    activityProgressTimeline: (rootId, activityId, instanceId = null) => [
+        'activity-progress-timeline', rootId, activityId, instanceId,
     ],
 };

@@ -29,6 +29,7 @@
   --color-text-primary: #e6edf5;
   --color-text-secondary: #bcc9d8;
   --color-text-muted: #8ea0b7;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' stroke='%238ea0b7' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --color-text-inverse: #101820;
 
   /* Branding */
@@ -239,6 +240,7 @@
   --color-text-primary: #0f1f33;
   --color-text-secondary: #334b66;
   --color-text-muted: #6f87a0;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' stroke='%236f87a0' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --color-text-inverse: #ffffff;
 
   --text-shadow-default: none;

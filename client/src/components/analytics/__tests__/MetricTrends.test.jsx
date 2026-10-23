@@ -5,12 +5,15 @@ import { render, screen } from '@testing-library/react';
 import { buildMetricTrendData, MetricTrendsChart } from '../visualizations/activities/MetricTrends';
 
 const lineChart = vi.fn(() => <div>Metric Trends Chart</div>);
+const density = { current: 'full' };
 
 vi.mock('react-chartjs-2', () => ({
     Line: (props) => lineChart(props),
 }));
 
 vi.mock('../ChartJSWrapper', () => ({
+    applyChartDensity: (options) => options,
+    useChartDensity: () => density.current,
     useChartThemeDefaults: () => ({
         textColor: '#ddd',
         gridColor: '#333',
@@ -27,6 +30,25 @@ vi.mock('../ChartJSWrapper', () => ({
 describe('MetricTrendsChart', () => {
     beforeEach(() => {
         lineChart.mockClear();
+        density.current = 'full';
+    });
+
+    it('plots only the first metric in compact form, with the rest in the caption', () => {
+        density.current = 'compact';
+        render(
+            <MetricTrendsChart
+                activity={{ id: 'activity-1', metric_definitions: [{ id: 'm1', name: 'Weight', unit: 'lbs' }, { id: 'm2', name: 'Reps', unit: '' }] }}
+                metrics={['m1', 'm2']}
+                activityInstances={{
+                    'activity-1': [
+                        { id: 'i1', session_date: '2026-04-20T12:00:00Z', metrics: [{ metric_id: 'm1', value: '100' }, { metric_id: 'm2', value: '5' }] },
+                    ],
+                }}
+            />
+        );
+
+        expect(lineChart.mock.calls.at(-1)[0].data.datasets.map((dataset) => dataset.label)).toEqual(['Weight']);
+        expect(screen.getByText('Weight · 1 session · +1 more')).toBeInTheDocument();
     });
 
     it('builds up to two metric line datasets from activity instances', () => {
@@ -82,5 +104,26 @@ describe('MetricTrendsChart', () => {
                 }),
             }),
         }));
+    });
+
+    it('plots the activity yield as a series, with its set handling', () => {
+        const data = buildMetricTrendData({
+            metricDefinitions: [{ id: 'm1', name: 'Weight', unit: 'lbs' }, { id: 'm2', name: 'Reps', unit: '' }],
+            selectedMetrics: ['yield'],
+            yieldIds: ['m1', 'm2'],
+            setsHandling: 'top',
+            highlightInstanceId: 'i1',
+            instances: [{
+                id: 'i1',
+                session_date: '2026-04-20T12:00:00Z',
+                sets: [
+                    { metrics: [{ metric_id: 'm1', value: '100' }, { metric_id: 'm2', value: '5' }] },
+                    { metrics: [{ metric_id: 'm1', value: '50' }, { metric_id: 'm2', value: '4' }] },
+                ],
+            }],
+        });
+        expect(data.datasets.map((dataset) => [dataset.label, dataset.data])).toEqual([['Yield', [500]]]);
+        expect(data.datasets[0].pointRadius).toEqual([5]);
+        expect(data.instanceIds).toEqual(['i1']);
     });
 });

@@ -11,7 +11,7 @@ export default function CircuitMemberHeader({ rootId, sessionId, instance, scope
                 <div className={`${activityStyles.activityNameContainer} ${styles.memberIdentity}`}>
                     <span className={`${activityStyles.activityName} ${styles.memberName}`}>
                         <span>{slot?.activity_name || 'Activity'}</span>
-                        {instance?.progress_comparison?.included === false ? <span className={styles.memberExcluded}>Excluded</span> : null}
+                        
                     </span>
                 </div>
             </SessionItemHeaderLeft>

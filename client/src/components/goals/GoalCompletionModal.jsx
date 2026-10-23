@@ -4,19 +4,29 @@ import {
     FolderIcon,
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
-import TargetCard from '../TargetCard';
+import { describeCondition, getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
 import styles from './GoalCompletionModal.module.css';
 
 function GoalCompletionModal({
     programs = [],
-    targets = [],
+    goal = null,
     activityDefinitions = [],
     completionDate = new Date(),
     accentColor,
-    goalType,
     completionNote = '',
     onCompletionNoteChange,
+    sequenceNextStep = null,
+    beginNext = true,
+    onBeginNextChange,
 }) {
+    const completionCondition = getGoalCompletionCondition(goal);
+    const condition = getGoalCondition(goal);
+    const activity = activityDefinitions.find((candidate) => candidate.id === condition?.activity_definition_id) || null;
+    const conditionText = completionCondition === 'activity_threshold' && condition
+        ? describeCondition(condition, activity)
+        : completionCondition === 'children'
+            ? 'When every child goal is complete'
+            : 'Manually';
     return (
         <div
             className={styles.container}
@@ -75,28 +85,28 @@ function GoalCompletionModal({
                 )}
             </div>
 
-            {/* Associated Targets */}
+            {sequenceNextStep ? (
+                <label className={styles.sequenceChoice}>
+                    <input
+                        type="checkbox"
+                        checked={beginNext}
+                        onChange={(event) => onBeginNextChange?.(event.target.checked)}
+                    />
+                    <span>Begin next goal in sequence: <strong>{sequenceNextStep.name}</strong></span>
+                </label>
+            ) : null}
+
+            {/* How this goal completes */}
             <div>
                 <label className={styles.sectionLabel}>
-                    Targets associated with this goal ({targets.length}):
+                    How this goal completes:
                 </label>
-                {targets.length === 0 ? (
-                    <div className={styles.emptyText}>
-                        No targets defined for this goal
-                    </div>
-                ) : (
-                    <div className={styles.listColumn}>
-                        {targets.map(target => (
-                            <TargetCard
-                                key={target.id}
-                                target={target}
-                                activityDefinitions={activityDefinitions}
-                                isCompleted={false}
-                                goalType={goalType}
-                            />
-                        ))}
-                    </div>
-                )}
+                <div className={styles.infoBox}>
+                    <span>{conditionText}</span>
+                </div>
+                {completionCondition !== 'manual' ? (
+                    <p className={styles.completionNoteHint}>If its condition isn’t met yet, this is recorded as a manual override.</p>
+                ) : null}
             </div>
         </div>
     );

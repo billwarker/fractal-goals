@@ -10,7 +10,6 @@ from services._serialize_common import (
     calculate_smart_status,
 )
 from services._serialize_activities import (
-    serialize_target,
     serialize_metric_value,
     serialize_activity_set,
     serialize_fractal_metric,
@@ -26,6 +25,7 @@ from services._serialize_activities import (
 )
 from services._serialize_goals import (
     serialize_goal,
+    serialize_goal_condition,
 )
 from services._serialize_sessions import (
     serialize_session_for_analytics,
@@ -66,6 +66,7 @@ __all__ = [
     "serialize_event_log",
     "serialize_fractal_metric",
     "serialize_goal",
+    "serialize_goal_condition",
     "serialize_metric_definition",
     "serialize_metric_value",
     "serialize_note",
@@ -79,7 +80,6 @@ __all__ = [
     "serialize_session_for_analytics",
     "serialize_session_template",
     "serialize_split_definition",
-    "serialize_target",
     "serialize_user",
     "serialize_work_interval",
 ]

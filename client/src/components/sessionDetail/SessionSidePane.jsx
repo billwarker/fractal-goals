@@ -4,7 +4,7 @@
  * Provides:
  * - Session info header (compact, expandable)
  * - Details: Session controls and goal hierarchy
- * - Timeline: Activity history
+ * - Progress: how an activity compares with its past sessions
  */
 
 import React, { useId, useState } from 'react';
@@ -17,7 +17,7 @@ import SidePaneHeader from '../common/SidePaneHeader';
 import ViewToggleTabs from '../common/ViewToggleTabs';
 import SessionGoalHierarchyPanel from './SessionGoalHierarchyPanel';
 import SessionNotesPanel from './SessionNotesPanel';
-import TimelinePanel from './TimelinePanel';
+import ProgressPanel from './ProgressPanel';
 import styles from './SessionSidePane.module.css';
 
 function SessionSidePane({
@@ -29,7 +29,7 @@ function SessionSidePane({
     const onModeChange = model?.onModeChange;
     const details = model?.details;
     const goals = model?.goals;
-    const timeline = model?.timeline;
+    const progress = model?.progress;
     const { timezone } = useTimezone();
     const pausedHintId = useId();
     const pausedAtLabel = details?.pausedAt
@@ -45,7 +45,7 @@ function SessionSidePane({
                     <ViewToggleTabs
                         items={[
                             { value: 'details', label: 'Details' },
-                            { value: 'timeline', label: 'Timeline' },
+                            { value: 'progress', label: 'Progress' },
                         ]}
                         value={mode}
                         onChange={onModeChange}
@@ -120,7 +120,7 @@ function SessionSidePane({
                                 onGoalClick={goals?.onGoalClick}
                                 onGoalCreated={goals?.onGoalCreated}
                                 readOnly={goals?.readOnly}
-                                targetModal={goals?.targetModal}
+                                conditionSnapshots={goals?.conditionSnapshots}
                                 activityGoalScope={goals?.activityGoalScope}
                                 onGoalScopeToggle={goals?.onGoalScopeToggle}
                                 className={styles.detailsGoalHierarchy}
@@ -141,11 +141,12 @@ function SessionSidePane({
                         )}
                     </div>
                 ) : (
-                    <TimelinePanel
-                        rootId={timeline?.rootId}
-                        sessionId={timeline?.sessionId}
-                        selectedActivity={timeline?.selectedActivity}
-                        sessionActivityDefs={timeline?.sessionActivityDefs}
+                    <ProgressPanel
+                        rootId={progress?.rootId}
+                        sessionId={progress?.sessionId}
+                        selectedActivity={progress?.selectedActivity}
+                        sessionActivityDefs={progress?.sessionActivityDefs}
+                        sessionInstances={progress?.sessionInstances}
                     />
                 )}
             </div>

@@ -6,7 +6,7 @@ const SMART_LETTERS = [
     { key: 'specific', letter: 'S' },
     { key: 'measurable', letter: 'M' },
     { key: 'achievable', letter: 'A' },
-    { key: 'relevant', letter: 'R' },
+    { key: 'reviewed', letter: 'R' },
     { key: 'timeBound', letter: 'T' },
 ];
 
@@ -14,7 +14,7 @@ const SMART_LETTERS = [
  * SmartBadge - the canonical SMART-letters pill.
  *
  * Purely presentational: pass `status` ({ specific, measurable, achievable,
- * relevant, timeBound }) to light individual letters; omit it to light all
+ * reviewed, timeBound }) to light individual letters; omit it to light all
  * five. `color` tints met letters (and the border once fully SMART); themes
  * are handled through shared tokens. `getLetterTooltip(key, isMet)` adds
  * per-letter hover help.

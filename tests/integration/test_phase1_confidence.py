@@ -13,8 +13,6 @@ from models import (
     MetricDefinition,
     MetricValue,
     Session,
-    Target,
-    TargetMetricCondition,
     session_goals,
 )
 from tests.conftest import session_token_for
@@ -264,170 +262,14 @@ class TestPhase1GoalConfidence:
         response = client.get(f"/api/fractal/{root_id}/sessions/{uuid.uuid4()}/micro-goals")
         assert response.status_code == 404
 
-    def test_evaluate_targets_requires_auth(self, client, sample_goal_hierarchy):
+    def test_removed_evaluate_targets_endpoint_returns_not_found(self, authed_client, sample_goal_hierarchy):
         root_id = sample_goal_hierarchy["ultimate"].id
         goal_id = sample_goal_hierarchy["short_term"].id
-        response = client.post(
-            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
-            data=json.dumps({"session_id": str(uuid.uuid4())}),
-            content_type="application/json",
-        )
+        response = authed_client.post(f"/api/{root_id}/goals/{goal_id}/evaluate-targets", json={"session_id": "s"})
+        assert response.status_code == 404
+
+    def test_condition_progress_requires_auth(self, client, sample_goal_hierarchy):
+        root_id = sample_goal_hierarchy["ultimate"].id
+        goal_id = sample_goal_hierarchy["short_term"].id
+        response = client.get(f"/api/{root_id}/goals/condition-progress?goal_ids={goal_id}")
         assert response.status_code == 401
-
-    def test_evaluate_targets_requires_session_id(self, authed_client, sample_goal_hierarchy):
-        root_id = sample_goal_hierarchy["ultimate"].id
-        goal_id = sample_goal_hierarchy["short_term"].id
-        response = authed_client.post(
-            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
-            data=json.dumps({}),
-            content_type="application/json",
-        )
-        assert response.status_code == 400
-
-    def test_evaluate_targets_rejects_non_string_session_id(self, authed_client, sample_goal_hierarchy):
-        root_id = sample_goal_hierarchy["ultimate"].id
-        goal_id = sample_goal_hierarchy["short_term"].id
-        response = authed_client.post(
-            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
-            data=json.dumps({"session_id": {"bad": "shape"}}),
-            content_type="application/json",
-        )
-        assert response.status_code == 400
-        assert response.get_json()["error"] == "Validation failed"
-
-    def test_evaluate_targets_no_targets_returns_empty_result(
-        self, authed_client, sample_goal_hierarchy, sample_practice_session
-    ):
-        root_id = sample_goal_hierarchy["ultimate"].id
-        goal_id = sample_goal_hierarchy["short_term"].id
-        response = authed_client.post(
-            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
-            data=json.dumps({"session_id": sample_practice_session.id}),
-            content_type="application/json",
-        )
-        assert response.status_code == 200
-        payload = response.get_json()
-        assert payload["targets_evaluated"] == 0
-        assert payload["targets_completed"] == 0
-        assert payload["goal_completed"] is False
-
-    def test_evaluate_targets_session_not_found_returns_404(self, authed_client, sample_goal_hierarchy):
-        root_id = sample_goal_hierarchy["ultimate"].id
-        goal_id = sample_goal_hierarchy["short_term"].id
-        response = authed_client.post(
-            f"/api/{root_id}/goals/{goal_id}/evaluate-targets",
-            data=json.dumps({"session_id": str(uuid.uuid4())}),
-            content_type="application/json",
-        )
-        assert response.status_code == 404
-
-    def test_evaluate_targets_goal_not_in_fractal_returns_404(self, authed_client, db_session, test_user, sample_ultimate_goal):
-        other_root = Goal(id=str(uuid.uuid4()), name="Other Root", owner_id=test_user.id)
-        other_root.root_id = other_root.id
-        db_session.add(other_root)
-        db_session.commit()
-
-        response = authed_client.post(
-            f"/api/{sample_ultimate_goal.id}/goals/{other_root.id}/evaluate-targets",
-            data=json.dumps({"session_id": str(uuid.uuid4())}),
-            content_type="application/json",
-        )
-        assert response.status_code == 404
-
-    def test_evaluate_targets_marks_target_complete_and_auto_completes_goal(
-        self, authed_client, db_session, test_user, sample_ultimate_goal
-    ):
-        root_id = sample_ultimate_goal.id
-
-        goal = Goal(
-            id=str(uuid.uuid4()),
-            name="Measured Goal",
-            owner_id=test_user.id,
-            parent_id=sample_ultimate_goal.id,
-            root_id=root_id,
-            completed=False,
-        )
-        db_session.add(goal)
-
-        session = Session(
-            owner_id=test_user.id,
-            id=str(uuid.uuid4()),
-            name="Eval Session",
-            root_id=root_id,
-        )
-        db_session.add(session)
-
-        group = ActivityGroup(id=str(uuid.uuid4()), root_id=root_id, name="Eval Group")
-        db_session.add(group)
-        db_session.flush()
-
-        activity = ActivityDefinition(
-            id=str(uuid.uuid4()),
-            root_id=root_id,
-            name="Eval Activity",
-            group_id=group.id,
-        )
-        db_session.add(activity)
-        db_session.flush()
-
-        metric_def = MetricDefinition(
-            id=str(uuid.uuid4()),
-            activity_id=activity.id,
-            root_id=root_id,
-            name="Weight",
-            unit="lbs",
-        )
-        db_session.add(metric_def)
-        db_session.flush()
-
-        target = Target(
-            id=str(uuid.uuid4()),
-            goal_id=goal.id,
-            root_id=root_id,
-            activity_id=activity.id,
-            name="Hit threshold",
-            type="threshold",
-            completed=False,
-        )
-        db_session.add(target)
-        db_session.flush()
-
-        condition = TargetMetricCondition(
-            id=str(uuid.uuid4()),
-            target_id=target.id,
-            metric_definition_id=metric_def.id,
-            operator=">=",
-            target_value=100,
-        )
-        db_session.add(condition)
-        db_session.flush()
-
-        instance = ActivityInstance(
-            id=str(uuid.uuid4()),
-            session_id=session.id,
-            activity_definition_id=activity.id,
-            root_id=root_id,
-            completed=True,
-        )
-        db_session.add(instance)
-        db_session.flush()
-
-        metric_value = MetricValue(
-            activity_instance_id=instance.id,
-            metric_definition_id=metric_def.id,
-            value=110.0,
-        )
-        db_session.add(metric_value)
-        db_session.commit()
-
-        response = authed_client.post(
-            f"/api/{root_id}/goals/{goal.id}/evaluate-targets",
-            data=json.dumps({"session_id": session.id}),
-            content_type="application/json",
-        )
-        assert response.status_code == 200
-        payload = response.get_json()
-        assert payload["targets_evaluated"] == 1
-        assert payload["targets_completed"] == 1
-        assert payload["goal_completed"] is True
-        assert len(payload["newly_completed_targets"]) == 1

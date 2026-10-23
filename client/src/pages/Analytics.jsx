@@ -4,6 +4,7 @@ import { formatDuration } from '../components/analytics/formatDuration';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
+import useAnalyticsDeepLink from '../components/analytics/useAnalyticsDeepLink';
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
@@ -41,7 +42,8 @@ const AnalyticsViewNameModal = lazy(() => import('../components/analytics/Analyt
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
 const MAX_WINDOWS = 4;
-const FILTER_PANE_COLUMNS = 16;
+// The filters pane's width (--panel-width-details, 390px) in grid columns, rounded.
+const FILTER_PANE_COLUMNS = 20;
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
 const DEFAULT_SELECTED_WINDOW_ID = 'window-1';
 const DEFAULT_WINDOW_STATES = {
@@ -124,7 +126,8 @@ function Analytics() {
         const extent = getGridLayoutExtent(incomingLayout);
         const missingColumns = dashboardBounds.columns - extent.columns;
         const looksLikeClosedFilterPaneGap = !isFiltersPaneOpen
-            && missingColumns >= FILTER_PANE_COLUMNS - 2
+            // (down to the 16 columns the pane took before it matched the other pages' sidebars)
+            && missingColumns >= FILTER_PANE_COLUMNS - 6
             && missingColumns <= FILTER_PANE_COLUMNS + 4;
         if (!looksLikeClosedFilterPaneGap) return incomingLayout;
 
@@ -182,6 +185,13 @@ function Analytics() {
         resetToEmptyView();
         setIsHydrated(true);
     }, [resetToEmptyView, rootId]);
+
+    const applyDeepLink = useCallback(({ windowState, globalFilters: linkFilters }) => {
+        setWindowStates({ [DEFAULT_SELECTED_WINDOW_ID]: windowState });
+        setSelectedWindowId(DEFAULT_SELECTED_WINDOW_ID);
+        setGlobalFilters(linkFilters);
+    }, []);
+    useAnalyticsDeepLink({ isHydrated, activities, onApply: applyDeepLink });
 
     useEffect(() => {
         if (!showSqlExplorer && activeMode === 'query') {
@@ -424,6 +434,7 @@ function Analytics() {
                     globalFilters={globalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
+                    onPageGrid
                 />
             </Suspense>
         );
@@ -452,6 +463,7 @@ function Analytics() {
             constrainToVisualViewport={false}
         >
             <AnalyticsFiltersSidebar
+                rootId={rootId} sessions={sessions} windowStates={windowStates}
                 filters={globalFilters}
                 dateRange={globalDateRange}
                 goals={goalAnalytics?.goals || []}
@@ -486,6 +498,8 @@ function Analytics() {
                     onModeChange={setActiveMode}
                     onOpenViewsModal={() => setIsViewsModalOpen(true)}
                     onSaveView={handleSaveView}
+                    rootId={rootId}
+                    savedView={analyticsViews.find((view) => view.id === selectedViewId && view.kind === 'view') || null}
                     isFiltersPaneOpen={isFiltersPaneOpen}
                     onToggleFiltersPane={() => setIsFiltersPaneOpen((current) => !current)}
                     showQueryConsole={showSqlExplorer}
@@ -498,7 +512,7 @@ function Analytics() {
                 {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />
                 ) : (
-                    <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown}>
+                    <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown} data-page-grid>
                         <div
                             className={`${styles.gridSurface} ${debugMode ? styles.gridSurfaceDebug : ''} ${isDashboardSettling ? styles.gridSurfaceSettling : ''}`}
                             onMouseDown={handleWorkspaceMouseDown}

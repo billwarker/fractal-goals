@@ -5,12 +5,15 @@ import { render, screen } from '@testing-library/react';
 import ActivityTotalsChart from '../visualizations/activities/ActivityTotals/ActivityTotalsChart';
 
 const barChart = vi.fn(() => <div>Bar Chart</div>);
+const density = { current: 'full' };
 
 vi.mock('react-chartjs-2', () => ({
     Bar: (props) => barChart(props),
 }));
 
 vi.mock('../ChartJSWrapper', () => ({
+    applyChartDensity: (options) => options,
+    useChartDensity: () => density.current,
     useChartThemeDefaults: () => ({
         textColor: '#ddd',
         gridColor: '#333',
@@ -27,6 +30,25 @@ vi.mock('../ChartJSWrapper', () => ({
 describe('ActivityTotalsChart', () => {
     beforeEach(() => {
         barChart.mockClear();
+        density.current = 'full';
+    });
+
+    it('shows the top five activities in compact form', () => {
+        density.current = 'compact';
+        const activities = Array.from({ length: 8 }, (_, index) => ({ id: `a${index}`, name: `Activity ${index}` }));
+        render(
+            <ActivityTotalsChart
+                metric="count"
+                limit={15}
+                activities={activities}
+                activityGroups={[]}
+                activityInstances={Object.fromEntries(activities.map((activity, index) => [
+                    activity.id, Array.from({ length: index + 1 }, (_, n) => ({ id: `${activity.id}-${n}`, completed: true })),
+                ]))}
+            />
+        );
+
+        expect(barChart.mock.calls.at(-1)[0].data.labels).toHaveLength(5);
     });
 
     it('renders completed activity totals with numeric duration axis, limit, and group hover metadata', () => {

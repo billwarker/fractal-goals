@@ -33,7 +33,7 @@ describe('GoalModal', () => {
         expect(screen.getByText(/ambitious goal well outside/)).toBeVisible();
         expect(screen.getByLabelText('Name (Required)')).toBeRequired();
         expect(screen.getByLabelText(/Description/)).not.toBeRequired();
-        expect(screen.getByLabelText(/Relevance/)).not.toBeRequired();
+        expect(screen.queryByLabelText(/Relevance/)).not.toBeInTheDocument();
         expect(screen.getByLabelText(/Deadline/)).not.toBeRequired();
         expect(screen.getByLabelText(/Deadline/)).toHaveValue('');
         expect(screen.queryByText('Relevance (SMART)')).not.toBeInTheDocument();

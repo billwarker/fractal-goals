@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from models import GoalLevel
+from models.goal import REVIEW_CADENCE_UNITS
 from services.service_types import JsonList, JsonDict, ServiceResult
 
 
@@ -72,7 +73,6 @@ class GoalLevelService:
                     icon=level.icon,
                     owner_id=current_user_id,
                     root_id=req_root_id,
-                    allow_manual_completion=level.allow_manual_completion,
                     track_activities=level.track_activities,
                     requires_smart=getattr(level, 'requires_smart', False),
                     deadline_min_value=level.deadline_min_value,
@@ -80,15 +80,25 @@ class GoalLevelService:
                     deadline_max_value=level.deadline_max_value,
                     deadline_max_unit=level.deadline_max_unit,
                     max_children=level.max_children,
-                    auto_complete_when_children_done=level.auto_complete_when_children_done,
-                    can_have_targets=level.can_have_targets,
                     description_required=level.description_required,
                     default_deadline_offset_value=level.default_deadline_offset_value,
                     default_deadline_offset_unit=level.default_deadline_offset_unit,
                     sort_children_by=level.sort_children_by,
+                    uses_reviews=getattr(level, 'uses_reviews', False),
+                    review_cadence_value=getattr(level, 'review_cadence_value', None),
+                    review_cadence_unit=getattr(level, 'review_cadence_unit', None),
                 )
                 self.db_session.add(level)
                 self.db_session.flush()
+
+        if 'review_cadence_value' in data or 'review_cadence_unit' in data:
+            value, unit = data.get('review_cadence_value'), data.get('review_cadence_unit')
+            if (value is None) != (unit is None):
+                return None, "Send review_cadence_value and review_cadence_unit together", 400
+            if unit is not None and unit not in REVIEW_CADENCE_UNITS:
+                return None, f"review_cadence_unit must be one of: {', '.join(REVIEW_CADENCE_UNITS)}", 400
+            if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 1):
+                return None, "review_cadence_value must be a positive whole number", 400
 
         scalar_fields = (
             'color',
@@ -98,20 +108,20 @@ class GoalLevelService:
             'deadline_max_unit',
             'default_deadline_offset_unit',
             'sort_children_by',
+            'review_cadence_unit',
         )
         bool_fields = (
-            'allow_manual_completion',
             'track_activities',
             'requires_smart',
-            'auto_complete_when_children_done',
-            'can_have_targets',
             'description_required',
+            'uses_reviews',
         )
         int_fields = (
             'deadline_min_value',
             'deadline_max_value',
             'max_children',
             'default_deadline_offset_value',
+            'review_cadence_value',
         )
 
         for field in scalar_fields:
@@ -139,11 +149,17 @@ class GoalLevelService:
             deleted_at=None,
         ).first()
         if system_default:
-            from models.goal import Goal
+            from models.goal import Goal, GoalSequenceTrack
 
             user_goals = self.db_session.query(Goal).filter_by(owner_id=current_user_id, level_id=level.id).all()
             for goal in user_goals:
                 goal.level_id = system_default.id
+            # Every goal on the level moves together, so its sequences stay one level; keep the track in step.
+            track_ids = {goal.sequence_track_id for goal in user_goals if goal.sequence_track_id}
+            if track_ids:
+                self.db_session.query(GoalSequenceTrack).filter(
+                    GoalSequenceTrack.id.in_(track_ids),
+                ).update({GoalSequenceTrack.level_id: system_default.id}, synchronize_session=False)
 
         level.deleted_at = datetime.now(timezone.utc)
         self.db_session.commit()

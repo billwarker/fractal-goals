@@ -16,7 +16,6 @@ from models import (
     MetricDefinition,
     MetricValue,
     Session,
-    Target,
     activity_goal_associations, activity_instance_goal_associations,
     goal_activity_group_associations,
 )
@@ -43,7 +42,6 @@ class GoalHistoryReadModel:
         self._rows["instance_links"] = {row.id: set(row.associated_goal_ids or []) & set(goal_ids) for row in self._rows["instances"] if row.associated_goal_ids}
         self._rows["association_events"] = self.association_events(goal_ids)
         if goals_by_id is None:
-            self._rows["targets"] = self.targets(goal_ids)
             self._rows["pause_intervals"] = self.pause_intervals(goal_ids)
         else:
             scoped_goals = [
@@ -52,12 +50,6 @@ class GoalHistoryReadModel:
                 if goal.root_id == self.root_id
                 and goal.id in goal_ids
                 and goal.deleted_at is None
-            ]
-            self._rows["targets"] = [
-                target
-                for goal in scoped_goals
-                for target in goal.targets_rel
-                if target.deleted_at is None
             ]
             self._rows["pause_intervals"] = [
                 interval for goal in scoped_goals for interval in goal.pause_intervals
@@ -215,28 +207,6 @@ class GoalHistoryReadModel:
         if event_ids is not None:
             query = query.filter(EventLog.id.in_(event_ids))
         return query.limit(limit).all()
-
-    def targets(self, goal_ids, *, summary_only=False, target_ids=None):
-        if target_ids is not None and not target_ids:
-            return []
-        if "targets" in self._rows:
-            rows = [row for row in self._rows["targets"] if row.goal_id in goal_ids and (target_ids is None or row.id in target_ids)]
-            return rows
-        query = (
-            self.db_session.query(Target)
-            .options(*([] if summary_only else [
-                joinedload(Target.completed_session),
-                joinedload(Target.metric_conditions),
-            ]))
-            .filter(
-                Target.root_id == self.root_id,
-                Target.goal_id.in_(goal_ids),
-                Target.deleted_at.is_(None),
-            )
-        )
-        if target_ids is not None:
-            query = query.filter(Target.id.in_(target_ids))
-        return query.all()
 
     def pause_intervals(self, goal_ids):
         if "pause_intervals" in self._rows:

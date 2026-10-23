@@ -11,13 +11,35 @@
     overflow: hidden;
 }
 
+/* The session content, or an expanded Progress chart in its place. */
+.sessionMainArea {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+}
+
 .sessionMainContent {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
+    transition: opacity 200ms ease-in-out;
     padding: var(--spacing-xl);
     padding-bottom: 120px;
     background: transparent;
+}
+
+.sessionMainContent[data-hidden] {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sessionMainContent {
+        transition: none;
+    }
 }
 
 .sessionSidebarWrapper {

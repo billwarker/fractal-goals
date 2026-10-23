@@ -9,6 +9,7 @@ import {
     applyTimerAction,
 } from './sessionOps';
 import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun } from './circuitOps';
+import { patchProgressChartSettings } from './progressChartOps';
 
 // Every queued in-session write has a kind. Each kind knows how to show itself
 // in the cache before the server answers (`optimistic`), which is also re-run
@@ -65,6 +66,15 @@ function patchRun(run, action, at, value = null) {
 
 const mapList = (updater) => (previous) => (Array.isArray(previous) ? updater(previous) : previous);
 
+const patchInstanceById /* fields: an object to merge, or a function of the instance returning one */ = (queryClient, meta, instanceId, fields) => queryClient.setQueryData(
+    keysFor(meta).activities,
+    mapList((list) => list.map((instance) => (instance.id === instanceId
+        ? { ...instance, ...(typeof fields === 'function' ? fields(instance) : fields) } : instance))),
+);
+
+// Tags and comparison choices decide which history a timeline lists; refetch once the server has them.
+const invalidateTimelines = (queryClient, rootId) => invalidateQueryKeys(queryClient, [['activity-progress-timeline', rootId]], { refetchType: 'all' });
+
 const patchRunById = (queryClient, meta, runId, patch) => queryClient.setQueryData(
     keysFor(meta).circuits,
     mapList((runs) => runs.map((run) => (run.id === runId ? patch(run) : run))),
@@ -98,10 +108,7 @@ function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, ru
 
 const OPTIMISTIC = {
     [SESSION_OP.INSTANCE_UPDATE]: (queryClient, op) => {
-        const { instanceId, updates } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id === instanceId ? { ...instance, ...updates } : instance
-        ))));
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, op.meta.updates);
     },
     [SESSION_OP.ACTIVITY_ADD]: (queryClient, op) => {
         const { placeholder } = op.meta;
@@ -223,20 +230,18 @@ const OPTIMISTIC = {
         patchRunById(queryClient, op.meta, op.meta.runId, (run) => applyTagChange(run, op.meta));
     },
     [SESSION_OP.INSTANCE_TAGS]: (queryClient, op) => {
-        const { instanceId, tags } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id === instanceId ? { ...instance, tags } : instance
-        ))));
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, { tags: op.meta.tags });
     },
     [SESSION_OP.SET_TAGS]: (queryClient, op) => {
         const { instanceId, setId, tags } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id !== instanceId ? instance : {
-                ...instance,
-                sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
-            }
-        ))));
+        patchInstanceById(queryClient, op.meta, instanceId, (instance) => ({
+            sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
+        }));
     },
+    // Merge: the queued choice keeps the session's template/program day and version.
+    [SESSION_OP.PROGRESS_COMPARISON]: (queryClient, op) => patchInstanceById(queryClient, op.meta, op.meta.instanceId,
+        (instance) => ({ comparison_context: { ...instance.comparison_context, ...op.meta.comparisonContext } })),
+    [SESSION_OP.PROGRESS_CHART]: (queryClient, op) => patchProgressChartSettings(queryClient, op.meta),
     [SESSION_OP.INSTANCE_GOAL_LINK]: (queryClient, op) => {
         const { instanceId, goalId, remove } = op.meta;
         queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
@@ -338,29 +343,42 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                 break;
             case SESSION_OP.INSTANCE_TAGS:
             case SESSION_OP.SET_TAGS:
+                invalidateTimelines(queryClient, op.meta.rootId);
                 // The new assignment version keeps later online edits' concurrency checks valid.
                 if (data?.version == null || outbox.hasPendingEntity(op.meta.setId || instanceId)) break;
                 queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => {
                     if (instance.id !== instanceId) return instance;
-                    if (!op.meta.setId) return { ...instance, tag_assignment_version: data.version };
+                    // Tags change what the instance compares against, so its progress arrives with the ack.
+                    const progress = data.progress_comparison !== undefined
+                        ? { progress_comparison: data.progress_comparison } : {};
+                    if (!op.meta.setId) return { ...instance, ...progress, tag_assignment_version: data.version };
                     return {
                         ...instance,
+                        ...progress,
                         sets: (instance.sets || []).map((set) => (
                             set.id === op.meta.setId ? { ...set, tag_assignment_version: data.version } : set
                         )),
                     };
                 })));
                 break;
+            case SESSION_OP.PROGRESS_CHART: // the series refetches with the timelines
+            case SESSION_OP.PROGRESS_COMPARISON:
+                invalidateTimelines(queryClient, op.meta.rootId);
+                if (!data?.comparison_context || outbox.hasPendingEntity(instanceId)) break;
+                patchInstanceById(queryClient, op.meta, instanceId, {
+                    comparison_context: data.comparison_context,
+                    progress_comparison: data.progress_comparison,
+                });
+                break;
             case SESSION_OP.INSTANCE_GOAL_LINK:
                 if (Array.isArray(data?.associated_goal_ids) && !outbox.hasPendingEntity(instanceId)) {
-                    queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-                        instance.id === instanceId ? { ...instance, associated_goal_ids: data.associated_goal_ids } : instance
-                    ))));
+                    patchInstanceById(queryClient, op.meta, instanceId, { associated_goal_ids: data.associated_goal_ids });
                 }
                 invalidateQueryKeys(queryClient, [
                     queryKeys.fractalTree(op.meta.rootId),
                     queryKeys.goals(op.meta.rootId),
                     queryKeys.goalTimelinesRoot(op.meta.rootId),
+                    queryKeys.goalConditionRoot(op.meta.rootId),
                     queryKeys.goalAnalytics(op.meta.rootId),
                 ]);
                 break;

@@ -30,7 +30,7 @@ describe('one-off goal control', () => {
         expect(api.associateActivityInstanceGoal).toHaveBeenCalledWith('root', 'instance', 'goal');
         expect(client.getQueryData(queryKeys.sessionActivities('root', 'session'))[1].associated_goal_ids).toEqual([]);
         expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.goalTimelinesRoot('root') });
-        expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.targetAnalyticsFractalRoot('root') });
+        expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.goalConditionRoot('root') });
         expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.sessionGoalsView('root', 'session') });
     });
     it('removes explicit links while explaining broader attribution', async () => {

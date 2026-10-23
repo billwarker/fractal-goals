@@ -1,0 +1,35 @@
+.due {
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.due[data-due-tone='normal'] {
+    color: var(--color-brand-success);
+}
+
+.due[data-due-tone='soon'] {
+    color: var(--color-brand-warning);
+}
+
+.due[data-due-tone='overdue'] {
+    color: var(--color-brand-danger);
+}
+
+.empty {
+    color: var(--color-text-muted);
+    font-style: italic;
+    white-space: nowrap;
+}
+
+.assistive {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

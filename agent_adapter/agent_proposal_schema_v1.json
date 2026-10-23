@@ -389,7 +389,7 @@
         "note_kind": {
           "anyOf": [
             {
-              "pattern": "^(goal_completion)$",
+              "pattern": "^(goal_completion|goal_review)$",
               "type": "string"
             },
             {
@@ -501,6 +501,41 @@
         "data"
       ],
       "title": "ScheduleProgramDayOperation",
+      "type": "object"
+    },
+    "SetGoalSequenceOperation": {
+      "additionalProperties": false,
+      "properties": {
+        "goal_ids": {
+          "description": "Sibling goals (same parent, same level) in the order they should run; each begins when the one before completes, and later goals wait paused. Replaces the sequence these goals are already in, or creates one. One goal that is already sequenced ends its sequence. IDs may be $ref:<operation_id> references to goals created earlier in this proposal.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "title": "Goal Ids",
+          "type": "array"
+        },
+        "operation_id": {
+          "description": "Stable unique ID for this operation within the proposal; later operations may refer to its result as $ref:<operation_id>.",
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "title": "Operation Id",
+          "type": "string"
+        },
+        "type": {
+          "const": "set_goal_sequence",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "operation_id",
+        "type",
+        "goal_ids"
+      ],
+      "title": "SetGoalSequenceOperation",
       "type": "object"
     },
     "StrictActivityCreateSchema": {
@@ -951,29 +986,35 @@
           "default": null,
           "title": "Activity Definition Id"
         },
-        "allow_manual_completion": {
+        "completion_condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "enum": [
+                "activity_threshold",
+                "children",
+                "manual"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "default": true,
-          "title": "Allow Manual Completion"
+          "default": null,
+          "title": "Completion Condition"
         },
-        "completed_via_children": {
+        "condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "additionalProperties": true,
+              "type": "object"
             },
             {
               "type": "null"
             }
           ],
-          "default": false,
-          "title": "Completed Via Children"
+          "default": null,
+          "title": "Condition"
         },
         "deadline": {
           "anyOf": [
@@ -1030,19 +1071,6 @@
           "default": null,
           "title": "Parent Id"
         },
-        "relevance_statement": {
-          "anyOf": [
-            {
-              "maxLength": 2000,
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Relevance Statement"
-        },
         "session_id": {
           "anyOf": [
             {
@@ -1055,21 +1083,17 @@
           "default": null,
           "title": "Session Id"
         },
-        "targets": {
+        "started_at": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              "type": "array"
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Targets"
+          "title": "Started At"
         },
         "track_activities": {
           "anyOf": [
@@ -1098,18 +1122,6 @@
     "StrictGoalUpdateSchema": {
       "additionalProperties": false,
       "properties": {
-        "allow_manual_completion": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Allow Manual Completion"
-        },
         "completed": {
           "anyOf": [
             {
@@ -1122,17 +1134,35 @@
           "default": null,
           "title": "Completed"
         },
-        "completed_via_children": {
+        "completion_condition": {
           "anyOf": [
             {
-              "type": "boolean"
+              "enum": [
+                "activity_threshold",
+                "children",
+                "manual"
+              ],
+              "type": "string"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Completed Via Children"
+          "title": "Completion Condition"
+        },
+        "condition": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Condition"
         },
         "deadline": {
           "anyOf": [
@@ -1210,10 +1240,15 @@
           "default": null,
           "title": "Progress Settings"
         },
-        "relevance_statement": {
+        "review_cadence_unit": {
           "anyOf": [
             {
-              "maxLength": 2000,
+              "enum": [
+                "days",
+                "weeks",
+                "months",
+                "years"
+              ],
               "type": "string"
             },
             {
@@ -1221,23 +1256,57 @@
             }
           ],
           "default": null,
-          "title": "Relevance Statement"
+          "title": "Review Cadence Unit"
         },
-        "targets": {
+        "review_cadence_value": {
           "anyOf": [
             {
-              "items": {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              "type": "array"
+              "maximum": 999,
+              "minimum": 1,
+              "type": "integer"
             },
             {
               "type": "null"
             }
           ],
           "default": null,
-          "title": "Targets"
+          "title": "Review Cadence Value"
+        },
+        "review_deferred_until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Deferred Until"
+        },
+        "review_disabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Disabled"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
         },
         "track_activities": {
           "anyOf": [
@@ -2641,7 +2710,7 @@
       "properties": {
         "data": {
           "$ref": "#/$defs/StrictGoalUpdateSchema",
-          "description": "Supported reviewed fields: name, description, deadline, parent_id, targets, child completion, activity inheritance, manual completion, activity tracking, and progress settings."
+          "description": "Supported reviewed fields: name, description, deadline, start date, parent_id, completion condition (activity threshold, children, or manual) with its activity threshold, activity inheritance, activity tracking, progress settings, and the review schedule (cadence pair, or both null for the level's; review_disabled)."
         },
         "goal_id": {
           "description": "Opaque ID of an existing goal in the task's fractal.",
@@ -2847,6 +2916,7 @@
             "create_session": "#/$defs/CreateSessionOperation",
             "create_template": "#/$defs/CreateTemplateOperation",
             "schedule_program_day": "#/$defs/ScheduleProgramDayOperation",
+            "set_goal_sequence": "#/$defs/SetGoalSequenceOperation",
             "update_activity": "#/$defs/UpdateActivityOperation",
             "update_block": "#/$defs/UpdateBlockOperation",
             "update_goal": "#/$defs/UpdateGoalOperation",
@@ -2872,6 +2942,9 @@
           },
           {
             "$ref": "#/$defs/AssociateActivityGoalsOperation"
+          },
+          {
+            "$ref": "#/$defs/SetGoalSequenceOperation"
           },
           {
             "$ref": "#/$defs/CreateNoteOperation"

@@ -99,8 +99,8 @@ def normalize_goal_payload(data, *, partial=False):
     if 'description' in normalized or not partial:
         normalized['description'] = sanitize_string(normalized.get('description') or '')
 
-    if 'relevance_statement' in normalized or not partial:
-        normalized['relevance_statement'] = _normalize_optional_string(normalized.get('relevance_statement'))
+    # Retired field: older clients may still send it.
+    normalized.pop('relevance_statement', None)
 
     if 'parent_id' in normalized or not partial:
         normalized['parent_id'] = _normalize_optional_string(normalized.get('parent_id'))
@@ -114,9 +114,11 @@ def normalize_goal_payload(data, *, partial=False):
     if 'deadline' in normalized:
         normalized['deadline'] = _normalize_optional_string(normalized.get('deadline'))
 
-    if 'targets' in normalized or not partial:
-        targets = normalized.get('targets')
-        normalized['targets'] = targets if isinstance(targets, list) else []
+    if 'started_at' in normalized:
+        normalized['started_at'] = _normalize_optional_string(normalized.get('started_at'))
+
+    if 'completion_condition' in normalized or not partial:
+        normalized['completion_condition'] = normalized.get('completion_condition') or 'manual'
 
     return normalized
 

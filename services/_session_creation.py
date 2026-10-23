@@ -513,13 +513,13 @@ class _SessionCreationMixin:
             return
         instance.prescription = prescription
         # Planned tags are applied up front, like tags the user would add during the session.
-        instance.tags = load_planned_tags(self.db_session, draft.root_id, definition.id, prescription.get('tags'))
+        instance.tags = load_planned_tags(self.db_session, draft.root_id, prescription.get('tags'))
         if definition.has_sets:
             instance.sets = [
                 ActivitySet(
                     sort_order=index,
                     status='planned',
-                    tags=load_planned_tags(self.db_session, draft.root_id, definition.id, planned_set.get('tags')),
+                    tags=load_planned_tags(self.db_session, draft.root_id, planned_set.get('tags')),
                 )
                 for index, planned_set in enumerate(prescription.get('sets') or [])
             ]

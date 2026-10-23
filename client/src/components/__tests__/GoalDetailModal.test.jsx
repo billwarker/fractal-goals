@@ -128,14 +128,17 @@ vi.mock('../goals/GoalOptionsView', () => ({
 }));
 
 vi.mock('../goals/GoalViewMode', () => ({
-    default: ({ name, setIsEditing, setViewState }) => (
+    default: ({ goal, setIsEditing, setViewState }) => (
         <div>
-            <div>view:{name}</div>
+            <div>view:{goal?.name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
             <button onClick={() => setViewState('goal-options')}>open options</button>
-            <div>goal timeline view</div>
         </div>
     ),
+}));
+
+vi.mock('../goalDetail/GoalActivityHeatmap', () => ({
+    default: ({ snapshotEntries }) => <section aria-label="Timeline">goal timeline view:{snapshotEntries ? 'snapshot' : 'live'}</section>,
 }));
 
 vi.mock('../goalDetail/ActivityAssociator', async () => {
@@ -146,8 +149,6 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
         registerAssociateCancelAction,
         onAssociationFlowChange,
         registerPickerFooterActions,
-        isTargetSelectionMode,
-        onSelectTargetActivity,
         activityGroups,
         associatedActivities,
         readOnly,
@@ -208,20 +209,6 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
                     ReactModule.createElement('button', { type: 'button' }, '+ Copy Existing Activity Definition'),
                     ReactModule.createElement('button', { type: 'button' }, '+ Create New Group')
                 )
-                : null,
-            isTargetSelectionMode
-                ? ReactModule.createElement(
-                    'button',
-                    {
-                        onClick: () => onSelectTargetActivity({
-                            id: 'activity-1',
-                            name: 'Performance',
-                            has_metrics: true,
-                            metric_definitions: [{ id: 'metric-1', name: 'Quality', unit: 'rating' }],
-                        }),
-                    },
-                    'select target activity'
-                )
                 : null
         );
     }
@@ -230,27 +217,6 @@ vi.mock('../goalDetail/ActivityAssociator', async () => {
         default: MockActivityAssociator,
     };
 });
-
-vi.mock('../goalDetail/TargetManager', () => ({
-    default: ({ viewMode, onCloseBuilder, onSaved }) => (
-        viewMode === 'builder' ? (
-            <div>
-                <div>embedded target builder</div>
-                <button onClick={onCloseBuilder}>back to activities</button>
-                <button
-                    onClick={() => {
-                        onSaved?.({ action: 'create' });
-                        onCloseBuilder?.();
-                    }}
-                >
-                    save target
-                </button>
-            </div>
-        ) : (
-            <div>target list view</div>
-        )
-    ),
-}));
 
 vi.mock('../goals/GoalEditForm', () => ({
     default: ({ name, handleSave, handleCancel }) => (
@@ -272,16 +238,14 @@ describe('GoalDetailModal smoke coverage', () => {
             setDescription: vi.fn(),
             deadline: '2026-04-01',
             setDeadline: vi.fn(),
-            relevanceStatement: 'Build momentum',
-            setRelevanceStatement: vi.fn(),
-            completedViaChildren: false,
-            setCompletedViaChildren: vi.fn(),
             trackActivities: true,
             setTrackActivities: vi.fn(),
-            allowManualCompletion: true,
-            setAllowManualCompletion: vi.fn(),
-            targets: [],
-            setTargets: vi.fn(),
+            startedAt: '',
+            setStartedAt: vi.fn(),
+            completionCondition: 'manual',
+            setCompletionCondition: vi.fn(),
+            conditionDraft: null,
+            setConditionDraft: vi.fn(),
             resetForm: mockResetForm,
             errors: {},
             validateForm: vi.fn(() => true),
@@ -450,7 +414,7 @@ describe('GoalDetailModal smoke coverage', () => {
                 goal_id: 'goal-1',
                 note_kind: 'goal_completion',
             });
-            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false);
+            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false, null);
         });
     });
 
@@ -534,11 +498,11 @@ describe('GoalDetailModal smoke coverage', () => {
 
         await waitFor(() => {
             expect(mockDeleteGoalCompletionNotes).toHaveBeenCalled();
-            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true);
+            expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', true, null);
         });
     });
 
-    it('keeps goal information and timeline in the same scrolling content', async () => {
+    it('shows the timeline heatmap in its own Timeline tab instead of Details', async () => {
         render(
             <GoalDetailModal
                 isOpen={true}
@@ -561,14 +525,18 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
-
         await waitFor(() => {
             expect(screen.getByText('header:Deep Work:active')).toBeInTheDocument();
-            expect(screen.getByText('goal timeline view')).toBeInTheDocument();
         }, { timeout: 5000 });
-        expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
+        expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Timeline' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Edit', exact: true })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }));
+
+        expect(await screen.findByText('goal timeline view:live', {}, { timeout: 5000 })).toBeInTheDocument();
+        expect(screen.queryByText('view:Deep Work')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Edit', exact: true })).not.toBeInTheDocument();
     });
 
     it('shows activities as a tab and moves associate action into the footer', async () => {
@@ -607,7 +575,6 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.getByText('goal activities view')).toBeInTheDocument();
             expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 
@@ -643,62 +610,7 @@ describe('GoalDetailModal smoke coverage', () => {
         }, { timeout: 5000 });
     });
 
-    it('selects an activity from the Activities tab before opening the embedded target builder', async () => {
-        render(
-            <GoalDetailModal
-                isOpen={true}
-                onClose={vi.fn()}
-                goal={{
-                    id: 'goal-1',
-                    name: 'Deep Work',
-                    attributes: { id: 'goal-1', type: 'ShortTermGoal', parent_id: 'parent-1' },
-                }}
-                onUpdate={vi.fn()}
-                onToggleCompletion={vi.fn()}
-                onDelete={vi.fn()}
-                rootId="root-1"
-                treeData={{
-                    id: 'root-1',
-                    name: 'Root',
-                    attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' },
-                    children: [],
-                }}
-            />
-        );
-
-        fireEvent.click(screen.getByRole('tab', { name: 'Activities' }));
-
-        await waitFor(() => {
-            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
-        }, { timeout: 5000 });
-
-        fireEvent.click(screen.getByRole('button', { name: '+ Add Target' }));
-
-        await waitFor(() => {
-            expect(screen.getByText('goal activities view')).toBeInTheDocument();
-            expect(screen.getByText('Select the activity you want to create a target for.')).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'select target activity' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeDisabled();
-        }, { timeout: 5000 });
-
-        fireEvent.click(screen.getByRole('button', { name: 'select target activity' }));
-
-        // The builder now opens in its own modal layered above the Activities view,
-        // rather than replacing the goal detail content.
-        await waitFor(() => {
-            expect(screen.getByText('embedded target builder')).toBeInTheDocument();
-        }, { timeout: 5000 });
-
-        fireEvent.click(screen.getByRole('button', { name: 'save target' }));
-
-        await waitFor(() => {
-            expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
-            expect(screen.queryByText('goal activities view')).not.toBeInTheDocument();
-        }, { timeout: 5000 });
-    });
-
-    it('keeps the Activities footer visible and turns Add Target into Cancel during association flow', async () => {
+    it('keeps the Activities footer visible and turns Associate into Cancel during association flow', async () => {
         render(
             <GoalDetailModal
                 isOpen={true}
@@ -725,7 +637,6 @@ describe('GoalDetailModal smoke coverage', () => {
 
         await waitFor(() => {
             expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeInTheDocument();
-            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
         }, { timeout: 5000 });
 
         fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
@@ -739,7 +650,6 @@ describe('GoalDetailModal smoke coverage', () => {
             expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Add Selected (2 activities)' })).toBeInTheDocument();
             expect(screen.queryByRole('button', { name: '+ Associate Activities' })).not.toBeInTheDocument();
-            expect(screen.queryByRole('button', { name: '+ Add Target' })).not.toBeInTheDocument();
         }, { timeout: 5000 });
 
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -747,7 +657,6 @@ describe('GoalDetailModal smoke coverage', () => {
         await waitFor(() => {
             expect(screen.queryByText('activity association picker')).not.toBeInTheDocument();
             expect(screen.getByRole('button', { name: '+ Associate Activities' })).toBeEnabled();
-            expect(screen.getByRole('button', { name: '+ Add Target' })).toBeInTheDocument();
         }, { timeout: 5000 });
     });
 
@@ -884,9 +793,8 @@ describe('GoalDetailModal smoke coverage', () => {
             />
         );
 
-        // Timeline is integrated into Details, including published snapshots.
         expect(screen.getByRole('tab', { name: 'Details' })).toBeInTheDocument();
-        expect(screen.queryByRole('tab', { name: 'Timeline' })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Timeline' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Activities' })).toBeInTheDocument();
         expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
 
@@ -936,12 +844,97 @@ describe('GoalDetailModal smoke coverage', () => {
                 name: 'Deep Work',
                 description: 'Focus on leverage work',
                 deadline: '2026-04-01',
-                relevance_statement: 'Build momentum',
                 parent_id: 'parent-1',
-                allow_manual_completion: true,
+                completion_condition: 'manual',
             }));
         });
+        expect(onCreate.mock.calls[0][0]).not.toHaveProperty('relevance_statement');
+        expect(onCreate.mock.calls[0][0]).not.toHaveProperty('condition');
+        expect(onCreate.mock.calls[0][0]).not.toHaveProperty('started_at');
 
         expect(mockNotify.success).toHaveBeenCalled();
+    });
+
+    const thresholdActivity = {
+        id: 'activity-1',
+        name: 'Performance',
+        has_metrics: true,
+        metric_definitions: [{ id: 'metric-1', name: 'Quality', unit: 'rating' }],
+    };
+
+    function renderCreateWithCondition(conditionDraft, onCreate) {
+        mockUseGoalForm.mockReturnValue({
+            ...mockUseGoalForm(),
+            startedAt: '2026-03-01',
+            completionCondition: 'activity_threshold',
+            conditionDraft,
+        });
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={null}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn()}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={[]}
+                mode="create"
+                onCreate={onCreate}
+                activityDefinitions={[thresholdActivity]}
+                parentGoal={{ id: 'parent-1', attributes: { id: 'parent-1', type: 'ShortTermGoal' } }}
+            />
+        );
+    }
+
+    it('submits an activity threshold condition and start date through onCreate', async () => {
+        const onCreate = vi.fn().mockResolvedValue({ id: 'goal-2', name: 'Deep Work' });
+        renderCreateWithCondition({
+            activity_definition_id: 'activity-1',
+            kind: 'single_session',
+            measure: 'sets',
+            min_sets: '3',
+            required_count: '3',
+            metric_definition_id: '',
+            operator: '>=',
+            target_value: '',
+            rules: [{ metric_definition_id: 'metric-1', operator: '>=', value: '8.5' }],
+        }, onCreate);
+
+        fireEvent.click(screen.getByText('save goal'));
+
+        await waitFor(() => {
+            expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({
+                completion_condition: 'activity_threshold',
+                started_at: '2026-03-01',
+                condition: {
+                    activity_definition_id: 'activity-1',
+                    kind: 'single_session',
+                    measure: 'sets',
+                    min_sets: 3,
+                    rules: [{ metric_definition_id: 'metric-1', operator: '>=', value: 8.5 }],
+                },
+            }));
+        });
+    });
+
+    it('blocks saving an invalid activity threshold condition', async () => {
+        const onCreate = vi.fn();
+        renderCreateWithCondition({
+            activity_definition_id: 'activity-1',
+            kind: 'single_session',
+            measure: 'sets',
+            min_sets: '1',
+            required_count: '3',
+            metric_definition_id: '',
+            operator: '>=',
+            target_value: '',
+            rules: [],
+        }, onCreate);
+
+        fireEvent.click(screen.getByText('save goal'));
+
+        await waitFor(() => expect(mockNotify.error).toHaveBeenCalledWith('Please fix the errors before saving.'));
+        expect(onCreate).not.toHaveBeenCalled();
     });
 });

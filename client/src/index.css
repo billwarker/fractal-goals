@@ -105,6 +105,19 @@ textarea {
   font-family: inherit;
 }
 
+/* One dropdown chevron, inset from the right edge. Many selects set the background and padding
+   shorthands, so the chevron's properties are !important; a select that draws its own arrow
+   opts out with .select-custom-arrow. */
+select:not([multiple]):not([size]):not(.select-custom-arrow) {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: var(--select-chevron) !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  background-size: 12px 12px !important;
+  padding-right: 38px !important;
+}
+
 img,
 video,
 canvas,

@@ -7,7 +7,7 @@ import {
     GoalMomentumChart,
     StaleGoalsChart,
 } from '../../AnalyticsExtraCharts';
-import { DISABLED_CHART_ANIMATION } from '../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity } from '../../ChartJSWrapper';
 import GoalCompletionTimeline from '../../GoalCompletionTimeline';
 import GoalTimeDistribution from '../../GoalTimeDistribution';
 import styles from '../../ProfileWindow.module.css';
@@ -175,6 +175,7 @@ function StaleGoalsVisualizationChart({ context }) {
 }
 
 function GoalDetailChart({ context }) {
+    const density = useChartDensity();
     const { effectiveSelectedGoal, getGoalTypeColor } = context;
     const selectedChart = context.visualizationState.chart || 'duration';
     if (!effectiveSelectedGoal) {
@@ -196,11 +197,11 @@ function GoalDetailChart({ context }) {
             <div className={styles.chartContainer}>
                 {selectedChart === 'duration' ? (
                     effectiveSelectedGoal.session_durations_by_date?.length > 0
-                        ? <Line data={getDurationChartData(effectiveSelectedGoal)} options={durationChartOptions} />
+                        ? <Line data={getDurationChartData(effectiveSelectedGoal)} options={applyChartDensity(durationChartOptions, density)} />
                         : <div className={styles.noData}>No session data available</div>
                 ) : (
                     effectiveSelectedGoal.activity_breakdown?.length > 0
-                        ? <Bar data={getActivityChartData(effectiveSelectedGoal)} options={activityChartOptions} />
+                        ? <Bar data={getActivityChartData(effectiveSelectedGoal)} options={applyChartDensity(activityChartOptions, density)} />
                         : <div className={styles.noData}>No activities recorded</div>
                 )}
             </div>

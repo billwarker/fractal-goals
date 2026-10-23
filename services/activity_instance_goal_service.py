@@ -3,8 +3,7 @@ from sqlalchemy import select
 from models import ActivityInstance, Goal, Session, activity_instance_goal_associations, utc_now, validate_root_goal
 from services.association_reconciliation import append_goal_association_event
 from services.instance_goal_evidence import load_instance_goal_ids
-from services.instance_goal_target_reconciliation import recalculate_instance_goal_targets
-from services.goal_loading import load_fractal_goals_for_serialization
+from services.goal_condition_service import reconcile_activity_conditions
 from services._completion_context import _emit_pending_events
 from services.events import Event, Events, event_bus
 
@@ -17,7 +16,7 @@ class ActivityInstanceGoalService:
         if not validate_root_goal(self.db_session, root_id, owner_id=user_id):
             return None
         if lock:
-            # A root-level lock also serializes ancestor target rollups across instances.
+            # A root-level lock also serializes ancestor condition rollups across instances.
             self.db_session.query(Goal).filter(Goal.id == root_id).with_for_update().one()
         query = self.db_session.query(ActivityInstance).filter(
             ActivityInstance.id == instance_id, ActivityInstance.root_id == root_id,
@@ -70,8 +69,10 @@ class ActivityInstanceGoalService:
             action='disassociated' if remove else 'associated', occurred_at=now, event_id=association_event.id,
         )
         pending = []
-        goals = load_fractal_goals_for_serialization(self.db_session, root_id)
-        recalculate_instance_goal_targets(self.db_session, instance, {goal_id}, goals, pending)
+        reconcile_activity_conditions(
+            self.db_session, root_id, instance.activity_definition_id, pending,
+            trigger='activity_instance_link_changed',
+        )
         self.db_session.commit()
         self.db_session.expire(instance, ['associated_goal_ids'])
         event_bus.emit(association_event)

@@ -142,7 +142,7 @@ def _seed_embedded_proposal(db, suffix, user):
 def _seed_goal_heatmap(db, suffix, user, now):
     """A multi-year goal with timed, untimed and milestone evidence for browser checks."""
     from datetime import timedelta
-    from models import Goal, GoalLevel, Session, ActivityDefinition, ActivityInstance, Target, EventLog, activity_goal_associations
+    from models import Goal, GoalCompletionCondition, GoalLevel, Session, ActivityDefinition, ActivityInstance, EventLog, activity_goal_associations
 
     root_id = f"browser-root-{suffix}"
     goal_id = f"browser-heatmap-goal-{suffix}"
@@ -151,7 +151,7 @@ def _seed_goal_heatmap(db, suffix, user, now):
     db.flush()
     db.add(Goal(id=goal_id, root_id=root_id, parent_id=root_id, owner_id=user.id, level_id=level_id,
                 name=f'Heatmap Guitar {suffix}', created_at=now - timedelta(days=500),
-                description='Build a steady guitar practice habit.', relevance_statement='Develop confident playing.'))
+                description='Build a steady guitar practice habit.'))
     db.add(ActivityDefinition(id=f'browser-heatmap-activity-{suffix}', root_id=root_id,
                               name='Guitar practice', has_metrics=False, has_sets=False))
     db.flush()
@@ -167,9 +167,15 @@ def _seed_goal_heatmap(db, suffix, user, now):
             session_id=session_id, activity_definition_id=f'browser-heatmap-activity-{suffix}',
             completed=True, created_at=occurred, time_start=occurred, time_stop=occurred,
             duration_seconds=None if index == 3 else 1800, data={}))
-    db.add(Target(id=f'browser-heatmap-target-{suffix}', root_id=root_id, goal_id=goal_id,
-                  activity_id=f'browser-heatmap-activity-{suffix}', name='First clean performance',
-                  created_at=now - timedelta(days=40), completed=True, completed_at=now - timedelta(days=2)))
+    db.add(GoalCompletionCondition(id=f'browser-heatmap-condition-{suffix}', root_id=root_id, goal_id=goal_id,
+                                   activity_definition_id=f'browser-heatmap-activity-{suffix}',
+                                   kind='consistency', measure='sets', required_count=20))
+    db.query(Goal).filter(Goal.id == goal_id).update({'completion_condition': 'activity_threshold'})
+    # A completed milestone child so the heatmap shows a milestone day.
+    db.add(Goal(id=f'browser-heatmap-milestone-{suffix}', root_id=root_id, parent_id=goal_id, owner_id=user.id,
+                level_id=level_id, name='First clean performance', created_at=now - timedelta(days=40),
+                started_at=now - timedelta(days=40), completed=True, completed_at=now - timedelta(days=2),
+                completion_source='manual'))
     for index in range(25):
         db.add(EventLog(id=f'browser-heatmap-event-{suffix}-{index}', root_id=root_id,
             event_type='activity.associated', entity_type='activity_definition', entity_id=f'archived-{index}',
@@ -247,6 +253,10 @@ def main():
                 id="browser-ultimate-level",
                 name="Ultimate Goal",
                 rank=0,
+                # As migration b5c6d7e8f9a0 seeds it: reviewed yearly.
+                uses_reviews=True,
+                review_cadence_value=1,
+                review_cadence_unit="years",
             )
             db.add(ultimate_level)
             db.flush()

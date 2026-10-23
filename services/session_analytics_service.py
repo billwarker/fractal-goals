@@ -5,7 +5,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import models
-from models import ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Session, session_goals, validate_root_goal
+from models import (
+    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Program, ProgramDay, Session, SessionTemplate,
+    session_goals, validate_root_goal,
+)
 from services.serializers import (
     format_utc,
     serialize_activity_instance_for_analytics,
@@ -50,6 +53,17 @@ class SessionAnalyticsService:
                 Session.attributes,
                 # ProgressService.compute_comparisons_for_instances reads it per session.
                 Session.deleted_at,  # pyright: ignore[reportArgumentType] - legacy Column typing; see baseline
+                # Progress scope and the template/program-day analytics filters.
+                Session.template_id,  # pyright: ignore[reportArgumentType] - legacy Column typing; see baseline
+                Session.program_day_id,  # pyright: ignore[reportArgumentType] - legacy Column typing; see baseline
+            ),
+            selectinload(Session.template).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
+                SessionTemplate.id, SessionTemplate.name, SessionTemplate.template_data,  # pyright: ignore[reportArgumentType]
+            ),
+            selectinload(Session.program_day).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
+                ProgramDay.id, ProgramDay.name, ProgramDay.program_id,  # pyright: ignore[reportArgumentType]
+            ).selectinload(ProgramDay.program).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
+                Program.id, Program.name, Program.color,  # pyright: ignore[reportArgumentType]
             ),
         )
 

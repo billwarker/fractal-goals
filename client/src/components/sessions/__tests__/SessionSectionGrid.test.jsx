@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 
-import SessionSectionGrid from '../SessionSectionGrid';
+import SessionSectionGrid, { packIntoStacks } from '../SessionSectionGrid';
 import activityCardStyles from '../ActivityCard.module.css';
 
 describe('SessionSectionGrid', () => {
@@ -279,5 +279,26 @@ describe('SessionSectionGrid', () => {
         expect(screen.getAllByText('Meet prep')).toHaveLength(1);
         expect(screen.getAllByText('Heavy')).toHaveLength(1);
         expect(screen.getByText('(▲33%)')).toBeInTheDocument();
+    });
+});
+
+describe('packIntoStacks', () => {
+    it('stacks consecutive items while the stack stays within the tallest item height', () => {
+        const heights = { a: 60, b: 60, c: 60, d: 300 };
+        // 60 + 8 + 60 + 8 + 60 = 196 fits under 300; d needs its own stack
+        expect(packIntoStacks(['a', 'b', 'c', 'd'], heights, 300).map((s) => s.keys))
+            .toEqual([['a', 'b', 'c'], ['d']]);
+    });
+
+    it('starts a new stack once the next item would exceed the max height', () => {
+        const heights = { a: 100, b: 100, c: 100 };
+        // 100 + 8 + 100 = 208 fits under 220; adding c (316) does not
+        expect(packIntoStacks(['a', 'b', 'c'], heights, 220).map((s) => s.keys))
+            .toEqual([['a', 'b'], ['c']]);
+    });
+
+    it('keeps unmeasured items in their own stack', () => {
+        expect(packIntoStacks(['a', 'b'], {}, 0).map((s) => s.keys))
+            .toEqual([['a'], ['b']]);
     });
 });

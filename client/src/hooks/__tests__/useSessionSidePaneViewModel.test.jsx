@@ -47,7 +47,7 @@ describe('useSessionSidePaneViewModel', () => {
         });
     });
 
-    it('builds a narrow side-pane model with derived notes and timeline inputs', () => {
+    it('builds a narrow side-pane model with derived notes and progress inputs', () => {
         const onModeChange = vi.fn();
         const onOptions = vi.fn();
         const onNoteAdded = vi.fn();
@@ -96,13 +96,18 @@ describe('useSessionSidePaneViewModel', () => {
             onGoalClick,
             onGoalCreated,
         });
-        expect(result.current.timeline).toEqual({
+        expect(result.current.progress).toEqual({
             rootId: 'root-1',
             sessionId: 'session-1',
             selectedActivity,
             sessionActivityDefs: [
                 { id: 'activity-1', name: 'Squat' },
                 { id: 'activity-2', name: 'Bench' },
+            ],
+            // The live instances carry each one's comparison context to the Timeline pane.
+            sessionInstances: [
+                { id: 'inst-1', activity_definition_id: 'activity-1' },
+                { id: 'inst-2', activity_definition_id: 'activity-2' },
             ],
         });
     });

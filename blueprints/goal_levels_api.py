@@ -22,7 +22,6 @@ def serialize_goal_level(level):
         "icon": level.icon,
         "owner_id": level.owner_id,
         "root_id": level.root_id,
-        "allow_manual_completion": level.allow_manual_completion,
         "track_activities": level.track_activities,
         "requires_smart": getattr(level, 'requires_smart', False),
         "deadline_min_value": level.deadline_min_value,
@@ -30,13 +29,13 @@ def serialize_goal_level(level):
         "deadline_max_value": level.deadline_max_value,
         "deadline_max_unit": level.deadline_max_unit,
         "max_children": level.max_children,
-        "auto_complete_when_children_done": level.auto_complete_when_children_done,
-        "can_have_targets": level.can_have_targets,
-
         "description_required": level.description_required,
         "default_deadline_offset_value": level.default_deadline_offset_value,
         "default_deadline_offset_unit": level.default_deadline_offset_unit,
         "sort_children_by": level.sort_children_by,
+        "uses_reviews": bool(getattr(level, 'uses_reviews', False)),
+        "review_cadence_value": getattr(level, 'review_cadence_value', None),
+        "review_cadence_unit": getattr(level, 'review_cadence_unit', None),
         "created_at": format_utc(level.created_at),
         "updated_at": format_utc(level.updated_at)
     }

@@ -32,13 +32,9 @@
 }
 
 .description {
-    margin: 0 0 4px;
+    margin: 0 0 12px;
     color: var(--color-text-secondary);
     font-size: 13px;
-}
-
-.descriptionStandalone {
-    margin-bottom: 12px;
 }
 
 .scopeRow {
@@ -78,21 +74,6 @@
     font: inherit;
     font-weight: 700;
     white-space: nowrap;
-}
-
-.provenanceLegend {
-    display: flex;
-    align-items: baseline;
-    gap: 5px;
-    margin: 0 0 12px;
-    color: var(--color-text-muted);
-    font-size: 12px;
-}
-
-.provenanceLegend > span:first-child {
-    color: var(--color-brand-primary);
-    font-size: 14px;
-    font-weight: 800;
 }
 
 .selectorFrame {

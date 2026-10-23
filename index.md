@@ -6,7 +6,7 @@
 ## Product and runtime
 
 Fractal Goals is a full-stack goal and practice tracker built around a five-level hierarchical
-goal model. Sessions capture execution; activities, templates, programs, targets, progress,
+goal model. Sessions capture execution; activities, templates, programs, completion conditions, progress,
 notes, and analytics provide structure and evidence.
 
 - Backend: Flask on port 8001, PostgreSQL, SQLAlchemy, Alembic
@@ -71,16 +71,64 @@ tokens. Mobile openers leave the header; sheets sit above the footer. Page filte
 
 ## Core domains
 
-### Goals and targets
+### Goals and completion conditions
 
 Goals form `Ultimate → Long Term → Mid Term → Short Term → Immediate` hierarchies. Fractal
 roots self-scope with `root_id == id`. Goal status, contribution evidence, pause history,
-association inheritance, target evaluation, and timeline projections are service-owned.
+association inheritance, condition evaluation, and timeline projections are service-owned.
 
-Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_target_service.py`,
-`blueprints/goals_api.py`, `client/src/components/goals/`, and `client/src/pages/Goals.jsx`.
+Primary code: `services/goal_service.py` and `_goal_*` modules, `services/goal_condition_*.py`,
+`blueprints/goals_api.py`, `blueprints/goal_conditions_api.py`, `client/src/components/goals/`,
+and `client/src/pages/Goals.jsx`.
 
-Goal Details has one Timeline section beneath targets: a lifetime calendar heatmap (intensity =
+Each goal completes in exactly one way (`goals.completion_condition`): an **activity threshold**
+(`goal_completion_conditions` + `goal_condition_metric_rules`: single session — N sets meeting every
+rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions),
+**children** (all child goals complete), or **manual**. Manual completion is always allowed and is
+recorded as `manual_override` unless the condition is `manual`. Progress is never stored: the pure
+`goal_condition_evaluator.py` runs over canonical instance evidence inside the goal's active period
+(`started_at` to deadline, minus pause intervals), and `goal_condition_service.reconcile_goal`
+completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
+After a manual uncompletion only newer evidence re-completes a goal. Rule values are
+`Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
+`CompletionConditionEditor` and `CompletionConditionSummary` render it, and `ConditionProgressChart`
+charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
+`goalCondition` query-key root.
+Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)
+and their tables and columns dropped by `a4b5c6d7e8f9`.
+See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
+
+SMART's R is **Reviewed** (relevance statements were retired into goal notes by `c6d7e8f9a0b1`).
+Reviewed levels (`goal_levels.uses_reviews`; Ultimate, Long and Mid Term by default) review goals on a
+cadence: the goal's own (`goals.review_cadence_*`) or the level's. `services/goal_review_rules.py`
+schedules the next review one cadence after the latest `goal_review` note (or the start), honouring
+`review_disabled` and `review_deferred_until`, and `is_reviewed` makes R depend on it: a due review
+takes R away until one is written. Goals on those levels serialize a `review` object, with review dates
+batch-loaded by `load_fractal_goals_for_serialization`. Notes carry an explicit
+`note_kind` (`goal_completion | goal_review`, CHECK-constrained). New goals start their due date at the
+level's default horizon.
+
+Goals are created from the Program calendar, Days and Session Detail hierarchies by scoping a goal
+through its icon and using its "+" (`GoalHierarchyList`, `onStartSubGoalCreation`). Every create
+path inserts the server's goal into cached trees and refetches goal read models through
+`utils/goalTreeCache.js` `applyCreatedGoal`. Interaction details:
+[UI behaviour contracts](planning/ui-contracts-reference.md#creating-goals-from-hierarchies).
+
+Due dates are soft guidance. `services/goal_deadline_rules.py` (mirrored by
+`client/src/utils/goalDeadlineRules.js`, both checked against `tests/fixtures/goal_deadline_cases.json`)
+warns when a date is after the parent's, before a child's, outside the level's horizon, or outside a
+program. Goal create and update responses carry `deadline_warnings`. Nothing is rejected, and children
+are never rewritten. Relative due text (Program calendar Goals pane and flow tree), calendar badges and drag-to-set:
+[UI behaviour contracts](planning/ui-contracts-reference.md#goal-due-dates-on-the-program-calendar).
+
+Sequences (`services/goal_sequence_service.py`, `blueprints/goal_sequences_api.py`) order same-level
+siblings so each begins when the one before completes. They are built on pause: later steps hold a
+pause interval with reason `sequence`. Manual, condition and child completions resume the next step
+in their own transaction, recording `resumed_by_goal_id`, so un-completing re-pauses exactly that
+step. Move, Convert Level and Delete take a goal out of its sequence. Details:
+[UI behaviour contracts](planning/ui-contracts-reference.md#goal-sequences).
+
+Goal Details has one Timeline section beneath the completion summary: a lifetime calendar heatmap (intensity =
 completed-activity counts, user timezone, optional child scope) above cursor-paginated evidence
 cards; selecting a date filters the list. Header, sticky calendar, footer and responsive sizing
 contracts live in [UI behaviour contracts](planning/ui-contracts-reference.md#goal-details-and-timeline).
@@ -88,7 +136,7 @@ contracts live in [UI behaviour contracts](planning/ui-contracts-reference.md#go
 `blueprints/goal_history_api.py` registers history reads. `services/goal_timeline_service.py` owns the
 shared evidence projection, `services/goal_activity_heatmap.py` daily aggregation, and
 `services/goal_timeline_page.py` stable mode filtering/cursors. Calendar summaries use complete
-evidence; pages default to 20 entries with no total-history cap, and rich activity/target data loads
+evidence; pages default to 20 entries with no total-history cap, and rich activity data loads
 only for the selected page. Shared activity instances count once. `components/common/CalendarHeatmap.jsx`
 serves goal and session calendars; `GoalTimelineFeed.jsx` and `GoalTimelineEntries.jsx` own the list
 and canonical cards. All queries share the `goalTimeline` invalidation root. Published landing
@@ -98,11 +146,10 @@ See [Goal Timeline](planning/goal-activity-heatmap.md).
 Goal evidence is resolved per activity instance: active direct instance links are unioned with
 existing definition/group sources, and each instance counts once across overlapping sources and
 ancestor rollups. One-off links roll upward, never inherit downward or add a definition to a
-reusable activity catalog. Occurrence dates retain goal lifetime, pause/completion exclusions,
-and target windows. `services/instance_goal_evidence.py` owns that attribution invariant;
-`activity_instance_goal_service.py` owns authenticated, reversible association mutations, and
-`instance_goal_target_reconciliation.py` applies existing target lifecycle rules in the same
-transaction. The additive `activity_instance_goal_associations` table preserves creation history
+reusable activity catalog. Occurrence dates retain goal lifetime and pause/completion
+exclusions. `services/instance_goal_evidence.py` owns that attribution invariant;
+`activity_instance_goal_service.py` owns authenticated, reversible association mutations and
+reconciles affected goal conditions in the same transaction. The additive `activity_instance_goal_associations` table preserves creation history
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
@@ -122,12 +169,21 @@ filter; legacy completion URL parameters do not constrain its list or heatmap.
 
 Activity definitions and instances, metrics, sets, circuits, work intervals, templates, and tags remain relationally linked. Dynamic progress is
 calculated from canonical result data; obsolete snapshot progress is not a competing source.
-Activities, circuit runs, and rounds use one fractal-owned tag catalog (`ActivityTagDefinition`).
-Circuit pickers read the full catalog and assign its identity, extending activity bindings to
-members as needed; they never silently merge same-name definitions. Activity availability controls
-remain catalog-owned. Circuit scopes materialize canonical instance/set links and preserve prior
-or overlapping assignments on removal. All session tag editors share the activity chip styling.
-See [Shared circuit tags audit](planning/shared-circuit-tags-audit.md).
+A tag is one `ActivityTagDefinition` per fractal, and any tag can be used on any activity: instance
+links (`activity_instance_tags`), set links (`activity_set_tags`), circuit run/round scopes
+(`circuit_scope_tags`, pure references) and planned tags all hold its id. Names are unique per
+fractal for the tag's whole life, archived tags included, through the generated `normalized_name`
+column (collapse whitespace, then trim and lowercase); `services/activity_tags.py` and
+`client/src/utils/tagNames.js` mirror it against `tests/fixtures/tag_name_normalization_cases.json`.
+Create and rename return 409 `tag_name_taken` with the existing tag, so pickers offer "Add" or
+"Restore" and the manager offers "Merge into…" instead of ever creating a copy. Tag families
+(`ActivityTagFamily`) order tags in every picker (families by `sort_order`, then "Other tags"); a
+single-select family allows one of its tags directly on an instance or set (422
+`tag_family_single_select`; circuit scopes replace the sibling and restore it on removal). Merge and
+hard delete rewrite planned tags in stored plans (`services/tag_reference_rewrites.py`). Database
+triggers keep each link inside its fractal and maintain `tag_signature` on instances and sets. All
+pickers group options with `client/src/utils/tagPickerOptions.js`.
+See [Tag families and tag-aware progress](planning/tag-families-and-tag-aware-progress.md).
 Metric input type and precision are live settings of the shared fractal metric, including for
 existing active/completed sessions and template prescriptions. Saving a metric refreshes activity
 and circuit definition caches; formatting changes preserve recorded and planned numeric values.
@@ -139,9 +195,9 @@ Primary code: `services/session_*`, `services/activity_*`, `services/progress_se
 
 Template section items carry a stable `item_key` (never `id`, a legacy activity-id alias) and an
 optional `prescription`: planned values per set or per metric, activity and set notes, and planned
-tags (`tags`: activity tag binding ids on the activity and on each set) (`validators/prescriptions.py`
+tags (`tags`: catalog tag ids on the activity and on each set) (`validators/prescriptions.py`
 owns shape; `services/prescriptions.py` checks that metrics and splits belong to the item's activity
-and respect metric bounds, and that tags are active bindings of that activity). Planned tags are
+and respect metric bounds, and that tags are active tags of the fractal). Planned tags are
 applied to the new instance and its planned sets at session creation, like tags added in-session. Templates count content edits in
 `revision`. Session creation snapshots the authoritative template's or dated plan's prescription onto
 `activity_instances.prescription`, looked up by `item_key`; client-sent planned values are ignored.
@@ -150,7 +206,7 @@ snapshots the plan on `circuit_runs.prescription`.
 Planned set activities start with one empty `planned` set per planned set and are reference-only
 (no metric defaults). Plan editors live in `components/prescriptions/`, plan section helpers in
 `services/plan_sections.py`, and the session card's "(plan …)" hint in `utils/sessionPrescription.js`.
-Plans never feed targets.
+Plans never feed completion conditions.
 
 Timer mutations persist the timer state and derived duration statistics in one
 transaction, then emit immutable event payloads after commit. Completing a session is also a
@@ -264,9 +320,26 @@ Detailed design:
 
 ### Bounded history reads
 
-`ProgressService` resolves one predecessor identity per requested instance in SQL, then
-hydrates only requested instances and those predecessors. Completed predecessors take
-priority, same-session instances are excluded, and tag/set inclusion remains canonical.
+`ProgressService` resolves predecessors for a whole batch in one SQL statement, then hydrates
+only requested instances and those predecessors. An instance compares with the latest earlier
+instance whose own tags match its comparison context: the same tags by default, chosen tags, or
+all history (`activity_instances.progress_compare_mode` plus `activity_instance_compare_tags`),
+optionally only within the same session template and/or program day
+(`progress_compare_same_template` / `progress_compare_same_program_day`). It is set per instance
+from the Progress pane and never changes other instances; `activity_progress_defaults` remembers the
+choice per activity × template/program day, and an insert trigger pre-applies it to new instances
+there. `GET …/progress-series` feeds the pane's chart: `chart_settings` (resolved by
+`services/progress_chart_settings.py`) says whether it's goal progress (the in-scope goal condition,
+`services/progress_chart_spec.py`), an activity trend (a metric or yield), a scatter or a metric trend,
+with its metrics and set aggregation (top / average / total for yield). The choice is saved in
+`activity_progress_charts` per activity × template/program day (both NULL: activity-wide, the fallback)
+via `PUT …/activity-instances/<id>/progress-chart`; saved fields that no longer apply fall back to the
+default (goal progress, else a scatter for 2+ tracked metrics, else a trend). The client draws it with
+the Analytics charts (`ScatterPlot`, `MetricTrendsChart`) and one set-aggregation utility,
+`utils/setAggregation.js`, shared by every activity chart. Each group of sets
+with the same set tags compares with the latest earlier instance in that context holding such sets,
+k-th set to k-th set. Completed predecessors take priority and same-session instances are excluded.
+Matching uses the trigger-maintained `tag_signature` columns (lookup keys, not stored progress).
 There is no competing full-history comparison cache/calculation.
 
 `goal_evidence_query.py` projects canonical timeline identities; `goal_evidence_read_model.py`
@@ -298,6 +371,17 @@ Optional surface widgets and the quick-session workspace load at their use bound
 Notes support goal/session/activity scoping and safe markdown media rendering. Analytics uses
 a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
+
+**Goal charts** replace the old target manager's per-goal view: saved activity, goal and session
+views (`analytics_dashboards`, `kind='view'`) attach to goals through `goal_analytics_views` (migration
+`d7e8f9a0b1c2`; `services/goal_chart_service.py`, `blueprints/goal_charts_api.py`; at most 12 a
+goal; query views stay in Analytics). Goals point to the view, so edits flow through; deleting
+a view removes its links after a warning that names its goals. Activity-threshold goals also get
+a derived (never stored) "Progress toward…" chart. `useVisualizationContext` is the one chart
+context for `ProfileWindow`, `AnalyticsWidget` and `SavedViewChart`; small containers render the
+simplified `compact` density (`applyChartDensity`, `useContainerDensity`). Embedded charts read
+bounded data (`/activities/<id>/analytics-evidence`, 500 newest). UI lives in
+`client/src/components/goalCharts/`. See [Goal charts plan](planning/goal-analytics-charts.md).
 
 Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/notes_api.py`,
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
@@ -350,7 +434,7 @@ The current implementation contains delegated OAuth/MCP, reviewed proposal execu
 and a fully embedded, persistent chat shell backed by the gated provider worker.
 The September 22 target replaces the handoff-first flow, removes manual entity-focus
 selection, and supports reviewed create/update proposals across goals, sessions,
-activities, metrics, programs, notes and templates. The agent discovers scoped context
+activities, metrics, programs, notes and templates, plus `set_goal_sequence` to order sibling goals. The agent discovers scoped context
 automatically; users preview and accept an immutable proposal before domain writes occur.
 Existing domain services remain canonical. Optional connectors have separate release
 gates. The embedded vertical slice and local correctness fixes are implemented behind

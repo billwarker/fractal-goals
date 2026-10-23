@@ -4,7 +4,15 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('../../../../utils/api', () => ({
-    fractalApi: { getActivityTagCatalog: vi.fn(() => Promise.resolve({ data: { tags: [] } })) },
+    fractalApi: {
+        getActivityTagCatalog: vi.fn(() => Promise.resolve({ data: {
+            families: [],
+            tags: [
+                { id: 'tag-paused', name: 'Paused', archived: false },
+                { id: 'tag-top', name: 'Top set', archived: false },
+            ],
+        } })),
+    },
 }));
 
 import SessionPlanCard from '../SessionPlanCard';
@@ -12,10 +20,6 @@ import SessionPlanCard from '../SessionPlanCard';
 const bench = {
     id: 'bench', name: 'Bench Press', has_sets: true,
     metric_definitions: [{ id: 'w', name: 'Weight', unit: 'kg' }],
-    tags: [
-        { id: 'tag-paused', name: 'Paused', scope: 'selected', archived: false },
-        { id: 'tag-top', name: 'Top set', scope: 'selected', archived: false },
-    ],
 };
 
 const entry = {
@@ -121,7 +125,7 @@ describe('SessionPlanCard scoping', () => {
         expect(setRemove.previousElementSibling).toContainElement(within(card).getByRole('group', { name: 'Set tags' }));
     });
 
-    it('lists planned tags by name on a past, read-only plan', () => {
+    it('lists planned tags by name on a past, read-only plan', async () => {
         const tagged = {
             ...entry,
             sections: [{ name: 'Main', items: [{
@@ -130,8 +134,8 @@ describe('SessionPlanCard scoping', () => {
             }] }],
         };
         const { card } = renderCard({ entry: tagged, readOnly: true });
-        // The same tag chips a live plan shows, without the picker.
-        expect(within(card).getByText('Paused')).toBeInTheDocument();
+        // The same tag chips a live plan shows, named from the catalog, without the picker.
+        expect(await within(card).findByText('Paused')).toBeInTheDocument();
         expect(within(card).getByText('Top set')).toBeInTheDocument();
         expect(within(card).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
     });

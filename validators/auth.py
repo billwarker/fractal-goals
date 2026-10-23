@@ -293,24 +293,15 @@ class LandingTreeViewSettingsSchema(BaseModel):
 class LandingGoalBulletSchema(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    key: Literal['break_down', 'associate_activities', 'set_targets']
+    key: Literal['break_down', 'associate_activities', 'set_conditions']
     heading: str = Field(..., min_length=1, max_length=100)
     body: str = Field(..., min_length=1, max_length=600)
     goal_id: Optional[str] = Field(None, min_length=1, max_length=120)
-    target_id: Optional[str] = Field(None, min_length=1, max_length=120)
 
-    @field_validator('heading', 'body', 'goal_id', 'target_id')
+    @field_validator('heading', 'body', 'goal_id')
     @classmethod
     def sanitize_landing_goal_content(cls, v: Optional[str]) -> Optional[str]:
         return sanitize_string(v) if v else v
-
-    @model_validator(mode='after')
-    def validate_target_selection(self) -> 'LandingGoalBulletSchema':
-        if self.key != 'set_targets' and self.target_id:
-            raise ValueError('Only the set-targets landing bullet may select a target')
-        if self.target_id and not self.goal_id:
-            raise ValueError('A landing target selection requires a goal selection')
-        return self
 
 
 class LandingGoalsPageSchema(BaseModel):
@@ -319,7 +310,7 @@ class LandingGoalsPageSchema(BaseModel):
     @field_validator('bullets')
     @classmethod
     def validate_goal_bullet_keys(cls, v: List[LandingGoalBulletSchema]) -> List[LandingGoalBulletSchema]:
-        if [bullet.key for bullet in v] != ['break_down', 'associate_activities', 'set_targets']:
+        if [bullet.key for bullet in v] != ['break_down', 'associate_activities', 'set_conditions']:
             raise ValueError('Landing goal bullets must use the canonical order and keys')
         return v
 

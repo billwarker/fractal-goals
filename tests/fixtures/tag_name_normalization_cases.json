@@ -1,0 +1,8 @@
+[
+  {"input": "Warmup", "display": "Warmup", "normalized": "warmup"},
+  {"input": "  warm   up ", "display": "warm up", "normalized": "warm up"},
+  {"input": "WARMUP\t", "display": "WARMUP", "normalized": "warmup"},
+  {"input": "Heavy\nSingles", "display": "Heavy Singles", "normalized": "heavy singles"},
+  {"input": "Zone 2", "display": "Zone 2", "normalized": "zone 2"},
+  {"input": "Élan", "display": "Élan", "normalized": "élan"}
+]

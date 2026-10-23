@@ -280,7 +280,6 @@ def test_storage_usage_is_exact_and_executes_as_one_scalar_statement(
     sample_ultimate_goal,
 ):
     sample_ultimate_goal.description = "Unicode snow: 雪"
-    sample_ultimate_goal.relevance_statement = "Meaningful"
     sample_ultimate_goal.progress_settings = {"mode": "weighted", "labels": ["é", "steady"]}
     session = Session(
         id=str(uuid.uuid4()),
@@ -333,8 +332,6 @@ def test_storage_usage_is_exact_and_executes_as_one_scalar_statement(
         QuotaService._payload_size(
             sample_ultimate_goal.name,
             sample_ultimate_goal.description,
-            sample_ultimate_goal.relevance_statement,
-            sample_ultimate_goal.targets,
             sample_ultimate_goal.progress_settings,
             sample_ultimate_goal.completion_reason,
         ),

@@ -656,7 +656,8 @@ class TestProgressService:
         )
         db_session.commit()
 
-        history = ProgressService(db_session).get_progress_history(activity.id, sample_ultimate_goal.id, limit=10)
+        timeline = ProgressService(db_session).get_progress_timeline(activity.id, sample_ultimate_goal.id, limit=10)
+        history = [item['progress_comparison'] for item in timeline['items']]
 
         assert len(history) == 2
         latest = next(item for item in history if item['activity_instance_id'] == current_instance.id)

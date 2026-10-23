@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy import func, inspect
 from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
-from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, Target, MetricValue, ProgramDay, Session, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, ActivitySet, CircuitRun, CircuitRound, Goal, MetricValue, ProgramDay, Session, validate_root_goal
 import models
 from services.effective_goal_activities import resolve_effective_goals_by_activity
 from services.goal_loading import goal_serializer_relationship_loaders, load_fractal_goals_for_serialization
@@ -173,32 +173,13 @@ class SessionService:
         }
 
         direct_completed_goals = self.db_session.query(Goal).options(
-            selectinload(Goal.level),
-            selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
+            *goal_serializer_relationship_loaders(),
         ).filter(
             Goal.completed_session_id.in_(session_ids),
             Goal.deleted_at == None,
         ).all()
         for goal in direct_completed_goals:
             session_id = goal.completed_session_id
-            if session_id in completed_goals_by_session_id:
-                completed_goals_by_session_id[session_id][goal.id] = goal
-
-        target_completed_rows = self.db_session.query(
-            Target.completed_session_id,
-            Goal,
-        ).join(
-            Goal,
-            Goal.id == Target.goal_id,
-        ).options(
-            selectinload(Goal.level),
-            selectinload(Goal.targets_rel).selectinload(Target.metric_conditions),
-        ).filter(
-            Target.completed_session_id.in_(session_ids),
-            Target.deleted_at == None,
-            Goal.deleted_at == None,
-        ).all()
-        for session_id, goal in target_completed_rows:
             if session_id in completed_goals_by_session_id:
                 completed_goals_by_session_id[session_id][goal.id] = goal
 

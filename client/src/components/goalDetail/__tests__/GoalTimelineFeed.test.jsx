@@ -4,7 +4,7 @@ import GoalTimelineFeed from '../GoalTimelineFeed';
 
 const { pages } = vi.hoisted(() => ({ pages: vi.fn(() => ({ isLoading: false })) }));
 vi.mock('../../../hooks/useGoalTimelinePages', () => ({ useGoalTimelinePages: pages }));
-vi.mock('../GoalTimelineEntries', () => ({ GoalTimelineEntries: ({ entries }) => entries.map((entry) => <p key={entry.id}>{entry.title}</p>) }));
+vi.mock('../GoalTimelineEntries', async (importOriginal) => ({ ...await importOriginal(), GoalTimelineEntries: ({ entries }) => entries.map((entry) => <p key={entry.id}>{entry.title}</p>) }));
 
 const snapshotEntries = Array.from({ length: 25 }, (_, index) => ({
     id: String(index), title: `Work ${index}`, timestamp: '2026-10-09T02:00:00Z', event_type: 'activity.completed',

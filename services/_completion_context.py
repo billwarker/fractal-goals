@@ -55,24 +55,13 @@ def clear_live_progress():
 
 
 def get_recent_achievements():
-    """Get achievements tracked during the current request. Called by API endpoints."""
-    return {
-        'achieved_targets': getattr(_achievement_context, 'achieved_targets', []),
-        'completed_goals': getattr(_achievement_context, 'completed_goals', [])
-    }
+    """Get goals completed during the current request. Called by API endpoints."""
+    return {'completed_goals': getattr(_achievement_context, 'completed_goals', [])}
 
 
 def clear_achievement_context():
     """Clear achievement tracking. Should be called at start of request."""
-    _achievement_context.achieved_targets = []
     _achievement_context.completed_goals = []
-
-
-def _track_target_achievement(target_data: dict):
-    """Track a target achievement for the current request."""
-    if not hasattr(_achievement_context, 'achieved_targets'):
-        _achievement_context.achieved_targets = []
-    _achievement_context.achieved_targets.append(target_data)
 
 
 def _track_goal_completion(goal_data: dict):

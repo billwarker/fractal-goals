@@ -4,6 +4,7 @@ import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 
 const VIEW_VISIT_KEYS = {
     timeline: 'goal_timeline',
+    'goal-timeline': 'goal_timeline',
     'goal-activities': 'goal_activities',
     'goal-notes': 'goal_notes',
 };

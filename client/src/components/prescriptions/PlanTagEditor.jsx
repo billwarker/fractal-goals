@@ -22,7 +22,6 @@ export default function PlanTagEditor({
             className={className}
             rootId={rootId}
             activityId={definition.id}
-            availableTags={definition.tags || []}
             inheritedTags={inheritedTags}
             selectedTagIds={tagIds}
             onChangeTags={onChangeTags}

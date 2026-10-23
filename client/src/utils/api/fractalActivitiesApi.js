@@ -37,8 +37,6 @@ export const fractalActivitiesApi = {
     getActivityInstances: (rootId) => axios.get(`${API_BASE}/${rootId}/activity-instances`),
     getActivityInstanceProgress: (rootId, instanceId) =>
         axios.get(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress`),
-    getActivityProgressHistory: (rootId, activityDefId, params = {}) =>
-        axios.get(`${API_BASE}/${rootId}/activities/${activityDefId}/progress-history`, { params }),
     getActivityTagCatalog: (rootId, params = {}) =>
         axios.get(`${API_BASE}/${rootId}/activity-tags`, { params }),
     createActivityTagCatalogItem: (rootId, data) =>
@@ -61,16 +59,29 @@ export const fractalActivitiesApi = {
         axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
     replaceActivitySetTags: (rootId, setId, tagIds, version = null) =>
         axios.put(`${API_BASE}/${rootId}/activity-sets/${setId}/tags`, { tag_ids: tagIds, ...(version ? { version } : {}) }),
-    createActivityProgressView: (rootId, activityId, data) =>
-        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/progress-views`, data),
-    updateActivityProgressView: (rootId, activityId, viewId, data) =>
-        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/progress-views/${viewId}`, data),
-    deleteActivityProgressView: (rootId, activityId, viewId) =>
-        axios.delete(`${API_BASE}/${rootId}/activities/${activityId}/progress-views/${viewId}`),
-    activateActivityProgressView: (rootId, activityId, viewId) =>
-        axios.put(`${API_BASE}/${rootId}/activities/${activityId}/active-progress-view`, { view_id: viewId }),
+    setActivityInstanceProgressComparison: (rootId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress-comparison`, data),
+    setActivityInstanceProgressChart: (rootId, instanceId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-instances/${instanceId}/progress-chart`, data),
     getActivityProgressTimeline: (rootId, activityId, params = {}) =>
-        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-timeline`, { params }),
-    queryActivityProgress: (rootId, activityId, data) =>
-        axios.post(`${API_BASE}/${rootId}/activities/${activityId}/progress-query`, data),
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-timeline`, {
+            params,
+            // Flask reads repeated keys (tag_ids=a&tag_ids=b), not tag_ids[]=a.
+            paramsSerializer: { indexes: null },
+        }),
+    getActivityProgressSeries: (rootId, activityId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-series`, {
+            params,
+            paramsSerializer: { indexes: null },
+        }),
+    reorderActivityTags: (rootId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-tags/order`, data),
+    createActivityTagFamily: (rootId, data) =>
+        axios.post(`${API_BASE}/${rootId}/activity-tag-families`, data),
+    updateActivityTagFamily: (rootId, familyId, data) =>
+        axios.put(`${API_BASE}/${rootId}/activity-tag-families/${familyId}`, data),
+    deleteActivityTagFamily: (rootId, familyId, version = null) =>
+        axios.delete(`${API_BASE}/${rootId}/activity-tag-families/${familyId}`, { data: version ? { version } : {} }),
+    reorderActivityTagFamilies: (rootId, familyIds) =>
+        axios.put(`${API_BASE}/${rootId}/activity-tag-families/order`, { family_ids: familyIds }),
 };

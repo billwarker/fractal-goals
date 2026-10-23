@@ -162,7 +162,6 @@ export function ActivityTimelineCard({
     const displayTime = showTime ? formatTime(displayTimestamp, timezone) : null;
     const sessionTemplateName = instance.session_template_name || instance.session_name;
     const sessionTemplateColor = instance.session_template_color || instance.template_color;
-    const isExcluded = instance.included === false || progressRecord?.included === false;
 
     const progressComparisons = Array.isArray(progressRecord?.metric_comparisons)
         ? progressRecord.metric_comparisons
@@ -259,7 +258,7 @@ export function ActivityTimelineCard({
     };
 
     return (
-        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''} ${isExcluded ? styles.timelineCardExcluded : ''}`}>
+        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`} data-instance-id={instance.id}>
             {isGoalTimeline ? (
                 <div className={styles.timelineCardHeader}>
                     {instance.session_name ? (
@@ -297,7 +296,7 @@ export function ActivityTimelineCard({
             ) : (
                 <>
                     <div className={styles.timelineCardHeader}>
-                        <span className={styles.timelineCardDate}>{displayDate}{isExcluded ? ' · Excluded' : ''}</span>
+                        <span className={styles.timelineCardDate}>{displayDate}</span>
                         {duration && (
                             <span className={styles.timelineCardDuration}>
                                 <ClockIcon size={13} />
@@ -361,8 +360,7 @@ export function ActivityTimelineCard({
                     {sets.map((set, idx) => (
                         <div
                             key={set.instance_id || idx}
-                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''}`}
-                        >
+                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''}`}>
                             <span className={styles.timelineSetNum}>#{idx + 1}</span>
                             <div className={styles.timelineSetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
@@ -386,9 +384,8 @@ export function ActivityTimelineCard({
                                 })}
                             </div>
                             <ActivityTagBadges
-                                tags={set.tags}
-                                className={styles.timelineSetTags}
-                                ariaLabel={`Set ${idx + 1} tags`}
+                                tags={set.tags} hideTags={instance.tags}
+                                className={styles.timelineSetTags} ariaLabel={`Set ${idx + 1} tags`}
                             />
                             {yieldBySetIndex?.[idx] != null && (() => {
                                 const currYield = yieldBySetIndex[idx];

@@ -6,7 +6,7 @@ function SessionDetailMobileDock({
     sidePaneMode,
     onModeSelect,
 }) {
-    const modes = ['details', 'timeline'];
+    const modes = ['details', 'progress'];
 
     return (
         <footer className={styles.mobileBottomDock} aria-label="Session detail views">

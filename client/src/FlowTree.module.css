@@ -59,6 +59,30 @@
     pointer-events: none;
 }
 
+/* Sequence order, outside the icon on its left so it never shifts the layout. */
+.sequenceStepNumber {
+    position: absolute;
+    right: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
 .nodeTextContainer {
     margin-left: 12px;
     display: flex;
@@ -129,16 +153,6 @@
 
 .timingSeparator {
     margin: 0 6px;
-}
-
-.dueTimeOverdue {
-    color: #ff5252;
-    font-weight: bold;
-}
-
-.dueTimeOnTime {
-    color: var(--color-brand-success);
-    font-weight: bold;
 }
 
 .addChildButton {

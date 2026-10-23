@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
-import { DISABLED_CHART_ANIMATION, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const improvedColor = '#22c55e';
 const regressedColor = '#ef4444';
@@ -83,6 +83,7 @@ export function MetricProgressChart({
     metric = null,
 }) {
     const chartTheme = useChartThemeDefaults();
+    const density = useChartDensity();
     const metricDefinitions = activity?.metric_definitions || [];
     const selectedMetricId = metric?.id || metric || metricDefinitions.find((item) => item.track_progress !== false)?.id || null;
     const rows = useMemo(() => buildMetricProgressRows({
@@ -103,6 +104,7 @@ export function MetricProgressChart({
                 labels: rows.map((row) => row.label),
                 datasets: [{
                     label: '% improvement',
+                    metricId: selectedMetricId, // read by the chart's "Set goal here…" menu
                     data: rows.map((row) => row.value),
                     backgroundColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
                     borderColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
@@ -112,7 +114,7 @@ export function MetricProgressChart({
                     metricNames: rows.map((row) => row.metricName),
                 }],
             }}
-            options={{
+            options={applyChartDensity({
                 responsive: true,
                 maintainAspectRatio: false,
                 ...DISABLED_CHART_ANIMATION,
@@ -150,7 +152,7 @@ export function MetricProgressChart({
                         title: { display: true, text: '% improvement', color: chartTheme.textColor },
                     },
                 },
-            }}
+            }, density)}
         />
     );
 }

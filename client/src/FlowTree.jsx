@@ -1,6 +1,5 @@
 import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import ReactFlow, {
-    BaseEdge,
     useNodesState,
     useEdgesState,
     getViewportForBounds,
@@ -9,8 +8,10 @@ import ReactFlow, {
 import {
     DEFAULT_VIEW_SETTINGS,
     FLOWTREE_LAYOUT_NODE_DIMENSIONS,
+    getSequenceBadgeBox,
 } from './components/flowTree/flowTreeGraphUtils';
 import FlowTreeNode from './components/flowTree/FlowTreeNode';
+import { flowTreeEdgeTypes as edgeTypes } from './components/flowTree/flowTreeEdges';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
 import useFlowTreeGraph from './components/flowTree/useFlowTreeGraph';
 import useIsMobile from './hooks/useIsMobile';
@@ -23,24 +24,6 @@ const nodeTypes = {
     custom: FlowTreeNode,
 };
 
-function TreeCenterEdge({ data, style, className }) {
-    const source = data?.sourceCenter;
-    const target = data?.targetCenter;
-    if (!source || !target) return null;
-
-    return (
-        <BaseEdge
-            path={`M ${source.x} ${source.y} L ${target.x} ${target.y}`}
-            style={style}
-            className={className}
-        />
-    );
-}
-
-const edgeTypes = {
-    treeCenter: TreeCenterEdge,
-};
-
 const EMPTY_ARRAY = [];
 
 function getGraphBounds(nodes, dimensions) {
@@ -49,7 +32,10 @@ function getGraphBounds(nodes, dimensions) {
     const bounds = nodes.reduce((acc, node) => {
         const width = node.width || dimensions.width;
         const height = node.height || dimensions.height;
-        const minX = node.position.x;
+        // A sequence step's number badge sits left of its node, so fit the view to include it.
+        const minX = node.data?.sequencePosition != null
+            ? getSequenceBadgeBox(node).x - getSequenceBadgeBox(node).halfWidth
+            : node.position.x;
         const minY = node.position.y;
         const maxX = node.position.x + width;
         const maxY = node.position.y + height;
@@ -106,6 +92,7 @@ const FlowTree = React.forwardRef(({
     activityGroups = EMPTY_ARRAY,
     programs = EMPTY_ARRAY,
     allowedGoalIds = null,
+    focusGoalIds = null,
     scopedProgramName = null,
     viewSettings = DEFAULT_VIEW_SETTINGS,
     onNodeClick,
@@ -137,9 +124,15 @@ const FlowTree = React.forwardRef(({
 
     const { nodes: graphNodes, edges: graphEdges, metrics: graphMetrics } = useFlowTreeGraph({
         treeData, onNodeClick, onAddChild, selectedNodeId, viewSettings, evidenceGoalIds,
-        metricsSummary, activities, activityGroups, programs, allowedGoalIds, isMobile, layoutMode,
+        metricsSummary, activities, activityGroups, programs, allowedGoalIds, focusGoalIds, isMobile, layoutMode,
     });
     const [nodes, setNodes, onNodesChange] = useNodesState(graphNodes);
+    // Read by setInitialViewport, so a node change (e.g. a sequence preview) refits without
+    // re-running the fade-out effects that depend on that callback.
+    const nodesRef = React.useRef(nodes);
+    useEffect(() => {
+        nodesRef.current = nodes;
+    }, [nodes]);
     const [edges, setEdges, onEdgesChange] = useEdgesState(graphEdges);
     const showEmptyScopedProgramMessage = Boolean(scopedProgramName) && nodes.length === 0;
     const showNoActiveGoalsMessage = !showEmptyScopedProgramMessage
@@ -161,16 +154,29 @@ const FlowTree = React.forwardRef(({
     const setInitialViewport = useCallback((duration = 0) => {
         if (!rfInstance) return false;
 
-        if (layoutMode !== 'hierarchy') {
-            rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration });
-            return true;
-        }
-
         const containerRect = flowTreeContainerRef.current?.getBoundingClientRect();
         const dimensions = isMobile
             ? FLOWTREE_LAYOUT_NODE_DIMENSIONS.compact
             : FLOWTREE_LAYOUT_NODE_DIMENSIONS.regular;
-        const graphBounds = getGraphBounds(nodes, dimensions);
+        const graphBounds = getGraphBounds(nodesRef.current, dimensions);
+
+        if (layoutMode !== 'hierarchy') {
+            // Fit to getGraphBounds (not fitView) so sequence number badges left of a node stay in view.
+            if (graphBounds && containerRect?.width && containerRect?.height) {
+                rfInstance.setViewport?.(getViewportForBounds(
+                    graphBounds,
+                    containerRect.width,
+                    containerRect.height,
+                    isMobile ? 0.06 : 0.1,
+                    isMobile ? 1.6 : 2,
+                    isMobile ? 0.08 : 0.2
+                ), { duration });
+                return true;
+            }
+            rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration });
+            return true;
+        }
+
         const viewport = getHierarchyViewport(
             graphBounds,
             containerRect?.width,
@@ -186,7 +192,7 @@ const FlowTree = React.forwardRef(({
 
         rfInstance.fitView({ padding: isMobile ? 0.08 : 0.2, duration });
         return true;
-    }, [isMobile, layoutMode, nodes, rfInstance, sidebarOpen]);
+    }, [isMobile, layoutMode, rfInstance, sidebarOpen]);
 
     const handleReactFlowInit = useCallback((instance) => {
         setRfInstance((currentInstance) => currentInstance || instance);

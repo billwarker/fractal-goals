@@ -1,7 +1,7 @@
 export function buildLandingGoalDemos({
     clearSelectedGoal, fallbackCards, findGoalById, findGoalByType, goalsViewMode,
     handleGoalSelect, selectedExample, selectedGoal, selectedGoalId, setFlowTreeScopeKey,
-    openTargetManager, setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId,
+    setGoalDetailEntry, setGoalsViewMode, setSelectedGoalId,
     setViewSettings, viewSettings,
 }) {
     const configured = selectedExample?.landingContent?.goals?.bullets;
@@ -22,11 +22,6 @@ export function buildLandingGoalDemos({
                 setSelectedGoalId(card.goal_id);
                 setGoalDetailEntry((current) => ({ view, key: current.key + 1 }));
                 setFlowTreeScopeKey((current) => current + 1);
-                if (card.key === 'set_targets' && card.target_id) {
-                    const target = (goal.attributes?.targets || goal.targets || [])
-                        .find((item) => String(item.id) === String(card.target_id));
-                    if (target) openTargetManager(goal, target);
-                }
                 return;
             }
         }

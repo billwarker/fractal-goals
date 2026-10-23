@@ -19,7 +19,7 @@ describe('goalDetailQueryUtils', () => {
 
         await invalidateGoalAssociationQueries(queryClient, 'root-1', 'goal-1');
 
-        expect(invalidateSpy).toHaveBeenCalledTimes(11);
+        expect(invalidateSpy).toHaveBeenCalledTimes(12);
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalActivities('root-1', 'goal-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalActivitiesRoot('root-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalActivityGroups('root-1', 'goal-1') });
@@ -27,6 +27,7 @@ describe('goalDetailQueryUtils', () => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalMetrics('goal-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalMetricsRoot() });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalTimelinesRoot('root-1') });
+        expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.goalConditionRoot('root-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.activities('root-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.fractalTree('root-1') });
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.programMetricsRoot('root-1') });

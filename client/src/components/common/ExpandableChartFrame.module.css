@@ -1,0 +1,67 @@
+.frame {
+    position: relative;
+    min-width: 0;
+}
+
+/* The mini chart is a preview: no hover tooltips on its points (the expanded chart has them), and
+   clicks reach the frame. */
+.frame canvas {
+    pointer-events: none;
+}
+
+.expandable {
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.frame.expandable:hover {
+    border-color: var(--color-border-hover);
+    background-color: var(--color-bg-card-hover);
+}
+
+.frame.expandable:focus-visible {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* What clicking does, in the top-right corner; brighter while the card is hovered or focused. */
+.icon {
+    position: absolute;
+    top: var(--expandable-chart-icon-inset, 6px);
+    right: var(--expandable-chart-icon-inset, 6px);
+    display: inline-flex;
+    color: var(--color-text-muted);
+    pointer-events: none;
+    transition: color 0.15s ease;
+}
+
+.frame > .icon {
+    height: auto;
+}
+
+.expandable:hover .icon,
+.expandable:focus-visible .icon {
+    color: var(--color-brand-primary);
+}
+
+/* Expanded elsewhere: the card's place holds the way back. Two classes, so it wins over the
+   caller's own layout for the card. */
+.frame.placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm, 8px);
+    border-style: dashed;
+}
+
+.frame.placeholder > * {
+    height: auto;
+}
+
+.note {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs, 12px);
+}

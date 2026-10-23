@@ -9,6 +9,8 @@ import { useAnalyticsViews } from '../../../hooks/useDashboardQueries';
 import { useAnalyticsPageData } from '../../../hooks/useAnalyticsPageData';
 import useGoalAnalyticsRead from '../../analytics/useGoalAnalyticsRead';
 import AnalyticsEvidenceNotice from '../../analytics/AnalyticsEvidenceNotice';
+import SavedViewChart from '../../analytics/SavedViewChart';
+import useContainerDensity from '../../analytics/useContainerDensity';
 
 const EMPTY = [];
 
@@ -49,7 +51,7 @@ export function AnalyticsWidgetHeaderControls({ state, onStateChange, sharedData
             <span>Saved view</span>
             <span className="surface-analytics-header-select-wrap">
                 <select
-                    className="surface-analytics-header-select"
+                    className="surface-analytics-header-select select-custom-arrow"
                     aria-label="Saved analytics view"
                     value={savedViewId}
                     onMouseDown={(event) => event.stopPropagation()}
@@ -77,6 +79,8 @@ export function AnalyticsWidgetHeaderControls({ state, onStateChange, sharedData
 export default function AnalyticsWidget({ state, sharedData, viewMode = 'overview' }) {
     const rootId = sharedData?.rootId;
     const chartRef = useRef(null);
+    const frameRef = useRef(null);
+    const density = useContainerDensity(frameRef);
     const { analyticsViewItems } = useAnalyticsViews(rootId);
 
     const savedViewId = state?.savedViewId || null;
@@ -96,6 +100,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
                 viz,
                 vizState: ws.visualizationState || (viz ? getVisualizationDefaultState(ws.selectedCategory, ws.selectedVisualization) : {}),
                 label: view?.name,
+                layout: view?.layout,
                 queryProfileView: ws.selectedCategory === 'query' ? ws : null,
             };
         }
@@ -183,10 +188,15 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
     );
 
     return (
-        <div className="surface-analytics" data-no-panel-drag="true">
+        <div className="surface-analytics" data-no-panel-drag="true" ref={frameRef}>
             <AnalyticsEvidenceNotice {...analyticsData} />
             {chartRead.isFetching || analyticsData.evidenceLoading ? <div role="status">Loading analytics…</div> : chartRead.isError || analyticsData.evidenceError ? <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => chartRead.isError ? chartRead.refetch() : analyticsData.retryEvidence()}>Retry</button></div> : resolved.queryProfileView ? (
                 renderQueryProfileView()
+            ) : savedViewId && resolved.layout ? (
+                // Saved views render through the shared chart path, so their activity and goal apply.
+                <div className="surface-analytics-chart">
+                    <SavedViewChart rootId={rootId} layout={resolved.layout} density={density} data={effectiveSharedData} />
+                </div>
             ) : Chart ? (
                 <div className="surface-analytics-chart">
                     <Chart context={context} />

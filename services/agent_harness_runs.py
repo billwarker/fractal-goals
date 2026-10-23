@@ -9,7 +9,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from config import config
 from models import AgentApproval, AgentChangeCursor, AgentOperation, AgentOutboxEvent, AgentProposal, AgentRun, AgentTaskBrief, EventLog, Goal, utc_now
 from services.activity_service import ActivityService
-from services.goal_service import GoalService, sync_goal_targets
+from services.goal_service import GoalService
 from services.note_service import NoteService
 from services.goal_type_utils import get_canonical_goal_type
 
@@ -36,6 +36,7 @@ def _enabled_run_origins(agent_flags):
 
 class AgentRunsMixin:
     db_session: Any
+    _app_href: Any  # provided by the composed AgentHarnessService
     def _mark_unstarted_operations(
         self, run_id, worker_id, fencing_token, stop_sequence, *, cancelled,
     ):
@@ -247,7 +248,7 @@ class AgentRunsMixin:
         )
 
         if operation.kind == "update_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.update_fractal_goal(
                 locked_run.root_id,
                 input_data["goal_id"],
@@ -331,7 +332,7 @@ class AgentRunsMixin:
                 "href": self._app_href(locked_run.root_id, "programs", input_data["program_id"]),
             }
         elif operation.kind == "create_goal":
-            service = GoalService(self.db_session, sync_targets=sync_goal_targets)
+            service = GoalService(self.db_session)
             entity, error, status = service.create_fractal_goal(
                 locked_run.root_id,
                 locked_run.user_id,
@@ -346,6 +347,23 @@ class AgentRunsMixin:
                 "name": entity.name,
                 "type": get_canonical_goal_type(entity),
                 "root_id": entity.root_id,
+                "href": self._app_href(locked_run.root_id, "goals"),
+            }
+        elif operation.kind == "set_goal_sequence":
+            from services.goal_sequence_service import GoalSequenceService
+
+            payload, error, status = GoalSequenceService(self.db_session).sequence_goals(
+                locked_run.root_id, locked_run.user_id, input_data["goal_ids"],
+                commit=False, pending_events=pending_events,
+            )
+            if error or payload is None:
+                raise AgentHarnessError(str(error), status, "validation_failed")
+            result = {
+                "id": payload["id"],
+                "name": "Sequence",
+                "root_id": locked_run.root_id,
+                "goal_ids": payload["goal_ids"],
+                "dissolved": bool(payload.get("dissolved")),
                 "href": self._app_href(locked_run.root_id, "goals"),
             }
         elif operation.kind == "create_activity":

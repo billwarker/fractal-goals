@@ -12,6 +12,9 @@ import {
 } from '../../utils/goalNodeModel';
 import { isSMART } from '../../utils/smartHelpers';
 import { buildTreeMaps, getLineagePath, sortChildren } from './flowTreeTreeUtils';
+import { orderSequencedSiblings } from '../../utils/goalSequenceOrder';
+
+export { orderSequencedSiblings };
 
 const toId = (value) => (value == null ? null : String(value));
 
@@ -21,6 +24,43 @@ const getTreeIconCenter = (node, compact = false) => {
         x: node.position.x + (iconSize / 2),
         y: node.position.y + (iconSize / 2),
     };
+};
+
+// Mirrors .sequenceStepNumber in FlowTree.module.css: 16px tall, at least 16px wide, 6px left of the icon.
+const SEQUENCE_BADGE_GAP = 6;
+const SEQUENCE_BADGE_HEIGHT = 16;
+// Tree-layout icons are 30px on every viewport, so the badge centre doesn't depend on isMobile.
+export const getSequenceBadgeBox = (node) => {
+    const label = String(node.data?.sequencePosition ?? '');
+    const width = Math.max(SEQUENCE_BADGE_HEIGHT, 8 + (label.length * 6));
+    return {
+        x: node.position.x - SEQUENCE_BADGE_GAP - (width / 2),
+        y: getTreeIconCenter(node).y,
+        halfWidth: width / 2,
+        halfHeight: SEQUENCE_BADGE_HEIGHT / 2,
+    };
+};
+
+/** Dashed arrows between consecutive visible steps of each sequence (not used for layout). */
+export const buildSequenceEdges = (orderedChildren, visibleNodeIds) => {
+    const byTrack = new Map();
+    orderedChildren.forEach((child) => {
+        const trackId = toId(child.sequence_track_id ?? child.attributes?.sequence_track_id);
+        const childId = toId(getGoalNodeId(child));
+        if (trackId && childId && visibleNodeIds.has(childId)) byTrack.set(trackId, [...(byTrack.get(trackId) || []), child]);
+    });
+    return [...byTrack.values()].flatMap((steps) => steps.slice(1).map((step, index) => {
+        const source = toId(getGoalNodeId(steps[index]));
+        const target = toId(getGoalNodeId(step));
+        return {
+            id: `sequence-${source}-${target}`,
+            source,
+            target,
+            type: 'sequence',
+            className: 'sequence-edge',
+            data: { sequence: true },
+        };
+    }));
 };
 
 export const DEFAULT_VIEW_SETTINGS = {
@@ -40,15 +80,18 @@ export const convertTreeToFlow = (
         hiddenInactiveGoalIds = null,
         activeLineageIds = new Set(),
         allowedGoalIds = null,
+        focusGoalIds = null,
         getSortChildrenBy = null,
     } = {}
 ) => {
     const nodes = [];
     const edges = [];
+    const siblingGroups = [];
     const addedNodeIds = new Set();
     const visibleNodeIds = new Set();
 
-    const lineagePath = selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null;
+    // A host-supplied focus (e.g. sequencing) replaces the selected goal's lineage.
+    const lineagePath = focusGoalIds || (selectedNodeId ? getLineagePath(treeData, selectedNodeId) : null);
 
     const traverse = (node, parentId = null) => {
         if (!node) return;
@@ -100,6 +143,7 @@ export const convertTreeToFlow = (
                 completed: normalizedNode.completed,
                 completed_at: normalizedNode.completed_at,
                 paused: normalizedNode.paused,
+                sequencePosition: normalizedNode.sequence_track_id ? (normalizedNode.sequence_position ?? null) : null,
                 created_at: normalizedNode.created_at,
                 deadline: normalizedNode.deadline,
                 hasChildren: normalizedNode.children.length > 0,
@@ -117,14 +161,16 @@ export const convertTreeToFlow = (
             const sortBy = node.level_characteristics?.sort_children_by
                 || node.attributes?.level_characteristics?.sort_children_by
                 || getSortChildrenBy?.(node);
-            const sortedChildren = sortChildren(children, sortBy);
+            const sortedChildren = orderSequencedSiblings(sortChildren(children, sortBy));
+            siblingGroups.push(sortedChildren);
             sortedChildren.forEach((child) => traverse(child, nodeId));
         }
     };
 
     traverse(treeData);
+    const sequenceEdges = siblingGroups.flatMap((group) => buildSequenceEdges(group, visibleNodeIds));
 
-    return { nodes, edges, visibleNodeIds };
+    return { nodes, edges, visibleNodeIds, sequenceEdges };
 };
 
 export const prepareGraphPresentation = ({
@@ -136,6 +182,7 @@ export const prepareGraphPresentation = ({
     viewSettings,
     evidenceGoalIds,
     allowedGoalIds = null,
+    focusGoalIds = null,
     getSortChildrenBy = null,
 }) => {
     if (!treeData) {
@@ -152,7 +199,7 @@ export const prepareGraphPresentation = ({
     const activeLineageIds = getActiveLineageIds(effectiveEvidenceGoalIds, treeMaps.parentById, treeMaps.nodeById);
     const inactiveNodeIds = getInactiveNodeIds(treeMaps.nodeById, treeMaps.childrenById, effectiveEvidenceGoalIds);
 
-    const { nodes: rawNodes, edges: rawEdges, visibleNodeIds } = convertTreeToFlow(
+    const { nodes: rawNodes, edges: rawEdges, visibleNodeIds, sequenceEdges } = convertTreeToFlow(
         treeData,
         onNodeClick,
         onAddChild,
@@ -163,12 +210,14 @@ export const prepareGraphPresentation = ({
             hiddenInactiveGoalIds: normalizedSettings.hideInactiveGoals ? inactiveNodeIds : null,
             activeLineageIds,
             allowedGoalIds,
+            focusGoalIds,
             getSortChildrenBy,
         }
     );
 
+    // Sequence arrows are drawn over the tree but never fed to layout, so positions don't change.
     return { rawNodes, rawEdges, visibleNodeIds, treeMaps, effectiveEvidenceGoalIds,
-        activeLineageIds, inactiveNodeIds, normalizedSettings };
+        activeLineageIds, inactiveNodeIds, normalizedSettings, sequenceEdges };
 };
 
 export const buildGraphPresentation = ({
@@ -184,6 +233,7 @@ export const buildGraphPresentation = ({
     activityGroups,
     programs,
     allowedGoalIds = null,
+    focusGoalIds = null,
     isMobile,
     layoutMode = 'tree',
     getSortChildrenBy = null,
@@ -192,11 +242,11 @@ export const buildGraphPresentation = ({
 }) => {
     const prepared = structure || prepareGraphPresentation({
         treeData, onNodeClick, onAddChild, selectedNodeId, completedGoalColor, viewSettings,
-        evidenceGoalIds, allowedGoalIds, getSortChildrenBy,
+        evidenceGoalIds, allowedGoalIds, focusGoalIds, getSortChildrenBy,
     });
     if (!prepared) return { nodes: [], edges: [], metrics: null };
     const { rawNodes, rawEdges, visibleNodeIds, treeMaps, effectiveEvidenceGoalIds,
-        activeLineageIds, inactiveNodeIds, normalizedSettings } = prepared;
+        activeLineageIds, inactiveNodeIds, normalizedSettings, sequenceEdges = [] } = prepared;
 
     const layout = geometry || (layoutMode === 'hierarchy'
         ? getHierarchyLayoutedElements(rawNodes, rawEdges, isMobile)
@@ -340,9 +390,27 @@ export const buildGraphPresentation = ({
         treeMaps.childrenById
     );
 
+    const sequenceArrows = layoutMode === 'tree' ? sequenceEdges.flatMap((edge) => {
+        const source = layoutedNodeById.get(edge.source);
+        const target = layoutedNodeById.get(edge.target);
+        if (!source || !target) return [];
+        return [{
+            ...edge,
+            // zIndex 0 keeps the arrow in the edge layer, beneath goal names and metadata.
+            zIndex: 0,
+            style: { stroke: 'var(--color-text-muted)', strokeWidth: 1.5, strokeDasharray: '5 5', pointerEvents: 'none' },
+            markerEnd: { type: 'arrowclosed', color: 'var(--color-text-muted)', width: 14, height: 14 },
+            data: {
+                ...edge.data,
+                sourceBox: getSequenceBadgeBox(source),
+                targetBox: getSequenceBadgeBox(target),
+            },
+        }];
+    }) : [];
+
     return {
         nodes,
-        edges: baseEdges,
+        edges: [...baseEdges, ...sequenceArrows],
         metrics,
     };
 };

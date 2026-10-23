@@ -1,9 +1,14 @@
 import React from 'react';
 import Input from '../atoms/Input';
-import Checkbox from '../atoms/Checkbox';
-import CheckIcon from '../atoms/CheckIcon';
+import CompletionConditionEditor from '../goalDetail/CompletionConditionEditor';
+import GoalReviewCadence from '../goalDetail/GoalReviewCadence';
+import { deadlineContextForGoal, deadlineWarnings, describeDeadlineWarning } from '../../utils/goalDeadlineRules';
+import { useTimezone } from '../../contexts/TimezoneContext';
+import { getISOYMDInTimezone } from '../../utils/dateUtils';
+import { formatDueDate } from '../../utils/goalDueFormat';
+import { getGoalReview } from '../../utils/goalReview';
 import { getValidChildTypes } from '../../utils/goalHelpers';
-import { getGoalNodeChildren, isExecutionGoalType } from '../../utils/goalNodeModel';
+import { isExecutionGoalType } from '../../utils/goalNodeModel';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
 
 function GoalEditForm({
@@ -13,38 +18,50 @@ function GoalEditForm({
     goalColor,
     textColor,
     parentGoal,
-    parentGoalName,
+    deadlineParentGoal = null,
+    levelConfig = null,
     // Level selection in create mode
     // Form state from useGoalForm
     name, setName,
     description, setDescription,
     deadline, setDeadline,
-    relevanceStatement, setRelevanceStatement,
-    trackActivities, setTrackActivities,
-    completedViaChildren, setCompletedViaChildren,
-    allowManualCompletion, setAllowManualCompletion,
+    startedAt, setStartedAt,
+    reviewCadence = null, setReviewCadence,
+    reviewsOn = true, setReviewsOn,
+    completionCondition, setCompletionCondition,
+    conditionDraft, setConditionDraft,
+    conditionErrors = {},
+    activityDefinitions = [],
+    associatedActivities = [],
     // Handlers
     handleCancel,
     handleSave,
     showActions = true,
     errors = {}
 }) {
-    const showActivityTargetProgress = mode !== 'create';
+    const { timezone } = useTimezone();
+    const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
     const canCompleteViaChildren = getValidChildTypes(goalType).length > 0;
-    const hasChildGoals = mode !== 'create' && getGoalNodeChildren(goal).length > 0;
-    const completedViaChildrenInfo = hasChildGoals
-        ? 'Goal will be marked as complete when all child goals are completed.'
-        : 'Goal will be marked as complete when all child goals are completed (no child goals created yet).';
+    const usesReviews = Boolean(levelConfig?.uses_reviews);
+    const levelCadence = levelConfig?.review_cadence_value && levelConfig?.review_cadence_unit
+        ? { value: levelConfig.review_cadence_value, unit: levelConfig.review_cadence_unit }
+        : null;
+    // Due-date rules are soft guidance: the date is saved either way, with these warnings.
+    const deadlineIssues = deadlineWarnings(deadline, deadlineContextForGoal(
+        { ...(goal?.attributes || goal || {}), started_at: startedAt || goal?.attributes?.started_at || goal?.attributes?.created_at },
+        { parent: deadlineParentGoal || parentGoal, children: mode === 'create' ? [] : goal?.children || [], level: levelConfig },
+    ));
     return (
         <div
             className={styles.editContainer}
             style={{ '--goal-edit-accent': goalColor }}
         >
             <div className={styles.fieldGroup}>
-                <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
+                <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-name">
                     Name
                 </label>
                 <Input
+                    id="goal-name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className={errors.name ? styles.inputError : ''}
@@ -54,10 +71,11 @@ function GoalEditForm({
 
             {(
                 <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-description">
                         Description
                     </label>
                     <textarea
+                        id="goal-description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
@@ -66,99 +84,81 @@ function GoalEditForm({
                 </div>
             )}
 
-            {/* Relevance Statement - SMART "R" Criterion */}
-            {((goal?.attributes?.parent_id || mode === 'create' && parentGoalName) || goalType === 'UltimateGoal') && (
+            {/* Review - SMART "R" (Reviewed), on levels that review goals */}
+            {usesReviews && mode !== 'create' && setReviewCadence && (
                 <div className={styles.fieldGroup}>
                     <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
-                        Relevance (SMART)
+                        Review (SMART)
                     </label>
-                    <div className={styles.relevanceInfo}>
-                        {goalType === 'UltimateGoal'
-                            ? "Why does this Ultimate Goal matter to you?"
-                            : <span>How does this goal help you achieve <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>{parentGoalName}</span><span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>?</span></span>
-                        }
-                    </div>
-                    <textarea
-                        value={relevanceStatement}
-                        onChange={(e) => setRelevanceStatement(e.target.value)}
-                        rows={2}
-                        placeholder={goalType === 'UltimateGoal' ? "Explain why this ultimate goal is important to you..." : "Explain how this goal contributes to your higher-level objective..."}
-                        className={`${styles.textarea} ${relevanceStatement?.trim() ? styles.relevanceTextareaFilled : ''}`}
+                    <GoalReviewCadence
+                        review={getGoalReview(goal)}
+                        today={today}
+                        startedAt={startedAt}
+                        createdAt={goal?.attributes?.created_at}
+                        paused={Boolean(goal?.paused)}
+                        enabled={reviewsOn}
+                        onEnabledChange={setReviewsOn}
+                        cadence={reviewCadence}
+                        levelCadence={levelCadence}
+                        onChange={setReviewCadence}
                     />
                 </div>
             )}
 
-            {!isExecutionGoalType(goalType) && (
+            <div className={styles.dateRow}>
                 <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
-                        Deadline
+                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-started-at">
+                        Start date
                     </label>
                     <Input
+                        id="goal-started-at"
                         type="date"
-                        value={deadline}
-                        onChange={(e) => setDeadline(e.target.value)}
-                        max={parentGoal?.attributes?.deadline?.split('T')[0] || parentGoal?.deadline?.split('T')[0]}
+                        value={startedAt}
+                        onChange={(e) => setStartedAt(e.target.value)}
+                        max={deadline || undefined}
                     />
                 </div>
-            )}
-
-            {/* How is progress measured? */}
-            {(
-                <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
-                        How is progress measured? (Select all that apply)
-                    </label>
-                    <div className={styles.progressBox}>
-                        <div className={styles.checkboxGroup}>
-                            {showActivityTargetProgress && (
-                                <Checkbox
-                                    label="Activities & Targets"
-                                    checked={trackActivities}
-                                    onChange={(e) => setTrackActivities(e.target.checked)}
-                                    className={styles.checkboxLabel}
-                                />
-                            )}
-                            {canCompleteViaChildren && (
-                                <Checkbox
-                                    label="Completed via Children"
-                                    checked={completedViaChildren}
-                                    onChange={(e) => setCompletedViaChildren(e.target.checked)}
-                                    className={styles.checkboxLabel}
-                                />
-                            )}
-                            <Checkbox
-                                label="Manual Completion"
-                                checked={allowManualCompletion}
-                                onChange={(e) => setAllowManualCompletion(e.target.checked)}
-                                className={styles.checkboxLabel}
-                            />
-                        </div>
-
-                        <div className={styles.infoList}>
-                            {showActivityTargetProgress && trackActivities && (
-                                <div className={styles.infoItem}>
-                                    <CheckIcon size={13} />
-                                    <span>Goal is complete when target(s) are achieved.</span>
-                                </div>
-                            )}
-
-                            {completedViaChildren && (
-                                <div className={styles.infoItem}>
-                                    <CheckIcon size={13} />
-                                    <span>{completedViaChildrenInfo}</span>
-                                </div>
-                            )}
-
-                            {allowManualCompletion && (
-                                <div className={styles.infoItem}>
-                                    <CheckIcon size={13} />
-                                    <span>Goal can be marked as complete by the user.</span>
-                                </div>
-                            )}
-                        </div>
+                {!isExecutionGoalType(goalType) && (
+                    <div className={styles.fieldGroup}>
+                        <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-deadline">
+                            Deadline
+                        </label>
+                        <Input
+                            id="goal-deadline"
+                            type="date"
+                            value={deadline}
+                            onChange={(e) => setDeadline(e.target.value)}
+                            min={startedAt || undefined}
+                            aria-describedby={deadlineIssues.length ? 'goal-deadline-warnings' : undefined}
+                        />
                     </div>
-                </div>
-            )}
+                )}
+            </div>
+            <p className={styles.fieldHint}>Activity before the start date and after the deadline doesn’t count toward completion.</p>
+            {deadlineIssues.length > 0 ? (
+                <ul className={styles.deadlineWarnings} id="goal-deadline-warnings">
+                    {deadlineIssues.map((warning) => (
+                        <li key={warning.code}>{describeDeadlineWarning(warning, (iso) => formatDueDate(iso, deadline))}</li>
+                    ))}
+                </ul>
+            ) : null}
+
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} style={{ color: 'var(--color-text-primary)' }}>
+                    How does this goal complete?
+                </label>
+                <CompletionConditionEditor
+                    completionCondition={completionCondition}
+                    onCompletionConditionChange={setCompletionCondition}
+                    draft={conditionDraft}
+                    onDraftChange={setConditionDraft}
+                    activityDefinitions={activityDefinitions}
+                    associatedActivityIds={(associatedActivities || []).map((activity) => activity.id)}
+                    goalName={name}
+                    canCompleteViaChildren={canCompleteViaChildren}
+                    errors={conditionErrors}
+                />
+            </div>
 
             {showActions && (
                 <div className={styles.editActions}>

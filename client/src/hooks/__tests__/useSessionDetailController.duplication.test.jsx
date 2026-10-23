@@ -15,6 +15,7 @@ vi.mock('../useSessionDetailUiState', () => ({ default: () => ({ setShowOptionsM
 vi.mock('../useSessionDetailGoalAssociations', () => ({ useSessionDetailGoalAssociations: () => ({}) }));
 vi.mock('../useSessionDetailNotes', () => ({ default: () => ({}) }));
 vi.mock('../useSessionSidePaneViewModel', () => ({ default: () => ({}) }));
+vi.mock('../useSequenceAdvanceUndo', () => ({ default: () => {} }));
 
 describe('session duplication availability', () => {
     it.each([

@@ -42,7 +42,7 @@ function SessionGoalScopePanel({
                     <span className={styles.optionalLabel}>{statusLabel}</span>
                 </div>
             )}
-            <p className={`${styles.description} ${automaticGoalIds.length === 0 ? styles.descriptionStandalone : ''}`}>
+            <p className={styles.description}>
                 {description}
             </p>
             {programScopeAvailable && !readOnly ? (
@@ -67,12 +67,6 @@ function SessionGoalScopePanel({
                     <button type="button" onClick={onClearOffScopeGoals}>Remove them</button>
                 </div>
             ) : null}
-            {automaticGoalIds.length > 0 && (
-                <p className={styles.provenanceLegend}>
-                    <span aria-hidden="true">*</span>
-                    <span>Included automatically through template activities and cannot be removed.</span>
-                </p>
-            )}
             {isLoading ? (
                 <div className={styles.status} role="status">Resolving activity-derived goals…</div>
             ) : error ? (
@@ -87,7 +81,7 @@ function SessionGoalScopePanel({
                         selectedGoalIds={manualGoalIds}
                         lockedGoalIds={automaticGoalIds}
                         lockedGoalLabel="Included by template activities"
-                        lockedGoalMarker="*"
+                        lockedGoalLegend="Included automatically through template activities and cannot be removed."
                         onSelectionChange={onChange}
                         highlightSelectionAncestors
                         connectorHighlightMode="lineage"

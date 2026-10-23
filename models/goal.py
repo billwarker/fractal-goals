@@ -4,6 +4,38 @@ from sqlalchemy.orm import relationship, backref
 import uuid
 from .base import Base, utc_now, JSON_TYPE
 
+COMPLETION_CONDITION_ACTIVITY_THRESHOLD = 'activity_threshold'
+COMPLETION_CONDITION_CHILDREN = 'children'
+COMPLETION_CONDITION_MANUAL = 'manual'
+COMPLETION_CONDITIONS = (
+    COMPLETION_CONDITION_ACTIVITY_THRESHOLD, COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL,
+)
+# How a completed goal got there. 'manual_override' completes a goal whose own condition is not manual.
+COMPLETION_SOURCES = ('condition', 'children', 'manual', 'manual_override')
+COMPLETION_CONDITIONS_SQL = "('activity_threshold', 'children', 'manual')"
+CONDITION_NAME_MAX_LENGTH = 120
+
+# Periodic reviews (goal_review notes) repeat on a cadence: a level's default, or a goal's own.
+REVIEW_CADENCE_UNITS = ('days', 'weeks', 'months', 'years')
+REVIEW_CADENCE_UNITS_SQL = "('days', 'weeks', 'months', 'years')"
+
+
+def _review_cadence_checks(table):
+    return (
+        CheckConstraint(
+            f"review_cadence_unit IS NULL OR review_cadence_unit IN {REVIEW_CADENCE_UNITS_SQL}",
+            name=f'ck_{table}_review_cadence_unit',
+        ),
+        CheckConstraint(
+            "(review_cadence_value IS NULL) = (review_cadence_unit IS NULL)"
+            " AND (review_cadence_value IS NULL OR review_cadence_value > 0)",
+            name=f'ck_{table}_review_cadence_pair',
+        ),
+    )
+COMPLETION_SOURCES_SQL = "('condition', 'children', 'manual', 'manual_override')"
+PAUSE_REASON_MANUAL = 'manual'
+PAUSE_REASON_SEQUENCE = 'sequence'
+
 # Junction table for linking Sessions to multiple Goals (ShortTerm and Immediate)
 session_goals = Table(
     'session_goals', Base.metadata,
@@ -86,7 +118,6 @@ class GoalLevel(Base):
     root_id = Column(String, nullable=True, index=True) # If tied to a specific fractal project
     
     # Characteristics Overrides
-    allow_manual_completion = Column(Boolean, default=True)
     track_activities = Column(Boolean, default=True)
     requires_smart = Column(Boolean, default=False)
     
@@ -98,11 +129,7 @@ class GoalLevel(Base):
     
     # Hierarchy behavior
     max_children = Column(Integer, nullable=True)  # null = unlimited
-    auto_complete_when_children_done = Column(Boolean, default=False)
-    
-    # Feature gates
-    can_have_targets = Column(Boolean, default=True)
-    
+
     # Content requirements
     description_required = Column(Boolean, default=False)
     default_deadline_offset_value = Column(Integer, nullable=True)
@@ -110,10 +137,17 @@ class GoalLevel(Base):
     
     # Display
     sort_children_by = Column(String, nullable=True)  # 'manual', 'deadline', 'created_at', 'completion_rate'
+
+    # Long-horizon levels review their goals (SMART's R), on this default cadence.
+    uses_reviews = Column(Boolean, nullable=False, default=False, server_default=sa.false())
+    review_cadence_value = Column(Integer, nullable=True)
+    review_cadence_unit = Column(String, nullable=True)  # days, weeks, months, years
     
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = _review_cadence_checks('goal_levels')
 
 class Goal(Base):
     """
@@ -149,15 +183,33 @@ class Goal(Base):
     root_id = Column(String, nullable=True, index=True)
     owner_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=True, index=True)
     
-    relevance_statement = Column(Text, nullable=True)
     is_smart = Column(Boolean, default=False)
-    completed_via_children = Column(Boolean, default=False)
     inherit_parent_activities = Column(Boolean, default=False, nullable=False)
-    allow_manual_completion = Column(Boolean, default=True)
     track_activities = Column(Boolean, default=True)
     paused = Column(Boolean, default=False)
     paused_at = Column(DateTime, nullable=True)
-    targets = Column(JSON_TYPE, nullable=True) # Legacy JSON column
+    # Exactly one way a goal completes on its own; manual override is always available.
+    completion_condition = Column(
+        String, nullable=False, default=COMPLETION_CONDITION_MANUAL,
+        server_default=COMPLETION_CONDITION_MANUAL,
+    )
+    # Start of the goal's active period: evidence before it never counts.
+    started_at = Column(DateTime, nullable=False, default=utc_now, server_default=sa.func.now())
+    # Reviews: an own cadence overrides the level's; reviews can be turned off or put off to a date.
+    review_cadence_value = Column(Integer, nullable=True)
+    review_cadence_unit = Column(String, nullable=True)
+    review_disabled = Column(Boolean, nullable=False, default=False, server_default=sa.false())
+    review_deferred_until = Column(DateTime, nullable=True)
+    sequence_track_id = Column(
+        String,
+        ForeignKey(
+            'goal_sequence_tracks.id', ondelete='SET NULL',
+            name='fk_goals_sequence_track_id_goal_sequence_tracks', use_alter=True,
+        ),
+        nullable=True,
+        index=True,
+    )
+    sequence_position = Column(Integer, nullable=True)
     progress_settings = Column(JSON_TYPE, nullable=True)  # Root-level progress config (ignored on non-root goals)
     row_version = Column(Integer, nullable=False, default=1, server_default=sa.text('1'))
     
@@ -167,6 +219,22 @@ class Goal(Base):
         # Child lookups that do not filter by root (completion cascade, agent tree walks).
         sa.Index('ix_goals_parent_deleted', 'parent_id', 'deleted_at'),
         sa.Index('ix_goals_completed_session_id', 'completed_session_id'),
+        sa.Index(
+            'uq_goals_sequence_track_position', 'sequence_track_id', 'sequence_position', unique=True,
+            postgresql_where=sa.text('sequence_track_id IS NOT NULL AND deleted_at IS NULL'),
+            sqlite_where=sa.text('sequence_track_id IS NOT NULL AND deleted_at IS NULL'),
+        ),
+        CheckConstraint(
+            f"completion_condition IN {COMPLETION_CONDITIONS_SQL}", name='ck_goals_completion_condition',
+        ),
+        CheckConstraint(
+            f"completion_source IS NULL OR completion_source IN {COMPLETION_SOURCES_SQL}",
+            name='ck_goals_completion_source',
+        ),
+        CheckConstraint(
+            'sequence_track_id IS NULL OR sequence_position IS NOT NULL', name='ck_goals_sequence_pair',
+        ),
+        *_review_cadence_checks('goals'),
     )
     __mapper_args__ = {'version_id_col': row_version}
 
@@ -196,17 +264,19 @@ class Goal(Base):
         back_populates="associated_goals",
         viewonly=True
     )
-    targets_rel = relationship(
-        "Target",
-        back_populates="goal",
-        cascade="all, delete-orphan",
-        foreign_keys="Target.goal_id"
+    condition = relationship(
+        "GoalCompletionCondition",
+        primaryjoin="and_(Goal.id == GoalCompletionCondition.goal_id, GoalCompletionCondition.deleted_at.is_(None))",
+        uselist=False,
+        viewonly=True,
     )
+    sequence_track = relationship("GoalSequenceTrack", foreign_keys=[sequence_track_id])
     pause_intervals = relationship(
         "GoalPauseInterval",
         back_populates="goal",
         cascade="all, delete-orphan",
-        order_by="GoalPauseInterval.paused_at"
+        order_by="GoalPauseInterval.paused_at",
+        foreign_keys="GoalPauseInterval.goal_id",
     )
 
     def __repr__(self):
@@ -228,104 +298,118 @@ class GoalPauseInterval(Base):
     root_id = Column(String, nullable=True, index=True)
     paused_at = Column(DateTime, nullable=False)
     resumed_at = Column(DateTime, nullable=True)
+    # 'sequence' pauses hold a goal until its predecessor in a sequence track completes.
+    reason = Column(String, nullable=False, default=PAUSE_REASON_MANUAL, server_default=PAUSE_REASON_MANUAL)
+    # Set when completing another goal resumed this one, so un-completion can re-pause exactly.
+    resumed_by_goal_id = Column(
+        String,
+        ForeignKey('goals.id', ondelete='SET NULL', name='fk_goal_pause_intervals_resumed_by_goal_id_goals'),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime, default=utc_now)
 
-    goal = relationship("Goal", back_populates="pause_intervals")
+    goal = relationship("Goal", back_populates="pause_intervals", foreign_keys=[goal_id])
 
     __table_args__ = (
         sa.Index('ix_goal_pause_intervals_goal_resumed', 'goal_id', 'resumed_at'),
+        CheckConstraint("reason IN ('manual', 'sequence')", name='ck_goal_pause_intervals_reason'),
     )
 
-class TargetTemplate(Base):
-    __tablename__ = 'target_templates'
-    
+
+class GoalSequenceTrack(Base):
+    """An ordered progression of same-level sibling goals under one parent."""
+    __tablename__ = 'goal_sequence_tracks'
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    description = Column(String, default='')
-    type = Column(String, default='threshold')
-    time_scope = Column(String, default='all_time')
-    frequency_days = Column(Integer, nullable=True)
-    frequency_count = Column(Integer, nullable=True)
-    
-    default_metrics = Column(JSON_TYPE, nullable=True) # JSON snapshot for default config conditions
-    
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    parent_goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    level_id = Column(String, ForeignKey('goal_levels.id'), nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
 
-class Target(Base):
-    __tablename__ = 'targets'
+
+class GoalCompletionCondition(Base):
+    """The activity threshold a goal completes on (one live row per goal).
+
+    single_session: one activity instance reaches `min_sets` sets meeting every rule
+        (measure 'sets'), or its total yield reaches `target_value` (measure 'yield').
+    cumulative: the summed metric (measure 'metric') or yield (measure 'yield') across the
+        goal's active period reaches `target_value`.
+    consistency: `required_count` instances in the active period each have a set meeting
+        every rule (any completed instance counts when there are no rules).
+    """
+    __tablename__ = 'goal_completion_conditions'
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    template_id = Column(String, ForeignKey('target_templates.id', ondelete='SET NULL'), nullable=True)
     goal_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
     root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
-    activity_id = Column(String, ForeignKey('activity_definitions.id', ondelete='SET NULL'), nullable=True, index=True)
-    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
-    activity_group_id = Column(String, ForeignKey('activity_groups.id', ondelete='SET NULL'), nullable=True, index=True)
-    name = Column(String, nullable=False)
-    type = Column(String, default='threshold')
-    time_scope = Column(String, default='all_time')
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
-    linked_block_id = Column(String, ForeignKey('program_blocks.id', ondelete='SET NULL'), nullable=True)
-    frequency_days = Column(Integer, nullable=True)
-    frequency_count = Column(Integer, nullable=True)
-    completed = Column(Boolean, default=False, index=True)
-    completed_at = Column(DateTime, nullable=True)
-    completed_session_id = Column(String, ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True, index=True)
-    completed_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True)
+    activity_definition_id = Column(
+        String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    name = Column(String(CONDITION_NAME_MAX_LENGTH), nullable=True)  # None: described from the rules
+    kind = Column(String, nullable=False)
+    measure = Column(String, nullable=False)
+    min_sets = Column(Integer, nullable=True)
+    required_count = Column(Integer, nullable=True)
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=True)
+    operator = Column(String, nullable=True)
+    target_value = Column(sa.Numeric(14, 4), nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
-    
+
     __table_args__ = (
-        sa.Index('ix_targets_goal_deleted', 'goal_id', 'deleted_at'),
-        sa.Index('ix_targets_root_deleted', 'root_id', 'deleted_at'),
+        sa.Index(
+            'uq_goal_completion_conditions_live_goal', 'goal_id', unique=True,
+            postgresql_where=sa.text('deleted_at IS NULL'), sqlite_where=sa.text('deleted_at IS NULL'),
+        ),
+        CheckConstraint("kind IN ('single_session', 'cumulative', 'consistency')", name='ck_goal_conditions_kind'),
+        CheckConstraint(
+            "(kind = 'single_session' AND measure IN ('sets', 'yield'))"
+            " OR (kind = 'cumulative' AND measure IN ('metric', 'yield'))"
+            " OR (kind = 'consistency' AND measure = 'sets')",
+            name='ck_goal_conditions_kind_measure',
+        ),
+        CheckConstraint("measure <> 'sets' OR kind <> 'single_session' OR min_sets >= 1", name='ck_goal_conditions_min_sets'),
+        CheckConstraint("kind <> 'consistency' OR required_count >= 1", name='ck_goal_conditions_required_count'),
+        CheckConstraint(
+            "measure NOT IN ('yield', 'metric') OR (target_value IS NOT NULL AND operator IN ('>=', '>', '<=', '<'))",
+            name='ck_goal_conditions_total',
+        ),
+        CheckConstraint("measure <> 'metric' OR metric_definition_id IS NOT NULL", name='ck_goal_conditions_metric'),
     )
-    
-    template = relationship("TargetTemplate")
-    goal = relationship("Goal", back_populates="targets_rel", foreign_keys=[goal_id])
+
+    goal = relationship("Goal", foreign_keys=[goal_id])
     activity = relationship("ActivityDefinition")
-    activity_instance = relationship("ActivityInstance", foreign_keys=[activity_instance_id])
-    activity_group = relationship("ActivityGroup")
-    metric_conditions = relationship("TargetMetricCondition", back_populates="target", cascade="all, delete-orphan")
-    ledger_entries = relationship("TargetContributionLedger", back_populates="target", cascade="all, delete-orphan")
-    completed_session = relationship("Session", foreign_keys=[completed_session_id])
-    completed_instance = relationship("ActivityInstance", foreign_keys=[completed_instance_id])
+    metric = relationship("MetricDefinition", foreign_keys=[metric_definition_id])
+    rules = relationship(
+        "GoalConditionMetricRule", back_populates="condition", cascade="all, delete-orphan",
+        order_by="GoalConditionMetricRule.position",
+    )
 
-class TargetMetricCondition(Base):
-    """
-    Explicit relational conditions that must be met to fulfill a Target.
-    """
-    __tablename__ = 'target_metric_conditions'
+
+class GoalConditionMetricRule(Base):
+    """One metric comparison every qualifying set must satisfy."""
+    __tablename__ = 'goal_condition_metric_rules'
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    target_id = Column(String, ForeignKey('targets.id', ondelete='CASCADE'), nullable=False, index=True)
-    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False, index=True)
-    operator = Column(String, nullable=False) # e.g. ">=", "<", "=="
-    target_value = Column(Integer, nullable=False) # stored as int/float
-    created_at = Column(DateTime, default=utc_now)
-    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+    condition_id = Column(
+        String, ForeignKey('goal_completion_conditions.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=False)
+    operator = Column(String, nullable=False)
+    value = Column(sa.Numeric(14, 4), nullable=False)
+    position = Column(Integer, nullable=False, default=0, server_default=sa.text('0'))
 
-    target = relationship("Target", back_populates="metric_conditions")
+    __table_args__ = (
+        sa.UniqueConstraint('condition_id', 'metric_definition_id', name='uq_goal_condition_rule_metric'),
+        CheckConstraint("operator IN ('>=', '>', '<=', '<', '==')", name='ck_goal_condition_rules_operator'),
+    )
+
+    condition = relationship("GoalCompletionCondition", back_populates="rules")
     metric = relationship("MetricDefinition")
-
-class TargetContributionLedger(Base):
-    """
-    Explicit log mapping an ActivityInstance's metric production to a Target's cumulative tracking.
-    """
-    __tablename__ = 'target_contribution_ledgers'
-    
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    target_id = Column(String, ForeignKey('targets.id', ondelete='CASCADE'), nullable=False, index=True)
-    activity_instance_id = Column(String, ForeignKey('activity_instances.id', ondelete='CASCADE'), nullable=False, index=True)
-    metric_condition_id = Column(String, ForeignKey('target_metric_conditions.id', ondelete='CASCADE'), nullable=False)
-    contributed_value = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=utc_now)
-
-    target = relationship("Target", back_populates="ledger_entries")
-    instance = relationship("ActivityInstance")
-    condition = relationship("TargetMetricCondition")
 
 def get_all_root_goals(db_session):
     from sqlalchemy.orm import selectinload

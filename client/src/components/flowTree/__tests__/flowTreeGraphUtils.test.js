@@ -33,6 +33,36 @@ describe('buildGraphPresentation', () => {
         expect(graph.edges.map((edge) => edge.id)).toEqual(['root-1-program-parent', 'program-parent-program-child']);
     });
 
+    it('numbers sequence steps and links them with one arrow beneath node text', () => {
+        const step = (id, position) => ({
+            id, name: id, type: 'LongTermGoal', sequence_track_id: 'track-1', sequence_position: position, children: [],
+        });
+        const treeData = {
+            id: 'root-1',
+            name: 'Root Goal',
+            type: 'UltimateGoal',
+            children: [step('second', 2), step('first', 1), { id: 'loose', name: 'Loose', type: 'LongTermGoal', children: [] }],
+        };
+
+        const graph = buildGraphPresentation({
+            treeData,
+            onNodeClick: () => {},
+            onAddChild: () => {},
+            selectedNodeId: null,
+            completedGoalColor: '#FFD700',
+            viewSettings: {},
+            programs: [],
+            isMobile: false,
+        });
+
+        const positionOf = (id) => graph.nodes.find((node) => node.id === id).data.sequencePosition;
+        expect([positionOf('first'), positionOf('second'), positionOf('loose'), positionOf('root-1')]).toEqual([1, 2, null, null]);
+        const arrows = graph.edges.filter((edge) => edge.type === 'sequence');
+        expect(arrows).toHaveLength(1);
+        expect(arrows[0]).toMatchObject({ source: 'first', target: 'second', zIndex: 0 });
+        expect(arrows[0].style.strokeDasharray).toBe('5 5');
+    });
+
     it('defaults FlowTree presentation nodes to tree layout mode', () => {
         const treeData = {
             id: 'root-1',

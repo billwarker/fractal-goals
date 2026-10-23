@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 import PlanGoalHierarchyPanel from '../components/programs/days/PlanGoalHierarchyPanel';
 import ProgramDaysNavigator from '../components/programs/days/ProgramDaysNavigator';
+import { createConditionDraft, activeMetricDefinitions } from '../utils/goalConditions';
 import { buildPlanGoalsView, planGoalsViewHasGoal } from '../utils/planGoalsView';
 import { resolveDaysSelection } from '../utils/programDaysView';
 import { sortProgramDays } from '../utils/programViewModel';
@@ -39,6 +40,7 @@ function sameActivePlan(left, right) {
 export default function useProgramDaysTab({
     rootId, program, today, timezone, enabled, setViewMode, onLeavePane, onCreateDay, onEditDay,
     onReorderDays = null, goalTree = null, activities = [], activityGroups = [], onGoalClick = null,
+    onStartSubGoalCreation = null, justCreatedGoalId = null,
 }) {
     const [selection, setSelection] = useState(null);
     // One program day at a time by default; the side pane toggles a second, comparison column.
@@ -80,10 +82,13 @@ export default function useProgramDaysTab({
         ? activeKey
         : { date: resolved.date, templateId: null };
 
+    // Goals created from this pane stay in view even when no plan activity works toward them yet.
+    const [createdGoalIds, setCreatedGoalIds] = useState([]);
     // Like a session started from the day: the day's goals, else the program's.
-    const scopeGoalIds = useMemo(() => (
-        selectedDay?.goal_ids?.length ? selectedDay.goal_ids : (program?.goal_ids || [])
-    ), [program?.goal_ids, selectedDay?.goal_ids]);
+    const scopeGoalIds = useMemo(() => [
+        ...(selectedDay?.goal_ids?.length ? selectedDay.goal_ids : (program?.goal_ids || [])),
+        ...createdGoalIds,
+    ], [createdGoalIds, program?.goal_ids, selectedDay?.goal_ids]);
     const builtGoalsView = useMemo(() => buildPlanGoalsView({
         goalTree,
         scopeGoalIds,
@@ -127,6 +132,23 @@ export default function useProgramDaysTab({
         dayGoalIds: selectedDay?.goal_ids || [],
         announcement: scopeAnnouncement,
     };
+    // A goal created under the scoped goal; with a plan activity selected it works toward that
+    // activity and starts as a threshold on it, as when creating from a session.
+    const startSubGoalCreation = useCallback((parentGoal) => {
+        const activity = activePlan?.selectedActivityId
+            ? activities.find((candidate) => String(candidate.id) === String(activePlan.selectedActivityId)) || null
+            : null;
+        onStartSubGoalCreation?.(parentGoal, {
+            initialActivities: activity ? [activity] : [],
+            initialCompletion: activity && activeMetricDefinitions(activity).length > 0
+                ? { completionCondition: 'activity_threshold', conditionDraft: createConditionDraft(activity) }
+                : null,
+            onCreated: (goal) => {
+                const id = goal?.id ?? goal?.attributes?.id;
+                if (id) setCreatedGoalIds((current) => (current.includes(String(id)) ? current : [...current, String(id)]));
+            },
+        });
+    }, [activePlan?.selectedActivityId, activities, onStartSubGoalCreation]);
     // The side pane's Goals view: the active plan card's goal hierarchy.
     const goalsPanel = selectedDay ? (
         <PlanGoalHierarchyPanel
@@ -138,6 +160,8 @@ export default function useProgramDaysTab({
             onGoalScopeToggle={toggleGoalScope}
             onGoalClick={onGoalClick}
             onEditDayGoals={onEditDay ? () => onEditDay(selectedDay) : null}
+            onStartSubGoalCreation={onStartSubGoalCreation ? startSubGoalCreation : null}
+            justCreatedGoalId={justCreatedGoalId}
         />
     ) : null;
 

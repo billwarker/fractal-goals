@@ -29,6 +29,13 @@
     "src/utils/sessionTime.js",
     "src/utils/durationStats.js",
     "src/utils/progressAggregations.js",
+    "src/utils/goalConditions.js",
+    "src/utils/goalConditionSeries.js",
+    "src/utils/goalTreeCache.js",
+    "src/utils/goalHierarchyFilters.js",
+    "src/utils/goalDeadlineRules.js",
+    "src/utils/goalDueFormat.js",
+    "src/utils/goalSequenceOrder.js",
     "src/components/common/calendarHeatmapModel.js"
   ],
   "exclude": [

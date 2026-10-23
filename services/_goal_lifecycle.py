@@ -1,25 +1,32 @@
-"""Completion, target evaluation, copy, pause, move, convert-level.
+"""Completion, copy, pause, move, convert-level.
 
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.orm import selectinload
 
-from models import Goal, activity_goal_associations, goal_activity_group_associations, get_goal_by_id, validate_root_goal
+from models import COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL, Goal, GoalCompletionCondition, activity_goal_associations, goal_activity_group_associations, get_goal_by_id, validate_root_goal
 from services.association_reconciliation import append_goal_association_event
 from services.goal_type_utils import get_canonical_goal_type
 from services.events import event_bus, Event, Events
-from services.goal_domain_rules import goal_allows_manual_completion, goal_requires_smart_validation
-from services.service_types import JsonDict, ServiceResult
+from services.goal_domain_rules import goal_requires_smart_validation
+from services.serializers import serialize_goal_condition
+from services.goal_condition_service import condition_met_now
+from services.service_types import ServiceResult
 from services.serializers import calculate_smart_status
-from services.goal_target_service import GoalTargetService
 from services.goal_workflow_service import GoalWorkflowService
+from services.goal_sequence_service import advance_after_completion, revert_after_uncompletion
+from services._completion_context import _emit_pending_events
+
 
 
 
 class _GoalLifecycleMixin:
+    db_session: Any  # provided by the composed GoalService
+
     def update_goal_completion(self, goal_id, current_user_id, data, root_id=None) -> ServiceResult[Goal]:
         goal = get_goal_by_id(self.db_session, goal_id)
         if not goal:
@@ -38,8 +45,6 @@ class _GoalLifecycleMixin:
         goal.completed = data['completed'] if 'completed' in data else not goal.completed
 
         if goal.completed:
-            if not goal_allows_manual_completion(goal):
-                return None, "Manual completion is not allowed for this goal level", 403
             if goal_requires_smart_validation(goal):
                 smart_status = calculate_smart_status(goal)
                 if not all(smart_status.values()):
@@ -52,39 +57,23 @@ class _GoalLifecycleMixin:
         goal.completed_at = completion_time if goal.completed else None
         goal.completed_session_id = data.get('session_id') if goal.completed else None
         if goal.completed:
-            goal.completion_source = 'manual'
-            goal.completion_reason = 'manual'
+            # Manual completion is always available. Confirming a condition that is already met records
+            # the condition as the source (so losing that evidence reverts it); otherwise it is an override.
+            goal.completion_source = self._manual_completion_source(goal)
+            goal.completion_reason = goal.completion_source
             goal.manually_uncompleted_at = None
         else:
             goal.completion_source = None
             goal.completion_reason = 'manual_uncompleted'
             goal.manually_uncompleted_at = completion_time
-        reset_target_events = []
-        if not goal.completed:
-            active_completed_targets = [
-                target
-                for target in (goal.targets_rel or [])
-                if target.deleted_at is None and target.completed
-            ]
-            for target in active_completed_targets:
-                target.completed = False
-                target.completed_at = None
-                target.completed_session_id = None
-                target.completed_instance_id = None
-                reset_target_events.append(Event(
-                    Events.TARGET_REVERTED,
-                    {
-                        'target_id': target.id,
-                        'target_name': target.name,
-                        'goal_id': goal.id,
-                        'goal_name': goal.name,
-                        'root_id': goal.root_id or goal.id,
-                        'reason': 'goal_manually_uncompleted',
-                    },
-                    source='goal_service.update_goal_completion',
-                    context={'db_session': self.db_session},
-                ))
+        # Sequenced goals: completing begins the next step, un-completing re-pauses the step it began.
+        pending_events = []
+        if goal.completed:
+            advance_after_completion(self.db_session, goal, pending_events, begin_next=data.get('begin_next', True) is not False)
+        else:
+            revert_after_uncompletion(self.db_session, goal, pause_next=data.get('pause_next', True) is not False)
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         self.db_session.refresh(goal)
         event_name = Events.GOAL_COMPLETED if goal.completed else Events.GOAL_UNCOMPLETED
         event_payload = {
@@ -96,24 +85,22 @@ class _GoalLifecycleMixin:
             event_payload['session_id'] = goal.completed_session_id
         if goal.completed:
             event_payload['auto_completed'] = False
-            event_payload['reason'] = 'manual'
+            event_payload['reason'] = goal.completion_source
         event_bus.emit(Event(
             event_name,
             event_payload,
             source='goal_service.update_goal_completion',
             context={'db_session': self.db_session},
         ))
-        for target_event in reset_target_events:
-            event_bus.emit(target_event)
         return goal, None, 200
 
-    def evaluate_goal_targets(self, root_id, goal_id, current_user_id, session_id) -> ServiceResult[JsonDict]:
-        return GoalTargetService(self.db_session).evaluate_goal_targets(
-            root_id,
-            goal_id,
-            current_user_id,
-            session_id,
-        )
+    def _manual_completion_source(self, goal) -> str:
+        if goal.completion_condition == COMPLETION_CONDITION_MANUAL:
+            return 'manual'
+        goals_by_id = self._load_fractal_goals_for_serialization(goal.root_id or goal.id)
+        if not condition_met_now(self.db_session, goals_by_id.get(goal.id, goal), goals_by_id):
+            return 'manual_override'
+        return 'children' if goal.completion_condition == COMPLETION_CONDITION_CHILDREN else 'condition'
 
     # ========== GOAL OPTIONS ==========
 
@@ -123,7 +110,7 @@ class _GoalLifecycleMixin:
             return None, *error
 
         source = self.db_session.query(Goal).options(
-            selectinload(Goal.targets_rel),
+            selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
@@ -139,30 +126,11 @@ class _GoalLifecycleMixin:
             'description': source.description or '',
             'parent_id': source.parent_id,
             'deadline': source.deadline.isoformat() if source.deadline else None,
-            'relevance_statement': source.relevance_statement,
-            'completed_via_children': source.completed_via_children,
             'inherit_parent_activities': source.inherit_parent_activities,
-            'allow_manual_completion': source.allow_manual_completion,
             'track_activities': source.track_activities,
+            'completion_condition': source.completion_condition,
+            'condition': serialize_goal_condition(source.condition),
         }
-
-        # Serialize source targets for the copy
-        if source.targets_rel:
-            create_data['targets'] = [
-                {
-                    'name': t.name,
-                    'target_type': t.target_type,
-                    'target_value': t.target_value,
-                    'target_unit': t.target_unit,
-                    'comparison_operator': t.comparison_operator,
-                    'activity_definition_id': t.activity_definition_id,
-                    'metric_definition_id': t.metric_definition_id,
-                    'time_scope': t.time_scope,
-                    'time_scope_value': t.time_scope_value,
-                    'time_scope_unit': t.time_scope_unit,
-                }
-                for t in source.targets_rel if t.deleted_at is None
-            ]
 
         new_goal, err, status = self.create_fractal_goal_record(root_id, current_user_id, create_data)
         if err:

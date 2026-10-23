@@ -1,19 +1,7 @@
 import React from 'react';
 import Linkify from '../atoms/Linkify';
 
-function GoalSmartSection({
-    goal,
-    parentGoalName,
-    mode,
-    goalType,
-    relevanceStatement
-}) {
-    // Determine effective relevance statement (prop or local state)
-    const effectiveRelevance = goal.attributes?.relevance_statement || relevanceStatement;
-
-    // Determine parent info visibility conditions
-    const showRelevance = ((parentGoalName && (goal.attributes?.parent_id || mode === 'create')) || goalType === 'UltimateGoal') && effectiveRelevance;
-
+function GoalSmartSection({ goal }) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {/* Description (Specific) */}
@@ -28,21 +16,6 @@ function GoalSmartSection({
                     )}
                 </div>
             </div>
-
-            {/* Relevance Statement (Relevant) */}
-            {showRelevance && (
-                <div>
-                    <label style={{ display: 'block', marginBottom: '4px', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-                        {goalType === 'UltimateGoal'
-                            ? "Why does this Ultimate Goal matter to you?"
-                            : <span>How does this goal help you achieve <span style={{ color: 'var(--color-text-primary)' }}>{parentGoalName}</span>?</span>
-                        }
-                    </label>
-                    <div style={{ fontSize: '13px', color: 'var(--color-text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                        <Linkify>{effectiveRelevance}</Linkify>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

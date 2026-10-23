@@ -23,6 +23,7 @@ function GoalHierarchySelectionModal({
     onConfirm,
     lockedGoalIds = [],
     lockedGoalLabel,
+    lockedGoalLegend,
     initialHideCompletedGoals = false,
     scopeGoalIds = [],
     scopeLabel = '',
@@ -59,7 +60,7 @@ function GoalHierarchySelectionModal({
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-            <ModalBody>
+            <ModalBody className={styles.body}>
                 <GoalHierarchySelector
                     goals={goals}
                     selectedGoalIds={draftGoalIds}
@@ -73,6 +74,7 @@ function GoalHierarchySelectionModal({
                     showAncestorControls={showAncestorControls}
                     lockedGoalIds={lockedGoalIds}
                     lockedGoalLabel={lockedGoalLabel}
+                    lockedGoalLegend={lockedGoalLegend}
                     initialHideCompletedGoals={initialHideCompletedGoals}
                     scopeGoalIds={scopeGoalIds}
                     scopeLabel={scopeLabel}
@@ -80,7 +82,7 @@ function GoalHierarchySelectionModal({
                 />
                 {confirmError && <div role="alert" className={styles.error}>{confirmError}</div>}
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter className={styles.footer}>
                 <button
                     type="button"
                     className={styles.secondaryButton}

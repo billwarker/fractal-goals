@@ -36,15 +36,17 @@ def test_normalize_goal_payload_cleans_optional_ids_and_defaults():
         'relevance_statement': '   ',
         'parent_id': ' ',
         'session_id': ' session-1 ',
-        'targets': None,
+        'started_at': ' ',
         'deadline': ' ',
     })
 
     assert payload['description'] == ''
-    assert payload['relevance_statement'] is None
+    # A retired field from older clients is dropped.
+    assert 'relevance_statement' not in payload
     assert payload['parent_id'] is None
     assert payload['session_id'] == 'session-1'
-    assert payload['targets'] == []
+    assert payload['started_at'] is None
+    assert payload['completion_condition'] == 'manual'
     assert payload['deadline'] is None
 
 

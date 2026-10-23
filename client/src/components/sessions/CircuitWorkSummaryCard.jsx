@@ -156,7 +156,7 @@ const CircuitWorkSummaryCard = memo(function CircuitWorkSummaryCard({
                                                             <span className={styles.memberContent}>
                                                                 <span className={styles.memberName}>
                                                                     {memberName}
-                                                                    {activityInstance?.progress_comparison?.included === false ? ' · Excluded' : ''}
+                                                                    
                                                                 </span>
                                                                 {showInstanceTags ? <ActivityTagBadges tags={activityInstance.tags} ariaLabel={`${memberName} activity tags`} /> : null}
                                                                 {metrics.length > 0 && (

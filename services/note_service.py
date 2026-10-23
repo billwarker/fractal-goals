@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from models import ActivityDefinition, ActivityInstance, CircuitRound, CircuitRun, Goal, Note, Program, Session, activity_goal_associations, goal_activity_group_associations, validate_root_goal
 from services.events import Event, Events, event_bus
+from services.goal_review_rules import restart_review_cadence
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.quota_service import QuotaService
@@ -638,9 +639,7 @@ class NoteService:
             return None, quota_error, quota_status
         content = data.get('content', '')
         _, storage_error, storage_status = quota_service.check_storage_available(
-            current_user_id,
-            QuotaService._payload_size(content),
-        )
+            current_user_id, QuotaService._payload_size(content))
         if storage_error:
             return None, storage_error, storage_status
 
@@ -652,8 +651,8 @@ class NoteService:
         context_id = data['context_id']
         note_kind = data.get('note_kind')
 
-        if note_kind == 'goal_completion' and context_type != 'goal':
-            return None, "goal_completion notes must be attached to a goal", 400
+        if note_kind in ('goal_completion', 'goal_review') and context_type != 'goal':
+            return None, f"{note_kind} notes must be attached to a goal", 400
         if data.get('activity_set_id') and context_type != 'activity_instance':
             return None, "activity_set_id is only valid for activity instance notes", 400
 
@@ -692,12 +691,11 @@ class NoteService:
             if activity_set_id:
                 from models import ActivitySet
 
-                set_query = self.db_session.query(ActivitySet).join(ActivityInstance).filter(
+                activity_set = self.db_session.query(ActivitySet).join(ActivityInstance).filter(
                     ActivityInstance.root_id == root_id,
                     ActivityInstance.deleted_at.is_(None),
-                )
-                set_query = set_query.filter(ActivitySet.id == activity_set_id)
-                activity_set = set_query.first()
+                    ActivitySet.id == activity_set_id,
+                ).first()
                 if not activity_set:
                     return None, "Activity set not found", 404
                 if activity_instance_id and activity_set.activity_instance_id != activity_instance_id:
@@ -721,6 +719,7 @@ class NoteService:
                 agent_run_id=agent_run_id,
             )
             self.db_session.add(note)
+            restart_review_cadence(self.db_session, root_id, context_id, note_kind)
 
         self.db_session.flush()
         event = Event(
