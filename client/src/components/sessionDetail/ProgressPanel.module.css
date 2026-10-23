@@ -54,6 +54,8 @@
     border: 1px solid var(--color-border);
     border-radius: 6px;
     background: var(--color-bg-secondary);
+    /* Line the expand icon up with the heading. */
+    --expandable-chart-icon-inset: 10px;
 }
 
 .compareHeader {
@@ -138,6 +140,17 @@
 
 @media (prefers-reduced-motion: reduce) {
     .compareDockBar { animation: none; }
+}
+
+/* A hovered past session stands out, as its point does on the charts. */
+.historyList :global([data-instance-id]) {
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.historyList :global([data-instance-id]):hover,
+.historyList :global([data-instance-id]):focus-within {
+    border-color: var(--color-brand-primary);
+    background-color: var(--color-bg-card-hover);
 }
 
 /* "Last session" / "Earlier sessions" over the history. */
@@ -360,46 +373,27 @@
     background: var(--color-bg-secondary);
 }
 
+/* A changed comparison cross-fades the chart (useFadeSwap). */
+.chartFade {
+    min-width: 0;
+    transition: opacity 200ms ease-in-out;
+}
+
+.chartFade[data-visible='false'] {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chartFade {
+        transition: none;
+    }
+}
+
 .progressChartHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
+    padding-right: 20px;
     color: var(--color-text-secondary);
     font-size: 12px;
     font-weight: 700;
-}
-
-.progressChartExpand {
-    width: 14px;
-    height: 14px;
-    color: var(--color-text-muted);
-}
-
-/* The whole card opens the chart in Analytics, like the goal charts. */
-.progressChart {
-    cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.progressChart:hover {
-    border-color: var(--color-border-hover);
-    background-color: var(--color-bg-card-hover);
-}
-
-.progressChart:hover .progressChartExpand {
-    color: var(--color-brand-primary);
-}
-
-.progressChart:focus-visible {
-    outline: none;
-    border-color: var(--color-brand-primary);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
-}
-
-/* A preview: no point tooltips, and clicks reach the card. */
-.progressChart canvas {
-    pointer-events: none;
 }
 
 .compareDetail {

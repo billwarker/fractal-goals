@@ -54,7 +54,7 @@ export function useCompareOpen(activityId, instance) {
 }
 
 /** The one-line description of a comparison: its scope, match count and compared tags. */
-function describeComparison(instance, timeline) {
+export function describeComparison(instance, timeline) {
     const context = instance.comparison_context || {};
     const choice = comparisonChoice(instance);
     const total = timeline?.total ?? 0;
@@ -97,6 +97,15 @@ export function comparisonChoice(instance) {
         sameTemplate: Boolean(context.same_template),
         sameProgramDay: Boolean(context.same_program_day),
     };
+}
+
+/**
+ * The comparison as the progress queries take it: "same tags" is sent as the instance's tags, so
+ * results match what the pane shows even while a tag change is still being saved.
+ */
+export function previewChoice(instance) {
+    const choice = comparisonChoice(instance);
+    return choice.mode === 'same_tags' ? { ...choice, mode: 'tags' } : choice;
 }
 
 /**

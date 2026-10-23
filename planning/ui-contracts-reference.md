@@ -199,7 +199,10 @@ from `GET /goals/conditions?activity_id=` (50 at most, open goals first).
 Goal details' Details tab has an **Analytics** section above Completion, showing the goal's charts
 one at a time (`GoalChartsCarousel`). Its header holds "Analytics", ‹ n of m ›, **+ Add chart**
 and, on attached views, **Remove** (named "Remove from goal"). The chart's name sits on its own
-line directly above the chart; on the Goals page, clicking the chart (or Enter on it) expands it.
+line directly above the chart; on the Goals page, clicking the chart (or Enter on it) expands it,
+and an expand icon (two outward arrows) in its top-right corner says so. Expandable compact charts
+share `ExpandableChartFrame` (with the `ExpandIcon` atom): the Progress pane's chart uses the same
+card, icon, hover/focus treatment and "Showing in place of …" + Collapse placeholder.
 ← → cycle charts while focus is in the section; an `aria-live` line announces the chart. The
 order is the threshold chart ("Progress toward <condition>", activity-threshold goals only, can't
 be removed), then attached views in order. The last chart shown is remembered per goal on this device.
@@ -323,7 +326,9 @@ instance: the focused one, else the session's first instance of the chosen activ
 - The count reads "N of M past sessions match", and the list shows only matching sessions. Sets
   carry no "compared with" accent. The newest match sits
   under "Last session" (the session this one's hints compare with), the rest under "Earlier
-  sessions".
+  sessions". Hovering a past session (or focusing into it) highlights its card and makes its
+  point the active one on the pane's chart and the expanded chart (with its tooltip on the
+  expanded chart).
 - The activity select stays fixed above the scrolling pane. Once the "Compare with" widget has
   scrolled out of view, a one-line bar (scope, compared tags, count) docks at the top of the
   history. It takes no layout space, so the history never jumps; activating it scrolls back to
@@ -331,9 +336,18 @@ instance: the focused one, else the session's first instance of the chosen activ
 - A compact chart sits directly under the activity select, above "Compare with". It plots the
   matching sessions ending with this one (highlighted): the in-scope goal condition with its
   threshold, else the activity's yield or best-set value. Like the goal detail charts, the whole
-  card is the control: it highlights on hover and focus, and clicking it (or Enter) opens the same
-  chart in Analytics with the tag, template and program-day filters applied. The mini chart has no
-  tooltips of its own.
+  card is the control: it highlights on hover and focus, and clicking it (or Enter/Space)
+  **expands** it. The mini chart has no tooltips of its own.
+- **Expanded** (like the Goals page's expanded goal chart): the session content fades out
+  (200 ms), then the chart fades in at full detail in its place, drawn on the page grid. The
+  content stays mounted underneath, hidden and inert, so its state and scroll survive. The
+  chart's header names the activity and chart, the scope and compared tags, **Open in Analytics**
+  (the same chart with the tag, template and program-day filters) and **Back to session**. It
+  follows the pane live: changing the comparison cross-fades it (the old chart fades out in
+  200 ms, stays out until the new series loads, then fades in; the compact chart does the same), and choosing another activity
+  switches to that activity's chart. The pane card shows "Showing in place of the session." and
+  **Collapse**. Escape, Collapse, Back to session or another pane mode brings the session back. On
+  mobile the pane sheet steps aside while the chart shows and returns when it closes.
 - While an instance uses an override, its card summary says so, so changed hints are never
   unexplained.
 

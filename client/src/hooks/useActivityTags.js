@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useOutbox } from '../offline/OutboxContext';
 import { SESSION_OP } from '../offline/opKinds';
@@ -122,13 +122,15 @@ export function useActivityProgressTimeline(rootId, activityId, {
 
 /**
  * The scoped instances the Progress pane charts (oldest first, the instance last) and the
- * chart spec: an in-scope goal condition, or one built from the activity's metrics.
+ * chart spec: an in-scope goal condition, or one built from the activity's metrics. While a
+ * changed comparison loads, the previous series stays (isPlaceholderData), so charts can fade.
  */
 export function useActivityProgressSeries(rootId, activityId, { instanceId = null, preview = null, limit = 60 } = {}) {
     return useQuery({
         // Shares the timeline prefix so every timeline refresh refreshes the chart too.
         queryKey: [...queryKeys.activityProgressTimeline(rootId, activityId, instanceId), 'series', limit, scopeKey(preview)],
         enabled: Boolean(rootId && activityId),
+        placeholderData: keepPreviousData,
         queryFn: async () => {
             const response = await fractalApi.getActivityProgressSeries(rootId, activityId, {
                 ...scopeParams(instanceId, preview),

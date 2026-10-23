@@ -76,7 +76,6 @@
 }
 
 .compactFrame {
-    position: relative;
     height: 180px;
     min-width: 0;
     border: 1px solid var(--color-border);
@@ -86,29 +85,6 @@
 
 .compactFrame > * {
     height: 100%;
-}
-
-/* The mini chart is a preview: no hover tooltips on its points (the expanded chart has them), and
-   clicks reach the frame. */
-.compactFrame canvas {
-    pointer-events: none;
-}
-
-/* Clicking the chart expands it (Goals page). */
-.compactFrameExpandable {
-    cursor: pointer;
-    transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-.compactFrameExpandable:hover {
-    border-color: var(--color-border-hover);
-    background-color: var(--color-bg-card-hover);
-}
-
-.compactFrameExpandable:focus-visible {
-    outline: none;
-    border-color: var(--color-brand-primary);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
 }
 
 .status {
@@ -224,26 +200,6 @@
 
 .expandedChart > * {
     height: 100%;
-}
-
-/* Goal details while the chart is expanded: its place holds the way back. */
-.expandedPlaceholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    border-style: dashed;
-}
-
-.compactFrame.expandedPlaceholder > * {
-    height: auto;
-}
-
-.expandedNote {
-    margin: 0;
-    font-size: var(--font-size-xs);
-    color: var(--color-text-muted);
 }
 
 .retry {

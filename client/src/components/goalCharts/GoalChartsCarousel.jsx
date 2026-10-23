@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 
 import { useGoalChartMutations, useGoalCharts } from '../../hooks/useGoalCharts';
 import Button from '../atoms/Button';
+import ExpandableChartFrame from '../common/ExpandableChartFrame';
 import AddGoalChartMenu from './AddGoalChartMenu';
 import GoalChartControls, { chartKeyHandler } from './GoalChartControls';
 import GoalChartView from './GoalChartView';
@@ -10,9 +11,6 @@ import useGoalChartCursor from './useGoalChartCursor';
 import styles from './GoalCharts.module.css';
 
 const NO_IDS = new Set();
-
-/** Controls inside the chart (e.g. Retry) keep their own clicks. */
-const fromInnerControl = (event) => Boolean(event.target.closest?.('button, a, input, select, textarea'));
 
 /**
  * Goal details' charts, one at a time, always in the simplified (compact) form. `chartExpansion`
@@ -65,31 +63,17 @@ export default function GoalChartsCarousel({ rootId, goal, goalId, chartExpansio
                     </Button>
                 ) : null}
             </div>
-            {isExpanded ? (
-                <div className={`${styles.compactFrame} ${styles.expandedPlaceholder}`} data-testid="goal-chart-placeholder">
-                    <p className={styles.expandedNote}>Showing in place of the goal tree.</p>
-                    <Button variant="secondary" size="sm" onClick={chartExpansion.collapse}>Collapse</Button>
-                </div>
-            ) : (
-                <div
-                    className={`${styles.compactFrame} ${canExpand ? styles.compactFrameExpandable : ''}`}
-                    data-testid="goal-chart"
-                    {...(canExpand ? {
-                        role: 'button',
-                        tabIndex: 0,
-                        'aria-label': `Expand chart: ${cursor.item.name}`,
-                        title: 'Expand chart',
-                        onClick: (event) => { if (!fromInnerControl(event)) expand(); },
-                        onKeyDown: (event) => {
-                            if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return;
-                            event.preventDefault();
-                            expand();
-                        },
-                    } : {})}
-                >
-                    <GoalChartView key={cursor.item?.key} rootId={rootId} goalId={goalId} item={cursor.item} density="compact" />
-                </div>
-            )}
+            <ExpandableChartFrame
+                className={styles.compactFrame}
+                data-testid={isExpanded ? 'goal-chart-placeholder' : 'goal-chart'}
+                onExpand={canExpand ? expand : null}
+                label={`Expand chart: ${cursor.item?.name}`}
+                isExpanded={isExpanded}
+                expandedNote="Showing in place of the goal tree."
+                onCollapse={chartExpansion?.collapse}
+            >
+                <GoalChartView key={cursor.item?.key} rootId={rootId} goalId={goalId} item={cursor.item} density="compact" />
+            </ExpandableChartFrame>
         </section>
     );
 }

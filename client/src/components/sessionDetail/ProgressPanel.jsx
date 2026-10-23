@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useActivityProgressTimeline } from '../../hooks/useActivityTags';
+import { setProgressHover } from '../../hooks/useProgressHover';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import { useTimezone } from '../../contexts/TimezoneContext';
@@ -8,7 +9,7 @@ import ActivityTimelineList from '../common/ActivityTimeline';
 import Button from '../atoms/Button';
 import TimelineShell from '../common/TimelineShell';
 import ProgressChart from './ProgressChart';
-import ProgressCompareControls, { ProgressCompareBar, comparisonChoice, useCompareOpen } from './ProgressCompareControls';
+import ProgressCompareControls, { ProgressCompareBar, previewChoice, useCompareOpen } from './ProgressCompareControls';
 import styles from './ProgressPanel.module.css';
 
 const HISTORY_LIMIT = 20;
@@ -52,8 +53,7 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
 
     // Ask for exactly what the panel shows (tags and template/program-day scope), so the list and
     // chart match the selected options even while a tag or comparison change is still being saved.
-    const choice = instance ? comparisonChoice(instance) : null;
-    const preview = choice && (choice.mode === 'same_tags' ? { ...choice, mode: 'tags' } : choice);
+    const preview = instance ? previewChoice(instance) : null;
     const query = useActivityProgressTimeline(rootId, selectedActivityId, {
         instanceId: instance?.id || null,
         preview,
@@ -82,6 +82,17 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
             </select>
         </div>
     );
+    // Hovering (or focusing into) a past session marks its point on the charts.
+    useEffect(() => () => setProgressHover(null), []);
+    const hoverFromEvent = (event) => {
+        setProgressHover(event.target.closest?.('[data-instance-id]')?.getAttribute('data-instance-id') || null);
+    };
+    const historyHover = {
+        onMouseOver: hoverFromEvent,
+        onMouseLeave: () => setProgressHover(null),
+        onFocus: hoverFromEvent,
+        onBlur: () => setProgressHover(null),
+    };
     // The newest match is the session this one's ▲/▼ hints compare against.
     const [lastSession, ...earlierSessions] = timeline?.items || [];
     const renderList = (items) => (
@@ -119,7 +130,7 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
             ) : null}
             <section className={styles.timelineSection}>
                 <div className={styles.timelineSectionHeader}>Past sessions</div>
-                <div className={styles.timelineContent}>
+                <div className={`${styles.timelineContent} ${styles.historyList}`} {...historyHover}>
                     {!selectedActivityId ? <div className={styles.timelineEmpty}>Select an activity to view previous sessions</div>
                         : query.isLoading ? <div className={styles.timelineLoading}>Loading timeline...</div>
                             : query.error ? <div className={styles.timelineError}>Error: {query.error.message}</div>

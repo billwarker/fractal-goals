@@ -258,7 +258,7 @@ export function ActivityTimelineCard({
     };
 
     return (
-        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`}>
+        <div className={`${styles.timelineCard} ${isGoalTimeline ? styles.timelineCardGoalTimeline : ''}`} data-instance-id={instance.id}>
             {isGoalTimeline ? (
                 <div className={styles.timelineCardHeader}>
                     {instance.session_name ? (

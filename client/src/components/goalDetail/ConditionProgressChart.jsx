@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import { DISABLED_CHART_ANIMATION, applyChartDensity, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
@@ -36,13 +36,30 @@ function thresholdAnnotations(series, chartTheme) {
  * A goal's activity threshold over time: each contributing session against the threshold line.
  * Compact density (goal details) keeps only the series and the threshold, with a one-line caption.
  */
-function ConditionProgressChart({ condition, instances, activity, density = 'full', highlightInstanceId = null }) {
+function ConditionProgressChart({
+    condition, instances, activity, density = 'full', highlightInstanceId = null, hoverInstanceId = null,
+}) {
     const chartTheme = useChartThemeDefaults();
     const compact = density === 'compact';
+    const chartRef = useRef(null);
     const { points, series } = useMemo(() => buildConditionSeries(condition, instances, {
         metricsById: new Map((activity?.metric_definitions || []).map((metric) => [metric.id, metric])),
         yieldMetricIds: activity?.yield_metric_ids || [],
     }), [activity, condition, instances]);
+    // An instance hovered elsewhere (e.g. a past session in a list) shows as the chart's active
+    // point, with its tooltip on full-size charts, as if the pointer were on it.
+    const hoverIndex = hoverInstanceId ? points.findIndex((point) => point.instanceId === hoverInstanceId) : -1;
+    useEffect(() => {
+        const chart = chartRef.current;
+        if (!chart) return;
+        const active = hoverIndex < 0 ? [] : series
+            .map((row, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: row.data[hoverIndex] }))
+            .filter((element) => element.value != null)
+            .map(({ datasetIndex, index }) => ({ datasetIndex, index }));
+        chart.setActiveElements(active);
+        if (!compact) chart.tooltip?.setActiveElements(active, { x: 0, y: 0 });
+        chart.update('none');
+    }, [compact, hoverIndex, series]);
 
     if (points.length === 0) {
         return <p className={styles.empty}>No contributing sessions yet.</p>;
@@ -60,6 +77,9 @@ function ConditionProgressChart({ condition, instances, activity, density = 'ful
             tension: 0.2,
             // The highlighted instance (e.g. the session being edited) stands out.
             pointRadius: points.map((point) => (point.instanceId === highlightInstanceId ? 5 : compact ? 2 : 3)),
+            pointHoverRadius: compact ? 5 : 7,
+            pointHoverBorderWidth: 3,
+            pointHoverBorderColor: chartTheme.tooltipText,
             yAxisID: `y${index}`,
         })),
     };
@@ -103,7 +123,7 @@ function ConditionProgressChart({ condition, instances, activity, density = 'ful
     return (
         <div className={styles.frame} data-density={density}>
             <div className={styles.chart} data-testid="condition-evidence-chart">
-                <Line data={data} options={options} />
+                <Line ref={chartRef} data={data} options={options} />
             </div>
             {caption ? <p className={styles.caption}>{caption}</p> : null}
         </div>

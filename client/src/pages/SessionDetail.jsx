@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import SessionSection from '../components/sessionDetail/SessionSection';
 import {
@@ -13,6 +13,9 @@ import StatusState from '../components/common/StatusState';
 import useIsMobile from '../hooks/useIsMobile';
 import { useSessionDetailController } from '../hooks/useSessionDetailController';
 import { isQuickSession } from '../utils/sessionRuntime';
+import useExpandedProgressChart, { ProgressChartExpansionContext } from '../components/sessionDetail/useExpandedProgressChart';
+
+const ExpandedProgressChart = lazy(() => import('../components/sessionDetail/ExpandedProgressChart'));
 
 // Context
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
@@ -111,6 +114,7 @@ function SessionDetailContent() {
         />
     );
     const isCompleted = Boolean(session?.attributes?.completed);
+    const expandedChart = useExpandedProgressChart({ isMobile, sidePaneMode, setIsMobilePaneOpen });
 
     useEffect(() => {
         if (isCompleted && onboarding?.enabled) onboarding.refresh();
@@ -227,8 +231,16 @@ function SessionDetailContent() {
     const selectedModeLabel = sidePaneMode.charAt(0).toUpperCase() + sidePaneMode.slice(1);
 
     return (
+        <ProgressChartExpansionContext.Provider value={expandedChart.context}>
         <div className={styles.sessionDetailContainer}>
-            <div className={styles.sessionMainContent} data-session-detail-content>
+            <div className={styles.sessionMainArea}>
+            {/* An expanded Progress chart takes the content's place; the content stays mounted, hidden. */}
+            <div
+                className={styles.sessionMainContent}
+                data-session-detail-content
+                data-hidden={expandedChart.isContentHidden || undefined}
+                inert={expandedChart.isContentHidden || undefined}
+            >
                 <div className={styles.sessionSectionsList}>
                     {localSessionData.sections?.map((section, sectionIndex) => (
                         <SessionSection
@@ -249,6 +261,19 @@ function SessionDetailContent() {
                         />
                     ))}
                 </div>
+            </div>
+            {expandedChart.activeChart ? (
+                <Suspense fallback={null}>
+                    <ExpandedProgressChart
+                        rootId={rootId}
+                        chart={expandedChart.activeChart}
+                        instances={activityInstances}
+                        activityDefs={sidePaneModel?.progress?.sessionActivityDefs}
+                        onClose={expandedChart.collapse}
+                        isLeaving={expandedChart.isLeaving}
+                    />
+                </Suspense>
+            ) : null}
             </div>
 
             <SessionDetailPaneLayout
@@ -315,6 +340,7 @@ function SessionDetailContent() {
                 />
             )}
         </div>
+        </ProgressChartExpansionContext.Provider>
     );
 }
 

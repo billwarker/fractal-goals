@@ -33,8 +33,8 @@ vi.mock('../../../hooks/useActivityTags', () => ({
 }));
 
 vi.mock('../../goalDetail/ConditionProgressChart', () => ({
-    default: ({ condition, instances, highlightInstanceId }) => (
-        <div data-testid="progress-chart">{condition.measure}:{instances.length}:{highlightInstanceId}</div>
+    default: ({ condition, instances, highlightInstanceId, hoverInstanceId }) => (
+        <div data-testid="progress-chart" data-hover={hoverInstanceId || ''}>{condition.measure}:{instances.length}:{highlightInstanceId}</div>
     ),
 }));
 
@@ -140,7 +140,7 @@ describe('ProgressPanel tags, scope and chart', () => {
             <ProgressPanel rootId="root-1" selectedActivity={scoped} sessionActivityDefs={sessionActivityDefs} sessionInstances={[scoped]} />,
             providers,
         );
-        const chart = screen.getByRole('link', { name: 'Goal: Front lever. Open in Analytics' });
+        const chart = screen.getByRole('button', { name: 'Goal: Front lever. Open in Analytics' });
         expect(within(chart).getByTestId('progress-chart')).toHaveTextContent('sets:2:instance-current');
         // The chart sits above the comparison controls.
         const compare = screen.getByRole('button', { name: /Any session|Same day|Same template/ });
@@ -233,5 +233,29 @@ describe('ProgressPanel tags, scope and chart', () => {
         body.scrollTop = 0;
         fireEvent.scroll(body);
         expect(screen.queryByRole('button', { name: /Show comparison/ })).not.toBeInTheDocument();
+    });
+
+    it('marks a hovered past session on the chart', () => {
+        useActivityProgressTimeline.mockReturnValue({ isLoading: false, error: null, data: {
+            items: [{ id: 'past-1', session_start_time: '2026-10-08T10:00:00Z', sets: [] }],
+            total: 1,
+            total_all: 1,
+        } });
+        useActivityProgressSeries.mockReturnValue({ isLoading: false, data: {
+            chart: { source: 'activity', condition: { measure: 'metric', metric_definition_id: 'm1' } },
+            activity_definition: { id: 'activity-def-1', yield_metric_ids: [] },
+            instances: [{ id: 'past-1' }, { id: 'instance-current' }],
+            current_instance_id: 'instance-current',
+        } });
+        const current = instance();
+        const { container } = renderWithProviders(
+            <ProgressPanel rootId="root-1" selectedActivity={current} sessionActivityDefs={sessionActivityDefs} sessionInstances={[current]} />,
+            providers,
+        );
+        const card = container.querySelector('[data-instance-id="past-1"]');
+        fireEvent.mouseOver(card);
+        expect(screen.getByTestId('progress-chart')).toHaveAttribute('data-hover', 'past-1');
+        fireEvent.mouseLeave(card.parentElement.parentElement);
+        expect(screen.getByTestId('progress-chart')).toHaveAttribute('data-hover', '');
     });
 });
