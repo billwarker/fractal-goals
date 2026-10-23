@@ -194,6 +194,8 @@ class ProgressComparisonSchema(BaseModel):
     model_config = ConfigDict(extra='forbid')
     mode: Literal['same_tags', 'tags', 'all']
     tag_ids: List[str] = Field(default_factory=list, max_length=MAX_PROGRESS_TAG_IDS)
+    same_template: bool = False
+    same_program_day: bool = False
     version: Optional[int] = Field(None, ge=1)
 
     @field_validator('tag_ids')

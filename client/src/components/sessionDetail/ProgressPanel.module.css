@@ -1,0 +1,403 @@
+/* ProgressPanel styles (shared with SessionNotesPanel) */
+
+.timelinePanel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.timelineSelector {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) 0;
+    flex-shrink: 0;
+}
+
+.timelineSelector label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.timelineSelector select {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--color-bg-input);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text-primary);
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.timelineSelector select:focus {
+    outline: none;
+    border-color: var(--color-brand-success);
+}
+
+.timelineBody {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 var(--spacing-lg, 16px);
+}
+
+.compareControls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+}
+
+.compareHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    margin: 0;
+    padding: 2px 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.compareHeader:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.compareSection {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+/* Matches the "Select Activity" label above it. */
+.compareSectionLabel {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.compareTitle {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compareDivider {
+    width: 100%;
+    margin: 0;
+    border: 0;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.compareSummary {
+    display: flex;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.compareHeaderEnd {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-muted);
+}
+
+.compareBody {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cohortCount {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.compareModes {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    margin: 0;
+    padding: 3px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+}
+
+.compareMode {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+}
+
+.compareMode input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.compareModeSelected {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.compareMode:focus-within {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 1px;
+}
+
+.tagChips {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+}
+
+.tagChipGroup {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.tagChipGroupLabel {
+    flex-basis: 100%;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.tagChip {
+    min-height: 26px;
+    padding: 2px 10px;
+    border: 1px solid color-mix(in srgb, var(--tag-color, var(--color-border)) 55%, var(--color-border));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tagChipSelected {
+    border-color: var(--tag-color, var(--color-brand-primary));
+    background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 22%, transparent);
+    color: var(--color-text-primary);
+}
+
+.tagChip:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 1px;
+}
+
+.scopeToggles {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.scopeToggles legend {
+    margin-bottom: 6px;
+    padding: 0;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Checkbox, label and name columns line up across the rows. */
+.scopeToggle {
+    display: grid;
+    grid-template-columns: 16px 9.5em minmax(0, 1fr);
+    align-items: center;
+    column-gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.scopeToggle input {
+    margin: 0;
+    accent-color: var(--color-brand-primary);
+}
+
+.scopeToggle:has(input:disabled) {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.scopeToggle:has(input:checked) {
+    color: var(--color-text-primary);
+}
+
+.scopeName {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-muted);
+    font-weight: 400;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.progressChart {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 10px 12px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-secondary);
+}
+
+.progressChartHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.progressChartExpand {
+    width: 14px;
+    height: 14px;
+    color: var(--color-text-muted);
+}
+
+/* The whole card opens the chart in Analytics, like the goal charts. */
+.progressChart {
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.progressChart:hover {
+    border-color: var(--color-border-hover);
+    background-color: var(--color-bg-card-hover);
+}
+
+.progressChart:hover .progressChartExpand {
+    color: var(--color-brand-primary);
+}
+
+.progressChart:focus-visible {
+    outline: none;
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* A preview: no point tooltips, and clicks reach the card. */
+.progressChart canvas {
+    pointer-events: none;
+}
+
+.compareDetail {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 24px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.timelineSection {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 18px;
+}
+
+.loadMoreHistory {
+    align-self: center;
+    margin-top: 8px;
+}
+
+.timelineSectionHeader {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+}
+
+.timelineContent {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.timelineLoading,
+.timelineEmpty,
+.timelineError {
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    padding: 20px;
+    font-style: italic;
+}
+
+.timelineError {
+    color: var(--color-brand-danger);
+}
+
+.timelineComposer {
+    flex-shrink: 0;
+    padding: var(--spacing-md, 12px) var(--spacing-lg, 16px) var(--spacing-lg, 16px);
+    background: var(--color-bg-sidebar);
+    border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 480px) {
+    .timelinePanel {
+        gap: 12px;
+    }
+
+    .progressViewToolbar label {
+        width: 100%;
+    }
+
+    .progressViewToolbar select {
+        flex: 1 1 auto;
+    }
+
+}

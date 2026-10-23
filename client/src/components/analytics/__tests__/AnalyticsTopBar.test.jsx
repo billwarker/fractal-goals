@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+vi.mock('../../../hooks/useActivityTagCatalog', () => ({
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [] } }),
+}));
+
 import AnalyticsFiltersSidebar from '../AnalyticsFiltersSidebar';
 
 describe('AnalyticsFiltersSidebar', () => {

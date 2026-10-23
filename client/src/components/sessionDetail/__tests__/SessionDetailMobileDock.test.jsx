@@ -19,8 +19,8 @@ describe('SessionDetailMobileDock', () => {
         expect(screen.getByRole('button', { name: 'Details' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.getByRole('button', { name: 'Details' }).className).toMatch(/mobileDockTabActive/);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Timeline' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Progress' }));
 
-        expect(onModeSelect).toHaveBeenCalledWith('timeline');
+        expect(onModeSelect).toHaveBeenCalledWith('progress');
     });
 });

@@ -65,9 +65,10 @@ function patchRun(run, action, at, value = null) {
 
 const mapList = (updater) => (previous) => (Array.isArray(previous) ? updater(previous) : previous);
 
-const patchInstanceById = (queryClient, meta, instanceId, fields) => queryClient.setQueryData(
+const patchInstanceById /* fields: an object to merge, or a function of the instance returning one */ = (queryClient, meta, instanceId, fields) => queryClient.setQueryData(
     keysFor(meta).activities,
-    mapList((list) => list.map((instance) => (instance.id === instanceId ? { ...instance, ...fields } : instance))),
+    mapList((list) => list.map((instance) => (instance.id === instanceId
+        ? { ...instance, ...(typeof fields === 'function' ? fields(instance) : fields) } : instance))),
 );
 
 // Tags and comparison choices decide which history a timeline lists; refetch once the server has them.
@@ -232,15 +233,15 @@ const OPTIMISTIC = {
     },
     [SESSION_OP.SET_TAGS]: (queryClient, op) => {
         const { instanceId, setId, tags } = op.meta;
-        queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => list.map((instance) => (
-            instance.id !== instanceId ? instance : {
-                ...instance,
-                sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
-            }
-        ))));
+        patchInstanceById(queryClient, op.meta, instanceId, (instance) => ({
+            sets: (instance.sets || []).map((set) => (set.id === setId ? { ...set, tags } : set)),
+        }));
     },
     [SESSION_OP.PROGRESS_COMPARISON]: (queryClient, op) => {
-        patchInstanceById(queryClient, op.meta, op.meta.instanceId, { comparison_context: op.meta.comparisonContext });
+        // Merge: the queued choice keeps the session's template/program day and version.
+        patchInstanceById(queryClient, op.meta, op.meta.instanceId, (instance) => ({
+            comparison_context: { ...instance.comparison_context, ...op.meta.comparisonContext },
+        }));
     },
     [SESSION_OP.INSTANCE_GOAL_LINK]: (queryClient, op) => {
         const { instanceId, goalId, remove } = op.meta;

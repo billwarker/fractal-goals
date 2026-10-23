@@ -221,6 +221,71 @@ class ActivityTagDefinition(Base):
 TAG_ORDER = (ActivityTagDefinition.sort_order, ActivityTagDefinition.name, ActivityTagDefinition.id)
 
 
+class ActivityProgressDefault(Base):
+    """The comparison last chosen for an activity in a session template and/or program day.
+
+    A database trigger copies it onto new instances of the activity in sessions with the
+    same template and program day, so the choice carries forward on every creation path.
+    """
+
+    __tablename__ = 'activity_progress_defaults'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(
+        String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    session_template_id = Column(String, ForeignKey('session_templates.id', ondelete='CASCADE'), nullable=True, index=True)
+    program_day_id = Column(String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=True, index=True)
+    compare_mode = Column(String(8), nullable=True)
+    same_template = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    same_program_day = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    version = Column(Integer, nullable=False, default=1, server_default='1')
+    created_at = Column(DateTime, default=utc_now, nullable=False, server_default=sa.func.now())
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False, server_default=sa.func.now())
+
+    compare_tags = relationship(
+        "ActivityTagDefinition",
+        secondary="activity_progress_default_tags",
+        order_by=TAG_ORDER,
+        lazy="selectin",
+    )
+
+    __table_args__ = (
+        sa.Index(
+            'uq_activity_progress_defaults_context',
+            'activity_definition_id',
+            sa.func.coalesce(session_template_id, ''),
+            sa.func.coalesce(program_day_id, ''),
+            unique=True,
+        ),
+        sa.CheckConstraint(
+            "compare_mode IS NULL OR compare_mode IN ('all', 'tags')",
+            name='ck_activity_progress_defaults_compare_mode',
+        ),
+        sa.CheckConstraint(
+            'session_template_id IS NOT NULL OR program_day_id IS NOT NULL',
+            name='ck_activity_progress_defaults_has_context',
+        ),
+        sa.CheckConstraint('version > 0', name='ck_activity_progress_defaults_version_positive'),
+    )
+
+
+class ActivityProgressDefaultTag(Base):
+    __tablename__ = 'activity_progress_default_tags'
+
+    default_id = Column(
+        String, ForeignKey('activity_progress_defaults.id', ondelete='CASCADE'), primary_key=True,
+    )
+    tag_definition_id = Column(
+        String, ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'), primary_key=True,
+    )
+
+    __table_args__ = (
+        sa.Index('ix_activity_progress_default_tags_tag', 'tag_definition_id'),
+    )
+
+
 class ActivityInstanceTag(Base):
     __tablename__ = 'activity_instance_tags'
 
@@ -309,6 +374,9 @@ class ActivityInstance(Base):
     # NULL compares with past instances that have the same tags; 'tags' compares with
     # the chosen compare_tags; 'all' compares with all history.
     progress_compare_mode = Column(String(8), nullable=True)
+    # Narrow the comparison to past sessions from the same session template and/or program day.
+    progress_compare_same_template = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    progress_compare_same_program_day = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
     progress_compare_version = Column(Integer, nullable=False, default=1, server_default='1')
 
     metric_values = relationship("MetricValue", backref="activity_instance", cascade="all, delete-orphan")
@@ -524,6 +592,43 @@ $$ LANGUAGE plpgsql;
 """
 
 
+PROGRESS_DEFAULT_TRIGGER_SQL = """
+CREATE OR REPLACE FUNCTION apply_activity_progress_default() RETURNS trigger AS $$
+DECLARE remembered record;
+BEGIN
+    IF NEW.session_id IS NULL THEN
+        RETURN NULL;
+    END IF;
+    SELECT progress_default.* INTO remembered
+    FROM activity_progress_defaults progress_default
+    JOIN sessions session_row ON session_row.id = NEW.session_id
+    WHERE progress_default.activity_definition_id = NEW.activity_definition_id
+      AND progress_default.session_template_id IS NOT DISTINCT FROM session_row.template_id
+      AND progress_default.program_day_id IS NOT DISTINCT FROM session_row.program_day_id;
+    IF NOT FOUND THEN
+        RETURN NULL;
+    END IF;
+    UPDATE activity_instances SET
+        progress_compare_mode = remembered.compare_mode,
+        progress_compare_same_template = remembered.same_template,
+        progress_compare_same_program_day = remembered.same_program_day
+    WHERE id = NEW.id;
+    INSERT INTO activity_instance_compare_tags (activity_instance_id, tag_definition_id)
+    SELECT NEW.id, default_tag.tag_definition_id
+    FROM activity_progress_default_tags default_tag
+    JOIN activity_tag_definitions tag ON tag.id = default_tag.tag_definition_id
+    WHERE default_tag.default_id = remembered.id AND tag.root_id = NEW.root_id
+    ON CONFLICT DO NOTHING;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_activity_instances_progress_default ON activity_instances;
+CREATE TRIGGER trg_activity_instances_progress_default AFTER INSERT ON activity_instances
+FOR EACH ROW EXECUTE FUNCTION apply_activity_progress_default();
+"""
+
+
 def tag_link_triggers_sql(table_name: str, *, signature: bool = True) -> str:
     statements = [
         f"DROP TRIGGER IF EXISTS trg_{table_name}_root ON {table_name};",
@@ -550,6 +655,13 @@ def _install_tag_link_triggers(table_name, *, signature=True):
 
 event.listen(ActivityInstanceTag.__table__, 'after_create', _install_tag_link_triggers('activity_instance_tags'))
 event.listen(ActivitySetTag.__table__, 'after_create', _install_tag_link_triggers('activity_set_tags'))
+def _install_progress_default_trigger(_target, connection, **_kwargs):
+    if connection.dialect.name == 'postgresql':
+        connection.exec_driver_sql(PROGRESS_DEFAULT_TRIGGER_SQL)
+
+
+# The trigger needs only its own table to exist; the function resolves the others when it runs.
+event.listen(ActivityInstance.__table__, 'after_create', _install_progress_default_trigger)
 event.listen(
     ActivityInstanceCompareTag.__table__,
     'after_create',

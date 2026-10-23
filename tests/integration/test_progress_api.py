@@ -211,7 +211,8 @@ class TestProgressApi:
         assert response.status_code == 200
         payload = response.get_json()
         assert payload['activity_instance_id'] == instance.id
-        assert payload['comparison_context'] == {'mode': 'same_tags', 'tag_ids': [], 'tags': [], 'version': 1}
+        assert payload['comparison_context']['mode'] == 'same_tags'
+        assert (payload['comparison_context']['same_template'], payload['comparison_context']['same_program_day']) == (False, False)
         assert payload['is_first_instance'] is True
 
     def test_instance_progress_returns_null_when_root_progress_is_disabled(self, authed_client, db_session, sample_ultimate_goal):

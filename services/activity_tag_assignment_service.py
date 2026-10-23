@@ -11,6 +11,7 @@ from collections import defaultdict
 
 from models import (
     ActivityInstance,
+    ActivityProgressDefault,
     ActivitySet,
     ActivityTagDefinition,
     CircuitRound,
@@ -183,14 +184,75 @@ class ActivityTagAssignmentService:
             return None, "Activity set not found", 404
         return self._replace(root_id, activity_set, tag_ids, version, instance=activity_set.activity_instance)
 
+    def _remember_comparison(self, instance, compare_tags):
+        """Keep this choice as the default for the activity in this template/program day.
+
+        A database trigger pre-applies it to the activity's next instances there. The plain
+        default (same tags, any session) is stored as no row at all.
+        """
+        session = instance.session
+        template_id = getattr(session, "template_id", None)
+        program_day_id = getattr(session, "program_day_id", None)
+        if template_id is None and program_day_id is None:
+            return
+        existing = self.db.query(ActivityProgressDefault).filter(
+            ActivityProgressDefault.activity_definition_id == instance.activity_definition_id,
+            ActivityProgressDefault.session_template_id.is_(None) if template_id is None
+            else ActivityProgressDefault.session_template_id == template_id,
+            ActivityProgressDefault.program_day_id.is_(None) if program_day_id is None
+            else ActivityProgressDefault.program_day_id == program_day_id,
+        ).with_for_update().first()
+        is_plain = (
+            instance.progress_compare_mode is None
+            and not instance.progress_compare_same_template
+            and not instance.progress_compare_same_program_day
+        )
+        if is_plain:
+            if existing is not None:
+                self.db.delete(existing)
+            return
+        choice = {
+            "compare_mode": instance.progress_compare_mode,
+            "same_template": instance.progress_compare_same_template,
+            "same_program_day": instance.progress_compare_same_program_day,
+            "compare_tags": list(compare_tags),
+        }
+        if existing is None:
+            self.db.add(ActivityProgressDefault(
+                root_id=instance.root_id,
+                activity_definition_id=instance.activity_definition_id,
+                session_template_id=template_id,
+                program_day_id=program_day_id,
+                **choice,
+            ))
+            return
+        for field, value in choice.items():
+            setattr(existing, field, value)
+        existing.version += 1
+
     def set_progress_comparison(self, root_id, instance_id, user_id, data):
-        """Choose what one instance compares against; never affects other instances."""
+        """Choose what one instance compares against, and remember it for its template/program day.
+
+        Other instances keep their own comparisons; only the activity's future instances in
+        the same template and program day start from this choice.
+        """
         instance = self._locked_instance(root_id, instance_id, user_id)
         if not instance:
             return None, "Activity instance not found", 404
         if data.get("version") is not None and data["version"] != instance.progress_compare_version:
             return {"current": serialize_compare_context(instance)}, "Comparison was changed elsewhere", 409
         mode = data["mode"]
+        same_template = bool(data.get("same_template"))
+        same_program_day = bool(data.get("same_program_day"))
+        session = instance.session
+        if (same_template and getattr(session, "template_id", None) is None) or (
+            same_program_day and getattr(session, "program_day_id", None) is None
+        ):
+            return (
+                {"code": "scope_unavailable", "same_template": same_template, "same_program_day": same_program_day},
+                "This session has no session template or program day to compare within",
+                422,
+            )
         compare_tags = []
         if mode == "tags":
             requested = list(dict.fromkeys(data.get("tag_ids") or []))
@@ -201,8 +263,11 @@ class ActivityTagAssignmentService:
             if len(compare_tags) != len(requested):
                 return None, "One or more tags are unavailable", 400
         instance.progress_compare_mode = None if mode == "same_tags" else mode
+        instance.progress_compare_same_template = same_template
+        instance.progress_compare_same_program_day = same_program_day
         instance.compare_tags = compare_tags
         instance.progress_compare_version += 1
+        self._remember_comparison(instance, compare_tags)
         self.db.commit()
         event_bus.emit(Event(Events.ACTIVITY_PROGRESS_COMPARISON_UPDATED, {
             "root_id": root_id,
@@ -210,6 +275,8 @@ class ActivityTagAssignmentService:
             "instance_id": instance.id,
             "mode": mode,
             "tag_ids": [tag.id for tag in compare_tags],
+            "same_template": same_template,
+            "same_program_day": same_program_day,
         }, source="activity_tag_assignment_service"))
         return {
             "comparison_context": serialize_compare_context(instance),

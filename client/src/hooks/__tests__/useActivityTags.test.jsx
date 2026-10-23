@@ -72,11 +72,15 @@ describe('useProgressComparisonMutation', () => {
         api.setActivityInstanceProgressComparison.mockResolvedValue({ data: {} });
         const { result } = renderHook(() => useProgressComparisonMutation('root-1', 'activity-1'), { wrapper: createWrapper(queryClient) });
 
-        await act(() => result.current.setComparison({ instanceId: 'instance-1', mode: 'tags', tagIds: ['a'], version: 3 }));
-        await act(() => result.current.setComparison({ instanceId: 'instance-1', mode: 'all', tagIds: ['ignored'] }));
+        await act(() => result.current.setComparison({ instanceId: 'instance-1', mode: 'tags', tagIds: ['a'], sameTemplate: true, version: 3 }));
+        await act(() => result.current.setComparison({ instanceId: 'instance-1', mode: 'all', tagIds: ['ignored'], sameProgramDay: true }));
 
-        expect(api.setActivityInstanceProgressComparison).toHaveBeenNthCalledWith(1, 'root-1', 'instance-1', { mode: 'tags', tag_ids: ['a'], version: 3 });
-        expect(api.setActivityInstanceProgressComparison).toHaveBeenNthCalledWith(2, 'root-1', 'instance-1', { mode: 'all', tag_ids: [] });
+        expect(api.setActivityInstanceProgressComparison).toHaveBeenNthCalledWith(1, 'root-1', 'instance-1', {
+            mode: 'tags', tag_ids: ['a'], same_template: true, same_program_day: false, version: 3,
+        });
+        expect(api.setActivityInstanceProgressComparison).toHaveBeenNthCalledWith(2, 'root-1', 'instance-1', {
+            mode: 'all', tag_ids: [], same_template: false, same_program_day: true,
+        });
     });
 });
 
@@ -84,13 +88,13 @@ describe('useActivityProgressTimeline', () => {
     it('reads one instance comparison context and previews an unsaved choice', async () => {
         api.getActivityProgressTimeline.mockResolvedValue({ data: { items: [{ id: 'a' }], total: 1, total_all: 4, offset: 0 } });
         const { result } = renderHook(
-            () => useActivityProgressTimeline('root-1', 'activity-1', { instanceId: 'instance-1', preview: { mode: 'tags', tagIds: ['b', 'a'] } }),
+            () => useActivityProgressTimeline('root-1', 'activity-1', { instanceId: 'instance-1', preview: { mode: 'tags', tagIds: ['b', 'a'], sameTemplate: true } }),
             { wrapper: createWrapper(createClient()) },
         );
 
         await waitFor(() => expect(result.current.data?.combined.items).toHaveLength(1));
         expect(api.getActivityProgressTimeline).toHaveBeenCalledWith('root-1', 'activity-1', {
-            instance_id: 'instance-1', mode: 'tags', tag_ids: ['b', 'a'], limit: 20, offset: 0,
+            instance_id: 'instance-1', mode: 'tags', tag_ids: ['b', 'a'], same_template: true, same_program_day: false, limit: 20, offset: 0,
         });
         expect(result.current.data.combined.total_all).toBe(4);
         expect(result.current.hasNextPage).toBe(false);

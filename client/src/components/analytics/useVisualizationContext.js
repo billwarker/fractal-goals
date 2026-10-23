@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 
-import { resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
+import { instanceMatchesScope, resolveAnalyticsGlobalFilters, sessionMatchesScope } from './analyticsGlobalFilters';
 import { summarizeFilteredGoals } from './filteredGoalSummary';
 import useGoalAnalyticsRead from './useGoalAnalyticsRead';
 import { getVisualization } from './visualizations/registry';
@@ -64,13 +64,15 @@ export default function useVisualizationContext({ data, windowState, globalDateR
     const filteredSessions = useMemo(() => {
         const dateFiltered = sessions.filter((session) => {
             const rawDate = session.session_start || session.created_at;
-            return isDateInRange(rawDate);
+            return isDateInRange(rawDate) && sessionMatchesScope(session, resolvedGlobalFilters.filters);
         });
         if (!resolvedGlobalFilters.hasActivityFilter) {
             return dateFiltered;
         }
         return dateFiltered.filter((session) => resolvedGlobalFilters.sessionIds.has(session.id));
-    }, [isDateInRange, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.sessionIds, sessions]);
+    }, [isDateInRange, resolvedGlobalFilters.filters, resolvedGlobalFilters.hasActivityFilter, resolvedGlobalFilters.sessionIds, sessions]);
+
+    const sessionsById = useMemo(() => new Map(sessions.map((session) => [session.id, session])), [sessions]);
 
     const filteredActivityInstances = useMemo(() => {
         return Object.fromEntries(Object.entries(activityInstances || {}).map(([activityId, instances]) => [
@@ -79,11 +81,14 @@ export default function useVisualizationContext({ data, windowState, globalDateR
                 if (resolvedGlobalFilters.hasActivityFilter && !resolvedGlobalFilters.activityIds.has(activityId)) {
                     return false;
                 }
+                if (!instanceMatchesScope(instance, sessionsById.get(instance.session_id), resolvedGlobalFilters.filters)) {
+                    return false;
+                }
                 const rawDate = instance.session_date || instance.created_at;
                 return isDateInRange(rawDate);
             }),
         ]));
-    }, [activityInstances, isDateInRange, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.hasActivityFilter]);
+    }, [activityInstances, isDateInRange, resolvedGlobalFilters.activityIds, resolvedGlobalFilters.filters, resolvedGlobalFilters.hasActivityFilter, sessionsById]);
 
     const filteredGoalAnalyticsGoals = useMemo(() => {
         const goals = scopedGoalAnalytics?.goals || [];

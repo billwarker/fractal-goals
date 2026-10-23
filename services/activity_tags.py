@@ -44,16 +44,41 @@ def serialize_tags(definitions) -> list[dict]:
 COMPARE_MODES = ("same_tags", "tags", "all")
 
 
+def session_scope(instance) -> dict:
+    """The session template and program day an instance ran in, as {id, name} or None."""
+    session = getattr(instance, "session", None)
+    template = getattr(session, "template", None) if session is not None else None
+    program_day = getattr(session, "program_day", None) if session is not None else None
+    return {
+        "template": {"id": template.id, "name": template.name} if template is not None else None,
+        "program_day": {"id": program_day.id, "name": program_day.name} if program_day is not None else None,
+    }
+
+
 def serialize_compare_context(instance) -> dict:
-    """What an instance compares against: its own tags (default), chosen tags, or all history."""
+    """What an instance compares against.
+
+    Tags: its own tags (default), chosen tags, or all history; optionally narrowed to past
+    sessions from the same session template and/or program day.
+    """
     mode = instance.progress_compare_mode or "same_tags"
     tags = list(instance.compare_tags or []) if mode == "tags" else (
         list(instance.tags or []) if mode == "same_tags" else []
     )
+    same_template = bool(getattr(instance, "progress_compare_same_template", False))
+    same_program_day = bool(getattr(instance, "progress_compare_same_program_day", False))
+    scope = session_scope(instance)
+    customized = mode != "same_tags" or same_template or same_program_day
+    remembered_in = scope["program_day"] or scope["template"]
     return {
         "mode": mode,
         "tag_ids": [tag.id for tag in tags],
         "tags": serialize_tags(tags),
+        "same_template": same_template,
+        "same_program_day": same_program_day,
+        **scope,
+        # A customized comparison is remembered for this activity in this template/program day.
+        "remembered_for": remembered_in["name"] if customized and remembered_in else None,
         "version": instance.progress_compare_version,
     }
 

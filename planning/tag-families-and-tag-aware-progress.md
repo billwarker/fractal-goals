@@ -157,7 +157,6 @@ The relational links and versioning are good foundations. Two things need struct
     - **Specific tags…** (the family-grouped picker in controlled mode)
     - **All history**
   - Changing it calls the override mutation. That re-bases the card's hints for that instance only.
-  - Show a "Reset to same tags" link whenever an override is active.
   - The card shows a small "comparing: All history" or tag-chip indicator next to the hints when an override is active, so a changed comparison is never invisible.
 - **Rendering:** `ActivityTimelineList` drops the `timelineCardExcluded` styling. List items highlight the sets that were paired.
 

@@ -6,8 +6,6 @@ import { findSessionForActivity } from '../offline/sessionCache';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 
-const EMPTY_CATALOG = Object.freeze({ families: [], tags: [] });
-
 const invalidateProgress = (queryClient, rootId, activityId = null) => Promise.all([
     queryClient.invalidateQueries({
         queryKey: activityId
@@ -28,20 +26,7 @@ const invalidateCatalogAndProgress = (queryClient, rootId, activityId = null) =>
     invalidateProgress(queryClient, rootId, activityId),
 ]);
 
-/** The fractal's tag families and tags, already in picker order. */
-export function useActivityTagCatalog(rootId, { includeArchived = true } = {}) {
-    const query = useQuery({
-        queryKey: [...queryKeys.activityTagCatalog(rootId), { includeArchived }],
-        enabled: Boolean(rootId),
-        queryFn: async () => {
-            const response = await fractalApi.getActivityTagCatalog(rootId, {
-                include_archived: includeArchived,
-            });
-            return response.data;
-        },
-    });
-    return { ...query, data: query.data || EMPTY_CATALOG };
-}
+export { useActivityTagCatalog } from './useActivityTagCatalog';
 
 export function useActivityTagCatalogMutations(rootId) {
     const queryClient = useQueryClient();
@@ -79,24 +64,40 @@ export function useActivityTagCatalogMutations(rootId) {
 }
 
 /**
+ * The comparison a request names: {mode, tagIds, sameTemplate, sameProgramDay}. Sent
+ * explicitly so results match what the pane shows even before a change has synced.
+ */
+const scopeParams = (instanceId, preview) => ({
+    ...(instanceId ? { instance_id: instanceId } : {}),
+    ...(preview ? {
+        mode: preview.mode,
+        tag_ids: preview.mode === 'tags' ? preview.tagIds || [] : [],
+        same_template: Boolean(preview.sameTemplate),
+        same_program_day: Boolean(preview.sameProgramDay),
+    } : {}),
+});
+
+const scopeKey = (preview) => (preview
+    ? [preview.mode, [...(preview.tagIds || [])].sort().join(','), Boolean(preview.sameTemplate), Boolean(preview.sameProgramDay)].join(':')
+    : null);
+
+/**
  * Past instances of an activity in one comparison context, newest first.
- * With instanceId the context is that instance's saved one; ``preview`` ({mode, tagIds})
- * shows an unsaved choice without changing anything.
+ * With instanceId the context is that instance's saved one; ``preview`` names the shown
+ * choice (see scopeParams) without changing anything.
  */
 export function useActivityProgressTimeline(rootId, activityId, {
     instanceId = null,
     preview = null,
     limit = 20,
 } = {}) {
-    const previewKey = preview ? `${preview.mode}:${[...(preview.tagIds || [])].sort().join(',')}` : null;
     return useInfiniteQuery({
-        queryKey: [...queryKeys.activityProgressTimeline(rootId, activityId, instanceId), limit, previewKey],
+        queryKey: [...queryKeys.activityProgressTimeline(rootId, activityId, instanceId), limit, scopeKey(preview)],
         enabled: Boolean(rootId && activityId),
         initialPageParam: 0,
         queryFn: async ({ pageParam }) => {
             const response = await fractalApi.getActivityProgressTimeline(rootId, activityId, {
-                ...(instanceId ? { instance_id: instanceId } : {}),
-                ...(preview ? { mode: preview.mode, tag_ids: preview.mode === 'tags' ? preview.tagIds || [] : [] } : {}),
+                ...scopeParams(instanceId, preview),
                 limit,
                 offset: pageParam,
             });
@@ -115,6 +116,25 @@ export function useActivityProgressTimeline(rootId, activityId, {
                     items: result.pages.flatMap((page) => page.items || []),
                 },
             };
+        },
+    });
+}
+
+/**
+ * The scoped instances the Progress pane charts (oldest first, the instance last) and the
+ * chart spec: an in-scope goal condition, or one built from the activity's metrics.
+ */
+export function useActivityProgressSeries(rootId, activityId, { instanceId = null, preview = null, limit = 60 } = {}) {
+    return useQuery({
+        // Shares the timeline prefix so every timeline refresh refreshes the chart too.
+        queryKey: [...queryKeys.activityProgressTimeline(rootId, activityId, instanceId), 'series', limit, scopeKey(preview)],
+        enabled: Boolean(rootId && activityId),
+        queryFn: async () => {
+            const response = await fractalApi.getActivityProgressSeries(rootId, activityId, {
+                ...scopeParams(instanceId, preview),
+                limit,
+            });
+            return response.data;
         },
     });
 }
@@ -172,13 +192,19 @@ export function useActivityTagMutations(rootId, activityId) {
 export function useProgressComparisonMutation(rootId, activityId) {
     const queryClient = useQueryClient();
     const outbox = useOutbox();
+    const comparisonBody = ({ mode, tagIds = [], sameTemplate = false, sameProgramDay = false }) => ({
+        mode,
+        tag_ids: mode === 'tags' ? tagIds : [],
+        same_template: Boolean(sameTemplate),
+        same_program_day: Boolean(sameProgramDay),
+    });
     const mutation = useMutation({
-        mutationFn: ({ instanceId, mode, tagIds = [], version }) => fractalApi.setActivityInstanceProgressComparison(
-            rootId, instanceId, { mode, tag_ids: mode === 'tags' ? tagIds : [], ...(version ? { version } : {}) },
+        mutationFn: ({ instanceId, version, ...choice }) => fractalApi.setActivityInstanceProgressComparison(
+            rootId, instanceId, { ...comparisonBody(choice), ...(version ? { version } : {}) },
         ),
         onSuccess: () => invalidateProgress(queryClient, rootId, activityId),
     });
-    const setComparison = async ({ instanceId, mode, tagIds = [], tags = [], version }) => {
+    const setComparison = async ({ instanceId, mode, tagIds = [], tags = [], sameTemplate = false, sameProgramDay = false, version }) => {
         const found = outbox && findSessionForActivity(queryClient, rootId, { instanceId });
         if (found) {
             await outbox.submit({
@@ -186,20 +212,26 @@ export function useProgressComparisonMutation(rootId, activityId) {
                 kind: SESSION_OP.PROGRESS_COMPARISON,
                 method: 'put',
                 url: `/${rootId}/activity-instances/${instanceId}/progress-comparison`,
-                body: { mode, tag_ids: mode === 'tags' ? tagIds : [] },
+                body: comparisonBody({ mode, tagIds, sameTemplate, sameProgramDay }),
                 coalesceKey: `progress-comparison:${instanceId}`,
                 entityIds: [instanceId],
                 meta: {
                     rootId,
                     sessionId: found.sessionId,
                     instanceId,
-                    comparisonContext: { mode, tag_ids: mode === 'tags' ? tagIds : [], tags: mode === 'tags' ? tags : [] },
+                    comparisonContext: {
+                        mode,
+                        tag_ids: mode === 'tags' ? tagIds : [],
+                        tags: mode === 'tags' ? tags : [],
+                        same_template: Boolean(sameTemplate),
+                        same_program_day: Boolean(sameProgramDay),
+                    },
                 },
             });
             // The timeline refetches when the server acknowledges the choice (see sessionOpHandlers).
             return { data: {} };
         }
-        return mutation.mutateAsync({ instanceId, mode, tagIds, version });
+        return mutation.mutateAsync({ instanceId, mode, tagIds, sameTemplate, sameProgramDay, version });
     };
     return { setComparison, isPending: mutation.isPending };
 }

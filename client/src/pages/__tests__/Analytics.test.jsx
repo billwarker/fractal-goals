@@ -9,12 +9,17 @@ const updateAnalyticsView = vi.fn();
 const deleteAnalyticsView = vi.fn();
 let analyticsSqlExplorerEnabled = true;
 
+vi.mock('../../hooks/useActivityTagCatalog', () => ({
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [] } }),
+}));
+
 vi.mock('react-router-dom', async (importOriginal) => {
     const actual = await importOriginal();
     return {
         ...actual,
         useParams: () => ({ rootId: 'root-1' }),
         useNavigate: () => navigate,
+        useSearchParams: () => [new URLSearchParams(), vi.fn()],
     };
 });
 
@@ -155,6 +160,8 @@ describe('Analytics page', () => {
                             activityIds: [],
                             groupIds: [],
                         },
+                        tags: null,
+                        sessions: { templateIds: [], programDayIds: [] },
                     },
                 },
             });

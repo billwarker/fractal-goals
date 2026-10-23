@@ -36,6 +36,19 @@ class _ProgressInstancesMixin:
             return tag_signature(chosen)
         return self._own_signature(instance)
 
+    def _compare_criteria(self, instance, *, mode=None, tag_ids=None, same_template=None, same_program_day=None):
+        """(tag signature, session template id, program day id) candidates must match; None means any."""
+        session = getattr(instance, 'session', None)
+        if same_template is None:
+            same_template = bool(getattr(instance, 'progress_compare_same_template', False))
+        if same_program_day is None:
+            same_program_day = bool(getattr(instance, 'progress_compare_same_program_day', False))
+        return (
+            self._compare_signature(instance, mode=mode, tag_ids=tag_ids),
+            getattr(session, 'template_id', None) if same_template else None,
+            getattr(session, 'program_day_id', None) if same_program_day else None,
+        )
+
     def _sets_for_instance(self, instance: ActivityInstance) -> list:
         """Serialized sets with their original index and own-tag signature."""
         cache = self._sets_cache
@@ -90,16 +103,20 @@ class _ProgressInstancesMixin:
                 ActivityInstance.session_id,
                 ActivityInstance.completed,
                 self._effective_time_expression().label('effective_time'),
+                Session.template_id.label('session_template_id'),
+                Session.program_day_id.label('session_program_day_id'),
             )
             .join(Session, ActivityInstance.session_id == Session.id)
             .filter(ActivityInstance.deleted_at.is_(None), Session.deleted_at.is_(None))
         )
 
     def _load_predecessor_ids(self, requests, *, exclude_session_id=None) -> dict:
-        """Resolve predecessors for (key, instance id, compare signature, set signature) rows.
+        """Resolve predecessors for request rows, entirely in SQL.
 
-        One SQL statement for the whole batch. A None compare signature means all
-        history; a None set signature asks for the instance-level predecessor. Completed
+        Each row is (key, instance id, compare signature, set signature, template id,
+        program day id). A None compare signature means all history; a None set signature
+        asks for the instance-level predecessor; a None template or program day id means
+        any session. One statement serves the whole batch. Completed
         predecessors win over incomplete ones; ties use the instance ID. Candidate history
         is never hydrated or transferred to Python.
         """
@@ -110,6 +127,8 @@ class _ProgressInstancesMixin:
             column('target_id', String),
             column('compare_signature', String),
             column('set_signature', String),
+            column('scope_template_id', String),
+            column('scope_program_day_id', String),
             name='progress_requests',
         ).data([tuple(request) for request in requests])
         targets = (
@@ -120,6 +139,8 @@ class _ProgressInstancesMixin:
                 request_rows.c.request_key,
                 request_rows.c.compare_signature,
                 request_rows.c.set_signature,
+                request_rows.c.scope_template_id,
+                request_rows.c.scope_program_day_id,
             )
             .subquery('progress_targets')
         )
@@ -137,6 +158,14 @@ class _ProgressInstancesMixin:
             or_(
                 targets.c.compare_signature.is_(None),
                 candidates.c.tag_signature == targets.c.compare_signature,
+            ),
+            or_(
+                targets.c.scope_template_id.is_(None),
+                candidates.c.session_template_id == targets.c.scope_template_id,
+            ),
+            or_(
+                targets.c.scope_program_day_id.is_(None),
+                candidates.c.session_program_day_id == targets.c.scope_program_day_id,
             ),
             or_(
                 targets.c.set_signature.is_(None),

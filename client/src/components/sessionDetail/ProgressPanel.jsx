@@ -1,102 +1,19 @@
 import React, { useMemo, useState } from 'react';
 
-import { useActivityProgressTimeline, useProgressComparisonMutation } from '../../hooks/useActivityTags';
+import { useActivityProgressTimeline } from '../../hooks/useActivityTags';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
 import { useEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { formatError } from '../../utils/mutationNotify';
-import notify from '../../utils/notify';
 import ActivityTimelineList from '../common/ActivityTimeline';
-import ActivityTagBadges from '../common/ActivityTagBadges';
 import Button from '../atoms/Button';
 import TimelineShell from '../common/TimelineShell';
-import ActivityTagEditor from './ActivityTagEditor';
-import styles from './TimelinePanel.module.css';
+import ProgressChart from './ProgressChart';
+import ProgressCompareControls, { comparisonChoice } from './ProgressCompareControls';
+import styles from './ProgressPanel.module.css';
 
 const HISTORY_LIMIT = 20;
-const MODES = [
-    ['same_tags', 'Same tags'],
-    ['tags', 'Specific tags'],
-    ['all', 'All history'],
-];
 
-/** What this instance's ▲/▼ hints compare against. Saved on the instance only. */
-function CompareControls({ rootId, activityId, instance, timeline }) {
-    const context = instance.comparison_context || { mode: 'same_tags', tag_ids: [], tags: [] };
-    const { setComparison, isPending } = useProgressComparisonMutation(rootId, activityId);
-    // "Specific tags" starts from the instance's own tags, so narrowing or widening is one click.
-    const [draftTagIds, setDraftTagIds] = useState(null);
-    const chosenTagIds = context.mode === 'tags' ? context.tag_ids : (draftTagIds ?? (instance.tags || []).map((tag) => tag.id));
-
-    const save = async (mode, tagIds = []) => {
-        try {
-            await setComparison({
-                instanceId: instance.id,
-                mode,
-                tagIds,
-                tags: [],
-                version: context.version,
-            });
-        } catch (error) {
-            notify.error(`Failed to change comparison: ${formatError(error)}`);
-        }
-    };
-
-    const total = timeline?.total ?? 0;
-    const totalAll = timeline?.total_all ?? 0;
-    return (
-        <div className={styles.compareControls} aria-label="Progress comparison">
-            <div className={styles.compareHeader}>
-                <strong id="compare-with-label">Compare with</strong>
-                {timeline ? (
-                    <span className={styles.cohortCount}>
-                        {context.mode === 'all' ? `${totalAll} past session${totalAll === 1 ? '' : 's'}` : `${total} of ${totalAll} past sessions match`}
-                    </span>
-                ) : null}
-            </div>
-            <fieldset className={styles.compareModes} aria-labelledby="compare-with-label" disabled={isPending}>
-                {MODES.map(([mode, label]) => (
-                    <label key={mode} className={`${styles.compareMode} ${context.mode === mode ? styles.compareModeSelected : ''}`}>
-                        <input
-                            type="radio"
-                            name={`compare-mode-${instance.id}`}
-                            checked={context.mode === mode}
-                            onChange={() => void save(mode, mode === 'tags' ? chosenTagIds : [])}
-                        />
-                        {label}
-                    </label>
-                ))}
-            </fieldset>
-            <div className={styles.compareDetail}>
-                {context.mode === 'same_tags' ? (
-                    (instance.tags || []).length
-                        ? <><span>Past sessions tagged</span><ActivityTagBadges tags={instance.tags} /></>
-                        : <span>Past sessions with no tags on this activity</span>
-                ) : null}
-                {context.mode === 'tags' ? (
-                    <ActivityTagEditor
-                        rootId={rootId}
-                        activityId={activityId}
-                        selectedTagIds={chosenTagIds}
-                        onChangeTags={(tagIds) => {
-                            setDraftTagIds(tagIds);
-                            void save('tags', tagIds);
-                        }}
-                        triggerFirst
-                    />
-                ) : null}
-                {context.mode === 'all' ? <span>Every past session, whatever its tags</span> : null}
-                {context.mode !== 'same_tags' ? (
-                    <button type="button" className={styles.resetComparison} onClick={() => void save('same_tags')} disabled={isPending}>
-                        Reset to same tags
-                    </button>
-                ) : null}
-            </div>
-        </div>
-    );
-}
-
-function TimelinePanel({ rootId, selectedActivity, sessionActivityDefs, sessionInstances = [] }) {
+function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionInstances = [] }) {
     const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
     const availableActivityIds = useMemo(() => sessionActivityDefs.map((definition) => definition.id), [sessionActivityDefs]);
     const selectedActivityId = useMemo(() => {
@@ -111,12 +28,10 @@ function TimelinePanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
         return candidates.find((row) => row.id === selectedActivity?.id) || candidates[0] || null;
     }, [selectedActivity?.id, selectedActivityId, sessionInstances]);
 
-    // Ask for exactly what the panel shows (the instance's tags, chosen tags, or all history), so the
-    // list matches the selected option even while a tag or comparison change is still being saved.
-    const shownContext = instance?.comparison_context;
-    const preview = !instance ? null
-        : shownContext?.mode === 'all' ? { mode: 'all', tagIds: [] }
-            : { mode: 'tags', tagIds: shownContext?.mode === 'tags' ? shownContext.tag_ids || [] : (instance.tags || []).map((tag) => tag.id) };
+    // Ask for exactly what the panel shows (tags and template/program-day scope), so the list and
+    // chart match the selected options even while a tag or comparison change is still being saved.
+    const choice = instance ? comparisonChoice(instance) : null;
+    const preview = choice && (choice.mode === 'same_tags' ? { ...choice, mode: 'tags' } : choice);
     const query = useActivityProgressTimeline(rootId, selectedActivityId, {
         instanceId: instance?.id || null,
         preview,
@@ -151,15 +66,18 @@ function TimelinePanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
     );
     const emptyMessage = instance?.comparison_context?.mode === 'all' || !instance
         ? `No previous sessions found for ${selectedDef?.name || 'this activity'}`
-        : `No previous sessions match. Try Specific tags or All history.`;
+        : 'No previous sessions match. Try other tags, All history, or turn off Within.';
 
     return (
         <TimelineShell className={styles.timelinePanel} bodyClassName={styles.timelineBody} selector={selector}>
             {selectedActivityId && instance ? (
-                <CompareControls key={instance.id} rootId={rootId} activityId={selectedActivityId} instance={instance} timeline={timeline} />
+                <>
+                    <ProgressChart rootId={rootId} activityId={selectedActivityId} instance={instance} choice={preview} />
+                    <ProgressCompareControls key={instance.id} rootId={rootId} activityId={selectedActivityId} instance={instance} timeline={timeline} />
+                </>
             ) : null}
             <section className={styles.timelineSection}>
-                <div className={styles.timelineSectionHeader}>Activity Timeline</div>
+                <div className={styles.timelineSectionHeader}>Past sessions</div>
                 <div className={styles.timelineContent}>
                     {!selectedActivityId ? <div className={styles.timelineEmpty}>Select an activity to view previous sessions</div>
                         : query.isLoading ? <div className={styles.timelineLoading}>Loading timeline...</div>
@@ -192,4 +110,4 @@ function TimelinePanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
     );
 }
 
-export default TimelinePanel;
+export default ProgressPanel;

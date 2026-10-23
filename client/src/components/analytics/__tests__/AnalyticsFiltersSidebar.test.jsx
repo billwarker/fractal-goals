@@ -1,6 +1,12 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+vi.mock('../../../hooks/useActivityTagCatalog', () => ({
+    useActivityTagCatalog: () => ({ data: { families: [], tags: [
+        { id: 'heavy', name: 'Heavy' }, { id: 'paused', name: 'Paused' },
+    ] } }),
+}));
+
 import AnalyticsFiltersSidebar from '../AnalyticsFiltersSidebar';
 
 describe('AnalyticsFiltersSidebar visualization controls', () => {
@@ -207,5 +213,32 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
 
         expect(screen.getByRole('button', { name: 'Front Lever' })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Duration' })).toBeInTheDocument();
+    });
+});
+
+
+describe('AnalyticsFiltersSidebar scope filters', () => {
+    const sessions = [
+        { id: 's1', template_id: 'tpl-a', template_name: 'Upper', program_day_id: 'day-1', program_day_name: 'Day A' },
+        { id: 's2', template_id: 'tpl-b', template_name: 'Lower', program_day_id: null },
+    ];
+
+    it('filters by tags (any or exact set), session template and program day', async () => {
+        const onChange = vi.fn();
+        const { rerender } = render(
+            <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} />,
+        );
+        fireEvent.click(await screen.findByRole('button', { name: 'Heavy' }));
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: { tagIds: ['heavy'], match: 'all' } }));
+        fireEvent.click(screen.getByRole('button', { name: 'Upper' }));
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sessions: { templateIds: ['tpl-a'], programDayIds: [] } }));
+        fireEvent.click(screen.getByRole('button', { name: 'Day A' }));
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sessions: { templateIds: [], programDayIds: ['day-1'] } }));
+
+        rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{ tags: { tagIds: [], match: 'exact' } }} dateRange={{}} onChange={onChange} />);
+        expect(await screen.findByLabelText('Tag filter')).toHaveTextContent('Untagged');
+        expect(screen.getByRole('checkbox', { name: 'Exact tag set' })).toBeChecked();
+        fireEvent.click(screen.getByRole('button', { name: 'Any tags' }));
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: null }));
     });
 });

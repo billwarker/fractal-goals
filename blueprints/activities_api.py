@@ -264,31 +264,72 @@ def set_activity_instance_progress_comparison(current_user, root_id, instance_id
         session.close()
 
 
+def _progress_scope_args():
+    """Previewed comparison criteria from the query string; None leaves the saved value."""
+    mode = request.args.get('mode') or None
+    if mode not in (None, 'same_tags', 'tags', 'all'):
+        raise ValueError("mode must be same_tags, tags, or all")
+
+    def flag(name):
+        raw = request.args.get(name)
+        if raw is None or raw == '':
+            return None
+        if raw.lower() not in ('true', 'false', '1', '0'):
+            raise ValueError(f"{name} must be true or false")
+        return raw.lower() in ('true', '1')
+
+    return {
+        'instance_id': request.args.get('instance_id') or None,
+        'mode': mode,
+        'tag_ids': [tag_id for tag_id in request.args.getlist('tag_ids') if tag_id],
+        'same_template': flag('same_template'),
+        'same_program_day': flag('same_program_day'),
+    }
+
+
+def _owned_activity_or_error(session, root_id, activity_id, current_user):
+    if not require_owned_root(session, root_id, current_user.id):
+        return jsonify({"error": "Fractal not found or access denied"}), 404
+    if not get_owned_activity_definition(session, root_id, activity_id):
+        return jsonify({"error": "Activity not found"}), 404
+    return None
+
+
 @activities_bp.route('/<root_id>/activities/<activity_id>/progress-timeline', methods=['GET'])
 @token_required
 def get_activity_progress_timeline(current_user, root_id, activity_id):
-    """Past instances in one comparison context; ``mode``/``tag_ids`` preview an unsaved one."""
+    """Past instances in one comparison context; query params preview an unsaved one."""
     session = get_db_session()
     try:
-        if not require_owned_root(session, root_id, current_user.id):
-            return jsonify({"error": "Fractal not found or access denied"}), 404
-        if not get_owned_activity_definition(session, root_id, activity_id):
-            return jsonify({"error": "Activity not found"}), 404
+        failure = _owned_activity_or_error(session, root_id, activity_id, current_user)
+        if failure:
+            return failure
         limit = min(max(request.args.get('limit', 20, type=int), 1), 100)
         offset = max(request.args.get('offset', 0, type=int), 0)
-        mode = request.args.get('mode') or None
-        if mode not in (None, 'same_tags', 'tags', 'all'):
-            return jsonify({"error": "mode must be same_tags, tags, or all"}), 400
-        tag_ids = [tag_id for tag_id in request.args.getlist('tag_ids') if tag_id]
         try:
             payload = ProgressService(session).get_progress_timeline(
-                activity_id,
-                root_id,
-                instance_id=request.args.get('instance_id') or None,
-                mode=mode,
-                tag_ids=tag_ids,
-                limit=limit,
-                offset=offset,
+                activity_id, root_id, limit=limit, offset=offset, **_progress_scope_args(),
+            )
+        except ValueError as error:
+            return jsonify({"error": str(error)}), 400
+        return jsonify(payload)
+    finally:
+        session.close()
+
+
+@activities_bp.route('/<root_id>/activities/<activity_id>/progress-series', methods=['GET'])
+@token_required
+def get_activity_progress_series(current_user, root_id, activity_id):
+    """Scoped instances for the Progress pane's compact chart, and what it plots."""
+    session = get_db_session()
+    try:
+        failure = _owned_activity_or_error(session, root_id, activity_id, current_user)
+        if failure:
+            return failure
+        limit = min(max(request.args.get('limit', 60, type=int), 1), 200)
+        try:
+            payload = ProgressService(session).get_progress_series(
+                activity_id, root_id, limit=limit, **_progress_scope_args(),
             )
         except ValueError as error:
             return jsonify({"error": str(error)}), 400

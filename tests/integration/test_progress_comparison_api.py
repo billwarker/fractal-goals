@@ -152,7 +152,10 @@ def test_per_instance_override_rebases_only_that_instance(authed_client, history
     all_history = authed_client.put(url, json={'mode': 'all', 'version': 1})
     assert all_history.status_code == 200, all_history.get_json()
     assert all_history.get_json()['progress_comparison']['previous_instance_id'] == light_day.id
-    assert all_history.get_json()['comparison_context'] == {'mode': 'all', 'tag_ids': [], 'tags': [], 'version': 2}
+    assert all_history.get_json()['comparison_context'] == {
+        'mode': 'all', 'tag_ids': [], 'tags': [], 'same_template': False, 'same_program_day': False,
+        'template': None, 'program_day': None, 'remembered_for': None, 'version': 2,
+    }
 
     stale = authed_client.put(url, json={'mode': 'same_tags', 'version': 1})
     assert stale.status_code == 409
@@ -226,3 +229,151 @@ def test_comparison_endpoint_is_owner_scoped(authed_client, db_session, history,
         f'/api/{other_root.id}/activity-instances/{current.id}/progress-comparison', json={'mode': 'all'},
     )
     assert response.status_code == 404
+
+
+# --- Scope: same session template / program day, remembered defaults, chart series ---------------
+
+from datetime import date  # noqa: E402
+
+from models import ActivityProgressDefault, Program, ProgramDay, SessionTemplate  # noqa: E402
+
+
+@pytest.fixture
+def scoped(db_session, history):
+    """Two templates and two program days, and a logger that files sessions under them."""
+    root_id = history['root_id']
+    templates = [SessionTemplate(id=str(uuid4()), name=name, root_id=root_id, template_data={}) for name in ('Upper', 'Lower')]
+    program = Program(
+        id=str(uuid4()), root_id=root_id, name='Block', start_date=date(2026, 9, 1), end_date=date(2026, 12, 1),
+        weekly_schedule={},
+    )
+    db_session.add_all([*templates, program])
+    db_session.flush()
+    days = [ProgramDay(id=str(uuid4()), program_id=program.id, name=name) for name in ('Day A', 'Day B')]
+    db_session.add_all(days)
+    db_session.commit()
+
+    def log(day, weight, *, template=None, program_day=None):
+        instance = history['log'](day, [(weight, [])])
+        session = db_session.get(Session, instance.session_id)
+        session.template_id = template.id if template else None
+        session.program_day_id = program_day.id if program_day else None
+        db_session.commit()
+        return instance
+
+    return {**history, 'templates': templates, 'days': days, 'log_in': log}
+
+
+def _compare(client, root_id, instance_id, **body):
+    return client.put(f'/api/{root_id}/activity-instances/{instance_id}/progress-comparison', json={'mode': 'same_tags', **body})
+
+
+@pytest.mark.integration
+def test_template_and_program_day_scopes_narrow_comparisons_independently_and_together(authed_client, scoped):
+    root_id, activity = scoped['root_id'], scoped['activity']
+    upper, lower = scoped['templates']
+    day_a, day_b = scoped['days']
+    log = scoped['log_in']
+    upper_a = log(0, 100, template=upper, program_day=day_a)
+    upper_b = log(1, 101, template=upper, program_day=day_b)
+    lower_a = log(2, 102, template=lower, program_day=day_a)
+    current = log(3, 110, template=upper, program_day=day_a)
+
+    assert _progress(authed_client, root_id, current.id)['previous_instance_id'] == lower_a.id
+    template_only = _compare(authed_client, root_id, current.id, same_template=True).get_json()
+    assert template_only['progress_comparison']['previous_instance_id'] == upper_b.id
+    assert template_only['comparison_context']['template'] == {'id': upper.id, 'name': 'Upper'}
+    day_only = _compare(authed_client, root_id, current.id, same_program_day=True).get_json()
+    assert day_only['progress_comparison']['previous_instance_id'] == lower_a.id
+    both = _compare(authed_client, root_id, current.id, same_template=True, same_program_day=True).get_json()
+    assert both['progress_comparison']['previous_instance_id'] == upper_a.id
+    assert both['comparison_context']['remembered_for'] == 'Day A'
+
+    url = f'/api/{root_id}/activities/{activity.id}/progress-timeline?instance_id={current.id}'
+    timeline = authed_client.get(url).get_json()
+    assert (timeline['total'], timeline['total_all']) == (1, 3)
+    assert timeline['items'][0]['session_template_id'] == upper.id
+    assert authed_client.get(f'{url}&same_program_day=false').get_json()['total'] == 2
+    assert authed_client.get(f'{url}&same_template=maybe').status_code == 400
+
+
+@pytest.mark.integration
+def test_scope_needs_a_template_or_program_day(authed_client, scoped):
+    current = scoped['log_in'](0, 100)
+    response = _compare(authed_client, scoped['root_id'], current.id, same_template=True)
+    assert response.status_code == 422
+    assert response.get_json()['details']['code'] == 'scope_unavailable'
+
+
+@pytest.mark.integration
+def test_a_comparison_is_remembered_for_the_next_instance_in_the_same_template_and_day(authed_client, db_session, scoped):
+    root_id, activity = scoped['root_id'], scoped['activity']
+    upper, lower = scoped['templates']
+    day_a = scoped['days'][0]
+    log = scoped['log_in']
+    heavy = _tag(authed_client, root_id, 'Heavy')
+    first = log(0, 100, template=upper, program_day=day_a)
+    _compare(authed_client, root_id, first.id, mode='tags', tag_ids=[heavy], same_template=True)
+    remembered = db_session.query(ActivityProgressDefault).filter_by(activity_definition_id=activity.id).one()
+    assert (remembered.session_template_id, remembered.program_day_id, remembered.compare_mode) == (upper.id, day_a.id, 'tags')
+
+    # The database pre-applies it to the activity's next instance in the same template and day.
+    session = Session(
+        id=str(uuid4()), owner_id=db_session.get(Goal, root_id).owner_id, root_id=root_id, name='Next',
+        completed=True, session_start=BASE + timedelta(days=1), template_id=upper.id, program_day_id=day_a.id,
+    )
+    db_session.add(session)
+    db_session.commit()
+    created = ActivityInstance(id=str(uuid4()), root_id=root_id, session_id=session.id, activity_definition_id=activity.id)
+    db_session.add(created)
+    db_session.commit()
+    context = _progress(authed_client, root_id, created.id)['comparison_context']
+    assert (context['mode'], context['tag_ids'], context['same_template'], context['same_program_day']) == ('tags', [heavy], True, False)
+
+    # A different template starts plain, and resetting forgets the default.
+    elsewhere = log(2, 100, template=lower, program_day=day_a)
+    assert _progress(authed_client, root_id, elsewhere.id)['comparison_context']['mode'] == 'same_tags'
+    _compare(authed_client, root_id, first.id)
+    assert db_session.query(ActivityProgressDefault).filter_by(activity_definition_id=activity.id).count() == 0
+
+
+@pytest.mark.integration
+def test_remembered_tags_follow_a_merge(authed_client, db_session, scoped):
+    root_id = scoped['root_id']
+    upper = scoped['templates'][0]
+    light = _tag(authed_client, root_id, 'Light')
+    easy = _tag(authed_client, root_id, 'Easy')
+    current = scoped['log_in'](0, 100, template=upper)
+    _compare(authed_client, root_id, current.id, mode='tags', tag_ids=[easy])
+    catalog = {tag['id']: tag for tag in authed_client.get(f'/api/{root_id}/activity-tags').get_json()['tags']}
+    authed_client.post(f'/api/{root_id}/activity-tags/merge', json={
+        'target_id': light, 'source_ids': [easy],
+        'versions': {light: catalog[light]['version'], easy: catalog[easy]['version']},
+    })
+    db_session.expire_all()
+    remembered = db_session.query(ActivityProgressDefault).one()
+    assert [tag.id for tag in remembered.compare_tags] == [light]
+
+
+@pytest.mark.integration
+def test_progress_series_plots_scoped_history_then_the_current_instance(authed_client, db_session, scoped):
+    root_id, activity, metric = scoped['root_id'], scoped['activity'], scoped['metric']
+    upper, lower = scoped['templates']
+    log = scoped['log_in']
+    older = log(0, 90, template=upper)
+    log(1, 95, template=lower)
+    newer = log(2, 100, template=upper)
+    current = log(3, 110, template=upper)
+    _compare(authed_client, root_id, current.id, same_template=True)
+
+    url = f'/api/{root_id}/activities/{activity.id}/progress-series?instance_id={current.id}'
+    series = authed_client.get(url).get_json()
+    assert [row['id'] for row in series['instances']] == [older.id, newer.id, current.id]
+    assert series['current_instance_id'] == current.id
+    assert series['chart']['source'] == 'activity'
+    assert series['chart']['condition']['measure'] == 'sets'
+    assert series['chart']['condition']['rules'][0]['metric_definition_id'] == metric.id
+    limited = authed_client.get(f'{url}&limit=1').get_json()
+    assert [row['id'] for row in limited['instances']] == [newer.id, current.id]
+    assert limited['truncated'] is True
+    assert len(authed_client.get(f'{url}&same_template=false').get_json()['instances']) == 4

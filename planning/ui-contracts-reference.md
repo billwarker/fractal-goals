@@ -303,13 +303,38 @@ offers ↑/↓ ordering within the whole family, even while filtered. Families h
 or "Merge into it" while renaming. "Merge…" on any row picks a target and previews the combined usage.
 Row actions carry the tag's name in their accessible labels.
 
-## Timeline progress comparison
+## Progress pane
 
-The Timeline pane's "Compare with" control (Same tags · Specific tags · All history) belongs to one
-activity instance: the focused one, else the session's first instance of the chosen activity. It
-saves immediately on that instance only, re-basing its ▲/▼ hints. "Reset to same tags" appears
-whenever another mode is active. The count reads "N of M past sessions match". The list shows only
-matching sessions. Earlier sets that the current sets compare with are marked with a left accent,
-titled "Compared with a set in this session". While an instance uses an override, its card summary
-says so ("Comparing with all history" or "Comparing with Heavy + Paused sessions"), so changed hints
-are never unexplained.
+The Session Detail side pane's **Progress** view (formerly Timeline) belongs to one activity
+instance: the focused one, else the session's first instance of the chosen activity.
+
+- **Compare with** (Same tags · Specific tags · All history): Specific tags shows the tags used on
+  this activity as chips, grouped by tag family; single-select families keep one.
+- **Within**: two independent checkboxes, Same template and Same program day, as aligned rows
+  (checkbox, label, name), with no pill borders. A checkbox is disabled when the session lacks a
+  template or program day. Both combine with the tag choice.
+- "Compare with" is a section label above the widget, styled like "Select Activity". The widget's
+  one-line toggle row names the scope ("Same day | Same template", "Same template", "Same day" or
+  "Any session") with the count ("1 of 8", full wording on hover). Expanded, Within comes first,
+  then the tag choice. Collapsed, a thin divider separates the row from the compared tags, shown
+  as tag badges (or "All history" / "Untagged sessions").
+- Every change saves immediately on that instance, re-basing its ▲/▼ hints, and is remembered
+  for the activity in that template/program day: its next instances there start from it. Choosing Same tags with both toggles off is the reset.
+- The count reads "N of M past sessions match", and the list shows only matching sessions, with
+  the earlier sets the current sets compare with marked by a left accent.
+- A compact chart sits directly under the activity select, above "Compare with". It plots the
+  matching sessions ending with this one (highlighted): the in-scope goal condition with its
+  threshold, else the activity's yield or best-set value. Like the goal detail charts, the whole
+  card is the control: it highlights on hover and focus, and clicking it (or Enter) opens the same
+  chart in Analytics with the tag, template and program-day filters applied. The mini chart has no
+  tooltips of its own.
+- While an instance uses an override, its card summary says so, so changed hints are never
+  unexplained.
+
+## Analytics tag, template and program-day filters
+
+The Analytics filter sidebar's Global Scope has Tags (chips by family, an "Exact tag set" switch,
+"Any tags" to clear), Session template and Program day sections; options come from the loaded
+history. They apply to activity instances (tags) and sessions (template, program day), are saved
+with views and dashboards, and a Progress pane link (`?activity=&viz=&metrics=&tags=&tagMatch=&template=&programDay=`)
+opens one pre-configured panel and then clears itself.

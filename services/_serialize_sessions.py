@@ -125,6 +125,10 @@ def serialize_session_for_analytics(session):
         "completed": bool(session.completed),
         "total_duration_seconds": _session_duration_seconds_for_analytics(session),
         "sections": _serialize_session_sections_for_analytics(session),
+        "template_id": session.template_id,
+        "template_name": get_session_template_name(session) if session.template_id else None,
+        "program_day_id": session.program_day_id,
+        "program_day_name": session.program_day.name if session.program_day_id and session.program_day else None,
     }
 
 

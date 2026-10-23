@@ -104,7 +104,7 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
             <ActivitySummaryRail metrics={summaryMetrics} />
             {overrideLabel && (
                 <div className={styles.progressExcluded} role="note">
-                    {overrideLabel}. Change it in the Timeline panel.
+                    {overrideLabel}. Change it in the Progress panel.
                 </div>
             )}
         </div>

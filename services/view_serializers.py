@@ -58,6 +58,8 @@ def serialize_activity_history_entry(instance, notes):
         )
         payload['session_template_color'] = get_session_template_color(instance.session)
         payload['session_date'] = format_utc(instance.session.session_start or instance.session.created_at)
+        payload['session_template_id'] = instance.session.template_id
+        payload['program_day_id'] = instance.session.program_day_id
     payload['notes'] = [serialize_note_display(note) for note in notes]
     return payload
 

@@ -4,6 +4,7 @@ import { formatDuration } from '../components/analytics/formatDuration';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
+import useAnalyticsDeepLink from '../components/analytics/useAnalyticsDeepLink';
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
@@ -184,6 +185,13 @@ function Analytics() {
         resetToEmptyView();
         setIsHydrated(true);
     }, [resetToEmptyView, rootId]);
+
+    const applyDeepLink = useCallback(({ windowState, globalFilters: linkFilters }) => {
+        setWindowStates({ [DEFAULT_SELECTED_WINDOW_ID]: windowState });
+        setSelectedWindowId(DEFAULT_SELECTED_WINDOW_ID);
+        setGlobalFilters(linkFilters);
+    }, []);
+    useAnalyticsDeepLink({ isHydrated, activities, onApply: applyDeepLink });
 
     useEffect(() => {
         if (!showSqlExplorer && activeMode === 'query') {
@@ -455,6 +463,8 @@ function Analytics() {
             constrainToVisualViewport={false}
         >
             <AnalyticsFiltersSidebar
+                rootId={rootId}
+                sessions={sessions}
                 filters={globalFilters}
                 dateRange={globalDateRange}
                 goals={goalAnalytics?.goals || []}

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
-import styles from './TimelinePanel.module.css';
+import styles from './ProgressPanel.module.css';
 import { logError } from '../../utils/logger';
 
 function SessionNotesPanel({

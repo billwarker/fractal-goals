@@ -569,6 +569,48 @@ def test_tag_filtered_progress_timeline_query_budget(
 
 
 @pytest.mark.integration
+def test_progress_series_query_budget_is_constant(
+    authed_client,
+    db_session,
+    query_counter,
+    sample_practice_session,
+    sample_activity_definition,
+    sample_activity_instance,
+):
+    """The Progress pane chart reads a bounded window in a constant number of queries."""
+    root_id = sample_practice_session.root_id
+    for index in range(80):
+        session = PracticeSession(
+            id=str(uuid.uuid4()),
+            owner_id=sample_practice_session.owner_id,
+            root_id=root_id,
+            name=f"Chart history {index}",
+            session_start=datetime.now(timezone.utc) - timedelta(days=index + 1),
+            completed=True,
+        )
+        db_session.add(session)
+        db_session.flush()
+        db_session.add(ActivityInstance(
+            id=str(uuid.uuid4()), session_id=session.id, activity_definition_id=sample_activity_definition.id,
+            root_id=root_id, completed=True,
+        ))
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = timed_get(
+        authed_client,
+        f"/api/{root_id}/activities/{sample_activity_definition.id}/progress-series"
+        f"?instance_id={sample_activity_instance.id}&limit=60",
+        query_counter=query_counter,
+    )
+    assert_response_budget(response, max_bytes=250_000, max_ms=900, elapsed_ms=elapsed_ms)
+    payload = response.get_json()
+    assert len(payload["instances"]) == 61
+    assert payload["truncated"] is True
+    assert query_counter["total"] <= 22
+
+
+@pytest.mark.integration
 def test_activity_tag_catalog_query_budget_is_constant(
     authed_client,
     db_session,

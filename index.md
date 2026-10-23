@@ -322,8 +322,13 @@ Detailed design:
 `ProgressService` resolves predecessors for a whole batch in one SQL statement, then hydrates
 only requested instances and those predecessors. An instance compares with the latest earlier
 instance whose own tags match its comparison context: the same tags by default, chosen tags, or
-all history (`activity_instances.progress_compare_mode` plus `activity_instance_compare_tags`,
-set per instance from the Timeline pane; it never changes other instances). Each group of sets
+all history (`activity_instances.progress_compare_mode` plus `activity_instance_compare_tags`),
+optionally only within the same session template and/or program day
+(`progress_compare_same_template` / `progress_compare_same_program_day`). It is set per instance
+from the Progress pane and never changes other instances; `activity_progress_defaults` remembers the
+choice per activity × template/program day, and an insert trigger pre-applies it to new instances
+there. `GET …/progress-series` feeds the pane's compact chart (`services/progress_chart_spec.py`:
+the in-scope goal condition, else one synthesized from the metrics). Each group of sets
 with the same set tags compares with the latest earlier instance in that context holding such sets,
 k-th set to k-th set. Completed predecessors take priority and same-session instances are excluded.
 Matching uses the trigger-maintained `tag_signature` columns (lookup keys, not stored progress).

@@ -67,6 +67,11 @@ export const fractalActivitiesApi = {
             // Flask reads repeated keys (tag_ids=a&tag_ids=b), not tag_ids[]=a.
             paramsSerializer: { indexes: null },
         }),
+    getActivityProgressSeries: (rootId, activityId, params = {}) =>
+        axios.get(`${API_BASE}/${rootId}/activities/${activityId}/progress-series`, {
+            params,
+            paramsSerializer: { indexes: null },
+        }),
     reorderActivityTags: (rootId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-tags/order`, data),
     createActivityTagFamily: (rootId, data) =>

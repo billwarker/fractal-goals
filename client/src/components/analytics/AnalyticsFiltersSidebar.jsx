@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
 
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
@@ -13,6 +13,9 @@ import {
 } from './visualizations/state';
 import '../sessions/SessionsQuerySidebar.css';
 
+// Loaded with the sidebar's content rather than the route, to keep the Analytics bundle in budget.
+const AnalyticsScopeFilters = lazy(() => import('./AnalyticsScopeFilters'));
+
 const SIDEBAR_DATE_RANGE_CLASSES = {
     chipGroup: 'sessions-query-chip-group',
     chip: 'sessions-query-chip',
@@ -22,6 +25,8 @@ const SIDEBAR_DATE_RANGE_CLASSES = {
 };
 
 function AnalyticsFiltersSidebar({
+    rootId,
+    sessions = [],
     filters,
     dateRange,
     goals = [],
@@ -47,6 +52,8 @@ function AnalyticsFiltersSidebar({
         Boolean(dateRange?.start || dateRange?.end),
         normalized.goals.goalIds.length > 0,
         normalized.activities.activityIds.length > 0 || normalized.activities.groupIds.length > 0,
+        Boolean(normalized.tags),
+        normalized.sessions.templateIds.length > 0 || normalized.sessions.programDayIds.length > 0,
     ].filter(Boolean).length;
 
     const selectedGoalNames = useMemo(
@@ -263,6 +270,9 @@ function AnalyticsFiltersSidebar({
                                 : 'All activities'}
                         </div>
                     </section>
+                    <Suspense fallback={null}>
+                        <AnalyticsScopeFilters rootId={rootId} filters={normalized} sessions={sessions} onUpdate={updateFilters} />
+                    </Suspense>
                     </>
                     )}
                 </div>

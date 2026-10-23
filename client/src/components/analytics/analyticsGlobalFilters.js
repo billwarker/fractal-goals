@@ -8,6 +8,13 @@ export const DEFAULT_GLOBAL_FILTERS = {
         activityIds: [],
         groupIds: [],
     },
+    // null: no tag filter. 'all': instances having every chosen tag; 'exact': instances whose
+    // own tags are exactly the chosen set (an empty set means untagged), as the Progress pane matches.
+    tags: null,
+    sessions: {
+        templateIds: [],
+        programDayIds: [],
+    },
 };
 
 const toIdSet = (values) => new Set((Array.isArray(values) ? values : []).filter(Boolean));
@@ -16,6 +23,8 @@ export function normalizeGlobalFilters(filters) {
     const candidate = filters && typeof filters === 'object' ? filters : {};
     const goals = candidate.goals && typeof candidate.goals === 'object' ? candidate.goals : {};
     const activities = candidate.activities && typeof candidate.activities === 'object' ? candidate.activities : {};
+    const tags = candidate.tags && typeof candidate.tags === 'object' ? candidate.tags : null;
+    const sessions = candidate.sessions && typeof candidate.sessions === 'object' ? candidate.sessions : {};
 
     return {
         goals: {
@@ -27,14 +36,46 @@ export function normalizeGlobalFilters(filters) {
             activityIds: Array.from(toIdSet(activities.activityIds)),
             groupIds: Array.from(toIdSet(activities.groupIds)),
         },
+        tags: tags ? { tagIds: Array.from(toIdSet(tags.tagIds)), match: tags.match === 'all' ? 'all' : 'exact' } : null,
+        sessions: {
+            templateIds: Array.from(toIdSet(sessions.templateIds)),
+            programDayIds: Array.from(toIdSet(sessions.programDayIds)),
+        },
     };
+}
+
+export function hasInstanceScopeFilters(filters) {
+    const normalized = normalizeGlobalFilters(filters);
+    return Boolean(normalized.tags)
+        || normalized.sessions.templateIds.length > 0
+        || normalized.sessions.programDayIds.length > 0;
+}
+
+/** Whether a session falls in the template and program-day filters. */
+export function sessionMatchesScope(session, filters) {
+    const { templateIds, programDayIds } = normalizeGlobalFilters(filters).sessions;
+    if (templateIds.length && !templateIds.includes(session?.template_id)) return false;
+    if (programDayIds.length && !programDayIds.includes(session?.program_day_id)) return false;
+    return true;
+}
+
+/** Whether an activity instance falls in the tag filter and its session in the session filters. */
+export function instanceMatchesScope(instance, session, filters) {
+    const normalized = normalizeGlobalFilters(filters);
+    if (!sessionMatchesScope(session, normalized)) return false;
+    if (!normalized.tags) return true;
+    const own = new Set((instance?.tags || []).map((tag) => tag.id));
+    const chosen = normalized.tags.tagIds;
+    if (normalized.tags.match === 'all') return chosen.every((tagId) => own.has(tagId));
+    return own.size === chosen.length && chosen.every((tagId) => own.has(tagId));
 }
 
 export function hasActiveGlobalFilters(filters) {
     const normalized = normalizeGlobalFilters(filters);
     return normalized.goals.goalIds.length > 0
         || normalized.activities.activityIds.length > 0
-        || normalized.activities.groupIds.length > 0;
+        || normalized.activities.groupIds.length > 0
+        || hasInstanceScopeFilters(normalized);
 }
 
 function collectDescendantGoalIds(goalIds, goals) {

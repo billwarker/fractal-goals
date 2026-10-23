@@ -36,7 +36,7 @@ function thresholdAnnotations(series, chartTheme) {
  * A goal's activity threshold over time: each contributing session against the threshold line.
  * Compact density (goal details) keeps only the series and the threshold, with a one-line caption.
  */
-function ConditionProgressChart({ condition, instances, activity, density = 'full' }) {
+function ConditionProgressChart({ condition, instances, activity, density = 'full', highlightInstanceId = null }) {
     const chartTheme = useChartThemeDefaults();
     const compact = density === 'compact';
     const { points, series } = useMemo(() => buildConditionSeries(condition, instances, {
@@ -58,7 +58,8 @@ function ConditionProgressChart({ condition, instances, activity, density = 'ful
             borderWidth: 2,
             spanGaps: true,
             tension: 0.2,
-            pointRadius: compact ? 2 : 3,
+            // The highlighted instance (e.g. the session being edited) stands out.
+            pointRadius: points.map((point) => (point.instanceId === highlightInstanceId ? 5 : compact ? 2 : 3)),
             yAxisID: `y${index}`,
         })),
     };

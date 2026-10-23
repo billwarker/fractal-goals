@@ -11,6 +11,7 @@ from models import (
     ActivityInstance,
     ActivityInstanceCompareTag,
     ActivityInstanceTag,
+    ActivityProgressDefaultTag,
     ActivitySet,
     ActivitySetTag,
     ActivityTagDefinition,
@@ -464,6 +465,7 @@ class ActivityTagCatalogService:
         self._union_links(ActivityInstanceTag, "activity_instance_id", source_ids, target.id)
         self._union_links(ActivitySetTag, "activity_set_id", source_ids, target.id)
         self._union_links(ActivityInstanceCompareTag, "activity_instance_id", source_ids, target.id)
+        self._union_links(ActivityProgressDefaultTag, "default_id", source_ids, target.id)
         for scope in self.db.query(CircuitScopeTag).filter(
             CircuitScopeTag.activity_tag_definition_id.in_(source_ids),
         ).all():

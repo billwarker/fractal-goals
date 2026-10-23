@@ -5,7 +5,9 @@ const budgets = {
     AuthenticatedRoot: { label: 'Authenticated shell', js: 200, css: 40 },
     FractalGoals: { label: 'Goals route', js: 350, css: 65 },
     Sessions: { label: 'Sessions route', js: 300, css: 65 },
-    Analytics: { label: 'Analytics route', js: 320, css: 65 },
+    // 322: tag, session-template and program-day filters plus Progress-pane deep links (+1.4 KiB,
+    // 2026-10; the filter section itself is lazy-loaded). See planning/progress-pane-scope-and-chart.md.
+    Analytics: { label: 'Analytics route', js: 322, css: 65 },
 };
 
 export default function bundleBudgets() {

@@ -70,7 +70,7 @@ export function useSessionSidePaneViewModel({
             activityGoalScope,
             onGoalScopeToggle,
         },
-        timeline: {
+        progress: {
             rootId,
             sessionId,
             selectedActivity,
