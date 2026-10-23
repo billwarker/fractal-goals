@@ -353,7 +353,9 @@ goal, 120 per goal for multi-goal charts). Date/activity filters apply before ag
 `SessionAnalyticsService` caps each evidence page at 500 instances within a paginated
 session window and reports continuation for both instances and older sessions. Analytics charts
 automatically traverse both continuations, merge session identities, and show loading/retry status
-until full history is available.
+until full history is available. Activity/session charts wait for complete history before rendering;
+Progress deep links start that history read alongside the activity catalog. Circuit section identities
+are bulk-loaded, and predecessor lookups drive from indexed activity instances before session scope.
 `SessionListReadModel` remains available through the opt-in `view=summary` API. The Sessions
 page requests full session records so activities and notes render inline as each page loads,
 without a separate detail-expansion control. `WindowedSessionRow` retains real cards in the DOM and uses CSS `content-visibility: auto`

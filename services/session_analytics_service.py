@@ -6,7 +6,8 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import models
 from models import (
-    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Program, ProgramDay, Session, SessionTemplate,
+    ActivityDefinition, ActivityInstance, ActivitySet, CircuitRound, CircuitRoundMember, CircuitRun,
+    Goal, MetricValue, Program, ProgramDay, Session, SessionTemplate,
     session_goals, validate_root_goal,
 )
 from services.serializers import (
@@ -65,6 +66,12 @@ class SessionAnalyticsService:
             ).selectinload(ProgramDay.program).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
                 Program.id, Program.name, Program.color,  # pyright: ignore[reportArgumentType]
             ),
+            # Sections list circuit members' instances: bulk-load the circuit chain,
+            # avoiding a separate query per run, round and member.
+            selectinload(Session.circuit_runs)  # pyright: ignore[reportArgumentType] - legacy Column typing
+            .selectinload(CircuitRun.rounds)  # pyright: ignore[reportArgumentType]
+            .selectinload(CircuitRound.members)  # pyright: ignore[reportArgumentType]
+            .joinedload(CircuitRoundMember.run_slot),  # pyright: ignore[reportArgumentType]
         )
 
     @staticmethod

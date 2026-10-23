@@ -379,3 +379,12 @@ opens one pre-configured panel and then clears itself. Metric Trends can plot th
 offering Total for it. Every activity chart combines sets the same way (`utils/setAggregation.js`):
 Top set follows the metric's direction (lower-is-better metrics take their lowest), so the
 scatter's top set is one real set chosen by its Y metric.
+
+Activity and session charts show "Loading full history…" until every instance and session page has
+arrived, so totals and trends never draw from a partial history. The history query uses windows of
+200 sessions and at most 500 instances per response, following instance continuation before older
+session windows. A Progress deep link starts history loading immediately, alongside the activity
+catalog, rather than waiting for the panel to be configured. Goal charts keep their independent
+SQL read/loading state. If a continuation fails, the chart shows an error with Retry; that action
+resumes the missing page while preserving loaded history. The page-level history notice offers the
+same retry, and keeps its loading wording steady between requests.

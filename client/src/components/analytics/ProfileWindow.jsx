@@ -496,9 +496,11 @@ function ProfileWindow({
         }
 
         const readQuery = selectedCategory === 'goals' ? scopedGoalQuery : {
-            isFetching: data.evidenceLoading, isError: Boolean(data.evidenceError), refetch: data.retryEvidence,
+            isFetching: data.evidenceLoading || (data.hasMoreEvidence && !data.evidenceError),
+            isError: Boolean(data.evidenceError),
+            refetch: data.hasMoreEvidence ? data.loadMoreEvidence : data.retryEvidence,
         };
-        if (readQuery.isFetching) return <div role="status">Loading analytics...</div>;
+        if (readQuery.isFetching) return <div role="status">{selectedCategory === 'goals' ? 'Loading analytics…' : 'Loading full history…'}</div>;
         if (readQuery.isError) {
             return <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => readQuery.refetch()}>Retry</button></div>;
         }

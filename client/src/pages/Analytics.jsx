@@ -4,7 +4,7 @@ import { formatDuration } from '../components/analytics/formatDuration';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
-import useAnalyticsDeepLink from '../components/analytics/useAnalyticsDeepLink';
+import useAnalyticsDeepLink, { useAnalyticsEvidenceDemand } from '../components/analytics/useAnalyticsDeepLink';
 import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
@@ -97,10 +97,10 @@ function Analytics() {
         goalAnalytics,
         loading,
         sessions,
-        hasMoreEvidence, loadingMoreEvidence, loadMoreEvidence,
+        hasMoreEvidence, loadMoreEvidence,
         evidenceLoading, evidenceError, retryEvidence,
     } = useAnalyticsPageData(rootId, {
-        needsSessionEvidence: Object.values(windowStates).some((state) => ['sessions', 'activities'].includes(state.selectedCategory)),
+        needsSessionEvidence: useAnalyticsEvidenceDemand(windowStates),
     });
     const [consoleInitialSql, setConsoleInitialSql] = useState('');
     const [dashboardBounds, setDashboardBounds] = useState(null);
@@ -258,8 +258,8 @@ function Analytics() {
         activityGroups,
         activityInstances,
         formatDuration,
-        rootId, evidenceLoading, evidenceError, retryEvidence,
-    }), [sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId, evidenceLoading, evidenceError, retryEvidence]);
+        rootId, evidenceLoading, evidenceError, retryEvidence, hasMoreEvidence, loadMoreEvidence,
+    }), [sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId, evidenceLoading, evidenceError, retryEvidence, hasMoreEvidence, loadMoreEvidence]);
 
     const handleDateRangeChange = useCallback((nextRange) => {
         let normalized = {
@@ -507,7 +507,7 @@ function Analytics() {
                 />
 
                 <AnalyticsOnboardingState rootId={rootId} />
-                <AnalyticsEvidenceNotice {...{ hasMoreEvidence, loadingMoreEvidence, loadMoreEvidence }} />
+                <AnalyticsEvidenceNotice {...{ hasMoreEvidence, evidenceError, loadMoreEvidence }} />
 
                 {activeMode === 'query' && showSqlExplorer ? (
                     <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />

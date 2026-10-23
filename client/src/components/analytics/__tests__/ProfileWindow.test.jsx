@@ -4,7 +4,10 @@ import { fireEvent, render as renderBase, screen } from '@testing-library/react'
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-const render = (element) => renderBase(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{element}</QueryClientProvider>);
+const render = (element) => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return renderBase(element, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+};
 
 import ProfileWindow from '../ProfileWindow';
 
@@ -36,6 +39,38 @@ describe('ProfileWindow', () => {
 
     beforeEach(() => {
         scatterPlot.mockClear();
+    });
+
+    it.each([
+        { evidenceLoading: true },
+        { evidenceLoading: false, hasMoreEvidence: true },
+    ])('holds the chart until history is complete: %o', (loadingState) => {
+        const activity = { id: 'activity-1', name: 'Squat' };
+        const data = { sessions: [], activities: [activity], activityGroups: [], activityInstances: {}, rootId: null };
+        const props = {
+            windowState: { selectedCategory: 'activities', selectedVisualization: 'scatterPlot', selectedActivity: activity },
+            updateWindowState: vi.fn(),
+        };
+        const { rerender } = render(<ProfileWindow {...props} data={{ ...data, ...loadingState }} />);
+        expect(screen.getByRole('status')).toHaveTextContent('Loading');
+        expect(scatterPlot).not.toHaveBeenCalled();
+        rerender(<ProfileWindow {...props} data={{ ...data, hasMoreEvidence: false }} />);
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(scatterPlot).toHaveBeenCalled();
+    });
+
+    it('offers retry instead of rendering partial history after a continuation fails', () => {
+        const loadMoreEvidence = vi.fn();
+        render(<ProfileWindow
+            data={{ sessions: [], activities: [], activityGroups: [], activityInstances: {}, rootId: null,
+                hasMoreEvidence: true, evidenceError: new Error('offline'), loadMoreEvidence }}
+            windowState={{ selectedCategory: 'activities', selectedVisualization: 'scatterPlot' }}
+            updateWindowState={vi.fn()}
+        />);
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(scatterPlot).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry', exact: true }));
+        expect(loadMoreEvidence).toHaveBeenCalledTimes(1);
     });
 
     it('renders the selected activity scatter plot view', () => {

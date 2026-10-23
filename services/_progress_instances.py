@@ -8,8 +8,8 @@ against the latest earlier instance in that context with sets carrying the same 
 
 from typing import Any, Optional
 
-from sqlalchemy import Integer, String, and_, column, exists, func, or_, select, tuple_, values
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy import Integer, String, and_, column, exists, func, or_, select, true, tuple_, values
+from sqlalchemy.orm import aliased, joinedload, selectinload
 
 from models import ActivityDefinition, ActivityInstance, ActivitySet, Session
 from services.activity_instance_data import load_instance_sets
@@ -144,39 +144,45 @@ class _ProgressInstancesMixin:
             )
             .subquery('progress_targets')
         )
-        candidates = self._active_instance_identity_query().add_columns(
-            ActivityInstance.activity_definition_id,
-            ActivityInstance.tag_signature,
+        # Candidates start from the target activity's own instances (indexed) and look their
+        # session up by key. The LATERAL ... OFFSET 0 keeps Postgres from flattening the join and
+        # starting from every session instead, which the optional scope filters invite.
+        candidate = aliased(ActivityInstance, name='candidate')
+        candidate_session = (
+            select(Session.session_start, Session.template_id, Session.program_day_id)
+            .where(Session.id == candidate.session_id, Session.deleted_at.is_(None))
+            .offset(0)
+            .lateral('candidate_session')
         )
-        if exclude_session_id:
-            candidates = candidates.filter(ActivityInstance.session_id != exclude_session_id)
-        candidates = candidates.subquery('progress_candidates')
-        earlier = select(candidates.c.id).where(
-            candidates.c.activity_definition_id == targets.c.activity_definition_id,
-            candidates.c.session_id != targets.c.session_id,
-            tuple_(candidates.c.effective_time, candidates.c.id) < tuple_(targets.c.effective_time, targets.c.id),
+        candidate_time = func.coalesce(candidate.time_stop, candidate_session.c.session_start, candidate.created_at)
+        earlier = select(candidate.id).select_from(candidate).join(candidate_session, true()).where(
+            candidate.deleted_at.is_(None),
+            candidate.activity_definition_id == targets.c.activity_definition_id,
+            candidate.session_id != targets.c.session_id,
+            *([candidate.session_id != exclude_session_id] if exclude_session_id else []),
+            tuple_(candidate_time, candidate.id) < tuple_(targets.c.effective_time, targets.c.id),
             or_(
                 targets.c.compare_signature.is_(None),
-                candidates.c.tag_signature == targets.c.compare_signature,
+                candidate.tag_signature == targets.c.compare_signature,
             ),
             or_(
                 targets.c.scope_template_id.is_(None),
-                candidates.c.session_template_id == targets.c.scope_template_id,
+                candidate_session.c.template_id == targets.c.scope_template_id,
             ),
             or_(
                 targets.c.scope_program_day_id.is_(None),
-                candidates.c.session_program_day_id == targets.c.scope_program_day_id,
+                candidate_session.c.program_day_id == targets.c.scope_program_day_id,
             ),
             or_(
                 targets.c.set_signature.is_(None),
                 # Correlate to the outer target and candidate rows, never re-select them.
                 exists().where(and_(
-                    ActivitySet.activity_instance_id == candidates.c.id,
+                    ActivitySet.activity_instance_id == candidate.id,
                     ActivitySet.tag_signature == targets.c.set_signature,
                 )).correlate_except(ActivitySet),
             ),
-        ).order_by(candidates.c.effective_time.desc(), candidates.c.id.desc()).correlate(targets)
-        completed = earlier.where(candidates.c.completed.is_(True)).limit(1).scalar_subquery()
+        ).order_by(candidate_time.desc(), candidate.id.desc()).correlate(targets)
+        completed = earlier.where(candidate.completed.is_(True)).limit(1).scalar_subquery()
         fallback = earlier.limit(1).scalar_subquery()
         return dict(self.db.execute(select(
             targets.c.request_key, func.coalesce(completed, fallback).label('previous_id'),

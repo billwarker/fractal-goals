@@ -210,7 +210,8 @@ class _HeaderClient:
     ("/goals", 8, 360_000),
     ("/goals/selection", 12, 90_000),
     ("/sessions?limit=20&view=summary", 12, 50_000),
-    ("/sessions/analytics-summary", 14, 350_000),
+    # One fixed circuit-run lookup prevents per-session/round/member lazy queries.
+    ("/sessions/analytics-summary", 15, 350_000),
     ("/goals/analytics", 8, 350_000),
 ])
 def test_power_account_root_read_budgets(client, query_counter, power_account_dataset, path, max_queries, max_bytes):

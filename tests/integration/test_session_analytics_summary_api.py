@@ -8,6 +8,60 @@ from models import ActivityInstance, MetricDefinition, MetricValue, Session
 
 
 @pytest.mark.integration
+@pytest.mark.parametrize('run_count', [0, 1, 3, 12])
+def test_analytics_circuit_sections_use_bounded_bulk_reads(
+    authed_client, db_session, sample_practice_session, sample_activity_definition, run_count,
+):
+    from sqlalchemy import event
+    from models import ActivitySet, CircuitRun, CircuitRunSlot, CircuitRound, CircuitRoundMember
+
+    session_id, root_id = sample_practice_session.id, sample_practice_session.root_id
+    items, expected = [], set()
+    for _ in range(run_count):
+        run = CircuitRun(id=str(uuid4()), root_id=root_id, session_id=session_id, name='Circuit')
+        db_session.add(run)
+        items.append({'type': 'circuit', 'circuit_run_id': run.id})
+        slots = []
+        for index in range(2):
+            instance = ActivityInstance(id=str(uuid4()), root_id=root_id, session_id=session_id,
+                                        activity_definition_id=sample_activity_definition.id)
+            slot = CircuitRunSlot(id=str(uuid4()), run=run, activity_instance=instance,
+                                  activity_definition_id=sample_activity_definition.id, sort_order=index,
+                                  activity_name='Member', has_sets=True, has_metrics=True)
+            db_session.add_all([instance, slot])
+            slots.append(slot)
+            expected.add(instance.id)
+        db_session.flush()
+        for number in range(1, 4):
+            circuit_round = CircuitRound(id=str(uuid4()), run=run, round_number=number)
+            db_session.add(circuit_round)
+            for index, slot in enumerate(slots):
+                activity_set = ActivitySet(id=str(uuid4()), activity_instance_id=slot.activity_instance_id,
+                                           sort_order=number - 1)
+                db_session.add(activity_set)
+                db_session.add(CircuitRoundMember(round=circuit_round, run_slot=slot,
+                                                  activity_set_id=activity_set.id, sort_order=index))
+    sample_practice_session.attributes = {'session_data': {'sections': [{'items': items}]}}
+    db_session.commit()
+    db_session.expire_all()
+    circuit_queries = []
+    def before(_conn, _cursor, statement, _params, _context, _many):
+        if statement.lstrip().upper().startswith('SELECT') and 'FROM circuit_' in statement:
+            circuit_queries.append(statement)
+    engine = db_session.get_bind()
+    event.listen(engine, 'before_cursor_execute', before)
+    try:
+        response = authed_client.get(f'/api/{root_id}/sessions/analytics-summary?limit=200')
+    finally:
+        event.remove(engine, 'before_cursor_execute', before)
+    assert response.status_code == 200
+    section = response.get_json()['sessions'][0]['sections'][0]
+    assert set(section['activity_ids']) == expected
+    assert len(section['activity_ids']) == len(expected)
+    assert len(circuit_queries) == (3 if run_count else 1)
+
+
+@pytest.mark.integration
 def test_session_analytics_summary_returns_lightweight_sessions_and_activity_instances(
     authed_client,
     db_session,

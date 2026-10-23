@@ -14,7 +14,7 @@ export function useSessionEvidenceHistory(rootId, { enabled = true } = {}) {
         queryKey: [...queryKeys.analyticsSummary(rootId), 'history'],
         initialPageParam: { session_offset: 0, instance_offset: 0 },
         queryFn: async ({ pageParam }) => {
-            const response = await fractalApi.getSessionAnalyticsSummary(rootId, { limit: 50, instance_limit: 500, ...pageParam });
+            const response = await fractalApi.getSessionAnalyticsSummary(rootId, { limit: 200, instance_limit: 500, ...pageParam });
             return response.data || { sessions: [], activity_instances: {} };
         },
         getNextPageParam: (page, _pages, pageParam) => {
@@ -90,7 +90,6 @@ export function useAnalyticsPageData(rootId, { needsSessionEvidence = true } = {
         evidenceError: analyticsSummaryQuery.error,
         retryEvidence: analyticsSummaryQuery.refetch,
         hasMoreEvidence: analyticsSummaryQuery.hasNextPage,
-        loadingMoreEvidence: analyticsSummaryQuery.isFetchingNextPage,
         loadMoreEvidence: analyticsSummaryQuery.fetchNextPage,
         goalAnalytics: goalAnalyticsQuery.data || null,
         activities: activitiesQuery.data || [],

@@ -6,6 +6,13 @@ import { normalizeGlobalFilters } from './analyticsGlobalFilters';
 import { getDefaultWindowState } from './dashboardState';
 import { getVisualizationSelectionUpdate, getVisualizationStateUpdate } from './visualizations/state';
 
+/** Links need evidence before their activity can be resolved into a panel. */
+export function useAnalyticsEvidenceDemand(windowStates) {
+    const [searchParams] = useSearchParams();
+    return Boolean(parseAnalyticsLink(searchParams))
+        || Object.values(windowStates).some((state) => ['sessions', 'activities'].includes(state.selectedCategory));
+}
+
 /** The single panel and global filters an Analytics link describes. */
 export function analyticsStateFromLink(link, activity) {
     const base = { ...getDefaultWindowState(), selectedCategory: 'activities', selectedActivity: activity };

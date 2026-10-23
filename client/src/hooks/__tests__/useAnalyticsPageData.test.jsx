@@ -109,8 +109,8 @@ describe('useAnalyticsPageData', () => {
         expect(getSessionAnalyticsSummary).not.toHaveBeenCalled();
         rerender({ enabled: true });
         await waitFor(() => expect(result.current.activityInstances.a?.map((row) => row.id)).toEqual(['one', 'two', 'three']));
-        expect(getSessionAnalyticsSummary).toHaveBeenNthCalledWith(2, 'root', { limit: 50, session_offset: 0, instance_offset: 500, instance_limit: 500 });
-        expect(getSessionAnalyticsSummary).toHaveBeenLastCalledWith('root', { limit: 50, session_offset: 50, instance_offset: 0, instance_limit: 500 });
+        expect(getSessionAnalyticsSummary).toHaveBeenNthCalledWith(2, 'root', { limit: 200, session_offset: 0, instance_offset: 500, instance_limit: 500 });
+        expect(getSessionAnalyticsSummary).toHaveBeenLastCalledWith('root', { limit: 200, session_offset: 50, instance_offset: 0, instance_limit: 500 });
         expect(result.current.sessions.map((row) => row.id)).toEqual(['recent', 'older']);
         expect(result.current.hasMoreEvidence).toBe(false);
     });
