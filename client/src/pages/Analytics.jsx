@@ -463,8 +463,7 @@ function Analytics() {
             constrainToVisualViewport={false}
         >
             <AnalyticsFiltersSidebar
-                rootId={rootId}
-                sessions={sessions}
+                rootId={rootId} sessions={sessions} windowStates={windowStates}
                 filters={globalFilters}
                 dateRange={globalDateRange}
                 goals={goalAnalytics?.goals || []}

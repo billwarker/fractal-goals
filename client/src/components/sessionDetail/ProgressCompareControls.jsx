@@ -3,10 +3,10 @@ import React, { useState } from 'react';
 import { useActivityTagCatalog, useProgressComparisonMutation } from '../../hooks/useActivityTags';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
-import { familiesWithMembers, groupTagsForPicker, toggleTagSelection } from '../../utils/tagPickerOptions';
 import ChevronIcon from '../atoms/ChevronIcon';
 import ActivityTagBadges from '../common/ActivityTagBadges';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
+import TagChipPicker from '../common/TagChipPicker';
 import styles from './ProgressPanel.module.css';
 
 const MODES = [
@@ -128,8 +128,6 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
             tag.activities?.some((activity) => activity.id === activityId) || chosenTagIds.includes(tag.id)
         )),
     };
-    const groups = groupTagsForPicker(activityCatalog, { keepIds: chosenTagIds });
-    const families = familiesWithMembers(activityCatalog);
 
     const save = async (changes) => {
         const next = { ...choice, ...changes };
@@ -224,33 +222,14 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
                         : <span>Past sessions with no tags on this activity</span>
                 ) : null}
                 {choice.mode === 'tags' ? (
-                    groups.length ? (
-                        <div className={styles.tagChips} aria-label="Tags to compare with">
-                            {groups.map((group) => (
-                                <div key={group.key} className={styles.tagChipGroup} role="group" aria-label={group.label}>
-                                    {groups.length > 1 || group.family ? (
-                                        <span className={styles.tagChipGroupLabel}>{group.label}{group.singleSelect ? ' · single select' : ''}</span>
-                                    ) : null}
-                                    {group.tags.map((tag) => {
-                                        const selected = choice.tagIds.includes(tag.id);
-                                        return (
-                                            <button
-                                                key={tag.id}
-                                                type="button"
-                                                className={`${styles.tagChip} ${selected ? styles.tagChipSelected : ''}`}
-                                                style={tag.color ? { '--tag-color': tag.color } : undefined}
-                                                aria-pressed={selected}
-                                                disabled={isPending}
-                                                onClick={() => void save({ tagIds: toggleTagSelection(choice.tagIds, tag, families) })}
-                                            >
-                                                {tag.name}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            ))}
-                        </div>
-                    ) : <span>No tags have been used on this activity yet.</span>
+                    <TagChipPicker
+                        catalog={activityCatalog}
+                        selectedIds={choice.tagIds}
+                        onChange={(tagIds) => void save({ tagIds })}
+                        disabled={isPending}
+                        ariaLabel="Tags to compare with"
+                        emptyText="No tags have been used on this activity yet."
+                    />
                 ) : null}
                 {choice.mode === 'all' ? <span>Every past session, whatever its tags</span> : null}
             </div>

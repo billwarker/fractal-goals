@@ -360,9 +360,19 @@ instance: the focused one, else the session's first instance of the chosen activ
 
 ## Analytics tag, template and program-day filters
 
-The Analytics filter sidebar's Global Scope has Tags (chips by family, an "Exact tag set" switch,
-"Any tags" to clear), Session template and Program day sections; options come from the loaded
-history. They apply to activity instances (tags) and sessions (template, program day), are saved
+The Analytics filter sidebar's Global Scope has Tags, Session template and Program day sections, shown
+only while a chart they affect is open: Tags with an activity chart, Session template and Program
+day with a session or activity chart (and only when the loaded history has any). A section that's
+set always shows, so it can be cleared ("N selected · Clear" in its header). Tags use the same tag
+chips as the Progress pane's Compare with (`common/TagChipPicker`: tag colours, grouped by tag
+family, single-select families keep one), with an "Exact tag set" switch. Session template and
+Program day work like Goals and Activities: a "Choose Templates" / "Choose Program Days" button and
+a preview of the chosen names open `common/OptionSelectionModal` (search over 8 options, each with
+its session count, Clear / Cancel / Apply). Templates show as their session template badges. Program
+days are grouped under their program, in the program's colour (left rule and name); a program's own
+checkbox picks all of its days, and the sidebar preview reads "Program · Day". Options come from the
+loaded history (the analytics session payload carries `template_color` and the day's `program_id`,
+`program_name` and `program_color`). They apply to activity instances (tags) and sessions (template, program day), are saved
 with views and dashboards, and a Progress pane link (`?activity=&viz=&metrics=&metricX=&metricY=&sets=&tags=&tagMatch=&template=&programDay=`)
 opens one pre-configured panel and then clears itself. Metric Trends can plot the activity's
 **Yield** (a chip when the activity has two or more multiplicative tracked metrics), with Sets

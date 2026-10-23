@@ -5,7 +5,7 @@ import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
 import DateRangeFilter from '../common/DateRangeFilter';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
-import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
+import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters, scopeFilterRelevance } from './analyticsGlobalFilters';
 import { getVisualization } from './visualizations/registry';
 import {
     getVisualizationStateUpdate,
@@ -34,6 +34,8 @@ function AnalyticsFiltersSidebar({
     activityGroups = [],
     activityInstances = {},
     selectedWindowState = null,
+    // Every panel's state, so scope filters only show for charts they affect.
+    windowStates = null,
     onUpdateSelectedWindowState,
     onChange,
     onDateRangeChange,
@@ -271,7 +273,13 @@ function AnalyticsFiltersSidebar({
                         </div>
                     </section>
                     <Suspense fallback={null}>
-                        <AnalyticsScopeFilters rootId={rootId} filters={normalized} sessions={sessions} onUpdate={updateFilters} />
+                        <AnalyticsScopeFilters
+                            rootId={rootId}
+                            filters={normalized}
+                            sessions={sessions}
+                            onUpdate={updateFilters}
+                            relevance={scopeFilterRelevance(windowStates)}
+                        />
                     </Suspense>
                     </>
                     )}

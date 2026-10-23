@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 vi.mock('../../../hooks/useActivityTagCatalog', () => ({
     useActivityTagCatalog: () => ({ data: { families: [], tags: [
@@ -219,8 +219,15 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
 
 describe('AnalyticsFiltersSidebar scope filters', () => {
     const sessions = [
-        { id: 's1', template_id: 'tpl-a', template_name: 'Upper', program_day_id: 'day-1', program_day_name: 'Day A' },
+        {
+            id: 's1', template_id: 'tpl-a', template_name: 'Upper', template_color: '#ef4444',
+            program_day_id: 'day-1', program_day_name: 'Day A', program_id: 'prog-1', program_name: 'Q4', program_color: '#f97316',
+        },
         { id: 's2', template_id: 'tpl-b', template_name: 'Lower', program_day_id: null },
+        {
+            id: 's3', template_id: 'tpl-b', template_name: 'Lower',
+            program_day_id: 'day-2', program_day_name: 'Day B', program_id: 'prog-1', program_name: 'Q4', program_color: '#f97316',
+        },
     ];
 
     it('filters by tags (any or exact set), session template and program day', async () => {
@@ -230,15 +237,50 @@ describe('AnalyticsFiltersSidebar scope filters', () => {
         );
         fireEvent.click(await screen.findByRole('button', { name: 'Heavy' }));
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: { tagIds: ['heavy'], match: 'all' } }));
-        fireEvent.click(screen.getByRole('button', { name: 'Upper' }));
+        // Templates and program days are picked in a modal; nothing changes until Apply.
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Templates' }));
+        const templateModal = await screen.findByRole('dialog');
+        expect(templateModal).toHaveTextContent('1 session');
+        expect(templateModal).toHaveTextContent('2 sessions');
+        const callsBefore = onChange.mock.calls.length;
+        fireEvent.click(within(templateModal).getByRole('checkbox', { name: /Upper/ }));
+        expect(onChange).toHaveBeenCalledTimes(callsBefore);
+        fireEvent.click(within(templateModal).getByRole('button', { name: 'Apply' }));
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sessions: { templateIds: ['tpl-a'], programDayIds: [] } }));
-        fireEvent.click(screen.getByRole('button', { name: 'Day A' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Program Days' }));
+        const dayModal = await screen.findByRole('dialog');
+        // Days are grouped under their program; its checkbox picks every day in it.
+        const program = within(dayModal).getByRole('group', { name: 'Q4' });
+        fireEvent.click(within(program).getByRole('checkbox', { name: 'All of Q4' }));
+        fireEvent.click(within(program).getByRole('checkbox', { name: /Day B/ }));
+        fireEvent.click(within(dayModal).getByRole('button', { name: 'Apply' }));
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ sessions: { templateIds: [], programDayIds: ['day-1'] } }));
 
         rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{ tags: { tagIds: [], match: 'exact' } }} dateRange={{}} onChange={onChange} />);
         expect(await screen.findByLabelText('Tag filter')).toHaveTextContent('Untagged');
         expect(screen.getByRole('checkbox', { name: 'Exact tag set' })).toBeChecked();
-        fireEvent.click(screen.getByRole('button', { name: 'Any tags' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear tags filter' }));
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: null }));
+    });
+
+    it('shows scope filters only for charts they affect, or while set', async () => {
+        const onChange = vi.fn();
+        const goalsOnly = { 'window-1': { selectedCategory: 'goals' } };
+        const { rerender } = render(
+            <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} windowStates={goalsOnly} />,
+        );
+        await screen.findByText('Activities');
+        expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Session template filter')).not.toBeInTheDocument();
+
+        // A session chart brings back template and program day; tags need an activity chart.
+        rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} windowStates={{ 'window-1': { selectedCategory: 'sessions' } }} />);
+        expect(await screen.findByLabelText('Session template filter')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
+
+        // A filter that's set stays, so it can be cleared.
+        rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{ tags: { tagIds: ['heavy'], match: 'all' } }} dateRange={{}} onChange={onChange} windowStates={goalsOnly} />);
+        expect(await screen.findByLabelText('Tag filter')).toHaveTextContent('1 selected');
+        expect(screen.queryByLabelText('Program day filter')).not.toBeInTheDocument();
     });
 });

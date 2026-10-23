@@ -1,0 +1,54 @@
+.chips {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+}
+
+.group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.groupLabel {
+    flex-basis: 100%;
+    color: var(--color-text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.chip {
+    min-height: 26px;
+    padding: 2px 10px;
+    border: 1px solid color-mix(in srgb, var(--tag-color, var(--color-border)) 55%, var(--color-border));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.chipSelected {
+    border-color: var(--tag-color, var(--color-brand-primary));
+    background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 22%, transparent);
+    color: var(--color-text-primary);
+}
+
+.chip:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 1px;
+}
+
+.chip:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.empty {
+    color: var(--color-text-muted);
+    font-size: 12px;
+}

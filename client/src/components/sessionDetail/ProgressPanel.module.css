@@ -273,51 +273,6 @@
     outline-offset: 1px;
 }
 
-.tagChips {
-    display: grid;
-    gap: 8px;
-    width: 100%;
-}
-
-.tagChipGroup {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-}
-
-.tagChipGroupLabel {
-    flex-basis: 100%;
-    color: var(--color-text-muted);
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-}
-
-.tagChip {
-    min-height: 26px;
-    padding: 2px 10px;
-    border: 1px solid color-mix(in srgb, var(--tag-color, var(--color-border)) 55%, var(--color-border));
-    border-radius: 999px;
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.tagChipSelected {
-    border-color: var(--tag-color, var(--color-brand-primary));
-    background: color-mix(in srgb, var(--tag-color, var(--color-brand-primary)) 22%, transparent);
-    color: var(--color-text-primary);
-}
-
-.tagChip:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
-    outline-offset: 1px;
-}
-
 .scopeToggles {
     display: grid;
     gap: 6px;

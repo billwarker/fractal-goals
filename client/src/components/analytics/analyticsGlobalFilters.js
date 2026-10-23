@@ -70,6 +70,20 @@ export function instanceMatchesScope(instance, session, filters) {
     return own.size === chosen.length && chosen.every((tagId) => own.has(tagId));
 }
 
+/**
+ * Which scope filters apply to the open charts: tags filter activity instances (activity charts);
+ * session template and program day filter sessions (session and activity charts). Without panel
+ * states (e.g. tests), everything applies.
+ */
+export function scopeFilterRelevance(windowStates) {
+    if (!windowStates) return { tags: true, sessions: true };
+    const categories = new Set(Object.values(windowStates).map((state) => state?.selectedCategory).filter(Boolean));
+    return {
+        tags: categories.has('activities'),
+        sessions: categories.has('activities') || categories.has('sessions'),
+    };
+}
+
 export function hasActiveGlobalFilters(filters) {
     const normalized = normalizeGlobalFilters(filters);
     return normalized.goals.goalIds.length > 0

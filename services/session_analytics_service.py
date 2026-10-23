@@ -6,7 +6,7 @@ from sqlalchemy.orm import joinedload, load_only, selectinload
 
 import models
 from models import (
-    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, ProgramDay, Session, SessionTemplate,
+    ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricValue, Program, ProgramDay, Session, SessionTemplate,
     session_goals, validate_root_goal,
 )
 from services.serializers import (
@@ -61,7 +61,9 @@ class SessionAnalyticsService:
                 SessionTemplate.id, SessionTemplate.name, SessionTemplate.template_data,  # pyright: ignore[reportArgumentType]
             ),
             selectinload(Session.program_day).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
-                ProgramDay.id, ProgramDay.name,  # pyright: ignore[reportArgumentType]
+                ProgramDay.id, ProgramDay.name, ProgramDay.program_id,  # pyright: ignore[reportArgumentType]
+            ).selectinload(ProgramDay.program).load_only(  # pyright: ignore[reportArgumentType] - legacy Column typing
+                Program.id, Program.name, Program.color,  # pyright: ignore[reportArgumentType]
             ),
         )
 
