@@ -91,8 +91,9 @@ recorded as `manual_override` unless the condition is `manual`. Progress is neve
 completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
 After a manual uncompletion only newer evidence re-completes a goal. Rule values are
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
-`CompletionConditionEditor`, `CompletionConditionSummary`, `ConditionEvidenceModal` and Session
-Detail's `ConditionCardsSection` render it, under the `goalCondition` query-key root.
+`CompletionConditionEditor` and `CompletionConditionSummary` render it, and `ConditionProgressChart`
+charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
+`goalCondition` query-key root.
 Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)
 and their tables and columns dropped by `a4b5c6d7e8f9`.
 See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).

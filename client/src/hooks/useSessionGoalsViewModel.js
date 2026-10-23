@@ -203,24 +203,6 @@ export function useSessionGoalsViewModel({
 
     }, [activeActivityDefId, selectedActivityGoalIds, selectedActivityInSession, normalizedTree, parentMap, conditionProgressByGoalId]);
 
-    // 4. Goals in view that complete on an activity threshold (scoped to the selected activity's).
-    const conditionCards = useMemo(() => {
-        const sourceHierarchy = activeActivityDefId ? activityHierarchy : sessionHierarchy;
-        return sourceHierarchy
-            .filter((goal) => goal.completion_condition === 'activity_threshold' && goal.condition)
-            .filter((goal) => !activeActivityDefId || goal.condition.activity_definition_id === activeActivityDefId)
-            .map((goal) => ({
-                goalId: goal.id,
-                goalName: goal.name,
-                goalType: goal.type,
-                goalDepth: goal.depth || 0,
-                condition: goal.condition,
-                completed: goal.status.completed,
-                progress: goal.status.progress,
-            }))
-            .sort((a, b) => b.goalDepth - a.goalDepth);
-    }, [activeActivityDefId, activityHierarchy, sessionHierarchy]);
-
     const goalStatusById = useMemo(() => {
         const map = new Map();
         [...sessionHierarchy, ...activityHierarchy].forEach((goal) => {
@@ -234,7 +216,6 @@ export function useSessionGoalsViewModel({
         activeActivityInstanceId,
         sessionHierarchy,
         activityHierarchy,
-        conditionCards,
         goalStatusById,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,

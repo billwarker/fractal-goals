@@ -292,37 +292,6 @@ describe('useSessionGoalsViewModel', () => {
         expect(handstand.status.completed).toBe(false);
         expect(handstand.status.readyForCompletion).toBe(true);
         expect(handstand.status.reason).toBe('pending');
-        expect(result.current.conditionCards).toEqual([
-            expect.objectContaining({ goalId: 'handstand', completed: false, progress: { met: true, completed: false } }),
-        ]);
-    });
-
-    it('scopes condition cards to the selected activity', () => {
-        const goal = (id, activityId) => ({
-            id,
-            type: 'ImmediateGoal',
-            name: id,
-            completion_condition: 'activity_threshold',
-            condition: { activity_definition_id: activityId, kind: 'cumulative' },
-            children: [],
-        });
-        const sessionGoalsView = {
-            goal_tree: { id: 'root', type: 'UltimateGoal', name: 'Root', children: [goal('scales', 'activity-1'), goal('chords', 'activity-2')] },
-            session_goal_ids: ['scales', 'chords'],
-            activity_goal_ids_by_activity: { 'activity-1': ['scales'], 'activity-2': ['chords'] },
-            session_activity_ids: ['activity-1', 'activity-2'],
-        };
-
-        const { result } = renderHook(() => useSessionGoalsViewModel({
-            sessionGoalsView,
-            selectedActivity: { id: 'inst-1', activity_definition_id: 'activity-1' },
-            activityInstances: [
-                { id: 'inst-1', activity_definition_id: 'activity-1' },
-                { id: 'inst-2', activity_definition_id: 'activity-2' },
-            ],
-        }));
-
-        expect(result.current.conditionCards.map((card) => card.goalId)).toEqual(['scales']);
     });
 
     it('returns an empty session hierarchy when the current session has no activities', () => {
@@ -524,7 +493,6 @@ describe('useSessionGoalsViewModel', () => {
 
         expect(result.current.sessionHierarchy.length).toBeGreaterThan(100);
         expect(result.current.activityHierarchy.length).toBeGreaterThan(10);
-        expect(result.current.conditionCards.length).toBeGreaterThan(0);
         expect(elapsedMs).toBeLessThan(250);
     });
 

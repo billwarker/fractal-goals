@@ -191,9 +191,6 @@ function LandingSessionScreenWithModel({
     const handleGoalClick = useCallback((goal) => setSelectedGoal(goal), []);
     const closeGoalDetail = useCallback(() => setSelectedGoal(null), []);
     const conditionSnapshots = example.conditionAnalytics || null;
-    const conditionModalHost = useMemo(() => (
-        modalHost ? { portalContainer: modalHost, overlayClassName: scopedModalStyles.scopedOverlay } : null
-    ), [modalHost]);
     const sidePaneModel = useSessionSidePaneViewModel({
         selectedActivity,
         onNoteAdded: () => {},
@@ -211,7 +208,6 @@ function LandingSessionScreenWithModel({
         onModeChange: setSidePaneMode,
         readOnly: true,
         conditionSnapshots,
-        conditionModalHost,
     });
 
     return (

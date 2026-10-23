@@ -20,7 +20,6 @@ function GoalViewMode({
     displayMode,
     programs,
     activityDefinitions,
-    name,
     goalCompletionNote,
     conditionSnapshot = null,
     treeData = null,
@@ -31,7 +30,6 @@ function GoalViewMode({
     onGoalSelect,
     chartExpansion = null,
     portalTarget = null,
-    overlayClassName = '',
     readOnly = false,
 }) {
     const navigate = useNavigate();
@@ -107,7 +105,6 @@ function GoalViewMode({
                     <CompletionConditionSummary
                         goal={goal}
                         goalId={goalId}
-                        goalName={name}
                         rootId={rootId}
                         goalColor={goalColor}
                         activityDefinitions={activityDefinitions}
@@ -118,8 +115,6 @@ function GoalViewMode({
                         snapshot={conditionSnapshot}
                         onCompleteNow={onCompleteNow}
                         chartShowsProgress={!readOnly}
-                        portalContainer={portalTarget}
-                        overlayClassName={overlayClassName}
                     />
                 </Suspense>
             )}

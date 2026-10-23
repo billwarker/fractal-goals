@@ -28,18 +28,6 @@
     color: var(--color-text-primary);
 }
 
-.evidenceButton {
-    align-self: flex-start;
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--condition-accent, var(--color-brand-primary));
-    font-size: var(--font-size-sm);
-    cursor: pointer;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
-
 .metPrompt {
     display: flex;
     align-items: center;

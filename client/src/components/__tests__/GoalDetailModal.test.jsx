@@ -128,9 +128,9 @@ vi.mock('../goals/GoalOptionsView', () => ({
 }));
 
 vi.mock('../goals/GoalViewMode', () => ({
-    default: ({ name, setIsEditing, setViewState }) => (
+    default: ({ goal, setIsEditing, setViewState }) => (
         <div>
-            <div>view:{name}</div>
+            <div>view:{goal?.name}</div>
             <button onClick={() => setIsEditing(true)}>edit goal</button>
             <button onClick={() => setViewState('goal-options')}>open options</button>
         </div>

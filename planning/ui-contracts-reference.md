@@ -65,14 +65,13 @@ server validation and render as alerts beside their inputs. Start date and Deadl
 and activity outside that window doesn't count.
 
 The details view's Completion section shows the sentence, a progress bar (sets, sessions, totals or
-child goals), the completion source once complete, and "See the evidence". When the condition is
+child goals) and the completion source once complete. When the condition is
 met on an open, unpaused goal it shows "Your logged activity already meets this. Mark complete".
 Mark Complete is always in the footer; completing an unmet condition says it is a manual override.
-The evidence modal charts each rule (at most two axes) or the running total or count against a
-dashed threshold, with Active period / All history tabs and the twelve most recent sessions.
-Read-only landing views use the published snapshot and the scoped portal host, without fetching.
-Session Detail lists "Goal thresholds" cards for goals in view, scoped to the selected activity's
-goals, deepest first; a card opens the evidence modal.
+Read-only landing views use the published snapshot, without fetching. There is no separate
+evidence view: a threshold's sessions are charted by the goal's "Progress toward…" chart (goal
+details) and by the Session Detail Progress pane's Goal progress chart, and Session Detail lists no
+threshold cards (removed 2026-10 with the Progress pane charts).
 
 ## Creating goals from hierarchies
 
@@ -213,8 +212,8 @@ be removed), then attached views in order. The last chart shown is remembered pe
   titles, at most 4 x and 3 y ticks, unlabelled reference lines and a one-line caption. Metric
   Trends plots its first metric ("+N more" in the caption); Activity Totals shows the top 5.
   Elsewhere charts go compact below 480 × 260 px.
-- **Threshold goals:** the chart is the goal's progress, so Completion's heading, progress bar and
-  "See the evidence" aren't shown; "Mark complete" still appears when the condition is met.
+- **Threshold goals:** the chart is the goal's progress, so Completion's heading and progress bar
+  aren't shown; "Mark complete" still appears when the condition is met.
   Read-only published pages keep the Completion section.
 - **Expand** (Goals page only) replaces the flow tree and its controls (options pane,
   type-to-zoom) with the chart at full size, fading like the tree (200 ms): the tree fades out,

@@ -81,19 +81,6 @@ vi.mock('../../ConnectedGoalDetailModal', () => ({
     ),
 }));
 
-vi.mock('../../goalDetail/ConditionEvidenceModal', () => ({
-    default: ({ goalName, snapshot, portalContainer, overlayClassName }) => (
-        <div
-            data-testid="condition-evidence-modal"
-            data-instance-count={snapshot?.instances?.length || 0}
-            data-portal-target={portalContainer?.id || ''}
-            data-overlay-class={overlayClassName || ''}
-        >
-            {goalName}
-        </div>
-    ),
-}));
-
 function withPullUpCondition() {
     const stg = activeSessionMock.sessionGoalsView.goal_tree.children[0];
     activeSessionMock = {
@@ -243,69 +230,12 @@ describe('SessionGoalHierarchyPanel smoke', () => {
             expect(screen.getByText('Goals: Pull Up')).toBeInTheDocument();
         });
         expect(screen.queryByText('Session Goals')).not.toBeInTheDocument();
-        expect(screen.getByText('Goal thresholds: Pull Up')).toBeInTheDocument();
-        expect(screen.getByText('Pull Up: 10 sessions')).toBeInTheDocument();
+        // Thresholds show as progress in the Progress pane, not as cards here.
+        expect(screen.queryByText(/Goal thresholds/)).not.toBeInTheDocument();
+        expect(screen.queryByText('Pull Up: 10 sessions')).not.toBeInTheDocument();
         expect(screen.getByText('STG')).toBeInTheDocument();
-        expect(screen.getAllByText('Pull Up Volume')).toHaveLength(2);
+        expect(screen.getAllByText('Pull Up Volume')).toHaveLength(1);
         expect(screen.queryByRole('button', { name: 'Activity' })).not.toBeInTheDocument();
-    });
-
-    it('opens the condition evidence modal from a session condition card', async () => {
-        withPullUpCondition();
-        renderWithProviders(
-            <SessionGoalHierarchyPanel
-                selectedActivity={{
-                    id: 'instance-1',
-                    activity_definition_id: 'activity-1',
-                    name: 'Pull Up'
-                }}
-                onGoalClick={vi.fn()}
-                onGoalCreated={vi.fn()}
-                onOpenGoals={vi.fn()}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        fireEvent.click(await screen.findByRole('button', { name: /Pull Up: 10 sessions/ }));
-        expect(await screen.findByTestId('condition-evidence-modal')).toHaveTextContent('Pull Up Volume');
-    });
-
-    it('uses a scoped read-only modal host and published condition snapshots', async () => {
-        withPullUpCondition();
-        const portalContainer = document.createElement('div');
-        portalContainer.id = 'landing-session-example';
-        const snapshot = { progress: { met: true, current: 10, required: 10 }, instances: [{ id: 'history-1' }, { id: 'history-2' }] };
-
-        renderWithProviders(
-            <SessionGoalHierarchyPanel
-                selectedActivity={{
-                    id: 'instance-1',
-                    activity_definition_id: 'activity-1',
-                    name: 'Pull Up'
-                }}
-                readOnly
-                conditionSnapshots={{ 'ig-1': snapshot }}
-                conditionModalHost={{ portalContainer, overlayClassName: 'scoped-overlay' }}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false
-            }
-        );
-
-        fireEvent.click(await screen.findByRole('button', { name: /Pull Up: 10 sessions/ }));
-
-        const modal = await screen.findByTestId('condition-evidence-modal');
-        expect(modal).toHaveAttribute('data-instance-count', '2');
-        expect(modal).toHaveAttribute('data-portal-target', 'landing-session-example');
-        expect(modal).toHaveAttribute('data-overlay-class', 'scoped-overlay');
     });
 
     it('opens read-only hierarchy goals without offering sub-goal creation', async () => {

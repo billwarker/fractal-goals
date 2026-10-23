@@ -323,11 +323,9 @@ function GoalDetailModalRenderSurface({
                         activityDefinitions={readOnly ? (readOnlyAssociatedActivities || []) : activityDefinitions}
                         conditionSnapshot={conditionSnapshot}
                         portalTarget={portalTarget}
-                        overlayClassName={overlayClassName}
                         onCompleteNow={readOnly || isPaused || !onToggleCompletion ? undefined : () => setViewState('complete-confirm')}
                         chartExpansion={chartExpansion}
                         treeData={treeData}
-                        name={name}
                         description={description}
                         deadline={deadline}
                         goalCompletionNote={goalCompletionNote}

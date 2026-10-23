@@ -22,7 +22,6 @@ export function useSessionSidePaneViewModel({
     onGoalScopeToggle,
     readOnly = false,
     conditionSnapshots = null,
-    conditionModalHost = null,
 }) {
     const {
         rootId,
@@ -66,7 +65,6 @@ export function useSessionSidePaneViewModel({
             onGoalCreated,
             readOnly,
             conditionSnapshots,
-            conditionModalHost,
             activityGoalScope,
             onGoalScopeToggle,
         },
@@ -100,7 +98,6 @@ export function useSessionSidePaneViewModel({
         activityInstances,
         sessionId,
         conditionSnapshots,
-        conditionModalHost,
         toggleSessionComplete,
         unpinNote,
         updateNote,

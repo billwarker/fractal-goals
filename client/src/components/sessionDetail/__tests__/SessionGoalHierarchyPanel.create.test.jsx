@@ -81,19 +81,6 @@ vi.mock('../../ConnectedGoalDetailModal', () => ({
     ),
 }));
 
-vi.mock('../../goalDetail/ConditionEvidenceModal', () => ({
-    default: ({ goalName, snapshot, portalContainer, overlayClassName }) => (
-        <div
-            data-testid="condition-evidence-modal"
-            data-instance-count={snapshot?.instances?.length || 0}
-            data-portal-target={portalContainer?.id || ''}
-            data-overlay-class={overlayClassName || ''}
-        >
-            {goalName}
-        </div>
-    ),
-}));
-
 describe('SessionGoalHierarchyPanel goal creation', () => {
     beforeEach(() => {
         apiMock.getGoals.mockResolvedValue({ data: null });

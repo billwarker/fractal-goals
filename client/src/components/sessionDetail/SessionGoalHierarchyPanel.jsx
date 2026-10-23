@@ -10,7 +10,6 @@ import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import { prefillConditionFromInstance } from '../../utils/goalConditions';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import HierarchySection from './HierarchySection';
-import ConditionCardsSection from './ConditionCardsSection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 import { logError } from '../../utils/logger';
 import { fractalApi } from '../../utils/api';
@@ -20,7 +19,6 @@ import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '..
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
-const ConditionEvidenceModal = lazyWithRetry(() => import('../goalDetail/ConditionEvidenceModal'), 'components/goalDetail/ConditionEvidenceModal');
 
 function SessionGoalHierarchyPanel({
     selectedActivity,
@@ -28,8 +26,6 @@ function SessionGoalHierarchyPanel({
     onGoalCreated,
     readOnly = false,
     conditionSnapshots = null,
-    // Where the evidence modal portals and which overlay class scopes it (embedded landing demos).
-    conditionModalHost = null,
     activityGoalScope = null,
     onGoalScopeToggle,
     className = '',
@@ -50,7 +46,6 @@ function SessionGoalHierarchyPanel({
     const { getGoalColor, getGoalSecondaryColor, getLevelByName, getGoalIcon } = useGoalLevels();
 
     const [createSubGoalParent, setCreateSubGoalParent] = useState(null);
-    const [evidenceCard, setEvidenceCard] = useState(null);
     const [justCreatedGoalId, markGoalCreated] = useJustCreatedGoal();
     // Published landing snapshots carry progress alongside each goal's evidence.
     const snapshotProgressByGoalId = useMemo(() => (
@@ -100,7 +95,6 @@ function SessionGoalHierarchyPanel({
 
     const {
         sessionHierarchy,
-        conditionCards,
         selectedActivityGoalIds,
         selectedActivityAncestorIds,
         manualGoalIds,
@@ -211,31 +205,8 @@ function SessionGoalHierarchyPanel({
                             </small>
                         </div>
                     )}
-                    <ConditionCardsSection
-                        cards={conditionCards}
-                        activityDefinitions={activityDefinitions}
-                        scopedActivityName={scopedActivityName}
-                        getGoalColor={getGoalColor}
-                        onCardClick={setEvidenceCard}
-                    />
                 </div>
             </div>
-
-            {evidenceCard && (
-                <React.Suspense fallback={null}>
-                    <ConditionEvidenceModal
-                        isOpen
-                        onClose={() => setEvidenceCard(null)}
-                        rootId={rootId}
-                        goalId={evidenceCard.goalId}
-                        goalName={evidenceCard.goalName}
-                        accentColor={getGoalColor(evidenceCard.goalType)}
-                        snapshot={conditionSnapshots?.[evidenceCard.goalId] || null}
-                        portalContainer={conditionModalHost?.portalContainer || null}
-                        overlayClassName={conditionModalHost?.overlayClassName || ''}
-                    />
-                </React.Suspense>
-            )}
 
             {!readOnly && createSubGoalParent && createPortal(
                 <React.Suspense fallback={<div>Loading Details...</div>}>

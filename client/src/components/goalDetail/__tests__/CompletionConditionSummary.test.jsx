@@ -15,14 +15,6 @@ vi.mock('../ChildGoalIconRow', () => ({
     default: ({ childGoals }) => <div data-testid="child-icons">{childGoals.length}</div>,
 }));
 
-vi.mock('../ConditionEvidenceModal', () => ({
-    default: ({ goalName, snapshot, portalContainer }) => (
-        <div data-testid="evidence-modal" data-snapshot={snapshot ? 'yes' : 'no'} data-portal={portalContainer?.id || ''}>
-            {goalName}
-        </div>
-    ),
-}));
-
 const pullUps = { id: 'pull-up', name: 'Pull Up', metric_definitions: [{ id: 'reps', name: 'Reps', unit: '' }] };
 const thresholdGoal = (overrides = {}) => ({
     id: 'goal-1',
@@ -101,7 +93,7 @@ describe('CompletionConditionSummary', () => {
         expect(screen.getByText('Completed manually (override)')).toBeInTheDocument();
     });
 
-    it('skips the progress fetch for manual goals and offers no evidence', () => {
+    it('skips the progress fetch for manual goals', () => {
         renderSummary({ goal: { id: 'goal-1', completion_condition: 'manual' } });
 
         expect(useGoalConditionProgressMock).toHaveBeenCalledWith('root-1', ['goal-1'], { enabled: false });
@@ -137,29 +129,14 @@ describe('CompletionConditionSummary', () => {
         expect(screen.queryByText('Completes when every child goal is complete.')).not.toBeInTheDocument();
     });
 
-    it('opens the evidence modal live, or from the published snapshot when read-only', () => {
-        const { unmount } = renderSummary();
-        fireEvent.click(screen.getByRole('button', { name: 'See the evidence' }));
-        expect(screen.getByTestId('evidence-modal')).toHaveAttribute('data-snapshot', 'no');
-        unmount();
-
-        const portalContainer = document.createElement('div');
-        portalContainer.id = 'landing-host';
+    it('shows the published snapshot\'s progress when read-only, with no evidence link', () => {
         renderSummary({
             readOnly: true,
             snapshot: { progress: { met: false, current: 1, required: 3, progress: 1 / 3 }, instances: [] },
-            portalContainer,
         });
         expect(useGoalConditionProgressMock).toHaveBeenLastCalledWith('root-1', ['goal-1'], { enabled: false });
         expect(screen.getByRole('progressbar', { name: 'Progress: 1 / 3 sets' })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'See the evidence' }));
-        expect(screen.getByTestId('evidence-modal')).toHaveAttribute('data-snapshot', 'yes');
-        expect(screen.getByTestId('evidence-modal')).toHaveAttribute('data-portal', 'landing-host');
-    });
-
-    it('hides evidence in read-only views without a published snapshot', () => {
-        renderSummary({ readOnly: true });
-        expect(screen.queryByRole('button', { name: 'See the evidence' })).not.toBeInTheDocument();
+        expect(screen.queryByText('See the evidence')).not.toBeInTheDocument();
     });
 
     it('leaves an activity threshold\'s progress to the goal chart, keeping only Mark complete', () => {
