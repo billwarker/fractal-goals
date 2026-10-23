@@ -259,28 +259,17 @@ def _complete_goals_already_met(bind):
     Old targets counted evidence only from their own creation; conditions use the goal's active
     period, so earlier achievements now count. Completed goals are never reverted here.
     """
-    from sqlalchemy.orm import Session as OrmSession
-    from models import Goal
-    from services.goal_condition_service import evaluate_goal_condition
-    from services.goal_loading import load_fractal_goals_for_serialization
+    from migrations.condition_backfill import met_conditions
 
-    session = OrmSession(bind=bind)
     completed = []
     root_ids = [row[0] for row in bind.execute(sa.text("""
         SELECT DISTINCT g.root_id FROM goals g
         WHERE g.completion_condition = 'activity_threshold' AND g.deleted_at IS NULL AND NOT COALESCE(g.completed, false)
     """))]
     for root_id in root_ids:
-        goals_by_id = load_fractal_goals_for_serialization(session, root_id)
-        for goal in goals_by_id.values():
-            if goal.completed or goal.paused or goal.completion_condition != 'activity_threshold':
-                continue
-            evaluation = evaluate_goal_condition(session, goal, goals_by_id, honor_decline=True)
-            if evaluation is None or not evaluation.met or evaluation.achieved_at is None:
-                continue
+        for goal, evaluation in met_conditions(bind, root_id):
             completed.append((goal.id, goal.name, evaluation.achieved_at.replace(tzinfo=None),
                               evaluation.achieving_session_id))
-    session.close()
     for goal_id, name, achieved_at, session_id in completed:
         bind.execute(sa.text("""
             UPDATE goals SET completed = true, completed_at = :achieved_at, completed_session_id = :session_id,

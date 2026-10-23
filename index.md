@@ -95,7 +95,9 @@ After a manual uncompletion only newer evidence re-completes a goal. Rule values
 charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
 `goalCondition` query-key root.
 Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)
-and their tables and columns dropped by `a4b5c6d7e8f9`.
+and their tables and columns dropped by `a4b5c6d7e8f9`. The conversion's completion backfill uses
+revision-local SQL evidence in `migrations/condition_backfill.py`, feeding the condition evaluator
+without hydrating current ORM models. Populated historical upgrades have their own integration gate.
 See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
 
 SMART's R is **Reviewed** (relevance statements were retired into goal notes by `c6d7e8f9a0b1`).
