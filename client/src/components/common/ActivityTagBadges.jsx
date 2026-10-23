@@ -6,14 +6,17 @@ import styles from './ActivityTagBadges.module.css';
 /**
  * Read-only presentation for direct activity-instance or set tags.
  * Callers deliberately pass direct tags only; inherited parent tags are
- * represented once at the activity-instance level.
+ * represented once at the activity-instance level. ``hideTags`` drops tags
+ * already shown there (a set inherits its activity's tags, so they never repeat).
  */
-export default function ActivityTagBadges({ tags = [], className = '', ariaLabel = 'Tags' }) {
-    if (!Array.isArray(tags) || tags.length === 0) return null;
+export default function ActivityTagBadges({ tags = [], hideTags = [], className = '', ariaLabel = 'Tags' }) {
+    const hidden = new Set((hideTags || []).map((tag) => tag.id));
+    const shown = Array.isArray(tags) ? tags.filter((tag) => !hidden.has(tag.id)) : [];
+    if (shown.length === 0) return null;
 
     return (
         <span className={`${styles.list} ${className}`.trim()} aria-label={ariaLabel}>
-            {tags.map((tag) => (
+            {shown.map((tag) => (
                 <Badge
                     key={tag.id}
                     size="sm"

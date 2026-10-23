@@ -93,7 +93,8 @@
 
 .setRow {
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 4px 12px;
     align-items: center;
 }
 
@@ -101,9 +102,20 @@
     align-items: flex-start;
 }
 
+.setMetrics {
+    display: flex;
+    flex: 1;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    align-items: center;
+    min-width: 0;
+}
+
+/* Set tags always sit on their own line under the set's values, aligned with them. */
 .setTags {
-    margin-left: auto;
-    justify-content: flex-end;
+    order: 1;
+    flex-basis: 100%;
+    padding-left: 52px;
 }
 
 .setLabel {
@@ -143,9 +155,14 @@
     gap: 2px;
 }
 
+/* Name, value and unit read as one phrase: a metric that doesn't fit takes its own line,
+   and only a long name wraps, never the value from its unit. */
 .metricItem {
-    display: flex;
-    gap: 4px;
+    max-width: 100%;
+}
+
+.metricItem > * + * {
+    margin-left: 4px;
 }
 
 .metricName {
@@ -154,6 +171,7 @@
 
 .metricValue {
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .singleMetricsContainer {
@@ -221,6 +239,10 @@
         flex-direction: column;
         align-items: flex-start;
         gap: 4px;
+    }
+
+    .setTags {
+        padding-left: 0;
     }
 
     .setLabel {

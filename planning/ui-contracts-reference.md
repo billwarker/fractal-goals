@@ -320,8 +320,14 @@ instance: the focused one, else the session's first instance of the chosen activ
   as tag badges (or "All history" / "Untagged sessions").
 - Every change saves immediately on that instance, re-basing its ▲/▼ hints, and is remembered
   for the activity in that template/program day: its next instances there start from it. Choosing Same tags with both toggles off is the reset.
-- The count reads "N of M past sessions match", and the list shows only matching sessions, with
-  the earlier sets the current sets compare with marked by a left accent.
+- The count reads "N of M past sessions match", and the list shows only matching sessions. Sets
+  carry no "compared with" accent. The newest match sits
+  under "Last session" (the session this one's hints compare with), the rest under "Earlier
+  sessions".
+- The activity select stays fixed above the scrolling pane. Once the "Compare with" widget has
+  scrolled out of view, a one-line bar (scope, compared tags, count) docks at the top of the
+  history. It takes no layout space, so the history never jumps; activating it scrolls back to
+  the widget and opens it.
 - A compact chart sits directly under the activity select, above "Compare with". It plots the
   matching sessions ending with this one (highlighted): the in-scope goal condition with its
   threshold, else the activity's yield or best-set value. Like the goal detail charts, the whole

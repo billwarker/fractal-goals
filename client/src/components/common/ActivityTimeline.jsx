@@ -65,7 +65,7 @@ function formatTime(isoString, timezone) {
 export function ActivityTimelineList({
     items,
     activityDef,
-    progressByInstanceId, pairedSetIndexes = null, // instance id -> Set of compared set indexes
+    progressByInstanceId,
     formatDate,
     timezone,
     deltaDisplayMode = 'percent',
@@ -91,7 +91,6 @@ export function ActivityTimelineList({
                     deltaDisplayMode={deltaDisplayMode}
                     showActivityName={showActivityName}
                     sessionHref={getSessionHref?.(instance)}
-                    pairedSetIndexes={pairedSetIndexes?.get(instance.id) || null}
                 />
             ))}
         </div>
@@ -109,7 +108,7 @@ export function ActivityTimelineCard({
     sessionHref = null,
     timestamp = null,
     showTime = false,
-    variant = 'default', pairedSetIndexes = null,
+    variant = 'default',
 }) {
     const sets = useMemo(() => instance.sets || [], [instance.sets]);
     const hasMetrics = instance.metric_values && instance.metric_values.length > 0;
@@ -361,8 +360,7 @@ export function ActivityTimelineCard({
                     {sets.map((set, idx) => (
                         <div
                             key={set.instance_id || idx}
-                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''} ${pairedSetIndexes?.has(idx) ? styles.timelineSetPaired : ''}`}
-                            title={pairedSetIndexes?.has(idx) ? 'Compared with a set in this session' : undefined}>
+                            className={`${styles.timelineSet} ${autoAgg?.best_set_index === idx ? styles.timelineSetBest : ''}`}>
                             <span className={styles.timelineSetNum}>#{idx + 1}</span>
                             <div className={styles.timelineSetMetrics}>
                                 {set.metrics?.map((m, mIdx) => {
@@ -386,9 +384,8 @@ export function ActivityTimelineCard({
                                 })}
                             </div>
                             <ActivityTagBadges
-                                tags={set.tags}
-                                className={styles.timelineSetTags}
-                                ariaLabel={`Set ${idx + 1} tags`}
+                                tags={set.tags} hideTags={instance.tags}
+                                className={styles.timelineSetTags} ariaLabel={`Set ${idx + 1} tags`}
                             />
                             {yieldBySetIndex?.[idx] != null && (() => {
                                 const currYield = yieldBySetIndex[idx];

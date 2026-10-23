@@ -224,41 +224,6 @@ describe('ProgressPanel', () => {
         }));
     });
 
-    it('highlights the earlier sets this instance is compared with', () => {
-        const current = instance({ progress_comparison: { metric_comparisons: [{
-            metric_id: 'm1',
-            set_comparisons: [{ set_index: 0, previous_instance_id: 'instance-old', previous_set_index: 1 }],
-        }] } });
-        useActivityProgressTimeline.mockReturnValue({
-            data: { total: 1, total_all: 1, items: [{
-                id: 'instance-old',
-                created_at: '2026-04-10T12:00:00.000Z',
-                metric_values: [],
-                notes: [],
-                sets: [
-                    { metrics: [{ metric_id: 'm1', value: 5 }] },
-                    { metrics: [{ metric_id: 'm1', value: 8 }] },
-                ],
-                progress_comparison: { metric_comparisons: [] },
-            }] },
-            isLoading: false,
-            error: null,
-        });
-        renderWithProviders(
-            <ProgressPanel
-                rootId="root-1"
-                selectedActivity={current}
-                sessionActivityDefs={[{ id: 'activity-def-1', name: 'Scales', metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps' }] }]}
-                sessionInstances={[current]}
-            />,
-            providers,
-        );
-
-        const paired = screen.getAllByTitle('Compared with a set in this session');
-        expect(paired).toHaveLength(1);
-        expect(paired[0]).toHaveTextContent('#2');
-    });
-
     it('loads older timeline pages on demand', () => {
         const fetchNextPage = vi.fn();
         useActivityProgressTimeline.mockReturnValue({

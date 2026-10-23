@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useActivityProgressTimeline } from '../../hooks/useActivityTags';
 import { useRootProgressSettings } from '../../hooks/useRootProgressSettings';
@@ -8,10 +8,32 @@ import ActivityTimelineList from '../common/ActivityTimeline';
 import Button from '../atoms/Button';
 import TimelineShell from '../common/TimelineShell';
 import ProgressChart from './ProgressChart';
-import ProgressCompareControls, { comparisonChoice } from './ProgressCompareControls';
+import ProgressCompareControls, { ProgressCompareBar, comparisonChoice, useCompareOpen } from './ProgressCompareControls';
 import styles from './ProgressPanel.module.css';
 
 const HISTORY_LIMIT = 20;
+
+/**
+ * True only while the container is scrolled and the element sits wholly above its top edge, so
+ * an unscrolled pane never shows the docked bar. The bar takes no layout space, so showing it
+ * never moves the content.
+ */
+function useScrolledPast(rootRef, targetRef, active) {
+    const [past, setPast] = useState(false);
+    useEffect(() => {
+        const root = rootRef.current;
+        if (!active || !root) return undefined;
+        const update = () => {
+            const target = targetRef.current;
+            setPast(Boolean(target) && root.scrollTop > 0
+                && target.getBoundingClientRect().bottom <= root.getBoundingClientRect().top);
+        };
+        update();
+        root.addEventListener('scroll', update, { passive: true });
+        return () => root.removeEventListener('scroll', update);
+    }, [rootRef, targetRef, active]);
+    return active && past;
+}
 
 function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionInstances = [] }) {
     const [manualSelectedActivityId, setManualSelectedActivityId] = useState(null);
@@ -38,20 +60,16 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
         limit: HISTORY_LIMIT,
     });
     const timeline = query.data?.combined ?? query.data;
+    const compareOpen = useCompareOpen(selectedActivityId, instance);
+    const bodyRef = useRef(null);
+    const compareRef = useRef(null);
+    const docked = useScrolledPast(bodyRef, compareRef, Boolean(instance));
+    const showComparison = () => {
+        compareOpen.setOpen(true);
+        compareRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    };
 
     const progressByInstanceId = useMemo(() => new Map((timeline?.items || []).map((item) => [item.id, item.progress_comparison])), [timeline?.items]);
-    // Earlier sets the current instance's sets are compared with, keyed by instance id.
-    const pairedSetIndexes = useMemo(() => {
-        const paired = new Map();
-        (instance?.progress_comparison?.metric_comparisons || []).forEach((comparison) => {
-            (comparison.set_comparisons || []).forEach((entry) => {
-                if (!entry.previous_instance_id || entry.previous_set_index == null) return;
-                if (!paired.has(entry.previous_instance_id)) paired.set(entry.previous_instance_id, new Set());
-                paired.get(entry.previous_instance_id).add(entry.previous_set_index);
-            });
-        });
-        return paired;
-    }, [instance?.progress_comparison]);
     const { timezone } = useTimezone();
     const { progressSettings } = useRootProgressSettings(rootId);
     const selectedDef = sessionActivityDefs.find((definition) => definition.id === selectedActivityId);
@@ -64,16 +82,39 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
             </select>
         </div>
     );
+    // The newest match is the session this one's ▲/▼ hints compare against.
+    const [lastSession, ...earlierSessions] = timeline?.items || [];
+    const renderList = (items) => (
+        <ActivityTimelineList
+            items={items}
+            activityDef={selectedDef}
+            progressByInstanceId={progressByInstanceId}
+            timezone={timezone}
+            deltaDisplayMode={deltaDisplayMode}
+        />
+    );
     const emptyMessage = instance?.comparison_context?.mode === 'all' || !instance
         ? `No previous sessions found for ${selectedDef?.name || 'this activity'}`
         : 'No previous sessions match. Try other tags, All history, or turn off Within.';
 
     return (
-        <TimelineShell className={styles.timelinePanel} bodyClassName={styles.timelineBody} selector={selector}>
+        <TimelineShell className={styles.timelinePanel} bodyClassName={styles.timelineBody} bodyRef={bodyRef} selector={selector}>
             {selectedActivityId && instance ? (
                 <>
+                    <div className={styles.compareDock}>
+                        {docked ? <ProgressCompareBar instance={instance} timeline={timeline} onExpand={showComparison} /> : null}
+                    </div>
                     <ProgressChart rootId={rootId} activityId={selectedActivityId} instance={instance} choice={preview} />
-                    <ProgressCompareControls key={instance.id} rootId={rootId} activityId={selectedActivityId} instance={instance} timeline={timeline} />
+                    <ProgressCompareControls
+                        key={instance.id}
+                        rootId={rootId}
+                        activityId={selectedActivityId}
+                        instance={instance}
+                        timeline={timeline}
+                        open={compareOpen.open}
+                        onToggle={compareOpen.toggle}
+                        sectionRef={compareRef}
+                    />
                 </>
             ) : null}
             <section className={styles.timelineSection}>
@@ -82,15 +123,19 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
                     {!selectedActivityId ? <div className={styles.timelineEmpty}>Select an activity to view previous sessions</div>
                         : query.isLoading ? <div className={styles.timelineLoading}>Loading timeline...</div>
                             : query.error ? <div className={styles.timelineError}>Error: {query.error.message}</div>
-                                : timeline?.items?.length ? (
-                                    <ActivityTimelineList
-                                        items={timeline.items}
-                                        activityDef={selectedDef}
-                                        progressByInstanceId={progressByInstanceId}
-                                        pairedSetIndexes={pairedSetIndexes}
-                                        timezone={timezone}
-                                        deltaDisplayMode={deltaDisplayMode}
-                                    />
+                                : lastSession ? (
+                                    <>
+                                        <div className={styles.historyLabel} title="This session's progress hints compare with it">
+                                            Last session
+                                        </div>
+                                        {renderList([lastSession])}
+                                        {earlierSessions.length ? (
+                                            <>
+                                                <div className={styles.historyLabel}>Earlier sessions</div>
+                                                {renderList(earlierSessions)}
+                                            </>
+                                        ) : null}
+                                    </>
                                 )
                                     : <div className={styles.timelineEmpty}>{emptyMessage}</div>}
                     {query.hasNextPage ? (

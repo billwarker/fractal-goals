@@ -37,6 +37,56 @@ function writeOpen(key, open) {
     }
 }
 
+/**
+ * Whether the widget is open, per viewer, for this activity in this template/program day.
+ * Nothing stored yet: open, unless a remembered choice already applies.
+ */
+export function useCompareOpen(activityId, instance) {
+    const context = instance?.comparison_context || {};
+    const key = openStorageKey(activityId, context);
+    const [overrides, setOverrides] = useState({});
+    const open = overrides[key] ?? readOpen(key, !context.remembered_for);
+    const setOpen = (next) => {
+        writeOpen(key, next);
+        setOverrides((current) => ({ ...current, [key]: next }));
+    };
+    return { open, setOpen, toggle: () => setOpen(!open) };
+}
+
+/** The one-line description of a comparison: its scope, match count and compared tags. */
+function describeComparison(instance, timeline) {
+    const context = instance.comparison_context || {};
+    const choice = comparisonChoice(instance);
+    const total = timeline?.total ?? 0;
+    const totalAll = timeline?.total_all ?? 0;
+    const narrowed = choice.mode !== 'all' || choice.sameTemplate || choice.sameProgramDay;
+    const summaryTags = choice.mode === 'tags' ? context.tags || [] : choice.mode === 'same_tags' ? instance.tags || [] : [];
+    return {
+        scope: [choice.sameProgramDay && 'Same day', choice.sameTemplate && 'Same template'].filter(Boolean).join(' | ') || 'Any session',
+        count: timeline ? (narrowed ? `${total} of ${totalAll}` : `${totalAll} past`) : null,
+        countTitle: `${narrowed ? `${total} of ${totalAll}` : totalAll} past sessions match`,
+        summary: choice.mode === 'all' ? 'All history' : summaryTags.length ? (
+            <ActivityTagBadges tags={summaryTags} ariaLabel="Compared tags" />
+        ) : 'Untagged sessions',
+    };
+}
+
+/**
+ * The comparison in one line, docked over the history once the widget has scrolled away.
+ * Activating it brings the widget back, open.
+ */
+export function ProgressCompareBar({ instance, timeline, onExpand }) {
+    const { scope, count, countTitle, summary } = describeComparison(instance, timeline);
+    return (
+        <button type="button" className={styles.compareDockBar} onClick={onExpand} aria-label={`Compare with: ${scope}. Show comparison`}>
+            <strong className={styles.compareTitle}>{scope}</strong>
+            <span className={styles.compareDockSummary}>{summary}</span>
+            {count ? <span className={styles.cohortCount} title={countTitle}>{count}</span> : null}
+            <ChevronIcon size={14} direction="down" />
+        </button>
+    );
+}
+
 /** The comparison an instance's context names, in the shape the progress hooks take. */
 export function comparisonChoice(instance) {
     const context = instance?.comparison_context || {};
@@ -54,19 +104,11 @@ export function comparisonChoice(instance) {
  * sessions from the same session template and/or program day. Saved on the instance and
  * remembered for the activity in that template/program day.
  */
-export default function ProgressCompareControls({ rootId, activityId, instance, timeline }) {
+export default function ProgressCompareControls({ rootId, activityId, instance, timeline, open, onToggle, sectionRef }) {
     const context = instance.comparison_context || { mode: 'same_tags', tag_ids: [], tags: [] };
     const choice = comparisonChoice(instance);
     const { setComparison, isPending } = useProgressComparisonMutation(rootId, activityId);
     const { data: catalog } = useActivityTagCatalog(rootId);
-    const storageKey = openStorageKey(activityId, context);
-    const [open, setOpen] = useState(() => readOpen(storageKey, !context.remembered_for));
-    const toggleOpen = () => {
-        setOpen((current) => {
-            writeOpen(storageKey, !current);
-            return !current;
-        });
-    };
 
     // Specific tags offers the tags this activity has been tagged with (and any already chosen).
     const chosenTagIds = choice.mode === 'tags' ? choice.tagIds : (instance.tags || []).map((tag) => tag.id);
@@ -94,22 +136,13 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
         }
     };
 
-    const total = timeline?.total ?? 0;
-    const totalAll = timeline?.total_all ?? 0;
-    const narrowed = choice.mode !== 'all' || choice.sameTemplate || choice.sameProgramDay;
     const scopes = [
         ['sameTemplate', 'Same template', context.template],
         ['sameProgramDay', 'Same program day', context.program_day],
     ];
-    // The header names the scope in one short line; collapsed, it shows the compared tags too.
     // The toggle row names the scope ("Same day | Same template"); collapsed, the compared tags
     // follow below a divider.
-    const scopeSummary = [choice.sameProgramDay && 'Same day', choice.sameTemplate && 'Same template']
-        .filter(Boolean).join(' | ') || 'Any session';
-    const summaryTags = choice.mode === 'tags' ? context.tags || [] : choice.mode === 'same_tags' ? instance.tags || [] : [];
-    const summary = choice.mode === 'all' ? 'All history' : summaryTags.length ? (
-        <ActivityTagBadges tags={summaryTags} ariaLabel="Compared tags" />
-    ) : 'Untagged sessions';
+    const { scope: scopeSummary, count, countTitle, summary } = describeComparison(instance, timeline);
     const bodyId = `compare-with-body-${instance.id}`;
     const scopeFieldset = (
         <fieldset className={styles.scopeToggles} disabled={isPending}>
@@ -133,7 +166,7 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
         </fieldset>
     );
     return (
-        <section className={styles.compareSection} aria-labelledby="compare-with-label">
+        <section ref={sectionRef} className={styles.compareSection} aria-labelledby="compare-with-label">
         <h3 id="compare-with-label" className={styles.compareSectionLabel}>Compare with</h3>
         <div className={styles.compareControls} aria-label="Progress comparison">
             <button
@@ -141,15 +174,11 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
                 className={styles.compareHeader}
                 aria-expanded={open}
                 aria-controls={bodyId}
-                onClick={toggleOpen}
+                onClick={onToggle}
             >
                 <strong className={styles.compareTitle}>{scopeSummary}</strong>
                 <span className={styles.compareHeaderEnd}>
-                    {timeline ? (
-                        <span className={styles.cohortCount} title={`${narrowed ? `${total} of ${totalAll}` : totalAll} past sessions match`}>
-                            {narrowed ? `${total} of ${totalAll}` : `${totalAll} past`}
-                        </span>
-                    ) : null}
+                    {count ? <span className={styles.cohortCount} title={countTitle}>{count}</span> : null}
                     <ChevronIcon size={14} direction={open ? 'up' : 'down'} />
                 </span>
             </button>

@@ -196,4 +196,42 @@ describe('ProgressPanel tags, scope and chart', () => {
         expect(header).toHaveAttribute('aria-expanded', 'false');
         expect(screen.getByRole('region', { name: 'Compare with' })).toHaveTextContent('All history');
     });
+
+    it('marks the last matching session, and docks the comparison once it scrolls away', async () => {
+        useActivityProgressTimeline.mockReturnValue({ isLoading: false, error: null, data: {
+            items: [
+                { id: 'past-1', session_name: 'Newest', session_start_time: '2026-10-08T10:00:00Z', sets: [] },
+                { id: 'past-2', session_name: 'Older', session_start_time: '2026-09-07T10:00:00Z', sets: [] },
+            ],
+            total: 2,
+            total_all: 2,
+        } });
+        const current = instance();
+        renderWithProviders(
+            <ProgressPanel rootId="root-1" selectedActivity={current} sessionActivityDefs={sessionActivityDefs} sessionInstances={[current]} />,
+            providers,
+        );
+        const labels = screen.getAllByText(/^(Last session|Earlier sessions)$/).map((node) => node.textContent);
+        expect(labels).toEqual(['Last session', 'Earlier sessions']);
+
+        // Unscrolled, there is no docked bar, even if the widget measures above the pane's top.
+        const compare = screen.getByRole('region', { name: 'Compare with' });
+        const body = compare.parentElement;
+        vi.spyOn(compare, 'getBoundingClientRect').mockReturnValue({ top: -200, bottom: -20 });
+        vi.spyOn(body, 'getBoundingClientRect').mockReturnValue({ top: 0, bottom: 600 });
+        fireEvent.scroll(body);
+        expect(screen.queryByRole('button', { name: /Show comparison/ })).not.toBeInTheDocument();
+
+        // Scrolled past: a one-line bar docks over the history; activating it reopens the widget.
+        body.scrollTop = 300;
+        fireEvent.scroll(body);
+        const header = screen.getByRole('button', { name: /^Any session/ });
+        fireEvent.click(header);
+        expect(header).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(screen.getByRole('button', { name: 'Compare with: Any session. Show comparison' }));
+        expect(header).toHaveAttribute('aria-expanded', 'true');
+        body.scrollTop = 0;
+        fireEvent.scroll(body);
+        expect(screen.queryByRole('button', { name: /Show comparison/ })).not.toBeInTheDocument();
+    });
 });
