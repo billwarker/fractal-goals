@@ -76,7 +76,7 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
     const deltaDisplayMode = useEffectiveDeltaDisplayMode(selectedDef, progressSettings);
     const selector = (
         <div className={styles.timelineSelector}>
-            <label htmlFor="timeline-activity-select">Select Activity:</label>
+            <label htmlFor="timeline-activity-select">Select Activity</label>
             <select id="timeline-activity-select" value={selectedActivityId || ''} onChange={(event) => setManualSelectedActivityId(event.target.value || null)}>
                 {sessionActivityDefs.length ? sessionActivityDefs.map((definition) => <option key={definition.id} value={definition.id}>{definition.name}</option>) : <option value="">No activities in session</option>}
             </select>

@@ -282,7 +282,7 @@ def test_template_and_program_day_scopes_narrow_comparisons_independently_and_to
     assert _progress(authed_client, root_id, current.id)['previous_instance_id'] == lower_a.id
     template_only = _compare(authed_client, root_id, current.id, same_template=True).get_json()
     assert template_only['progress_comparison']['previous_instance_id'] == upper_b.id
-    assert template_only['comparison_context']['template'] == {'id': upper.id, 'name': 'Upper'}
+    assert template_only['comparison_context']['template'] == {'id': upper.id, 'name': 'Upper', 'color': None}
     day_only = _compare(authed_client, root_id, current.id, same_program_day=True).get_json()
     assert day_only['progress_comparison']['previous_instance_id'] == lower_a.id
     both = _compare(authed_client, root_id, current.id, same_template=True, same_program_day=True).get_json()

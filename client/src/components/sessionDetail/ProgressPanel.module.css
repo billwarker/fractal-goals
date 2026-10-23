@@ -17,10 +17,9 @@
 }
 
 .timelineSelector label {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
 }
 
 .timelineSelector select {
@@ -167,14 +166,12 @@
     margin-bottom: 16px;
 }
 
-/* Matches the "Select Activity" label above it. */
+/* Pane section headings ("Select Activity", "Compare with", "Past sessions") share one style. */
 .compareSectionLabel {
     margin: 0;
-    color: var(--color-text-muted);
-    font-size: 11px;
-    font-weight: 400;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
 }
 
 .compareTitle {
@@ -352,6 +349,11 @@
 
 .scopeToggle:has(input:checked) {
     color: var(--color-text-primary);
+}
+
+.scopeBadge {
+    justify-self: start;
+    max-width: 100%;
 }
 
 .scopeName {

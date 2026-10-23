@@ -3362,64 +3362,6 @@
                 }
             }
         ],
-        "./services/activity_progress_view_service.py": [
-            {
-                "code": "reportArgumentType",
-                "range": {
-                    "startColumn": 8,
-                    "endColumn": 23,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportGeneralTypeIssues",
-                "range": {
-                    "startColumn": 53,
-                    "endColumn": 68,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportGeneralTypeIssues",
-                "range": {
-                    "startColumn": 53,
-                    "endColumn": 68,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalIterable",
-                "range": {
-                    "startColumn": 174,
-                    "endColumn": 178,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalIterable",
-                "range": {
-                    "startColumn": 60,
-                    "endColumn": 73,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalIterable",
-                "range": {
-                    "startColumn": 251,
-                    "endColumn": 255,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalIterable",
-                "range": {
-                    "startColumn": 60,
-                    "endColumn": 77,
-                    "lineCount": 1
-                }
-            }
-        ],
         "./services/activity_service.py": [
             {
                 "code": "reportArgumentType",

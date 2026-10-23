@@ -6,6 +6,7 @@ import notify from '../../utils/notify';
 import { familiesWithMembers, groupTagsForPicker, toggleTagSelection } from '../../utils/tagPickerOptions';
 import ChevronIcon from '../atoms/ChevronIcon';
 import ActivityTagBadges from '../common/ActivityTagBadges';
+import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import styles from './ProgressPanel.module.css';
 
 const MODES = [
@@ -169,7 +170,10 @@ export default function ProgressCompareControls({ rootId, activityId, instance, 
                         onChange={(event) => void save({ [key]: event.target.checked })}
                     />
                     <span>{label}</span>
-                    {scope ? <span className={styles.scopeName}>{scope.name}</span> : null}
+                    {scope && key === 'sameTemplate' ? (
+                        <SessionTemplateNameBadge name={scope.name} color={scope.color} size="sm" className={styles.scopeBadge} />
+                    ) : null}
+                    {scope && key !== 'sameTemplate' ? <span className={styles.scopeName}>{scope.name}</span> : null}
                 </label>
             ))}
         </fieldset>

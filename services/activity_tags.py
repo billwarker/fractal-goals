@@ -45,12 +45,18 @@ COMPARE_MODES = ("same_tags", "tags", "all")
 
 
 def session_scope(instance) -> dict:
-    """The session template and program day an instance ran in, as {id, name} or None."""
+    """The session template ({id, name, color}) and program day ({id, name}) an instance ran in, or None."""
+    from services.session_runtime import get_session_template_color
+
     session = getattr(instance, "session", None)
     template = getattr(session, "template", None) if session is not None else None
     program_day = getattr(session, "program_day", None) if session is not None else None
     return {
-        "template": {"id": template.id, "name": template.name} if template is not None else None,
+        "template": {
+            "id": template.id,
+            "name": template.name,
+            "color": get_session_template_color(session),
+        } if template is not None else None,
         "program_day": {"id": program_day.id, "name": program_day.name} if program_day is not None else None,
     }
 

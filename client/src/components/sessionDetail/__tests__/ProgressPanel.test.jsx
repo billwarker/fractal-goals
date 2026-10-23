@@ -85,7 +85,7 @@ describe('ProgressPanel', () => {
             providers,
         );
 
-        expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-2');
+        expect(screen.getByLabelText('Select Activity')).toHaveValue('activity-def-2');
         // The request names the shown context: the instance's own tags by default.
         expect(useActivityProgressTimeline).toHaveBeenCalledWith('root-1', 'activity-def-2', {
             instanceId: 'instance-2',
@@ -110,7 +110,7 @@ describe('ProgressPanel', () => {
             }
         );
 
-        const select = screen.getByLabelText('Select Activity:');
+        const select = screen.getByLabelText('Select Activity');
         expect(select).toHaveValue('activity-def-1');
 
         fireEvent.change(select, { target: { value: 'activity-def-2' } });
@@ -125,7 +125,7 @@ describe('ProgressPanel', () => {
             />
         );
 
-        expect(screen.getByLabelText('Select Activity:')).toHaveValue('activity-def-1');
+        expect(screen.getByLabelText('Select Activity')).toHaveValue('activity-def-1');
     });
 
     it('keeps session notes out of the activity timeline view', () => {
