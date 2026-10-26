@@ -5,12 +5,12 @@
 import { useMemo } from 'react';
 
 import {
-    canComputeYield,
     computeAutoAggregations,
     filterTrackedMetricDefs,
-    formatAggValue,
 } from '../../utils/progressAggregations';
+import { relativeDelta } from '../../utils/planComparison';
 import ActivitySummaryRail from '../common/ActivitySummaryRail';
+import { buildActivitySummaryMetrics } from '../common/activitySummaryMetrics';
 import styles from './SessionActivityItem.module.css';
 
 /**
@@ -40,64 +40,20 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
 
     if (!autoAgg && !overrideLabel) return null;
 
-    const yieldEligible = canComputeYield(trackedMetricDefs);
-    const hasYield = Boolean(autoAgg) && yieldEligible && autoAgg.total_yield != null;
-    const hasAdditive = Boolean(autoAgg) && Object.keys(autoAgg.additive_totals).length > 0;
-    const hasBestSet = Boolean(autoAgg) && autoAgg.best_set_index != null;
-
-    if (!hasYield && !hasAdditive && !hasBestSet && !overrideLabel) return null;
-
     // Previous total yield for delta display
     const prevYield = (() => {
         if (!activeProgress?.metric_comparisons) return null;
         const yieldComp = activeProgress.metric_comparisons.find((mc) => mc.type === 'yield');
         return yieldComp?.previous_value ?? null;
     })();
-
     const isFirstInstance = activeProgress?.is_first_instance;
-    const additiveMetricDefs = hasAdditive
-        ? trackedMetricDefs.filter((md) => (
-            md.is_additive !== false && autoAgg.additive_totals[md.id] != null
-        ))
-        : [];
+    const summaryMetrics = buildActivitySummaryMetrics(autoAgg, trackedMetricDefs, {
+        deltaFor: (key) => (key === 'yield' && !isFirstInstance && prevYield != null ? (
+            <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
+        ) : null),
+    });
 
-    const bestSetLabel = hasBestSet
-        ? (hasYield && autoAgg.best_set_yield != null
-            ? `= ${formatAggValue(autoAgg.best_set_yield)}`
-            : trackedMetricDefs
-                .filter((md) => autoAgg.best_set_values[md.id] != null)
-                .map((md) => `${formatAggValue(autoAgg.best_set_values[md.id])} ${md.unit}`)
-                .join(' × ')
-        )
-        : null;
-
-    const summaryMetrics = additiveMetricDefs.map((md) => ({
-        key: `total-${md.id}`,
-        label: `Total ${md.name}:`,
-        value: `${formatAggValue(autoAgg.additive_totals[md.id])} ${md.unit}`,
-    }));
-    if (hasYield) {
-        summaryMetrics.push({
-            key: 'yield',
-            label: 'Total yield:',
-            value: (
-                <>
-                    {formatAggValue(autoAgg.total_yield)}
-                    {!isFirstInstance && prevYield != null && autoAgg.total_yield != null && (
-                        <SummaryDelta current={autoAgg.total_yield} previous={prevYield} higherIsBetter styles={styles} displayMode={displayMode} />
-                    )}
-                </>
-            ),
-        });
-    }
-    if (hasBestSet && bestSetLabel) {
-        summaryMetrics.push({
-            key: 'best-set',
-            label: 'Best:',
-            value: `Set ${autoAgg.best_set_index + 1} ${bestSetLabel}`,
-            muted: true,
-        });
-    }
+    if (!summaryMetrics.length && !overrideLabel) return null;
 
     return (
         <div className={styles.progressSummary}>
@@ -112,21 +68,10 @@ function SessionActivityProgressSummary({ sets, metricDefs, activeProgress, disp
 }
 
 function SummaryDelta({ current, previous, higherIsBetter = true, styles, displayMode = 'percent' }) {
-    if (previous == null || current == null) return null;
-    const delta = current - previous;
-    if (delta === 0) return null;
-    const improved = (delta > 0 && higherIsBetter) || (delta < 0 && !higherIsBetter);
-    let label;
-    if (displayMode === 'absolute') {
-        label = `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
-    } else {
-        const pct = previous !== 0 ? Math.abs(delta / previous * 100) : null;
-        label = pct != null
-            ? `${improved ? '▲' : '▼'}${formatAggValue(pct)}%`
-            : `${delta > 0 ? '+' : ''}${formatAggValue(delta)}`;
-    }
-    const cls = improved ? styles.metricInlineProgressImproved : styles.metricInlineProgressRegressed;
-    return <span className={`${styles.metricInlineProgress} ${cls}`}> ({label})</span>;
+    const change = relativeDelta(current, previous, { higherIsBetter, mode: displayMode });
+    if (!change) return null;
+    const cls = change.improved ? styles.metricInlineProgressImproved : styles.metricInlineProgressRegressed;
+    return <span className={`${styles.metricInlineProgress} ${cls}`}> ({change.label})</span>;
 }
 
 export default SessionActivityProgressSummary;

@@ -216,12 +216,22 @@
     gap: 8px;
 }
 
+/* A flat value's name sits beside its input, on one line. */
 .flatField {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 8px;
     min-width: 96px;
     flex: 1 1 96px;
+}
+
+.flatField > .columnLabel {
+    flex: none;
+    white-space: nowrap;
+}
+
+.flatField > .valueCell {
+    flex: 1 1 auto;
 }
 
 /* Circuit plans: rounds stacked vertically, one activity per row within each round. */
@@ -325,6 +335,17 @@
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
     border-radius: 4px;
+}
+
+/* Round tags sit between the round's title and its remove button. */
+.roundTags {
+    margin-left: auto;
+}
+
+/* A member's tags take the round's trailing flexible track, after its fields. */
+.roundSlotTags {
+    grid-column: -2 / -1;
+    justify-self: end;
 }
 
 /* The field columns, as a nested subgrid so wrapped rows never disturb the name. It stops

@@ -2,32 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import Badge from '../../atoms/Badge';
-import { queryKeys } from '../../../hooks/queryKeys';
-import { fractalApi } from '../../../utils/api';
+import { sessionDetailQueryOptions } from '../../../hooks/useSessionQueries';
+import {
+    activityIdOf,
+    loggedActivityValue,
+    loggedCircuitRounds,
+    loggedCircuitSlots,
+    sessionSectionItems,
+} from '../../../utils/loggedSessionPlan';
+import { indexByAlignKey } from '../../../utils/planComparison';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick } from '../../prescriptions/usePlanRowSelection';
 import CompletedSessionHeader from './CompletedSessionHeader';
 import styles from './ProgramDaysView.module.css';
-
-/** A session section's recorded work items, from hydrated typed items or legacy exercises. */
-export function sessionSectionItems(section) {
-    if (Array.isArray(section?.items) && section.items.some((item) => item?.activity || item?.circuit)) {
-        return section.items
-            .map((item) => {
-                if (item?.type === 'circuit' && item.circuit) return { type: 'circuit', circuit: item.circuit };
-                if (item?.type === 'activity' && item.activity) return { type: 'activity', activity: item.activity };
-                return null;
-            })
-            .filter(Boolean);
-    }
-    return (section?.exercises || []).map((activity) => ({ type: 'activity', activity }));
-}
-
-function activityIdOf(activity) {
-    return activity.activity_id || activity.activity_definition_id;
-}
 
 const noop = () => {};
 
@@ -48,13 +37,10 @@ export default function CompletedSessionCard({
     isActive = false,
     onActivate = null,
     onReport = null,
+    comparison = null,
+    progressSettings = null,
 }) {
-    const query = useQuery({
-        queryKey: queryKeys.session(rootId, sessionId),
-        queryFn: async () => (await fractalApi.getSession(rootId, sessionId)).data,
-        enabled: Boolean(rootId && sessionId),
-        staleTime: 60 * 1000,
-    });
+    const query = useQuery(sessionDetailQueryOptions(rootId, sessionId));
     const activityById = useMemo(
         () => new Map((activities || []).map((activity) => [activity.id, activity])),
         [activities],
@@ -72,6 +58,15 @@ export default function CompletedSessionCard({
             ? { type: 'circuit', circuit_definition_id: item.circuit.circuit_definition_id }
             : { type: 'activity', activity_definition_id: activityIdOf(item.activity) })),
     }))) : null), [alignmentPrefix, sections]);
+
+    // With a comparison (the other column's card for this template), each activity shows its
+    // change from the paired one there.
+    const comparedByKey = useMemo(
+        () => (alignmentPrefix && comparison && !comparison.isLoading && comparison.kind !== 'empty'
+            ? indexByAlignKey(alignmentPrefix, comparison.sections)
+            : null),
+        [alignmentPrefix, comparison],
+    );
 
     // The Goals side pane follows this card when active: the session's own goal evidence, and
     // the goals of an activity picked here (picking only highlights; nothing is editable).
@@ -125,17 +120,14 @@ export default function CompletedSessionCard({
     const session = query.data;
 
     const renderActivity = (activity, alignKey) => {
+        const compared = comparedByKey?.get(alignKey);
         const definition = activityById.get(activityIdOf(activity));
         if (!definition) return null;
         return (
             <PrescriptionEditor
                 rootId={rootId}
                 definition={definition}
-                value={{
-                    sets: (activity.sets || []).map((loggedSet) => ({ metrics: loggedSet.metrics, notes: loggedSet.notes })),
-                    metrics: activity.metrics || [],
-                    notes: activity.notes || null,
-                }}
+                value={loggedActivityValue(activity)}
                 onChange={noop}
                 idPrefix={`logged-${sessionId}-${activity.instance_id || activity.id}`}
                 active={false}
@@ -143,29 +135,18 @@ export default function CompletedSessionCard({
                 valueKind="logged"
                 emptyText="No values logged."
                 alignKey={alignKey}
+                comparison={compared?.type === 'activity' ? compared.prescription || {} : null}
+                comparisonDate={comparison?.date || null}
+                progressSettings={progressSettings}
             />
         );
     };
 
     const renderCircuit = (run, alignKey, itemKey) => {
-        const slots = [...(run.slots || [])]
-            .sort((left, right) => left.sort_order - right.sort_order)
-            .map((slot) => ({
-                id: slot.id,
-                activity_definition_id: slot.activity_definition_id,
-                definition: activityById.get(slot.activity_definition_id)
-                    || { ...(slot.activity_schema || {}), name: slot.activity_name },
-            }));
+        const compared = comparedByKey?.get(alignKey);
+        const slots = loggedCircuitSlots(run, activityById);
         // The logged rounds in the plan's shape, so the circuit editor shows them read-only.
-        const rounds = [...(run.rounds || [])]
-            .sort((left, right) => left.round_number - right.round_number)
-            .map((round) => ({
-                slots: slots.map((slot) => ({
-                    slot_id: slot.id,
-                    metrics: round.members?.find((member) => member.circuit_run_slot_id === slot.id)?.metrics || [],
-                })),
-                notes: null,
-            }));
+        const rounds = loggedCircuitRounds(run, slots);
         if (!rounds.length) return <p className={styles.planEmpty}>No rounds logged.</p>;
         return (
             <CircuitPrescriptionEditor
@@ -178,6 +159,9 @@ export default function CompletedSessionCard({
                 readOnly
                 valueKind="logged"
                 alignKey={alignKey}
+                comparison={compared?.type === 'circuit' ? compared.prescription || {} : null}
+                comparisonDate={comparison?.date || null}
+                progressSettings={progressSettings}
                 selectedRoundIndex={selected?.key === itemKey ? selected.roundIndex : null}
                 onSelectRound={(roundIndex) => setSelected({ key: itemKey, activityId: null, roundIndex })}
                 selectedSlot={selected?.key === itemKey && selected.slotId

@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from models import ActivityInstance, ActivitySet, ActivityTagDefinition, CircuitScopeTag
 from services.activity_tags import canonical_tag_name, normalize_tag_name
 from services.events import Event, Events, event_bus
+from services.prescriptions import circuit_prescription_tag_ids, load_planned_tags
 from services.quota_service import QuotaService
 from services.serializers import serialize_circuit_run
 
@@ -342,3 +343,83 @@ class CircuitTagOperations:
             if replaced:
                 scope.preserved_target_keys = [*(scope.preserved_target_keys or []), *replaced]
         return None, None, 200
+
+    def apply_planned_tags(self, run, prescription, user_id=None):
+        """Apply a circuit plan's tags to a run created from it, before commit.
+
+        Lands each tag where the session page would put it: a round member's tags on the
+        member's set or instance; round tags as round scopes; circuit tags as run scopes
+        (which later rounds inherit). Member tags go first, so a scope that finds a member
+        already tagged preserves it as the member's own. Archived or deleted tags are
+        skipped (``load_planned_tags``), never failing the session.
+        """
+        prescription = prescription or {}
+        tag_ids = list(dict.fromkeys(circuit_prescription_tag_ids(prescription)))
+        if not tag_ids:
+            return None, None, 200
+        tags_by_id = {tag.id: tag for tag in load_planned_tags(self.db, run.root_id, tag_ids)}
+
+        def planned(ids):
+            return [tags_by_id[tag_id] for tag_id in ids or [] if tag_id in tags_by_id]
+
+        rounds = sorted(run.rounds, key=lambda row: row.round_number)
+        planned_rounds = list(zip(rounds, prescription.get("rounds") or []))
+        run_slot_by_source = {slot.source_slot_id: slot.id for slot in run.slots}
+        member_tags = []
+        for circuit_round, planned_round in planned_rounds:
+            members = {member.circuit_run_slot_id: member for member in circuit_round.members}
+            for planned_slot in planned_round.get("slots") or []:
+                member = members.get(run_slot_by_source.get(planned_slot.get("slot_id")))
+                definitions = planned(planned_slot.get("tags"))
+                if member is not None and definitions:
+                    member_tags.append((self._member_target(member), definitions))
+        run_scope = (None, self._run_targets(run), planned(prescription.get("tags")))
+        round_scopes = [
+            (circuit_round, self._round_targets(circuit_round), planned(planned_round.get("tags")))
+            for circuit_round, planned_round in planned_rounds
+        ]
+
+        if user_id is not None:
+            assignments = [
+                (definition.name, definition.color)
+                for target, definitions in member_tags for definition in definitions
+            ] + [
+                (definition.name, definition.color)
+                for _round, targets, definitions in [run_scope, *round_scopes]
+                for definition in definitions for _target in targets
+            ]
+            if assignments:
+                quota = QuotaService(self.db)
+                _, error, status = quota.check_storage_available(user_id, quota.payload_size(*assignments))
+                if error:
+                    return None, error, status
+
+        for target, definitions in member_tags:
+            for definition in definitions:
+                self._assign([target], definition)
+        for circuit_round, targets, definitions in [run_scope, *round_scopes]:
+            if targets:
+                self._add_planned_scopes(run, circuit_round, targets, definitions)
+        return None, None, 200
+
+    def _add_planned_scopes(self, run, circuit_round, targets, definitions):
+        round_id = circuit_round.id if circuit_round is not None else None
+        scoped = {scope.activity_tag_definition_id for scope in run.scope_tags if scope.circuit_round_id == round_id}
+        sort_order = max(
+            (scope.sort_order for scope in run.scope_tags if scope.circuit_round_id == round_id),
+            default=-1,
+        )
+        for definition in definitions:
+            if definition.id in scoped:
+                continue
+            _changed, preserved = self._assign(targets, definition)
+            sort_order += 1
+            self.db.add(CircuitScopeTag(
+                root_id=run.root_id,
+                run=run,
+                round=circuit_round,
+                activity_tag_definition_id=definition.id,
+                sort_order=sort_order,
+                preserved_target_keys=preserved,
+            ))
+            scoped.add(definition.id)

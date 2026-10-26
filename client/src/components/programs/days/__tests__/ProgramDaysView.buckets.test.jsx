@@ -3,7 +3,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { WEEK_ONE, planEntry, programDaysApi as api, resetProgramDaysApi } from '../../../../test/programs/programDaysFixtures';
-import { nextCard, renderView } from '../../../../test/programs/renderProgramDaysView';
+import { nextCard, pane, renderView } from '../../../../test/programs/renderProgramDaysView';
 
 vi.mock('../../../../utils/api', () => import('../../../../test/programs/programDaysFixtures'));
 vi.mock('../../../../contexts/GoalLevelsContext', () => ({ useGoalLevels: () => ({ getGoalColor: () => '#336699' }) }));
@@ -39,21 +39,22 @@ describe('Block and week buckets', () => {
     it('keeps every date on the rail and marks the selected date\'s block and week', async () => {
         renderView();
 
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+        // Today (Thu Oct 1) is one of the day's dates, so it opens there.
+        await screen.findByRole('region', { name: 'Thursday, Oct 1' });
         expect(railDates()).toHaveLength(6);
         expect(within(weeks()).getAllByRole('button')).toHaveLength(9);
-        expect(within(weeks()).getByRole('button', { name: /^Week 6,/ })).toHaveAttribute('aria-pressed', 'true');
+        expect(within(weeks()).getByRole('button', { name: /^Week 5,/ })).toHaveAttribute('aria-pressed', 'true');
         expect(within(weeks()).getByRole('button', { name: /^Week 5,.*2 dates, 2 done/ })).toBeInTheDocument();
     });
 
     it('jumps to the start of a picked week, and ignores weeks without dates', async () => {
         renderView();
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+        await screen.findByRole('region', { name: 'Thursday, Oct 1' });
 
         const empty = within(weeks()).getByRole('button', { name: /^Week 7,.*no dates for this day/ });
         expect(empty).toHaveAttribute('aria-disabled', 'true');
         fireEvent.click(empty);
-        expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Thursday, Oct 1' })).toBeInTheDocument();
 
         fireEvent.click(within(weeks()).getByRole('button', { name: /^Week 8,/ }));
         expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
@@ -65,9 +66,54 @@ describe('Block and week buckets', () => {
         expect(await screen.findByRole('region', { name: 'Monday, Oct 19' })).toBeInTheDocument();
     });
 
+    it('compares the date in view with the date before it, starting fresh each time', async () => {
+        renderView();
+        await screen.findByRole('region', { name: 'Thursday, Oct 1' });
+        fireEvent.click(screen.getByRole('button', { name: 'Program day dates: next date' }));
+        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+
+        const toggle = within(pane()).getByRole('button', { name: 'Compare two days' });
+        fireEvent.click(toggle);
+        // The date in view stays on the right; the left is the date before it.
+        expect(await screen.findByRole('region', { name: 'Thursday, Oct 1' })).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
+
+        const left = screen.getByRole('list', { name: 'Left column dates' });
+        fireEvent.click(within(left).getByRole('button', { name: /^Monday, Sep 28/ }));
+        expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
+
+        fireEvent.click(toggle);
+        await waitFor(() => expect(screen.queryByRole('region', { name: 'Monday, Sep 28' })).not.toBeInTheDocument());
+        fireEvent.click(toggle);
+        expect(await screen.findByRole('region', { name: 'Thursday, Oct 1' })).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Monday, Sep 28' })).not.toBeInTheDocument();
+    });
+
+    it('copies into whichever column is upcoming, pointing at the other', async () => {
+        renderView({ compare: true });
+        // Today (Oct 1) is on the right, so the right copies from the left.
+        const today = await screen.findByRole('region', { name: 'Thursday, Oct 1' });
+        expect(await within(today).findByRole('button', { name: '← Copy from Mon, Sep 28' })).toBeInTheDocument();
+
+        // Put an upcoming date on the left and a past one on the right.
+        fireEvent.click(within(screen.getByRole('list', { name: 'Left column dates' }))
+            .getByRole('button', { name: /^Thursday, Oct 8/ }));
+        await screen.findByRole('region', { name: 'Thursday, Oct 8' });
+        fireEvent.click(within(screen.getByRole('list', { name: 'Right column dates' }))
+            .getByRole('button', { name: /^Monday, Sep 28/ }));
+
+        const left = await screen.findByRole('region', { name: 'Thursday, Oct 8' });
+        const right = await screen.findByRole('region', { name: 'Monday, Sep 28' });
+        const copy = await within(left).findByRole('button', { name: 'Copy from Mon, Sep 28 →' });
+        // Sep 28 logged nothing here, so there is nothing to copy yet.
+        expect(copy).toBeDisabled();
+        expect(copy).toHaveAccessibleDescription('Nothing to copy from Mon, Sep 28.');
+        expect(within(right).queryByRole('button', { name: /Copy from/ })).not.toBeInTheDocument();
+    });
+
     it('jumps to the start of a picked block', async () => {
         renderView();
-        await screen.findByRole('region', { name: 'Monday, Oct 5' });
+        await screen.findByRole('region', { name: 'Thursday, Oct 1' });
 
         fireEvent.click(screen.getByRole('button', { name: /^Hypertrophy,/ }));
         expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();

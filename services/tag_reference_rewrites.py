@@ -1,7 +1,7 @@
 """Keep planned-tag ids inside stored plans in step with catalog merges and deletions.
 
 Planned tags live in prescription JSON (templates, dated program plans, the plan
-snapshot on each activity instance, and session snapshots). Unlike relational links
+snapshot on each activity instance and circuit run, and session snapshots). Unlike relational links
 they have no foreign key, so catalog operations rewrite them explicitly.
 """
 
@@ -12,7 +12,7 @@ import json
 
 from sqlalchemy import Text, cast, or_
 
-from models import ActivityInstance, ProgramSessionPlan, Session, SessionTemplate
+from models import ActivityInstance, CircuitRun, ProgramSessionPlan, Session, SessionTemplate
 
 
 def _rewrite_ids(tag_ids, mapping):
@@ -31,39 +31,60 @@ def _rewrite_ids(tag_ids, mapping):
     return rewritten, changed
 
 
+def _rewrite_tags_field(entry, mapping):
+    """Return (entry, changed) with an object's ``tags`` list mapped; an emptied list is dropped."""
+    if not isinstance(entry, dict) or "tags" not in entry:
+        return entry, False
+    tags, changed = _rewrite_ids(entry["tags"], mapping)
+    if not changed:
+        return entry, False
+    entry = dict(entry)
+    if tags:
+        entry["tags"] = tags
+    else:
+        entry.pop("tags")
+    return entry, True
+
+
+def _rewrite_tagged_list(entries, mapping, rewrite_entry):
+    """Return (list, changed) with ``rewrite_entry`` applied to each object of a list."""
+    if not isinstance(entries, list):
+        return entries, False
+    rewritten = []
+    changed = False
+    for entry in entries:
+        entry, entry_changed = rewrite_entry(entry, mapping)
+        rewritten.append(entry)
+        changed = changed or entry_changed
+    return (rewritten, True) if changed else (entries, False)
+
+
+def _rewrite_round(planned_round, mapping):
+    """A circuit plan round: its own tags and each member slot's."""
+    result, changed = _rewrite_tags_field(planned_round, mapping)
+    if not isinstance(result, dict):
+        return result, changed
+    slots, slots_changed = _rewrite_tagged_list(result.get("slots"), mapping, _rewrite_tags_field)
+    if slots_changed:
+        result = dict(result) if result is planned_round else result
+        result["slots"] = slots
+    return result, changed or slots_changed
+
+
 def rewrite_prescription(prescription, mapping):
-    """Return (prescription, changed) with tag ids mapped; a mapping to None removes the id."""
+    """Return (prescription, changed) with tag ids mapped; a mapping to None removes the id.
+
+    Covers activity plans (``tags``, ``sets[].tags``) and circuit plans (``tags``,
+    ``rounds[].tags``, ``rounds[].slots[].tags``).
+    """
     if not isinstance(prescription, dict):
         return prescription, False
-    result = prescription
-    changed = False
-    if "tags" in prescription:
-        tags, tags_changed = _rewrite_ids(prescription["tags"], mapping)
-        if tags_changed:
-            result = dict(result)
-            if tags:
-                result["tags"] = tags
-            else:
-                result.pop("tags")
-            changed = True
-    sets = prescription.get("sets")
-    if isinstance(sets, list):
-        new_sets = []
-        sets_changed = False
-        for planned_set in sets:
-            if isinstance(planned_set, dict) and "tags" in planned_set:
-                tags, tags_changed = _rewrite_ids(planned_set["tags"], mapping)
-                if tags_changed:
-                    planned_set = dict(planned_set)
-                    if tags:
-                        planned_set["tags"] = tags
-                    else:
-                        planned_set.pop("tags")
-                    sets_changed = True
-            new_sets.append(planned_set)
-        if sets_changed:
+    result, changed = _rewrite_tags_field(prescription, mapping)
+    for key, rewrite_entry in (("sets", _rewrite_tags_field), ("rounds", _rewrite_round)):
+        entries, entries_changed = _rewrite_tagged_list(result.get(key), mapping, rewrite_entry)
+        if entries_changed:
             result = dict(result) if result is prescription else result
-            result["sets"] = new_sets
+            result[key] = entries
             changed = True
     return result, changed
 
@@ -124,12 +145,14 @@ def rewrite_planned_tags(db_session, root_id, mapping) -> int:
             if changed:
                 setattr(row, column_name, rewritten)
                 changed_rows += 1
-    for instance in db_session.query(ActivityInstance).filter(
-        ActivityInstance.root_id == root_id,
-        _mentions(ActivityInstance.prescription, tag_ids),
-    ).all():
-        rewritten, changed = rewrite_prescription(instance.prescription, mapping)
-        if changed:
-            instance.prescription = rewritten
-            changed_rows += 1
+    # Plan snapshots taken at session start: activity instances' and circuit runs'.
+    for model in (ActivityInstance, CircuitRun):
+        for row in db_session.query(model).filter(
+            model.root_id == root_id,
+            _mentions(model.prescription, tag_ids),
+        ).all():
+            rewritten, changed = rewrite_prescription(row.prescription, mapping)
+            if changed:
+                row.prescription = rewritten
+                changed_rows += 1
     return changed_rows

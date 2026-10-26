@@ -8,18 +8,26 @@ import {
     MAX_CIRCUIT_PLAN_ROUNDS,
     getCircuitPlanSlots,
     getCircuitRoundEntries,
+    getCircuitRoundTags,
     getEntryValue,
     getPrescriptionColumns,
     withAddedRound,
     withCircuitNotes,
     withCircuitRoundValue,
+    withCircuitSlotTags,
+    withCircuitTags,
     withRemovedRound,
     withRoundNotes,
+    withRoundTags,
 } from '../../utils/prescriptionModel';
+import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
+import { compareCircuitSlot } from '../../utils/planComparison';
 import { planRowAlignKey } from '../../utils/programDaysView';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import { formatPlannedValue } from '../../utils/sessionPrescription';
+import PlanDeltaChip from './PlanDeltaChip';
 import PlanNoteComposer from './PlanNoteComposer';
+import PlanTagEditor from './PlanTagEditor';
 import styles from './PrescriptionEditor.module.css';
 import usePlanRowSelection, { isItemSurfaceClick } from './usePlanRowSelection';
 
@@ -56,8 +64,17 @@ function slotAlignKinds(slots) {
  * the session page: `onSelectSlot(roundIndex, slotId)` picks one (`slotId` null goes back to
  * the round) and `selectedSlot` ({ roundIndex, slotId }) marks it, read-only or not.
  * Read-only rounds remain selectable when the caller supplies `onSelectRound`.
+ *
+ * Tags plan where the session page puts them: on the circuit (`showCircuitTags`, unless the
+ * caller shows them itself), on a selected round, or on a selected round member. Each shows
+ * the enclosing scopes' tags as inherited. Needs `rootId`.
+ *
+ * `comparison` (the compared plan's circuit prescription) shows each value's change from it,
+ * round by round, beside the value; a round it lacks is marked new. Slots pair by the circuit's
+ * slot id (a logged run's slot by its `source_slot_id`).
  */
 export default function CircuitPrescriptionEditor({
+    rootId = null,
     circuit,
     activityById,
     value,
@@ -74,7 +91,12 @@ export default function CircuitPrescriptionEditor({
     alignKey = null,
     selectedSlot = null,
     onSelectSlot = null,
+    comparison = null,
+    comparisonDate = null,
+    showCircuitTags = true,
+    progressSettings = null,
 }) {
+    const comparedRounds = comparison?.rounds || [];
     const slots = slotsOverride || getCircuitPlanSlots(circuit, activityById);
     const slotKinds = slotAlignKinds(slots);
     const rounds = value?.rounds || [];
@@ -85,6 +107,8 @@ export default function CircuitPrescriptionEditor({
     );
     const scopedRound = selectedIndex == null ? null : rounds[selectedIndex];
     const name = circuit?.name || 'this circuit';
+    const editable = active && !disabled && !readOnly;
+    const circuitTagIds = value?.tags || [];
 
     const commit = (roundIndex, slotId, column, rawValue) => {
         const normalized = normalizeMetricValueForStorage(column.metric, rawValue);
@@ -98,6 +122,17 @@ export default function CircuitPrescriptionEditor({
             className={styles.editor}
             onClick={(event) => { if (isItemSurfaceClick(event)) clearSelection(); }}
         >
+            {showCircuitTags ? (
+                <PlanTagEditor
+                    rootId={rootId}
+                    scopeId={circuit?.id}
+                    tagIds={circuitTagIds}
+                    editable={editable && selectedIndex == null}
+                    onChangeTags={(tagIds) => onChange(withCircuitTags(value, tagIds))}
+                    scopeLabel="Circuit tags"
+                    className={styles.itemMeta}
+                />
+            ) : null}
             <div
                 className={styles.rounds}
                 role="group"
@@ -105,6 +140,8 @@ export default function CircuitPrescriptionEditor({
             >
                 {rounds.map((plannedRound, roundIndex) => {
                     const isSelected = selectedIndex === roundIndex;
+                    const roundTagIds = getCircuitRoundTags(value, roundIndex);
+                    const isMemberSelected = selectedSlot?.roundIndex === roundIndex && Boolean(selectedSlot?.slotId);
                     return (
                         // Planned rounds have no identity beyond their position.
                         <div
@@ -131,6 +168,20 @@ export default function CircuitPrescriptionEditor({
                                         Round {roundIndex + 1}
                                     </Button>
                                 )}
+                                {comparison && roundIndex >= comparedRounds.length ? (
+                                    <PlanDeltaChip isNew subject={`Round ${roundIndex + 1}`} comparisonDate={comparisonDate} />
+                                ) : null}
+                                <PlanTagEditor
+                                    rootId={rootId}
+                                    scopeId={circuit?.id}
+                                    tagIds={roundTagIds}
+                                    inheritedTagIds={circuitTagIds}
+                                    editable={editable && isSelected && !isMemberSelected}
+                                    onChangeTags={(tagIds) => onChange(withRoundTags(value, roundIndex, tagIds))}
+                                    className={styles.roundTags}
+                                    scopeLabel={`Round ${roundIndex + 1} tags`}
+                                    setScope
+                                />
                                 {/* Read-only keeps the remove button's space so rounds match a live plan's height. */}
                                 {readOnly ? <span className={styles.rowActionSpacer} aria-hidden="true" /> : (
                                     <IconButton
@@ -152,6 +203,14 @@ export default function CircuitPrescriptionEditor({
                                 const columns = getPrescriptionColumns(slot.definition);
                                 const entries = getCircuitRoundEntries(value, roundIndex, slot.id);
                                 const previousEntries = getCircuitRoundEntries(previous, roundIndex, slot.id);
+                                const deltas = comparison && roundIndex < comparedRounds.length
+                                    ? compareCircuitSlot(
+                                        slot.definition,
+                                        entries,
+                                        getCircuitRoundEntries(comparison, roundIndex, slot.source_slot_id || slot.id),
+                                        { mode: resolveEffectiveDeltaDisplayMode(slot.definition, progressSettings) },
+                                    )
+                                    : null;
                                 const isSlotSelected = selectedSlot?.roundIndex === roundIndex
                                     && selectedSlot?.slotId === slot.id;
                                 const slotLabel = `Round ${roundIndex + 1} ${slot.definition.name}`;
@@ -207,11 +266,29 @@ export default function CircuitPrescriptionEditor({
                                                                 onDraftChange={() => {}}
                                                                 onCommit={(rawValue) => (readOnly ? false : commit(roundIndex, slot.id, column, rawValue))}
                                                             />
+                                                            {deltas ? (
+                                                                <PlanDeltaChip
+                                                                    deltas={deltas.filter((change) => change.key === column.key)}
+                                                                    subject={`Round ${roundIndex + 1} ${slot.definition.name}`}
+                                                                    comparisonDate={comparisonDate}
+                                                                />
+                                                            ) : null}
                                                         </span>
                                                     </label>
                                                 );
                                             })}
                                         </span>
+                                        <PlanTagEditor
+                                            rootId={rootId}
+                                            definition={slot.definition}
+                                            tagIds={getCircuitRoundTags(value, roundIndex, slot.id)}
+                                            inheritedTagIds={[...circuitTagIds, ...roundTagIds]}
+                                            editable={editable && isSlotSelected}
+                                            onChangeTags={(tagIds) => onChange(withCircuitSlotTags(value, roundIndex, slot.id, tagIds))}
+                                            className={styles.roundSlotTags}
+                                            scopeLabel={`${slotLabel} tags`}
+                                            setScope
+                                        />
                                     </div>
                                 );
                             })}

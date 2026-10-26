@@ -1,5 +1,5 @@
 import {
-    pairAlignmentKeys, pickColumnDate, planAlignmentKeys, planRowAlignKey, resolveDaysSelection,
+    pairAlignmentKeys, pickColumnDate, pickCopyColumns, planAlignmentKeys, planRowAlignKey, resolveDaysSelection,
 } from '../programDaysView';
 
 describe('plan column alignment', () => {
@@ -75,15 +75,24 @@ describe('Days tab column selection', () => {
         expect(single.compareDate).toBeNull();
     });
 
-    it('defaults to the latest completed day beside the next one', () => {
-        expect(resolve(null).columnDates).toEqual(['2026-09-14', '2026-10-05']);
+    it('defaults to the date just before the one in view, completed or not', () => {
+        expect(resolve(null).columnDates).toEqual(['2026-09-28', '2026-10-05']);
+    });
+
+    it('shows today when the day is scheduled today, beside the date before it', () => {
+        expect(resolveDaysSelection({
+            days, occurrencesByDay, selection: null, today: '2026-10-05', compare: true,
+        }).columnDates).toEqual(['2026-09-28', '2026-10-05']);
+        expect(resolveDaysSelection({
+            days, occurrencesByDay, selection: null, today: '2026-10-05',
+        }).columnDates).toEqual(['2026-10-05']);
     });
 
     it('keeps a chosen comparison, and ignores one equal to the planned date', () => {
         expect(resolve({ dayId: 'd', date: '2026-10-12', compareDate: '2026-09-28' }).columnDates)
             .toEqual(['2026-09-28', '2026-10-12']);
         expect(resolve({ dayId: 'd', date: '2026-10-12', compareDate: '2026-10-12' }).columnDates)
-            .toEqual(['2026-09-14', '2026-10-12']);
+            .toEqual(['2026-10-05', '2026-10-12']);
     });
 
     it('compares against the next date when nothing comes before the planned one', () => {
@@ -113,5 +122,21 @@ describe('column rail picks', () => {
             .toEqual({ date: '2026-09-14', compareDate: '2026-10-05' });
         expect(pickColumnDate({ isFocus: false, nextDate: '2026-10-05', ...current }))
             .toEqual({ date: '2026-09-14', compareDate: '2026-10-05' });
+    });
+});
+
+describe('pickCopyColumns', () => {
+    it('copies into the plannable column, the right one unless only the left is', () => {
+        const today = '2026-10-01';
+        expect(pickCopyColumns({ compareDate: '2026-09-28', date: '2026-10-05', today }))
+            .toEqual({ sourceDate: '2026-09-28', targetDate: '2026-10-05' });
+        expect(pickCopyColumns({ compareDate: '2026-10-05', date: '2026-09-28', today }))
+            .toEqual({ sourceDate: '2026-09-28', targetDate: '2026-10-05' });
+        expect(pickCopyColumns({ compareDate: '2026-10-12', date: '2026-10-05', today }))
+            .toEqual({ sourceDate: '2026-10-12', targetDate: '2026-10-05' });
+        expect(pickCopyColumns({ compareDate: '2026-09-21', date: '2026-09-28', today }))
+            .toEqual({ sourceDate: '2026-09-21', targetDate: '2026-09-28' });
+        expect(pickCopyColumns({ compareDate: null, date: '2026-10-05', today }))
+            .toEqual({ sourceDate: null, targetDate: null });
     });
 });

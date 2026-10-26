@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
@@ -17,9 +17,13 @@ import {
     withSetTags,
     withSetValue,
 } from '../../utils/prescriptionModel';
+import { resolveEffectiveDeltaDisplayMode } from '../../hooks/useEffectiveDeltaDisplayMode';
+import { comparePrescriptions } from '../../utils/planComparison';
 import { planRowAlignKey } from '../../utils/programDaysView';
 import { normalizeMetricValueForStorage } from '../../utils/sessionActivityMetrics';
 import { formatPlannedValue } from '../../utils/sessionPrescription';
+import PlanActivitySummary from './PlanActivitySummary';
+import PlanDeltaChip from './PlanDeltaChip';
 import PlanNoteComposer from './PlanNoteComposer';
 import PlanTagEditor from './PlanTagEditor';
 import styles from './PrescriptionEditor.module.css';
@@ -69,8 +73,18 @@ export default function PrescriptionEditor({
     valueKind = 'planned',
     emptyText = null,
     alignKey = null,
+    comparison = null,
+    comparisonDate = null,
+    progressSettings = null,
 }) {
     const columns = getPrescriptionColumns(definition);
+    // The change from the compared plan (`comparison`), set by set and in total, shown in the
+    // session page's delta display mode for this activity.
+    const deltaMode = resolveEffectiveDeltaDisplayMode(definition, progressSettings);
+    const compared = useMemo(
+        () => comparePrescriptions(value, comparison, definition, { mode: deltaMode }),
+        [comparison, definition, deltaMode, value],
+    );
     const hasSets = Boolean(definition?.has_sets);
     const sets = value?.sets || [];
     const { selectedIndex, clearSelection, rowProps } = usePlanRowSelection(
@@ -93,7 +107,8 @@ export default function PrescriptionEditor({
         return true;
     };
 
-    const renderValueCell = (column, entries, previousEntries, setIndex = null) => (
+    // A value's change from the compared plan sits beside it, as on the session page.
+    const renderValueCell = (column, entries, previousEntries, setIndex = null, deltas = null) => (
         <div key={column.key} className={styles.valueCell}>
             <MetricValueEditor
                 metricDef={column.metric}
@@ -109,6 +124,13 @@ export default function PrescriptionEditor({
                 onDraftChange={() => {}}
                 onCommit={(rawValue) => (readOnly ? false : commitValue(column, rawValue, setIndex))}
             />
+            {deltas ? (
+                <PlanDeltaChip
+                    deltas={deltas.filter((change) => change.key === column.key)}
+                    subject={setIndex == null ? name : `Set ${setIndex + 1}`}
+                    comparisonDate={comparisonDate}
+                />
+            ) : null}
         </div>
     );
 
@@ -196,8 +218,18 @@ export default function PrescriptionEditor({
                                         plannedSet.metrics,
                                         previous?.sets?.[setIndex]?.metrics,
                                         setIndex,
+                                        compared && !compared.yieldEligible ? compared.sets[setIndex]?.deltas : null,
                                     ))}
                                     <span className={styles.setExtras}>
+                                        {/* A set's yield change (or `new`) is for the whole row. */}
+                                        {compared && (compared.yieldEligible || compared.sets[setIndex]?.isNew) ? (
+                                            <PlanDeltaChip
+                                                deltas={compared.sets[setIndex]?.deltas}
+                                                isNew={compared.sets[setIndex]?.isNew}
+                                                subject={`Set ${setIndex + 1}`}
+                                                comparisonDate={comparisonDate}
+                                            />
+                                        ) : null}
                                         <PlanTagEditor
                                             rootId={rootId}
                                             definition={definition}
@@ -251,11 +283,20 @@ export default function PrescriptionEditor({
                     {columns.map((column) => (
                         <label key={column.key} className={styles.flatField}>
                             <span className={styles.columnLabel}>{columnLabel(column)}</span>
-                            {renderValueCell(column, value?.metrics, previous?.metrics)}
+                            {renderValueCell(column, value?.metrics, previous?.metrics, null, compared?.flat)}
                         </label>
                     ))}
                 </div>
             )}
+            {columns.length > 0 && hasSets ? (
+                <PlanActivitySummary
+                    value={value}
+                    definition={definition}
+                    compared={compared}
+                    comparisonDate={comparisonDate}
+                    alignKey={planRowAlignKey(alignKey, 'summary')}
+                />
+            ) : null}
             {active && !readOnly ? (
                 scopedSet ? (
                     <PlanNoteComposer

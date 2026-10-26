@@ -31,14 +31,14 @@ vi.mock('../../../../hooks/useCircuitQueries', () => ({
 beforeEach(resetProgramDaysApi);
 
 describe('Days view date selection', () => {
-    it('defaults to the latest program day beside the next one', () => {
+    it('defaults to today or the next date, beside the date before it', () => {
         expect(pickDefaultDayId(program.days, null, '2026-10-01')).toBe('upper');
         const dates = ['2026-09-21', '2026-09-28', '2026-10-05', '2026-10-12'];
         expect(pickDefaultDate(dates, '2026-10-01')).toBe('2026-10-05');
         const asOccurrences = (values) => values.map((date) => ({ date, templates: [], closed: true }));
         expect(pickComparisonDates(asOccurrences(dates), '2026-10-05')).toEqual(['2026-09-28', '2026-10-05']);
-        // A program day today is the latest one; the next follows it.
-        expect(pickDefaultDate(dates, '2026-10-05')).toBe('2026-10-12');
+        // A program day scheduled today shows today.
+        expect(pickDefaultDate(dates, '2026-10-05')).toBe('2026-10-05');
         // After the last date, compare the last two; before the first, show the first alone.
         expect(pickDefaultDate(dates, '2026-11-01')).toBe('2026-10-12');
         expect(pickComparisonDates(asOccurrences(dates), pickDefaultDate(dates, '2026-09-01'))).toEqual(['2026-09-21']);
@@ -272,7 +272,7 @@ describe('ProgramDaysView', () => {
         expect(await screen.findByRole('list', { name: 'Program day dates' })).toBeInTheDocument();
     });
 
-    it('compares against the latest completed day, skipping a missed one', async () => {
+    it('compares against the date just before, even a missed one', async () => {
         api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
             {
                 date: '2026-09-21', templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
@@ -289,9 +289,8 @@ describe('ProgramDaysView', () => {
         ] }] } });
         renderView({ compare: true });
 
-        const completed = await screen.findByRole('region', { name: 'Monday, Sep 21' });
-        expect(within(completed).getByText('Last completed')).toBeInTheDocument();
-        expect(screen.queryByRole('region', { name: 'Monday, Sep 28' })).not.toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: 'Monday, Sep 28' })).toBeInTheDocument();
+        expect(screen.queryByRole('region', { name: 'Monday, Sep 21' })).not.toBeInTheDocument();
         expect(screen.getByRole('region', { name: 'Monday, Oct 5' })).toBeInTheDocument();
     });
 
@@ -398,5 +397,51 @@ describe('ProgramDaysView', () => {
         expect(session.querySelector('[data-align-key="tmpl|c:circ#0"]')).not.toBeNull();
         expect(screen.queryByRole('article', { name: 'Bench Day plan, Mon, Sep 28' })).not.toBeInTheDocument();
         expect(await nextCard()).toBeInTheDocument();
+    });
+
+    it('copies what the latest session logged into the next plan, only from the left column', async () => {
+        api.getSession.mockResolvedValue({ data: {
+            id: 'sess-1', name: 'Bench Day', completed: true,
+            attributes: { session_data: { sections: [{ name: 'Main', items: [
+                { type: 'activity', activity: {
+                    instance_id: 'i1', activity_id: 'bench', name: 'Bench Press', metrics: [], notes: 'felt strong',
+                    sets: [
+                        { metrics: [{ metric_id: 'w', split_id: null, value: 102.5 }], notes: 'grind' },
+                        { metrics: [{ metric_id: 'w', split_id: null, value: 100 }], notes: null },
+                    ],
+                } },
+            ] }] } },
+        } });
+        api.getProgramPlanOccurrences.mockResolvedValue({ data: { program_id: 'program', days: [{ day_id: 'upper', dates: [
+            {
+                date: '2026-09-28', templates: [{ template_id: 'tmpl', state: 'planned', plan_id: 'p0' }],
+                state: 'scheduled_met', manual_status: null, closed: true, program_day_completed: true,
+                sessions: [{ id: 'sess-1', name: 'Bench Day', completed: true }],
+            },
+            {
+                date: '2026-10-05', templates: [{ template_id: 'tmpl', state: 'seeded', plan_id: null }],
+                state: 'scheduled_pending', manual_status: null, closed: false, program_day_completed: false,
+                sessions: [],
+            },
+        ] }] } });
+        api.getProgramDayPlans.mockImplementation(plansFor({ '2026-09-28': {
+            ...WEEK_ONE,
+            logged_sessions: [{ id: 'sess-1', name: 'Bench Day', completed: true }],
+        } }));
+        renderView({ compare: true });
+
+        const session = await screen.findByRole('article', { name: 'Bench Day session' });
+        expect(within(session).queryByRole('button', { name: /Copy from/ })).not.toBeInTheDocument();
+        const card = await nextCard();
+        const copy = await within(card).findByRole('button', { name: '← Copy from Mon, Sep 28' });
+        await waitFor(() => expect(copy).toBeEnabled());
+        fireEvent.click(copy);
+
+        expect(within(card).getByRole('button', { name: '← Copied from Mon, Sep 28' })).toBeInTheDocument();
+        expect(within(card).getByRole('status')).toHaveTextContent('Copied from Mon, Sep 28. Review, then Save.');
+        expect(within(card).getByLabelText('Set 1 planned Weight')).toHaveValue('102.5');
+        expect(within(card).getByLabelText('Set 2 planned Weight')).toHaveValue('100');
+        expect(within(card).queryByText('grind')).not.toBeInTheDocument();
+        expect(within(card).getByRole('button', { name: 'Save plan' })).toBeEnabled();
     });
 });

@@ -29,27 +29,16 @@ function wrapper({ children }) {
     return <MemoryRouter><TimezoneContext.Provider value={{ timezone: 'America/Toronto' }}>{children}</TimezoneContext.Provider></MemoryRouter>;
 }
 
-it('shows session metadata in the chosen timezone and navigates through the session badge', () => {
+it('links the session badge and shows no start, end, or duration metadata', () => {
     render(<CompletedSessionHeader rootId="root" session={session} template={template} />, { wrapper });
     expect(screen.getByRole('link', { name: session.name })).toHaveAttribute('href', '/root/session/session');
     expect(screen.getByLabelText('Completed session')).toBeInTheDocument();
-    expect(screen.getByText('Oct 13, 2026 · 10:00 AM')).toBeInTheDocument();
-    expect(screen.getByText('Oct 13, 2026 · 11:00 AM')).toBeInTheDocument();
-    expect(screen.queryByText('Last modified')).not.toBeInTheDocument();
-    // Persisted active time takes priority over the hour between start and end.
-    expect(screen.getByText('45:00')).toBeInTheDocument();
-    expect(screen.queryByText(/Open session/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Session start|Session end|Duration/)).not.toBeInTheDocument();
+    expect(screen.queryByText('45:00')).not.toBeInTheDocument();
 });
 
-it('handles legacy timestamps, subtracts paused time, and tolerates absent or invalid metadata', () => {
-    const { rerender } = render(<CompletedSessionHeader rootId="root" template={template} session={{
-        id: 'session', attributes: { total_paused_seconds: 600, updated_at: session.updated_at, session_data: {
-            session_start: session.session_start, session_end: session.session_end,
-        } },
-    }} />, { wrapper });
-    expect(screen.getByText('50:00')).toBeInTheDocument();
-    rerender(<CompletedSessionHeader rootId="root" template={template} session={{ id: 'session', session_start: 'invalid' }} />);
-    expect(screen.getAllByText('—')).toHaveLength(3);
+it('falls back to the template name and omits the check for an unfinished session', () => {
+    render(<CompletedSessionHeader rootId="root" template={template} session={{ id: 'session' }} />, { wrapper });
     expect(screen.queryByLabelText('Completed session')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: template.name })).toBeInTheDocument();
 });

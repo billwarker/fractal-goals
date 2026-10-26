@@ -36,6 +36,7 @@ function Harness({ timezone = 'UTC', showDayHeading = false, onEditDay = vi.fn()
                 onSelectionChange={tab.setSelection}
                 onEditDay={onEditDay}
                 showDayHeading={showDayHeading}
+                progressSettings={tab.progressSettings}
             />
         </>
     );

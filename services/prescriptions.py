@@ -108,18 +108,44 @@ def _check_circuit_prescriptions(db_session, root_id, sections) -> None:
             .all()
         )
     }
+    available_tags = _active_tag_ids(db_session, root_id, {
+        tag_id for item in prescribed for tag_id in circuit_prescription_tag_ids(item['prescription'])
+    })
     for item in prescribed:
         circuit = circuits.get(item.get('circuit_definition_id'))
         if circuit is None:
             raise ValueError('Circuit plan: circuit not found')
+        _check_tag_ids(available_tags, item['prescription'].get('tags'), f'{circuit.name} plan')
         slots = {slot.id: slot for slot in circuit.slots}
         for round_index, planned_round in enumerate(item['prescription'].get('rounds') or []):
+            path = f'{circuit.name} round {round_index + 1}'
+            _check_tag_ids(available_tags, planned_round.get('tags'), path)
             for planned_slot in planned_round.get('slots') or []:
                 slot = slots.get(planned_slot['slot_id'])
-                path = f'{circuit.name} round {round_index + 1}'
                 if slot is None:
                     raise ValueError(f'{path}: activity is not part of this circuit')
                 _check_metric_entries(slot.activity_definition, planned_slot.get('metrics') or [], path)
+                _check_tag_ids(
+                    available_tags,
+                    planned_slot.get('tags'),
+                    f'{path} {slot.activity_definition.name}',
+                )
+
+
+def circuit_prescription_tag_ids(prescription) -> list:
+    """Every tag id a circuit plan names: the run's, each round's, and each round member's."""
+    prescription = prescription or {}
+    return [
+        *(prescription.get('tags') or []),
+        *(
+            tag_id
+            for planned_round in prescription.get('rounds') or []
+            for tag_id in [
+                *(planned_round.get('tags') or []),
+                *(tag for planned_slot in planned_round.get('slots') or [] for tag in planned_slot.get('tags') or []),
+            ]
+        ),
+    ]
 
 
 def _active_tag_ids(db_session, root_id, tag_ids) -> set:

@@ -157,4 +157,29 @@ describe('circuit plans', () => {
         expect(model.withRemovedRound(model.withRemovedRound(plan, 0), 0)).toBeNull();
         expect(model.withRoundNotes(plan, 1, 'finisher').rounds[1].notes).toBe('finisher');
     });
+    it('tags the circuit, a round, or one member of a round', () => {
+        let plan = model.withCircuitRoundValue(null, 0, 'a', 'reps', null, 10);
+        plan = model.withCircuitTags(plan, ['run', 'run']);
+        plan = model.withRoundTags(plan, 0, ['round']);
+        // A member with only tags is kept.
+        plan = model.withCircuitSlotTags(plan, 0, 'b', ['member']);
+
+        expect(plan.tags).toEqual(['run']);
+        expect(model.getCircuitRoundTags(plan, 0)).toEqual(['round']);
+        expect(model.getCircuitRoundTags(plan, 0, 'b')).toEqual(['member']);
+        expect(model.getCircuitRoundTags(plan, 0, 'a')).toEqual([]);
+        expect(model.summarizePrescription(plan)).toBe('1 round · tags');
+
+        // Values repeat into an added round; tags don't.
+        plan = model.withAddedRound(plan);
+        expect(plan.rounds[1]).toEqual({
+            slots: [{ slot_id: 'a', metrics: [{ metric_id: 'reps', split_id: null, value: 10 }] }],
+            notes: null,
+        });
+
+        plan = model.withCircuitSlotTags(plan, 0, 'b', []);
+        expect(plan.rounds[0].slots.map((slot) => slot.slot_id)).toEqual(['a']);
+        expect(model.withCircuitTags(model.withRoundTags(plan, 0, []), []).tags).toBeUndefined();
+        expect(model.withCircuitTags(null, ['run'])).toEqual({ schema: 1, tags: ['run'] });
+    });
 });

@@ -1,0 +1,32 @@
+.deltas {
+    display: inline-flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    flex: none;
+    align-self: center;
+    gap: 4px 8px;
+}
+
+/* Inline like the session page's progress (`metricInlineProgress`), not a badge. */
+.delta {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.improved {
+    color: var(--color-brand-success);
+}
+
+.regressed {
+    color: var(--color-brand-danger);
+}
+
+.unchanged {
+    color: var(--color-text-muted);
+}
+
+.summary {
+    min-width: 0;
+}
