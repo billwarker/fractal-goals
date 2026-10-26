@@ -153,3 +153,25 @@ def test_planned_tags_are_deduplicated_and_count_as_a_plan():
     assert result['sets'] == [{'metrics': [], 'notes': None, 'tags': ['t']}, {'metrics': [], 'notes': None}]
     with pytest.raises(ValueError, match='tag id'):
         validate_prescription({'tags': ['']})
+
+
+def test_circuit_plans_carry_run_round_and_member_tags():
+    from validators.prescriptions import validate_circuit_prescription
+
+    result = validate_circuit_prescription({'tags': ['run', 'run'], 'rounds': [
+        {'tags': ['round'], 'slots': [
+            {'slot_id': 's1', 'metrics': [], 'tags': ['member']},
+            {'slot_id': 's2', 'metrics': [], 'tags': []},
+        ]},
+        {'tags': [], 'slots': []},
+    ]})
+    assert result == {'schema': 1, 'tags': ['run'], 'rounds': [
+        # A member with only tags is kept; one with neither values nor tags is not.
+        {'slots': [{'slot_id': 's1', 'metrics': [], 'tags': ['member']}], 'notes': None, 'tags': ['round']},
+        {'slots': [], 'notes': None},
+    ]}
+    assert validate_circuit_prescription({'tags': ['t']}) == {'schema': 1, 'tags': ['t']}
+    with pytest.raises(ValueError, match=r'rounds\[0\]\.slots\[0\]\.tags\[0\] must be a tag id'):
+        validate_circuit_prescription({'rounds': [{'slots': [{'slot_id': 's', 'tags': [3]}]}]})
+    with pytest.raises(ValueError, match=r'rounds\[0\]\.tags must be a list'):
+        validate_circuit_prescription({'rounds': [{'tags': 'x'}]})

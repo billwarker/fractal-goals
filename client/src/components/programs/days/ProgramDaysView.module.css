@@ -251,6 +251,22 @@
     gap: 8px;
 }
 
+/* Copy from the other column sits at the header's end, after the plan source. */
+.planCopy {
+    display: inline-flex;
+    margin-left: auto;
+}
+
+.planCopy .planCopyDone {
+    color: var(--color-brand-success);
+    border-color: color-mix(in srgb, var(--color-brand-success) 45%, transparent);
+}
+
+.planCopySkipped {
+    color: var(--color-brand-warning);
+    font-weight: 400;
+}
+
 .planSource {
     display: inline-flex;
     align-items: center;

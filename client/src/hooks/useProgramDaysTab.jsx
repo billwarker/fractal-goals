@@ -179,6 +179,12 @@ export default function useProgramDaysTab({
         onLeavePane();
     };
 
+    // Comparing keeps the date in view on the right and starts the left at the date before it.
+    const changeCompare = (next) => {
+        setCompare(next);
+        if (next) setSelection((current) => (current?.compareDate ? { ...current, compareDate: null } : current));
+    };
+
     const openDayPlan = (dayId, date) => {
         setSelection({ dayId, date });
         setViewMode('days');
@@ -218,7 +224,7 @@ export default function useProgramDaysTab({
             onMoveDay={onReorderDays ? moveDay : null}
             today={today}
             compare={compare}
-            onCompareChange={setCompare}
+            onCompareChange={changeCompare}
         />
     );
 
@@ -234,5 +240,7 @@ export default function useProgramDaysTab({
         occurrencesQuery,
         planFocus,
         goalsPanel,
+        // The fractal's progress settings (delta display mode), so plans show changes as sessions do.
+        progressSettings: goalTree?.attributes?.progress_settings ?? null,
     };
 }

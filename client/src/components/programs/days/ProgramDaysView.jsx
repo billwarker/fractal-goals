@@ -3,12 +3,14 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import EmptyState from '../../common/EmptyState';
 import useAlignedColumns from '../../../hooks/useAlignedColumns';
 import { useCircuits } from '../../../hooks/useCircuitQueries';
+import usePlanComparisonSource from '../../../hooks/usePlanComparisonSource';
 import { formatLiteralDate } from '../../../utils/dateUtils';
 import {
     describeOccurrenceDate,
     isPlannableDay,
     occurrenceStatus,
     pickColumnDate,
+    pickCopyColumns,
     planCardElementId,
 } from '../../../utils/programDaysView';
 import PlanDateColumn from './PlanDateColumn';
@@ -38,6 +40,7 @@ export default function ProgramDaysView({
     onEditDay = null,
     showDayHeading = false,
     planFocus = null,
+    progressSettings = null,
 }) {
     const { found, occurrences, date, compareDate, columnDates } = resolved;
     const occurrenceDates = useMemo(() => occurrences.map((occurrence) => occurrence.date), [occurrences]);
@@ -59,6 +62,19 @@ export default function ProgramDaysView({
         () => new Map((circuits || []).map((circuit) => [circuit.id, circuit])),
         [circuits],
     );
+    // One column compares with, and can copy, what the other shows for each template: the
+    // plannable one (today or later), so a past date is never the target. That is the right
+    // column unless only the left one is plannable.
+    const { sourceDate, targetDate } = pickCopyColumns({ date, compareDate, today });
+    const sourceOccurrence = sourceDate ? occurrenceByDate.get(sourceDate) : null;
+    const comparison = usePlanComparisonSource({
+        rootId,
+        programId: program?.id,
+        dayId: found?.day.id,
+        date: sourceOccurrence ? sourceDate : null,
+        timezone,
+        isEmptyPast: Boolean(sourceOccurrence && sourceDate < today && !(sourceOccurrence.sessions || []).length),
+    });
     const announcement = columnDates.length
         ? `Showing plans for ${columnDates.map((value) => formatLiteralDate(value, { weekday: 'long' })).join(' and ')}`
         : '';
@@ -171,6 +187,9 @@ export default function ProgramDaysView({
                                 circuits={circuits}
                                 activityGroups={activityGroups}
                                 planFocus={planFocus}
+                                progressSettings={progressSettings}
+                                comparison={value === targetDate ? comparison : null}
+                                comparisonSide={sourceDate === compareDate ? 'left' : 'right'}
                             />
                         );
                     })}

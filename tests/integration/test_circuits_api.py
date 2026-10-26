@@ -2045,3 +2045,133 @@ def test_client_sent_circuit_plans_are_ignored(authed_client, db_session, sample
     run = db_session.query(CircuitRun).filter_by(session_id=created.get_json()["id"]).one()
     assert len(run.rounds) == 1
     assert run.prescription is None
+
+
+def _catalog_tag(client, root, name):
+    response = client.post(f"/api/{root.id}/activity-tags", json={"name": name})
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()
+
+
+def test_planned_circuit_round_and_member_tags_land_where_the_session_page_puts_them(
+    authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+):
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    bench_slot, burpee_slot = (slot["id"] for slot in definition["slots"])
+    meet = _catalog_tag(authed_client, sample_ultimate_goal, "Meet")
+    heavy = _catalog_tag(authed_client, sample_ultimate_goal, "Heavy")
+    fast = _catalog_tag(authed_client, sample_ultimate_goal, "Fast")
+    gone = _catalog_tag(authed_client, sample_ultimate_goal, "Gone")
+    prescription = {"schema": 1, "tags": [meet["id"]], "rounds": [
+        {"slots": [{"slot_id": bench_slot, "metrics": [], "tags": [heavy["id"]]}], "notes": None},
+        {"slots": [{"slot_id": burpee_slot, "metrics": [], "tags": [meet["id"], gone["id"]]}],
+         "notes": None, "tags": [fast["id"]]},
+    ]}
+    template = _planned_circuit_template(db_session, sample_ultimate_goal, definition, prescription)
+    # Archived after planning: skipped at session start rather than failing it.
+    archived = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/activity-tags/{gone['id']}/archive", json={"version": gone["version"]},
+    )
+    assert archived.status_code == 200, archived.get_json()
+
+    created = authed_client.post(f"/api/{sample_ultimate_goal.id}/sessions", json={
+        "name": "Circuit day", "template_id": template.id,
+    })
+    assert created.status_code == 201, created.get_json()
+
+    run_id = db_session.query(CircuitRun).filter_by(session_id=created.get_json()["id"]).one().id
+    run = authed_client.get(f"/api/{sample_ultimate_goal.id}/circuit-runs/{run_id}").get_json()
+    assert [tag["name"] for tag in run["tags"]] == ["Meet"]
+    assert [round_["tags"] for round_ in run["rounds"]][0] == []
+    assert [tag["name"] for tag in run["rounds"][1]["tags"]] == ["Fast"]
+
+    def member(round_index, has_sets):
+        row = next(
+            row for row in run["rounds"][round_index]["members"]
+            if bool(row["activity_set_id"]) == has_sets
+        )
+        if has_sets:
+            return db_session.get(ActivitySet, row["activity_set_id"])
+        return db_session.get(ActivityInstance, row["activity_instance_id"])
+
+    db_session.expire_all()
+    # Member tags sit on the round's own set or instance; the run scope tags the set-based
+    # slot's parent instance and each setless member; a round scope tags that round's members.
+    assert [tag.name for tag in member(0, True).tags] == ["Heavy"]
+    assert [tag.name for tag in member(0, False).tags] == ["Meet"]
+    assert [tag.name for tag in member(1, True).tags] == ["Fast"]
+    assert {tag.name for tag in member(1, False).tags} == {"Meet", "Fast"}
+    bench_parent = next(slot for slot in run["slots"] if slot["has_sets"])["activity_instance_id"]
+    assert [tag.name for tag in db_session.get(ActivityInstance, bench_parent).tags] == ["Meet"]
+
+    # Removing the run scope keeps round 2's planned member tag: it was the member's own.
+    removed = authed_client.patch(
+        f"/api/{sample_ultimate_goal.id}/circuit-runs/{run_id}/tags",
+        json={"definition_id": meet["id"], "name": "Meet", "assigned": False},
+    )
+    assert removed.status_code == 200, removed.get_json()
+    db_session.expire_all()
+    assert member(0, False).tags == []
+    assert {tag.name for tag in member(1, False).tags} == {"Meet", "Fast"}
+
+
+def test_circuit_plan_tags_must_be_active_catalog_tags(
+    authed_client, db_session, sample_ultimate_goal, sample_activity_definition, test_user,
+):
+    from services.template_service import TemplateService
+
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    burpee_slot = definition["slots"][1]["id"]
+    service = TemplateService(db_session)
+
+    def create(prescription):
+        return service.create_template(sample_ultimate_goal.id, test_user.id, {
+            "name": "Circuit day",
+            "template_data": {"session_type": "normal", "sections": [{"name": "Main", "items": [
+                {"type": "circuit", "circuit_definition_id": definition["id"], "prescription": prescription},
+            ]}]},
+        })
+
+    _, error, status = create({"tags": ["missing"]})
+    assert status == 400 and "Two-station circuit plan" in error
+    _, error, status = create({"rounds": [{"tags": ["missing"]}]})
+    assert status == 400 and "round 1" in error
+    _, error, status = create({"rounds": [{"slots": [{"slot_id": burpee_slot, "tags": ["missing"]}]}]})
+    assert status == 400 and "round 1 Burpee" in error
+    tag = _catalog_tag(authed_client, sample_ultimate_goal, "Tempo")
+    _, error, status = create({"rounds": [{"slots": [{"slot_id": burpee_slot, "tags": [tag["id"]]}]}]})
+    assert (error, status) == (None, 201)
+
+
+def test_tag_merges_rewrite_circuit_run_plan_snapshots(
+    authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+):
+    burpee = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(authed_client, sample_ultimate_goal, sample_activity_definition, burpee)
+    burpee_slot = definition["slots"][1]["id"]
+    target = _catalog_tag(authed_client, sample_ultimate_goal, "Rehab")
+    source = _catalog_tag(authed_client, sample_ultimate_goal, "Rehabilitation")
+    prescription = {"schema": 1, "rounds": [
+        {"slots": [{"slot_id": burpee_slot, "metrics": [], "tags": [source["id"]]}], "notes": None, "tags": [source["id"]]},
+    ]}
+    template = _planned_circuit_template(db_session, sample_ultimate_goal, definition, prescription)
+    created = authed_client.post(f"/api/{sample_ultimate_goal.id}/sessions", json={
+        "name": "Circuit day", "template_id": template.id,
+    })
+    assert created.status_code == 201, created.get_json()
+
+    merged = authed_client.post(f"/api/{sample_ultimate_goal.id}/activity-tags/merge", json={
+        "target_id": target["id"], "source_ids": [source["id"]],
+        "versions": {target["id"]: target["version"], source["id"]: source["version"]},
+    })
+    assert merged.status_code == 200, merged.get_json()
+
+    db_session.expire_all()
+    run = db_session.query(CircuitRun).filter_by(session_id=created.get_json()["id"]).one()
+    planned_round = run.prescription["rounds"][0]
+    assert planned_round["tags"] == [target["id"]]
+    assert planned_round["slots"][0]["tags"] == [target["id"]]
+    assert db_session.get(SessionTemplate, template.id).template_data["sections"][0]["items"][0][
+        "prescription"]["rounds"][0]["tags"] == [target["id"]]

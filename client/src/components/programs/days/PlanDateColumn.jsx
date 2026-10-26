@@ -64,6 +64,9 @@ export default function PlanDateColumn({
     circuits,
     activityGroups,
     planFocus = null,
+    progressSettings = null,
+    comparisonSide = 'left',
+    comparison = null,
 }) {
     const { date } = occurrence;
     const isEmptyPast = date < today && !(occurrence.sessions || []).length;
@@ -142,6 +145,8 @@ export default function PlanDateColumn({
                         template={entry.template}
                         activities={activities}
                         date={date}
+                        comparison={index === 0 ? comparison?.get(entry.template.id) || null : null}
+                        progressSettings={progressSettings}
                         // Only the first logged session stands for the template in the Goals pane.
                         {...(index === 0 ? focusProps(entry) : {})}
                     />
@@ -163,6 +168,9 @@ export default function PlanDateColumn({
                         onRemoved={() => setFocusTarget('selector')}
                         activityGoalScope={planFocus?.activityGoalScope || null}
                         dayGoalIds={planFocus?.dayGoalIds || []}
+                        comparison={comparison?.get(entry.template.id) || null}
+                        comparisonSide={comparisonSide}
+                        progressSettings={progressSettings}
                         {...focusProps(entry)}
                     />
                 )))}

@@ -834,6 +834,7 @@ function ProgramCalendarPage() {
                                         onEditDay={handleEditDay}
                                         showDayHeading={isMobile}
                                         planFocus={daysTab.planFocus}
+                                        progressSettings={daysTab.progressSettings}
                                     />
                                 </Suspense>
                             </div>

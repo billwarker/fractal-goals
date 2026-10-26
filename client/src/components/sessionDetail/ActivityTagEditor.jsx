@@ -30,8 +30,11 @@ function ActivityTagEditor({
     selectedTagIds = null,
     onChangeTags = null,
     setScope = false,
+    // What the tags belong to, when not an activity or set (e.g. "Round 2 tags").
+    scopeLabel = null,
 }) {
     const isSetScope = Boolean(setId) || setScope;
+    const groupLabel = scopeLabel || (isSetScope ? 'Set tags' : 'Activity tags');
     const assignmentKey = setId || instanceId;
     const editorRef = useRef(null);
     const pickerRef = useRef(null);
@@ -292,7 +295,7 @@ function ActivityTagEditor({
             className={`${styles.editor} ${isSetScope ? styles.setEditor : styles.instanceEditor} ${className}`}
             ref={editorRef}
             role="group"
-            aria-label={isSetScope ? 'Set tags' : 'Activity tags'}
+            aria-label={groupLabel}
             onClick={(event) => event.stopPropagation()}
         >
             <div className={styles.tags} ref={tagOverflow.containerRef}>
@@ -329,7 +332,7 @@ function ActivityTagEditor({
                 {triggerFirst ? null : addTagTrigger}
             </div>
             {editable && isPickerOpen && createPortal(
-                <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={isSetScope ? 'Choose set tags' : 'Choose activity tags'}>
+                <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={`Choose ${groupLabel.toLocaleLowerCase()}`}>
                     <div className={styles.pickerHeader}>
                         <span>Choose tags</span>
                         <CloseButton size={14} buttonSize="sm" className={styles.pickerClose} aria-label="Close tag picker" onClick={() => closePicker()} />

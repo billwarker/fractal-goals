@@ -229,6 +229,60 @@ describe('SessionPlanCard selection', () => {
         expect(within(card).getByRole('button', { name: 'Round 2' })).toHaveAttribute('aria-pressed', 'false');
     });
 
+    it('tags the circuit, a selected round, and a selected round member', async () => {
+        const { card, mutations } = renderCircuitCard();
+        const addTag = async (group, tagName) => {
+            fireEvent.click(within(group).getByRole('button', { name: 'Add tag' }));
+            fireEvent.click(await screen.findByRole('checkbox', { name: tagName }));
+            fireEvent.keyDown(document, { key: 'Escape' });
+        };
+
+        fireEvent.click(within(card).getByText('Superset', { selector: 'span' }));
+        await addTag(within(card).getByRole('group', { name: 'Circuit tags' }), 'Paused');
+        // A round's and a member's tags are editable only once selected.
+        expect(within(card).queryByRole('group', { name: 'Round 2 tags' })).not.toBeInTheDocument();
+        expect(within(card).queryByRole('group', { name: 'Round 2 Barbell Row tags' })).not.toBeInTheDocument();
+
+        fireEvent.click(within(card).getByRole('button', { name: 'Round 2' }));
+        await addTag(within(card).getByRole('group', { name: 'Round 2 tags' }), 'Top set');
+
+        fireEvent.click(within(card).getByRole('button', { name: 'Round 2 Barbell Row' }));
+        expect(within(card).queryByRole('group', { name: 'Round 2 tags' })).toBeInTheDocument();
+        const memberTags = within(card).getByRole('group', { name: 'Round 2 Barbell Row tags' });
+        // The circuit's and round's tags are inherited here, so they aren't offered again.
+        fireEvent.click(within(memberTags).getByRole('button', { name: 'Add tag' }));
+        const picker = await screen.findByRole('dialog', { name: 'Choose round 2 barbell row tags' });
+        expect(within(picker).queryByRole('checkbox', { name: 'Paused' })).not.toBeInTheDocument();
+        expect(within(picker).queryByRole('checkbox', { name: 'Top set' })).not.toBeInTheDocument();
+        fireEvent.keyDown(document, { key: 'Escape' });
+
+        fireEvent.click(within(card).getByRole('button', { name: 'Save plan' }));
+        const { sections } = mutations.save.mutate.mock.calls[0][0];
+        expect(sections[0].items[1].prescription).toEqual({
+            schema: 1,
+            tags: ['tag-paused'],
+            rounds: [{ slots: [], notes: null }, { slots: [], notes: null, tags: ['tag-top'] }],
+        });
+    });
+
+    it("shows a past circuit's planned tags without editing them", async () => {
+        const tagged = {
+            ...circuitEntry,
+            sections: [{ name: 'Main', items: [{
+                ...circuitEntry.sections[0].items[1],
+                prescription: { schema: 1, tags: ['tag-paused'], rounds: [
+                    { slots: [{ slot_id: 'slot-row', metrics: [], tags: ['tag-top'] }], notes: null },
+                ] },
+            }] }],
+        };
+        const { card } = renderCircuitCard({ entry: tagged, readOnly: true });
+
+        expect(await within(within(card).getByRole('group', { name: 'Circuit tags' })).findByText('Paused')).toBeInTheDocument();
+        expect(await within(within(card).getByRole('group', { name: 'Round 1 Barbell Row tags' })).findByText('Top set'))
+            .toBeInTheDocument();
+        expect(within(card).queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
+    });
+
     it("deselects when the card's empty space is clicked", () => {
         const onReport = vi.fn();
         const { card } = renderCircuitCard({ onReport });
@@ -243,5 +297,113 @@ describe('SessionPlanCard selection', () => {
         fireEvent.click(within(card).getByRole('button', { name: 'Round 1 Bench Press' }));
         fireEvent.click(within(card).getAllByRole('button', { name: '+ Add activity' })[0]);
         expect(card.querySelector('[data-plan-item][data-selected="true"]')).not.toBeNull();
+    });
+});
+
+describe('SessionPlanCard copy and comparison', () => {
+    const yieldBench = {
+        ...bench,
+        metric_definitions: [
+            { id: 'w', name: 'Weight', unit: 'kg', is_multiplicative: true, is_additive: false },
+            { id: 'r', name: 'Reps', unit: 'reps', is_multiplicative: true },
+        ],
+    };
+    const plannedSet = (w, r) => ({ metrics: [
+        { metric_id: 'w', split_id: null, value: w }, { metric_id: 'r', split_id: null, value: r },
+    ] });
+    const target = {
+        ...entry,
+        date: '2099-10-23',
+        sections: [{ name: 'Main', items: [{
+            type: 'activity', activity_definition_id: 'bench', name: 'Bench Press', item_key: 'k1',
+            prescription: { schema: 1, sets: [plannedSet(105, 5), plannedSet(100, 5)] },
+        }] }],
+    };
+    const comparison = {
+        date: '2099-10-16',
+        kind: 'logged',
+        isLoading: false,
+        sections: [{ name: 'Main', items: [{
+            type: 'activity', activity_definition_id: 'bench', name: 'Bench Press',
+            prescription: { sets: [{ ...plannedSet(100, 5), notes: 'grind' }], metrics: [], notes: 'felt heavy' },
+        }] }],
+    };
+    const renderCompared = (props = {}) => renderCard({
+        entry: target, comparison, activityById: new Map([['bench', yieldBench]]), elementId: 'card', ...props,
+    });
+
+    it('shows set and total yield changes from the compared card', () => {
+        const { card } = renderCompared();
+        expect(within(card).getByLabelText('Set 1 yield up 5% from Fri, Oct 16')).toHaveTextContent('▲5%');
+        expect(within(card).getByLabelText('Set 2 is new from Fri, Oct 16')).toBeInTheDocument();
+        const summary = within(card).getByLabelText('Activity summary metrics');
+        expect(within(summary).getByText('Total yield:').closest('div')).toHaveTextContent('1025 (▲105%)');
+        expect(within(summary).getByText('Best:').closest('div')).toHaveTextContent('Set 1 = 525');
+    });
+
+    it('copies the compared values into an unsaved draft without notes, then saves them', () => {
+        const { card, mutations } = renderCompared();
+        fireEvent.click(within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' }));
+        // The button itself shows the copy; no banner.
+        expect(within(card).getByRole('button', { name: '← Copied from Fri, Oct 16' })).toBeEnabled();
+        expect(within(card).getByRole('status')).toHaveTextContent('Copied from Fri, Oct 16. Review, then Save.');
+        expect(within(card).queryByText('Copied from Fri, Oct 16. Review, then Save.', { selector: ':not([role="status"])' }))
+            .not.toBeInTheDocument();
+        expect(within(card).queryByText('felt heavy')).not.toBeInTheDocument();
+        expect(within(card).queryByLabelText(/Set 2/)).not.toBeInTheDocument();
+        fireEvent.click(within(card).getByRole('button', { name: 'Save plan' }));
+        expect(mutations.save.mutate).toHaveBeenCalledWith(expect.objectContaining({
+            templateId: 'tmpl',
+            sections: [{ name: 'Main', items: [{
+                type: 'activity', activity_definition_id: 'bench', name: 'Bench Press', item_key: 'k1',
+                prescription: { schema: 1, sets: [{ metrics: plannedSet(100, 5).metrics, notes: null }] },
+            }] }],
+        }), expect.anything());
+        fireEvent.click(within(card).getByRole('button', { name: 'Discard' }));
+        expect(within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' })).toBeInTheDocument();
+        expect(within(card).getByRole('status')).toBeEmptyDOMElement();
+    });
+
+    it("says on the button what a copy couldn't bring over", () => {
+        const withDeleted = {
+            ...comparison,
+            sections: [{ name: 'Main', items: [
+                ...comparison.sections[0].items,
+                { type: 'activity', activity_definition_id: 'gone', name: 'Old Lift', prescription: { sets: [] } },
+            ] }],
+        };
+        const { card } = renderCompared({ comparison: withDeleted });
+        fireEvent.click(within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' }));
+        const button = within(card).getByRole('button', { name: '← Copied from Fri, Oct 16 · 1 not copied' });
+        expect(button).toHaveAttribute('title', expect.stringContaining("Old Lift wasn't copied: this activity was deleted."));
+        expect(within(card).getByRole('status')).toHaveTextContent("Old Lift wasn't copied: this activity was deleted.");
+    });
+
+    it('asks before replacing unsaved edits', () => {
+        const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        const { card } = renderCompared();
+        fireEvent.click(within(card).getByRole('button', { name: 'Remove Bench Press from this plan' }));
+        fireEvent.click(within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' }));
+        expect(confirm).toHaveBeenCalledWith('Replace your unsaved changes with the plan from Fri, Oct 16?');
+        expect(within(card).queryByRole('button', { name: /Copied from/ })).not.toBeInTheDocument();
+        confirm.mockRestore();
+    });
+
+    it('disables Copy once a session started from the plan', () => {
+        const { card } = renderCompared({ entry: { ...target, executed_sessions: [{ id: 's', name: 'Bench Day', completed: false }] } });
+        const button = within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAccessibleDescription('A session has already started from this plan.');
+    });
+
+    it('hides Copy on a past date', () => {
+        renderCompared({ readOnly: true });
+        expect(screen.queryByRole('button', { name: /Copy from/ })).not.toBeInTheDocument();
+    });
+
+    it('hides Copy without a comparison', () => {
+        renderCard({ entry: target });
+        expect(screen.queryByRole('button', { name: /Copy from/ })).not.toBeInTheDocument();
+        expect(screen.queryByText(/[▲▼]/)).not.toBeInTheDocument();
     });
 });

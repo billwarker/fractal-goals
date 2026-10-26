@@ -27,6 +27,7 @@ from services.circuit_tag_operations import CircuitTagOperations
 from services.circuit_session_items import append_circuit_run_item, remove_circuit_run_item
 from services.events import Event, Events, event_bus
 from services.owned_entity_queries import get_owned_activity_definition, get_owned_session
+from services.prescriptions import circuit_prescription_tag_ids
 from services.quota_service import QuotaService
 from services.circuit_rules import (
     ESTIMATED_CIRCUIT_RESULT_BYTES,
@@ -383,6 +384,14 @@ class CircuitService:
                 round_number,
                 round_id=circuit_ids.initial_round_id(run.id, round_number) if client_run_id else None,
             )
+        if circuit_prescription_tag_ids(prescription):
+            # The new rounds' members exist now; load them onto the run before tagging them.
+            self.db_session.flush()
+            self.db_session.expire(run, ["slots", "rounds", "scope_tags"])
+            _, tag_error, tag_status = self.tag_operations.apply_planned_tags(run, prescription, user_id)
+            if tag_error:
+                self.db_session.rollback()
+                return None, tag_error, tag_status
         if attach_goals:
             self._attach_member_goals(session, definition, root_id)
         structure_error = append_circuit_run_item(

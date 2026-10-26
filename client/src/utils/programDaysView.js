@@ -25,14 +25,12 @@ export function pickDefaultDayId(days, occurrencesByDay, today) {
 }
 
 /**
- * The date shown in the right-hand ("next") column by default: the first occurrence after
- * the latest one on or before today. Falls back to that latest date when nothing follows,
- * and to the first date when none has happened yet.
+ * The date shown by default (the right-hand column when comparing): today when the day is
+ * scheduled today, else its next date, else (once every date has passed) its last.
  */
 export function pickDefaultDate(dates, today) {
     if (!dates.length) return null;
-    const latestIndex = dates.reduce((found, value, index) => (value <= today ? index : found), -1);
-    return dates[latestIndex + 1] || dates[latestIndex] || dates[0];
+    return dates.find((value) => value >= today) || dates[dates.length - 1];
 }
 
 /** The same status symbol the calendar and day review use for an occurrence. */
@@ -71,16 +69,12 @@ export function programDayStats(occurrences = []) {
 
 /**
  * The two columns: what to compare against, then the focused date. The comparison is the
- * latest completed occurrence before the focused one, so the user programs from what they
- * actually did; without one it is simply the previous occurrence. The first date shows alone.
+ * program day's date just before the focused one. The first date shows alone.
  */
 export function pickComparisonDates(occurrences, focusDate) {
     const index = occurrences.findIndex((occurrence) => occurrence.date === focusDate);
     if (index < 0) return [];
-    const earlier = occurrences.slice(0, index);
-    const completed = [...earlier].reverse().find((occurrence) => occurrenceStatus(occurrence) === 'complete');
-    const compare = completed || earlier[earlier.length - 1];
-    return compare ? [compare.date, focusDate] : [focusDate];
+    return index > 0 ? [occurrences[index - 1].date, focusDate] : [focusDate];
 }
 
 /**
@@ -109,9 +103,9 @@ export function planCardElementId(templateId, date) {
 
 /**
  * The Days tab's resolved selection: the program day, its dates, and the two columns.
- * The right column (`date`, rail B) defaults to the next program day; the left column
- * (`compareDate`, rail A) defaults to the latest completed day before it, unless the user
- * picked one (or, with nothing earlier, the next date). Without `compare`, or for a day
+ * The right column (`date`, rail B) is the date in view (by default today's, else the next);
+ * the left column (`compareDate`, rail A) defaults to the date just before it, unless the
+ * user picked one (or, with nothing earlier, the next date). Without `compare`, or for a day
  * with a single date, only the right column shows.
  */
 export function resolveDaysSelection({ days, occurrencesByDay, selection, today, compare = false }) {
@@ -140,6 +134,20 @@ export function resolveDaysSelection({ days, occurrencesByDay, selection, today,
         compareDate: hasCompare ? compareDate : null,
         columnDates: date ? (hasCompare ? [compareDate, date] : [date]) : [],
     };
+}
+
+/**
+ * Which compared column copies from (and compares with) the other: the target is the
+ * plannable one (today or later), so a past date never receives a copy. The right column
+ * (`date`) is the target unless only the left (`compareDate`) is plannable. Nulls without
+ * a comparison.
+ */
+export function pickCopyColumns({ date, compareDate, today }) {
+    if (!date || !compareDate) return { sourceDate: null, targetDate: null };
+    const leftOnly = date < today && compareDate >= today;
+    return leftOnly
+        ? { sourceDate: date, targetDate: compareDate }
+        : { sourceDate: compareDate, targetDate: date };
 }
 
 /**

@@ -188,9 +188,10 @@ block, week, and date rails remain visible in the workspace.
 
 The Programs page has **Calendar** and **Days** views. Calendar/Days sits in the page header immediately before Program Options on desktop and mobile, sized to its labels and matching the shared header buttons (32px desktop, 44px mobile). The full program date span and status sit beneath the program/block/date title on the left on desktop. The side pane keeps its scoped header and Collapse control; the header's Show/Hide Sidebar button reopens it, and its open state is remembered per fractal. At program scope, including the Days view, a Details | Goals toggle sits in the pane's header immediately before Collapse: Details shows headline metrics, events, then the program's blocks (whole-program results; block name in its colour, status counts, and one row of Consistency, Goals completed/due, and Longest streak), and Goals shows the goal hierarchy. A selected timeframe shows Details only, and a scoped date shows the day review;
 mobile keeps Calendar/Days in the header and places Show Sidebar in a fixed, full-width footer using the shared secondary HeaderButton styling and Session Detail's spacing, with safe-area spacing and reserved content space; bulk calendar actions sit above it. The footer is available even without a selected program, portalled outside the page animation, and stays beneath modal sheets. The pane remains a closable sheet. Days (`components/programs/days/`) programs
-one program day's occurrence dates in two columns: a focused date (by default the next program day)
-beside the latest completed occurrence before it (else the previous one), each with its canonical
-status mark and credited sessions. A template completed on a date shows its session in the plan card
+one program day's occurrence dates in two columns: a focused date (by default today's when the day is
+scheduled today, else its next) beside the date just before it, each with its canonical
+status mark and credited sessions. Turning compare on keeps the date in view on the right and starts
+the left at the date before it. A template completed on a date shows its session in the plan card
 layout (its sections, logged sets, and circuit rounds), aligned with the plan beside it; past days are read-only; upcoming dates show editable plans. Required templates are always open; optional templates wait in an **Optional sessions** selector until loaded into the date, which stores their seeded plan (`POST …/plans/<template>/<date>/load`, idempotent; `is_loaded` on each day-plan entry). **Remove from day** deletes that plan. On this tab the side pane lists every program day once (schedule summary, next date, its dates by
 status with consistency (`programDayStats`, the block rollups' rules), templates,
 and an Edit button; days without templates are listed and prompt for one) between a **Compare two
@@ -215,7 +216,27 @@ instances. A goal's icon scopes the active card's picker; scope clears on day ch
 Days, or when the active card's hierarchy lacks the goal. Past cards highlight goals but never scope.
 Within a circuit, each round's activities are selectable (item → round → member, as on the session
 page); a member stands for its activity in the Goals pane. Clicking a card's empty space deselects.
+A circuit plan tags as the session page does: the circuit (item header), a selected round, or a
+selected round member (`tags` on the prescription, `rounds[].tags`, `rounds[].slots[].tags`; each
+picker shows the enclosing scopes' tags as inherited). At session start
+(`CircuitTagOperations.apply_planned_tags`) member tags go on the member's set or instance, then
+round and circuit tags become round and run scopes; archived tags are skipped. See
+[Circuit plan tags](program-days-circuit-plan-tags.md).
 See [Days alignment, picker, and goals](program-days-alignment-picker-goals.md).
+With compare on, one column's cards compare with and can copy the other column's card for the
+same template: the right column's, unless only the left date is plannable (today or later), in which
+case the left copies from the right (`pickCopyColumns`; **Copy from <date> →**) (`hooks/usePlanComparisonSource.js` reads the left column's cached plans and sessions in
+plan shape; a logged card's values come from `utils/loggedSessionPlan.js`, which the card also
+renders). **Copy from <date>** (`utils/planCopy.js`) replaces the right plan's items and values as an
+unsaved draft (no notes or tags), keeping item keys by `item_key` or aligned position; it is hidden
+on past dates and disabled while the left card loads, when it has nothing, or once a session started
+from the right plan. Completed-session cards show only the session badge and completion check. Each
+paired activity shows its change from the left (`utils/planComparison.js`): set yield (or each changed
+value, beside it) per set, and its change on each total of the session page's summary rail (additive
+totals, total yield and best set, shown under every planned or logged activity with sets; changes use
+the session page's delta display mode), inline as on the session
+page: ▲/▼ by the metric's direction, a muted 0% when unchanged (as right after a copy);
+circuits compare each member value round by round (slots paired by circuit slot id). See [Copy and compare](program-days-copy-and-compare.md).
 `program_session_plans` (`services/program_session_plans.py`, `blueprints/program_session_plans_api.py`)
 holds one dated plan per program day, template, and date: an independent snapshot of the template's
 sections whose items may be added, removed, or reordered (sections stay fixed) and carry prescriptions.

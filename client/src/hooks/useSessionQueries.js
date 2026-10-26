@@ -160,6 +160,19 @@ export function useSessionsHeatmap(rootId, filters = {}) {
     });
 }
 
+/**
+ * A session's detail for read-only views beside the session page (the Programs Days tab's
+ * logged cards and their comparisons). Shares the session page's cache entry.
+ */
+export function sessionDetailQueryOptions(rootId, sessionId) {
+    return {
+        queryKey: queryKeys.session(rootId, sessionId),
+        queryFn: async () => (await fractalApi.getSession(rootId, sessionId)).data,
+        enabled: Boolean(rootId && sessionId),
+        staleTime: 60 * 1000,
+    };
+}
+
 export function useSessionDetail(rootId, sessionId) {
     const isReady = Boolean(rootId && sessionId);
 

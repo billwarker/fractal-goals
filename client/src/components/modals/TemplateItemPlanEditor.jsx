@@ -6,7 +6,7 @@ import PrescriptionEditor from '../prescriptions/PrescriptionEditor';
 
 /**
  * The "Planned values" editor for one template item: an activity's sets, tags and notes,
- * or a circuit's rounds. The open editor is the scoped item, so its note composer and tag
+ * or a circuit's rounds and its circuit, round and member tags. The open editor is the scoped item, so its note composer and tag
  * pickers are always live; clicking a set or round narrows them to it.
  */
 export default function TemplateItemPlanEditor({ item, definition, circuit, activityById, idPrefix, onChange }) {
@@ -14,6 +14,7 @@ export default function TemplateItemPlanEditor({ item, definition, circuit, acti
     if (circuit) {
         return (
             <CircuitPrescriptionEditor
+                rootId={rootId}
                 circuit={circuit}
                 activityById={activityById}
                 value={item.prescription || null}

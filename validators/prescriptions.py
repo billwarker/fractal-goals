@@ -142,9 +142,10 @@ def validate_prescription(prescription: Any, path: str = 'prescription') -> Opti
 def validate_circuit_prescription(prescription: Any, path: str = 'prescription') -> Optional[Dict[str, Any]]:
     """Return a normalized circuit prescription, or None when it plans nothing.
 
-    Shape: ``{schema, notes?, rounds: [{notes?, slots: [{slot_id, metrics: [...]}]}]}`` where
-    ``slot_id`` is a circuit definition slot. A round with no values still counts: it plans
-    how many rounds the session starts with.
+    Shape: ``{schema, notes?, tags?, rounds: [{notes?, tags?, slots: [{slot_id, metrics: [...],
+    tags?}]}]}`` where ``slot_id`` is a circuit definition slot. Tags are catalog tag ids for the
+    run, a round, or one member of a round. A round with no values still counts: it plans how
+    many rounds the session starts with.
     """
     if prescription is None:
         return None
@@ -154,6 +155,7 @@ def validate_circuit_prescription(prescription: Any, path: str = 'prescription')
     if schema != PRESCRIPTION_SCHEMA_VERSION:
         raise ValueError(f'{path}.schema must be {PRESCRIPTION_SCHEMA_VERSION}')
     notes = _validate_note(prescription.get('notes'), f'{path}.notes')
+    tags = _validate_tag_ids(prescription.get('tags'), f'{path}.tags')
     raw_rounds = prescription.get('rounds')
     rounds: List[Dict[str, Any]] = []
     if raw_rounds is not None:
@@ -181,17 +183,27 @@ def validate_circuit_prescription(prescription: Any, path: str = 'prescription')
                     raise ValueError(f'{slot_path} repeats a slot')
                 seen_slots.add(slot_id)
                 metrics = _validate_metric_entries(raw_slot.get('metrics'), f'{slot_path}.metrics')
-                if metrics:
-                    slots.append({'slot_id': slot_id.strip(), 'metrics': metrics})
-            rounds.append({
+                slot_tags = _validate_tag_ids(raw_slot.get('tags'), f'{slot_path}.tags')
+                if metrics or slot_tags:
+                    planned_slot = {'slot_id': slot_id.strip(), 'metrics': metrics}
+                    if slot_tags:
+                        planned_slot['tags'] = slot_tags
+                    slots.append(planned_slot)
+            planned_round = {
                 'slots': slots,
                 'notes': _validate_note(raw_round.get('notes'), f'{round_path}.notes'),
-            })
-    if not notes and not rounds:
+            }
+            round_tags = _validate_tag_ids(raw_round.get('tags'), f'{round_path}.tags')
+            if round_tags:
+                planned_round['tags'] = round_tags
+            rounds.append(planned_round)
+    if not notes and not tags and not rounds:
         return None
     normalized: Dict[str, Any] = {'schema': PRESCRIPTION_SCHEMA_VERSION}
     if notes:
         normalized['notes'] = notes
+    if tags:
+        normalized['tags'] = tags
     if rounds:
         normalized['rounds'] = rounds
     return normalized

@@ -153,12 +153,19 @@ export function summarizePrescription(prescription) {
         || prescription.sets?.some((plannedSet) => plannedSet.notes)
         || prescription.rounds?.some((plannedRound) => plannedRound.notes)
     ) parts.push('notes');
-    if (prescription.tags?.length || prescription.sets?.some((plannedSet) => plannedSet.tags?.length)) parts.push('tags');
+    if (
+        prescription.tags?.length
+        || prescription.sets?.some((plannedSet) => plannedSet.tags?.length)
+        || prescription.rounds?.some((plannedRound) => (
+            plannedRound.tags?.length || plannedRound.slots?.some((slot) => slot.tags?.length)
+        ))
+    ) parts.push('tags');
     return parts.join(' · ');
 }
 
-// Circuit plans: { schema: 1, notes?, rounds: [{ notes?, slots: [{ slot_id, metrics: Entry[] }] }] }.
+// Circuit plans: { schema: 1, notes?, tags?, rounds: [{ notes?, tags?, slots: [{ slot_id, metrics: Entry[], tags? }] }] }.
 // A round with no values still counts: it plans how many rounds the session starts with.
+// Tags (catalog tag ids) apply to the run, a round, or one member of a round when the session starts.
 
 export const MAX_CIRCUIT_PLAN_ROUNDS = 100;
 
@@ -177,14 +184,26 @@ export function getCircuitPlanSlots(circuit, activityById = new Map()) {
 export function normalizeCircuitPrescription(prescription) {
     if (!prescription) return null;
     const notes = cleanNote(prescription.notes);
-    const rounds = (prescription.rounds || []).map((plannedRound) => ({
-        slots: (plannedRound.slots || []).filter((slot) => (slot.metrics || []).length > 0),
-        notes: cleanNote(plannedRound.notes),
-    }));
-    if (!notes && rounds.length === 0) return null;
+    const tags = cleanTags(prescription.tags);
+    const rounds = (prescription.rounds || []).map((plannedRound) => {
+        const roundTags = cleanTags(plannedRound.tags);
+        const slots = (plannedRound.slots || []).flatMap((slot) => {
+            const slotTags = cleanTags(slot.tags);
+            const metrics = slot.metrics || [];
+            if (!metrics.length && !slotTags.length) return [];
+            return [{ slot_id: slot.slot_id, metrics, ...(slotTags.length ? { tags: slotTags } : {}) }];
+        });
+        return {
+            slots,
+            notes: cleanNote(plannedRound.notes),
+            ...(roundTags.length ? { tags: roundTags } : {}),
+        };
+    });
+    if (!notes && !tags.length && rounds.length === 0) return null;
     return {
         schema: PRESCRIPTION_SCHEMA_VERSION,
         ...(notes ? { notes } : {}),
+        ...(tags.length ? { tags } : {}),
         ...(rounds.length ? { rounds } : {}),
     };
 }
@@ -212,7 +231,8 @@ export function withAddedRound(prescription) {
     if (rounds.length >= MAX_CIRCUIT_PLAN_ROUNDS) return prescription;
     const last = rounds[rounds.length - 1];
     rounds.push({
-        slots: last ? last.slots.map((slot) => ({ ...slot, metrics: slot.metrics.map((entry) => ({ ...entry })) })) : [],
+        // Values repeat; tags don't, as for an added set.
+        slots: last ? last.slots.map((slot) => ({ slot_id: slot.slot_id, metrics: slot.metrics.map((entry) => ({ ...entry })) })) : [],
         notes: null,
     });
     return normalizeCircuitPrescription({ ...(prescription || {}), rounds });
@@ -231,4 +251,33 @@ export function withRoundNotes(prescription, roundIndex, notes) {
 
 export function withCircuitNotes(prescription, notes) {
     return normalizeCircuitPrescription({ ...(prescription || {}), notes });
+}
+
+export function withCircuitTags(prescription, tags) {
+    return normalizeCircuitPrescription({ ...(prescription || {}), tags });
+}
+
+export function withRoundTags(prescription, roundIndex, tags) {
+    const rounds = [...(prescription?.rounds || [])];
+    rounds[roundIndex] = { ...(rounds[roundIndex] || { slots: [] }), tags };
+    return normalizeCircuitPrescription({ ...(prescription || {}), rounds });
+}
+
+/** One round member's tags; `slotId` is the circuit definition's slot. */
+export function withCircuitSlotTags(prescription, roundIndex, slotId, tags) {
+    const rounds = [...(prescription?.rounds || [])];
+    const current = rounds[roundIndex] || { slots: [] };
+    const slots = [...(current.slots || [])];
+    const slotIndex = slots.findIndex((slot) => slot.slot_id === slotId);
+    const nextSlot = { ...(slotIndex >= 0 ? slots[slotIndex] : { slot_id: slotId, metrics: [] }), tags };
+    if (slotIndex >= 0) slots[slotIndex] = nextSlot;
+    else slots.push(nextSlot);
+    rounds[roundIndex] = { ...current, slots };
+    return normalizeCircuitPrescription({ ...(prescription || {}), rounds });
+}
+
+export function getCircuitRoundTags(prescription, roundIndex, slotId = null) {
+    const plannedRound = prescription?.rounds?.[roundIndex];
+    if (slotId == null) return plannedRound?.tags || [];
+    return plannedRound?.slots?.find((slot) => slot.slot_id === slotId)?.tags || [];
 }

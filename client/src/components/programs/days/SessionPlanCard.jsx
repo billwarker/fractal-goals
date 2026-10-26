@@ -9,8 +9,10 @@ import PlanTagEditor from '../../prescriptions/PlanTagEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick, shouldScopeOnFocus } from '../../prescriptions/usePlanRowSelection';
 import { formatLiteralDate } from '../../../utils/dateUtils';
+import { indexByAlignKey } from '../../../utils/planComparison';
+import { copyPlanSections, formatCopyDate, planCopyEligibility } from '../../../utils/planCopy';
 import { planSectionActivityIds } from '../../../utils/planGoalsView';
-import { withPrescriptionTags } from '../../../utils/prescriptionModel';
+import { withCircuitTags, withPrescriptionTags } from '../../../utils/prescriptionModel';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import {
     addPlanItem,
@@ -21,6 +23,7 @@ import {
     setPlanItemPrescription,
 } from '../../../utils/sessionPlanDraft';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
+import { PlanCopyButton } from './PlanCopyControls';
 import PlanItemPicker from './PlanItemPicker';
 import styles from './ProgramDaysView.module.css';
 
@@ -55,6 +58,10 @@ export default function SessionPlanCard({
     isActive = false,
     onActivate = null,
     onReport = null,
+    comparison = null,
+    progressSettings = null,
+    // Which column the comparison is in, so Copy points at it.
+    comparisonSide = 'left',
 }) {
     // Only unsaved edits are local. An untouched card always shows the latest server plan,
     // so a seed refreshes when the plan it comes from is saved in the neighbouring column.
@@ -69,6 +76,8 @@ export default function SessionPlanCard({
         current.itemKey === itemKey ? current : { ...NO_SCOPE, itemKey }
     ));
     const [conflict, setConflict] = useState(false);
+    // What the last Copy brought in and left out, until the copy is saved or discarded.
+    const [copyNotice, setCopyNotice] = useState(null);
     const [error, setError] = useState('');
     const previousByKey = useMemo(
         () => indexPrescriptionsByItemKey(entry.previous?.sections),
@@ -76,6 +85,14 @@ export default function SessionPlanCard({
     );
     const templateId = entry.template.id;
     const alignKeys = planAlignmentKeys(templateId, sections);
+    // The other column's card for this template: its items pair with ours by alignment key.
+    const comparedByKey = useMemo(
+        () => (comparison && !comparison.isLoading && comparison.kind !== 'empty'
+            ? indexByAlignKey(templateId, comparison.sections)
+            : null),
+        [comparison, templateId],
+    );
+    const copyState = planCopyEligibility({ entry, comparison, readOnly });
     const activityName = (activityId) => activityById.get(activityId)?.name || 'Activity';
     // The day's mutations are shared by every card; only this template's requests count here.
     const isPendingHere = (mutation) => mutation.isPending && mutation.variables?.templateId === templateId;
@@ -122,6 +139,22 @@ export default function SessionPlanCard({
         setError(errorMessage(mutationError));
     };
 
+    const copyFromComparison = () => {
+        const fromDate = formatCopyDate(comparison.date);
+        if (isDirty && !window.confirm(`Replace your unsaved changes with the plan from ${fromDate}?`)) return;
+        const copied = copyPlanSections({
+            templateId,
+            source: comparison,
+            targetSections: entry.sections,
+            activityById,
+            circuitById,
+        });
+        setDraftSections(copied.sections);
+        setScope(NO_SCOPE);
+        setError('');
+        setCopyNotice({ fromDate, skipped: copied.skipped });
+    };
+
     const save = () => mutations.save.mutate(
         { templateId, sections, rowVersion: entry.row_version },
         { onError: handleFailure },
@@ -158,6 +191,15 @@ export default function SessionPlanCard({
                     {!entry.is_required ? <Badge size="sm">Optional</Badge> : null}
                     {describePlanSource(entry)}
                 </span>
+                <PlanCopyButton
+                    copyState={copyState}
+                    date={comparison?.date}
+                    fromSide={comparisonSide}
+                    reasonId={`${elementId}-copy-reason`}
+                    disabled={isBusy}
+                    copied={isDirty ? copyNotice : null}
+                    onCopy={copyFromComparison}
+                />
             </header>
 
 
@@ -207,6 +249,7 @@ export default function SessionPlanCard({
                         // A past plan's item is selectable too, only to show its goals in the Goals pane.
                         const isHighlighted = scope.itemKey === itemKey;
                         const isSelected = !readOnly && isHighlighted;
+                        const compared = comparedByKey?.get(alignKeys.items[sectionIndex][itemIndex]) || null;
                         const rowScope = {
                             selectedIndex: isHighlighted ? scope.rowIndex : null,
                             onSelect: (rowIndex) => setScope({ ...NO_SCOPE, itemKey, rowIndex }),
@@ -233,6 +276,9 @@ export default function SessionPlanCard({
                                     <span className={styles.planItemName}>
                                         {name}
                                         {item.type === 'circuit' ? <Badge size="sm">Circuit</Badge> : null}
+                                        {comparedByKey && !compared ? (
+                                            <Badge size="sm" title={`Not in ${formatCopyDate(comparison.date)}`}>New</Badge>
+                                        ) : null}
                                     </span>
                                     {!readOnly ? (
                                         <span className={styles.planItemActions}>
@@ -248,17 +294,22 @@ export default function SessionPlanCard({
                                                 disabled={itemIndex === section.items.length - 1}
                                                 aria-label={`Move ${name} down`}
                                             >↓</button>
-                                            {definition ? (
+                                            {definition || circuit ? (
                                                 <PlanTagEditor
                                                     rootId={rootId}
                                                     definition={definition}
+                                                    scopeId={circuit?.id}
                                                     tagIds={item.prescription?.tags || []}
                                                     editable={isSelected && !isBusy}
+                                                    scopeLabel={circuit ? 'Circuit tags' : null}
                                                     onChangeTags={(tagIds) => edit((current) => setPlanItemPrescription(
                                                         current,
                                                         sectionIndex,
                                                         itemIndex,
-                                                        withPrescriptionTags(current[sectionIndex].items[itemIndex].prescription, tagIds),
+                                                        (circuit ? withCircuitTags : withPrescriptionTags)(
+                                                            current[sectionIndex].items[itemIndex].prescription,
+                                                            tagIds,
+                                                        ),
                                                     ))}
                                                 />
                                             ) : null}
@@ -291,6 +342,9 @@ export default function SessionPlanCard({
                                         idPrefix={`plan-${templateId}-${item.item_key || itemIndex}`}
                                         disabled={isBusy}
                                         alignKey={alignKeys.items[sectionIndex][itemIndex]}
+                                        comparison={compared?.type === 'activity' ? compared.prescription || {} : null}
+                                        comparisonDate={comparison?.date || null}
+                                        progressSettings={progressSettings}
                                         onChange={(prescription) => edit((current) => (
                                             setPlanItemPrescription(current, sectionIndex, itemIndex, prescription)
                                         ))}
@@ -298,15 +352,21 @@ export default function SessionPlanCard({
                                 ) : null}
                                 {circuit && (!readOnly || item.prescription?.rounds?.length) ? (
                                     <CircuitPrescriptionEditor
+                                        rootId={rootId}
                                         circuit={circuit}
                                         active={isHighlighted}
                                         readOnly={readOnly}
+                                        // A live plan's circuit tags are in the item header, as an activity's are.
+                                        showCircuitTags={readOnly}
                                         selectedRoundIndex={rowScope.selectedIndex}
                                         onSelectRound={rowScope.onSelect}
                                         selectedSlot={isHighlighted && scope.slotId
                                             ? { roundIndex: scope.rowIndex, slotId: scope.slotId }
                                             : null}
                                         onSelectSlot={(roundIndex, slotId) => setScope({ itemKey, rowIndex: roundIndex, slotId })}
+                                        comparison={compared?.type === 'circuit' ? compared.prescription || {} : null}
+                                        comparisonDate={comparison?.date || null}
+                                        progressSettings={progressSettings}
                                         activityById={activityById}
                                         value={item.prescription || null}
                                         previous={previousByKey.get(item.item_key) || null}
@@ -384,7 +444,7 @@ export default function SessionPlanCard({
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                onClick={() => { setDraftSections(null); setError(''); }}
+                                onClick={() => { setDraftSections(null); setError(''); setCopyNotice(null); }}
                                 disabled={isBusy}
                             >Discard</Button>
                         ) : null}
