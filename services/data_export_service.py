@@ -11,6 +11,8 @@ a caller-supplied root or user id.
 """
 
 from datetime import datetime, timezone
+from models import MediaAsset, StorageConnection
+from services.storage_common import serialize_asset
 
 from models import (
     ActivityDefinition,
@@ -86,6 +88,9 @@ class DataExportService:
             # OAuth bearer credentials and authorization codes are never
             # exported; grants are represented only by consent metadata.
             "ai_connections": self._export_agent_connections(user_id),
+            "storage_connections": [{"provider": row.provider, "account_label": row.account_label,
+                                     "status": row.status, "upload_default": row.upload_default}
+                                    for row in self.db_session.query(StorageConnection).filter_by(user_id=user_id).all()],
             # Usage events are the user's own telemetry rows. Included because
             # the Privacy Policy discloses collecting them, so a subject access
             # request should return them.
@@ -113,6 +118,8 @@ class DataExportService:
             "program_days": self._serialize_program_children(ProgramDay, root_id, serialize_program_day),
             "program_day_status_overrides": self._export_program_day_statuses(root_id),
             "notes": self._serialize_all(Note, root_id, serialize_note),
+            "media_assets": [{**serialize_asset(row), "file_id": row.file_id, "revision": row.revision}
+                             for row in self.db_session.query(MediaAsset).filter_by(root_id=root_id).all()],
             "analytics_dashboards": self._serialize_all(AnalyticsDashboard, root_id, serialize_analytics_dashboard),
             "event_logs": self._serialize_all(EventLog, root_id, serialize_event_log),
             "ai_agent_history": self._export_agent_history(root_id),

@@ -616,6 +616,7 @@ function GoalDetailModalRenderSurface({
         <GoalDetailModalFooter
             showGoalNoteComposer={showGoalNoteComposer}
             handleQuickGoalNote={handleQuickGoalNote}
+            rootId={rootId}
             showCreateFooter={showCreateFooter}
             showEditFooter={showEditFooter}
             handleCancel={handleCancel}

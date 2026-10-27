@@ -1,0 +1,22 @@
+.attach {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+/* Quick bars sit at the bottom of their panes, so the menu opens upward. */
+.attach .menu {
+    top: auto;
+    bottom: calc(100% + 6px);
+    min-width: 200px;
+}
+
+.item {
+    display: grid;
+    gap: 2px;
+}
+
+.detail {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}

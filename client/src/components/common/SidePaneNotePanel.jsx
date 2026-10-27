@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import SharedNoteTimeline from '../notes/NoteTimeline';
+import AttachMenuButton from '../notes/AttachMenuButton';
+import { AttachmentDraftList, AttachmentDraftNotice } from '../notes/NoteAttachmentsEditor';
+import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import styles from './SidePaneNotePanel.module.css';
 
@@ -19,8 +22,10 @@ function SidePaneNotePanel({
     composerOnly = false,
     hideHeader = false,
     className = '',
+    rootId = null,  // Enables attaching cloud media; onSubmit then receives (content, attachments).
 }) {
     const [content, setContent] = useState('');
+    const draft = useAttachmentDraft(rootId);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const inputRef = React.useRef(null);
 
@@ -45,11 +50,12 @@ function SidePaneNotePanel({
     const handleSubmit = async (e) => {
         e?.preventDefault();
         const trimmed = content.trim();
-        if (!trimmed || isSubmitting) return;
+        if (!trimmed || isSubmitting || draft.isBusy) return;
         setIsSubmitting(true);
         try {
-            await onSubmit(trimmed);
+            await onSubmit(trimmed, draft.payload());
             setContent('');
+            draft.reset();
             if (inputRef.current) {
                 inputRef.current.style.height = 'auto';
                 inputRef.current.focus();
@@ -61,7 +67,9 @@ function SidePaneNotePanel({
 
     const composer = (
         <div className={`${styles.composer} ${className}`}>
-            <form className={styles.composerForm} onSubmit={handleSubmit}>
+            <form className={styles.composerForm} onSubmit={handleSubmit} {...(rootId ? draft.dropProps : {})}>
+                {rootId && <AttachmentDraftList draft={draft} disabled={isSubmitting} compact />}
+                {rootId && <AttachmentDraftNotice draft={draft} />}
                 <div className={styles.inputRow}>
                     <textarea
                         ref={inputRef}
@@ -70,14 +78,22 @@ function SidePaneNotePanel({
                         onKeyDown={handleKeyDown}
                         placeholder={placeholder}
                         disabled={isSubmitting}
+                        onPaste={rootId ? draft.handlePaste : undefined}
                         className={styles.textarea}
                         rows={1}
                     />
+                    {rootId && (
+                        <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.submitBtn}
+                            onPickerClosed={() => inputRef.current?.focus()} />
+                    )}
                     <button
                         type="submit"
-                        disabled={!content.trim() || isSubmitting}
+                        disabled={!content.trim() || isSubmitting || draft.isBusy}
                         className={styles.submitBtn}
-                        title="Add note (Enter, Shift+Enter for new line)"
+                        aria-label="Add note"
+                        title={draft.busyReason || (draft.items.length > 0 && !content.trim()
+                            ? 'Write a few words to save with the attachment'
+                            : 'Add note (Enter, Shift+Enter for new line)')}
                     >
                         {isSubmitting ? '…' : <CreateNoteIcon />}
                     </button>

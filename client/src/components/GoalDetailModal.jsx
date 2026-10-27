@@ -434,7 +434,7 @@ function GoalDetailModal({
         return () => observer.disconnect();
     }, [viewState, name, deadline, goalStatus]);
 
-    const handleQuickGoalNote = async (content) => {
+    const handleQuickGoalNote = async (content, attachments = []) => {
         if (!rootId || !goalId) {
             return;
         }
@@ -443,6 +443,7 @@ function GoalDetailModal({
             context_type: 'goal',
             context_id: goalId,
             goal_id: goalId,
+            attachments,
         });
     };
 

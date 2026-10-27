@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDuration } from '../components/analytics/formatDuration';
+import AnalyticsLoading from '../components/analytics/AnalyticsLoading';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
@@ -42,21 +43,10 @@ const AnalyticsViewNameModal = lazy(() => import('../components/analytics/Analyt
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
 const MAX_WINDOWS = 4;
-// The filters pane's width (--panel-width-details, 390px) in grid columns, rounded.
 const FILTER_PANE_COLUMNS = 20;
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
-const DEFAULT_SELECTED_WINDOW_ID = 'window-1';
-const DEFAULT_WINDOW_STATES = {
-    'window-1': getDefaultWindowState(),
-};
+const DEFAULT_WINDOW_STATES = { 'window-1': getDefaultWindowState() };
 const EMPTY_VIEW_NAME = 'Empty Analytics View';
-const analyticsFallback = (
-    <div style={{ height: '100%', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#666' }}>
-        Loading analytics panel...
-    </div>
-);
-
-
 let windowIdCounter = 1;
 const generateWindowId = () => `window-${++windowIdCounter}`;
 
@@ -75,7 +65,7 @@ function Analytics() {
     } = useAnalyticsViews(rootId);
 
     const [layout, setLayout] = useState(DEFAULT_LAYOUT);
-    const [selectedWindowId, setSelectedWindowId] = useState(DEFAULT_SELECTED_WINDOW_ID);
+    const [selectedWindowId, setSelectedWindowId] = useState('window-1');
     const [windowStates, setWindowStates] = useState(DEFAULT_WINDOW_STATES);
     const [selectedViewId, setSelectedViewId] = useState('');
     const [currentViewName, setCurrentViewName] = useState(EMPTY_VIEW_NAME);
@@ -110,7 +100,7 @@ function Analytics() {
         windowIdCounter = 1;
         setLayout(DEFAULT_LAYOUT);
         setWindowStates(DEFAULT_WINDOW_STATES);
-        setSelectedWindowId(DEFAULT_SELECTED_WINDOW_ID);
+        setSelectedWindowId('window-1');
         setSelectedViewId('');
         setCurrentViewName(EMPTY_VIEW_NAME);
         setGlobalDateRange({ start: null, end: null });
@@ -187,8 +177,8 @@ function Analytics() {
     }, [resetToEmptyView, rootId]);
 
     const applyDeepLink = useCallback(({ windowState, globalFilters: linkFilters }) => {
-        setWindowStates({ [DEFAULT_SELECTED_WINDOW_ID]: windowState });
-        setSelectedWindowId(DEFAULT_SELECTED_WINDOW_ID);
+        setWindowStates({ ['window-1']: windowState });
+        setSelectedWindowId('window-1');
         setGlobalFilters(linkFilters);
     }, []);
     useAnalyticsDeepLink({ isHydrated, activities, onApply: applyDeepLink });
@@ -241,7 +231,7 @@ function Analytics() {
         });
 
         if (!nextWindowIds.includes(selectedWindowId)) {
-            setSelectedWindowId(nextWindowIds[0] || DEFAULT_SELECTED_WINDOW_ID);
+            setSelectedWindowId(nextWindowIds[0] || 'window-1');
         }
     }, [layout, selectedWindowId]);
 
@@ -317,7 +307,7 @@ function Analytics() {
     const buildCurrentSavedObjectPayload = useCallback((kind) => {
         if (kind === 'view') {
             const configuredIds = getConfiguredWindowIds(layout, windowStates);
-            const windowId = configuredIds[0] || selectedWindowId || Object.keys(windowStates)[0] || DEFAULT_SELECTED_WINDOW_ID;
+            const windowId = configuredIds[0] || selectedWindowId || Object.keys(windowStates)[0] || 'window-1';
             return createAnalyticsViewPayload({
                 windowState: windowStates[windowId] || getDefaultWindowState(),
                 globalFilters,
@@ -408,7 +398,7 @@ function Analytics() {
         const canClose = windowCount > 1;
 
         return (
-            <Suspense fallback={analyticsFallback}>
+            <Suspense fallback={<AnalyticsLoading />}>
                 <ProfileWindow
                     key={windowId}
                     windowId={windowId}
@@ -483,9 +473,7 @@ function Analytics() {
 
     if (loading && !isHydrated) {
         return (
-            <div className="page-container" style={{ textAlign: 'center', color: '#666', padding: '40px' }}>
-                Loading analytics...
-            </div>
+            <AnalyticsLoading />
         );
     }
 

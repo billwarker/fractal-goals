@@ -48,6 +48,17 @@ class Config:
     # falls back to the plain /embed iframe. See services/oembed_service.py.
     INSTAGRAM_OEMBED_TOKEN = os.getenv('INSTAGRAM_OEMBED_TOKEN', None)
 
+    # External media stays disabled until credentials and an independent encryption key exist.
+    # Comma-separated Fernet keys: first encrypts; remaining keys decrypt during rotation.
+    STORAGE_ENCRYPTION_KEYS = os.getenv('STORAGE_ENCRYPTION_KEYS', '')
+    GOOGLE_DRIVE_CLIENT_ID = os.getenv('GOOGLE_DRIVE_CLIENT_ID', '')
+    GOOGLE_DRIVE_CLIENT_SECRET = os.getenv('GOOGLE_DRIVE_CLIENT_SECRET', '')
+    GOOGLE_PICKER_API_KEY = os.getenv('GOOGLE_PICKER_API_KEY', '')
+    GOOGLE_PICKER_APP_ID = os.getenv('GOOGLE_PICKER_APP_ID', '')
+    DROPBOX_CLIENT_ID = os.getenv('DROPBOX_CLIENT_ID', '')
+    DROPBOX_CLIENT_SECRET = os.getenv('DROPBOX_CLIENT_SECRET', '')
+    STORAGE_MAX_FILE_BYTES = max(1, min(500 * 1024 * 1024, int(os.getenv('STORAGE_MAX_FILE_BYTES', str(100 * 1024 * 1024)))))
+
     # Database Configuration
     # Use DATABASE_URL for local/test environments.
     # In production/staging, prefer SUPABASE_DATABASE_URL so deployment config

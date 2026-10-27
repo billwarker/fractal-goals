@@ -53,7 +53,7 @@ button.button {
 
 button.button:hover,
 button.button:focus-visible {
-    background: var(--color-bg-surface-hover);
+    background: var(--color-bg-card-hover);
 }
 
 .caption {

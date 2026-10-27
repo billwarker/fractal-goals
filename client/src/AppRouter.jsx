@@ -1,7 +1,7 @@
 import { NavigationHeader } from './components/layout/NavigationHeader';
 export { NavigationHeader } from './components/layout/NavigationHeader';
 import React, { useState, useEffect, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { HeaderProvider } from './contexts/HeaderContext';
 import { useAuth } from './contexts/AuthContext';
 import useIsMobile from './hooks/useIsMobile';
@@ -29,6 +29,7 @@ const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
+const StorageConnected = lazyWithRetry(() => import('./pages/StorageConnected'), 'pages/StorageConnected');
 
 const LEGAL_PATHS = ['/privacy', '/terms'];
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
@@ -61,6 +62,9 @@ function RequireAdmin({ children }) {
 }
 
 const appEnvironment = import.meta.env.VITE_ENV || 'development';
+const STORAGE_CONNECTED_PATH = '/storage/connected';
+// Full-page routes outside a fractal: no navigation header or fractal agent shell.
+const STANDALONE_PATHS = new Set(['/admin', '/reset-password', STORAGE_CONNECTED_PATH]);
 
 function App() {
     const location = useLocation();
@@ -69,6 +73,8 @@ function App() {
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState(null);
+    const navigate = useNavigate();
     const [isAgentChatOpen, setIsAgentChatOpen] = useState(false);
     const [hasOpenedAgentChat, setHasOpenedAgentChat] = useState(false);
     const isMobile = useIsMobile();
@@ -90,8 +96,24 @@ function App() {
         && !showLandingPage
         && !showLegalPage
         && !redirectDeprecatedLandingRoute
-        && location.pathname !== '/admin'
-        && location.pathname !== '/reset-password';
+        && !STANDALONE_PATHS.has(location.pathname);
+
+    // `?settings=<tab>` deep-links into Settings (e.g. from the cloud storage return page).
+    // Each navigation has its own key, so the same link can open Settings again later.
+    const requestedSettingsTab = isAuthenticated ? new URLSearchParams(location.search).get('settings') : null;
+    const [settingsRequestKey, setSettingsRequestKey] = useState(null);
+    if (requestedSettingsTab && settingsRequestKey !== location.key) {
+        setSettingsRequestKey(location.key);
+        setSettingsTab(requestedSettingsTab);
+        setIsSettingsOpen(true);
+    }
+    useEffect(() => {
+        if (!requestedSettingsTab) return;
+        const params = new URLSearchParams(location.search);
+        params.delete('settings');
+        const query = params.toString();
+        navigate({ pathname: location.pathname, search: query ? `?${query}` : '' }, { replace: true });
+    }, [requestedSettingsTab, location.pathname, location.search, navigate]);
 
     // Determine page title based on path
     const getPageTitle = (pathname) => {
@@ -99,6 +121,7 @@ function App() {
         if (pathname === '/') return 'Selection';
         if (pathname === '/admin') return 'Admin';
         if (pathname === '/reset-password') return 'Reset Password';
+        if (pathname === STORAGE_CONNECTED_PATH) return 'Cloud Storage';
         if (pathname === '/privacy') return 'Privacy Policy';
         if (pathname === '/terms') return 'Terms of Service';
         if (pathname.includes('/goals')) return 'Goals';
@@ -205,7 +228,7 @@ function App() {
                         <LegalAcceptanceModal />
                     </Suspense>
                 )}
-                {!showSelectionPage && !showLandingPage && !showLegalPage && !redirectDeprecatedLandingRoute && location.pathname !== '/admin' && location.pathname !== '/reset-password' && (
+                {!showSelectionPage && !showLandingPage && !showLegalPage && !redirectDeprecatedLandingRoute && !STANDALONE_PATHS.has(location.pathname) && (
                     <NavigationHeader
                         onOpenSettings={() => {
                             trackEvent('settings_opened');
@@ -249,6 +272,12 @@ function App() {
                         <ComponentErrorBoundary>
                             <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
                                 <ResetPassword />
+                            </Suspense>
+                        </ComponentErrorBoundary>
+                    ) : location.pathname === STORAGE_CONNECTED_PATH ? (
+                        <ComponentErrorBoundary>
+                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                <StorageConnected />
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : (
@@ -350,7 +379,11 @@ function App() {
                 {/* Settings Modal */}
                 <Suspense fallback={null}>
                     {isSettingsOpen && (
-                        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+                        <SettingsModal
+                            isOpen={isSettingsOpen}
+                            initialTab={settingsTab}
+                            onClose={() => { setIsSettingsOpen(false); setSettingsTab(null); }}
+                        />
                     )}
                 </Suspense>
 

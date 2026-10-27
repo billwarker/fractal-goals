@@ -1,10 +1,10 @@
 """Ordered candidates and scope projection for bulk goal-note reads."""
 
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, noload
 from models import Note, Session
 
 
-def load_root_goal_notes(db_session, root_id):
+def load_root_goal_notes(db_session, root_id, *, include_attachments=True):
     """Ordered candidates for bulk projection through get_goal_notes."""
     return (
         db_session.query(Note)
@@ -14,6 +14,7 @@ def load_root_goal_notes(db_session, root_id):
             Note.context_type.in_(("goal", "activity_instance")),
         )
         .options(
+            *(() if include_attachments else (noload(Note.attachments),)),
             joinedload(Note.session).joinedload(Session.template),
             joinedload(Note.goal),
             joinedload(Note.activity_definition),

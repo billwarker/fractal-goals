@@ -39,7 +39,7 @@ export default function GoalReviewView({ rootId, goal, goalId, onSubmit, onCance
             prelinkedGoalId={goalId}
             hideLinkPanel
             isSubmitting={isSaving}
-            onSubmit={(content) => onSubmit(content)}
+            onSubmit={(content, _goalId, _activityId, attachments) => onSubmit(content, attachments)}
             onCancel={onCancel}
         />
     );

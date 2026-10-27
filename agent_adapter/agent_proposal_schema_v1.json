@@ -318,6 +318,28 @@
       "title": "CreateTemplateOperation",
       "type": "object"
     },
+    "NoteAttachmentSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "alt_text": {
+          "default": "",
+          "maxLength": 500,
+          "title": "Alt Text",
+          "type": "string"
+        },
+        "asset_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Asset Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "asset_id"
+      ],
+      "title": "NoteAttachmentSchema",
+      "type": "object"
+    },
     "NoteCreateSchema": {
       "additionalProperties": false,
       "description": "Schema for creating a note.",
@@ -357,6 +379,14 @@
           ],
           "default": null,
           "title": "Activity Set Id"
+        },
+        "attachments": {
+          "items": {
+            "$ref": "#/$defs/NoteAttachmentSchema"
+          },
+          "maxItems": 8,
+          "title": "Attachments",
+          "type": "array"
         },
         "content": {
           "maxLength": 5000,

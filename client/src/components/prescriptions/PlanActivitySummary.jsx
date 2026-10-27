@@ -1,11 +1,10 @@
 import React, { useMemo } from 'react';
-
 import ActivitySummaryRail from '../common/ActivitySummaryRail';
 import { buildActivitySummaryMetrics } from '../common/activitySummaryMetrics';
 import { formatCopyDate } from '../../utils/planCopy';
 import { computeAutoAggregations, filterTrackedMetricDefs } from '../../utils/progressAggregations';
-import styles from './PlanComparison.module.css';
 import { deltaTone } from './PlanDeltaChip';
+import styles from './PlanComparison.module.css';
 
 /**
  * A planned (or logged) activity's summary under its sets, as on the session page: each

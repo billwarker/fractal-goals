@@ -37,8 +37,9 @@ export default function useGoalReviewActions(rootId, goalId) {
 
     return {
         isSaving,
-        writeReview: (content) => run(() => fractalNotesApi.createNote(rootId, {
+        writeReview: (content, attachments = []) => run(() => fractalNotesApi.createNote(rootId, {
             content, context_type: 'goal', context_id: goalId, goal_id: goalId, note_kind: 'goal_review',
+            ...(attachments.length ? { attachments } : {}),
         }), 'Couldn’t save the review', 'Review saved'),
         setReviewsOn: (on) => run(
             () => fractalApi.updateGoal(rootId, goalId, { review_disabled: !on }),

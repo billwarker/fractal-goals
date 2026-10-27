@@ -25,7 +25,7 @@ RUN npm run build
 # =======================================
 # Stage 2: Production Server (Nginx)
 # =======================================
-FROM nginx:alpine-slim
+FROM nginx:1.30.6-alpine-slim
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -33,6 +33,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # The official nginx entrypoint renders templates in /etc/nginx/templates.
 ENV BACKEND_URL=https://fractal-backend-195572181270.us-east1.run.app
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY security-headers.conf /etc/nginx/security-headers.conf
 
 # Expose port
 EXPOSE 8080

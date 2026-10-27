@@ -45,8 +45,8 @@ vi.mock('../../components/notes', () => ({
     ),
 }));
 
-vi.mock('../../components/notes/NoteComposer', () => ({
-    ComposeLinkPanel: () => <div>Compose links</div>,
+vi.mock('../../components/notes/ComposeLinkPanel', () => ({
+    default: () => <div>Compose links</div>,
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -132,6 +132,7 @@ describe('Notes page', () => {
         await waitFor(() => {
             expect(createNote).toHaveBeenCalledWith({
                 content: 'Root note',
+                attachments: [],
                 context_type: 'root',
                 context_id: 'root-1',
                 goal_id: undefined,

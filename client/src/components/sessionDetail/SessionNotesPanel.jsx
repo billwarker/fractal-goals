@@ -6,6 +6,7 @@ import styles from './ProgressPanel.module.css';
 import { logError } from '../../utils/logger';
 
 function SessionNotesPanel({
+    rootId,
     sessionId,
     onNoteAdded,
     notes = [],
@@ -43,7 +44,7 @@ function SessionNotesPanel({
         });
     }, [notes, previousSessionNotes]);
 
-    const handleAddNote = async (content) => {
+    const handleAddNote = async (content, attachments = []) => {
         if (!addNote) return;
 
         try {
@@ -52,6 +53,7 @@ function SessionNotesPanel({
                 context_id: sessionId,
                 session_id: sessionId,
                 content,
+                ...(attachments.length ? { attachments } : {}),
             });
             onNoteAdded?.();
         } catch (err) {
@@ -86,6 +88,7 @@ function SessionNotesPanel({
 
             <div className={styles.timelineComposer}>
                 <NoteQuickAdd
+                    rootId={rootId}
                     onSubmit={handleAddNote}
                     placeholder="Add a session note..."
                 />

@@ -19,6 +19,13 @@ import { queryKeys } from './queryKeys';
  * @param {string} sessionId - ID of the current session
  * @param {string|null} activityDefinitionId - Optional activity definition ID for fetching previous notes
  */
+// Quick bars pass attachments in the serialized shape (for optimistic notes); the API takes ids and descriptions.
+const noteRequest = ({ attachments = [], ...data }) => (
+    attachments.length
+        ? { ...data, attachments: attachments.map((item) => ({ asset_id: item.asset_id || item.id, alt_text: item.alt_text || '' })) }
+        : data
+);
+
 export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
     const queryClient = useQueryClient();
     const outbox = useOutbox();
@@ -48,7 +55,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                 });
                 await enqueue(
                     SESSION_OP.NOTE_CREATE,
-                    { method: 'post', url: `/${rootId}/notes`, body: { ...data, id } },
+                    { method: 'post', url: `/${rootId}/notes`, body: { ...noteRequest(data), id } },
                     { note },
                     { creates: [id], entityIds: data.activity_instance_id ? [data.activity_instance_id] : [] },
                 );
@@ -122,7 +129,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
     });
 
     const addNoteMutation = useMutation({
-        mutationFn: (noteData) => fractalApi.createNote(rootId, noteData),
+        mutationFn: (noteData) => fractalApi.createNote(rootId, noteRequest(noteData)),
         onSuccess: (response) => {
             const newNote = response.data;
             // Update the session-notes cache immediately after a confirmed save.

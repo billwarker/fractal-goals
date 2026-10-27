@@ -83,13 +83,6 @@
     background: var(--color-bg-hover);
 }
 
-.noteCard.menuOpen {
-    z-index: 100;
-    content-visibility: visible;
-    contain: layout style;
-    overflow: visible;
-}
-
 .noteCard.pinned {
     border-left: 2px solid var(--color-brand-primary);
     padding-left: 10px;
@@ -272,15 +265,14 @@
 }
 
 .optionsMenu {
-    position: absolute;
-    top: 100%;
-    right: 0;
+    /* Rendered in a body portal by NoteOptionsMenu, positioned beside its button. */
+    position: fixed;
     background: var(--color-bg-surface);
     border: 1px solid var(--color-border);
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 50;
-    min-width: 120px;
+    z-index: var(--z-modal-top);
+    min-width: 160px;
     overflow: hidden;
 }
 
@@ -297,8 +289,10 @@
     transition: background 0.1s;
 }
 
-.optionsMenuItem:hover {
+.optionsMenuItem:hover,
+.optionsMenuItem:focus-visible {
     background: var(--color-bg-hover);
+    outline: none;
 }
 
 .optionsMenuItemDanger {

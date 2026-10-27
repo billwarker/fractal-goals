@@ -70,6 +70,16 @@ you enter is stored so we can show it back to you:
 This content is yours. It is visible only to you. See
 [Section 4 — Who can see your content](#4-who-can-see-your-content).
 
+#### Optional connected media storage
+
+You can connect Google Drive or Dropbox to attach pictures and videos to notes. Original files
+remain in your provider account. We store file references, descriptive metadata, and encrypted
+credentials needed to access files you authorize. Google Picker receives a short-lived access
+token to select files. Private media may pass through our servers for display; it is not included
+in public examples or cached for offline use. Disconnecting destroys our stored credentials.
+Removing a note or deleting your account does not delete original files from your cloud storage.
+An account export includes media references and metadata, rather than the original file bytes.
+
 ### 2.3 Product usage information
 
 To understand which parts of the Service are used and where people get stuck, we record a
@@ -182,9 +192,9 @@ service and configuration, as described below.
 | Provider | What they do | Where |
 |---|---|---|
 | **Google Cloud Platform** | Hosts the application and its infrastructure | United States (`us-east1`) |
-| **Supabase** | Provides the managed PostgreSQL database storing your account and content | [CONFIRM REGION] |
+| **Supabase** | Provides the managed PostgreSQL database storing your account and content | United States |
 | **Resend** | Delivers transactional and security emails | United States |
-| **Google BigQuery** | Internal analytics warehouse (see [Section 6](#6-internal-analytics)) | [CONFIRM DATASET LOCATION] |
+| **Google BigQuery** | Internal analytics warehouse (see [Section 6](#6-internal-analytics)) | United States |
 | **OpenAI API** | Optional embedded assistant; receives the user's message, bounded fractal context requested by the assistant, and proposal/tool results | Determined by the configured API project and data controls |
 | **Anthropic API** | Optional embedded assistant; receives the user's message, bounded fractal context requested by the assistant, and proposal/tool results | Determined by the configured API account and data controls |
 

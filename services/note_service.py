@@ -15,6 +15,9 @@ from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
 from services.serializers import derive_note_type, serialize_note_display
 from services.session_runtime import is_quick_session
+from services.media_service import MediaService
+from services.note_display_context import attach_program_names
+from services.storage_common import StorageError
 from services.view_serializers import (
     serialize_activity_history_entry,
     serialize_note_with_session,
@@ -27,25 +30,6 @@ logger = logging.getLogger(__name__)
 class NoteService:
     def __init__(self, db_session):
         self.db_session = db_session
-
-    def _attach_program_names(self, notes_payload):
-        notes = notes_payload if isinstance(notes_payload, list) else [notes_payload]
-        program_ids = {
-            note.get('context_id')
-            for note in notes
-            if note.get('context_type') == 'program' and note.get('context_id')
-        }
-        if not program_ids:
-            return notes_payload
-
-        programs = self.db_session.query(Program.id, Program.name).filter(
-            Program.id.in_(program_ids),
-        ).all()
-        program_names = {program_id: name for program_id, name in programs}
-        for note in notes:
-            if note.get('context_type') == 'program':
-                note['program_name'] = program_names.get(note.get('context_id'))
-        return notes_payload
 
     def _resolve_note_session(self, root_id, session_id=None, activity_instance_id=None):
         if session_id:
@@ -559,7 +543,7 @@ class NoteService:
             total = len(filtered_results)
             start_index = page * page_size
             results = filtered_results[start_index:start_index + page_size]
-            self._attach_program_names(results)
+            attach_program_names(self.db_session, results)
         else:
             total = query.count()
             notes = query.order_by(
@@ -567,7 +551,7 @@ class NoteService:
                 Note.created_at.desc(),
             ).limit(page_size).offset(page * page_size).all()
             results = [serialize_note_display(note) for note in notes]
-            self._attach_program_names(results)
+            attach_program_names(self.db_session, results)
 
         return {
             'notes': results,
@@ -671,6 +655,11 @@ class NoteService:
         if not content:
             return None, "content is required", 400
 
+        try:
+            attachments = MediaService(self.db_session).validate_attachments(root_id, current_user_id, data.get('attachments', []))
+        except StorageError as exc:
+            return None, str(exc), exc.status
+
         activity_instance = (context_payload or {}).get('activity_instance')
         if activity_instance:
             if not session_id:
@@ -719,6 +708,8 @@ class NoteService:
                 agent_run_id=agent_run_id,
             )
             self.db_session.add(note)
+            self.db_session.flush()
+            MediaService(self.db_session).replace_attachments(note, attachments)
             restart_review_cadence(self.db_session, root_id, context_id, note_kind)
 
         self.db_session.flush()
@@ -743,7 +734,7 @@ class NoteService:
         elif pending_events is not None:
             pending_events.append(event)
         logger.info("Created note %s for %s %s", note.id, data['context_type'], note.context_id)
-        return self._attach_program_names(serialize_note_display(note)), None, 201
+        return attach_program_names(self.db_session, serialize_note_display(note)), None, 201
 
     def update_note(self, root_id, note_id, current_user_id, data) -> ServiceResult[JsonDict]:
         data = normalize_note_payload(data, partial=True)
@@ -758,6 +749,13 @@ class NoteService:
         ).first()
         if not note:
             return None, "Note not found", 404
+
+        attachments = data.get('attachments')
+        if attachments is not None:
+            try:
+                MediaService(self.db_session).validate_attachments(root_id, current_user_id, attachments)
+            except StorageError as exc:
+                return None, str(exc), exc.status
 
         if 'content' in data:
             if not data['content']:
@@ -777,6 +775,8 @@ class NoteService:
             else:
                 note.pinned_at = None
 
+        if attachments is not None:
+            MediaService(self.db_session).replace_attachments(note, attachments)
         self.db_session.commit()
         logger.info("Updated note %s", note_id)
         event_bus.emit(Event(

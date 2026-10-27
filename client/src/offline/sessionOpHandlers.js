@@ -1,8 +1,8 @@
 import { queryKeys } from '../hooks/queryKeys';
-import { SESSION_OP } from './opKinds';
 import { getSectionItems, withSectionItems } from '../hooks/sessionItemMutationUtils';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
+import { SESSION_OP } from './opKinds';
 import {
     applySessionPause,
     applySessionResume,
@@ -261,7 +261,7 @@ const OPTIMISTIC = {
     },
     [SESSION_OP.NOTE_UPDATE]: (queryClient, op) => {
         queryClient.setQueryData(keysFor(op.meta).notes, mapList((list) => list.map((note) => (
-            note.id === op.meta.noteId ? { ...note, ...op.body } : note
+            note.id === op.meta.noteId ? { ...note, ...op.body, ...(op.meta.attachments ? { attachments: op.meta.attachments } : {}) } : note
         ))));
     },
     [SESSION_OP.NOTE_DELETE]: (queryClient, op) => {

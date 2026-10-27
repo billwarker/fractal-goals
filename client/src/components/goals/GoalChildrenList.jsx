@@ -77,7 +77,7 @@ function GoalChildrenList({
                                 cursor: 'pointer',
                                 transition: 'background-color 0.2s ease'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-hover)'}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-card-hover)'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-card-alt)'}
                         >
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

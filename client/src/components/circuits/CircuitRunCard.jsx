@@ -414,6 +414,7 @@ export default function CircuitRunCard({
                         </AddItemButton>
                     )}
                     <CircuitRunNotes
+                        rootId={rootId}
                         notes={derived.circuitNotes}
                         noteTarget={derived.noteTarget}
                         onAddNote={onAddNote}

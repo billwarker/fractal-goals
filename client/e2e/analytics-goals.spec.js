@@ -41,7 +41,7 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
     await expect(dialog).toBeVisible();
     const levelChoice = dialog.getByRole('button', { name: /Long Term Goal/ });
     if (await levelChoice.count()) await levelChoice.first().click();
-    await dialog.getByLabel('Name').fill(`Practise more ${suffix}`);
+    await dialog.locator('#goal-name').fill(`Practise more ${suffix}`);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     await expect(dialog).toHaveCount(0);
 

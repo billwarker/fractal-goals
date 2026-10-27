@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { useActiveSession } from './useSessionQueries';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
+import { useActiveSession } from './useSessionQueries';
+import { useActivityTagCatalog } from './useActivityTagCatalog';
 import { useGoalActivities } from './useGoalQueries';
 import useSessionOptionsMutations from './useSessionOptionsMutations';
 import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
@@ -11,6 +12,8 @@ import useSequenceAdvanceUndo from './useSequenceAdvanceUndo';
 import useSessionSidePaneViewModel from './useSessionSidePaneViewModel';
 
 export function useSessionDetailController({ rootId, sessionId, navigate, isMobile }) {
+    // The catalog must be available after an offline reload, before a picker is first opened.
+    useActivityTagCatalog(rootId);
     const { user } = useAuth();
     const activeSessionQuery = useActiveSession(user?.id, rootId);
     const {

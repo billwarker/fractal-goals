@@ -10,6 +10,7 @@ vi.mock('../../contexts/ActiveSessionContext', () => ({
 }));
 vi.mock('../useSessionQueries', () => ({ useActiveSession: () => state.activeQuery }));
 vi.mock('../useGoalQueries', () => ({ useGoalActivities: () => ({}) }));
+vi.mock('../useActivityTagCatalog', () => ({ useActivityTagCatalog: () => ({}) }));
 vi.mock('../useSessionOptionsMutations', () => ({ default: () => ({ duplicateSession: state.duplicate }) }));
 vi.mock('../useSessionDetailUiState', () => ({ default: () => ({ setShowOptionsModal: vi.fn() }) }));
 vi.mock('../useSessionDetailGoalAssociations', () => ({ useSessionDetailGoalAssociations: () => ({}) }));

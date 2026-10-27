@@ -7,6 +7,12 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from .core import MAX_DESCRIPTION_LENGTH, sanitize_note_content
 
+
+class NoteAttachmentSchema(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    asset_id: str = Field(min_length=1, max_length=255)
+    alt_text: str = Field(default='', max_length=500)
+
 class NoteCreateSchema(BaseModel):
     """Schema for creating a note."""
     model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
@@ -23,6 +29,7 @@ class NoteCreateSchema(BaseModel):
     goal_id: Optional[str] = None
     activity_set_id: Optional[str] = None
     note_kind: Optional[str] = Field(None, pattern=r'^(goal_completion|goal_review)$')
+    attachments: list[NoteAttachmentSchema] = Field(default_factory=list, max_length=8)
 
     @field_validator('content')
     @classmethod
@@ -42,6 +49,7 @@ class NoteUpdateSchema(BaseModel):
     """Schema for updating a note."""
     content: Optional[str] = Field(None, min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
     pin: Optional[bool] = None
+    attachments: Optional[list[NoteAttachmentSchema]] = Field(default=None, max_length=8)
 
     @field_validator('content')
     @classmethod

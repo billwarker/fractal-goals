@@ -198,7 +198,7 @@ function SessionActivityItem({
         ? activityNotesProp
         : (allNotes?.filter(n => n.activity_instance_id === exercise.id) || []);
 
-    const handleAddNote = async (content) => {
+    const handleAddNote = async (content, attachments = []) => {
         if (!content.trim() || !onAddNote || !exercise.id) return;
 
         try {
@@ -213,6 +213,7 @@ function SessionActivityItem({
                 activity_definition_id: activityDefinition?.id,
                 activity_set_id: selectedSet?.id || null,
                 content: content.trim(),
+                ...(attachments.length ? { attachments } : {}),
             });
             if (onNoteCreated) onNoteCreated();
         } catch (err) {

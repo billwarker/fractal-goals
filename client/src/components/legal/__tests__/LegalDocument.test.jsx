@@ -38,8 +38,6 @@ describe('legal documents', () => {
     const placeholders = [...combined.matchAll(/\[([A-Z][A-Z \-—]+)\]/g)].map((m) => m[1]);
     const unique = [...new Set(placeholders)].sort();
     expect(unique).toEqual([
-      'CONFIRM DATASET LOCATION',
-      'CONFIRM REGION',
       'LEGAL ENTITY NAME',
       'REGISTERED ADDRESS',
     ]);

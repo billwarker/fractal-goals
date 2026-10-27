@@ -19,9 +19,8 @@ test('circuit and round tags use activity chips and the shared catalog', async (
             if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
             return response.json();
         };
-        const unrelated = await post('activities', { name: 'Catalog source' });
         const member = await post('activities', { name: 'Circuit member' });
-        const tag = await post('activity-tags', { name: 'Shared strength', color: '#123ABC', scope: 'selected', activity_ids: [unrelated.id] });
+        const tag = await post('activity-tags', { name: 'Shared strength', color: '#123ABC' });
         const circuit = await post('circuits', { name: 'Shared tag circuit', slots: [{ activity_definition_id: member.id }] });
         const session = await post('sessions', { name: 'Circuit tags browser QA', goal_ids: [root], session_data: { sections: [{ name: 'Main', items: [] }] } });
         await post(`sessions/${session.id}/circuit-runs`, { circuit_definition_id: circuit.id, section_index: 0 });

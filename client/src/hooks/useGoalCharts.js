@@ -1,12 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-
 import { sanitizeDashboardLayoutPayload } from '../components/analytics/dashboardState';
 import { formatDuration } from '../components/analytics/formatDuration';
 import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
-import { useSessionEvidenceHistory } from './useAnalyticsPageData';
 import notify from '../utils/notify';
+import { useSessionEvidenceHistory } from './useAnalyticsPageData';
 import { queryKeys } from './queryKeys';
 
 /** Chart categories a goal can show; query views stay on the Analytics page. */

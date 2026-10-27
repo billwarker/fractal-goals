@@ -1,0 +1,161 @@
+.panel {
+    display: grid;
+    gap: 24px;
+}
+
+.section {
+    display: grid;
+    gap: 12px;
+}
+
+.section h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+.section p,
+.card p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.section > p {
+    color: var(--color-text-secondary);
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    gap: 12px;
+}
+
+.card {
+    display: grid;
+    align-content: start;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+}
+
+.card[data-status='reconnect_required'] {
+    border-color: var(--color-warning);
+}
+
+.cardHeader {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.cardHeader h4 {
+    margin: 0;
+    color: var(--color-text-primary);
+}
+
+
+.details {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+}
+
+.details > div {
+    display: grid;
+    grid-template-columns: minmax(80px, auto) 1fr;
+    gap: 8px;
+}
+
+.details dt {
+    color: var(--color-text-secondary);
+}
+
+.details dd {
+    min-width: 0;
+    margin: 0;
+    color: var(--color-text-primary);
+    overflow-wrap: anywhere;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.confirm {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-primary);
+}
+
+.muted {
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.warning {
+    color: var(--color-warning);
+}
+
+.success {
+    color: var(--color-success, var(--color-text-primary));
+}
+
+.error {
+    color: var(--color-danger);
+}
+
+.limits {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding-left: 20px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+}
+
+.section a {
+    color: var(--color-link, var(--color-text-primary));
+    font-weight: 600;
+}
+
+.section a:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.destinations {
+    display: grid;
+    gap: 8px;
+}
+
+.destination {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--color-border-card);
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.destination:has(input:checked) {
+    border-color: var(--color-brand-primary);
+}
+
+.destination > span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.destination strong {
+    color: var(--color-text-primary);
+}

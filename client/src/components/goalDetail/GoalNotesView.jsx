@@ -35,11 +35,12 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
     const notes = isReadOnly ? readOnlyNotes : fetchedNotes;
     const isLoading = isReadOnly ? false : fetchedLoading;
 
-    const handleCompose = async (content, linkedGoalId, activityDefinitionId) => {
+    const handleCompose = async (content, linkedGoalId, activityDefinitionId, attachments = []) => {
         // Pre-linked to this goal; any linked goal from picker overrides
         const targetGoalId = linkedGoalId || goalId;
         await createNote({
             content,
+            attachments,
             context_type: 'goal',
             context_id: targetGoalId,
             goal_id: targetGoalId,

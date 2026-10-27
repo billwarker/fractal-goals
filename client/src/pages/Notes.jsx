@@ -11,7 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { NoteTimeline, NoteComposer } from '../components/notes';
-import { ComposeLinkPanel } from '../components/notes/NoteComposer';
+import ComposeLinkPanel from '../components/notes/ComposeLinkPanel';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useFractalTree } from '../hooks/useGoalQueries';
@@ -157,15 +157,16 @@ function Notes() {
         setComposeActivityName(null);
     };
 
-    const handleCompose = async (content, goalId, activityDefinitionId) => {
+    const handleCompose = async (content, goalId, activityDefinitionId, attachments = []) => {
         if (editingNote) {
-            await updateNote(editingNote.id, content);
+            await updateNote(editingNote.id, content, attachments);
             setEditingNote(null);
         } else {
             const contextType = goalId ? 'goal' : activityDefinitionId ? 'activity_definition' : 'root';
             const contextId = goalId || activityDefinitionId || rootId;
             await createNote({
                 content,
+                attachments,
                 context_type: contextType,
                 context_id: contextId,
                 goal_id: goalId || undefined,
@@ -257,6 +258,7 @@ function Notes() {
                             resetComposeLinks();
                         }}
                         initialContent={editingNote?.content}
+                        initialAttachments={editingNote?.attachments || []}
                         selectedGoalId={composeGoalId}
                         selectedGoalName={composeGoalName}
                         selectedActivityId={composeActivityId}

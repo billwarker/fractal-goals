@@ -437,6 +437,9 @@ class AdminService(_AdminBetaSignupsMixin):
             ).all()
         ]
 
+        from services.storage_connection_service import StorageConnectionService
+        StorageConnectionService(self.db_session).disconnect_all(user_id)
+
         self._audit(
             "user_hard_deleted",
             target=user,

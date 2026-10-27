@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+
 
 import Badge from '../../atoms/Badge';
 import Button from '../../atoms/Button';
@@ -25,6 +25,7 @@ import {
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
 import { PlanCopyButton } from './PlanCopyControls';
 import PlanItemPicker from './PlanItemPicker';
+import ExecutedPlanSessions from './ExecutedPlanSessions';
 import styles from './ProgramDaysView.module.css';
 
 function errorMessage(error) {
@@ -202,7 +203,6 @@ export default function SessionPlanCard({
                 />
             </header>
 
-
             {readOnly ? (
                 <p className={styles.planReadOnlyNote}>Past program day · this plan can&apos;t be changed.</p>
             ) : null}
@@ -216,17 +216,7 @@ export default function SessionPlanCard({
                 </div>
             ) : null}
 
-            {entry.executed_sessions.length ? (
-                <ul className={styles.executedList} aria-label="Sessions from this plan">
-                    {entry.executed_sessions.map((session) => (
-                        <li key={session.id}>
-                            <Link to={`/${rootId}/session/${session.id}`}>
-                                {session.completed ? 'Done' : 'In progress'}: {session.name}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
+            <ExecutedPlanSessions rootId={rootId} sessions={entry.executed_sessions} />
 
             {sections.map((section, sectionIndex) => (
                 <section

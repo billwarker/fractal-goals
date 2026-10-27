@@ -46,8 +46,8 @@ vi.mock('../../components/notes', () => ({
     ),
 }));
 
-vi.mock('../../components/notes/NoteComposer', () => ({
-    ComposeLinkPanel: () => <div>Associator panel</div>,
+vi.mock('../../components/notes/ComposeLinkPanel', () => ({
+    default: () => <div>Associator panel</div>,
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({

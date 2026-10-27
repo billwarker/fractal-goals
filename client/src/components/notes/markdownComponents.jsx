@@ -1,6 +1,7 @@
 import React from 'react';
 import { parseVideoUrl } from '../../utils/videoEmbeds';
 import VideoEmbed from './VideoEmbed';
+import MarkdownImage from './MarkdownImage';
 
 const SAFE_PROTOCOLS = ['http:', 'https:', 'mailto:', 'tel:'];
 
@@ -43,6 +44,7 @@ function extractSoleVideoLink(node) {
 }
 
 export const markdownComponents = {
+    img({ src, alt }) { return <MarkdownImage key={src} src={src} alt={alt} />; },
     p({ node, children, ...props }) {
         const embed = extractSoleVideoLink(node);
         if (embed) {

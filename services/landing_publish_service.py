@@ -5,6 +5,8 @@ in its own service boundary. AdminService and the admin blueprint compose this
 service; the public landing read path (`PublicService.get_landing_examples`)
 consumes the published cache via `LANDING_EXAMPLE_CACHE_KEY`.
 """
+from services.media_stream import omit_private_media
+
 import gzip
 import logging
 import uuid
@@ -102,6 +104,7 @@ class LandingPublishService(
             "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
             "examples": published_examples,
         }
+        cache = omit_private_media(cache)
         serialized_snapshot = self._serialized_landing_snapshot(cache)
         snapshot_bytes = len(serialized_snapshot.encode("utf-8"))
         compressed_snapshot = gzip.compress(

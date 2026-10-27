@@ -48,6 +48,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify production nginx headers
+        run: |
+          docker build -t fractal-client:headers .
+          python3 ../scripts/check_frontend_headers.py fractal-client:headers
+
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15

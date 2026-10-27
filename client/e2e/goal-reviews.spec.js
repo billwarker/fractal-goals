@@ -51,7 +51,9 @@ test('a due review shows a Review banner and can be written from goal details', 
     const composer = page.getByRole('textbox').filter({ hasText: '## Review: Browser Planning desktop' });
     await expect(composer).toBeVisible();
     await expect(composer).toContainText('Plan sessions that build toward a recital.');
+    const saved = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/notes`) && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Save review' }).click();
+    expect((await saved).ok()).toBeTruthy();
 
     await expect(page.getByRole('region', { name: 'Review due' })).toHaveCount(0);
     const goal = await (await page.request.get(`/api/${root}/goals/${root}`, { headers })).json();

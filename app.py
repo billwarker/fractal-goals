@@ -19,10 +19,14 @@ import os
 # Initialize Sentry if DSN is present
 if os.getenv("SENTRY_DSN"):
     from config import config as _sentry_config
+    from services.storage_monitoring import scrub_storage_event
 
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),
         integrations=[FlaskIntegration()],
+        before_send=scrub_storage_event,
+        before_send_transaction=scrub_storage_event,
+        include_local_variables=False,
         traces_sample_rate=_sentry_config.SENTRY_TRACES_SAMPLE_RATE,
         profiles_sample_rate=_sentry_config.SENTRY_PROFILES_SAMPLE_RATE,
         environment=os.getenv("ENV", "development")
@@ -40,6 +44,7 @@ from blueprints.programs_api import programs_bp
 from blueprints.program_session_plans_api import program_session_plans_bp
 from blueprints.calendar_periods_api import calendar_periods_bp
 from blueprints.notes_api import notes_bp
+from blueprints.storage_api import storage_bp
 from blueprints.dashboards_api import dashboards_bp
 from blueprints.page_surface_api import page_surface_bp
 from blueprints.analytics_api import analytics_bp
@@ -153,7 +158,7 @@ CORS(app, resources={
     r"/api/.*": {
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME, "Idempotency-Key"],
+        "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME, "Idempotency-Key", "Upload-Offset"],
         "expose_headers": [config.CSRF_HEADER_NAME],
         "supports_credentials": True
     }
@@ -168,6 +173,7 @@ for write_limited_blueprint in (
     programs_bp,
     program_session_plans_bp,
     notes_bp,
+    storage_bp,
     dashboards_bp,
     page_surface_bp,
     analytics_bp,
@@ -199,6 +205,7 @@ app.register_blueprint(programs_bp)
 app.register_blueprint(program_session_plans_bp)
 app.register_blueprint(calendar_periods_bp)
 app.register_blueprint(notes_bp)
+app.register_blueprint(storage_bp)
 app.register_blueprint(dashboards_bp)
 app.register_blueprint(page_surface_bp)
 app.register_blueprint(analytics_bp)

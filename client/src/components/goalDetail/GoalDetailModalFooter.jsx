@@ -12,6 +12,7 @@ function FooterActions({ children, ...props }) {
 function GoalDetailModalFooter({
     showGoalNoteComposer,
     handleQuickGoalNote,
+    rootId,
     showCreateFooter,
     showEditFooter,
     handleCancel,
@@ -53,6 +54,7 @@ function GoalDetailModalFooter({
             composerOnly
             onSubmit={handleQuickGoalNote}
             placeholder="Add a goal note..."
+            rootId={rootId}
             className={styles.modalFooterComposer}
         />
     ) : (showCreateFooter || showEditFooter) ? (

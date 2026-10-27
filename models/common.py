@@ -43,6 +43,7 @@ class Note(Base):
     activity_set = relationship("ActivitySet")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     goal = relationship("Goal", foreign_keys=[goal_id])
+    attachments = relationship("NoteAttachment", order_by="NoteAttachment.position", lazy="selectin", passive_deletes=True)
 
 class AnalyticsDashboard(Base):
     __tablename__ = 'analytics_dashboards'

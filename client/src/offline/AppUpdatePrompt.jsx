@@ -1,9 +1,8 @@
 import React, { useSyncExternalStore } from 'react';
-
 import Button from '../components/atoms/Button';
-import styles from './AppUpdatePrompt.module.css';
 import { useOutboxStatus } from './OutboxContext';
 import { applyAppUpdate, isAppUpdateReady, subscribeAppUpdate } from './serviceWorker';
+import styles from './AppUpdatePrompt.module.css';
 
 /**
  * Offers a waiting app update, but not while changes are still waiting to sync.

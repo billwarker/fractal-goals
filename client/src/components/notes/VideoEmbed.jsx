@@ -3,11 +3,9 @@
  *
  * Receives a validated descriptor from `videoEmbeds.parseVideoUrl`. Behaviour:
  *  - native files (kind: 'native')  → <video controls preload="none">
- *  - iframe providers (kind: 'iframe') → a lightweight *facade*: a poster/button
- *    is shown first and the heavy third-party iframe is only mounted on click.
- *    This keeps note timelines with many videos cheap to render.
- *  - Instagram additionally tries the backend oEmbed proxy (official embed HTML)
- *    and falls back to the plain /embed iframe when the proxy is unconfigured.
+ *  - YouTube and Instagram use a poster facade before mounting an iframe.
+ *  - Drive mounts its lazy preview directly so the provider can show a first frame.
+ *  - Instagram uses only the proxy's structured thumbnail, never raw embed HTML.
  *
  * A caption/source footer with an "open original" link is always shown, so the
  * evidence link survives even if the embed itself fails to load.
@@ -69,10 +67,12 @@ function FailureCard({ provider, sourceUrl, label }) {
 
 /** Native <video> playback for direct file links. */
 function NativeVideo({ src, sourceUrl, caption }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) return <FailureCard provider="file" sourceUrl={sourceUrl} label="This video could not load. Open the original to check access or format support." />;
     return (
         <div className={[styles.embed, styles.landscape].join(' ')}>
             {/* User-supplied evidence video; no caption track is available. */}
-            <video className={styles.frame} src={src} controls preload="none" />
+            <video className={styles.frame} src={src} controls preload="none" onError={() => setFailed(true)} />
             <EmbedFooter provider="file" sourceUrl={sourceUrl} caption={caption} />
         </div>
     );
@@ -181,7 +181,7 @@ function VideoEmbed({ descriptor, caption }) {
     const title = caption || `${PROVIDER_LABEL[provider] || 'Embedded'} video`;
 
     if (kind === 'native') {
-        return <NativeVideo src={descriptor.src} sourceUrl={descriptor.sourceUrl} caption={caption} />;
+        return <NativeVideo key={descriptor.src} src={descriptor.src} sourceUrl={descriptor.sourceUrl} caption={caption} />;
     }
 
     if (provider === 'instagram') {

@@ -15,6 +15,7 @@ const PERSISTED_PREFIXES = new Set([
     'session-goals-view',
     'activities',
     'activity-groups',
+    'activity-tag-catalog',
     'circuits',
     'session-templates',
 ]);

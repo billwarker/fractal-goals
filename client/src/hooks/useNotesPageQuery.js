@@ -81,7 +81,7 @@ export function useNotesPageQuery(rootId, filters = {}) {
     });
 
     const updateNoteMutation = useMutation({
-        mutationFn: ({ noteId, content }) => fractalNotesApi.updateNote(rootId, noteId, { content }),
+        mutationFn: ({ noteId, content, attachments }) => fractalNotesApi.updateNote(rootId, noteId, { content, ...(attachments ? { attachments } : {}) }),
         onSuccess: () => { invalidate(); },
         onError: () => notify.error('Failed to update note'),
     });
@@ -113,7 +113,7 @@ export function useNotesPageQuery(rootId, filters = {}) {
         error,
         loadNextPage: () => fetchNextPage(),
         createNote: (data) => createNoteMutation.mutateAsync(data),
-        updateNote: (noteId, content) => updateNoteMutation.mutateAsync({ noteId, content }),
+        updateNote: (noteId, content, attachments) => updateNoteMutation.mutateAsync({ noteId, content, attachments }),
         deleteNote: (note) => deleteNoteMutation.mutateAsync(note),
         pinNote: (noteId) => pinNoteMutation.mutateAsync(noteId),
         unpinNote: (noteId) => unpinNoteMutation.mutateAsync(noteId),
