@@ -145,6 +145,7 @@ never stored by the text outbox or offline query cache.
 
 - Every media read authenticates inside an owned fractal and requires the media to be attached to a live note or goal, or attached to nothing yet (so its owner can preview it before saving). Media whose only attachments are on deleted notes or goals is refused, and media is only ever served to the user whose storage account it came from.
 - Media is streamed in range pieces of at most 8 MiB (`MAX_RANGE_BYTES` in `services/media_stream.py`). Cloud Run rejects any response over 32 MiB that declares its length, so an open-ended `Range: bytes=0-` from a video player is cut to one piece, and a full download of a large file is sent chunked without a `Content-Length`.
+- Video posters come from `GET /api/<root>/media/<id>/thumbnail`, which returns the provider's own preview image (Drive `thumbnailLink`, fetched only from `lhN.googleusercontent.com`; Dropbox `get_thumbnail_v2`). It uses the same access rule as playback, is capped at 2 MiB, and may be kept in the viewer's own browser cache for an hour (`private, max-age=3600`). Every other storage response is `private, no-store`. Nothing of the video itself loads until the user presses play.
   Admin support impersonation cannot use cloud-storage routes.
 - Credentials and provider upload sessions use authenticated encryption. OAuth state is random,
   stored hashed, expires in ten minutes and is consumed once; exchanges use PKCE. A separate

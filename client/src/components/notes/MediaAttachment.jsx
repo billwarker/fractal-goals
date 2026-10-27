@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { mediaContentUrl, mediaOpenUrl } from '../../utils/api/storageApi';
+import { mediaContentUrl, mediaOpenUrl, mediaThumbnailUrl } from '../../utils/api/storageApi';
 import Button from '../atoms/Button';
 import styles from './MediaAttachment.module.css';
 
@@ -21,7 +21,9 @@ export default function MediaAttachment({ asset, rootId }) {
                 <img key={attempt} src={src} alt={asset.alt_text || asset.name} loading="lazy" decoding="async"
                     referrerPolicy="no-referrer" onError={() => setFailed(true)} />
             ) : (
-                <video key={attempt} src={src} controls preload="none" aria-label={asset.alt_text || asset.name}
+                // The poster is the provider's thumbnail, so nothing of the video loads until it plays.
+                <video key={attempt} src={src} poster={mediaThumbnailUrl(rootId, asset.id)} controls preload="none"
+                    aria-label={asset.alt_text || asset.name}
                     onError={() => setFailed(true)} />
             )}
             <figcaption>

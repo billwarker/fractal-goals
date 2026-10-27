@@ -29,6 +29,11 @@ export function mediaOpenUrl(rootId, assetId) {
     return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/open`;
 }
 
+/** The provider's preview image for a file, used as a video's poster frame. */
+export function mediaThumbnailUrl(rootId, assetId) {
+    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/thumbnail`;
+}
+
 export function mediaContentUrl(rootId, assetId) {
     return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/content`;
 }

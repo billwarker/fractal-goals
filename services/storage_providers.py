@@ -1,6 +1,7 @@
 """Fixed-endpoint adapters. Never fetch a caller-supplied URL or follow redirects."""
 import json
 import mimetypes
+import re
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
 
@@ -178,6 +179,43 @@ def web_url(provider, file_id, resource_key=None, token=None):
         return folder_root  # Moved or deleted: the app folder is the best place to look.
     folder, _, name = path.rpartition('/')
     return f'{folder_root}{quote(folder)}?preview={quote(name)}'
+
+
+MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+GOOGLE_THUMBNAIL_HOST = re.compile(r'lh\d+\.googleusercontent\.com')
+
+
+def thumbnail(provider, token, file_id, resource_key=None):
+    """A preview image the provider generated for a file, as (bytes, content type).
+
+    Drive returns a short-lived signed link on a Google image host; only that host is fetched.
+    """
+    auth = headers(token)
+    if provider == 'google_drive':
+        if resource_key:
+            auth['X-Goog-Drive-Resource-Keys'] = f'{file_id}/{resource_key}'
+        data = json_call('GET', f'https://www.googleapis.com/drive/v3/files/{file_id}', headers=auth,
+                         params={'fields': 'hasThumbnail,thumbnailLink'})
+        link = (data.get('thumbnailLink') if data.get('hasThumbnail') else None) or ''
+        parsed = urlparse(link)
+        if parsed.scheme != 'https' or not GOOGLE_THUMBNAIL_HOST.fullmatch(parsed.hostname or ''):
+            raise StorageError('No preview image for this file', 404, 'media_no_thumbnail')
+        # The link ends in a size such as "=s220"; ask for one large enough for the player.
+        response = call('GET', re.sub(r'=s\d+$', '=s1280', link), headers=headers(token), stream=True,
+                        accepted_statuses=(200,))
+    else:
+        auth['Dropbox-API-Arg'] = json.dumps({'resource': {'.tag': 'path', 'path': file_id}, 'format': 'jpeg',
+                                              'size': 'w1024h768', 'mode': 'fitone_bestfit'})
+        response = call('POST', 'https://content.dropboxapi.com/2/files/get_thumbnail_v2', headers=auth, stream=True,
+                        accepted_statuses=(200,))
+    with response:
+        content_type = response.headers.get('Content-Type', '').split(';')[0].strip()
+        if content_type not in ('image/jpeg', 'image/png', 'image/webp'):
+            raise StorageError('No preview image for this file', 404, 'media_no_thumbnail')
+        body = response.raw.read(MAX_THUMBNAIL_BYTES + 1, decode_content=True)
+        if len(body) > MAX_THUMBNAIL_BYTES:
+            raise StorageError('Preview image is too large', 502)
+        return body, content_type
 
 
 def list_dropbox(token, cursor=None):

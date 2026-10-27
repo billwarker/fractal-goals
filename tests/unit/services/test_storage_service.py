@@ -496,3 +496,61 @@ def test_large_media_streams_in_pieces_and_full_files_go_out_chunked(storage, cl
     assert int(piece.headers['Content-Length']) == MAX_RANGE_BYTES
     full = client.get(url)
     assert full.status_code == 200 and 'Content-Length' not in full.headers and len(full.data) == size
+
+
+class FakeImage:
+    def __init__(self, content_type, body=b'jpeg-bytes'):
+        import io
+        self.headers = {'Content-Type': content_type}
+        self.raw = io.BytesIO(body)
+        self.raw.read = lambda size, decode_content=False, _read=self.raw.read: _read(size)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
+@pytest.mark.parametrize('link,fetched', [
+    ('https://lh3.googleusercontent.com/drive-storage/abc=s220', 'https://lh3.googleusercontent.com/drive-storage/abc=s1280'),
+    ('https://evil.example.com/abc=s220', None),
+    ('http://lh3.googleusercontent.com/abc=s220', None),
+    (None, None),
+])
+def test_drive_thumbnail_only_fetches_google_image_hosts(monkeypatch, link, fetched):
+    calls = []
+    monkeypatch.setattr(providers, 'json_call', lambda *args, **kwargs: {'hasThumbnail': bool(link), 'thumbnailLink': link})
+    monkeypatch.setattr(providers, 'call', lambda method, url, **kwargs: calls.append(url) or FakeImage('image/jpeg'))
+    if fetched:
+        assert providers.thumbnail('google_drive', 'token', 'file-1') == (b'jpeg-bytes', 'image/jpeg')
+        assert calls == [fetched]
+    else:
+        with pytest.raises(StorageError) as error:
+            providers.thumbnail('google_drive', 'token', 'file-1')
+        assert error.value.status == 404 and calls == []
+
+
+def test_dropbox_thumbnail_rejects_non_images(monkeypatch):
+    monkeypatch.setattr(providers, 'call', lambda *args, **kwargs: FakeImage('text/html'))
+    with pytest.raises(StorageError):
+        providers.thumbnail('dropbox', 'token', 'id:abc')
+    monkeypatch.setattr(providers, 'call', lambda *args, **kwargs: FakeImage('image/jpeg', bytes(providers.MAX_THUMBNAIL_BYTES + 1)))
+    with pytest.raises(StorageError):
+        providers.thumbnail('dropbox', 'token', 'id:abc')
+
+
+def test_thumbnail_route_serves_playable_media_only(storage, client, monkeypatch):
+    from tests.conftest import session_token_for
+    asset = import_asset(storage)
+    monkeypatch.setattr(providers, 'thumbnail', lambda *args: (b'poster', 'image/jpeg'))
+    client.set_cookie(config.AUTH_COOKIE_NAME, session_token_for(storage.user))
+    url = f'/api/{storage.root.id}/media/{asset["id"]}/thumbnail'
+    response = client.get(url)
+    assert response.status_code == 200 and response.data == b'poster'
+    assert response.headers['Content-Type'] == 'image/jpeg'
+    assert response.headers['Cache-Control'] == 'private, max-age=3600'
+    note, _, _ = create_note(storage, [{'asset_id': asset['id']}])
+    NoteService(storage.db).delete_note(storage.root.id, note['id'], storage.user.id)
+    refused = client.get(url)
+    assert refused.status_code == 404 and refused.headers['Cache-Control'] == 'private, no-store'

@@ -33,6 +33,7 @@ describe('MediaAttachment', () => {
     it('does not preload a private video', () => {
         const { container } = render(<MediaAttachment asset={{ ...image, mime_type: 'video/mp4' }} rootId="root" />);
         expect(container.querySelector('video')).toHaveAttribute('preload', 'none');
+        expect(container.querySelector('video')).toHaveAttribute('poster', expect.stringMatching(/\/root\/media\/.+\/thumbnail$/));
     });
 
     it('renders Markdown pictures responsively with a fallback', () => {

@@ -20,7 +20,8 @@ storage_bp = Blueprint('storage', __name__, url_prefix='/api')
 
 @storage_bp.after_request
 def private_response(response):
-    response.headers['Cache-Control'] = 'private, no-store'
+    # Never stored unless a route opts in (only video posters do).
+    response.headers.setdefault('Cache-Control', 'private, no-store')
     response.headers['Referrer-Policy'] = 'no-referrer'
     return response
 
@@ -195,6 +196,20 @@ def delete_media(current_user, root_id, asset_id):
 def open_in_provider(current_user, root_id, asset_id):
     # Cookie-authenticated link from the attachment caption; redirects to a fixed provider host.
     return execute(lambda db: redirect(MediaService(db).web_url(root_id, current_user.id, asset_id), code=302))
+
+
+@storage_bp.get('/<root_id>/media/<asset_id>/thumbnail')
+@token_required
+@limiter.limit('120 per minute')
+def media_thumbnail(current_user, root_id, asset_id):
+    # Poster image for video players; provider links expire, so only the image bytes are passed on.
+    # A small preview may stay in this browser's own cache for an hour (never a shared cache), so
+    # a feed of videos doesn't refetch every poster from the provider on each visit.
+    def action(db):
+        body, content_type = MediaService(db).thumbnail(root_id, current_user.id, asset_id)
+        return Response(body, headers={'Content-Type': content_type, 'X-Content-Type-Options': 'nosniff',
+                                       'Cache-Control': 'private, max-age=3600'})
+    return execute(action)
 
 
 @storage_bp.get('/<root_id>/media/<asset_id>/content')

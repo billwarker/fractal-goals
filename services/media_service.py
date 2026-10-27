@@ -172,6 +172,12 @@ class MediaService:
             raise StorageError('Attachment not found', 404)
         return asset
 
+    def thumbnail(self, root_id, user_id, asset_id):
+        """The provider's preview image for a playable file (a video's poster frame)."""
+        asset = self.playable_asset(root_id, user_id, asset_id)
+        token = self.connections.access_token(asset.connection_id, user_id)
+        return provider_api.thumbnail(asset.connection.provider, token, asset.file_id, asset.resource_key)
+
     def open_content(self, root_id, user_id, asset_id, byte_range=None):
         asset = self.playable_asset(root_id, user_id, asset_id)
         if byte_range and not re.fullmatch(r'bytes=(?:\d+-\d*|-\d+)', byte_range):
