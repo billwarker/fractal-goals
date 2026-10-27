@@ -25,6 +25,7 @@ function GoalDetailModalFooter({
     completionConfirmTextColor,
     onCancelCompletionConfirm,
     onConfirmCompletion,
+    confirmCompletionBlocked = '',
     onConfirmUncompletion,
     showActivitiesFooter,
     isAssociationFlowActive,
@@ -100,6 +101,8 @@ function GoalDetailModalFooter({
                 </button>
                 <button
                     type="button"
+                    disabled={!isUncompletionConfirm && Boolean(confirmCompletionBlocked)}
+                    title={!isUncompletionConfirm && confirmCompletionBlocked ? confirmCompletionBlocked : undefined}
                     onClick={isUncompletionConfirm ? onConfirmUncompletion : onConfirmCompletion}
                     className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
                     style={{

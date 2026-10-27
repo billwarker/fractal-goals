@@ -9,6 +9,7 @@ import { queryKeys } from './queryKeys';
 // account-wide, so each root is invalidated for every fractal.
 const ATTACHMENT_READ_MODEL_ROOTS = [
     'all-notes', 'goal-notes', 'session-notes', 'previous-session-notes', 'activity-definition-notes', 'goalTimeline',
+    'goal-attachments',
 ];
 
 function invalidateAttachmentReadModels(client) {

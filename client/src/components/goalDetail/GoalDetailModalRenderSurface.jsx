@@ -6,6 +6,7 @@ import { getTypeDisplayName } from '../../utils/goalHelpers';
 import { findGoalNodeById } from '../../utils/goalNodeModel';
 import { getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
 import { useSequenceCompletionChoice } from '../../hooks/useGoalSequenceQueries';
 import notify from '../../utils/notify';
 import CloseButton from '../atoms/CloseButton';
@@ -57,6 +58,7 @@ function GoalDetailModalRenderSurface({
     contentScrollRef,
     deadline,
     description,
+    descriptionAttachments,
     displayGoalColor,
     displayGoalSecondaryColor,
     displayMode,
@@ -195,12 +197,16 @@ function GoalDetailModalRenderSurface({
         : null;
     const uncompletionCompletedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
     const [completionNoteDraft, setCompletionNoteDraft] = useState('');
+    // Pictures and video for the completion note, saved to the user's cloud storage.
+    const completionAttachments = useAttachmentDraft(rootId);
+    const resetCompletionAttachments = completionAttachments.reset;
     const sequenceChoice = useSequenceCompletionChoice({ rootId, goalId, goal, viewState, readOnly });
     useEffect(() => {
         if (viewState !== 'complete-confirm') {
             setCompletionNoteDraft('');
+            resetCompletionAttachments();
         }
-    }, [viewState]);
+    }, [viewState, resetCompletionAttachments]);
 
     const renderLevelPicker = () => (
         <div className={styles.levelPickerContainer}>
@@ -278,6 +284,7 @@ function GoalDetailModalRenderSurface({
                         onLevelChange={setSelectedChildType}
                         name={name} setName={setName}
                         description={description} setDescription={setDescription}
+                        descriptionAttachments={descriptionAttachments}
                         deadline={deadline} setDeadline={setDeadline}
                         startedAt={startedAt} setStartedAt={setStartedAt}
                         reviewCadence={reviewCadence} setReviewCadence={setReviewCadence}
@@ -356,6 +363,7 @@ function GoalDetailModalRenderSurface({
                 goalType={goalType}
                 completionNote={completionNoteDraft}
                 onCompletionNoteChange={setCompletionNoteDraft}
+                attachmentDraft={rootId ? completionAttachments : null}
                 sequenceNextStep={sequenceChoice.nextStep}
                 beginNext={sequenceChoice.beginNext}
                 onBeginNextChange={sequenceChoice.setBeginNext}
@@ -629,7 +637,10 @@ function GoalDetailModalRenderSurface({
             completionConfirmAccentColor={completionConfirmAccentColor}
             completionConfirmTextColor={completionConfirmTextColor}
             onCancelCompletionConfirm={() => setViewState('goal')}
-            onConfirmCompletion={() => handleCompletionConfirm(completionPreviewDate, completionNoteDraft, sequenceChoice.completionOptions)}
+            onConfirmCompletion={() => handleCompletionConfirm(
+                completionPreviewDate, completionNoteDraft, sequenceChoice.completionOptions, completionAttachments.payload(),
+            )}
+            confirmCompletionBlocked={completionAttachments.isBusy ? completionAttachments.busyReason : ''}
             onConfirmUncompletion={() => handleUncompletionConfirm(sequenceChoice.uncompletionOptions)}
             isAssociationFlowActive={isAssociationFlowActive}
             activityPickerFooterActions={activityPickerFooterActions}

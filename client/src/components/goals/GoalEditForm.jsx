@@ -9,11 +9,14 @@ import { formatDueDate } from '../../utils/goalDueFormat';
 import { getGoalReview } from '../../utils/goalReview';
 import { getValidChildTypes } from '../../utils/goalHelpers';
 import { isExecutionGoalType } from '../../utils/goalNodeModel';
+import AttachableField from '../notes/AttachableField';
+import GoalDescriptionMedia from './GoalDescriptionMedia';
 import styles from '../GoalDetailModal.module.css'; // Reusing the same styles for now
 
 function GoalEditForm({
     mode,
     goal,
+    rootId,
     goalType,
     goalColor,
     textColor,
@@ -24,6 +27,7 @@ function GoalEditForm({
     // Form state from useGoalForm
     name, setName,
     description, setDescription,
+    descriptionAttachments = null,
     deadline, setDeadline,
     startedAt, setStartedAt,
     reviewCadence = null, setReviewCadence,
@@ -69,20 +73,36 @@ function GoalEditForm({
                 {errors.name && <div className={styles.errorText}>{errors.name}</div>}
             </div>
 
-            {(
-                <div className={styles.fieldGroup}>
-                    <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-description">
-                        Description
-                    </label>
+            <div className={styles.fieldGroup}>
+                <label className={styles.label} style={{ color: 'var(--color-text-primary)' }} htmlFor="goal-description">
+                    Description
+                </label>
+                {descriptionAttachments ? (
+                    <>
+                        <AttachableField draft={descriptionAttachments} label="Attachments for this description">
+                            <textarea
+                                id="goal-description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                onPaste={descriptionAttachments.handlePaste}
+                                placeholder="Write your goal's description here. Optionally attach pictures or video with the paperclip, or paste or drop them in."
+                                rows={3}
+                                className={styles.textarea}
+                            />
+                        </AttachableField>
+                        <GoalDescriptionMedia draft={descriptionAttachments} rootId={rootId} />
+                    </>
+                ) : (
                     <textarea
                         id="goal-description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Write your goal's description here."
                         rows={3}
                         className={styles.textarea}
                     />
-                </div>
-            )}
+                )}
+            </div>
 
             {/* Review - SMART "R" (Reviewed), on levels that review goals */}
             {usesReviews && mode !== 'create' && setReviewCadence && (

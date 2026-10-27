@@ -9,7 +9,7 @@ import styles from './AttachMenuButton.module.css';
  * Quick-bar paperclip: one button whose menu offers this device or cloud storage.
  * Pasting or dropping pictures onto the bar bypasses the menu.
  */
-export default function AttachMenuButton({ draft, disabled = false, className = '', onPickerClosed }) {
+export default function AttachMenuButton({ draft, disabled = false, className = styles.button, placement = 'up', onPickerClosed }) {
     const [open, setOpen] = useState(false);
     const [choosing, setChoosing] = useState(false);
     const container = useRef(null);
@@ -53,7 +53,7 @@ export default function AttachMenuButton({ draft, disabled = false, className = 
                 <PaperclipIcon size={20} />
             </button>
             {open && (
-                <DropdownMenu ref={menu} id={menuId} className={styles.menu} align="right" aria-label="Attach from">
+                <DropdownMenu ref={menu} id={menuId} className={placement === 'down' ? styles.menuDown : styles.menu} align="right" aria-label="Attach from">
                     <DropdownMenuItem onClick={() => { setOpen(false); fileInput.current?.click(); }}>
                         <span className={styles.item}>
                             <span>From this device</span>

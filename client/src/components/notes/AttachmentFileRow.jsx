@@ -7,6 +7,15 @@ import styles from './MediaAttachment.module.css';
 const errorText = (error) => error?.response?.data?.error || error?.message || 'Something went wrong. Try again.';
 const TRASH = { google_drive: 'Google Drive trash', dropbox: 'Dropbox deleted files' };
 
+const count = (value, one, many) => `${value} ${value === 1 ? one : many}`;
+
+/** Where deleting the file will remove it from, by its usage counts. */
+export function usageText({ notes = 0, goals = 0 }) {
+    if (notes + goals <= 1) return 'It will be removed from where it’s attached.';
+    const places = [notes && count(notes, 'note', 'notes'), goals && count(goals, 'goal description', 'goal descriptions')].filter(Boolean);
+    return `It will be removed from ${places.join(' and ')}.`;
+}
+
 function splitName(name = '') {
     const match = name.match(/^(.*?)(\.[^.]+)?$/);
     return { base: match?.[1] || '', extension: match?.[2] || '' };
@@ -14,7 +23,7 @@ function splitName(name = '') {
 
 /**
  * A stored attachment while composing or managing a note: rename the original, remove it
- * from this note, or delete it from the user's storage (and so from every note).
+ * from this note, or delete it from the user's storage (and so from every note and goal using it).
  */
 export default function AttachmentFileRow({ item, draft, disabled = false }) {
     const { base, extension } = splitName(item.name);
@@ -55,7 +64,7 @@ export default function AttachmentFileRow({ item, draft, disabled = false }) {
                 <div className={styles.confirm} role="group" aria-label={`Confirm deleting ${item.name}`}>
                     <p>
                         Move {item.name} to the {TRASH[item.provider] || `${storage} trash`}?
-                        {confirm.notes > 1 ? ` It will be removed from ${confirm.notes} notes.` : ' It will be removed from this note.'}
+                        {` ${usageText(confirm)}`}
                         {' '}You can restore it from {storage} for a limited time.
                     </p>
                     <span className={styles.controls}>

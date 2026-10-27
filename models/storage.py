@@ -84,6 +84,21 @@ class NoteAttachment(Base):
     asset: Mapped[MediaAsset] = relationship(lazy='joined')
 
 
+class GoalAttachment(Base):
+    """A media file attached to a goal's description."""
+    __tablename__ = 'goal_attachments'
+    __table_args__ = (
+        UniqueConstraint('goal_id', 'asset_id', name='uq_goal_asset'),
+        UniqueConstraint('goal_id', 'position', name='uq_goal_attachment_position'),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)
+    goal_id: Mapped[str] = mapped_column(ForeignKey('goals.id', ondelete='CASCADE'), index=True)
+    asset_id: Mapped[str] = mapped_column(ForeignKey('media_assets.id', ondelete='CASCADE'), index=True)
+    position: Mapped[int] = mapped_column(Integer)
+    alt_text: Mapped[str] = mapped_column(String(500), default='')
+    asset: Mapped[MediaAsset] = relationship(lazy='joined')
+
+
 class StorageUpload(Base):
     __tablename__ = 'storage_uploads'
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_id)

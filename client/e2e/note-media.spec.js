@@ -179,3 +179,51 @@ test('a note’s options menu closes on an outside click without crashing the pa
     await expect(page.getByRole('region', { name: 'Manage attachments' })).toBeVisible();
     expect(errors).toEqual([]);
 });
+
+test('goal descriptions and completion notes take pasted pictures into cloud storage', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    test.skip(suffix !== 'desktop', 'The goal details flow is the same on mobile; one viewport covers the wiring.');
+    const uploads = [];
+    await mockConnectedStorage(page, uploads);
+    const sent = { goal: null, note: null };
+    await page.route('**/api/*/goals/*/attachments', (route) => route.fulfill({ json: [] }));
+    await page.route(new RegExp(`/api/browser-root-${suffix}/goals/browser-root-${suffix}$`), async (route) => {
+        if (route.request().method() !== 'PUT') return route.fallback();
+        const body = route.request().postDataJSON();
+        sent.goal = body;
+        const { attachments: _attachments, ...rest } = body;  // The fake asset id isn't in the test database.
+        return route.fallback({ postData: JSON.stringify(rest) });
+    });
+    await page.route(`**/api/browser-root-${suffix}/notes`, async (route) => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        const body = route.request().postDataJSON();
+        sent.note = body;
+        const { attachments: _attachments, ...rest } = body;
+        return route.fallback({ postData: JSON.stringify(rest) });
+    });
+    await openGoalNotes(page, suffix);
+    await page.getByRole('tab', { name: 'Details', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    const description = page.getByLabel('Description', { exact: true });
+    await expect(description).toBeVisible();
+    const field = page.locator('[class*="attachableField"]').filter({ has: description });
+    await expect(field.getByRole('button', { name: 'Attach pictures or video' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload from device' })).toHaveCount(0);
+    await pasteImage(description);
+    await expect(page.getByRole('list', { name: 'Attachments for this description' }).getByRole('listitem')).toHaveCount(1);
+    await page.screenshot({ path: testInfo.outputPath('goal-description.png') });
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect.poll(() => sent.goal?.attachments?.length).toBe(1);
+
+    await page.getByRole('button', { name: 'Mark Complete' }).click();
+    const note = page.getByLabel('Goal Completion Note (optional):');
+    await expect(note).toBeVisible();
+    await note.fill('Finally clean');
+    await pasteImage(note);
+    await expect(page.getByRole('list', { name: 'Attachments for this completion note' }).getByRole('listitem')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Complete Goal' })).toBeEnabled();
+    await page.screenshot({ path: testInfo.outputPath('goal-completion.png') });
+    await page.getByRole('button', { name: 'Complete Goal' }).click();
+    await expect.poll(() => sent.note?.attachments?.length).toBe(1);
+    expect(sent.note).toMatchObject({ content: 'Finally clean', note_kind: 'goal_completion' });
+});

@@ -6,6 +6,7 @@ Re-exported by the validators package __init__, so existing
 import re
 from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from .notes import NoteAttachmentSchema
 from .core import (
     MAX_NAME_LENGTH,
     MAX_DESCRIPTION_LENGTH,
@@ -108,6 +109,8 @@ class GoalUpdateSchema(BaseModel):
     review_cadence_unit: Optional[Literal['days', 'weeks', 'months', 'years']] = None
     review_disabled: Optional[bool] = None
     review_deferred_until: Optional[str] = None
+    # Media on the description; ids of assets imported or uploaded into this fractal.
+    attachments: Optional[list[NoteAttachmentSchema]] = Field(None, max_length=8)
 
     @model_validator(mode='after')
     def validate_review_cadence_pair(self):

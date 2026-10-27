@@ -1,10 +1,10 @@
 """Tenant-scoped durable media references and atomic note attachment validation."""
 import re
 
-from sqlalchemy import func
+from sqlalchemy import exists, func, or_
 from sqlalchemy.orm import Session
 
-from models import Goal, MediaAsset, Note, NoteAttachment, validate_root_goal
+from models import Goal, GoalAttachment, MediaAsset, Note, NoteAttachment, validate_root_goal
 from services import storage_providers as provider_api
 from services.storage_common import MAX_ATTACHMENTS, StorageError, serialize_asset, validate_file, validate_file_id, verify_signature
 from services.storage_connection_service import StorageConnectionService
@@ -71,14 +71,30 @@ class MediaService:
         return attachments
 
     def replace_attachments(self, note, attachments):
+        self._replace(NoteAttachment, 'note_id', note, attachments)
+
+    def goal_attachments(self, root_id, user_id, goal_id):
+        """Media on a goal's description, read on demand so goal trees don't load it."""
+        self.owned_root(root_id, user_id)
+        goal = self.db.query(Goal).filter(Goal.id == goal_id, Goal.root_id == root_id, Goal.deleted_at.is_(None)).first()
+        if not goal:
+            raise StorageError('Goal not found', 404)
+        rows = self.db.query(GoalAttachment).filter_by(goal_id=goal.id).order_by(GoalAttachment.position).all()
+        return [serialize_attachment(row) for row in rows]
+
+    def replace_goal_attachments(self, goal, attachments):
+        """Media on a goal's description; validated with validate_attachments like a note's."""
+        self._replace(GoalAttachment, 'goal_id', goal, attachments)
+
+    def _replace(self, model, owner_key, owner, attachments):
         # Delete first so reordering does not collide with unique positions.
-        self.db.query(NoteAttachment).filter_by(note_id=note.id).delete(synchronize_session=False)
+        self.db.query(model).filter_by(**{owner_key: owner.id}).delete(synchronize_session=False)
         self.db.flush()
         for position, item in enumerate(attachments):
-            self.db.add(NoteAttachment(note_id=note.id, asset_id=item['asset_id'], position=position,
-                                       alt_text=item.get('alt_text', '').strip()))
+            self.db.add(model(**{owner_key: owner.id}, asset_id=item['asset_id'], position=position,
+                              alt_text=item.get('alt_text', '').strip()))
         self.db.flush()
-        self.db.expire(note, ['attachments'])
+        self.db.expire(owner, ['attachments'])
 
     def owned_asset(self, root_id, user_id, asset_id):
         self.owned_root(root_id, user_id)
@@ -97,7 +113,10 @@ class MediaService:
         notes = self.db.query(func.count(func.distinct(NoteAttachment.note_id))).join(
             Note, Note.id == NoteAttachment.note_id,
         ).filter(NoteAttachment.asset_id.in_(ids), Note.deleted_at.is_(None)).scalar()
-        return {'notes': int(notes or 0), 'provider': asset.connection.provider}
+        goals = self.db.query(func.count(func.distinct(GoalAttachment.goal_id))).join(
+            Goal, Goal.id == GoalAttachment.goal_id,
+        ).filter(GoalAttachment.asset_id.in_(ids), Goal.deleted_at.is_(None)).scalar()
+        return {'notes': int(notes or 0), 'goals': int(goals or 0), 'provider': asset.connection.provider}
 
     def rename(self, root_id, user_id, asset_id, name):
         """Rename the original in the user's storage; the extension (and so the type) cannot change."""
@@ -118,17 +137,21 @@ class MediaService:
         result = self.usage(root_id, user_id, asset_id)
         token = self.connections.access_token(asset.connection_id, user_id)
         provider_api.trash(asset.connection.provider, token, asset.file_id, asset.resource_key)
-        # Attachments cascade with their assets in the database.
+        # Note and goal attachments cascade with their assets in the database.
         self._same_file(asset).delete(synchronize_session=False)
         self.db.commit()
-        return {'deleted': True, 'notes_updated': result['notes']}
+        return {'deleted': True, 'notes_updated': result['notes'], 'goals_updated': result['goals']}
 
     def playable_asset(self, root_id, user_id, asset_id):
         self.owned_root(root_id, user_id)
-        asset = self.db.query(MediaAsset).join(NoteAttachment, NoteAttachment.asset_id == MediaAsset.id).join(
-            Note, Note.id == NoteAttachment.note_id,
-        ).filter(MediaAsset.id == asset_id, MediaAsset.root_id == root_id, Note.root_id == root_id,
-                 Note.deleted_at.is_(None)).first()
+        # Playable only while attached to a live note or a live goal in this fractal.
+        on_note = exists().where(NoteAttachment.asset_id == MediaAsset.id, Note.id == NoteAttachment.note_id,
+                                 Note.root_id == root_id, Note.deleted_at.is_(None))
+        on_goal = exists().where(GoalAttachment.asset_id == MediaAsset.id, Goal.id == GoalAttachment.goal_id,
+                                 Goal.root_id == root_id, Goal.deleted_at.is_(None))
+        asset = self.db.query(MediaAsset).filter(
+            MediaAsset.id == asset_id, MediaAsset.root_id == root_id, or_(on_note, on_goal),
+        ).first()
         if not asset or asset.connection.user_id != user_id:
             raise StorageError('Attachment not found', 404)
         return asset

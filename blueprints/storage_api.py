@@ -160,6 +160,12 @@ def import_media(current_user, root_id):
     )), 201))
 
 
+@storage_bp.get('/<root_id>/goals/<goal_id>/attachments')
+@token_required
+def goal_attachments(current_user, root_id, goal_id):
+    return execute(lambda db: jsonify(MediaService(db).goal_attachments(root_id, current_user.id, goal_id)))
+
+
 @storage_bp.patch('/<root_id>/media/<asset_id>')
 @token_required
 @limiter.limit('30 per minute')

@@ -118,6 +118,12 @@ limited time, and removes it from every note that used it. Drive only lets a fil
 that refusal is reported as `storage_forbidden`, not as a reconnect. Removing an attachment from a note
 never touches the original.
 
+Goal descriptions and goal completion notes take attachments too. Completion notes are ordinary
+notes. Description media lives in `goal_attachments` (cascades with the goal or asset); it is read on
+demand rather than with goal trees, counted in Settings and usage, removed when the original is
+deleted, exported per fractal, and stripped from public landing snapshots with every other
+`attachments` key.
+
 The provider redirect URIs stay `/api/storage/<provider>/callback`. The callback always answers
 `303` to `/storage/connected?provider=<p>&result=<code>` with a fixed result allowlist
 (`connected`, `cancelled`, `expired`, `wrong_browser`, `account_mismatch`, `permissions`,

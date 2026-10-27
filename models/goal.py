@@ -271,6 +271,8 @@ class Goal(Base):
         viewonly=True,
     )
     sequence_track = relationship("GoalSequenceTrack", foreign_keys=[sequence_track_id])
+    # Media attached to the description. Read on demand (GET …/goals/<id>/attachments); serialized only when loaded.
+    attachments = relationship("GoalAttachment", order_by="GoalAttachment.position", passive_deletes=True)
     pause_intervals = relationship(
         "GoalPauseInterval",
         back_populates="goal",

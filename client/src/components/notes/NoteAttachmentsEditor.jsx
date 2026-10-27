@@ -24,10 +24,10 @@ export function CloudPicker({ draft, onClose }) {
 }
 
 /** Uploading, failed and finished attachments. `compact` (quick bars) only offers removal. */
-export function AttachmentDraftList({ draft, disabled = false, compact = false }) {
+export function AttachmentDraftList({ draft, disabled = false, compact = false, label = 'Attachments for this note' }) {
     if (!draft.items.length) return null;
     return (
-        <ul className={compact ? styles.compactFiles : styles.files} aria-label="Attachments for this note">
+        <ul className={compact ? styles.compactFiles : styles.files} aria-label={label}>
             {draft.items.map((item) => (!compact && item.status === 'ready' ? (
                 <AttachmentFileRow key={item.key} item={item} draft={draft} disabled={disabled} />
             ) : (

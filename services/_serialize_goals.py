@@ -1,8 +1,11 @@
 """Goal serializer, including SMART status and the completion condition.
 """
 
+from sqlalchemy import inspect as sa_inspect
+
 from .goal_type_utils import get_canonical_goal_type
 from services._serialize_common import calculate_smart_status, format_utc
+from services.media_service import serialize_attachment
 
 
 def _number(value):
@@ -121,6 +124,10 @@ def serialize_goal(goal, include_children=True):
         },
         "children": []
     }
+
+    if 'attachments' not in sa_inspect(goal).unloaded:
+        # Description media, only when already loaded (e.g. the update response); never lazy-loaded here.
+        result["attachments"] = [serialize_attachment(item) for item in goal.attachments]
 
     if getattr(goal, 'sequence_track_id', None):
         # The predecessor whose completion began this step, while it runs (Undo can re-pause it).

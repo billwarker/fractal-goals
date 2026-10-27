@@ -5,21 +5,24 @@ Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 """
 import uuid
 
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from models import Goal, GoalLevel, Session, get_goal_by_id, session_goals
 from services.events import event_bus, Event, Events
 from services.goal_domain_rules import should_inherit_parent_activities
 from services.goal_loading import goal_serializer_load_options
+from services.media_service import MediaService
 from services.payload_normalizers import normalize_goal_payload
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
+from services.storage_common import StorageError
 
 from services._goal_service_common import resolve_level_id, session_goal_insert_values
 
 
 
 class _GoalCrudMixin:
+    db_session: Session  # Provided by GoalService.
     def create_global_goal(self, current_user_id, data) -> ServiceResult[Goal]:
         data = normalize_goal_payload(data)
         quota_service = QuotaService(self.db_session)
@@ -354,10 +357,19 @@ class _GoalCrudMixin:
         )
         if update_error:
             return None, *update_error
+        if data.get('attachments') is not None:
+            media = MediaService(self.db_session)
+            try:
+                media.replace_goal_attachments(goal, media.validate_attachments(root_id, current_user_id, data['attachments']))
+            except StorageError as exc:
+                self.db_session.rollback()
+                return None, str(exc), exc.status
 
         if commit:
             self.db_session.commit()
             self.db_session.refresh(goal)
+        if 'attachments' in data:
+            _ = goal.attachments  # Load them so the response shows what was saved.
         event = Event(Events.GOAL_UPDATED, {
             'goal_id': goal.id,
             'goal_name': goal.name,

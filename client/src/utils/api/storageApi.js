@@ -21,6 +21,7 @@ export const storageApi = {
     renameMedia: (rootId, assetId, name) => axios.patch(`${API_BASE}/${rootId}/media/${assetId}`, { name }),
     mediaUsage: (rootId, assetId) => axios.get(`${API_BASE}/${rootId}/media/${assetId}/usage`),
     deleteMedia: (rootId, assetId) => axios.delete(`${API_BASE}/${rootId}/media/${assetId}`),
+    goalAttachments: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/attachments`),
 };
 
 export function mediaContentUrl(rootId, assetId) {

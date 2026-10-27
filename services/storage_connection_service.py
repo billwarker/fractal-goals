@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from config import config
-from models import MediaAsset, Note, NoteAttachment, StorageAuthorization, StorageConnection, User
+from models import Goal, GoalAttachment, MediaAsset, Note, NoteAttachment, StorageAuthorization, StorageConnection, User
 from models.base import utc_now
 from services import storage_providers as provider_api
 from services.storage_common import MAX_ATTACHMENTS, PROVIDERS, StorageError, provider_config, seal, unseal
@@ -35,7 +35,15 @@ class StorageConnectionService:
                             .join(StorageConnection, StorageConnection.id == MediaAsset.connection_id)
                             .filter(StorageConnection.user_id == user_id, Note.deleted_at.is_(None))
                             .group_by(MediaAsset.connection_id).all())
-        counts: dict[str, int] = {connection_id: count for connection_id, count in rows_with_counts}
+        goal_counts = (self.db.query(MediaAsset.connection_id, func.count(GoalAttachment.id))
+                       .join(GoalAttachment, GoalAttachment.asset_id == MediaAsset.id)
+                       .join(Goal, Goal.id == GoalAttachment.goal_id)
+                       .join(StorageConnection, StorageConnection.id == MediaAsset.connection_id)
+                       .filter(StorageConnection.user_id == user_id, Goal.deleted_at.is_(None))
+                       .group_by(MediaAsset.connection_id).all())
+        counts: dict[str, int] = {}
+        for connection_id, count in [*rows_with_counts, *goal_counts]:
+            counts[connection_id] = counts.get(connection_id, 0) + count
         providers = []
         chosen = next((provider for provider, row in rows.items() if row.upload_default), None)
         for provider in PROVIDERS:

@@ -11,7 +11,7 @@ a caller-supplied root or user id.
 """
 
 from datetime import datetime, timezone
-from models import MediaAsset, NoteFilter, StorageConnection
+from models import GoalAttachment, MediaAsset, NoteFilter, StorageConnection
 from services.note_filter_service import serialize_note_filter
 from services.storage_common import serialize_asset
 
@@ -121,6 +121,9 @@ class DataExportService:
             "notes": self._serialize_all(Note, root_id, serialize_note),
             "note_filters": [serialize_note_filter(row) for row in self.db_session.query(NoteFilter).filter_by(root_id=root_id)
                              .order_by(NoteFilter.position, NoteFilter.created_at).all()],
+            "goal_attachments": [{"goal_id": row.goal_id, "asset_id": row.asset_id, "position": row.position, "alt_text": row.alt_text}
+                                 for row in self.db_session.query(GoalAttachment).join(Goal, Goal.id == GoalAttachment.goal_id)
+                                 .filter(Goal.root_id == root_id).order_by(GoalAttachment.goal_id, GoalAttachment.position).all()],
             "media_assets": [{**serialize_asset(row), "file_id": row.file_id, "revision": row.revision}
                              for row in self.db_session.query(MediaAsset).filter_by(root_id=root_id).all()],
             "analytics_dashboards": self._serialize_all(AnalyticsDashboard, root_id, serialize_analytics_dashboard),

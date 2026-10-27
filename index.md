@@ -393,8 +393,11 @@ Media has one structured attachment boundary: `models/storage.py`, `services/med
 `services/storage_connection_service.py`, `services/storage_upload_service.py` and
 `blueprints/storage_api.py`. User-owned Google Drive (`drive.file` + Picker) and Dropbox App Folder
 connections retain encrypted credentials; originals stay in the provider. Notes link to scoped
-media assets through `note_attachments`; goal notes/reviews, sessions and activities reuse that
-store. OAuth combines single-use PKCE state with a dedicated browser-bound Lax callback cookie;
+media assets through `note_attachments`; goal notes/reviews/completion notes, sessions and activities reuse that
+store. Goal descriptions link through `goal_attachments`, read on demand (`GET …/goals/<id>/attachments`,
+`hooks/useGoalDescriptionAttachments.js`) so goal trees never load them, and saved with the goal update
+(`attachments`). Media is playable while attached to a live note or a live goal. Text fields outside quick
+bars use `notes/AttachableField` (paperclip menu, paste, drop, compact chips). OAuth combines single-use PKCE state with a dedicated browser-bound Lax callback cookie;
 the main production auth cookie stays Strict. Shared note cards render `NoteMedia` / `MediaAttachment`. `hooks/useAttachmentDraft.js` owns a
 note's draft attachments: device files, pasted and dropped pictures upload through `utils/cloudUpload.js`
 with resumable chunks into the user's upload destination (`storage_connections.upload_default`, chosen in

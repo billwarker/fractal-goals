@@ -59,9 +59,9 @@ def test_rename_without_change_does_not_call_the_provider(media):
 def test_usage_and_delete_remove_the_file_from_every_note(media):
     first, second = note_with(media, media.asset.id, 'One'), note_with(media, media.asset.id, 'Two')
     NoteService(media.db).delete_note(media.root.id, second['id'], media.user.id)
-    assert media.service.usage(media.root.id, media.user.id, media.asset.id) == {'notes': 1, 'provider': 'google_drive'}
+    assert media.service.usage(media.root.id, media.user.id, media.asset.id) == {'notes': 1, 'goals': 0, 'provider': 'google_drive'}
     result = media.service.delete_from_storage(media.root.id, media.user.id, media.asset.id)
-    assert result == {'deleted': True, 'notes_updated': 1}
+    assert result == {'deleted': True, 'notes_updated': 1, 'goals_updated': 0}
     assert media.calls == [('trash', 'file-1')]
     assert media.db.query(MediaAsset).count() == 0
     assert media.db.query(NoteAttachment).count() == 0
@@ -92,8 +92,8 @@ def test_http_routes(media, authed_client):
     base = f'/api/{media.root.id}/media/{media.asset.id}'
     assert authed_client.patch(base, json={'name': 'Form.png', 'extra': 1}).status_code == 400
     assert authed_client.patch(base, json={'name': 'Form.png'}).get_json()['name'] == 'Form.png'
-    assert authed_client.get(f'{base}/usage').get_json() == {'notes': 0, 'provider': 'google_drive'}
-    assert authed_client.delete(base).get_json() == {'deleted': True, 'notes_updated': 0}
+    assert authed_client.get(f'{base}/usage').get_json() == {'notes': 0, 'goals': 0, 'provider': 'google_drive'}
+    assert authed_client.delete(base).get_json() == {'deleted': True, 'notes_updated': 0, 'goals_updated': 0}
     assert authed_client.delete(base).status_code == 404
 
 
