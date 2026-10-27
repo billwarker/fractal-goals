@@ -1,6 +1,7 @@
 import React from 'react';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { formatDateTimeParts } from '../../utils/formatters';
+import Badge from '../atoms/Badge';
 import GoalIcon from '../atoms/GoalIcon';
 import { ActivityTimelineCard } from '../common/ActivityTimeline';
 import { normalizeTimelineEntry } from './goalTimelineViewModel';
@@ -104,7 +105,7 @@ function TimelineItem({ item, rootId, timezone, currentGoal = null }) {
                 {card.metrics.length > 0 && (
                     <div className={styles.metrics}>
                         {card.metrics.map((metric) => (
-                            <span key={metric} className={styles.metricPill}>{metric}</span>
+                            <Badge key={metric} size="sm" pill={false}>{metric}</Badge>
                         ))}
                     </div>
                 )}

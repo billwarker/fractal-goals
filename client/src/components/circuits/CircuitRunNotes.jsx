@@ -4,6 +4,7 @@ import styles from './CircuitRunCard.module.css';
 
 
 export default function CircuitRunNotes({
+    rootId,
     notes,
     noteTarget,
     onAddNote,
@@ -12,9 +13,9 @@ export default function CircuitRunNotes({
     onNoteCreated,
 }) {
     if (!notes.length && !onAddNote) return null;
-    const handleAdd = async (content) => {
+    const handleAdd = async (content, attachments = []) => {
         if (!content.trim() || !onAddNote) return;
-        await onAddNote({ ...noteTarget.payload, content: content.trim() });
+        await onAddNote({ ...noteTarget.payload, content: content.trim(), ...(attachments.length ? { attachments } : {}) });
         onNoteCreated?.();
     };
     return (
@@ -33,6 +34,7 @@ export default function CircuitRunNotes({
             {onAddNote && (
                 <NoteQuickAdd
                     key={`${noteTarget.kind}:${noteTarget.payload.context_id}:${noteTarget.payload.activity_set_id || ''}`}
+                    rootId={rootId}
                     onSubmit={handleAdd}
                     placeholder={noteTarget.placeholder}
                 />

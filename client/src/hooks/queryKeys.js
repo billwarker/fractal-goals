@@ -6,6 +6,7 @@ export const queryKeys = {
     aiRuns: (rootId = null) => ['ai-agent', 'runs', rootId],
     aiChangeCursor: (rootId) => ['ai-agent', 'changes', rootId],
     aiEmbeddedProviders: () => ['ai-agent', 'embedded-providers'],
+    storageConnections: () => ['storage', 'connections'],
     aiEmbeddedConversations: (rootId) => ['ai-agent', 'embedded-conversations', rootId],
     aiEmbeddedConversation: (conversationId) => ['ai-agent', 'embedded-conversation', conversationId],
     instanceGoalMutation: (rootId, instanceId) => ['instance-goal', rootId, instanceId],
@@ -160,6 +161,10 @@ export const queryKeys = {
     goalNotesRoot: (rootId) => ['goal-notes', rootId],
     allNotes: (rootId, filters = {}) => ['all-notes', rootId, filters],
     allNotesRoot: (rootId) => ['all-notes', rootId],
+    // Under the all-notes root so every note mutation refreshes the heatmap too.
+    notesHeatmap: (rootId, filters = {}) => ['all-notes', rootId, 'heatmap', filters],
+    noteFilters: (rootId) => ['note-filters', rootId],
+    goalAttachments: (rootId, goalId) => ['goal-attachments', rootId, goalId],
     instagramOembed: (permalink) => ['instagram-oembed', permalink],
     progressRoot: () => ['progress'],
     progressComparison: (instanceId) => ['progress', 'comparison', instanceId],

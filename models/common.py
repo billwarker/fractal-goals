@@ -16,6 +16,8 @@ class Note(Base):
     
     __table_args__ = (
         sa.Index('ix_notes_root_context_deleted', 'root_id', 'context_type', 'context_id', 'deleted_at'),
+        # Notes feed, day filter and heatmap read live notes of one fractal by time.
+        sa.Index('ix_notes_root_live_created', 'root_id', 'created_at', postgresql_where=sa.text('deleted_at IS NULL')),
         sa.CheckConstraint(
             "note_kind IS NULL OR note_kind IN ('goal_completion', 'goal_review')", name='ck_notes_note_kind',
         ),
@@ -43,6 +45,23 @@ class Note(Base):
     activity_set = relationship("ActivitySet")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     goal = relationship("Goal", foreign_keys=[goal_id])
+    attachments = relationship("NoteAttachment", order_by="NoteAttachment.position", lazy="selectin", passive_deletes=True)
+
+class NoteFilter(Base):
+    """A named, clickable Notes page filter; its spec is validated by services/note_filter_spec.py."""
+    __tablename__ = 'note_filters'
+    __table_args__ = (
+        sa.UniqueConstraint('root_id', 'name', name='uq_note_filters_root_name'),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    name = Column(String(60), nullable=False)
+    spec = Column(JSON_TYPE, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
 
 class AnalyticsDashboard(Base):
     __tablename__ = 'analytics_dashboards'

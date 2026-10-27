@@ -55,5 +55,5 @@ EXPOSE $PORT
 # so the trusted proxy hop count (TRUSTED_PROXY_HOPS) can be verified.
 CMD exec gunicorn --bind :$PORT --workers $WEB_CONCURRENCY --threads $GUNICORN_THREADS --timeout $GUNICORN_TIMEOUT \
     --access-logfile - --error-logfile - \
-    --access-logformat '%(h)s xff="%({x-forwarded-for}i)s" %(t)s "%(r)s" %(s)s %(b)s %(M)sms' \
+    --access-logformat '%(h)s xff="%({x-forwarded-for}i)s" %(t)s "%(m)s %(U)s %(H)s" %(s)s %(b)s %(M)sms' \
     app:app

@@ -127,6 +127,7 @@ function SessionSidePane({
                             />
                         ) : (
                             <SessionNotesPanel
+                                rootId={details?.rootId}
                                 sessionId={details?.sessionId}
                                 onNoteAdded={details?.onNoteAdded}
                                 notes={details?.notes}

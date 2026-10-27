@@ -45,6 +45,7 @@ export function useSessionSidePaneViewModel({
         mode,
         onModeChange,
         details: {
+            rootId,
             sessionId,
             isCompleted,
             pausedAt,

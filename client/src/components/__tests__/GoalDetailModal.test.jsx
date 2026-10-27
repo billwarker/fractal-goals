@@ -97,7 +97,7 @@ vi.mock('../goals/goalDetailQueryUtils', () => ({
 }));
 
 vi.mock('../goals/GoalCompletionModal', () => ({
-    default: ({ accentColor, completionNote, onCompletionNoteChange }) => (
+    default: ({ accentColor, completionNote, onCompletionNoteChange, attachmentDraft }) => (
         <div>
             <div>completion modal:{accentColor}</div>
             <textarea
@@ -105,8 +105,17 @@ vi.mock('../goals/GoalCompletionModal', () => ({
                 value={completionNote}
                 onChange={(event) => onCompletionNoteChange(event.target.value)}
             />
+            {attachmentDraft && (
+                <button type="button" onClick={() => attachmentDraft.addAsset({ id: 'evidence', name: 'run.mp4' })}>
+                    Add evidence
+                </button>
+            )}
         </div>
     ),
+}));
+
+vi.mock('../../hooks/useStorageConnections', () => ({
+    useStorageConnections: () => ({ providers: [], limits: null }),
 }));
 
 vi.mock('../goals/GoalUncompletionModal', () => ({
@@ -368,6 +377,34 @@ describe('GoalDetailModal smoke coverage', () => {
                 '--completion-accent': '#22d3ee',
             });
         }, { timeout: 5000 });
+    });
+
+    it('saves attached evidence with the completion note, labelling it when there is no text', async () => {
+        render(
+            <GoalDetailModal
+                isOpen={true}
+                onClose={vi.fn()}
+                goal={{ id: 'goal-1', name: 'Deep Work', completed: false,
+                    attributes: { id: 'goal-1', type: 'ShortTermGoal', completed: false, allow_manual_completion: true } }}
+                onUpdate={vi.fn()}
+                onToggleCompletion={vi.fn(() => Promise.resolve())}
+                onDelete={vi.fn()}
+                rootId="root-1"
+                treeData={{ id: 'root-1', name: 'Root', attributes: { id: 'root-1', type: 'UltimateGoal', level_id: 'level-root' }, children: [] }}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: 'Mark Complete' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Add evidence' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Complete Goal' }));
+
+        await waitFor(() => {
+            expect(mockCreateGoalNote).toHaveBeenCalledWith(expect.objectContaining({
+                content: 'Completion evidence',
+                note_kind: 'goal_completion',
+                attachments: [{ asset_id: 'evidence', alt_text: '' }],
+            }));
+        });
     });
 
     it('creates a special goal completion note before completing the goal', async () => {

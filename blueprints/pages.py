@@ -159,6 +159,7 @@ def serve_index_html():
 @pages_bp.route('/reset-password')
 @pages_bp.route('/terms')
 @pages_bp.route('/privacy')
+@pages_bp.route('/storage/connected')
 @pages_bp.route('/<root_id>/analytics')
 @pages_bp.route('/<root_id>/notes')
 @pages_bp.route('/<root_id>/logs')

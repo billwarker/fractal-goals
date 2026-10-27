@@ -1,4 +1,5 @@
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 import Notes from '../Notes';
@@ -29,7 +30,14 @@ vi.mock('../../hooks/useNotesPageQuery', () => ({
         pinNote: vi.fn(),
         unpinNote: vi.fn(),
     }),
+    useNotesHeatmap: () => ({ data: { days: [], total: 0, max_count: 0 }, isLoading: false }),
 }));
+
+vi.mock('../../hooks/useNoteFilters', () => ({
+    useNoteFilters: () => ({ savedFilters: [], isLoading: false, createFilter: vi.fn(), updateFilter: vi.fn(), deleteFilter: vi.fn() }),
+}));
+
+vi.mock('../../contexts/TimezoneContext', () => ({ useTimezone: () => ({ timezone: 'UTC' }) }));
 
 vi.mock('../../hooks/useActivityQueries', () => ({
     useActivities: () => ({ activities: [] }),
@@ -46,8 +54,8 @@ vi.mock('../../components/notes', () => ({
     ),
 }));
 
-vi.mock('../../components/notes/NoteComposer', () => ({
-    ComposeLinkPanel: () => <div>Associator panel</div>,
+vi.mock('../../components/notes/ComposeLinkPanel', () => ({
+    default: () => <div>Associator panel</div>,
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -84,7 +92,7 @@ describe('Notes mobile compose shell', () => {
     });
 
     it('opens and closes mobile filters from a single secondary footer action', () => {
-        render(<Notes />);
+        render(<MemoryRouter><Notes /></MemoryRouter>);
         const footer = screen.getByRole('contentinfo', { name: 'Note filter controls' });
         expect(footer.parentElement).toBe(document.body);
         const button = within(footer).getByRole('button', { name: 'Show Filters' });
@@ -102,7 +110,7 @@ describe('Notes mobile compose shell', () => {
     });
 
     it('switches the mobile footer action to the associator toggle during compose mode', async () => {
-        render(<Notes />);
+        render(<MemoryRouter><Notes /></MemoryRouter>);
 
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: '+ Write Note' }));

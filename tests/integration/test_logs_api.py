@@ -1,3 +1,4 @@
+from config import config
 from datetime import datetime, timezone
 
 import pytest
@@ -13,7 +14,7 @@ def admin_user(db_session):
         email="logsadmin@example.com",
         role="admin",
         terms_accepted_version="1.0",
-        privacy_accepted_version="1.0",
+        privacy_accepted_version=config.PRIVACY_VERSION,
     )
     user.set_password("Password123")
     db_session.add(user)

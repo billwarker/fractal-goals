@@ -6,6 +6,7 @@ import { useGoalForm } from '../hooks/useGoalForm';
 import useGoalDetailOnboardingVisits from '../hooks/useGoalDetailOnboardingVisits';
 import useInitialGoalDetailView from '../hooks/useInitialGoalDetailView';
 import { useGoalNotes } from '../hooks/useGoalNotes';
+import { useGoalDescriptionAttachments } from '../hooks/useGoalDescriptionAttachments';
 import { useGoalAssociations } from '../hooks/useGoalQueries';
 import { getActiveLineageIds } from '../hooks/useFlowTreeMetrics';
 import useLevelDefaultDeadline from '../hooks/useLevelDefaultDeadline';
@@ -141,6 +142,8 @@ function GoalDetailModal({
         ? (selectedChildType || defaultChildType)
         : (goal?.attributes?.type || goal?.type);
     const goalId = mode === 'create' ? null : (goal?.attributes?.id || goal?.id);
+    // Description media is edited with the goal (not on create: it needs a saved goal to attach to).
+    const descriptionMedia = useGoalDescriptionAttachments(rootId, goalId, mode !== 'create' && !readOnly);
     const markOnboardingView = useGoalDetailOnboardingVisits({ displayMode, goalId, isOpen, mode, readOnly, rootId });
     const queryRootId = readOnly ? null : rootId;
     const queryGoalId = readOnly ? null : goalId;
@@ -196,15 +199,17 @@ function GoalDetailModal({
         mode,
         onClose,
         onToggleCompletion,
-        onBeforeCompletionConfirm: async ({ noteContent }) => {
+        onBeforeCompletionConfirm: async ({ noteContent, attachments = [] }) => {
             const trimmedContent = noteContent?.trim();
-            if (!trimmedContent) return;
+            if (!trimmedContent && !attachments.length) return;
             await createGoalNote({
-                content: trimmedContent,
+                // Notes need text; attached evidence alone gets a plain label.
+                content: trimmedContent || 'Completion evidence',
                 context_type: 'goal',
                 context_id: goalId,
                 goal_id: goalId,
                 note_kind: 'goal_completion',
+                ...(attachments.length ? { attachments } : {}),
             });
         },
         onBeforeUncompletionConfirm: async () => {
@@ -292,6 +297,10 @@ function GoalDetailModal({
             notify.error('Please fix the errors before saving.');
             return;
         }
+        if (descriptionMedia.draft.isBusy) {
+            notify.error(descriptionMedia.draft.busyReason || 'Wait for uploads to finish.');
+            return;
+        }
 
         const completionFields = {
             completion_condition: completionCondition,
@@ -319,6 +328,7 @@ function GoalDetailModal({
                 review_cadence_unit: reviewCadence?.unit ?? null,
                 review_disabled: !reviewsOn,
             } : {}),
+            ...(descriptionMedia.loaded ? { attachments: descriptionMedia.draft.payload() } : {}),
         };
 
         if (mode === 'create') {
@@ -349,6 +359,7 @@ function GoalDetailModal({
             }
         } else {
             await onUpdate?.(goalId, payload);
+            void descriptionMedia.refresh();
 
             // Persist activity and group associations
             await persistAssociations();
@@ -434,7 +445,7 @@ function GoalDetailModal({
         return () => observer.disconnect();
     }, [viewState, name, deadline, goalStatus]);
 
-    const handleQuickGoalNote = async (content) => {
+    const handleQuickGoalNote = async (content, attachments = []) => {
         if (!rootId || !goalId) {
             return;
         }
@@ -443,6 +454,7 @@ function GoalDetailModal({
             context_type: 'goal',
             context_id: goalId,
             goal_id: goalId,
+            attachments,
         });
     };
 
@@ -576,6 +588,7 @@ function GoalDetailModal({
             contentScrollRef={contentScrollRef}
             deadline={deadline}
             description={description}
+            descriptionAttachments={mode !== 'create' && !readOnly ? descriptionMedia.draft : null}
             displayGoalColor={displayGoalColor}
             displayGoalSecondaryColor={displayGoalSecondaryColor}
             displayMode={displayMode}

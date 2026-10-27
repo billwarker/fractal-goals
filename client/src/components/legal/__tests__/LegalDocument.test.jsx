@@ -7,8 +7,8 @@ import { PRIVACY_VERSION, TERMS_VERSION } from '../../../content/legal/legalVers
 
 describe('legal documents', () => {
   it('parses version and effective date from the markdown header', () => {
-    expect(PRIVACY_DOCUMENT.version).toBe('1.0');
-    expect(PRIVACY_DOCUMENT.effective).toBe('2026-08-25');
+    expect(PRIVACY_DOCUMENT.version).toBe('1.1');
+    expect(PRIVACY_DOCUMENT.effective).toBe('2026-10-27');
     expect(TERMS_DOCUMENT.version).toBe('1.0');
   });
 
@@ -23,7 +23,7 @@ describe('legal documents', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Privacy Policy/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Information we collect/i })).toBeInTheDocument();
     expect(screen.getAllByRole('table').length).toBeGreaterThan(3);
-    expect(screen.getByText(/Version 1.0 . Effective August 25, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Version 1.1 . Effective October 27, 2026/)).toBeInTheDocument();
   });
 
   it('renders the terms with the key liability sections', () => {
@@ -38,8 +38,6 @@ describe('legal documents', () => {
     const placeholders = [...combined.matchAll(/\[([A-Z][A-Z \-—]+)\]/g)].map((m) => m[1]);
     const unique = [...new Set(placeholders)].sort();
     expect(unique).toEqual([
-      'CONFIRM DATASET LOCATION',
-      'CONFIRM REGION',
       'LEGAL ENTITY NAME',
       'REGISTERED ADDRESS',
     ]);

@@ -1,4 +1,5 @@
 """Goal charts: saved analytics views on goals, a view's goals, and the scoped activity evidence."""
+from config import config
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -121,7 +122,7 @@ class TestGoalCharts:
         other = User(
             id=str(uuid.uuid4()), username="charter", email="charter@example.com",
             terms_accepted_version="1.0", terms_accepted_at=datetime.now(timezone.utc),
-            privacy_accepted_version="1.0", privacy_accepted_at=datetime.now(timezone.utc),
+            privacy_accepted_version=config.PRIVACY_VERSION, privacy_accepted_at=datetime.now(timezone.utc),
         )
         other.set_password("Password123")
         db_session.add(other)

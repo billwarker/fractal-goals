@@ -12,6 +12,7 @@ function FooterActions({ children, ...props }) {
 function GoalDetailModalFooter({
     showGoalNoteComposer,
     handleQuickGoalNote,
+    rootId,
     showCreateFooter,
     showEditFooter,
     handleCancel,
@@ -24,6 +25,7 @@ function GoalDetailModalFooter({
     completionConfirmTextColor,
     onCancelCompletionConfirm,
     onConfirmCompletion,
+    confirmCompletionBlocked = '',
     onConfirmUncompletion,
     showActivitiesFooter,
     isAssociationFlowActive,
@@ -53,6 +55,7 @@ function GoalDetailModalFooter({
             composerOnly
             onSubmit={handleQuickGoalNote}
             placeholder="Add a goal note..."
+            rootId={rootId}
             className={styles.modalFooterComposer}
         />
     ) : (showCreateFooter || showEditFooter) ? (
@@ -98,6 +101,8 @@ function GoalDetailModalFooter({
                 </button>
                 <button
                     type="button"
+                    disabled={!isUncompletionConfirm && Boolean(confirmCompletionBlocked)}
+                    title={!isUncompletionConfirm && confirmCompletionBlocked ? confirmCompletionBlocked : undefined}
                     onClick={isUncompletionConfirm ? onConfirmUncompletion : onConfirmCompletion}
                     className={`${styles.completionFooterButton} ${styles.editFooterSaveButton}`}
                     style={{

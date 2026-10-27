@@ -2,6 +2,7 @@
 """
 
 from datetime import datetime, timezone
+from typing import Any
 from sqlalchemy.orm.attributes import flag_modified
 import models
 from models import ActivityInstance, CircuitRun, Session, validate_root_goal
@@ -20,6 +21,7 @@ from services._session_lifecycle_common import _as_utc_datetime, _parse_iso_date
 
 
 class _SessionUpdatesMixin:
+    db_session: Any
     @staticmethod
     def _pause_completion_boundary(session_obj):
         """A session completed while paused ends at its pause, not at the click."""
@@ -142,7 +144,7 @@ class _SessionUpdatesMixin:
                     return None, conflict, 409
             if data['completed'] and not session.completed:
                 completed_at, time_error = resolve_occurred_at(self.db_session, session, data.get('occurred_at'))
-                if time_error:
+                if time_error or completed_at is None:
                     return None, time_error, 400
             else:
                 completed_at = datetime.now(timezone.utc).replace(tzinfo=None)

@@ -1,0 +1,63 @@
+.attach {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+}
+
+/* Quick bars sit at the bottom of their panes, so the menu opens upward. */
+.attach .menu {
+    top: auto;
+    bottom: calc(100% + 6px);
+    min-width: 200px;
+}
+
+.item {
+    display: grid;
+    gap: 2px;
+}
+
+.detail {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+/* Fields mid-form open the menu downward. */
+.attach .menuDown {
+    min-width: 200px;
+}
+
+/* Default look, matching the quick note bars' icon buttons. */
+.button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-brand-primary);
+    cursor: pointer;
+}
+
+.button svg {
+    display: block;
+    width: 20px;
+    height: 20px;
+}
+
+.button:hover:not(:disabled) {
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-secondary);
+}
+
+.button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.button:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+

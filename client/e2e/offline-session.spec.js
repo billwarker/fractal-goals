@@ -211,7 +211,7 @@ test('offline tag edits sync, and an activity added then deleted offline never r
     };
     const kept = await post('activities', { name: 'Kept lift', has_metrics: false });
     await post('activities', { name: 'Scrapped drill', has_metrics: false });
-    await post('activity-tags', { name: 'Heavy day', color: '#123ABC', scope: 'selected', activity_ids: [kept.id] });
+    await post('activity-tags', { name: 'Heavy day', color: '#123ABC' });
     const session = await post('sessions', {
         name: 'Offline edits', goal_ids: [root],
         session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_definition_id: kept.id }] }] },
@@ -315,7 +315,15 @@ test('the offline kill switch removes the service worker on the next load', asyn
     });
     await page.reload();
     await expect.poll(
-        () => page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length),
+        async () => {
+            try {
+                return await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length);
+            } catch (error) {
+                // Disabling the worker intentionally triggers a second navigation.
+                if (error.message.includes('Execution context was destroyed')) return -1;
+                throw error;
+            }
+        },
         { timeout: 15_000 },
     ).toBe(0);
     expect(await page.evaluate(async () => (await caches.keys()).filter((key) => key.startsWith('workbox-')))).toEqual([]);

@@ -7,6 +7,8 @@ import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
+import NoteMedia from './NoteMedia';
+import NoteOptionsMenu from './NoteOptionsMenu';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import styles from './NoteCard.module.css';
 import { GOAL_NOTE_TYPES, NOTE_KIND_LABELS, NOTE_TYPE_LABELS } from '../../utils/noteTypes';
@@ -71,8 +73,7 @@ function NoteCard({
     const [isEditing, setIsEditing] = useState(false);
     const [editContent, setEditContent] = useState(note.content);
     const [isDeleting, setIsDeleting] = useState(false);
-    const [menuOpen, setMenuOpen] = useState(false);
-    const menuRef = useRef(null);
+    const [managingMedia, setManagingMedia] = useState(false);
     const textareaRef = useRef(null);
     const cardRef = useRef(null);
     const { timezone } = useTimezone();
@@ -116,18 +117,6 @@ function NoteCard({
         }
     }, [isEditing]);
 
-    // Close menu on outside click
-    useEffect(() => {
-        if (!menuOpen) return;
-        const handleOutsideClick = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setMenuOpen(false);
-            }
-        };
-        document.addEventListener('mousedown', handleOutsideClick);
-        return () => document.removeEventListener('mousedown', handleOutsideClick);
-    }, [menuOpen]);
-
     const formatDate = (isoString) => {
         if (!isoString) return '';
         try {
@@ -164,7 +153,6 @@ function NoteCard({
 
     const handleDelete = async (e) => {
         e.stopPropagation();
-        setMenuOpen(false);
         setIsDeleting(true);
         try {
             await onDelete(note);
@@ -185,7 +173,6 @@ function NoteCard({
 
     const handlePinToggle = (e) => {
         e.stopPropagation();
-        setMenuOpen(false);
         if (note.is_pinned) {
             onUnpin && onUnpin(note.id);
         } else {
@@ -195,7 +182,6 @@ function NoteCard({
 
     const handleEditClick = (e) => {
         e.stopPropagation();
-        setMenuOpen(false);
         if (onEditRequest) {
             onEditRequest(note);
         } else {
@@ -206,12 +192,18 @@ function NoteCard({
     const canEdit = (!!onEdit || !!onEditRequest) && !note.isPast;
     const canPin = (!!onPin || !!onUnpin) && !note.isPast && resolvedNoteType !== 'activity_set_note';
     const canDelete = !!onDelete && !note.isPast;
-    const hasMenu = canEdit || canPin || canDelete;
+    const canManageMedia = canEdit && Boolean(note.root_id);
+    const menuItems = [
+        canEdit && { label: 'Edit', onSelect: handleEditClick },
+        canManageMedia && { label: note.attachments?.length ? 'Manage attachments' : 'Attach pictures or video', onSelect: () => setManagingMedia(true) },
+        canPin && { label: note.is_pinned ? 'Unpin' : 'Pin note', onSelect: handlePinToggle },
+        canDelete && { label: 'Delete', onSelect: handleDelete, danger: true },
+    ].filter(Boolean);
     const shouldDeferRichContent = !note.is_pinned && !isSelected && !minimal && !compact;
     const [shouldRenderRichContent, setShouldRenderRichContent] = useState(
         typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
     );
-    const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent;
+    const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent || managingMedia;
     const previewContent = supportsMarkdown ? buildPlainTextPreview(note.content) : note.content;
     const timestamp = (
         <span className={styles.timestamp}>
@@ -307,7 +299,6 @@ function NoteCard({
                     isSelected ? styles.selected : '',
                     note.isPast ? styles.pastNote : '',
                     note.is_pinned ? styles.pinned : '',
-                    menuOpen ? styles.menuOpen : '',
                 ].filter(Boolean).join(' ')}
                 onClick={(e) => {
                     e.stopPropagation();
@@ -322,37 +313,7 @@ function NoteCard({
                 )}
 
                 {/* Options button — pinned to the card's top-right corner */}
-                {hasMenu && (
-                    <div className={styles.optionsWrapper} ref={menuRef}>
-                        <button
-                            className={styles.optionsBtn}
-                            onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
-                            title="Options"
-                            aria-label="Note options"
-                        >
-                            ···
-                        </button>
-                        {menuOpen && (
-                            <div className={styles.optionsMenu}>
-                                {canEdit && (
-                                    <button className={styles.optionsMenuItem} onClick={handleEditClick}>
-                                        Edit
-                                    </button>
-                                )}
-                                {canPin && (
-                                    <button className={styles.optionsMenuItem} onClick={handlePinToggle}>
-                                        {note.is_pinned ? 'Unpin' : 'Pin note'}
-                                    </button>
-                                )}
-                                {canDelete && (
-                                    <button className={`${styles.optionsMenuItem} ${styles.optionsMenuItemDanger}`} onClick={handleDelete}>
-                                        Delete
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                )}
+                {menuItems.length > 0 && <NoteOptionsMenu items={menuItems} />}
 
                 {/* Top row: timestamp + badges */}
                 <div className={styles.topRow}>
@@ -387,7 +348,9 @@ function NoteCard({
                                                 </>
                                             )}
                                         </span>
-                                    ) : resolvedNoteType === 'session_note' && !suppressSessionContext ? (
+                                    ) : resolvedNoteType === 'session_note' && suppressSessionContext ? (
+                                        null  // The session group's header already names the session.
+                                    ) : resolvedNoteType === 'session_note' ? (
                                         renderSessionTemplateBadge()
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
@@ -417,7 +380,7 @@ function NoteCard({
                     <div className={styles.headerActions}>
                         {!minimal && noteTypeVariant === 'metadata' && (
                             <>
-                                {showTypePill && !noteKindLabel && (
+                                {showTypePill && !noteKindLabel && !suppressSessionContext && (
                                     <>
                                         <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
                                         <span className={styles.metaSep} aria-hidden="true">·</span>
@@ -484,6 +447,9 @@ function NoteCard({
                             </div>
                         )}
                     </div>
+                )}
+                {shouldShowRichContent && (
+                    <NoteMedia note={note} managing={managingMedia} onDoneManaging={() => setManagingMedia(false)} />
                 )}
             </div>
         </>

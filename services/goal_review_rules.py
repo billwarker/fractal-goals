@@ -62,7 +62,8 @@ def pause_windows(goal: Any) -> list[tuple[date, date | None]]:
     """The goal's pause windows as (paused_on, resumed_on) dates, oldest first; resumed_on is None
     while the goal is paused."""
     intervals = sorted(getattr(goal, 'pause_intervals', None) or [], key=lambda interval: interval.paused_at)
-    return [(as_date(interval.paused_at), as_date(interval.resumed_at)) for interval in intervals]
+    return [(paused_on, as_date(interval.resumed_at)) for interval in intervals
+            if (paused_on := as_date(interval.paused_at)) is not None]
 
 
 def next_review_date(

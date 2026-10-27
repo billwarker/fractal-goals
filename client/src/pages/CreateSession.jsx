@@ -4,7 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
-import { invalidateAfterSessionCreated, invalidateOnboardingProgress } from '../utils/queryInvalidation';
+import { updateCreatedSessionCaches } from '../utils/createdSessionCache';
 import { useCreateSessionPageData } from '../hooks/useCreateSessionPageData';
 import notify from '../utils/notify';
 import {
@@ -171,53 +171,6 @@ function CreateSession() {
         setSessionSource('program');
     };
 
-    const updateCreatedSessionCaches = (createdSession) => {
-        const createdSessionId = createdSession.id;
-
-        queryClient.setQueryData(queryKeys.sessionsPaginated(rootId), (prev) => {
-            if (!prev || !Array.isArray(prev.pages) || prev.pages.length === 0) return prev;
-            const [firstPage, ...restPages] = prev.pages;
-            const existing = (firstPage.sessions || []).some((session) => session.id === createdSession.id);
-            if (existing) return prev;
-
-            const updatedFirstPage = {
-                ...firstPage,
-                sessions: [createdSession, ...(firstPage.sessions || [])],
-                pagination: firstPage.pagination
-                    ? {
-                        ...firstPage.pagination,
-                        total: typeof firstPage.pagination.total === 'number'
-                            ? firstPage.pagination.total + 1
-                            : firstPage.pagination.total
-                    }
-                    : firstPage.pagination
-            };
-
-            return {
-                ...prev,
-                pages: [updatedFirstPage, ...restPages]
-            };
-        });
-
-        queryClient.setQueryData(queryKeys.sessions(rootId), (prev) => {
-            if (!Array.isArray(prev)) return prev;
-            if (prev.some((session) => session.id === createdSession.id)) return prev;
-            return [createdSession, ...prev];
-        });
-
-        queryClient.setQueryData(queryKeys.sessionsAll(rootId), (prev) => {
-            if (!Array.isArray(prev)) return prev;
-            if (prev.some((session) => session.id === createdSession.id)) return prev;
-            return [createdSession, ...prev];
-        });
-
-        queryClient.setQueryData(queryKeys.session(rootId, createdSessionId), createdSession);
-
-        invalidateAfterSessionCreated(queryClient, rootId, queryKeys);
-        // Advances the onboarding "Create your first session" step.
-        invalidateOnboardingProgress(queryClient, queryKeys);
-    };
-
     const createSessionFromTemplate = async (template) => {
         if (!template) {
             notify.error('Please select a template or program day');
@@ -242,7 +195,7 @@ function CreateSession() {
             const response = await fractalApi.createSession(rootId, sessionData);
             const createdSession = response.data;
 
-            updateCreatedSessionCaches(createdSession);
+            updateCreatedSessionCaches(queryClient, rootId, createdSession);
 
             if (quickTemplate) return createdSession;
 
@@ -302,7 +255,7 @@ function CreateSession() {
             const completedSessionResponse = await fractalApi.completeQuickSession(rootId, quickSessionPayload);
             const completedSession = completedSessionResponse.data;
 
-            updateCreatedSessionCaches(completedSession);
+            updateCreatedSessionCaches(queryClient, rootId, completedSession);
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivities(rootId, completedSession.id) });
 
             setQueuedQuickSession(null);

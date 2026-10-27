@@ -787,6 +787,7 @@ function SessionActivityItemView({
                             </div>
                         )}
                         <NoteQuickAdd
+                            rootId={rootId}
                             onSubmit={handleAddNote}
                             placeholder={selectedSetIndex !== null
                                 ? `Note for Set #${selectedSetIndex + 1}...`

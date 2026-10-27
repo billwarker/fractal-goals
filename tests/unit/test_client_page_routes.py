@@ -24,6 +24,7 @@ from blueprints.pages import pages_bp
         "/reset-password",
         "/terms",
         "/privacy",
+        "/storage/connected",
     ],
 )
 def test_canonical_client_routes_serve_the_spa(path, tmp_path, monkeypatch):

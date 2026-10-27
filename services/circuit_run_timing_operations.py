@@ -178,9 +178,12 @@ class CircuitRunTimingOperations:
         )
         if time_error:
             return None, time_error, 400
+        if now is None:
+            return None, "Circuit completion time is unavailable", 400
         if not run.time_start:
             run.time_start = now
-        if run.time_start > now:
+        start = run.time_start or now
+        if start > now:
             return None, "Circuit start cannot be in the future", 409
         conflict = self._historical_conflict(run, run.time_start, now)
         if conflict:

@@ -79,6 +79,7 @@ test('large session lists keep real cards available during fast scrolling and de
     }).toBeTruthy();
     const selectionStart = await page.evaluate(() => performance.now());
     await page.locator('.react-flow__node').getByText(visibleGoal, { exact: true }).click();
+    await page.getByRole('tab', { name: 'Timeline', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     const tasks = await page.evaluate((start) => window.performanceLongTasks.filter((entry) => entry.startTime >= start), selectionStart);
     expect(Math.max(0, ...tasks.map((entry) => entry.duration))).toBeLessThan(500);

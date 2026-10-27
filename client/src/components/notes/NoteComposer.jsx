@@ -6,23 +6,21 @@
  * The right-side panel has tabs for Goal tree browser and Activity picker.
  */
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import { useActivities, useActivityGroups } from '../../hooks/useActivityQueries';
-import { useFractalTree } from '../../hooks/useGoalQueries';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import React, { useState, useRef, useEffect } from 'react';
 import CloseIcon from '../atoms/CloseIcon';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
-import GoalTreePicker from '../common/GoalTreePicker';
-import { markdownComponents } from './markdownComponents';
+import MarkdownNoteContent from './MarkdownNoteContent';
+import NoteAttachmentsEditor from './NoteAttachmentsEditor';
+import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
 import { parseVideoUrl } from '../../utils/videoEmbeds';
+import ComposeLinkPanel from './ComposeLinkPanel';
 import styles from './NoteComposer.module.css';
 
 function NoteComposer({
     rootId,
-    onSubmit,       // (content, goalId, activityDefinitionId) => Promise
+    onSubmit,       // (content, goalId, activityDefinitionId, attachments) => Promise
     onCancel,
+    initialAttachments = [],
     initialContent = '',      // pre-populate for edit mode
     submitLabel,              // override submit button label
     prelinkedGoalId = null,   // when set, goal is pre-filled and locked (goal modal context)
@@ -39,14 +37,14 @@ function NoteComposer({
     bare = false,
 }) {
     const [content, setContent] = useState(initialContent);
+    const draft = useAttachmentDraft(rootId, initialAttachments);
     const [previewMode, setPreviewMode] = useState(false);
-    const [linkTab, setLinkTab] = useState('goal'); // 'goal' | 'activity'
     const [internalGoalId, setInternalGoalId] = useState(prelinkedGoalId);
     const [internalGoalName, setInternalGoalName] = useState(prelinkedGoalName);
     const [internalActivityId, setInternalActivityId] = useState(null);
     const [internalActivityName, setInternalActivityName] = useState(null);
-    const [activitySearch, setActivitySearch] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState('');
     const textareaRef = useRef(null);
 
     // Use controlled or internal state
@@ -56,11 +54,6 @@ function NoteComposer({
     const selectedActivityName = controlledActivityName !== undefined ? controlledActivityName : internalActivityName;
     // All note surfaces support markdown + inline video embeds, so the
     // Write/Preview toggle is always available regardless of goal/activity links.
-    const supportsMarkdown = true;
-
-    const { data: treeData } = useFractalTree(rootId, { enabled: !prelinkedGoalId });
-    const { activities: internalActivities = [] } = useActivities(rootId);
-    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
 
     const adjustHeight = (el) => {
         if (!el) return;
@@ -75,17 +68,6 @@ function NoteComposer({
         }
     }, []);
 
-    const handleActivitySelect = (activity) => {
-        const next = selectedActivityId === activity.id ? null : activity.id;
-        const nextName = selectedActivityId === activity.id ? null : activity.name;
-        if (controlledActivitySelect) {
-            controlledActivitySelect(next, nextName);
-        } else {
-            setInternalActivityId(next);
-            setInternalActivityName(nextName);
-        }
-    };
-
     const clearGoal = () => {
         if (controlledGoalSelect) controlledGoalSelect(null, null);
         else { setInternalGoalId(null); setInternalGoalName(null); }
@@ -97,10 +79,13 @@ function NoteComposer({
     };
 
     const handleSubmit = async () => {
-        if (!content.trim()) return;
+        if (!content.trim() || isSubmitting || externalSubmitting || draft.isBusy) return;
+        setSubmitError('');
         setIsSubmitting(true);
         try {
-            await onSubmit(content.trim(), selectedGoalId, selectedActivityId);
+            const saved = await onSubmit(content.trim(), selectedGoalId, selectedActivityId, draft.payload());
+            if (saved === false) throw new Error('The note could not be saved. Your draft is still here.');
+            draft.reset();
             setContent('');
             setInternalGoalId(prelinkedGoalId);
             setInternalGoalName(prelinkedGoalName);
@@ -109,6 +94,8 @@ function NoteComposer({
             if (controlledGoalSelect && !prelinkedGoalId) controlledGoalSelect(null, null);
             if (controlledActivitySelect) controlledActivitySelect(null, null);
             setPreviewMode(false);
+        } catch (error) {
+            setSubmitError(error?.response?.data?.error || error?.message || 'The note could not be saved. Try again.');
         } finally {
             setIsSubmitting(false);
         }
@@ -125,6 +112,7 @@ function NoteComposer({
     // insert it on its own line (blank lines around it) so it satisfies the
     // "own line" embed rule without the user needing to know it.
     const handlePaste = (e) => {
+        if (draft.handlePaste(e)) return;  // Pasted pictures upload into connected storage.
         const pasted = (e.clipboardData?.getData('text') || '').trim();
         if (!pasted || /\s/.test(pasted) || !parseVideoUrl(pasted)) return;
 
@@ -148,42 +136,34 @@ function NoteComposer({
         });
     };
 
-    const filteredActivities = internalActivities.filter(a =>
-        !activitySearch || a.name.toLowerCase().includes(activitySearch.toLowerCase())
-    );
-
-    // Build a flat tree for the root
-    const rootNode = treeData;
-
     return (
         <div className={[styles.composer, bare ? styles.bare : ''].filter(Boolean).join(' ')}>
+            {submitError && <p role="alert">{submitError}</p>}
             <div className={styles.composerBody}>
                 {/* Left: write/preview area */}
-                <div className={styles.writeArea}>
-                    {supportsMarkdown && (
-                        <div className={styles.writeToolbar}>
-                            <button
-                                className={[styles.modeBtn, !previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
-                                onClick={() => setPreviewMode(false)}
-                                type="button"
-                            >
-                                Write
-                            </button>
-                            <button
-                                className={[styles.modeBtn, previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
-                                onClick={() => setPreviewMode(true)}
-                                type="button"
-                            >
-                                Preview
-                            </button>
-                        </div>
-                    )}
+                <div className={styles.writeArea} {...draft.dropProps}>
+                    <div className={styles.writeToolbar}>
+                        <button
+                            className={[styles.modeBtn, !previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
+                            onClick={() => setPreviewMode(false)}
+                            type="button"
+                        >
+                            Write
+                        </button>
+                        <button
+                            className={[styles.modeBtn, previewMode ? styles.modeBtnActive : ''].filter(Boolean).join(' ')}
+                            onClick={() => setPreviewMode(true)}
+                            type="button"
+                        >
+                            Preview
+                        </button>
+                    </div>
 
-                    {supportsMarkdown && previewMode ? (
+                    {previewMode ? (
                         <div className={styles.previewPane}>
                             {content.trim() ? (
                                 <div className={styles.markdownPreview}>
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</ReactMarkdown>
+                                    <MarkdownNoteContent content={content} />
                                 </div>
                             ) : (
                                 <span className={styles.previewEmpty}>Nothing to preview.</span>
@@ -201,6 +181,8 @@ function NoteComposer({
                             rows={4}
                         />
                     )}
+
+                    <NoteAttachmentsEditor draft={draft} disabled={isSubmitting || externalSubmitting} />
 
                     {/* Selected links */}
                     <div className={styles.linkedChips}>
@@ -228,7 +210,8 @@ function NoteComposer({
                         <button
                             className={styles.submitBtn}
                             onClick={handleSubmit}
-                            disabled={!content.trim() || isSubmitting || externalSubmitting}
+                            disabled={!content.trim() || isSubmitting || externalSubmitting || draft.isBusy}
+                            title={draft.busyReason || undefined}
                             type="button"
                         >
                             {isSubmitting ? (
@@ -248,248 +231,21 @@ function NoteComposer({
                     </div>
                 </div>
 
-                {/* Right: link panel (hidden when hoisted to parent column) */}
-                {!prelinkedGoalId && !hideLinkPanel && (
-                    <div className={styles.linkPanel}>
-                        <div className={styles.linkTabs}>
-                            <button
-                                className={[styles.linkTab, linkTab === 'goal' ? styles.linkTabActive : ''].filter(Boolean).join(' ')}
-                                onClick={() => setLinkTab('goal')}
-                                type="button"
-                            >
-                                Goal
-                            </button>
-                            <button
-                                className={[styles.linkTab, linkTab === 'activity' ? styles.linkTabActive : ''].filter(Boolean).join(' ')}
-                                onClick={() => setLinkTab('activity')}
-                                type="button"
-                            >
-                                Activity
-                            </button>
-                        </div>
-
-                        <div className={styles.linkPanelContent}>
-                            {linkTab === 'goal' && (
-                                <div className={styles.goalTree}>
-                                    <GoalTreePicker
-                                        treeData={rootNode}
-                                        selectedGoalIds={selectedGoalId ? [selectedGoalId] : []}
-                                        onSelectionChange={(ids, names) => {
-                                            if (controlledGoalSelect) {
-                                                controlledGoalSelect(ids[0] || null, names[0] || null);
-                                            } else {
-                                                setInternalGoalId(ids[0] || null);
-                                                setInternalGoalName(names[0] || null);
-                                            }
-                                        }}
-                                        showHideCompleted={true}
-                                        allowLineageSelection={false}
-                                        getGoalColor={getGoalColor}
-                                        getGoalIcon={getGoalIcon}
-                                        getGoalSecondaryColor={getGoalSecondaryColor}
-                                    />
-                                </div>
-                            )}
-                            {linkTab === 'activity' && (
-                                <div className={styles.activityList}>
-                                    <input
-                                        className={styles.activitySearch}
-                                        placeholder="Search activities…"
-                                        value={activitySearch}
-                                        onChange={(e) => setActivitySearch(e.target.value)}
-                                        type="text"
-                                    />
-                                    {filteredActivities.length === 0 && (
-                                        <span className={styles.panelEmpty}>No activities found.</span>
-                                    )}
-                                    {filteredActivities.map(activity => (
-                                        <div
-                                            key={activity.id}
-                                            className={[
-                                                styles.activityItem,
-                                                selectedActivityId === activity.id ? styles.activityItemSelected : '',
-                                            ].filter(Boolean).join(' ')}
-                                            onClick={() => handleActivitySelect(activity)}
-                                        >
-                                            {activity.name}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                {!prelinkedGoalId && !hideLinkPanel && <ComposeLinkPanel
+                    rootId={rootId} selectedGoalId={selectedGoalId} selectedActivityId={selectedActivityId}
+                    onGoalSelect={(id, name) => {
+                        if (controlledGoalSelect) controlledGoalSelect(id, name);
+                        else { setInternalGoalId(id); setInternalGoalName(name); }
+                    }}
+                    onActivitySelect={(id, name) => {
+                        if (controlledActivitySelect) controlledActivitySelect(id, name);
+                        else { setInternalActivityId(id); setInternalActivityName(name); }
+                    }}
+                />}
             </div>
         </div>
     );
 }
 
-/**
- * ComposeLinkPanel — standalone link panel for use when the panel is hoisted
- * to a parent column (e.g. the /notes page right column during compose mode).
- * Uses ActivitySelectorPanel for activities and GoalIcon tree for goals.
- */
-export function ComposeLinkPanel({
-    rootId,
-    selectedGoalId,
-    selectedActivityId,
-    onGoalSelect,
-    onActivitySelect,
-}) {
-    const [linkTab, setLinkTab] = useState('goal');
-    const [browseGroupId, setBrowseGroupId] = useState(null);
-    const { data: treeData } = useFractalTree(rootId);
-    const { activities = [] } = useActivities(rootId);
-    const { activityGroups = [] } = useActivityGroups(rootId);
-    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
-
-    const groupMap = useMemo(() => Object.fromEntries(activityGroups.map(g => [g.id, g])), [activityGroups]);
-    const childGroupsByParent = useMemo(() => {
-        const m = {};
-        activityGroups.forEach(g => {
-            const pid = g.parent_id || '__root__';
-            if (!m[pid]) m[pid] = [];
-            m[pid].push(g);
-        });
-        return m;
-    }, [activityGroups]);
-    const activitiesByGroup = useMemo(() => {
-        const m = {};
-        activities.forEach(a => {
-            const gid = a.group_id || '__ungrouped__';
-            if (!m[gid]) m[gid] = [];
-            m[gid].push(a);
-        });
-        return m;
-    }, [activities]);
-
-    const currentGroup = browseGroupId ? groupMap[browseGroupId] : null;
-    const currentSubGroups = childGroupsByParent[browseGroupId || '__root__'] || [];
-    const currentActivities = activitiesByGroup[browseGroupId] || [];
-
-    const toggleActivity = (activity) => {
-        const isDeselect = selectedActivityId === activity.id;
-        onActivitySelect(isDeselect ? null : activity.id, isDeselect ? null : activity.name);
-    };
-
-    const handleBack = () => {
-        const parent = groupMap[browseGroupId]?.parent_id || null;
-        setBrowseGroupId(parent);
-    };
-
-    return (
-        <div className={styles.standaloneLinkPanel}>
-            <div className={styles.linkTabs}>
-                <button
-                    className={[styles.linkTab, linkTab === 'goal' ? styles.linkTabActive : ''].filter(Boolean).join(' ')}
-                    onClick={() => setLinkTab('goal')}
-                    type="button"
-                >
-                    Goal
-                </button>
-                <button
-                    className={[styles.linkTab, linkTab === 'activity' ? styles.linkTabActive : ''].filter(Boolean).join(' ')}
-                    onClick={() => setLinkTab('activity')}
-                    type="button"
-                >
-                    Activity
-                </button>
-            </div>
-            <div className={styles.standaloneLinkPanelContent}>
-                {linkTab === 'goal' && (
-                    <div className={styles.goalTree}>
-                        <GoalTreePicker
-                            treeData={treeData}
-                            selectedGoalIds={selectedGoalId ? [selectedGoalId] : []}
-                            onSelectionChange={(ids, names) => {
-                                onGoalSelect(ids[0] || null, names[0] || null);
-                            }}
-                            showHideCompleted={true}
-                            allowLineageSelection={false}
-                            getGoalColor={getGoalColor}
-                            getGoalIcon={getGoalIcon}
-                            getGoalSecondaryColor={getGoalSecondaryColor}
-                        />
-                    </div>
-                )}
-                {linkTab === 'activity' && (
-                    <div className={styles.activityBrowser}>
-                        {/* breadcrumb / back */}
-                        {browseGroupId && (
-                            <div className={styles.activityBrowserNav}>
-                                <button className={styles.activityBrowserBack} onClick={handleBack} type="button">
-                                    ‹ {currentGroup?.name || 'Back'}
-                                </button>
-                            </div>
-                        )}
-
-                        {/* sub-groups */}
-                        {currentSubGroups.length > 0 && (
-                            <div className={styles.activityGroupList}>
-                                {currentSubGroups.map(group => {
-                                    const actCount = (activitiesByGroup[group.id] || []).length;
-                                    const hasChildren = (childGroupsByParent[group.id] || []).length > 0;
-                                    return (
-                                        <button
-                                            key={group.id}
-                                            className={styles.activityGroupRow}
-                                            onClick={() => setBrowseGroupId(group.id)}
-                                            type="button"
-                                        >
-                                            <span>{group.name}</span>
-                                            <span className={styles.activityGroupMeta}>
-                                                {hasChildren ? '›' : `${actCount}`}
-                                            </span>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        )}
-
-                        {/* activities */}
-                        {currentActivities.length > 0 && (
-                            <div className={styles.activityCheckList}>
-                                {currentSubGroups.length > 0 && (
-                                    <div className={styles.activityCheckListDivider}>Activities</div>
-                                )}
-                                {currentActivities.map(activity => (
-                                    <label key={activity.id} className={styles.activityCheckRow}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedActivityId === activity.id}
-                                            onChange={() => toggleActivity(activity)}
-                                        />
-                                        <span className={styles.activityCheckName}>{activity.name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* ungrouped at root */}
-                        {!browseGroupId && (activitiesByGroup['__ungrouped__'] || []).length > 0 && (
-                            <div className={styles.activityCheckList}>
-                                <div className={styles.activityCheckListDivider}>Ungrouped</div>
-                                {(activitiesByGroup['__ungrouped__'] || []).map(activity => (
-                                    <label key={activity.id} className={styles.activityCheckRow}>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedActivityId === activity.id}
-                                            onChange={() => toggleActivity(activity)}
-                                        />
-                                        <span className={styles.activityCheckName}>{activity.name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-
-                        {currentSubGroups.length === 0 && currentActivities.length === 0 && !browseGroupId && (
-                            <span className={styles.activityEmpty}>No activities found.</span>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
 
 export default NoteComposer;

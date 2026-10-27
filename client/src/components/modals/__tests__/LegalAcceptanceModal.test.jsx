@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import LegalAcceptanceModal from '../LegalAcceptanceModal';
+import { PRIVACY_VERSION, TERMS_VERSION } from '../../../content/legal/legalVersions';
 
 const { acceptLegalDocuments, logout, setUser, notify } = vi.hoisted(() => ({
     acceptLegalDocuments: vi.fn(),
@@ -41,8 +42,8 @@ describe('LegalAcceptanceModal', () => {
 
         await waitFor(() => expect(acceptLegalDocuments).toHaveBeenCalledWith({
             accepted_terms: true,
-            terms_version: '1.0',
-            privacy_version: '1.0',
+            terms_version: TERMS_VERSION,
+            privacy_version: PRIVACY_VERSION,
         }));
         expect(setUser).toHaveBeenCalledWith({ id: 'user-a', legal_acceptance_required: false });
         expect(notify.success).toHaveBeenCalled();

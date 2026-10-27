@@ -31,6 +31,15 @@ describe('query persistence', () => {
         expect(persisted).toEqual(['session']);
     });
 
+    it('persists the offline tag catalog and excludes cloud credentials', () => {
+        const queryClient = new QueryClient();
+        queryClient.setQueryData(['activity-tag-catalog', 'root-1'], { tags: [{ id: 'tag' }] });
+        queryClient.setQueryData(['storageConnections', 'user-1'], { access_token: 'must-not-persist' });
+        const persisted = dehydrate(queryClient, { shouldDehydrateQuery: shouldPersistQuery });
+        expect(persisted.queries.map((query) => query.queryKey[0])).toEqual(['activity-tag-catalog']);
+        expect(JSON.stringify(persisted)).not.toContain('must-not-persist');
+    });
+
     it('round-trips session data for the same user', async () => {
         vi.useFakeTimers();
         const source = new QueryClient();

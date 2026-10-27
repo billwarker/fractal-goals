@@ -184,7 +184,7 @@ class _LandingPublicTreeMixin:
         history = history or GoalHistoryReadModel(self.db_session, root.id).preload(set(goals_by_id), goals_by_id=goals_by_id)
         timeline_service = GoalTimelineService(self.db_session)
         note_service = NoteService(self.db_session)
-        root_notes = load_root_goal_notes(self.db_session, root.id)
+        root_notes = load_root_goal_notes(self.db_session, root.id, include_attachments=False)
         activity_association_service = ActivityAssociationService(self.db_session)
         owner_id = root.owner_id
 

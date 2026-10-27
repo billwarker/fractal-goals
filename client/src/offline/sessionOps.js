@@ -144,6 +144,8 @@ export function buildPlaceholderNote({ id, data, session = null, setIndex = null
     });
     return {
         id,
+        root_id: data.root_id || session?.root_id || null,
+        attachments: data.attachments || [],
         context_type: data.context_type,
         context_id: data.context_id,
         session_id: data.session_id || session?.id || null,

@@ -1,4 +1,5 @@
 """Sequence tracks end to end: built on pause, advanced by completion, cleaned up by Move/Convert/Delete."""
+from config import config
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -95,7 +96,7 @@ class TestBuildingTracks:
         other = User(
             id=str(uuid.uuid4()), username="sequencer", email="sequencer@example.com",
             terms_accepted_version="1.0", terms_accepted_at=datetime.now(timezone.utc),
-            privacy_accepted_version="1.0", privacy_accepted_at=datetime.now(timezone.utc),
+            privacy_accepted_version=config.PRIVACY_VERSION, privacy_accepted_at=datetime.now(timezone.utc),
         )
         other.set_password("Password123")
         db_session.add(other)

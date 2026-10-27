@@ -21,6 +21,20 @@ vi.mock('../../atoms/GoalIcon', () => ({
     },
 }));
 
+function FilterHarness({ goals }) {
+            const [selectedIds, setSelectedIds] = React.useState([]);
+            return (
+                <GoalHierarchySelector
+                    goals={goals}
+                    selectedGoalIds={selectedIds}
+                    onSelectionChange={setSelectedIds}
+                    selectionMode="multiple"
+                    connectorHighlightMode="bulk"
+                    showGoalHighlightHalo
+                />
+            );
+        }
+
 describe('GoalHierarchySelector', () => {
     const goals = [
         { id: 'goal-root', name: 'Root Goal', type: 'UltimateGoal', childrenIds: ['goal-child'] },
@@ -350,21 +364,7 @@ describe('GoalHierarchySelector', () => {
     });
 
     it('uses halos for direct filter selections and connector lines only for bulk controls', async () => {
-        function FilterHarness() {
-            const [selectedIds, setSelectedIds] = React.useState([]);
-            return (
-                <GoalHierarchySelector
-                    goals={goals}
-                    selectedGoalIds={selectedIds}
-                    onSelectionChange={setSelectedIds}
-                    selectionMode="multiple"
-                    connectorHighlightMode="bulk"
-                    showGoalHighlightHalo
-                />
-            );
-        }
-
-        const { container } = render(<FilterHarness />);
+        const { container } = render(<FilterHarness goals={goals} />);
 
         fireEvent.click(screen.getByLabelText('Select Child Goal'));
         expect(container.querySelectorAll('[class*="sessionIconSlotBranchActive"]')).toHaveLength(1);
@@ -378,21 +378,7 @@ describe('GoalHierarchySelector', () => {
     });
 
     it('does not highlight ancestor lineage when selecting filter descendants', async () => {
-        function FilterHarness() {
-            const [selectedIds, setSelectedIds] = React.useState([]);
-            return (
-                <GoalHierarchySelector
-                    goals={goals}
-                    selectedGoalIds={selectedIds}
-                    onSelectionChange={setSelectedIds}
-                    selectionMode="multiple"
-                    connectorHighlightMode="bulk"
-                    showGoalHighlightHalo
-                />
-            );
-        }
-
-        const { container } = render(<FilterHarness />);
+        const { container } = render(<FilterHarness goals={goals} />);
 
         fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
 
@@ -405,21 +391,7 @@ describe('GoalHierarchySelector', () => {
     });
 
     it('keeps descendant connector highlighting when selecting the bulk source goal afterward', async () => {
-        function FilterHarness() {
-            const [selectedIds, setSelectedIds] = React.useState([]);
-            return (
-                <GoalHierarchySelector
-                    goals={goals}
-                    selectedGoalIds={selectedIds}
-                    onSelectionChange={setSelectedIds}
-                    selectionMode="multiple"
-                    connectorHighlightMode="bulk"
-                    showGoalHighlightHalo
-                />
-            );
-        }
-
-        const { container } = render(<FilterHarness />);
+        const { container } = render(<FilterHarness goals={goals} />);
 
         fireEvent.click(screen.getByLabelText('Select all descendants of Child Goal'));
         await waitFor(() => {

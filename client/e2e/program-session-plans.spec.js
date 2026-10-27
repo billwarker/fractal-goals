@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
 
+async function selectTodayAndNextWeek(page, today) {
+    const rails = page.getByRole('list', { name: /^(Left|Right) column dates$/ });
+    await rails.first().getByRole('button', { name: /today/ }).click();
+    const nextDate = new Date(`${today}T12:00:00Z`);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 7);
+    const nextLabel = nextDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+    await rails.last().getByRole('button', { name: new RegExp(`^${nextLabel}`) }).click();
+}
+
 // Uses the "Browser Planning" fractal: a weekly "Upper A" day on today's weekday with a
 // set-based "Bench Day" template, and no active session.
 test('program a dated plan, see it as next week\'s hints, and see it in the session', async ({ page }, testInfo) => {
@@ -20,6 +29,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     await page.getByRole('button', { name: 'Compare two days' }).click();
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    await selectTodayAndNextWeek(page, today);
     // Today is the latest program day; next week's sits beside it.
     const cards = page.getByRole('article', { name: /^Bench Day plan/ });
     await expect(cards).toHaveCount(2);
@@ -100,6 +110,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
         await page.goto(`/${rootId}/programs`);
         await page.getByRole('tab', { name: 'Days' }).click();
         await page.getByRole('button', { name: 'Compare two days' }).click();
+        await selectTodayAndNextWeek(page, today);
         const sessionCard = page.getByRole('article', { name: 'Bench Day session' });
         const nextPlan = page.getByRole('article', { name: /^Bench Day plan/ });
         await expect(sessionCard).toHaveCount(1);

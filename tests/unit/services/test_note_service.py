@@ -441,7 +441,7 @@ def test_get_all_notes_filters_regular_goal_notes_by_goal_id(
     payload, error, status = service.get_all_notes(
         root.id,
         test_user.id,
-        filters={'note_types': ['goal_note']},
+        filters={'categories': ['goals']},
     )
 
     assert error is None
@@ -449,6 +449,7 @@ def test_get_all_notes_filters_regular_goal_notes_by_goal_id(
     assert payload['total'] == 1
     assert payload['notes'][0]['id'] == goal_note.id
     assert payload['notes'][0]['note_type'] == 'goal_note'
+    assert payload['notes'][0]['note_category'] == 'goals'
     assert payload['notes'][0]['goal_name'] == 'Immediate Goal'
 
     payload, error, status = service.get_all_notes(

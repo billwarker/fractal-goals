@@ -67,7 +67,7 @@ const readGoal = (goal, key) => goal?.[key] ?? goal?.attributes?.[key];
 
 /**
  * A program's goal lineage: its scoped goals and every ancestor (where reviewed levels sit).
- * @param {Array<object>} goals every goal, each with parent_id
+ * @param {Array<{id: string, parent_id?: string, attributes?: object}>} goals every goal, each with parent_id
  * @param {Iterable<string>} scopeGoalIds
  */
 export function programLineageGoalIds(goals, scopeGoalIds) {

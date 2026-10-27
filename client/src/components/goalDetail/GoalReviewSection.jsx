@@ -44,8 +44,10 @@ export function GoalReviewComposer({ rootId, goal, goalId, onDone }) {
             goalId={goalId}
             isSaving={isSaving}
             onCancel={onDone}
-            onSubmit={async (content) => {
-                if (await writeReview(content)) onDone();
+            onSubmit={async (content, attachments) => {
+                const saved = await writeReview(content, attachments);
+                if (saved) onDone();
+                return saved;
             }}
         />
     );

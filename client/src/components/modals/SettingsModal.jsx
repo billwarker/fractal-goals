@@ -21,6 +21,7 @@ import styles from './SettingsModal.module.css';
 import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
 import OnboardingSettingsPanel from '../onboarding/OnboardingSettingsPanel';
 import AgentConnectionsPanel from '../agent/AgentConnectionsPanel';
+import StorageConnectionsPanel from '../settings/StorageConnectionsPanel';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
 
 const SETTINGS_TABS = [
@@ -28,9 +29,10 @@ const SETTINGS_TABS = [
     { id: 'styling', label: 'Goal Characteristics' },
     { id: 'account', label: 'Account' },
     { id: 'ai-connections', label: 'AI Connections' },
+    { id: 'storage', label: 'Cloud Storage' },
 ];
 
-const SettingsModalInner = ({ onClose }) => {
+const SettingsModalInner = ({ onClose, initialTab }) => {
     const {
         theme,
         toggleTheme,
@@ -40,7 +42,9 @@ const SettingsModalInner = ({ onClose }) => {
 
     const { preference, setPreference } = useTimezone();
 
-    const [activeTab, setActiveTab] = useState('general');
+    const [activeTab, setActiveTab] = useState(() => (
+        SETTINGS_TABS.some(({ id }) => id === initialTab) ? initialTab : 'general'
+    ));
     const { user, accountUsage, accountUsageLoading, availableFractals, fractalsLoading, selectedQuotaRootIds, setSelectedQuotaRootIds, passwordData, setPasswordData, emailData, setEmailData, deleteData, setDeleteData, exportPassword, setExportPassword, isExporting, quotaRows, displayTier, displayStatus, quotaScopeLabel, handleQuotaRootToggle, handlePasswordUpdate, handleEmailUpdate, handleExportData, handleDeleteAccount, handleCancelDeletion, handleSignOutEverywhere } = useAccountSettings(activeTab);
     const { activeRootId } = useGoals();
     const isMobile = useIsMobile();
@@ -315,6 +319,12 @@ const SettingsModalInner = ({ onClose }) => {
                             </div>
                         )}
 
+                        {activeTab === 'storage' && (
+                            <div className={styles.tabContent}>
+                                <StorageConnectionsPanel />
+                            </div>
+                        )}
+
                         {activeTab === 'account' && (
                             <div className={styles.tabContent}>
                                 <section>
@@ -567,12 +577,12 @@ const SettingsModalInner = ({ onClose }) => {
     );
 };
 
-const SettingsModal = ({ isOpen, onClose }) => {
+const SettingsModal = ({ isOpen, onClose, initialTab = null }) => {
     if (!isOpen) {
         return null;
     }
 
-    return <SettingsModalInner onClose={onClose} />;
+    return <SettingsModalInner onClose={onClose} initialTab={initialTab} />;
 };
 
 export default SettingsModal;

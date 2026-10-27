@@ -140,11 +140,14 @@ function parseGoogleDrive(url) {
     if (!id || !GOOGLE_DRIVE_ID_PATTERN.test(id)) return null;
 
     // Google's sanctioned embed player for a Drive file.
+    const resourceKey = url.searchParams.get('resourcekey');
+    const suffix = resourceKey && /^[A-Za-z0-9_-]{1,255}$/.test(resourceKey)
+        ? `?resourcekey=${encodeURIComponent(resourceKey)}` : '';
     return {
         provider: 'googleDrive',
         kind: 'iframe',
         id,
-        embedUrl: `https://drive.google.com/file/d/${id}/preview`,
+        embedUrl: `https://drive.google.com/file/d/${id}/preview${suffix}`,
     };
 }
 

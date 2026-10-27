@@ -42,6 +42,8 @@ from blueprints.programs_api import programs_bp
 from blueprints.calendar_periods_api import calendar_periods_bp
 from blueprints.program_session_plans_api import program_session_plans_bp
 from blueprints.notes_api import notes_bp
+from blueprints.storage_api import storage_bp
+from blueprints.note_filters_api import note_filters_bp
 from blueprints.dashboards_api import dashboards_bp
 from blueprints.page_surface_api import page_surface_bp
 from blueprints.analytics_api import analytics_bp
@@ -145,6 +147,8 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
     test_app.register_blueprint(program_session_plans_bp)
     test_app.register_blueprint(calendar_periods_bp)
     test_app.register_blueprint(notes_bp)
+    test_app.register_blueprint(storage_bp)
+    test_app.register_blueprint(note_filters_bp)
     test_app.register_blueprint(dashboards_bp)
     test_app.register_blueprint(page_surface_bp)
     test_app.register_blueprint(analytics_bp)
@@ -259,6 +263,7 @@ def query_counter(app):
 @pytest.fixture(scope='function')
 def test_user(db_session):
     """Create a test user."""
+    from config import config
     from models import User
     
     user = User(
@@ -267,7 +272,7 @@ def test_user(db_session):
         email="test@example.com",
         terms_accepted_version="1.0",
         terms_accepted_at=datetime.now(timezone.utc),
-        privacy_accepted_version="1.0",
+        privacy_accepted_version=config.PRIVACY_VERSION,
         privacy_accepted_at=datetime.now(timezone.utc),
     )
     user.set_password("Password123")

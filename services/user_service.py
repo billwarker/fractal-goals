@@ -589,6 +589,9 @@ class UserService:
 
         requested_at = utc_now()
         user.erasure_requested_at = requested_at
+        # Destroy cloud credentials as soon as erasure is requested; originals remain in the provider.
+        from services.storage_connection_service import StorageConnectionService
+        StorageConnectionService(self.db_session).disconnect_all(user_id)
         # The account stays active during the grace window. Deactivating here
         # would lock the user out of the very endpoint that cancels the
         # request (token_required rejects inactive users), turning a reversible

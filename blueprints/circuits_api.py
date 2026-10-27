@@ -223,7 +223,7 @@ def add_circuit_round(current_user, root_id, run_id):
     if error:
         return error
     return _execute(
-        lambda service: service.add_round(root_id, run_id, current_user.id, round_id=data.get("round_id")),
+        lambda service: service.add_round(root_id, run_id, current_user.id, round_id=(data or {}).get("round_id")),
         "Error adding circuit round",
     )
 

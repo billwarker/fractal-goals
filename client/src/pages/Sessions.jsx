@@ -23,7 +23,7 @@ import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
 import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
-import { flattenGoals } from '../utils/goalHelpers';
+import { goalFilterOptions } from '../components/common/FilterPickerModals';
 import { formatSessionCardDate } from '../utils/sessionCardDates';
 import { fractalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
@@ -208,10 +208,7 @@ function Sessions() {
         return () => dialog.removeEventListener('keydown', handleKeyDown);
     }, [activeQuickSession, handleCloseQuickSessionModal]);
 
-    const goalOptions = useMemo(() => {
-        const allGoals = flattenGoals(goalTree ? [goalTree] : []);
-        return allGoals;
-    }, [goalTree]);
+    const goalOptions = useMemo(() => goalFilterOptions(goalTree), [goalTree]);
 
     const formatDate = useCallback(
         (dateString, options = {}) => formatSessionCardDate(dateString, timezone, options),

@@ -93,8 +93,8 @@ export function useGoalDetailController({
     };
 
     // `sequenceOptions` carries the sequence checkboxes ({ beginNext } / { pauseNext }) to the API.
-    const handleCompletionConfirm = async (completionDate, completionNoteContent = '', sequenceOptions = null) => {
-        await onBeforeCompletionConfirm?.({ completionDate, noteContent: completionNoteContent });
+    const handleCompletionConfirm = async (completionDate, completionNoteContent = '', sequenceOptions = null, attachments = []) => {
+        await onBeforeCompletionConfirm?.({ completionDate, noteContent: completionNoteContent, attachments });
         updateControllerState((prev) => ({
             ...prev,
             localCompleted: true,

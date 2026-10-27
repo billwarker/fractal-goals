@@ -10,6 +10,7 @@ import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from typing import cast
 
 from flask import Response, jsonify, make_response, request
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -47,9 +48,9 @@ def _request_hash() -> str:
 
 def _replay(record: IdempotencyRecord) -> Response:
     response = Response(
-        record.response_body if record.response_body is not None else '{"replayed": true}',
-        status=record.response_status or 200,
-        mimetype=record.response_mimetype or 'application/json',
+        cast(str, record.response_body) if record.response_body is not None else '{"replayed": true}',
+        status=cast(int, record.response_status) if record.response_status is not None else 200,
+        mimetype=cast(str, record.response_mimetype) if record.response_mimetype is not None else 'application/json',
     )
     response.headers[REPLAY_HEADER] = 'true'
     return response

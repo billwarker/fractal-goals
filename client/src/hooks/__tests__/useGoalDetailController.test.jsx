@@ -53,6 +53,7 @@ describe('useGoalDetailController', () => {
         expect(onBeforeCompletionConfirm).toHaveBeenCalledWith({
             completionDate: new Date('2026-03-01T12:00:00Z'),
             noteContent: 'Done well',
+            attachments: [],
         });
         expect(onToggleCompletion).toHaveBeenCalledWith('goal-1', false, null);
     });

@@ -458,8 +458,10 @@ class ActivityTagCatalogService:
 
     def merge(self, root_id, user_id, data):
         target, sources, failure = self._merge_inputs(root_id, user_id, data, lock=True)
-        if failure or target is None or sources is None:
+        if failure:
             return failure
+        if target is None or sources is None:
+            return None, "Tag merge inputs are unavailable", 404
         source_ids = [source.id for source in sources]
         self._bump_assignment_versions([target.id, *source_ids])
         self._union_links(ActivityInstanceTag, "activity_instance_id", source_ids, target.id)
@@ -502,8 +504,10 @@ class ActivityTagCatalogService:
 
     def preview_merge(self, root_id, user_id, data):
         target, sources, failure = self._merge_inputs(root_id, user_id, data, lock=False)
-        if failure or target is None or sources is None:
+        if failure:
             return failure
+        if target is None or sources is None:
+            return None, "Tag merge inputs are unavailable", 404
         definitions = [target, *sources]
         usage, _activities = self._usage_maps(root_id, [row.id for row in definitions])
         totals = Counter()

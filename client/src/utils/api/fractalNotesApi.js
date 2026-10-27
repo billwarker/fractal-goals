@@ -1,5 +1,26 @@
 import { API_BASE, axios, buildQueryString } from './core';
 
+/** Notes page feed/heatmap parameters; the server validates them (services/note_filter_spec.py). */
+function noteFeedQuery(params) {
+    const query = new URLSearchParams();
+    const list = (key, values) => { if (values?.length) query.set(key, values.join(',')); };
+    list('context_types', params.context_types);
+    if (params.context_id) query.set('context_id', params.context_id);
+    if (params.text) query.set('text', params.text);
+    list('categories', params.categories);
+    list('goal_ids', params.goal_ids);
+    list('activity_definition_ids', params.activity_definition_ids);
+    list('activity_group_ids', params.activity_group_ids);
+    if (params.pinned_only) query.set('pinned_only', 'true');
+    list('filters', params.saved_filter_ids);
+    if (params.day) query.set('day', params.day);
+    if (params.timezone) query.set('timezone', params.timezone);
+    if (params.page != null) query.set('page', params.page);
+    if (params.page_size != null) query.set('page_size', params.page_size);
+    const qs = query.toString();
+    return qs ? `?${qs}` : '';
+}
+
 export const fractalNotesApi = {
     getSessionNotes: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/notes`),
     getPreviousSessionNotes: (rootId, sessionId) =>
@@ -25,25 +46,12 @@ export const fractalNotesApi = {
             includeGoalNotes: 'include_goal_notes',
             includeActivityInstanceNotes: 'include_activity_instance_notes',
         })}`),
-    getAllNotes: (rootId, params = {}) => {
-        const query = new URLSearchParams();
-        if (params.context_types && params.context_types.length) query.set('context_types', params.context_types.join(','));
-        if (params.note_types && params.note_types.length) query.set('note_types', params.note_types.join(','));
-        if (params.context_id) query.set('context_id', params.context_id);
-        if (params.goal_id) query.set('goal_id', params.goal_id);
-        if (params.activity_definition_ids && params.activity_definition_ids.length)
-            params.activity_definition_ids.forEach(id => query.append('activity_definition_ids[]', id));
-        if (params.activity_group_ids && params.activity_group_ids.length)
-            params.activity_group_ids.forEach(id => query.append('activity_group_ids[]', id));
-        if (params.pinned_only) query.set('pinned_only', 'true');
-        if (params.search) query.set('search', params.search);
-        if (params.date_from) query.set('date_from', params.date_from);
-        if (params.date_to) query.set('date_to', params.date_to);
-        if (params.page != null) query.set('page', params.page);
-        if (params.page_size != null) query.set('page_size', params.page_size);
-        const qs = query.toString();
-        return axios.get(`${API_BASE}/${rootId}/notes${qs ? '?' + qs : ''}`);
-    },
+    getAllNotes: (rootId, params = {}) => axios.get(`${API_BASE}/${rootId}/notes${noteFeedQuery(params)}`),
+    getNotesHeatmap: (rootId, params = {}) => axios.get(`${API_BASE}/${rootId}/notes/heatmap${noteFeedQuery(params)}`),
+    listNoteFilters: (rootId) => axios.get(`${API_BASE}/${rootId}/note-filters`),
+    createNoteFilter: (rootId, data) => axios.post(`${API_BASE}/${rootId}/note-filters`, data),
+    updateNoteFilter: (rootId, filterId, data) => axios.put(`${API_BASE}/${rootId}/note-filters/${filterId}`, data),
+    deleteNoteFilter: (rootId, filterId) => axios.delete(`${API_BASE}/${rootId}/note-filters/${filterId}`),
     pinNote: (rootId, noteId) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}/pin`),
     unpinNote: (rootId, noteId) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}/unpin`),
 };

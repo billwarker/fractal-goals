@@ -1,3 +1,4 @@
+from config import config
 import json
 import uuid
 from datetime import date, datetime, time, timedelta, timezone
@@ -400,7 +401,7 @@ def test_merge_template_changes_drops_removed_template_items():
 def test_other_users_cannot_read_or_write_plans(client, db_session, plan_world):
     intruder = User(id=str(uuid.uuid4()), username='intruder', email='intruder@example.com',
                     terms_accepted_version='1.0', terms_accepted_at=datetime.now(timezone.utc),
-                    privacy_accepted_version='1.0', privacy_accepted_at=datetime.now(timezone.utc))
+                    privacy_accepted_version=config.PRIVACY_VERSION, privacy_accepted_at=datetime.now(timezone.utc))
     intruder.set_password('Password123')
     db_session.add(intruder)
     db_session.commit()

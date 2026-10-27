@@ -9,4 +9,4 @@
  * the other fails the suite rather than silently recording a wrong version.
  */
 export const TERMS_VERSION = '1.0';
-export const PRIVACY_VERSION = '1.0';
+export const PRIVACY_VERSION = '1.1';

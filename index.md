@@ -372,9 +372,57 @@ Optional surface widgets and the quick-session workspace load at their use bound
 
 ### Notes and analytics
 
-Notes support goal/session/activity scoping and safe markdown media rendering. Analytics uses
+Notes support goal/session/activity scoping and safe markdown media rendering. The Notes page groups
+notes into four categories by where they were written (`services/note_filter_spec.py`
+`CATEGORY_CONTEXT_TYPES`, mirrored in `utils/noteTypes.js` and checked against
+`tests/fixtures/note_categories.json`): General, Goals, Sessions, Programs. One filter spec (quick-search words and phrases, keyword
+conditions that each *contain* or *equal* a whole word/phrase combined all-or-any, categories, goals,
+activities, pinned) is applied in SQL by `services/note_feed.py` for both the feed and its per-day heatmap.
+"Equals" uses an escaped word-boundary match, so user text is never a pattern; there is no regex search.
+Saved filters (`note_filters`, `services/note_filter_service.py`) are full specs, and every selected one is
+AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageFilters.js`); the side pane
+holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
+saved-filter toggles and the remaining controls; active conditions show as badges beside the note count.
+Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
 a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
+Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;
+keep that correlation to avoid quadratic joins when tenant statistics lag behind history imports.
+
+Media has one structured attachment boundary: `models/storage.py`, `services/media_service.py`,
+`services/storage_connection_service.py`, `services/storage_upload_service.py` and
+`blueprints/storage_api.py`. User-owned Google Drive (`drive.file` + Picker) and Dropbox App Folder
+connections retain encrypted credentials; originals stay in the provider. Notes link to scoped
+media assets through `note_attachments`; goal notes/reviews/completion notes, sessions and activities reuse that
+store. Goal descriptions link through `goal_attachments`, read on demand (`GET …/goals/<id>/attachments`,
+`hooks/useGoalDescriptionAttachments.js`) so goal trees never load them, and saved with the goal update
+(`attachments`). Media is playable while attached to a live note or a live goal. Text fields outside quick
+bars use `notes/AttachableField` (paperclip menu, paste, drop, compact chips). OAuth combines single-use PKCE state with a dedicated browser-bound Lax callback cookie;
+the main production auth cookie stays Strict. Shared note cards render `NoteMedia` / `MediaAttachment`. `hooks/useAttachmentDraft.js` owns a
+note's draft attachments: device files, pasted and dropped pictures upload through `utils/cloudUpload.js`
+with resumable chunks into the user's upload destination (`storage_connections.upload_default`, chosen in
+Settings when several accounts are connected; otherwise the first connected one), and only finished uploads
+reach the note payload. `NoteAttachmentsEditor` renders a draft for full composers; quick bars (goal
+`SidePaneNotePanel`, session/activity/circuit `NoteQuickAdd`) use one paperclip, `notes/AttachMenuButton`,
+offering this device or cloud storage. Session-side notes pass serialized attachments so outbox placeholders
+render them; `useSessionNotes` sends only ids and descriptions. `CloudMediaDialog` only chooses existing files. A note's
+"···" menu (`notes/NoteOptionsMenu`, body-portaled so cards keep their `content-visibility` containment;
+toggling it mid-click crashed Chrome) opens attachment management, where `AttachmentFileRow` renames the
+original in storage (extension fixed), removes it from the note, or moves it to the provider's trash and
+drops it from every note (`MediaService.rename`/`delete_from_storage`). Connections carry an explicit
+`status` (`active | reconnect_required | disconnected`); a revoked refresh grant becomes
+`reconnect_required`. Settings → Cloud Storage (`components/settings/StorageConnectionsPanel.jsx`)
+owns connect, reconnect and disconnect through `hooks/useStorageConnections.js`; provider OAuth returns
+to `/storage/connected`, which reports an allowlisted result to open tabs and closes. Session-note attachment
+writes use the existing outbox; media bytes are online-only. Public landing publication strips
+private attachment data, and exports omit credentials. Integrations remain unavailable without
+provider configuration. Setup and real-account release gates:
+[BYO media runbook](docs/architecture/BYO_MEDIA_RUNBOOK.md). Original audit and delivery evidence:
+[BYO storage audit](planning/byo-storage-audit-2026-10-26.md).
+
+Pasted Drive previews, direct HTTPS videos and Markdown image URLs remain supported by the
+shared Markdown renderer; Drive resource keys survive preview normalization. `ComposeLinkPanel`
+is the canonical link picker for inline and hoisted note composition.
 
 **Goal charts** replace the old target manager's per-goal view: saved activity, goal and session
 views (`analytics_dashboards`, `kind='view'`) attach to goals through `goal_analytics_views` (migration
@@ -484,7 +532,10 @@ covers the client API layer, query keys, and pure view models with zero errors.
 Frontend CI gates its production dependency audit, zero-warning lint, all-source
 coverage, production build, responsive source checks, maintainability budgets, and
 desktop/mobile Chromium workflows against the real Flask app and a disposable
-PostgreSQL database.
+PostgreSQL database. It also builds the nginx container and verifies security headers on the
+app shell, deep links, service-worker files and error responses through
+`scripts/check_frontend_headers.py`; shared nginx header includes preserve location-level
+cache policies without losing CSP or the other headers.
 
 Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with

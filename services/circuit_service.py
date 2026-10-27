@@ -356,7 +356,7 @@ class CircuitService:
         for slot in sorted(definition.slots, key=lambda item: item.sort_order):
             activity = slot.activity_definition
             run_slot = CircuitRunSlot(
-                **({'id': circuit_ids.run_slot_id(run.id, slot.id)} if client_run_id else {}),
+                **({'id': circuit_ids.run_slot_id(str(run.id), str(slot.id))} if client_run_id else {}),
                 circuit_run_id=run.id,
                 source_slot_id=slot.id,
                 activity_definition_id=activity.id,
@@ -368,7 +368,7 @@ class CircuitService:
             )
             if activity.has_sets:
                 instance = ActivityInstance(
-                    **({'id': circuit_ids.run_slot_instance_id(run.id, slot.id)} if client_run_id else {}),
+                    **({'id': circuit_ids.run_slot_instance_id(str(run.id), str(slot.id))} if client_run_id else {}),
                     session_id=session_id,
                     root_id=root_id,
                     activity_definition_id=activity.id,
@@ -382,7 +382,7 @@ class CircuitService:
             self._create_round_occurrences(
                 run,
                 round_number,
-                round_id=circuit_ids.initial_round_id(run.id, round_number) if client_run_id else None,
+                round_id=circuit_ids.initial_round_id(str(run.id), round_number) if client_run_id else None,
             )
         if circuit_prescription_tag_ids(prescription):
             # The new rounds' members exist now; load them onto the run before tagging them.

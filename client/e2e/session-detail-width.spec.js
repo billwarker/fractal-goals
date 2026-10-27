@@ -31,11 +31,8 @@ test('session hierarchy shares mobile edges and metric inputs retain usable widt
             splits: [{ name: 'Left side' }, { name: 'Right side' }],
         });
         const single = await post('activities', { name: 'Handstand Practice', has_metrics: true, metrics: [metric] });
-        await post('activity-tags', { name: 'Long strength and mobility tag', color: '#123ABC', scope: 'selected', activity_ids: [activity.id] });
-        const tagged = await (await fetch(`/api/${root}/activities`, {
-            headers: { Authorization: `Bearer ${token}` },
-        })).json();
-        const tagId = tagged.find((definition) => definition.id === activity.id).tags[0].id;
+        const tag = await post('activity-tags', { name: 'Long strength and mobility tag', color: '#123ABC' });
+        const tagId = tag.id;
         const entries = (definition) => definition.metric_definitions.flatMap((m) => definition.has_splits
             ? definition.split_definitions.map((split) => ({ metric_id: m.id, split_id: split.id, value: 18 }))
             : [{ metric_id: m.id, value: 36 }]);

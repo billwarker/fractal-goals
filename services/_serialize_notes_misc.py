@@ -8,6 +8,8 @@ from .account_flags import must_change_password as _must_change_password
 from .goal_type_utils import get_canonical_goal_type
 from .session_runtime import get_session_template_color, get_session_template_name
 from services._serialize_common import calculate_smart_status, format_utc
+from services.media_service import serialize_attachment
+from services.note_filter_spec import derive_note_category
 
 
 def serialize_user(user):
@@ -62,6 +64,7 @@ def serialize_note(note):
     )
     result = {
         "id": note.id,
+        "root_id": note.root_id,
         "context_type": note.context_type,
         "context_id": note.context_id,
         "session_id": note.session_id,
@@ -70,9 +73,11 @@ def serialize_note(note):
         "set_index": set_index,
         "activity_set_id": getattr(note, "activity_set_id", None),
         "content": note.content,
+        "attachments": [serialize_attachment(item) for item in getattr(note, 'attachments', [])],
         "note_kind": note_kind,
         "note_type": resolved_note_type,
         "note_type_label": note_type_label(resolved_note_type),
+        "note_category": derive_note_category(note.context_type),
         "created_at": format_utc(note.created_at),
         "updated_at": format_utc(note.updated_at),
         "goal_id": note.goal_id,
@@ -121,6 +126,7 @@ def note_type_label(note_type):
         "circuit_run_note": "Activity Circuit Note",
         "circuit_round_note": "Circuit Round Note",
         "goal_completion_note": "Goal Completion Note",
+        "goal_review_note": "Goal Review Note",
         "note": "Note",
     }
     return labels.get(note_type, "Note")
