@@ -65,7 +65,7 @@ def admin_user(db_session):
         email='admin@example.com',
         role='admin',
         terms_accepted_version='1.0',
-        privacy_accepted_version='1.0',
+        privacy_accepted_version=config.PRIVACY_VERSION,
     )
     user.set_password('Password123')
     db_session.add(user)
@@ -163,7 +163,7 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )
@@ -178,7 +178,7 @@ def test_signup_requires_and_consumes_invite_key(client, admin_client):
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )
@@ -203,7 +203,7 @@ def test_manual_invite_key_is_bound_to_assigned_email(client, admin_client):
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )
@@ -219,7 +219,7 @@ def test_manual_invite_key_is_bound_to_assigned_email(client, admin_client):
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )
@@ -1711,7 +1711,7 @@ def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, d
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )
@@ -1727,7 +1727,7 @@ def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, d
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }),
         content_type='application/json',
     )

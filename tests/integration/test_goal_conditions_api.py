@@ -1,4 +1,5 @@
 """Goal completion conditions end to end: API writes, evidence reconciliation, and reads."""
+from config import config
 from datetime import datetime, timedelta, timezone
 import uuid
 
@@ -171,7 +172,7 @@ class TestConditionWrites:
         other = User(
             id=str(uuid.uuid4()), username="otheruser", email="other@example.com",
             terms_accepted_version="1.0", terms_accepted_at=datetime.now(timezone.utc),
-            privacy_accepted_version="1.0", privacy_accepted_at=datetime.now(timezone.utc),
+            privacy_accepted_version=config.PRIVACY_VERSION, privacy_accepted_at=datetime.now(timezone.utc),
         )
         other.set_password("Password123")
         db_session.add(other)

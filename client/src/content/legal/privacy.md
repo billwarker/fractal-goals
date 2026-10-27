@@ -1,6 +1,6 @@
 <!--
-version: 1.0
-effective: 2026-08-25
+version: 1.1
+effective: 2026-10-27
 -->
 
 # Privacy Policy
@@ -72,12 +72,17 @@ This content is yours. It is visible only to you. See
 
 #### Optional connected media storage
 
-You can connect Google Drive or Dropbox to attach pictures and videos to notes. Original files
-remain in your provider account. We store file references, descriptive metadata, and encrypted
-credentials needed to access files you authorize. Google Picker receives a short-lived access
-token to select files. Private media may pass through our servers for display; it is not included
+You can connect Google Drive or Dropbox to attach pictures and videos to notes and goal
+descriptions. Original files remain in your provider account. When you upload a file from your
+device, we save it to a Fractal Goals folder in that account, and at your request we can rename a
+file or move it to your provider's trash. We store file references, descriptive metadata, and
+encrypted credentials needed to access files you authorize. With Google Drive we can only open
+files you choose or upload through Fractal Goals; with Dropbox, only the Apps/Fractal Goals folder.
+Google Picker receives a short-lived access token to select files. Private media may pass through our servers for display; it is not included
 in public examples or cached for offline use. Disconnecting destroys our stored credentials.
-Removing a note or deleting your account does not delete original files from your cloud storage.
+Removing an attachment, a note or a goal, or deleting your account, does not delete original files
+from your cloud storage; only an explicit delete you confirm in the app moves a file to your
+provider's trash.
 An account export includes media references and metadata, rather than the original file bytes.
 
 ### 2.3 Product usage information

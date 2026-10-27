@@ -263,6 +263,7 @@ def query_counter(app):
 @pytest.fixture(scope='function')
 def test_user(db_session):
     """Create a test user."""
+    from config import config
     from models import User
     
     user = User(
@@ -271,7 +272,7 @@ def test_user(db_session):
         email="test@example.com",
         terms_accepted_version="1.0",
         terms_accepted_at=datetime.now(timezone.utc),
-        privacy_accepted_version="1.0",
+        privacy_accepted_version=config.PRIVACY_VERSION,
         privacy_accepted_at=datetime.now(timezone.utc),
     )
     user.set_password("Password123")

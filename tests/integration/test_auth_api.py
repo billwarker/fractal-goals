@@ -56,7 +56,7 @@ class TestSignupEndpoint:
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
             '/api/auth/signup',
@@ -83,7 +83,7 @@ class TestSignupEndpoint:
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
             '/api/auth/signup',
@@ -120,7 +120,7 @@ class TestSignupEndpoint:
             'invite_key': invite_key,
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
             '/api/auth/signup',
@@ -140,7 +140,7 @@ class TestSignupEndpoint:
             'invite_key': 'fg_invite_invalid_email',
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
             '/api/auth/signup',
@@ -159,7 +159,7 @@ class TestSignupEndpoint:
             'invite_key': 'fg_invite_short_password',
             'accepted_terms': True,
             'terms_version': '1.0',
-            'privacy_version': '1.0',
+            'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
             '/api/auth/signup',
