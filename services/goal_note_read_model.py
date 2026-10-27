@@ -50,7 +50,11 @@ def filter_goal_notes(
             instance is not None
             and instance.root_id == root_id
             and instance.deleted_at is None
-            and instance.activity_definition_id in activity_ids
+            and (
+                instance.activity_definition_id in activity_ids
+                # Ad hoc links from the session goal hierarchy carry their notes too.
+                or not goal_ids.isdisjoint(instance.associated_goal_ids or ())
+            )
         )
 
     return [note for note in notes if included(note)]

@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
-from models import ActivityDefinition, ActivityInstance, CircuitRound, CircuitRun, Goal, Note, Program, Session, activity_goal_associations, goal_activity_group_associations, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, CircuitRound, CircuitRun, Goal, Note, Program, Session, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations, validate_root_goal
 from services.events import Event, Events, event_bus
 from services.goal_review_rules import restart_review_cadence
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
@@ -386,6 +386,23 @@ class NoteService:
                 if preloaded_activity_definition_ids is not None and not include_descendants
                 else self._collect_goal_activity_definition_ids(root_id, goal_ids)
             )
+            # Ad hoc links from the session goal hierarchy carry their notes too.
+            linked_instance_ids = select(activity_instance_goal_associations.c.activity_instance_id).join(
+                Goal, Goal.id == activity_instance_goal_associations.c.goal_id,
+            ).where(
+                activity_instance_goal_associations.c.goal_id.in_(goal_ids),
+                activity_instance_goal_associations.c.deleted_at.is_(None),
+                Goal.root_id == root_id,
+                Goal.deleted_at.is_(None),
+            )
+            activity_note_conditions.append(and_(
+                Note.context_type == 'activity_instance',
+                Note.activity_instance_id.in_(linked_instance_ids),
+                Note.activity_instance.has(and_(
+                    ActivityInstance.root_id == root_id,
+                    ActivityInstance.deleted_at.is_(None),
+                )),
+            ))
             if activity_definition_ids:
                 scoped_instance_ids = select(ActivityInstance.id).where(
                     ActivityInstance.root_id == root_id,

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from services.events import Events
-from models import Note, Program, SessionTemplate, activity_goal_associations
+from models import Note, Program, SessionTemplate, activity_goal_associations, activity_instance_goal_associations
 
 
 @pytest.fixture(params=['direct', 'bulk'], autouse=True)
@@ -202,6 +202,54 @@ class TestNotesApiNanoValidation:
         )
         assert no_note_types.status_code == 200
         assert no_note_types.get_json() == []
+
+    def test_goal_notes_include_notes_from_ad_hoc_linked_instances(
+        self,
+        authed_client,
+        db_session,
+        sample_goal_hierarchy,
+        sample_activity_instance,
+    ):
+        root = sample_goal_hierarchy['ultimate']
+        parent = sample_goal_hierarchy['mid_term']
+        child = sample_goal_hierarchy['short_term']
+        db_session.add(Note(
+            id=str(uuid.uuid4()),
+            root_id=root.id,
+            context_type='activity_instance',
+            context_id=sample_activity_instance.id,
+            activity_instance_id=sample_activity_instance.id,
+            session_id=sample_activity_instance.session_id,
+            activity_definition_id=sample_activity_instance.activity_definition_id,
+            content='Linked instance note',
+        ))
+        db_session.commit()
+
+        def contents(goal, query=''):
+            response = authed_client.get(f'/api/{root.id}/goals/{goal.id}/notes{query}')
+            assert response.status_code == 200
+            return [note['content'] for note in response.get_json()]
+
+        assert contents(child) == []
+
+        db_session.execute(activity_instance_goal_associations.insert().values(
+            activity_instance_id=sample_activity_instance.id,
+            goal_id=child.id,
+            created_at=datetime.utcnow(),
+        ))
+        db_session.commit()
+
+        assert contents(child) == ['Linked instance note']
+        assert contents(parent) == []
+        assert contents(parent, '?include_descendants=true') == ['Linked instance note']
+
+        db_session.execute(activity_instance_goal_associations.update().where(
+            activity_instance_goal_associations.c.activity_instance_id == sample_activity_instance.id,
+        ).values(deleted_at=datetime.utcnow()))
+        db_session.commit()
+        db_session.expire_all()
+
+        assert contents(child) == []
 
     def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id

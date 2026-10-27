@@ -496,7 +496,8 @@
     align-self: flex-start;
 }
 
-.childInheritedNote {
+.childInheritedNote,
+.inheritedBadge {
     font-size: 9px;
     color: var(--color-text-muted);
     background: rgba(0, 0, 0, 0.04);
