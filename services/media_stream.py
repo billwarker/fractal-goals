@@ -12,6 +12,22 @@ from services.storage_common import StorageError
 
 logger = logging.getLogger(__name__)
 
+# Cloud Run refuses a response over 32 MiB that declares its length, so ranges are served in
+# pieces of at most this size. Media players ask for the next piece as they play or seek.
+MAX_RANGE_BYTES = 8 * 1024 * 1024
+
+
+def bounded_range(byte_range, size):
+    """The upstream range to fetch: open-ended or oversized ranges are cut to MAX_RANGE_BYTES."""
+    if not byte_range:
+        return None
+    first, last = byte_range.removeprefix('bytes=').split('-')
+    if not first:  # Suffix range: the last N bytes.
+        return f'bytes=-{min(int(last), MAX_RANGE_BYTES)}'
+    start = int(first)
+    end = min(int(last) if last else size - 1, start + MAX_RANGE_BYTES - 1)
+    return f'bytes={start}-{end}' if end >= start else byte_range  # Past the end: let the provider answer 416.
+
 
 def stream_headers(asset, upstream):
     result = {'Content-Type': asset.mime_type, 'Cache-Control': 'private, no-store',
@@ -22,7 +38,9 @@ def stream_headers(asset, upstream):
         if not length.isdigit() or int(length) > asset.size_bytes:
             upstream.close()
             raise StorageError('Invalid media length from provider', 502)
-        result['Content-Length'] = length
+        # A full file over the cap goes out chunked (no declared length), which Cloud Run allows.
+        if upstream.status_code != 200 or int(length) <= MAX_RANGE_BYTES:
+            result['Content-Length'] = length
     if upstream.status_code in (206, 416):
         content_range = upstream.headers.get('Content-Range', '')
         pattern = r'bytes \d+-\d+/\d+' if upstream.status_code == 206 else r'bytes \*/\d+'

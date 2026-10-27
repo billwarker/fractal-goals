@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from models import Goal, GoalAttachment, MediaAsset, Note, NoteAttachment, validate_root_goal
 from services import storage_providers as provider_api
 from services.storage_common import MAX_ATTACHMENTS, StorageError, serialize_asset, validate_file, validate_file_id, verify_signature
+from services.media_stream import bounded_range
 from services.storage_connection_service import StorageConnectionService
 
 
@@ -179,7 +180,8 @@ class MediaService:
         current = provider_api.metadata(asset.connection.provider, token, asset.file_id, asset.resource_key)
         if current['revision'] != asset.revision or current['size_bytes'] != asset.size_bytes or current['mime_type'] != asset.mime_type:
             raise StorageError('The source file changed. Relink a new file to preserve this evidence.', 409, 'media_revision_changed')
-        response = provider_api.download(asset.connection.provider, token, asset.file_id, asset.resource_key, byte_range)
+        response = provider_api.download(asset.connection.provider, token, asset.file_id, asset.resource_key,
+                                         bounded_range(byte_range, asset.size_bytes))
         return asset, response
 
 

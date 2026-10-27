@@ -236,14 +236,15 @@ def test_export_and_publication_boundaries(storage):
     assert 'attachments' in note
 
 
-@pytest.mark.parametrize('range_value', ['bytes=0-9', 'bytes=10-', 'bytes=-20', None])
-def test_content_revalidates_revision_and_forwards_range(storage, monkeypatch, range_value):
+@pytest.mark.parametrize('range_value,forwarded', [('bytes=0-9', 'bytes=0-9'), ('bytes=10-', 'bytes=10-99'),
+                                                    ('bytes=-20', 'bytes=-20'), (None, None)])
+def test_content_revalidates_revision_and_forwards_range(storage, monkeypatch, range_value, forwarded):
     asset = import_asset(storage)
     create_note(storage, [{'asset_id': asset['id']}])
     observed = []
     monkeypatch.setattr(providers, 'download', lambda *args: observed.append(args) or 'response')
     _, response = MediaService(storage.db).open_content(storage.root.id, storage.user.id, asset['id'], range_value)
-    assert response == 'response' and observed[0][-1] == range_value
+    assert response == 'response' and observed[0][-1] == forwarded
     storage.metadata['revision'] = '2'
     with pytest.raises(StorageError, match='source file changed'):
         MediaService(storage.db).open_content(storage.root.id, storage.user.id, asset['id'])
@@ -441,3 +442,57 @@ def test_http_upload_offset_validation(storage, authed_client, offset):
     response = authed_client.put(f'/api/{storage.root.id}/media/uploads/missing',
                                 data=b'bytes', environ_overrides={'HTTP_UPLOAD_OFFSET': offset} if offset is not None else {})
     assert response.status_code == 400
+
+
+MiB = 1024 * 1024
+
+
+@pytest.mark.parametrize('requested,size,upstream', [
+    (None, 100 * MiB, None),
+    ('bytes=0-', 100 * MiB, f'bytes=0-{8 * MiB - 1}'),
+    ('bytes=0-', 1000, 'bytes=0-999'),
+    ('bytes=20-29', 100 * MiB, 'bytes=20-29'),
+    (f'bytes=10-{50 * MiB}', 100 * MiB, f'bytes=10-{10 + 8 * MiB - 1}'),
+    (f'bytes=-{20 * MiB}', 100 * MiB, f'bytes=-{8 * MiB}'),
+    ('bytes=-500', 100 * MiB, 'bytes=-500'),
+    ('bytes=5000-', 1000, 'bytes=5000-'),
+])
+def test_media_ranges_are_fetched_in_bounded_pieces(requested, size, upstream):
+    # Cloud Run rejects responses over 32 MiB with a declared length, so a video is served in pieces.
+    from services.media_stream import bounded_range
+    assert bounded_range(requested, size) == upstream
+
+
+def test_large_media_streams_in_pieces_and_full_files_go_out_chunked(storage, client, monkeypatch):
+    import requests
+    from services.media_stream import MAX_RANGE_BYTES
+    from tests.conftest import session_token_for
+    size = 40 * MiB
+    asset = storage.db.query(MediaAsset).filter_by(id=import_asset(storage)['id']).one()
+    asset.size_bytes = size
+    storage.db.commit()
+    monkeypatch.setattr(providers, 'metadata', lambda *args: {'revision': asset.revision, 'size_bytes': size,
+                                                              'mime_type': asset.mime_type})
+    create_note(storage, [{'asset_id': asset.id}])
+    requested = []
+    def download(provider, token, file_id, resource_key=None, byte_range=None):
+        requested.append(byte_range)
+        response = requests.Response()
+        if byte_range:
+            start, end = map(int, byte_range.removeprefix('bytes=').split('-'))
+            response.status_code, response._content = 206, bytes(end - start + 1)
+            response.headers['Content-Range'] = f'bytes {start}-{end}/{size}'
+        else:
+            response.status_code, response._content = 200, bytes(size)
+        response._content_consumed = True
+        response.headers['Content-Length'] = str(len(response._content))
+        return response
+    monkeypatch.setattr(providers, 'download', download)
+    client.set_cookie(config.AUTH_COOKIE_NAME, session_token_for(storage.user))
+    url = f'/api/{storage.root.id}/media/{asset.id}/content'
+    piece = client.get(url, headers={'Range': 'bytes=0-'})
+    assert piece.status_code == 206 and requested[-1] == f'bytes=0-{MAX_RANGE_BYTES - 1}'
+    assert piece.headers['Content-Range'] == f'bytes 0-{MAX_RANGE_BYTES - 1}/{size}'
+    assert int(piece.headers['Content-Length']) == MAX_RANGE_BYTES
+    full = client.get(url)
+    assert full.status_code == 200 and 'Content-Length' not in full.headers and len(full.data) == size
