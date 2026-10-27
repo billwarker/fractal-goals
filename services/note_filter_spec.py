@@ -22,7 +22,7 @@ MAX_CONDITIONS = 10
 # contains: the value appears anywhere (LIKE). equals: the value appears as a whole word or phrase.
 CONDITION_OPS = ('contains', 'equals')
 MATCH_MODES = ('all', 'any')
-SPEC_KEYS = {'text', 'conditions', 'match', 'categories', 'goal_id', 'activity_definition_ids', 'activity_group_ids', 'pinned_only'}
+SPEC_KEYS = {'text', 'conditions', 'match', 'categories', 'goal_ids', 'activity_definition_ids', 'activity_group_ids', 'pinned_only'}
 
 
 class NoteFilterError(ValueError):
@@ -54,6 +54,10 @@ def normalize_spec(raw):
     if raw.get('text_mode') in (None, 'keyword'):
         # Filters saved before regex search was removed carry text_mode='keyword'.
         raw = {key: value for key, value in raw.items() if key != 'text_mode'}
+    if 'goal_id' in raw:
+        # Earlier specs held one goal; goals are now a list like the Sessions filter.
+        raw = {**{key: value for key, value in raw.items() if key != 'goal_id'},
+               'goal_ids': [*(raw.get('goal_ids') or []), *([raw['goal_id']] if raw['goal_id'] else [])]}
     unknown = set(raw) - SPEC_KEYS
     if unknown:
         raise NoteFilterError(f'Unknown filter fields: {", ".join(sorted(unknown))}')
@@ -69,9 +73,6 @@ def normalize_spec(raw):
         categories = [part for part in categories.split(',') if part]
     if not isinstance(categories, list) or any(category not in CATEGORY_CONTEXT_TYPES for category in categories):
         raise NoteFilterError(f'Categories must be from: {", ".join(CATEGORY_CONTEXT_TYPES)}')
-    goal_id = raw.get('goal_id') or None
-    if goal_id is not None and (not isinstance(goal_id, str) or len(goal_id) > 64):
-        raise NoteFilterError('Invalid goal')
     pinned = raw.get('pinned_only') or False
     if not isinstance(pinned, bool):
         raise NoteFilterError('pinned_only must be true or false')
@@ -80,7 +81,7 @@ def normalize_spec(raw):
         'conditions': conditions,
         'match': match if len(conditions) > 1 else None,
         'categories': sorted(set(categories)),
-        'goal_id': goal_id,
+        'goal_ids': _id_list(raw.get('goal_ids'), 'goal_ids'),
         'activity_definition_ids': _id_list(raw.get('activity_definition_ids'), 'activity_definition_ids'),
         'activity_group_ids': _id_list(raw.get('activity_group_ids'), 'activity_group_ids'),
         'pinned_only': pinned,
@@ -142,8 +143,8 @@ def apply_spec(query, spec, db):
     if spec.get('categories'):
         contexts = [context for category in spec['categories'] for context in CATEGORY_CONTEXT_TYPES[category]]
         query = query.filter(Note.context_type.in_(contexts))
-    if spec.get('goal_id'):
-        query = query.filter(Note.goal_id == spec['goal_id'])
+    if spec.get('goal_ids'):
+        query = query.filter(Note.goal_id.in_(spec['goal_ids']))
     definitions, groups = spec.get('activity_definition_ids', []), spec.get('activity_group_ids', [])
     if definitions or groups:
         conditions = []

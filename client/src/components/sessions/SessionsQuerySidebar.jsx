@@ -1,8 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
-import ActivityFilterModal from '../common/ActivityFilterModal';
-import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
+import { ActivityFilterPicker, GoalFilterModal } from '../common/FilterPickerModals';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
 import './SessionsQuerySidebar.css';
 
@@ -275,29 +274,19 @@ function SessionsQuerySidebar({
             </div>
 
             {isActivityModalOpen && (
-                <ActivityFilterModal
-                    title="Filter By Activity"
+                <ActivityFilterPicker
                     activities={activities}
                     activityGroups={activityGroups}
-                    initialActivityIds={filters.activityIds}
-                    selectionMode="multiple"
-                    allowGroupSelection={false}
-                    confirmLabel="Apply"
+                    selectedActivityIds={filters.activityIds}
                     onClose={() => setIsActivityModalOpen(false)}
                     onConfirm={(selectedIds) => onUpdateFilters?.({ activityIds: selectedIds })}
                 />
             )}
 
-            <GoalHierarchySelectionModal
+            <GoalFilterModal
                 isOpen={isGoalModalOpen}
-                title="Filter By Goal"
                 goals={goalOptions}
                 selectedGoalIds={filters.goalIds}
-                selectionMode="multiple"
-                searchPlaceholder="Search goals"
-                emptyState="No goals available."
-                connectorHighlightMode="bulk"
-                showGoalHighlightHalo
                 onClose={() => setIsGoalModalOpen(false)}
                 onConfirm={(selectedIds) => onUpdateFilters?.({ goalIds: selectedIds })}
             />

@@ -8,7 +8,7 @@ function noteFeedQuery(params) {
     if (params.context_id) query.set('context_id', params.context_id);
     if (params.text) query.set('text', params.text);
     list('categories', params.categories);
-    if (params.goal_id) query.set('goal_id', params.goal_id);
+    list('goal_ids', params.goal_ids);
     list('activity_definition_ids', params.activity_definition_ids);
     list('activity_group_ids', params.activity_group_ids);
     if (params.pinned_only) query.set('pinned_only', 'true');

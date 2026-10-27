@@ -21,7 +21,7 @@ export function normalizeNoteFilters(filters = {}) {
         context_id: filters.context_id || undefined,
         text,
         categories: sortedList(filters.categories),
-        goal_id: filters.goal_id || undefined,
+        goal_ids: sortedList(filters.goal_ids),
         activity_definition_ids: sortedList(filters.activity_definition_ids),
         activity_group_ids: sortedList(filters.activity_group_ids),
         pinned_only: filters.pinned_only ? true : undefined,

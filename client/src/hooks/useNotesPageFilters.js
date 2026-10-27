@@ -11,13 +11,11 @@ const csv = (value) => (value ? value.split(',').map((part) => part.trim()).filt
 // URL parameter for each filter field. Saved filter ids and the selected heatmap day are part
 // of the view, so back/forward and shared links restore exactly what was on screen.
 const PARAMS = {
-    text: 'q', categories: 'cat', goalId: 'goal', goalName: 'goal_name',
-    activityIds: 'act', groupIds: 'grp', pinnedOnly: 'pinned', savedFilterIds: 'saved', day: 'day',
+    text: 'q', categories: 'cat', goalIds: 'goals', activityIds: 'act', pinnedOnly: 'pinned', savedFilterIds: 'saved', day: 'day',
 };
 
 export const EMPTY_NOTES_FILTERS = {
-    text: '', categories: [], goalId: null, goalName: '', activityIds: [], groupIds: [],
-    pinnedOnly: false, savedFilterIds: [], day: null,
+    text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false, savedFilterIds: [], day: null,
 };
 
 /** Notes page filter state, kept in the URL. */
@@ -27,10 +25,8 @@ export function useNotesPageFilters(timezone) {
     const filters = useMemo(() => ({
         text: searchParams.get(PARAMS.text) || '',
         categories: csv(searchParams.get(PARAMS.categories)).filter((value) => CATEGORY_VALUES.has(value)),
-        goalId: searchParams.get(PARAMS.goalId) || null,
-        goalName: searchParams.get(PARAMS.goalName) || '',
+        goalIds: csv(searchParams.get(PARAMS.goalIds)),
         activityIds: csv(searchParams.get(PARAMS.activityIds)),
-        groupIds: csv(searchParams.get(PARAMS.groupIds)),
         pinnedOnly: searchParams.get(PARAMS.pinnedOnly) === '1',
         savedFilterIds: csv(searchParams.get(PARAMS.savedFilterIds)),
         day: DAY.test(searchParams.get(PARAMS.day) || '') ? searchParams.get(PARAMS.day) : null,
@@ -56,9 +52,8 @@ export function useNotesPageFilters(timezone) {
     const spec = useMemo(() => ({
         text: filters.text.trim() || undefined,
         categories: filters.categories.length ? filters.categories : undefined,
-        goal_id: filters.goalId || undefined,
+        goal_ids: filters.goalIds.length ? filters.goalIds : undefined,
         activity_definition_ids: filters.activityIds.length ? filters.activityIds : undefined,
-        activity_group_ids: filters.groupIds.length ? filters.groupIds : undefined,
         pinned_only: filters.pinnedOnly || undefined,
     }), [filters]);
 
@@ -74,7 +69,7 @@ export function useNotesPageFilters(timezone) {
 
     // One URL update: consecutive setSearchParams calls in a handler would overwrite each other.
     const clearAdHoc = useCallback((alsoUpdate = {}) => updateFilters({
-        text: '', categories: [], goalId: null, goalName: '', activityIds: [], groupIds: [], pinnedOnly: false,
+        text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false,
         ...alsoUpdate,
     }), [updateFilters]);
     const clearAll = useCallback(() => updateFilters(EMPTY_NOTES_FILTERS), [updateFilters]);

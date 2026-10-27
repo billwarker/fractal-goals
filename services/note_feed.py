@@ -22,7 +22,8 @@ def _timezone(name):
 
 def _specs(db, root_id, filters):
     """The ad-hoc spec plus every selected saved filter; the feed matches all of them."""
-    specs = [normalize_spec({key: filters[key] for key in SPEC_KEYS if filters.get(key) not in (None, '', [], False)})]
+    keys = SPEC_KEYS | {'goal_id'}  # goal_id: a single goal, from older callers.
+    specs = [normalize_spec({key: filters[key] for key in keys if filters.get(key) not in (None, '', [], False)})]
     ids = filters.get('saved_filter_ids') or []
     if len(ids) > MAX_SAVED_FILTERS_PER_QUERY:
         raise NoteFilterError(f'Select at most {MAX_SAVED_FILTERS_PER_QUERY} saved filters')

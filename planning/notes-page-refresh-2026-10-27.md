@@ -266,3 +266,16 @@ Alembic upgrade/check/downgrade/reapply; Playwright `notes-page.spec.js` on desk
 - Saved filters render as compact wrapping chips.
 - Specs saved earlier with `text_mode: "keyword"` are still accepted; `text_mode: "regex"` is rejected.
 
+### Third follow-up (2026-10-27)
+
+- Goal and activity filters use the Sessions page pickers through one shared module,
+  `components/common/FilterPickerModals.jsx` (`GoalFilterModal`, `ActivityFilterPicker`,
+  `goalFilterOptions`). Notes now filter by **several goals** (`goal_ids`, matching any); earlier
+  single-`goal_id` specs are still accepted. Activity-group selection is not offered, matching Sessions.
+- Active filter conditions show as badges beside the note count in the page header; the
+  "Filtered by … · Edit filters · Clear" line above the feed is gone.
+- Saved-filter chips draw one focus outline around the whole chip; the menu item reads "Edit".
+- Categories are a multi-select (`CategoryPicker`): independent checkbox-style options instead of a
+  joined segmented control with "All". No selection means any category (the header says "Any"; a Clear
+  link appears once something is chosen). The filter dialog uses the same picker.
+

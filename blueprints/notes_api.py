@@ -246,7 +246,7 @@ def _feed_filters():
         'context_id': request.args.get('context_id') or None,
         'text': request.args.get('text', ''),
         'categories': _csv('categories'),
-        'goal_id': request.args.get('goal_id') or None,
+        'goal_ids': _csv('goal_ids') or ([request.args['goal_id']] if request.args.get('goal_id') else []),
         'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or _csv('activity_definition_ids'),
         'activity_group_ids': request.args.getlist('activity_group_ids[]') or _csv('activity_group_ids'),
         'pinned_only': request.args.get('pinned_only', 'false').lower() == 'true',

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { NOTE_CATEGORIES } from '../../../utils/noteTypes';
 import { FilterPlusIcon } from '../../atoms/AppIcons';
+import { formatDay } from './FilterConditions';
+import CategoryPicker from './CategoryPicker';
 import FilterModal from './FilterModal';
 import NotesHeatmap from './NotesHeatmap';
 import SavedFilters from './SavedFilters';
@@ -41,17 +42,10 @@ function SearchField({ value, onChange, onCreateFilter }) {
     );
 }
 
-export const formatDay = (day) => new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-
 export default function NotesFilterControls({
-    rootId, filters, apiFilters, updateFilters, activityCount, onPickGoal, onPickActivities, saved,
+    rootId, filters, apiFilters, updateFilters, goalSummary, activitySummary, onPickGoal, onPickActivities, saved,
 }) {
     const [editing, setEditing] = useState(null); // { filter } to edit, or { searchText } to create.
-    const toggleCategory = (value) => updateFilters({
-        categories: filters.categories.includes(value)
-            ? filters.categories.filter((category) => category !== value)
-            : [...filters.categories, value],
-    });
     return (
         <div className={styles.controls}>
             <section className={styles.section} aria-labelledby="notes-heatmap-title">
@@ -83,26 +77,25 @@ export default function NotesFilterControls({
             />
 
             <section className={styles.section} aria-labelledby="notes-category-title">
-                <div className={styles.sectionHeader}><h4 id="notes-category-title">Category</h4></div>
-                <div className={styles.segments} role="group" aria-labelledby="notes-category-title">
-                    <button type="button" className={styles.toggle} aria-pressed={!filters.categories.length}
-                        onClick={() => updateFilters({ categories: [] })}>All</button>
-                    {NOTE_CATEGORIES.map((category) => (
-                        <button key={category.value} type="button" className={styles.toggle}
-                            aria-pressed={filters.categories.includes(category.value)} onClick={() => toggleCategory(category.value)}>
-                            {category.label}
+                <div className={styles.sectionHeader}>
+                    <h4 id="notes-category-title">Categories</h4>
+                    {filters.categories.length > 0 ? (
+                        <button type="button" className={styles.linkButton} onClick={() => updateFilters({ categories: [] })}>
+                            Clear
                         </button>
-                    ))}
+                    ) : <span className={styles.headerNote}>Any</span>}
                 </div>
+                <CategoryPicker value={filters.categories} labelledBy="notes-category-title"
+                    onChange={(categories) => updateFilters({ categories })} />
             </section>
 
             <section className={styles.section} aria-labelledby="notes-links-title">
                 <div className={styles.sectionHeader}><h4 id="notes-links-title">Goal &amp; Activity</h4></div>
                 <button type="button" className={styles.pickRow} onClick={onPickGoal}>
-                    <span>Goal</span><strong>{filters.goalId ? (filters.goalName || 'Selected goal') : 'Any'}</strong>›
+                    <span>Goals</span><strong>{goalSummary || 'Any'}</strong>›
                 </button>
                 <button type="button" className={styles.pickRow} onClick={onPickActivities}>
-                    <span>Activity</span><strong>{activityCount ? `${activityCount} selected` : 'Any'}</strong>›
+                    <span>Activities</span><strong>{activitySummary || 'Any'}</strong>›
                 </button>
                 <label className={styles.check}>
                     <input type="checkbox" checked={filters.pinnedOnly} onChange={(event) => updateFilters({ pinnedOnly: event.target.checked })} />

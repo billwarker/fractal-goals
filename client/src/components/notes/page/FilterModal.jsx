@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
-import { NOTE_CATEGORIES } from '../../../utils/noteTypes';
 import Button from '../../atoms/Button';
 import Modal from '../../atoms/Modal';
 import ModalBody from '../../atoms/ModalBody';
 import ModalFooter from '../../atoms/ModalFooter';
+import CategoryPicker from './CategoryPicker';
 import styles from './NotesFilters.module.css';
 
 const errorText = (error) => error?.response?.data?.error || error?.message || 'The filter could not be saved. Try again.';
@@ -40,10 +40,14 @@ export default function FilterModal({ filter = null, searchText = '', current, o
     const [categories, setCategories] = useState(filter ? spec.categories || [] : current.categories);
     const [pinnedOnly, setPinnedOnly] = useState(filter ? Boolean(spec.pinned_only) : current.pinnedOnly);
     const links = filter
-        ? { goalId: spec.goal_id || null, goalName: '', activityIds: spec.activity_definition_ids || [], groupIds: spec.activity_group_ids || [] }
-        : current;
+        ? {
+            goalIds: spec.goal_ids || (spec.goal_id ? [spec.goal_id] : []),
+            activityIds: spec.activity_definition_ids || [],
+            groupIds: spec.activity_group_ids || [],
+        }
+        : { goalIds: current.goalIds, activityIds: current.activityIds, groupIds: [] };
     const linkCount = links.activityIds.length + links.groupIds.length;
-    const hasLinks = Boolean(links.goalId) || linkCount > 0;
+    const hasLinks = links.goalIds.length > 0 || linkCount > 0;
     const [includeLinks, setIncludeLinks] = useState(hasLinks);
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
@@ -55,17 +59,15 @@ export default function FilterModal({ filter = null, searchText = '', current, o
         categories: categories.length ? categories : undefined,
         pinned_only: pinnedOnly || undefined,
         ...(includeLinks ? {
-            goal_id: links.goalId || undefined,
+            goal_ids: links.goalIds.length ? links.goalIds : undefined,
             activity_definition_ids: links.activityIds.length ? links.activityIds : undefined,
             activity_group_ids: links.groupIds.length ? links.groupIds : undefined,
         } : {}),
     };
     const hasCondition = Object.values(nextSpec).some((value) => value !== undefined);
     const updateRow = (key, changes) => setRows((items) => items.map((item) => (item.key === key ? { ...item, ...changes } : item)));
-    const toggleCategory = (value) => setCategories((selected) => (
-        selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value]
-    ));
-    const linkLabel = [links.goalId && (links.goalName ? `goal “${links.goalName}”` : 'goal'), linkCount && `${linkCount} activit${linkCount === 1 ? 'y' : 'ies'}`]
+    const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
+    const linkLabel = [links.goalIds.length && plural(links.goalIds.length, 'goal', 'goals'), linkCount && plural(linkCount, 'activity', 'activities')]
         .filter(Boolean).join(' and ');
 
     const submit = async (event) => {
@@ -127,15 +129,8 @@ export default function FilterModal({ filter = null, searchText = '', current, o
                         <p className={styles.hint}>“Equals” matches a whole word or phrase, so “lock” won’t match “lockout”.</p>
                     </fieldset>
                     <div className={styles.field}>
-                        <span id="filter-categories">Categories</span>
-                        <div className={styles.segments} role="group" aria-labelledby="filter-categories">
-                            {NOTE_CATEGORIES.map((category) => (
-                                <button key={category.value} type="button" className={styles.toggle}
-                                    aria-pressed={categories.includes(category.value)} onClick={() => toggleCategory(category.value)}>
-                                    {category.label}
-                                </button>
-                            ))}
-                        </div>
+                        <span id="filter-categories">Categories <span className={styles.headerNote}>(none selected means any)</span></span>
+                        <CategoryPicker value={categories} onChange={setCategories} labelledBy="filter-categories" />
                     </div>
                     <label className={styles.check}>
                         <input type="checkbox" checked={pinnedOnly} onChange={(event) => setPinnedOnly(event.target.checked)} />

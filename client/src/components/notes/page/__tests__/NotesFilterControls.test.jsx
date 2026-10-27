@@ -9,12 +9,12 @@ import NotesFilterControls from '../NotesFilterControls';
 const heatmap = vi.hoisted(() => ({ value: { data: null, isLoading: false } }));
 vi.mock('../../../../hooks/useNotesPageQuery', () => ({ useNotesHeatmap: () => heatmap.value }));
 
-const base = { text: '', categories: [], goalId: null, goalName: '', activityIds: [], groupIds: [], pinnedOnly: false, savedFilterIds: [], day: null };
+const base = { text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false, savedFilterIds: [], day: null };
 const saved = (overrides = {}) => ({ savedFilters: [], activeIds: [], onToggle: vi.fn(), onCreate: vi.fn(), onUpdate: vi.fn(), onDelete: vi.fn(), ...overrides });
 const renderControls = (filters = {}, extra = {}) => {
     const updateFilters = vi.fn();
     render(<NotesFilterControls rootId="root" filters={{ ...base, ...filters }} apiFilters={{}} updateFilters={updateFilters}
-        activityCount={0} onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
+        goalSummary="" activitySummary="" onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
     return updateFilters;
 };
 
@@ -29,16 +29,25 @@ describe('NotesFilterControls', () => {
     it('orders sections heatmap, search, saved filters with Sessions-style headers and no search mode toggle', () => {
         renderControls();
         expect(screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent))
-            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Category', 'Goal & Activity']);
+            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Categories', 'Goal & Activity']);
         expect(screen.queryByRole('radiogroup', { name: 'Search mode' })).not.toBeInTheDocument();
     });
 
-    it('toggles categories and resets to all', () => {
+    it('presents categories as a multi-select with no "All" option', () => {
         const update = renderControls({ categories: ['goals'] });
-        fireEvent.click(screen.getByRole('button', { name: 'Sessions' }));
+        const group = screen.getByRole('group', { name: 'Categories' });
+        expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['General', '✓Goals', 'Sessions', 'Programs']);  // ✓ marks the selected option.
+        expect(within(group).queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
+        fireEvent.click(within(group).getByRole('button', { name: 'Sessions' }));
         expect(update).toHaveBeenLastCalledWith({ categories: ['goals', 'sessions'] });
-        fireEvent.click(screen.getByRole('button', { name: 'All' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
         expect(update).toHaveBeenLastCalledWith({ categories: [] });
+    });
+
+    it('says "Any" when no category is chosen', () => {
+        renderControls();
+        expect(screen.getByText('Any', { selector: 'span' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument();
     });
 
     it('commits search after typing pauses', () => {
@@ -79,7 +88,7 @@ describe('NotesFilterControls', () => {
         const filter = { id: 'f1', name: 'YouTube', spec: { text: 'youtube' } };
         renderControls({}, { saved: saved({ savedFilters: [filter], onUpdate }) });
         fireEvent.click(screen.getByRole('button', { name: 'YouTube options' }));
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
         const dialog = screen.getByRole('dialog', { name: 'Edit filter' });
         expect(within(dialog).getByLabelText('Name')).toHaveValue('YouTube');
         expect(within(dialog).getByLabelText('Condition 1 text')).toHaveValue('youtube');

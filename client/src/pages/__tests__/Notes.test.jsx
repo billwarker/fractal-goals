@@ -152,9 +152,9 @@ describe('Notes page', () => {
     it('offers four compact categories and passes the selection to the notes query', async () => {
         render(<MemoryRouter><Notes /></MemoryRouter>);
 
-        const categories = screen.getByRole('group', { name: 'Category' });
+        const categories = screen.getByRole('group', { name: 'Categories' });
         expect(Array.from(categories.querySelectorAll('button')).map((button) => button.textContent))
-            .toEqual(['All', 'General', 'Goals', 'Sessions', 'Programs']);
+            .toEqual(['General', 'Goals', 'Sessions', 'Programs']);
         expect(screen.queryByRole('button', { name: 'Activity Set Notes' })).not.toBeInTheDocument();
 
         await act(async () => {

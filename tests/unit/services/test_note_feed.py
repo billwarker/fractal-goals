@@ -51,6 +51,7 @@ def test_spec_normalization_and_limits():
     assert normalize_spec({'text': '  scapula ', 'categories': ['goals', 'goals']}) == {
         'text': 'scapula', 'categories': ['goals']}
     assert normalize_spec({'text': 'youtube', 'text_mode': 'keyword'}) == {'text': 'youtube'}  # Earlier saved filters.
+    assert normalize_spec({'goal_id': 'g1', 'goal_ids': ['g2']}) == {'goal_ids': ['g1', 'g2']}
     assert normalize_spec({'conditions': [{'op': 'equals', 'value': ' elbow '}], 'match': 'any'}) == {
         'conditions': [{'op': 'equals', 'value': 'elbow'}]}  # "match" only matters with two or more conditions.
     for bad in ({'unknown': 1}, {'text': 'x' * 201}, {'text_mode': 'regex'}, {'categories': ['activities']},
@@ -76,6 +77,11 @@ def test_keyword_search_escapes_wildcards_and_ands_terms(feed):
     assert contents(feed, text='_') == []  # An underscore is literal, not a wildcard.
     assert contents(feed, text='ELBOW strong') == ['Elbow lockout felt strong']
     assert contents(feed, text='"stack scapula"') == ['Handstand cue: stack scapula']
+
+
+def test_several_goals_match_any_of_them(feed):
+    assert contents(feed, goal_ids=[feed.root.id, 'other-goal']) == ['Review: scapula control improving']
+    assert contents(feed, goal_ids=['other-goal']) == []
 
 
 def test_conditions_contain_or_equal_and_combine_with_all_or_any(feed):

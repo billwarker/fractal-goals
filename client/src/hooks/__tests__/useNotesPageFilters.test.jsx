@@ -14,17 +14,17 @@ describe('useNotesPageFilters', () => {
     it('round-trips every filter through the URL', () => {
         const { result } = setup();
         act(() => result.current.state.updateFilters({
-            text: 'elbow scapula', categories: ['goals', 'sessions'], goalId: 'g1', goalName: 'Handstand',
-            activityIds: ['a1'], groupIds: ['grp'], pinnedOnly: true, savedFilterIds: ['f1', 'f2'], day: '2026-10-23',
+            text: 'elbow scapula', categories: ['goals', 'sessions'], goalIds: ['g1', 'g2'],
+            activityIds: ['a1'], pinnedOnly: true, savedFilterIds: ['f1', 'f2'], day: '2026-10-23',
         }));
         const params = new URLSearchParams(result.current.location.search);
         expect(Object.fromEntries(params)).toEqual({
-            q: 'elbow scapula', cat: 'goals,sessions', goal: 'g1', goal_name: 'Handstand',
-            act: 'a1', grp: 'grp', pinned: '1', saved: 'f1,f2', day: '2026-10-23',
+            q: 'elbow scapula', cat: 'goals,sessions', goals: 'g1,g2',
+            act: 'a1', pinned: '1', saved: 'f1,f2', day: '2026-10-23',
         });
         expect(result.current.state.apiFilters).toEqual({
-            text: 'elbow scapula', categories: ['goals', 'sessions'], goal_id: 'g1',
-            activity_definition_ids: ['a1'], activity_group_ids: ['grp'], pinned_only: true,
+            text: 'elbow scapula', categories: ['goals', 'sessions'], goal_ids: ['g1', 'g2'],
+            activity_definition_ids: ['a1'], pinned_only: true,
             saved_filter_ids: ['f1', 'f2'], day: '2026-10-23', timezone: 'America/New_York',
         });
         expect(result.current.state.hasAdHocFilters).toBe(true);

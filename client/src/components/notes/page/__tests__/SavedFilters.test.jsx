@@ -21,8 +21,8 @@ describe('SavedFilters', () => {
         const handlers = props();
         render(<SavedFilters {...handlers} />);
         fireEvent.click(screen.getByRole('button', { name: 'Form cues options' }));
-        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Edit…', 'Delete']);
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }));
+        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Edit', 'Delete']);
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
         expect(handlers.onEdit).toHaveBeenCalledWith(filters[0]);
         fireEvent.click(screen.getByRole('button', { name: 'Injuries options' }));
         fireEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));

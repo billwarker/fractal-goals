@@ -7,7 +7,7 @@
  * Filters live in the URL (useNotesPageFilters). Mobile moves the right pane into a sheet.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { NoteTimeline, NoteComposer } from '../components/notes';
 import ComposeLinkPanel from '../components/notes/ComposeLinkPanel';
@@ -17,11 +17,7 @@ import { useNotesPageFilters } from '../hooks/useNotesPageFilters';
 import { useNoteFilters } from '../hooks/useNoteFilters';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useFractalTree } from '../hooks/useGoalQueries';
-import { useGoalLevels } from '../contexts/GoalLevelsContext';
-import CloseButton from '../components/atoms/CloseButton';
-import ModalBackdrop from '../components/atoms/ModalBackdrop';
-import ActivityFilterModal from '../components/common/ActivityFilterModal';
-import GoalTreePicker from '../components/common/GoalTreePicker';
+import { ActivityFilterPicker, GoalFilterModal, goalFilterOptions } from '../components/common/FilterPickerModals';
 import EmptyState from '../components/common/EmptyState';
 import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
@@ -29,54 +25,11 @@ import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
-import BodyPortal from '../components/layout/BodyPortal';
 import NotesMobileSheet from '../components/notes/NotesMobileSheet';
 import NotesFilterControls from '../components/notes/page/NotesFilterControls';
-import ActiveFiltersSummary from '../components/notes/page/ActiveFiltersSummary';
+import FilterConditions, { filterConditionLabels } from '../components/notes/page/FilterConditions';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
-
-// ─── Goal Picker Modal ───────────────────────────────────────────────────────
-function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
-    const { data: treeData } = useFractalTree(rootId);
-    const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
-
-    return (
-        <ModalBackdrop className={styles.modalOverlay} onClose={onClose}>
-            <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
-                <div className={styles.modalHeader}>
-                    <span className={styles.modalTitle}>Filter by Goal</span>
-                    <CloseButton
-                        className={styles.modalClose}
-                        onClick={onClose}
-                        aria-label="Close goal picker"
-                        size={16}
-                    />
-                </div>
-                <div className={styles.modalBody}>
-                    {selectedGoalId && (
-                        <button className={styles.clearSelectionBtn} onClick={() => { onSelect(null, null); onClose(); }}>
-                            Clear goal filter
-                        </button>
-                    )}
-                    <GoalTreePicker
-                        treeData={treeData}
-                        selectedGoalIds={selectedGoalId ? [selectedGoalId] : []}
-                        onSelectionChange={(ids, names) => {
-                            onSelect(ids[0] || null, names[0] || null);
-                            onClose();
-                        }}
-                        showHideCompleted={true}
-                        allowLineageSelection={false}
-                        getGoalColor={getGoalColor}
-                        getGoalIcon={getGoalIcon}
-                        getGoalSecondaryColor={getGoalSecondaryColor}
-                    />
-                </div>
-            </div>
-        </ModalBackdrop>
-    );
-}
 
 // ─── Main Notes Page ─────────────────────────────────────────────────────────
 
@@ -87,6 +40,8 @@ function Notes() {
     const isMobile = useIsMobile();
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
+    const { data: goalTree } = useFractalTree(rootId);
+    const goalOptions = useMemo(() => goalFilterOptions(goalTree), [goalTree]);
 
     const { timezone } = useTimezone();
     const { filters, apiFilters, updateFilters, hasActiveFilters, clearAdHoc, clearAll } = useNotesPageFilters(timezone);
@@ -187,9 +142,10 @@ function Notes() {
         }
     };
 
-    const handleGoalFilterSelect = (id, name) => updateFilters({ goalId: id, goalName: name || '' });
-    const handleActivityFilterConfirm = (activityIds, groupIds) => updateFilters({ activityIds, groupIds });
-    const activityFilterCount = filters.activityIds.length + filters.groupIds.length;
+    const goalNames = Object.fromEntries(goalOptions.map((goal) => [goal.id, goal.name]));
+    const activityNames = Object.fromEntries(activities.map((activity) => [activity.id, activity.name]));
+    const summarize = (ids, names) => (ids.length > 2 ? `${ids.length} selected` : ids.map((id) => names[id] || '…').join(', '));
+    const conditionLabels = filterConditionLabels({ filters, savedFilters, activeSavedIds, goalNames, activityNames });
     const mobilePanelLabel = composing
         ? (mobilePanelOpen ? 'Hide Associator' : 'Show Associator')
         : (mobilePanelOpen ? 'Hide Filters' : 'Show Filters');
@@ -199,7 +155,12 @@ function Notes() {
         <div className={styles.leftColumn}>
             <PageHeader
                 title="Notes"
-                subtitle={isLoading && notes.length === 0 ? '…' : `${total} note${total !== 1 ? 's' : ''}`}
+                subtitle={isLoading && notes.length === 0 ? '…' : (
+                    <>
+                        <span>{`${total} note${total !== 1 ? 's' : ''}`}</span>
+                        <FilterConditions labels={conditionLabels} />
+                    </>
+                )}
                 actions={(
                     <>
                         <HeaderButton
@@ -222,16 +183,6 @@ function Notes() {
 
             {onboarding?.enabled && onboarding.state?.status === 'active' && !onboarding.state?.steps?.first_session && (
                 <EmptyState compact className={styles.onboardingEmptyState} title="Notes preserve the context numbers miss" description="Complete a session, then capture what changed, what worked, and what to adjust next time." />
-            )}
-
-            {!composing && (
-                <ActiveFiltersSummary
-                    filters={filters}
-                    savedFilters={savedFilters}
-                    activeSavedIds={activeSavedIds}
-                    onEdit={() => (isMobile ? setMobilePanelOpen(true) : setIsFiltersPaneOpen(true))}
-                    onClear={clearAll}
-                />
             )}
 
             <div className={styles.timelineArea}>
@@ -285,7 +236,8 @@ function Notes() {
                 filters={filters}
                 apiFilters={feedFilters}
                 updateFilters={updateFilters}
-                activityCount={activityFilterCount}
+                goalSummary={summarize(filters.goalIds, goalNames)}
+                activitySummary={summarize(filters.activityIds, activityNames)}
                 onPickGoal={() => setGoalPickerOpen(true)}
                 onPickActivities={() => setActivityPickerOpen(true)}
                 saved={{
@@ -368,25 +320,22 @@ function Notes() {
                 />
             ) : null}
 
-            <BodyPortal when={goalPickerOpen}>
-                <GoalPickerModal
-                    rootId={rootId}
-                    selectedGoalId={filters.goalId}
-                    onSelect={handleGoalFilterSelect}
-                    onClose={() => setGoalPickerOpen(false)}
-                />
-            </BodyPortal>
-            <BodyPortal when={activityPickerOpen}>
-                <ActivityFilterModal
-                    title="Filter by Activity"
+            <GoalFilterModal
+                isOpen={goalPickerOpen}
+                goals={goalOptions}
+                selectedGoalIds={filters.goalIds}
+                onClose={() => setGoalPickerOpen(false)}
+                onConfirm={(goalIds) => updateFilters({ goalIds })}
+            />
+            {activityPickerOpen && (
+                <ActivityFilterPicker
                     activities={activities}
                     activityGroups={activityGroups}
-                    initialActivityIds={filters.activityIds}
-                    initialGroupIds={filters.groupIds}
-                    onConfirm={handleActivityFilterConfirm}
+                    selectedActivityIds={filters.activityIds}
                     onClose={() => setActivityPickerOpen(false)}
+                    onConfirm={(activityIds) => updateFilters({ activityIds })}
                 />
-            </BodyPortal>
+            )}
 
             <NotesMobileSheet
                 open={isMobile && mobilePanelOpen}

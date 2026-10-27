@@ -59,7 +59,7 @@ test('saved keyword filters combine, the heatmap narrows to a day, and the URL r
     await expect(shown(page)).toHaveText('3 notes');
 
     // A second filter: goal notes where "elbow" is a whole word, built in the dialog.
-    await page.getByRole('group', { name: 'Category' }).getByRole('button', { name: 'Goals' }).click();
+    await page.getByRole('group', { name: 'Categories' }).getByRole('button', { name: 'Goals' }).click();
     await page.getByRole('button', { name: 'Create filter', exact: true }).first().click();
     const dialog = page.getByRole('dialog', { name: 'Create filter' });
     await dialog.getByLabel('Name').fill(`Goal elbow ${marker}`);
@@ -70,9 +70,10 @@ test('saved keyword filters combine, the heatmap narrows to a day, and the URL r
 
     // Both active: AND.
     await expect(page.getByText('Showing notes that match all selected filters.')).toBeVisible();
-    // Saved filters live in the side pane; the feed only summarises them.
-    await expect(page.getByRole('list', { name: 'Saved filters' }).getByRole('listitem')).toHaveCount(2);
-    await expect(page.getByRole('status').filter({ hasText: 'Filtered by' })).toContainText(`Mine ${marker}`);
+    // Saved filters live in the side pane; the header names what's applied beside the count.
+    await expect(page.getByRole('list', { name: 'Saved Filters' }).getByRole('listitem')).toHaveCount(2);
+    await expect(page.getByLabel(/^Filtered by /)).toContainText(`Mine ${marker}`);
+    await expect(page.getByRole('button', { name: 'Edit filters' })).toHaveCount(0);
     await expect(shown(page)).toHaveText('1 note');
     await page.getByRole('button', { name: `Goal elbow ${marker}`, exact: true }).click();
     await expect(shown(page)).toHaveText('3 notes');

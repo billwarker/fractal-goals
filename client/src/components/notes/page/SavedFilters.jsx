@@ -39,7 +39,7 @@ export default function SavedFilters({ savedFilters, activeIds, onToggle, onEdit
                                     label={`${filter.name} options`}
                                     className={styles.savedMenu}
                                     items={[
-                                        { label: 'Edit…', onSelect: () => onEdit(filter) },
+                                        { label: 'Edit', onSelect: () => onEdit(filter) },
                                         { label: 'Delete', danger: true, onSelect: () => setConfirmDelete(filter) },
                                     ]}
                                 />

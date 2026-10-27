@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import FilterModal, { keywordTerms } from '../FilterModal';
 
-const current = { categories: [], pinnedOnly: false, goalId: null, goalName: '', activityIds: [], groupIds: [] };
+const current = { categories: [], pinnedOnly: false, goalIds: [], activityIds: [] };
 
 describe('FilterModal', () => {
     it('splits search text like the server', () => {
@@ -22,7 +22,7 @@ describe('FilterModal', () => {
 
     it('builds AND/OR conditions with contains and equals', async () => {
         const onSubmit = vi.fn().mockResolvedValue();
-        render(<FilterModal searchText="elbow" current={{ ...current, goalId: 'g1', goalName: 'Handstand' }} onSubmit={onSubmit} onClose={vi.fn()} />);
+        render(<FilterModal searchText="elbow" current={{ ...current, goalIds: ['g1'] }} onSubmit={onSubmit} onClose={vi.fn()} />);
         expect(screen.queryByRole('radiogroup', { name: 'Match' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '+ Add condition' }));
         fireEvent.change(screen.getByLabelText('Condition 2 match'), { target: { value: 'equals' } });
@@ -32,7 +32,7 @@ describe('FilterModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create filter' }));
         await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('Either', {
             conditions: [{ op: 'contains', value: 'elbow' }, { op: 'equals', value: 'lockout' }], match: 'any',
-            categories: undefined, pinned_only: undefined, goal_id: 'g1', activity_definition_ids: undefined, activity_group_ids: undefined,
+            categories: undefined, pinned_only: undefined, goal_ids: ['g1'], activity_definition_ids: undefined, activity_group_ids: undefined,
         }));
     });
 
