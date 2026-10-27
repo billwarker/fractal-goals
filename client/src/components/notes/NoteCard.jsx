@@ -348,7 +348,9 @@ function NoteCard({
                                                 </>
                                             )}
                                         </span>
-                                    ) : resolvedNoteType === 'session_note' && !suppressSessionContext ? (
+                                    ) : resolvedNoteType === 'session_note' && suppressSessionContext ? (
+                                        null  // The session group's header already names the session.
+                                    ) : resolvedNoteType === 'session_note' ? (
                                         renderSessionTemplateBadge()
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
@@ -378,7 +380,7 @@ function NoteCard({
                     <div className={styles.headerActions}>
                         {!minimal && noteTypeVariant === 'metadata' && (
                             <>
-                                {showTypePill && !noteKindLabel && (
+                                {showTypePill && !noteKindLabel && !suppressSessionContext && (
                                     <>
                                         <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
                                         <span className={styles.metaSep} aria-hidden="true">·</span>

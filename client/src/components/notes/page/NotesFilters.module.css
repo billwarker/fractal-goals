@@ -1,0 +1,375 @@
+/* Notes page filters: saved-filter bar above the feed and compact controls in the side pane. */
+
+.summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 8px 14px 2px;
+    color: var(--color-text-secondary);
+    font-size: 12.5px;
+}
+
+.summaryText {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.linkButton {
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-link, var(--color-brand-primary));
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.savedList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.saved {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-input);
+}
+
+.saved[data-active='true'] {
+    border-color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 16%, var(--color-bg-input));
+}
+
+.savedToggle {
+    min-width: 0;
+    min-height: 26px;
+    padding: 0 2px 0 10px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}
+
+.saved[data-active='true'] .savedToggle {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.savedMenu {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    padding-right: 2px;
+}
+
+/* The shared "···" trigger is sized for note cards; keep it small inside a chip. */
+.savedMenu button {
+    min-width: 22px;
+    min-height: 22px;
+    padding: 0 4px;
+    font-size: 12px;
+}
+
+.savedToggle:hover {
+    color: var(--color-text-primary);
+}
+
+.savedToggle:focus-visible,
+.toggle:focus-visible,
+.linkButton:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.hint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+}
+
+.nameForm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.error {
+    margin: 0;
+    color: var(--color-danger);
+    font-size: 12px;
+}
+
+/* Side pane controls: sections match the Sessions sidebar (divided blocks, 13px headings). */
+.controls {
+    display: grid;
+}
+
+.section {
+    display: grid;
+    gap: 10px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.section:last-of-type {
+    border-bottom: none;
+}
+
+.sectionHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.sectionHeader h4 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+}
+
+.search {
+    display: flex;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+}
+
+.search:focus-within {
+    border-color: var(--color-brand-primary);
+}
+
+.search input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 13px;
+}
+
+.search input:focus {
+    outline: none;
+}
+
+.segments {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+}
+
+.toggle {
+    flex: 1 0 auto;
+    min-height: 30px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.toggle[aria-pressed='true'],
+.toggle[aria-checked='true'] {
+    background: var(--color-bg-surface);
+    color: var(--color-text-primary);
+    font-weight: 600;
+    box-shadow: 0 0 0 1px var(--color-border);
+}
+
+.pickRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.pickRow span:first-child {
+    color: var(--color-text-muted);
+}
+
+.pickRow strong {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pickRow:hover {
+    border-color: var(--color-brand-primary);
+}
+
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.check input {
+    accent-color: var(--color-brand-primary);
+}
+
+.heatmapSummary {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.modalForm {
+    display: grid;
+    gap: 16px;
+}
+
+.field {
+    display: grid;
+    gap: 6px;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.field > input {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+}
+
+.field > input:focus {
+    border-color: var(--color-brand-primary);
+    outline: none;
+}
+
+.searchAction {
+    display: inline-grid;
+    flex-shrink: 0;
+    place-items: center;
+    width: 34px;
+    border: 0;
+    border-left: 1px solid var(--color-border);
+    border-radius: 0 6px 6px 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.searchAction:hover {
+    color: var(--color-brand-primary);
+}
+
+.searchAction:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
+}
+
+.conditions {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.condition {
+    display: flex;
+    gap: 6px;
+    min-width: 0;
+}
+
+.condition select,
+.condition input {
+    min-height: 34px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 13px;
+}
+
+.condition select {
+    flex-shrink: 0;
+    padding: 0 6px;
+}
+
+.condition input {
+    flex: 1;
+    min-width: 0;
+    padding: 0 10px;
+}
+
+.condition select:focus,
+.condition input:focus {
+    border-color: var(--color-brand-primary);
+    outline: none;
+}
+
+.removeCondition {
+    flex-shrink: 0;
+    width: 34px;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.removeCondition:hover {
+    color: var(--color-text-primary);
+}
+
+fieldset.field {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+fieldset.field legend {
+    margin-bottom: 6px;
+    padding: 0;
+}
+

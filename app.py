@@ -45,6 +45,7 @@ from blueprints.program_session_plans_api import program_session_plans_bp
 from blueprints.calendar_periods_api import calendar_periods_bp
 from blueprints.notes_api import notes_bp
 from blueprints.storage_api import storage_bp
+from blueprints.note_filters_api import note_filters_bp
 from blueprints.dashboards_api import dashboards_bp
 from blueprints.page_surface_api import page_surface_bp
 from blueprints.analytics_api import analytics_bp
@@ -174,6 +175,7 @@ for write_limited_blueprint in (
     program_session_plans_bp,
     notes_bp,
     storage_bp,
+    note_filters_bp,
     dashboards_bp,
     page_surface_bp,
     analytics_bp,
@@ -206,6 +208,7 @@ app.register_blueprint(program_session_plans_bp)
 app.register_blueprint(calendar_periods_bp)
 app.register_blueprint(notes_bp)
 app.register_blueprint(storage_bp)
+app.register_blueprint(note_filters_bp)
 app.register_blueprint(dashboards_bp)
 app.register_blueprint(page_surface_bp)
 app.register_blueprint(analytics_bp)

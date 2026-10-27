@@ -1,4 +1,5 @@
 import React from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import Notes from '../Notes';
@@ -26,7 +27,14 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 vi.mock('../../hooks/useNotesPageQuery', () => ({
     useNotesPageQuery: (...args) => useNotesPageQueryMock(...args),
+    useNotesHeatmap: () => ({ data: { days: [], total: 0, max_count: 0 }, isLoading: false }),
 }));
+
+vi.mock('../../hooks/useNoteFilters', () => ({
+    useNoteFilters: () => ({ savedFilters: [], isLoading: false, createFilter: vi.fn(), updateFilter: vi.fn(), deleteFilter: vi.fn() }),
+}));
+
+vi.mock('../../contexts/TimezoneContext', () => ({ useTimezone: () => ({ timezone: 'UTC' }) }));
 
 vi.mock('../../hooks/useActivityQueries', () => ({
     useActivities: () => ({ activities: [] }),
@@ -115,7 +123,7 @@ describe('Notes page', () => {
     it('creates a root-context note when no goal or activity is linked', async () => {
         createNote.mockResolvedValue({});
 
-        render(<Notes />);
+        render(<MemoryRouter><Notes /></MemoryRouter>);
 
         await act(async () => {
             fireEvent.click(screen.getByText('+ Write Note'));
@@ -141,26 +149,24 @@ describe('Notes page', () => {
         });
     });
 
-    it('shows note type filters and passes selected note types to the notes query', async () => {
-        render(<Notes />);
+    it('offers four compact categories and passes the selection to the notes query', async () => {
+        render(<MemoryRouter><Notes /></MemoryRouter>);
 
-        expect(screen.getByRole('button', { name: 'Activity Set Notes' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Program Notes' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Activity Circuit Notes' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Circuit Round Notes' })).toBeInTheDocument();
+        const categories = screen.getByRole('group', { name: 'Category' });
+        expect(Array.from(categories.querySelectorAll('button')).map((button) => button.textContent))
+            .toEqual(['All', 'General', 'Goals', 'Sessions', 'Programs']);
+        expect(screen.queryByRole('button', { name: 'Activity Set Notes' })).not.toBeInTheDocument();
 
         await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Program Notes' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Programs' }));
         });
 
-        const latestCall = useNotesPageQueryMock.mock.calls.at(-1);
-        expect(latestCall[1]).toMatchObject({
-            note_types: ['program_note'],
-        });
+        expect(useNotesPageQueryMock.mock.calls.at(-1)[1]).toMatchObject({ categories: ['programs'] });
+        expect(screen.getByRole('button', { name: 'Programs' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('renders note type labels as metadata text on the timeline', () => {
-        render(<Notes />);
+        render(<MemoryRouter><Notes /></MemoryRouter>);
 
         expect(noteTimelineMock).toHaveBeenCalledWith(expect.objectContaining({
             noteTypeVariant: 'metadata',

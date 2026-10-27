@@ -17,6 +17,8 @@ from services.serializers import derive_note_type, serialize_note_display
 from services.session_runtime import is_quick_session
 from services.media_service import MediaService
 from services.note_display_context import attach_program_names
+from services.note_feed import notes_heatmap, notes_page
+from services.note_filter_spec import NoteFilterError
 from services.storage_common import StorageError
 from services.view_serializers import (
     serialize_activity_history_entry,
@@ -467,99 +469,25 @@ class NoteService:
     def get_all_notes(
         self, root_id, current_user_id, filters=None, page=0, page_size=25
     ) -> ServiceResult[JsonDict]:
+        """Notes page feed; see services/note_feed.py for the filter semantics."""
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+        try:
+            return notes_page(self.db_session, root_id, filters or {}, page, page_size), None, 200
+        except NoteFilterError as exc:
+            self.db_session.rollback()
+            return None, str(exc), 404 if exc.code == 'filter_not_found' else 400
 
-        filters = filters or {}
-        query = self.db_session.query(Note).filter(
-            Note.root_id == root_id,
-            Note.deleted_at.is_(None),
-        ).options(
-            *goal_note_load_options(),
-        )
-
-        note_types = filters.get('note_types') or []
-        context_types = filters.get('context_types')
-        if context_types:
-            query = query.filter(Note.context_type.in_(context_types))
-
-        context_id = filters.get('context_id')
-        if context_id:
-            query = query.filter(Note.context_id == context_id)
-
-        filter_goal_id = filters.get('goal_id')
-        if filter_goal_id:
-            query = query.filter(Note.goal_id == filter_goal_id)
-
-        filter_activity_definition_ids = filters.get('activity_definition_ids') or []
-        filter_activity_group_ids = filters.get('activity_group_ids') or []
-
-        if filter_activity_definition_ids or filter_activity_group_ids:
-            from models.activity import ActivityDefinition
-            conditions = []
-            if filter_activity_definition_ids:
-                conditions.append(Note.activity_definition_id.in_(filter_activity_definition_ids))
-            if filter_activity_group_ids:
-                group_act_ids = self.db_session.query(ActivityDefinition.id).filter(
-                    ActivityDefinition.group_id.in_(filter_activity_group_ids),
-                    ActivityDefinition.deleted_at.is_(None),
-                ).all()
-                group_act_ids = [r[0] for r in group_act_ids]
-                if group_act_ids:
-                    conditions.append(Note.activity_definition_id.in_(group_act_ids))
-            if conditions:
-                query = query.filter(or_(*conditions))
-
-        if filters.get('pinned_only'):
-            query = query.filter(Note.pinned_at.isnot(None))
-
-        search = filters.get('search', '').strip()
-        if search:
-            query = query.filter(Note.content.ilike(f'%{search}%'))
-
-        date_from = filters.get('date_from')
-        if date_from:
-            query = query.filter(Note.created_at >= date_from)
-
-        date_to = filters.get('date_to')
-        if date_to:
-            query = query.filter(Note.created_at <= date_to)
-
-        if note_types:
-            ordered_notes = query.order_by(
-                Note.pinned_at.desc().nullslast(),
-                Note.created_at.desc(),
-            ).all()
-            serialized_notes = [
-                serialize_note_display(note)
-                for note in ordered_notes
-            ]
-            filtered_results = [
-                note
-                for note in serialized_notes
-                if note.get('note_type') in note_types
-            ]
-            total = len(filtered_results)
-            start_index = page * page_size
-            results = filtered_results[start_index:start_index + page_size]
-            attach_program_names(self.db_session, results)
-        else:
-            total = query.count()
-            notes = query.order_by(
-                Note.pinned_at.desc().nullslast(),
-                Note.created_at.desc(),
-            ).limit(page_size).offset(page * page_size).all()
-            results = [serialize_note_display(note) for note in notes]
-            attach_program_names(self.db_session, results)
-
-        return {
-            'notes': results,
-            'total': total,
-            'page': page,
-            'page_size': page_size,
-            'has_more': (page + 1) * page_size < total,
-        }, None, 200
+    def get_notes_heatmap(self, root_id, current_user_id, filters=None) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+        try:
+            return notes_heatmap(self.db_session, root_id, filters or {}), None, 200
+        except NoteFilterError as exc:
+            self.db_session.rollback()
+            return None, str(exc), 404 if exc.code == 'filter_not_found' else 400
 
     def pin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)

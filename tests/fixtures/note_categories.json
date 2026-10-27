@@ -1,0 +1,6 @@
+[
+  {"value": "general", "label": "General", "context_types": ["root", "activity_definition"]},
+  {"value": "goals", "label": "Goals", "context_types": ["goal"]},
+  {"value": "sessions", "label": "Sessions", "context_types": ["session", "activity_instance", "circuit_run", "circuit_round"]},
+  {"value": "programs", "label": "Programs", "context_types": ["program"]}
+]

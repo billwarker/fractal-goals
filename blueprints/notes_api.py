@@ -235,31 +235,35 @@ def get_goal_notes(current_user, root_id, goal_id):
         db_session.close()
 
 
+def _csv(name):
+    return [part.strip() for part in request.args.get(name, '').split(',') if part.strip()]
+
+
+def _feed_filters():
+    """Notes page query parameters. Spec fields are validated by services/note_filter_spec.py."""
+    return {
+        'context_types': _csv('context_types') or None,
+        'context_id': request.args.get('context_id') or None,
+        'text': request.args.get('text', ''),
+        'categories': _csv('categories'),
+        'goal_id': request.args.get('goal_id') or None,
+        'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or _csv('activity_definition_ids'),
+        'activity_group_ids': request.args.getlist('activity_group_ids[]') or _csv('activity_group_ids'),
+        'pinned_only': request.args.get('pinned_only', 'false').lower() == 'true',
+        'saved_filter_ids': _csv('filters'),
+        'day': request.args.get('day') or None,
+        'timezone': request.args.get('timezone') or None,
+    }
+
+
 @notes_bp.route('/<root_id>/notes', methods=['GET'])
 @token_required
 def get_all_notes(current_user, root_id):
     db_session, note_service = _with_note_service()
     try:
-        context_types_raw = request.args.get('context_types', '')
-        context_types = [ct.strip() for ct in context_types_raw.split(',') if ct.strip()] or None
-        note_types_raw = request.args.get('note_types', '')
-        note_types = [nt.strip() for nt in note_types_raw.split(',') if nt.strip()] or None
-        filters = {
-            'context_types': context_types,
-            'note_types': note_types,
-            'context_id': request.args.get('context_id') or None,
-            'goal_id': request.args.get('goal_id') or None,
-            'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or request.args.getlist('activity_definition_ids') or [],
-            'activity_group_ids': request.args.getlist('activity_group_ids[]') or request.args.getlist('activity_group_ids') or [],
-            'pinned_only': request.args.get('pinned_only', 'false').lower() == 'true',
-            'search': request.args.get('search', ''),
-            'date_from': request.args.get('date_from') or None,
-            'date_to': request.args.get('date_to') or None,
-        }
-        page = request.args.get('page', 0, type=int)
-        page_size = request.args.get('page_size', 25, type=int)
         payload, error, status = note_service.get_all_notes(
-            root_id, current_user.id, filters=filters, page=page, page_size=page_size
+            root_id, current_user.id, filters=_feed_filters(),
+            page=request.args.get('page', 0, type=int), page_size=request.args.get('page_size', 25, type=int),
         )
         if error:
             return jsonify({"error": error}), status
@@ -268,6 +272,23 @@ def get_all_notes(current_user, root_id):
         db_session.rollback()
         logger.exception("Error fetching all notes")
         return internal_error(logger, "Error fetching all notes")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/notes/heatmap', methods=['GET'])
+@token_required
+def get_notes_heatmap(current_user, root_id):
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.get_notes_heatmap(root_id, current_user.id, filters=_feed_filters())
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching notes heatmap")
+        return internal_error(logger, "Error fetching notes heatmap")
     finally:
         db_session.close()
 

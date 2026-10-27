@@ -161,6 +161,9 @@ export const queryKeys = {
     goalNotesRoot: (rootId) => ['goal-notes', rootId],
     allNotes: (rootId, filters = {}) => ['all-notes', rootId, filters],
     allNotesRoot: (rootId) => ['all-notes', rootId],
+    // Under the all-notes root so every note mutation refreshes the heatmap too.
+    notesHeatmap: (rootId, filters = {}) => ['all-notes', rootId, 'heatmap', filters],
+    noteFilters: (rootId) => ['note-filters', rootId],
     instagramOembed: (permalink) => ['instagram-oembed', permalink],
     progressRoot: () => ['progress'],
     progressComparison: (instanceId) => ['progress', 'comparison', instanceId],

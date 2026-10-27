@@ -4,39 +4,48 @@ import BodyPortal from '../layout/BodyPortal';
 import styles from './NoteCard.module.css';
 
 const GAP = 4;
+const EDGE = 8; // Minimum distance from the viewport edge.
 
 /**
  * Note "···" menu. The menu renders in a body portal at a fixed position, so the card keeps
  * its `content-visibility`/paint containment while it is open. Toggling that containment on
  * the card during a click crashed Chrome's renderer.
  */
-export default function NoteOptionsMenu({ items }) {
+export default function NoteOptionsMenu({ items, label = 'Note options', className = styles.optionsWrapper }) {
     const [open, setOpen] = useState(false);
-    const [position, setPosition] = useState(null);
     const trigger = useRef(null);
     const menu = useRef(null);
     const menuId = useId();
 
+    // Position the open menu beside its button. This is DOM measurement, so it writes the
+    // menu's style directly; the menu renders hidden until placed.
     useLayoutEffect(() => {
-        if (!open || !trigger.current) return;
+        const node = menu.current;
+        if (!open || !trigger.current || !node) return;
         const bounds = trigger.current.getBoundingClientRect();
-        const height = menu.current?.offsetHeight || 0;
+        const height = node.offsetHeight || 0;
+        const width = node.offsetWidth || 0;
         const below = bounds.bottom + GAP + height <= window.innerHeight;
-        setPosition({
-            right: Math.max(8, window.innerWidth - bounds.right),
-            ...(below ? { top: bounds.bottom + GAP } : { bottom: window.innerHeight - bounds.top + GAP }),
+        // Right-align to the button unless that would push the menu off the left edge.
+        const fitsLeftward = bounds.right - width >= EDGE;
+        Object.assign(node.style, {
+            left: fitsLeftward ? '' : `${Math.max(EDGE, Math.min(bounds.left, window.innerWidth - width - EDGE))}px`,
+            right: fitsLeftward ? `${Math.max(EDGE, window.innerWidth - bounds.right)}px` : '',
+            top: below ? `${bounds.bottom + GAP}px` : '',
+            bottom: below ? '' : `${window.innerHeight - bounds.top + GAP}px`,
+            visibility: 'visible',
         });
     }, [open]);
 
     useEffect(() => {
         if (!open) return undefined;
-        menu.current?.querySelector('[role="menuitem"]')?.focus();
+        menu.current?.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
         const close = (event) => {
             if (!menu.current?.contains(event.target) && !trigger.current?.contains(event.target)) setOpen(false);
         };
         const dismiss = () => setOpen(false);
         const keys = (event) => {
-            const entries = Array.from(menu.current?.querySelectorAll('[role="menuitem"]') || []);
+            const entries = Array.from(menu.current?.querySelectorAll('[role="menuitem"]:not(:disabled)') || []);
             const index = entries.indexOf(document.activeElement);
             if (event.key === 'Escape') { event.preventDefault(); setOpen(false); trigger.current?.focus(); }
             if (event.key === 'ArrowDown') { event.preventDefault(); entries[(index + 1) % entries.length]?.focus(); }
@@ -57,14 +66,14 @@ export default function NoteOptionsMenu({ items }) {
     }, [open]);
 
     return (
-        <div className={styles.optionsWrapper}>
+        <div className={className}>
             <button
                 ref={trigger}
                 type="button"
                 className={styles.optionsBtn}
                 onClick={(event) => { event.stopPropagation(); setOpen((value) => !value); }}
                 title="Options"
-                aria-label="Note options"
+                aria-label={label}
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls={open ? menuId : undefined}
@@ -76,9 +85,9 @@ export default function NoteOptionsMenu({ items }) {
                     ref={menu}
                     id={menuId}
                     role="menu"
-                    aria-label="Note options"
+                    aria-label={label}
                     className={styles.optionsMenu}
-                    style={position || { visibility: 'hidden', top: 0, right: 0 }}
+                    style={{ visibility: 'hidden', top: 0, right: 0 }}
                     onClick={(event) => event.stopPropagation()}
                 >
                     {items.map((item) => (
@@ -86,6 +95,7 @@ export default function NoteOptionsMenu({ items }) {
                             key={item.label}
                             type="button"
                             role="menuitem"
+                            disabled={item.disabled}
                             className={`${styles.optionsMenuItem} ${item.danger ? styles.optionsMenuItemDanger : ''}`}
                             onClick={(event) => { setOpen(false); item.onSelect(event); }}
                         >

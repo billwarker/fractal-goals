@@ -12,7 +12,6 @@ SIZE_BACKLOG = {
     "services/program_metrics_service.py": 805,
     "blueprints/activities_api.py": 936,
     "blueprints/goals_api.py": 838,
-    "services/note_service.py": 833,
 }
 # The AI API adds one shared database boundary; the delegated and embedded
 # workers each need a containment boundary for durable failure state. The

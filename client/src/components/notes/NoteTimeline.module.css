@@ -4,24 +4,94 @@
     gap: 6px;
 }
 
+/*
+ * Timeline presentation: one rail runs through every day. Each marker is placed from the
+ * same variables, so breakpoints only change the variables.
+ *   --rail-x      rail centre, from the feed's left edge
+ *   --rail-gap    where content starts, from the feed's left edge
+ *   --node        day and session node size; --node-small for standalone notes
+ *   --header-h    session header height (its node sits on the header's centre line)
+ */
 .continuousTimeline {
+    --rail-x: 7px;
+    --rail-gap: 22px;
+    --node: 11px;
+    --node-small: 7px;
+    --header-h: 34px;
+    --rail-color: color-mix(in srgb, var(--color-border) 90%, transparent);
     gap: 0;
+}
+
+.rail {
     position: relative;
+}
+
+.rail::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: calc(var(--rail-x) - 0.5px);
+    width: 1px;
+    background: var(--rail-color);
+}
+
+/* Shared node look: filled dot with a page-coloured ring that cuts the rail. */
+.continuousTimeline .dateHeader::before,
+.sessionGroup::before,
+.standaloneNote::before {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    box-sizing: border-box;
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px var(--color-bg-primary, var(--color-bg-surface));
+}
+
+.continuousTimeline .dateHeader {
+    position: relative;
+    padding: 18px 0 8px var(--rail-gap);
+    border-top: 0;
+    margin-top: 0;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.continuousTimeline .dateHeader::before {
+    top: calc(18px + 0.5lh - var(--node) / 2);
+    left: calc(var(--rail-x) - var(--node) / 2);
+    width: var(--node);
+    height: var(--node);
+    border: 2px solid var(--color-text-muted);
+    background: var(--color-bg-primary, var(--color-bg-surface));
+}
+
+.continuousTimeline .dateGroup:first-child .dateHeader {
+    padding-top: 4px;
+}
+
+.continuousTimeline .dateGroup:first-child .dateHeader::before {
+    top: calc(4px + 0.5lh - var(--node) / 2);
 }
 
 .dateNotes {
-    position: relative;
-    margin-left: 7px;
-    border-left: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+    display: grid;
+    gap: 6px;
+    padding-left: var(--rail-gap);
 }
 
 .sessionGroup {
+    --session-color: var(--color-text-muted);
     position: relative;
-    margin: 2px 0 8px 12px;
-    border: 1px solid color-mix(in srgb, var(--color-border) 78%, transparent);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--color-bg-surface) 45%, transparent);
-    overflow: visible;
+    margin: 2px 0 6px;
+}
+
+.sessionGroup::before {
+    top: calc(var(--header-h) / 2 - var(--node) / 2);
+    left: calc(var(--rail-x) - var(--rail-gap) - var(--node) / 2);
+    width: var(--node);
+    height: var(--node);
+    background: var(--session-color);
 }
 
 .sessionHeader {
@@ -29,21 +99,7 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    padding: 8px 12px;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 68%, transparent);
-}
-
-.sessionMarker {
-    position: absolute;
-    top: 17px;
-    left: -18px;
-    width: 9px;
-    height: 9px;
-    box-sizing: border-box;
-    border: 2px solid var(--color-bg-surface);
-    border-radius: 50%;
-    background: var(--color-text-muted);
-    box-shadow: 0 0 0 1px var(--color-border);
+    min-height: var(--header-h);
 }
 
 .sessionBadge {
@@ -55,32 +111,29 @@
     flex-shrink: 0;
     margin-left: auto;
     color: var(--color-text-muted);
-    font-size: 10px;
+    font-size: 11px;
     white-space: nowrap;
 }
 
+/* A light bracket in the session's colour groups its notes under the header. */
 .sessionNotes {
     min-width: 0;
+    margin-left: 4px;
+    padding-left: 12px;
+    border-left: 2px solid color-mix(in srgb, var(--session-color) 45%, transparent);
 }
 
 .standaloneNote {
     position: relative;
-    margin-left: 12px;
 }
 
 .standaloneNote::before {
-    content: '';
-    position: absolute;
-    z-index: 1;
     top: 20px;
-    left: -17px;
-    width: 7px;
-    height: 7px;
-    box-sizing: border-box;
-    border: 2px solid var(--color-bg-surface);
-    border-radius: 50%;
-    background: var(--color-text-muted);
-    box-shadow: 0 0 0 1px var(--color-border);
+    left: calc(var(--rail-x) - var(--rail-gap) - var(--node-small) / 2);
+    width: var(--node-small);
+    height: var(--node-small);
+    border: 1.5px solid var(--color-text-muted);
+    background: var(--color-bg-primary, var(--color-bg-surface));
 }
 
 .emptyState {
@@ -117,13 +170,10 @@
     margin-top: 4px;
 }
 
-.continuousTimeline .dateHeader {
-    position: relative;
-    z-index: 2;
-    padding: 16px 0 8px;
-    border-top: 0;
-    background: var(--color-bg-primary, transparent);
-    font-size: 12px;
+.dateGroup:first-child .dateHeader {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
 }
 
 .continuousTimeline .pinnedSection {
@@ -133,45 +183,19 @@
 }
 
 @media (max-width: 640px) {
-    .dateNotes {
-        margin-left: 4px;
-    }
-
-    .sessionGroup,
-    .standaloneNote {
-        margin-left: 10px;
-    }
-
-    .sessionMarker {
-        left: -15px;
-    }
-
-    .standaloneNote::before {
-        left: -14px;
+    .continuousTimeline {
+        --rail-x: 5px;
+        --rail-gap: 16px;
+        --node: 9px;
     }
 
     .sessionHeader {
-        align-items: flex-start;
         flex-wrap: wrap;
-        padding: 8px 10px;
     }
 
     .sessionBadge {
-        width: auto;
-        max-width: calc(100% - 8px);
+        max-width: calc(100% - 64px);
     }
-
-    .sessionCount {
-        width: 100%;
-        margin-left: 0;
-        padding-left: 1px;
-    }
-}
-
-.dateGroup:first-child .dateHeader {
-    border-top: none;
-    padding-top: 0;
-    margin-top: 0;
 }
 
 .loadMoreBtn {

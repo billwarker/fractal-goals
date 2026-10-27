@@ -1,11 +1,10 @@
 /**
- * Notes Page — /fractal/:rootId/notes
+ * Notes Page — /:rootId/notes
  *
- * Two-column layout:
- * - Left: filter chips + reverse-chronological timeline + compose toggle
- * - Right: "Filter Notes" panel with Goal + Activity filter buttons (open modals)
- *
- * Mobile: single column; filter panel becomes bottom sheet.
+ * - Left: saved filters (combine with AND) above the reverse-chronological timeline.
+ * - Right: heatmap, search (keyword or regex), category, goal, activity and pinned filters.
+ *   While composing, the right pane links the note to a goal or activity instead.
+ * Filters live in the URL (useNotesPageFilters). Mobile moves the right pane into a sheet.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +13,9 @@ import { NoteTimeline, NoteComposer } from '../components/notes';
 import ComposeLinkPanel from '../components/notes/ComposeLinkPanel';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
+import { useNotesPageFilters } from '../hooks/useNotesPageFilters';
+import { useNoteFilters } from '../hooks/useNoteFilters';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { useFractalTree } from '../hooks/useGoalQueries';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import CloseButton from '../components/atoms/CloseButton';
@@ -29,11 +31,10 @@ import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
 import BodyPortal from '../components/layout/BodyPortal';
 import NotesMobileSheet from '../components/notes/NotesMobileSheet';
+import NotesFilterControls from '../components/notes/page/NotesFilterControls';
+import ActiveFiltersSummary from '../components/notes/page/ActiveFiltersSummary';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
 import styles from './Notes.module.css';
-import { NOTE_TYPE_FILTER_OPTIONS } from '../utils/noteTypes';
-
-const NOTE_TYPE_OPTIONS = NOTE_TYPE_FILTER_OPTIONS;
 
 // ─── Goal Picker Modal ───────────────────────────────────────────────────────
 function GoalPickerModal({ rootId, selectedGoalId, onSelect, onClose }) {
@@ -87,14 +88,9 @@ function Notes() {
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
 
-    // Filter state
-    const [selectedNoteTypes, setSelectedNoteTypes] = useState([]);
-    const [pinnedOnly, setPinnedOnly] = useState(false);
-    const [filterGoalId, setFilterGoalId] = useState(null);
-    const [filterGoalName, setFilterGoalName] = useState('');
-    const [filterActivityIds, setFilterActivityIds] = useState([]);
-    const [filterGroupIds, setFilterGroupIds] = useState([]);
-    const [search, setSearch] = useState('');
+    const { timezone } = useTimezone();
+    const { filters, apiFilters, updateFilters, hasActiveFilters, clearAdHoc, clearAll } = useNotesPageFilters(timezone);
+    const { savedFilters, isLoading: savedFiltersLoading, createFilter, updateFilter, deleteFilter } = useNoteFilters(rootId);
 
     // UI state
     const filtersPaneStorageKey = `notes-filter-pane-open:${rootId || 'default'}`;
@@ -128,26 +124,30 @@ function Notes() {
     const [composeActivityId, setComposeActivityId] = useState(null);
     const [composeActivityName, setComposeActivityName] = useState(null);
 
-    const filters = {
-        note_types: selectedNoteTypes.length ? selectedNoteTypes : undefined,
-        goal_id: filterGoalId || undefined,
-        activity_definition_ids: filterActivityIds.length ? filterActivityIds : undefined,
-        activity_group_ids: filterGroupIds.length ? filterGroupIds : undefined,
-        pinned_only: pinnedOnly || undefined,
-        search: search || undefined,
-    };
+    // Ignore saved-filter ids in the URL that no longer exist (deleted elsewhere).
+    const activeSavedIds = savedFiltersLoading
+        ? filters.savedFilterIds
+        : filters.savedFilterIds.filter((id) => savedFilters.some((filter) => filter.id === id));
+    const feedFilters = { ...apiFilters, saved_filter_ids: activeSavedIds };
 
     const {
         notes, total, hasMore, isLoading,
         loadNextPage, createNote, updateNote, deleteNote, pinNote, unpinNote,
-    } = useNotesPageQuery(rootId, filters);
+    } = useNotesPageQuery(rootId, feedFilters);
 
     useEffect(() => { if (!rootId) navigate('/'); }, [rootId, navigate]);
 
-    const toggleNoteType = (noteType) => {
-        setSelectedNoteTypes(prev =>
-            prev.includes(noteType) ? prev.filter(x => x !== noteType) : [...prev, noteType]
-        );
+    const toggleSavedFilter = (id) => updateFilters({
+        savedFilterIds: activeSavedIds.includes(id) ? activeSavedIds.filter((item) => item !== id) : [...activeSavedIds, id],
+    });
+    // A new saved filter takes over the conditions it was created from.
+    const createSavedFilter = async (name, filterSpec) => {
+        const created = await createFilter({ name, spec: filterSpec });
+        clearAdHoc({ savedFilterIds: [...activeSavedIds, created.id] });
+    };
+    const deleteSavedFilter = async (filter) => {
+        await deleteFilter(filter.id);
+        updateFilters({ savedFilterIds: activeSavedIds.filter((id) => id !== filter.id) });
     };
 
     const resetComposeLinks = () => {
@@ -187,30 +187,9 @@ function Notes() {
         }
     };
 
-    const handleGoalFilterSelect = (id, name) => {
-        setFilterGoalId(id);
-        setFilterGoalName(name || '');
-    };
-
-    const handleActivityFilterConfirm = (activityIds, groupIds) => {
-        setFilterActivityIds(activityIds);
-        setFilterGroupIds(groupIds);
-    };
-
-    const clearFilters = () => {
-        setSelectedNoteTypes([]);
-        setPinnedOnly(false);
-        setFilterGoalId(null);
-        setFilterGoalName('');
-        setFilterActivityIds([]);
-        setFilterGroupIds([]);
-        setSearch('');
-    };
-
-    const hasActiveFilters = selectedNoteTypes.length > 0 || pinnedOnly || filterGoalId ||
-        filterActivityIds.length > 0 || filterGroupIds.length > 0 || search;
-
-    const activityFilterCount = filterActivityIds.length + filterGroupIds.length;
+    const handleGoalFilterSelect = (id, name) => updateFilters({ goalId: id, goalName: name || '' });
+    const handleActivityFilterConfirm = (activityIds, groupIds) => updateFilters({ activityIds, groupIds });
+    const activityFilterCount = filters.activityIds.length + filters.groupIds.length;
     const mobilePanelLabel = composing
         ? (mobilePanelOpen ? 'Hide Associator' : 'Show Associator')
         : (mobilePanelOpen ? 'Hide Filters' : 'Show Filters');
@@ -243,6 +222,16 @@ function Notes() {
 
             {onboarding?.enabled && onboarding.state?.status === 'active' && !onboarding.state?.steps?.first_session && (
                 <EmptyState compact className={styles.onboardingEmptyState} title="Notes preserve the context numbers miss" description="Complete a session, then capture what changed, what worked, and what to adjust next time." />
+            )}
+
+            {!composing && (
+                <ActiveFiltersSummary
+                    filters={filters}
+                    savedFilters={savedFilters}
+                    activeSavedIds={activeSavedIds}
+                    onEdit={() => (isMobile ? setMobilePanelOpen(true) : setIsFiltersPaneOpen(true))}
+                    onClear={clearAll}
+                />
             )}
 
             <div className={styles.timelineArea}>
@@ -291,82 +280,23 @@ function Notes() {
 
     const filterPanelBody = (
         <div className={styles.filterPanelBody}>
-            {/* Search */}
-            <div className={styles.filterSection}>
-                <div className={styles.filterSectionHeader}><h4>Search</h4></div>
-                <input
-                    className={styles.searchInput}
-                    placeholder="Search notes…"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    type="text"
-                />
-            </div>
-
-            {/* Note Type */}
-            <div className={styles.filterSection}>
-                <div className={styles.filterSectionHeader}><h4>Note Type</h4></div>
-                <div className={styles.chipGroup}>
-                    {NOTE_TYPE_OPTIONS.map(opt => (
-                        <button
-                            key={opt.value}
-                            className={[styles.chip, selectedNoteTypes.includes(opt.value) ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                            onClick={() => toggleNoteType(opt.value)}
-                        >
-                            {opt.label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            {/* Pinned */}
-            <div className={styles.filterSection}>
-                <div className={styles.filterSectionHeader}><h4>Pinned</h4></div>
-                <div className={styles.chipGroup}>
-                    <button
-                        className={[styles.chip, !pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                        onClick={() => setPinnedOnly(false)}
-                    >
-                        All
-                    </button>
-                    <button
-                        className={[styles.chip, pinnedOnly ? styles.chipActive : ''].filter(Boolean).join(' ')}
-                        onClick={() => setPinnedOnly(true)}
-                    >
-                        Pinned only
-                    </button>
-                </div>
-            </div>
-
-            {/* Goal */}
-            <div className={styles.filterSection}>
-                <div className={styles.filterSectionHeader}><h4>Goal</h4></div>
-                <button className={styles.pickerButton} onClick={() => setGoalPickerOpen(true)}>
-                    {filterGoalName || 'Select a goal…'}
-                    <span className={styles.pickerButtonArrow}>›</span>
-                </button>
-                {filterGoalId && (
-                    <div className={styles.pickerSelection}>
-                        <span>{filterGoalName}</span>
-                        <button onClick={() => handleGoalFilterSelect(null, null)}>Clear</button>
-                    </div>
-                )}
-            </div>
-
-            {/* Activity */}
-            <div className={styles.filterSection}>
-                <div className={styles.filterSectionHeader}><h4>Activity</h4></div>
-                <button className={styles.pickerButton} onClick={() => setActivityPickerOpen(true)}>
-                    {activityFilterCount > 0 ? `${activityFilterCount} selected` : 'Select activities…'}
-                    <span className={styles.pickerButtonArrow}>›</span>
-                </button>
-                {activityFilterCount > 0 && (
-                    <div className={styles.pickerSelection}>
-                        <span>{activityFilterCount} activit{activityFilterCount === 1 ? 'y' : 'ies/groups'} selected</span>
-                        <button onClick={() => { setFilterActivityIds([]); setFilterGroupIds([]); }}>Clear</button>
-                    </div>
-                )}
-            </div>
+            <NotesFilterControls
+                rootId={rootId}
+                filters={filters}
+                apiFilters={feedFilters}
+                updateFilters={updateFilters}
+                activityCount={activityFilterCount}
+                onPickGoal={() => setGoalPickerOpen(true)}
+                onPickActivities={() => setActivityPickerOpen(true)}
+                saved={{
+                    savedFilters,
+                    activeIds: activeSavedIds,
+                    onToggle: toggleSavedFilter,
+                    onCreate: createSavedFilter,
+                    onUpdate: (filter, name, filterSpec) => updateFilter({ id: filter.id, name, spec: filterSpec }),
+                    onDelete: deleteSavedFilter,
+                }}
+            />
         </div>
     );
 
@@ -380,7 +310,7 @@ function Notes() {
                     <>
                     <SidePaneHeaderButton
                         variant="reset"
-                        onClick={clearFilters}
+                        onClick={clearAll}
                         disabled={!hasActiveFilters}
                     >
                         Reset Filters
@@ -441,7 +371,7 @@ function Notes() {
             <BodyPortal when={goalPickerOpen}>
                 <GoalPickerModal
                     rootId={rootId}
-                    selectedGoalId={filterGoalId}
+                    selectedGoalId={filters.goalId}
                     onSelect={handleGoalFilterSelect}
                     onClose={() => setGoalPickerOpen(false)}
                 />
@@ -451,8 +381,8 @@ function Notes() {
                     title="Filter by Activity"
                     activities={activities}
                     activityGroups={activityGroups}
-                    initialActivityIds={filterActivityIds}
-                    initialGroupIds={filterGroupIds}
+                    initialActivityIds={filters.activityIds}
+                    initialGroupIds={filters.groupIds}
                     onConfirm={handleActivityFilterConfirm}
                     onClose={() => setActivityPickerOpen(false)}
                 />
@@ -463,7 +393,7 @@ function Notes() {
                 composing={composing}
                 total={total}
                 hasActiveFilters={hasActiveFilters}
-                onReset={clearFilters}
+                onReset={clearAll}
                 onClose={() => setMobilePanelOpen(false)}
             >
                 {composing ? composeLinkPanelBody : filterPanelBody}

@@ -4,34 +4,44 @@
  */
 
 import { useMemo } from 'react';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fractalNotesApi } from '../utils/api/fractalNotesApi';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
 const PAGE_SIZE = 25;
 
-function normalizeNoteFilters(filters = {}) {
+const sortedList = (values) => (Array.isArray(values) && values.length ? [...values].filter(Boolean).sort() : undefined);
+
+/** Canonical feed parameters, so equal filters share one query key. */
+export function normalizeNoteFilters(filters = {}) {
+    const text = filters.text?.trim() || undefined;
     return {
-        context_types: Array.isArray(filters.context_types) && filters.context_types.length
-            ? [...filters.context_types].filter(Boolean).sort()
-            : undefined,
-        note_types: Array.isArray(filters.note_types) && filters.note_types.length
-            ? [...filters.note_types].filter(Boolean).sort()
-            : undefined,
+        context_types: sortedList(filters.context_types),
         context_id: filters.context_id || undefined,
+        text,
+        categories: sortedList(filters.categories),
         goal_id: filters.goal_id || undefined,
-        activity_definition_ids: Array.isArray(filters.activity_definition_ids) && filters.activity_definition_ids.length
-            ? [...filters.activity_definition_ids].filter(Boolean).sort()
-            : undefined,
-        activity_group_ids: Array.isArray(filters.activity_group_ids) && filters.activity_group_ids.length
-            ? [...filters.activity_group_ids].filter(Boolean).sort()
-            : undefined,
+        activity_definition_ids: sortedList(filters.activity_definition_ids),
+        activity_group_ids: sortedList(filters.activity_group_ids),
         pinned_only: filters.pinned_only ? true : undefined,
-        search: filters.search?.trim() || undefined,
-        date_from: filters.date_from || undefined,
-        date_to: filters.date_to || undefined,
+        saved_filter_ids: sortedList(filters.saved_filter_ids),
+        day: filters.day || undefined,
+        timezone: filters.timezone || undefined,
     };
+}
+
+/** Matching notes per local day for the Notes page heatmap (day selection excluded). */
+export function useNotesHeatmap(rootId, filters = {}) {
+    const params = useMemo(() => ({ ...normalizeNoteFilters(filters), day: undefined }), [filters]);
+    return useQuery({
+        queryKey: queryKeys.notesHeatmap(rootId, params),
+        queryFn: async () => (await fractalNotesApi.getNotesHeatmap(rootId, params)).data,
+        enabled: Boolean(rootId),
+        staleTime: 20000,
+        placeholderData: (previous) => previous,
+        retry: false,
+    });
 }
 
 export function useNotesPageQuery(rootId, filters = {}) {
@@ -62,6 +72,7 @@ export function useNotesPageQuery(rootId, filters = {}) {
         enabled: !!rootId,
         staleTime: 20000,
         placeholderData: (previousData) => previousData,
+        retry: false,
     });
 
     const pages = data?.pages || [];

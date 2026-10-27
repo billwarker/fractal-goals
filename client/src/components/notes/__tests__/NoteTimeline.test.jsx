@@ -88,4 +88,36 @@ describe('NoteTimeline timeline presentation', () => {
         expect(screen.getByText('Content one')).toBeInTheDocument();
         expect(container.querySelector('[class*="_noteCard_"]').className).not.toContain('_timeline_');
     });
+
+    it('does not repeat the session inside its group', () => {
+        render(
+            <NoteTimeline
+                presentation="timeline"
+                noteTypeVariant="metadata"
+                showContext
+                notes={[
+                    note('session', {
+                        session_id: 'session-1', session_template_name: 'Upper Body - Heavy', context_type: 'session',
+                        note_type: 'session_note', note_type_label: 'Session Note', content: 'Abort tonight',
+                    }),
+                    note('set', { session_id: 'session-1', session_template_name: 'Upper Body - Heavy', activity_definition_name: 'Bench Press' }),
+                ]}
+            />,
+        );
+
+        const group = screen.getByRole('region', { name: 'Upper Body - Heavy session notes' });
+        expect(group.style.getPropertyValue('--session-color')).toBe('');
+        expect(within(group).queryByText('Session note')).not.toBeInTheDocument();
+        expect(within(group).queryByText('Session')).not.toBeInTheDocument();
+        expect(within(group).queryByText('Activity Instance')).not.toBeInTheDocument();
+        expect(within(group).getByText('Bench Press')).toBeInTheDocument();
+        expect(within(group).getAllByText('Upper Body - Heavy')).toHaveLength(1);
+    });
+
+    it('colours a session group with its template colour', () => {
+        render(
+            <NoteTimeline presentation="timeline" notes={[note('one', { session_id: 's', session_template_name: 'Heavy', session_template_color: '#ef4444' })]} />,
+        );
+        expect(screen.getByRole('region', { name: 'Heavy session notes' }).style.getPropertyValue('--session-color')).toBe('#ef4444');
+    });
 });

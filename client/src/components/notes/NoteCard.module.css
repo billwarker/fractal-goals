@@ -295,6 +295,11 @@
     outline: none;
 }
 
+.optionsMenuItem:disabled {
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
 .optionsMenuItemDanger {
     color: var(--color-danger, #e05555);
 }

@@ -56,3 +56,18 @@ describe('NoteCard options menu', () => {
         expect(screen.queryByRole('region', { name: 'Manage attachments' })).not.toBeInTheDocument();
     });
 });
+
+describe('NoteOptionsMenu placement', () => {
+    it('flips to left alignment instead of running off the left edge', async () => {
+        const { default: NoteOptionsMenu } = await import('../NoteOptionsMenu');
+        renderWithProviders(<NoteOptionsMenu label="Filter options" items={[{ label: 'Rename', onSelect: vi.fn() }]} />,
+            { withAuth: false, withGoalLevels: false });
+        const trigger = screen.getByRole('button', { name: 'Filter options' });
+        trigger.getBoundingClientRect = () => ({ left: 40, right: 60, top: 100, bottom: 120, width: 20, height: 20 });
+        vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(160);
+        fireEvent.click(trigger);
+        const menu = screen.getByRole('menu', { name: 'Filter options' });
+        expect(menu.style.left).toBe('40px');
+        expect(menu.style.right).toBe('');
+    });
+});

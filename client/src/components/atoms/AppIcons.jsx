@@ -28,6 +28,16 @@ function SvgIcon({
     );
 }
 
+export function FilterPlusIcon(props) {
+    return (
+        <SvgIcon {...props}>
+            <path d="M3 5h13l-5 6.5V18l-3 1.5v-8L3 5Z" />
+            <path d="M18 13v6" />
+            <path d="M15 16h6" />
+        </SvgIcon>
+    );
+}
+
 export function PaperclipIcon(props) {
     return (
         <SvgIcon {...props}>

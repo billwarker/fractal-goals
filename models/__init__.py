@@ -34,7 +34,7 @@ from .program import (
     program_day_templates, program_goals, program_block_goals
 )
 from .calendar_period import CalendarPeriod, CALENDAR_PERIOD_KINDS
-from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, GoalAnalyticsView, Note, EventLog, PageSurfaceLayout
+from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, GoalAnalyticsView, Note, NoteFilter, EventLog, PageSurfaceLayout
 from .product_event import ProductEvent
 from .idempotency import IdempotencyRecord
 from .storage import StorageConnection, StorageAuthorization, MediaAsset, NoteAttachment, StorageUpload

@@ -92,7 +92,7 @@ describe('useNotesPageQuery', () => {
             });
 
         const { result } = renderHook(
-            () => useNotesPageQuery('root-1', { search: 'focus' }),
+            () => useNotesPageQuery('root-1', { text: 'focus' }),
             { wrapper: createWrapper(queryClient) }
         );
 
@@ -112,12 +112,12 @@ describe('useNotesPageQuery', () => {
         });
 
         expect(getAllNotes).toHaveBeenNthCalledWith(1, 'root-1', {
-            search: 'focus',
+            text: 'focus',
             page: 0,
             page_size: 25,
         });
         expect(getAllNotes).toHaveBeenNthCalledWith(2, 'root-1', {
-            search: 'focus',
+            text: 'focus',
             page: 1,
             page_size: 25,
         });

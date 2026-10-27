@@ -372,7 +372,17 @@ Optional surface widgets and the quick-session workspace load at their use bound
 
 ### Notes and analytics
 
-Notes support goal/session/activity scoping and safe markdown media rendering. Analytics uses
+Notes support goal/session/activity scoping and safe markdown media rendering. The Notes page groups
+notes into four categories by where they were written (`services/note_filter_spec.py`
+`CATEGORY_CONTEXT_TYPES`, mirrored in `utils/noteTypes.js` and checked against
+`tests/fixtures/note_categories.json`): General, Goals, Sessions, Programs. One filter spec (quick-search words and phrases, keyword
+conditions that each *contain* or *equal* a whole word/phrase combined all-or-any, categories, goal,
+activities, pinned) is applied in SQL by `services/note_feed.py` for both the feed and its per-day heatmap.
+"Equals" uses an escaped word-boundary match, so user text is never a pattern; there is no regex search.
+Saved filters (`note_filters`, `services/note_filter_service.py`) are full specs, and every selected one is
+AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageFilters.js`); the side pane
+holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
+saved-filter toggles and the remaining controls. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
 a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;

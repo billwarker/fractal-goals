@@ -152,6 +152,7 @@ function NoteTimeline({
                 <section
                     key={`session-${sessionGroup.sessionId}-${index}`}
                     className={styles.sessionGroup}
+                    style={sessionGroup.sessionColor ? { '--session-color': sessionGroup.sessionColor } : undefined}
                     aria-label={`${sessionGroup.sessionName} session notes`}
                 >
                     <div className={styles.sessionHeader}>
@@ -189,13 +190,15 @@ function NoteTimeline({
                 </div>
             )}
 
-            {/* Date-grouped unpinned notes */}
-            {groups.map(group => (
-                <div key={group.date} className={styles.dateGroup}>
-                    <div className={styles.dateHeader}>{group.date}</div>
-                    <div className={isTimeline ? styles.dateNotes : undefined}>{renderDateNotes(group.notes)}</div>
-                </div>
-            ))}
+            {/* Date-grouped unpinned notes; the timeline presentation draws one rail through them. */}
+            <div className={isTimeline ? styles.rail : undefined}>
+                {groups.map(group => (
+                    <div key={group.date} className={styles.dateGroup}>
+                        <div className={styles.dateHeader}>{group.date}</div>
+                        <div className={isTimeline ? styles.dateNotes : undefined}>{renderDateNotes(group.notes)}</div>
+                    </div>
+                ))}
+            </div>
 
             {hasMore && (
                 <button className={styles.loadMoreBtn} onClick={onLoadMore}>Load more</button>
