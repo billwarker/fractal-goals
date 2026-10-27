@@ -37,4 +37,7 @@
 .attachableRow { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .attachableRow > textarea { flex: 1; min-width: 0; }
 .attachableField .compactFiles { margin: 0; }
+.sourceLink { color: inherit; text-decoration: none; }
+.sourceLink:hover { color: var(--color-link, var(--color-text-primary)); text-decoration: underline; }
+.sourceLink:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; border-radius: 2px; }
 

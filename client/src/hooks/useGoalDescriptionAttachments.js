@@ -10,16 +10,21 @@ import { useAttachmentDraft } from './useAttachmentDraft';
  * editable draft. `loaded` stays false until the saved list arrives, so a save never
  * overwrites attachments it hasn't seen.
  */
-export function useGoalDescriptionAttachments(rootId, goalId, enabled) {
-    const client = useQueryClient();
-    const queryKey = queryKeys.goalAttachments(rootId, goalId);
-    const query = useQuery({
-        queryKey,
+/** The saved media on a goal's description; shared by view mode and the editor through one cache entry. */
+export function useGoalAttachments(rootId, goalId, enabled = true) {
+    return useQuery({
+        queryKey: queryKeys.goalAttachments(rootId, goalId),
         queryFn: async () => (await storageApi.goalAttachments(rootId, goalId)).data,
         enabled: Boolean(enabled && rootId && goalId),
         staleTime: Infinity,
         refetchOnWindowFocus: false,  // Don't replace edits in progress.
     });
+}
+
+export function useGoalDescriptionAttachments(rootId, goalId, enabled) {
+    const client = useQueryClient();
+    const queryKey = queryKeys.goalAttachments(rootId, goalId);
+    const query = useGoalAttachments(rootId, goalId, enabled);
     const draft = useAttachmentDraft(rootId);
     const { reset } = draft;
     const { data, dataUpdatedAt } = query;

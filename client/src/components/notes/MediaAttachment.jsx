@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-import { mediaContentUrl } from '../../utils/api/storageApi';
+import { mediaContentUrl, mediaOpenUrl } from '../../utils/api/storageApi';
 import Button from '../atoms/Button';
 import styles from './MediaAttachment.module.css';
 
@@ -9,6 +9,7 @@ export default function MediaAttachment({ asset, rootId }) {
     const [failed, setFailed] = useState(false);
     const available = asset.available && rootId;
     const src = available ? mediaContentUrl(rootId, asset.id) : null;
+    const providerName = asset.provider === 'google_drive' ? 'Google Drive' : 'Dropbox';
     return (
         <figure className={styles.attachment}>
             {!available || failed ? (
@@ -23,7 +24,14 @@ export default function MediaAttachment({ asset, rootId }) {
                 <video key={attempt} src={src} controls preload="none" aria-label={asset.alt_text || asset.name}
                     onError={() => setFailed(true)} />
             )}
-            <figcaption>{asset.name} · {asset.provider === 'google_drive' ? 'Google Drive' : 'Dropbox'}</figcaption>
+            <figcaption>
+                {rootId ? (
+                    <a className={styles.sourceLink} href={mediaOpenUrl(rootId, asset.id)} target="_blank" rel="noopener noreferrer"
+                        title={`Open in ${providerName}`}>
+                        {asset.name} · {providerName}<span aria-hidden="true"> ↗</span>
+                    </a>
+                ) : `${asset.name} · ${providerName}`}
+            </figcaption>
         </figure>
     );
 }

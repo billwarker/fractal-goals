@@ -125,3 +125,26 @@ def test_dropbox_rename_conflict_and_already_deleted(monkeypatch):
     monkeypatch.setattr(providers.requests, 'request', lambda *a, **k: FakeResponse(409, {'error_summary': 'path_write/disallowed_name/'}))
     with pytest.raises(StorageError):
         providers.trash('dropbox', 'token', 'id:abc')
+
+
+def test_open_in_provider_links_to_the_original(media, authed_client, monkeypatch):
+    base = f'/api/{media.root.id}/media/{media.asset.id}/open'
+    response = authed_client.get(base)
+    assert response.status_code == 302
+    assert response.headers['Location'] == 'https://drive.google.com/file/d/file-1/view'
+    media.asset.resource_key = 'rk_1'
+    media.db.commit()
+    assert authed_client.get(base).headers['Location'] == 'https://drive.google.com/file/d/file-1/view?resourcekey=rk_1'
+    assert authed_client.get(f'/api/{media.root.id}/media/missing/open').status_code == 404
+    with pytest.raises(StorageError):
+        media.service.web_url(media.root.id, 'someone-else', media.asset.id)
+
+
+def test_dropbox_links_use_the_current_path_or_fall_back_to_the_app_folder(monkeypatch):
+    monkeypatch.setattr(config, 'DROPBOX_APP_FOLDER', 'Fractal Goals')
+    monkeypatch.setattr(providers.requests, 'request', lambda *a, **k: FakeResponse(200, {'path_display': '/Lessons/Run 1.mp4'}))
+    assert providers.web_url('dropbox', 'id:abc', token='t') == \
+        'https://www.dropbox.com/home/Apps/Fractal%20Goals/Lessons?preview=Run%201.mp4'
+    monkeypatch.setattr(providers.requests, 'request', lambda *a, **k: FakeResponse(409, {'error_summary': 'path/not_found/'}))
+    assert providers.web_url('dropbox', 'id:abc', token='t') == 'https://www.dropbox.com/home/Apps/Fractal%20Goals'
+    assert providers.web_url('dropbox', 'id:abc') == 'https://www.dropbox.com/home/Apps/Fractal%20Goals'

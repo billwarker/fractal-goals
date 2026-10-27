@@ -103,6 +103,18 @@ class MediaService:
             raise StorageError('Attachment not found', 404)
         return asset
 
+    def web_url(self, root_id, user_id, asset_id):
+        """Where to view the original in Google Drive or Dropbox."""
+        asset = self.owned_asset(root_id, user_id, asset_id)
+        provider = asset.connection.provider
+        token = None
+        if provider == 'dropbox' and asset.connection.status == 'active':
+            try:
+                token = self.connections.access_token(asset.connection_id, user_id)
+            except StorageError:
+                token = None  # Falls back to the app folder rather than an error page.
+        return provider_api.web_url(provider, asset.file_id, asset.resource_key, token)
+
     def _same_file(self, asset):
         """Every reference to this provider file: one asset per fractal it was attached in."""
         return self.db.query(MediaAsset).filter_by(connection_id=asset.connection_id, file_id=asset.file_id)
@@ -144,13 +156,16 @@ class MediaService:
 
     def playable_asset(self, root_id, user_id, asset_id):
         self.owned_root(root_id, user_id)
-        # Playable only while attached to a live note or a live goal in this fractal.
+        # Playable while attached to a live note or goal in this fractal, or while attached to
+        # nothing yet (a file just chosen or uploaded, previewed before its note or goal is saved).
+        # Media whose only attachments are on deleted notes or goals stays unavailable.
         on_note = exists().where(NoteAttachment.asset_id == MediaAsset.id, Note.id == NoteAttachment.note_id,
                                  Note.root_id == root_id, Note.deleted_at.is_(None))
         on_goal = exists().where(GoalAttachment.asset_id == MediaAsset.id, Goal.id == GoalAttachment.goal_id,
                                  Goal.root_id == root_id, Goal.deleted_at.is_(None))
+        unattached = ~exists().where(NoteAttachment.asset_id == MediaAsset.id) & ~exists().where(GoalAttachment.asset_id == MediaAsset.id)
         asset = self.db.query(MediaAsset).filter(
-            MediaAsset.id == asset_id, MediaAsset.root_id == root_id, or_(on_note, on_goal),
+            MediaAsset.id == asset_id, MediaAsset.root_id == root_id, or_(on_note, on_goal, unattached),
         ).first()
         if not asset or asset.connection.user_id != user_id:
             raise StorageError('Attachment not found', 404)

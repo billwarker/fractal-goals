@@ -57,6 +57,8 @@ class Config:
     GOOGLE_PICKER_APP_ID = os.getenv('GOOGLE_PICKER_APP_ID', '')
     DROPBOX_CLIENT_ID = os.getenv('DROPBOX_CLIENT_ID', '')
     DROPBOX_CLIENT_SECRET = os.getenv('DROPBOX_CLIENT_SECRET', '')
+    # The Dropbox app's folder name under Apps/ (the app's name), for links to files in Dropbox.
+    DROPBOX_APP_FOLDER = os.getenv('DROPBOX_APP_FOLDER', 'Fractal Goals')
     STORAGE_MAX_FILE_BYTES = max(1, min(500 * 1024 * 1024, int(os.getenv('STORAGE_MAX_FILE_BYTES', str(100 * 1024 * 1024)))))
 
     # Database Configuration

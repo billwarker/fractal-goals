@@ -24,6 +24,11 @@ export const storageApi = {
     goalAttachments: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/attachments`),
 };
 
+/** Opens the original in Google Drive or Dropbox (the server redirects after checking ownership). */
+export function mediaOpenUrl(rootId, assetId) {
+    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/open`;
+}
+
 export function mediaContentUrl(rootId, assetId) {
     return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/content`;
 }

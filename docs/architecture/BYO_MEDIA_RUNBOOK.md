@@ -118,6 +118,12 @@ limited time, and removes it from every note that used it. Drive only lets a fil
 that refusal is reported as `storage_forbidden`, not as a reconnect. Removing an attachment from a note
 never touches the original.
 
+Each attachment's caption links to the original in a new tab through `GET …/media/<asset>/open`,
+which checks ownership and redirects to a fixed provider host: Drive's file page (with its resource key
+when one is needed), or the file's folder in Dropbox (`DROPBOX_APP_FOLDER`, default "Fractal Goals",
+falling back to the app folder when the file has moved or Dropbox is disconnected). File IDs and
+resource keys never appear in note data.
+
 Goal descriptions and goal completion notes take attachments too. Completion notes are ordinary
 notes. Description media lives in `goal_attachments` (cascades with the goal or asset); it is read on
 demand rather than with goal trees, counted in Settings and usage, removed when the original is
@@ -137,7 +143,7 @@ never stored by the text outbox or offline query cache.
 
 ## Privacy, deletion and recovery
 
-- Every media read authenticates and checks a live note attachment inside an owned fractal.
+- Every media read authenticates inside an owned fractal and requires the media to be attached to a live note or goal, or attached to nothing yet (so its owner can preview it before saving). Media whose only attachments are on deleted notes or goals is refused, and media is only ever served to the user whose storage account it came from.
   Admin support impersonation cannot use cloud-storage routes.
 - Credentials and provider upload sessions use authenticated encryption. OAuth state is random,
   stored hashed, expires in ten minutes and is consumed once; exchanges use PKCE. A separate

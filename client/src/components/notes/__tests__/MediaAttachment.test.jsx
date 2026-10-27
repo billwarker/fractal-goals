@@ -43,3 +43,20 @@ describe('MediaAttachment', () => {
         expect(screen.getByRole('link', { name: 'Photo' })).toHaveAttribute('href', 'https://example.test/picture.jpg');
     });
 });
+
+describe('MediaAttachment source link', () => {
+    it('links the file name and location to the original in a new tab', () => {
+        render(<MediaAttachment rootId="root 1" asset={{ id: 'asset/1', name: 'Run.mp4', mime_type: 'video/mp4', provider: 'google_drive', available: true }} />);
+        const link = screen.getByRole('link', { name: /Run\.mp4 · Google Drive/ });
+        expect(link).toHaveAttribute('href', expect.stringMatching(/\/root%201\/media\/asset%2F1\/open$/));
+        expect(link).toHaveAttribute('target', '_blank');
+        expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+        expect(link).toHaveAttribute('title', 'Open in Google Drive');
+    });
+
+    it('keeps a plain caption without a fractal', () => {
+        render(<MediaAttachment asset={{ id: 'a', name: 'pic.png', mime_type: 'image/png', provider: 'dropbox', available: false }} />);
+        expect(screen.queryByRole('link')).not.toBeInTheDocument();
+        expect(screen.getByText('pic.png · Dropbox')).toBeInTheDocument();
+    });
+});

@@ -227,3 +227,18 @@ test('goal descriptions and completion notes take pasted pictures into cloud sto
     await expect.poll(() => sent.note?.attachments?.length).toBe(1);
     expect(sent.note).toMatchObject({ content: 'Finally clean', note_kind: 'goal_completion' });
 });
+
+test('goal details view mode shows the pictures attached to the description', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64');
+    await page.route(`**/api/browser-root-${suffix}/goals/browser-root-${suffix}/attachments`, (route) => route.fulfill({ json: [
+        { id: 'asset-1', name: 'Form Reference.png', mime_type: 'image/png', provider: 'google_drive', available: true, alt_text: '' },
+    ] }));
+    await page.route('**/media/asset-1/content', (route) => route.fulfill({ body: png, contentType: 'image/png' }));
+    await openGoalNotes(page, suffix);
+    await page.getByRole('tab', { name: 'Details', exact: true }).click();
+    const image = page.getByRole('img', { name: 'Form Reference.png' });
+    await expect(image).toBeVisible();
+    await expect(page.getByRole('link', { name: /Form Reference\.png · Google Drive/ })).toHaveAttribute('target', '_blank');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);  // View mode, not the editor.
+});

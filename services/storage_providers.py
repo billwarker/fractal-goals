@@ -2,7 +2,7 @@
 import json
 import mimetypes
 from typing import Any
-from urllib.parse import urlencode, urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 import requests
 
@@ -160,6 +160,24 @@ def trash(provider, token, file_id, resource_key=None):
         # Already deleted is the requested end state; any other conflict is a real failure.
         if response.status_code == 409 and 'not_found' not in str(response.json().get('error_summary', '')):
             raise StorageError('Dropbox couldn’t delete this file. Try again.', 409, 'storage_delete_failed')
+
+
+def web_url(provider, file_id, resource_key=None, token=None):
+    """The provider's own page for a file. Built from fixed hosts, never from caller input."""
+    if provider == 'google_drive':
+        url = f'https://drive.google.com/file/d/{quote(file_id, safe="")}/view'
+        return f'{url}?resourcekey={quote(resource_key, safe="")}' if resource_key else url
+    from config import config
+    folder_root = f'https://www.dropbox.com/home/Apps/{quote(config.DROPBOX_APP_FOLDER)}'
+    if not token:
+        return folder_root
+    try:
+        path = json_call('POST', 'https://api.dropboxapi.com/2/files/get_metadata', headers=headers(token),
+                         json={'path': file_id})['path_display']
+    except (StorageError, KeyError):
+        return folder_root  # Moved or deleted: the app folder is the best place to look.
+    folder, _, name = path.rpartition('/')
+    return f'{folder_root}{quote(folder)}?preview={quote(name)}'
 
 
 def list_dropbox(token, cursor=None):

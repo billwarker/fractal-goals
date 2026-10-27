@@ -56,7 +56,7 @@ function GoalViewMode({
                 </section>
             )}
 
-            <GoalSmartSection goal={goal} />
+            <GoalSmartSection goal={goal} rootId={rootId} goalId={goalId} showMedia={!readOnly && mode !== 'create'} />
 
             {/* Associated Programs */}
             {programs && (() => {

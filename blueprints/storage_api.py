@@ -189,6 +189,14 @@ def delete_media(current_user, root_id, asset_id):
     return execute(lambda db: jsonify(MediaService(db).delete_from_storage(root_id, current_user.id, asset_id)))
 
 
+@storage_bp.get('/<root_id>/media/<asset_id>/open')
+@token_required
+@limiter.limit('60 per minute')
+def open_in_provider(current_user, root_id, asset_id):
+    # Cookie-authenticated link from the attachment caption; redirects to a fixed provider host.
+    return execute(lambda db: redirect(MediaService(db).web_url(root_id, current_user.id, asset_id), code=302))
+
+
 @storage_bp.get('/<root_id>/media/<asset_id>/content')
 @token_required
 @limiter.limit('120 per minute')

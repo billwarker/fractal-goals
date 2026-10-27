@@ -59,8 +59,10 @@ def test_goal_attachments_reject_foreign_or_disconnected_assets(setup):
 
 def test_description_media_is_playable_until_the_goal_is_deleted(setup):
     media = MediaService(setup.db)
+    # Before the goal is saved, the owner can preview the upload in the description editor.
+    assert media.playable_asset(setup.root.id, setup.user.id, setup.asset.id).id == setup.asset.id
     with pytest.raises(StorageError):
-        media.playable_asset(setup.root.id, setup.user.id, setup.asset.id)
+        media.playable_asset(setup.root.id, 'someone-else', setup.asset.id)
     attach(setup, [{'asset_id': setup.asset.id}])
     assert media.playable_asset(setup.root.id, setup.user.id, setup.asset.id).id == setup.asset.id
     with pytest.raises(StorageError):

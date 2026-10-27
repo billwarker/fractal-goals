@@ -396,7 +396,7 @@ connections retain encrypted credentials; originals stay in the provider. Notes 
 media assets through `note_attachments`; goal notes/reviews/completion notes, sessions and activities reuse that
 store. Goal descriptions link through `goal_attachments`, read on demand (`GET …/goals/<id>/attachments`,
 `hooks/useGoalDescriptionAttachments.js`) so goal trees never load them, and saved with the goal update
-(`attachments`). Media is playable while attached to a live note or a live goal. Text fields outside quick
+(`attachments`). Media is playable, to its owner only, while attached to a live note or a live goal, or while not attached to anything yet (previews before saving). Text fields outside quick
 bars use `notes/AttachableField` (paperclip menu, paste, drop, compact chips). OAuth combines single-use PKCE state with a dedicated browser-bound Lax callback cookie;
 the main production auth cookie stays Strict. Shared note cards render `NoteMedia` / `MediaAttachment`. `hooks/useAttachmentDraft.js` owns a
 note's draft attachments: device files, pasted and dropped pictures upload through `utils/cloudUpload.js`

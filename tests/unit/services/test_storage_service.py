@@ -124,8 +124,10 @@ def test_duplicate_attachment_rejected(storage):
 
 def test_note_save_replace_and_soft_delete_gate_playback(storage):
     asset = import_asset(storage)
+    # Not attached yet: its owner can preview it (e.g. before saving the note); nobody else can.
+    assert MediaService(storage.db).playable_asset(storage.root.id, storage.user.id, asset['id']).id == asset['id']
     with pytest.raises(StorageError):
-        MediaService(storage.db).playable_asset(storage.root.id, storage.user.id, asset['id'])
+        MediaService(storage.db).playable_asset(storage.root.id, 'someone-else', asset['id'])
     payload, error, _ = create_note(storage, [{'asset_id': asset['id'], 'alt_text': 'First practice'}])
     assert error is None
     assert payload['attachments'][0]['alt_text'] == 'First practice'
@@ -340,7 +342,6 @@ def test_http_routes_validate_body_and_media_auth(storage, authed_client):
     imported = authed_client.post(f'/api/{root}/media', json={'provider': 'google_drive', 'file_id': 'file-123'})
     assert imported.status_code == 201
     asset = imported.get_json()
-    assert authed_client.get(f'/api/{root}/media/{asset["id"]}/content').status_code == 404
     created = authed_client.post(f'/api/{root}/notes', json={
         'content': 'HTTP evidence', 'context_type': 'root', 'context_id': root,
         'attachments': [{'asset_id': asset['id'], 'alt_text': 'Practice'}],
@@ -350,6 +351,10 @@ def test_http_routes_validate_body_and_media_auth(storage, authed_client):
     assert note['attachments'][0]['alt_text'] == 'Practice'
     updated = authed_client.put(f'/api/{root}/notes/{note["id"]}', json={'attachments': []})
     assert updated.status_code == 200 and updated.get_json()['attachments'] == []
+    # Media whose only note was deleted is no longer served.
+    attached = authed_client.put(f'/api/{root}/notes/{note["id"]}', json={'attachments': [{'asset_id': asset['id']}]})
+    assert attached.status_code == 200
+    assert authed_client.delete(f'/api/{root}/notes/{note["id"]}').status_code in (200, 204)
     assert authed_client.get(f'/api/{root}/media/{asset["id"]}/content').status_code == 404
 
 
