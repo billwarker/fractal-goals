@@ -293,6 +293,7 @@ const SessionSection = ({
                             <CircuitRunCard
                                 key={`circuit:${run.id}`}
                                 activityGoalScope={activityGoalScope}
+                                activityGroups={activityGroups}
                                 rootId={rootId}
                                 sessionId={sessionId}
                                 run={run}

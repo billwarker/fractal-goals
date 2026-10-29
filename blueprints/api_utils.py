@@ -53,6 +53,11 @@ def parse_optional_pagination(req, *, max_limit: int = 200):
     return limit_val, offset_val
 
 
+def error_body(error):
+    """Coded domain errors are already a body ({error, code, ...}); plain messages are wrapped."""
+    return error if isinstance(error, dict) else {"error": error}
+
+
 def service_response(payload, error, status):
     if error:
         body = {"error": error}

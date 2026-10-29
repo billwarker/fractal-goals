@@ -1,0 +1,27 @@
+.icons {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.icon,
+.more {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--border-radius-sm);
+}
+
+.icon:focus-visible,
+.more:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.more {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}

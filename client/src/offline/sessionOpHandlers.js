@@ -379,7 +379,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
                     queryKeys.goals(op.meta.rootId),
                     queryKeys.goalTimelinesRoot(op.meta.rootId),
                     queryKeys.goalConditionRoot(op.meta.rootId),
-                    queryKeys.goalAnalytics(op.meta.rootId),
+                    queryKeys.goalAnalytics(op.meta.rootId), queryKeys.goalInstanceLinksRoot(op.meta.rootId),
                 ]);
                 break;
             case SESSION_OP.QUICK_COMPLETE:

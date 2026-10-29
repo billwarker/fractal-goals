@@ -11,9 +11,9 @@ import GroupBuilderModal from '../modals/GroupBuilderModal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import { buildActivityPayload } from '../../utils/activityBuilder';
-import { getGroupBreadcrumb, sortGroupsTreeOrder } from '../../utils/manageActivities';
 import styles from '../ActivityBuilder.module.css';
 import ActivityAssociationsField from './ActivityAssociationsField';
+import ActivityGroupField, { useActivityGroupChoice } from './ActivityGroupField';
 import ActivityMetricsSection from './ActivityMetricsSection';
 import ActivitySplitsSection from './ActivitySplitsSection';
 import {
@@ -35,9 +35,9 @@ function ActivityBuilderForm({
     getGoalColor,
     getGoalIcon,
     onNameChange,
-    initialSelectedGoalIds = [], nestedModalLayer = 'default',
+    initialSelectedGoalIds = [], initialGroup = null, nestedModalLayer = 'default',
 }) {
-    const initialState = getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds);
+    const initialState = getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds, initialGroup?.id);
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
     const [pendingSubmission, setPendingSubmission] = useState(null);
@@ -52,7 +52,7 @@ function ActivityBuilderForm({
     const [hasMetrics, setHasMetrics] = useState(initialState.hasMetrics);
     const [hasSplits, setHasSplits] = useState(initialState.hasSplits);
     const [splits, setSplits] = useState(initialState.splits);
-    const [groupId, setGroupId] = useState(initialState.groupId);
+    const { groupId, scopeGoalName, setGroupId } = useActivityGroupChoice(initialState.groupId, initialGroup, activityGroups);
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [trackProgress, setTrackProgress] = useState(initialState.trackProgress);
     const [deltaDisplayMode, setDeltaDisplayMode] = useState(initialState.deltaDisplayMode);
@@ -305,22 +305,12 @@ function ActivityBuilderForm({
                         />
                     </div>
 
-                    <div>
-                        <Select
-                            label="Activity Group"
-                            value={groupId}
-                            onChange={handleGroupChange}
-                            fullWidth
-                        >
-                            <option value="">(No Group)</option>
-                            {sortGroupsTreeOrder(activityGroups || []).map((group) => (
-                                <option key={group.id} value={group.id}>
-                                    {getGroupBreadcrumb(group.id, activityGroups)}
-                                </option>
-                            ))}
-                            <option value="__create__">+ Create new activity group…</option>
-                        </Select>
-                    </div>
+                    <ActivityGroupField
+                        activityGroups={activityGroups}
+                        groupId={groupId}
+                        scopeGoalName={scopeGoalName}
+                        onChange={handleGroupChange}
+                    />
 
                     <ActivityAssociationsField
                         allGoals={allGoals}

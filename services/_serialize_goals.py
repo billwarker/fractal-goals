@@ -108,6 +108,8 @@ def serialize_goal(goal, include_children=True):
         "started_at": format_utc(getattr(goal, 'started_at', None)),
         "sequence_track_id": getattr(goal, 'sequence_track_id', None),
         "sequence_position": getattr(goal, 'sequence_position', None),
+        # A goal has at most one live activity group (services/goal_activity_group_links.py).
+        "activity_group_id": goal.associated_activity_groups[0].id if goal.associated_activity_groups else None,
         # Fields that exist nowhere else on the payload. Top-level fields are
         # canonical and are no longer duplicated here.
         "attributes": {

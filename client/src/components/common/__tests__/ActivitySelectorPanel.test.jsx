@@ -292,3 +292,29 @@ describe('ActivitySelectorPanel', () => {
         });
     });
 });
+
+describe('ActivitySelectorPanel one-off links', () => {
+    it('marks activities that are in scope only through one-off instance links', () => {
+        render(
+            <ActivitySelectorPanel
+                activities={[
+                    { id: 'catalog', name: 'Practice Octave Shapes', group_id: null },
+                    { id: 'linked', name: 'Intro Melody', group_id: null },
+                ]}
+                activityGroups={[]}
+                onClose={vi.fn()}
+                onSelectActivity={vi.fn()}
+                activityGoalScope={{
+                    goal: { id: 'goal', name: 'Head Over Heels' },
+                    activityIds: ['catalog', 'linked'],
+                    instanceLinkedIds: new Set(['linked']),
+                    onClear: vi.fn(),
+                }}
+            />,
+        );
+        const chips = screen.getAllByText('One-off link');
+        expect(chips).toHaveLength(1);
+        expect(chips[0].closest('button')).toHaveTextContent('Intro Melody');
+        expect(chips[0]).toHaveAttribute('title', expect.stringContaining('linked to Head Over Heels'));
+    });
+});

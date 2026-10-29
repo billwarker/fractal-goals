@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import ActivityAssociator from '../ActivityAssociator';
 
@@ -277,5 +277,108 @@ describe('ActivityAssociator', () => {
         ).toBeTruthy();
         expect(screen.queryByText('Already Linked Exercise')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: '+' })).toBeInTheDocument();
+    });
+
+    describe('one activity group per goal', () => {
+        const groups = [
+            { id: 'group-a', name: 'Songs', parent_id: null, sort_order: 1 },
+            { id: 'group-b', name: 'Scales', parent_id: null, sort_order: 2 },
+        ];
+        const definitions = [
+            { id: 'song-1', name: 'Head Over Heels', group_id: 'group-a' },
+            { id: 'scale-1', name: 'Major Scale', group_id: 'group-b' },
+        ];
+        const linkedSong = { id: 'song-1', name: 'Head Over Heels', group_id: 'group-a', from_linked_group: true };
+
+        const chooseGroup = async (name) => {
+            fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
+            await screen.findByText('Available Activities & Groups');
+            const row = screen.getAllByText(name)
+                .map((node) => node.closest('button')?.parentElement)
+                .find((element) => element && within(element).queryByRole('button', { name: 'Link Group' }));
+            fireEvent.click(within(row).getByRole('button', { name: 'Link Group' }));
+            fireEvent.click(screen.getByRole('button', { name: /Add Selected/ }));
+        };
+
+        it('asks before replacing the current group and unlinks its activities on confirm', async () => {
+            const onSave = vi.fn(() => Promise.resolve());
+            render(
+                <ActivityAssociatorHarness
+                    initialActivities={[linkedSong]}
+                    initialGroups={[groups[0]]}
+                    activityDefinitions={definitions}
+                    activityGroups={groups}
+                    onSave={onSave}
+                />
+            );
+            await chooseGroup('Scales');
+
+            expect(await screen.findByRole('heading', { name: 'Replace Activity Group?' })).toBeInTheDocument();
+            // Picked activities persist at once; the group is still the old one.
+            expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[0]]);
+
+            expect(onSave.mock.calls.at(-1)[0].map((activity) => activity.id)).toEqual(['song-1']);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Replace Group' }));
+            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
+            const [savedActivities] = onSave.mock.calls.at(-1);
+            expect(savedActivities.map((activity) => activity.id)).toEqual(['scale-1']);
+        });
+
+        it('keeps the current group when the replacement is declined', async () => {
+            const onSave = vi.fn(() => Promise.resolve());
+            render(
+                <ActivityAssociatorHarness
+                    initialActivities={[linkedSong]}
+                    initialGroups={[groups[0]]}
+                    activityDefinitions={definitions}
+                    activityGroups={groups}
+                    onSave={onSave}
+                />
+            );
+            await chooseGroup('Scales');
+            fireEvent.click(await screen.findByRole('button', { name: 'Keep Current Group' }));
+            await waitFor(() => expect(screen.queryByRole('heading', { name: 'Replace Activity Group?' })).not.toBeInTheDocument());
+            expect(onSave.mock.calls.every(([, savedGroups]) => savedGroups.length === 1 && savedGroups[0].id === 'group-a')).toBe(true);
+            // The declined group's activities were never linked on their own.
+            expect(onSave.mock.calls.every(([savedActivities]) => !savedActivities.some((activity) => activity.id === 'scale-1'))).toBe(true);
+        });
+
+        it('lets the picker hold one group at a time', async () => {
+            const onSave = vi.fn(() => Promise.resolve());
+            render(
+                <ActivityAssociatorHarness
+                    initialActivities={[]}
+                    activityDefinitions={definitions}
+                    activityGroups={groups}
+                    onSave={onSave}
+                />
+            );
+            fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
+            await screen.findByText('Available Activities & Groups');
+            const [songs, scales] = screen.getAllByRole('button', { name: 'Link Group' });
+            fireEvent.click(songs);
+            fireEvent.click(scales);
+            expect(screen.getAllByRole('button', { name: /Linked/ })).toHaveLength(1);
+            fireEvent.click(screen.getByRole('button', { name: /Add Selected/ }));
+            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
+            const [savedActivities] = onSave.mock.calls.at(-1);
+            expect(savedActivities.map((activity) => activity.id)).toEqual(['scale-1']);
+        });
+
+        it('links a first group without asking', async () => {
+            const onSave = vi.fn(() => Promise.resolve());
+            render(
+                <ActivityAssociatorHarness
+                    initialActivities={[]}
+                    activityDefinitions={definitions}
+                    activityGroups={groups}
+                    onSave={onSave}
+                />
+            );
+            await chooseGroup('Scales');
+            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
+            expect(screen.queryByRole('heading', { name: 'Replace Activity Group?' })).not.toBeInTheDocument();
+        });
     });
 });

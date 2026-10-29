@@ -46,13 +46,17 @@ export const fractalGoalsApi = {
     getGoalAnalytics: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/goals/analytics${buildQueryString(options)}`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),
+    // Definitions whose instances were linked one-off to the goal or a descendant (never catalog links).
+    getGoalInstanceLinkedActivities: (rootId, goalId) =>
+        axios.get(`${API_BASE}/${rootId}/goals/${goalId}/instance-linked-activities`),
     getGoalActivityHeatmap: (rootId, goalId, { includeChildren = true, timezone = 'UTC', date = null, view = 'calendar', metric = 'activities', cursor = null, limit = 20 } = {}) =>
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-heatmap`, {
             params: { include_children: includeChildren, timezone, ...(date ? { date } : {}), ...(view === 'entries' ? { view, metric, limit, ...(cursor ? { cursor } : {}) } : {}) },
         }),
     getGoalMetrics: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics`),
-    linkGoalActivityGroup: (rootId, goalId, groupId) =>
-        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
+    // A goal has one activity group: another one returns 409 goal_activity_group_taken unless `replace`.
+    linkGoalActivityGroup: (rootId, goalId, groupId, { replace = false } = {}) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`, replace ? { replace: true } : undefined),
     unlinkGoalActivityGroup: (rootId, goalId, groupId) =>
         axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     setGoalAssociationsBatch: (rootId, goalId, data) =>

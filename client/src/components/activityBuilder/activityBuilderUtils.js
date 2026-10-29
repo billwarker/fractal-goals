@@ -117,7 +117,7 @@ function mergeGoalIds(...goalIdLists) {
     ));
 }
 
-function getBlankActivityBuilderState(initialSelectedGoalIds = []) {
+function getBlankActivityBuilderState(initialSelectedGoalIds = [], initialGroupId = null) {
     return {
         name: '',
         description: '',
@@ -126,15 +126,19 @@ function getBlankActivityBuilderState(initialSelectedGoalIds = []) {
         hasMetrics: true,
         hasSplits: false,
         splits: DEFAULT_SPLITS,
-        groupId: '',
+        groupId: initialGroupId ? String(initialGroupId) : '',
         selectedGoalIds: mergeGoalIds(initialSelectedGoalIds),
         trackProgress: true,
         deltaDisplayMode: null,
     };
 }
 
-export function getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds = []) {
-    const blankState = getBlankActivityBuilderState(initialSelectedGoalIds);
+/**
+ * `initialGroupId` (the scoped goal's group) seeds blank creates and id-less seeds without a group
+ * of their own; a copy keeps its group, and editing an existing definition never applies it.
+ */
+export function getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds = [], initialGroupId = null) {
+    const blankState = getBlankActivityBuilderState(initialSelectedGoalIds, initialGroupId);
     if (!editingActivity) {
         return blankState;
     }
@@ -166,7 +170,7 @@ export function getInitialActivityBuilderState(editingActivity, initialSelectedG
         splits: splitDefinitions.length > 0
             ? splitDefinitions.map((split) => ({ id: split.id, name: split.name }))
             : DEFAULT_SPLITS,
-        groupId: editingActivity.group_id || '',
+        groupId: editingActivity.group_id || (isNewDefinition ? blankState.groupId : ''),
         selectedGoalIds: mergeGoalIds(editingActivity.associated_goal_ids, initialSelectedGoalIds),
         trackProgress: editingActivity.track_progress !== false,
         deltaDisplayMode: editingActivity.delta_display_mode || null,

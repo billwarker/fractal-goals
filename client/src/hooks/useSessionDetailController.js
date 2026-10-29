@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../contexts/ActiveSessionContext';
+import { buildGoalScopeActivityIds, collectGoalScopeIds } from '../utils/sessionActivityScope';
 import { useActiveSession } from './useSessionQueries';
 import { useActivityTagCatalog } from './useActivityTagCatalog';
-import { useGoalActivities } from './useGoalQueries';
+import { useGoalActivities, useGoalInstanceLinkedActivities } from './useGoalQueries';
 import useSessionOptionsMutations from './useSessionOptionsMutations';
 import { useSessionDetailGoalAssociations } from './useSessionDetailGoalAssociations';
 import useSessionDetailNotes from './useSessionDetailNotes';
@@ -50,6 +51,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         showBuilder,
         builderActivity,
         builderInitialGoalIds,
+        builderInitialGroup,
         selectedGoal,
         setSelectedGoal,
         selectedActivity: selectedActivityDraft,
@@ -86,18 +88,31 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         isError: isGoalScopeError,
         refetch: retryGoalScope,
     } = useGoalActivities(rootId, scopedGoal?.id);
+    // One-off links widen only the picker; a failed read degrades to the catalog alone.
+    const { data: instanceLinkedActivities = [] } = useGoalInstanceLinkedActivities(rootId, scopedGoal?.id);
+    const sessionGoalTree = sessionGoalsView?.goal_tree;
 
     const activityGoalScope = useMemo(() => {
         if (!scopedGoal) return null;
+        const { activityIds, instanceLinkedIds } = buildGoalScopeActivityIds({
+            catalogActivities: scopedGoalActivities,
+            instanceLinkedActivities,
+            sessionInstances: activityInstances,
+            scopeGoalIds: collectGoalScopeIds(sessionGoalTree, scopedGoal.id),
+        });
         return {
             goal: scopedGoal,
-            activityIds: scopedGoalActivities.map((activity) => String(activity.id)),
+            activityIds,
+            instanceLinkedIds,
             isLoading: isGoalScopeLoading,
             isError: isGoalScopeError,
             onRetry: retryGoalScope,
             onClear: clearGoalScope,
         };
-    }, [clearGoalScope, isGoalScopeError, isGoalScopeLoading, retryGoalScope, scopedGoal, scopedGoalActivities]);
+    }, [
+        activityInstances, clearGoalScope, instanceLinkedActivities, isGoalScopeError, isGoalScopeLoading,
+        retryGoalScope, scopedGoal, scopedGoalActivities, sessionGoalTree,
+    ]);
 
     const {
         allAvailableGoals,
@@ -203,6 +218,7 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         showBuilder,
         builderActivity,
         builderInitialGoalIds,
+        builderInitialGroup,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,

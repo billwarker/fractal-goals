@@ -78,7 +78,12 @@ goal_activity_group_associations = Table(
     Column('created_at', DateTime, default=utc_now),
     Column('deleted_at', DateTime, nullable=True),
     # Reverse lookup; the composite primary key leads with the other column.
-    sa.Index('ix_goal_activity_group_associations_activity_group_id', 'activity_group_id')
+    sa.Index('ix_goal_activity_group_associations_activity_group_id', 'activity_group_id'),
+    # A goal links at most one live activity group (services/goal_activity_group_links.py).
+    sa.Index(
+        'uq_goal_activity_group_associations_one_active', 'goal_id',
+        unique=True, postgresql_where=sa.text('deleted_at IS NULL'),
+    ),
 )
 
 # Junction table for linking Session Templates to Goals
@@ -252,15 +257,24 @@ class Goal(Base):
         viewonly=True
     )
     completed_session = relationship("Session", foreign_keys=[completed_session_id])
+    # Live links only: removed link rows and deleted groups never read as associations.
     associated_activities = relationship(
         "ActivityDefinition",
         secondary=activity_goal_associations,
+        primaryjoin="and_(Goal.id == activity_goal_associations.c.goal_id, "
+                    "activity_goal_associations.c.deleted_at.is_(None))",
+        secondaryjoin="ActivityDefinition.id == activity_goal_associations.c.activity_id",
         back_populates="associated_goals",
         viewonly=True
     )
+    # At most one live group (uq_goal_activity_group_associations_one_active); a list for loaders.
     associated_activity_groups = relationship(
         "ActivityGroup",
         secondary=goal_activity_group_associations,
+        primaryjoin="and_(Goal.id == goal_activity_group_associations.c.goal_id, "
+                    "goal_activity_group_associations.c.deleted_at.is_(None))",
+        secondaryjoin="and_(ActivityGroup.id == goal_activity_group_associations.c.activity_group_id, "
+                      "ActivityGroup.deleted_at.is_(None))",
         back_populates="associated_goals",
         viewonly=True
     )

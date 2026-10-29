@@ -59,6 +59,9 @@ class ActivityGroup(Base):
     associated_goals = relationship(
         "Goal",
         secondary="goal_activity_group_associations",
+        primaryjoin="and_(ActivityGroup.id == goal_activity_group_associations.c.activity_group_id, "
+                    "goal_activity_group_associations.c.deleted_at.is_(None))",
+        secondaryjoin="and_(Goal.id == goal_activity_group_associations.c.goal_id, Goal.deleted_at.is_(None))",
         back_populates="associated_activity_groups",
         viewonly=True
     )
@@ -95,6 +98,9 @@ class ActivityDefinition(Base):
     associated_goals = relationship(
         "Goal",
         secondary="activity_goal_associations",
+        primaryjoin="and_(ActivityDefinition.id == activity_goal_associations.c.activity_id, "
+                    "activity_goal_associations.c.deleted_at.is_(None))",
+        secondaryjoin="Goal.id == activity_goal_associations.c.goal_id",
         back_populates="associated_activities",
         viewonly=True
     )

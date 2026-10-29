@@ -10,6 +10,7 @@ import {
     isActivityPickerEmpty,
     resolveActivityPickerBrowseState,
     toSelectionSet,
+    toggleGroupSelection,
 } from './activityPickerUtils';
 import styles from './ActivityPicker.module.css';
 
@@ -29,6 +30,8 @@ function ActivityPicker({
     initialBrowseGroupId = null,
     allowActivitySelection = true,
     allowGroupSelection = false,
+    // Choosing a group replaces any other chosen group (a goal has one activity group).
+    singleGroupSelection = false,
     allowCreateActivity = false,
     allowCopyActivity = false,
     allowCreateGroup = false,
@@ -136,18 +139,13 @@ function ActivityPicker({
 
     const toggleGroup = (group) => {
         if (!allowGroupSelection || !group?.id) return;
-
-        const nextGroupIds = new Set(pendingGroupIds);
-        const nextActivityIds = new Set(pendingActivityIds);
-        const groupActivityIds = model.getActivityIdsForGroup(group.id);
-
-        if (nextGroupIds.has(group.id)) {
-            nextGroupIds.delete(group.id);
-            groupActivityIds.forEach((activityId) => nextActivityIds.delete(activityId));
-        } else {
-            nextGroupIds.add(group.id);
-            groupActivityIds.forEach((activityId) => nextActivityIds.add(activityId));
-        }
+        const { groupIds: nextGroupIds, activityIds: nextActivityIds } = toggleGroupSelection({
+            groupIds: pendingGroupIds,
+            activityIds: pendingActivityIds,
+            groupId: group.id,
+            getActivityIdsForGroup: model.getActivityIdsForGroup,
+            single: singleGroupSelection,
+        });
 
         setPendingGroupIds(nextGroupIds);
         setPendingActivityIds(nextActivityIds);

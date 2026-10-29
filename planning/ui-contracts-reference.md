@@ -264,10 +264,28 @@ is selected and a goal is scoped. Circuit run/round selection does not expose me
 Action and association explanations appear in a hover/focus tooltip. The icon shows the hierarchy's scoped
 ring only when the instance is directly associated with the current scoped goal. It sits in the
 activity header beside the pencil/options controls, sharing their 28px button and 14px symbol
-sizing. Circuit member controls also live in their headers. Linked buttons retain the neutral
+sizing. Circuit member controls sit beside the member name. Linked buttons retain the neutral
 background/border styling and expose their association through the ring and accessible pressed state.
 `useActivityInstanceGoalAssociation` owns
 cache updates and evidence invalidation. Duplication starts with no one-off links.
+
+Every one-off link is also shown, read-only, on the card's meta line after "Group • Avg": a 12px
+goal icon per linked goal (`InstanceLinkedGoalIcons`, goals resolved from the cached fractal tree),
+whatever the selection or scope, with a "Linked to <goal> (this instance only)" tooltip and `+N` past
+four. Circuit members match instance cards: their name carries the scoped link button and the tag control
+(sets included) beside it, and
+the meta line under it shows the activity group breadcrumb, then the linked goal icons. While a goal is scoped, the add-activity
+picker also offers definitions whose instances were linked to that goal or a descendant, from any
+session (`GET …/goals/<id>/instance-linked-activities`, unioned with this session's linked instances
+so offline links show at once); those not otherwise associated carry a plain "One-off link" chip.
+Creating a definition while scoped also preselects the scoped goal's activity group, named under the
+Activity Group field ("From <goal>'s activity group") until the user picks another; a copy keeps its
+own group, and a deleted seeded group reads as no group.
+
+A goal has at most one activity group. The goal-detail picker holds one group at a time, and choosing
+a different group asks "Replace Activity Group?" before unlinking the old one and its linked
+activities. The group editor's goal list reports goals already in another group and offers to move
+them or to keep their groups (linking only the free goals).
 
 ## Plan editors and planned-value hints
 

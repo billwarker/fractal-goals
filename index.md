@@ -155,12 +155,26 @@ reconciles affected goal conditions in the same transaction. The additive `activ
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
+A goal links at most one live activity group (partial unique index
+`uq_goal_activity_group_associations_one_active`; migration `a7c9e1b3d5f7` refuses to run while any goal
+holds several, listed by `scripts/report_multi_group_goals.py`). Every goal↔group write goes through
+`services/goal_activity_group_links.py`, which locks the root, returns 409 `goal_activity_group_taken`
+(with the current group or a `conflicts` list) unless `replace`, rejects a batch naming two real groups
+(422 `goal_activity_group_single`), and reconciles affected activity-threshold goals and ancestors in
+the same transaction. Goal payloads carry the canonical top-level `activity_group_id`
+(`getGoalNodeActivityGroupId`); association relationships ignore removed link rows and deleted groups.
+Goal↔group routes live in `blueprints/goal_activity_groups_api.py`.
+
 Session Detail exposes reversible one-off links on actual activity instances (including circuit
 members and completed sessions) through the scoped goal's icon, only when that instance is selected
-and a goal is scoped. `useActivityInstanceGoalAssociation` owns cache updates and evidence
-invalidation; duplication starts with no one-off links. Interaction details:
+and a goal is scoped; each link's goal icon is always shown on the card's meta line. While scoped, the
+add-activity picker unions the goal's catalog with definitions linked one-off to the goal or a
+descendant (`load_instance_linked_activities`, bounded, never the reusable catalog), and new
+definitions are seeded with the scoped goal and its group. `useActivityInstanceGoalAssociation` owns
+cache updates and evidence invalidation; duplication starts with no one-off links. Interaction details:
 [UI behaviour contracts](planning/ui-contracts-reference.md#session-detail-one-off-goal-links) and
-[Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md).
+[Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md) and
+[Scoped-goal group prefill and one-off link visibility](planning/scoped-goal-group-prefill-and-instance-link-visibility.md).
 
 ### Sessions, activities, and progress
 
@@ -384,7 +398,9 @@ AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageF
 holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
 saved-filter toggles and the remaining controls; active conditions show as badges beside the note count.
 Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
-a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
+a tenant-governed semantic catalog with structured queries and a raw SQL execution path. The
+October 28 audit confirmed that raw SQL can escape catalog tenant scopes; production release
+requires closing that boundary (see the current security audit under Testing and quality). Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;
 keep that correlation to avoid quadratic joins when tenant statistics lag behind history imports.
@@ -561,6 +577,9 @@ The current backlog assessment and item-level evidence live in
 [Backlog Quality Audit — September 2026](planning/backlog-quality-audit-2026-09.md).
 The broader production assessment, release-gate gaps, and test-speed evidence are in
 [Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
+The current code-quality and security assessment, confirmed analytics isolation defects,
+and ordered production-hardening plan are in
+[Code Quality and Security Audit — October 28, 2026](planning/code-quality-security-audit-2026-10-28.md).
 Read-path query and payload budgets for a power-user-sized account live in
 `tests/performance/test_power_account_budgets.py`; the performance pass that introduced them is in
 [Performance Pass — September 2026](planning/performance-pass-2026-09.md).

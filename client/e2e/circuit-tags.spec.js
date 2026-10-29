@@ -54,5 +54,15 @@ test('circuit and round tags use activity chips and the shared catalog', async (
     const matches = (await catalog.json()).tags.filter((item) => item.name === 'Shared strength');
     expect(matches).toHaveLength(1);
     expect(matches[0].id).toBe(tag.id);
+    // Member tags sit after the activity name, like an activity instance's.
+    await page.locator('[data-circuit-member-id]').first().click();
+    const memberName = page.locator('[data-circuit-member-id]').first().getByText('Circuit member', { exact: true });
+    const addTag = page.locator('[data-circuit-member-id]').first().getByRole('button', { name: 'Add tag' });
+    await expect(addTag).toBeVisible();
+    const [nameBox, tagBox] = [await memberName.boundingBox(), await addTag.boundingBox()];
+    expect(tagBox.x).toBeGreaterThan(nameBox.x + nameBox.width - 1);
+    expect(tagBox.x - (nameBox.x + nameBox.width)).toBeLessThan(24);
+    expect(Math.abs((tagBox.y + tagBox.height / 2) - (nameBox.y + nameBox.height / 2))).toBeLessThan(tagBox.height);
+    await page.screenshot({ path: testInfo.outputPath('circuit-member-tags.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
 });

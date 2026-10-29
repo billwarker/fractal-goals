@@ -75,3 +75,11 @@ describe('one-off goal control', () => {
         expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
 });
+describe('one-off goal control explanation', () => {
+    it('does not claim a definition link when the definition is in scope only through one-off links', () => {
+        setup({ scope: { ...scope, activityIds: ['definition'], instanceLinkedIds: new Set(['definition']) } });
+        fireEvent.focus(screen.getByRole('button', { name: 'Associate with Practice' }));
+        expect(screen.getByRole('tooltip')).toHaveTextContent('Associate with Practice. This instance only.');
+        expect(screen.getByRole('tooltip')).not.toHaveTextContent('Definition or group links also apply');
+    });
+});

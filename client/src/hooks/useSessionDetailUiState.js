@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { getGoalNodeActivityGroupId } from '../utils/goalNodeModel';
+
 export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivity, setSidePaneMode }) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
     const [builderActivity, setBuilderActivity] = useState(null);
     const [builderInitialGoalIds, setBuilderInitialGoalIds] = useState([]);
+    const [builderInitialGroup, setBuilderInitialGroup] = useState(null);
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -42,7 +45,11 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         const editingExistingDefinition = options.mode === 'edit' && activityDefinition?.id;
         setSectionForNewActivity(editingExistingDefinition ? null : sectionIndex);
         setBuilderActivity(activityDefinition);
-        setBuilderInitialGoalIds(!editingExistingDefinition && scopedGoal?.id ? [String(scopedGoal.id)] : []);
+        const seedFromScope = !editingExistingDefinition && Boolean(scopedGoal?.id);
+        setBuilderInitialGoalIds(seedFromScope ? [String(scopedGoal.id)] : []);
+        // New definitions join the scoped goal's activity group (a goal has at most one).
+        const scopedGroupId = seedFromScope ? getGoalNodeActivityGroupId(scopedGoal) : null;
+        setBuilderInitialGroup(scopedGroupId ? { id: String(scopedGroupId), goalName: scopedGoal.name } : null);
         setShowBuilder(true);
     };
 
@@ -88,6 +95,7 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         showBuilder,
         builderActivity,
         builderInitialGoalIds,
+        builderInitialGroup,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,

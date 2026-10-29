@@ -422,6 +422,7 @@ def main():
                     ("circuit-tags", "Circuit Tags"),
                     ("session-width", "Session Width"),
                     ("associations", "Associations"),
+                    ("scoped-groups", "Scoped Groups"),
                     ("quick-session", "Quick Session"),
                     ("ai", "AI"),
                     ("offline-quick", "Offline Quick"),
