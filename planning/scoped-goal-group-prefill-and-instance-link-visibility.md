@@ -246,3 +246,24 @@ The other two are a history-scaling timing test, which passes when run alone, an
 The feature is **S** for this scope. The invariant is enforced at the database, the service and the UI. Every write
 path shares one helper. Migration and failure modes are explicit, and coverage spans unit, integration, browser and
 performance tests. The repository is not S+ yet: the three pre-existing backend failures above need their own fixes.
+
+## Follow-up — live session Activity clock (2026-10-28)
+
+The side pane's "Activity" duration now shows the sum of the session's activity and circuit item
+durations, plus the elapsed time of any timer still running. It ticks each second only while
+something runs and the session isn't paused, and a paused session holds it still. It is computed
+from the instances themselves, so a reset or an edited duration shows at once.
+
+`utils/sessionTime.js` owns the one live-seconds rule: `liveInstanceSeconds` (elapsed time minus
+the instance's own pauses and the session's current pause) and `liveCircuitSeconds`. The instance
+card, the circuit timer and `hooks/useLiveActivityDuration.js` all use it.
+
+Verification: unit tests for the live rule and for live sums, panel tests for ticking and pause,
+and the desktop and mobile Playwright spec `e2e/activity-duration-clock.spec.js` (the clock starts
+with the timer, keeps rising, and returns to "—" on reset) all pass, along with the full frontend
+suite, zero-warning lint and the maintainability audit.
+
+Ticks are synchronized: `hooks/useSecondTicker.js` is one shared one-second clock
+(`useSyncExternalStore`, one interval while anything subscribes). Activity cards, circuit timers
+and the Activity total all read the same `nowMs` on the same tick. The browser spec checks that,
+with one running activity, the card's duration and the total are equal across eight samples.

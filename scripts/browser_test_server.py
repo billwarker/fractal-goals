@@ -423,6 +423,7 @@ def main():
                     ("session-width", "Session Width"),
                     ("associations", "Associations"),
                     ("scoped-groups", "Scoped Groups"),
+                    ("activity-clock", "Activity Clock"),
                     ("quick-session", "Quick Session"),
                     ("ai", "AI"),
                     ("offline-quick", "Offline Quick"),

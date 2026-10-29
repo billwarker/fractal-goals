@@ -237,6 +237,11 @@ start/complete and completion writes accept `occurred_at` (the user's action tim
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
 
+Session Detail's "Activity" duration is live: the session's item durations plus any running activity or
+circuit timer, by the one rule in `utils/sessionTime.js` (`liveInstanceSeconds`, `liveCircuitSeconds`)
+that instance cards and circuit timers also use (`hooks/useLiveActivityDuration.js`). All of them tick on
+one shared clock, `hooks/useSecondTicker.js`, so they change together.
+
 Session Detail's main mobile workspace uses full-width hierarchy bands with depth-independent
 insets, three-column name/value/unit rows with progress hints underneath, and one mobile
 Start/Stop/Duration row; circuit names align left and selection perimeters paint above
