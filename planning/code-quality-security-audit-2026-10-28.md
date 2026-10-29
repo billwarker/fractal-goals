@@ -2,6 +2,16 @@
 
 ## Decision
 
+**Independent review — October 29:** the original direct table-read exploit is blocked and the
+focused remediation checks pass, but security closure is not complete. Function namespace and
+nested cast validation gaps, unbounded SQL result bytes, an inventory false negative and a
+monitoring/CSP compatibility issue were independently reproduced. The grades and code-ready
+claim below record the remediation's earlier assessment; the current grades and disposition
+are in [Independent remediation review](remediation-independent-review-2026-10-29.md).
+**Round 2 (October 29)** closed R1–R4 and N1/N2 in code and added in-repo release gates for F8;
+see that review's "Round 2 remediation" section. F9, F10, and live verification of the F8 gates
+remain.
+
 **Original decision (morning of October 28): release blocked.** An authenticated analytics
 endpoint could read outside the tenant-scoped catalog. An isolated API probe returned another
 synthetic user's password hash, and the raw SQL path did not make its transaction read-only.

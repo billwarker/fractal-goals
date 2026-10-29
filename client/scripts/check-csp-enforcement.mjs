@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Prove the production nginx image's CSP in a real browser: the delivered shell
-// boots without violations, while injected inline and foreign-origin script are
-// blocked. (Playwright's evaluate runs through DevTools, which CSP exempts from
+// boots without violations, injected inline and foreign-origin script are blocked,
+// and the monitoring path (same-origin replay worker, Sentry ingest) stays allowed. (Playwright's evaluate runs through DevTools, which CSP exempts from
 // eval checks, so the absence of 'unsafe-eval' is asserted by
 // scripts/check_frontend_headers.py instead.)
 // Usage: node scripts/check-csp-enforcement.mjs [image]
@@ -79,7 +79,44 @@ try {
     if (!blockedForeign || !blockedInline) {
         throw new Error(`Expected inline and foreign script violations, saw ${JSON.stringify(violations)}`);
     }
-    console.log('CSP enforcement passed: shell boots cleanly; inline and foreign script are blocked');
+
+    // Monitoring path: the replay compression worker must run from our origin, a Blob
+    // worker must stay blocked, and Sentry ingest must be an allowed connection.
+    // Network is intercepted, so no Sentry account or telemetry is involved.
+    const workerAsset = docker('exec', container, 'sh', '-c', 'ls /usr/share/nginx/html/assets | grep "^worker-bundler-"');
+    if (!workerAsset) throw new Error('Replay worker asset missing from the image');
+    await page.route('https://*.ingest.sentry.io/**', (route) => route.fulfill({ status: 200, body: '{}' }));
+    violations.length = 0;
+    const monitoring = await page.evaluate(async (workerPath) => {
+        const settle = (worker) => new Promise((resolve) => {
+            const timer = setTimeout(() => resolve('timeout'), 3000);
+            worker.onmessage = (event) => { clearTimeout(timer); resolve(event.data?.method || 'message'); };
+            worker.onerror = () => { clearTimeout(timer); resolve('error'); };
+        });
+        const sameOrigin = await settle(new Worker(workerPath));
+        let blob;
+        try {
+            const url = URL.createObjectURL(new Blob(['postMessage({ method: "init" })'], { type: 'text/javascript' }));
+            blob = await settle(new Worker(url));
+        } catch {
+            blob = 'blocked';
+        }
+        const ingest = await fetch('https://o0.ingest.sentry.io/api/0/envelope/', { method: 'POST', body: '{}' })
+            .then((response) => response.status).catch(() => 'blocked');
+        return { sameOrigin, blob, ingest };
+    }, `/assets/${workerAsset}`);
+    if (monitoring.sameOrigin !== 'init') {
+        throw new Error(`Replay worker did not run under the CSP: ${JSON.stringify(monitoring)}`);
+    }
+    if (monitoring.blob === 'init') throw new Error('Blob worker ran; worker-src must stay strict');
+    if (monitoring.ingest !== 200) throw new Error(`Sentry ingest was blocked: ${JSON.stringify(monitoring)}`);
+    const monitoringViolations = violations.filter((violation) => !violation.blocked.startsWith('blob'));
+    if (monitoringViolations.length) {
+        throw new Error(`Monitoring path violated the CSP: ${JSON.stringify(monitoringViolations)}`);
+    }
+
+    console.log('CSP enforcement passed: shell boots cleanly; inline and foreign script are blocked; '
+        + 'the same-origin replay worker runs, Blob workers stay blocked, and Sentry ingest is allowed');
 } finally {
     await browser?.close();
     execFileSync('docker', ['rm', '-f', container], { stdio: 'ignore' });

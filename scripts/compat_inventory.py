@@ -22,6 +22,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from sqlalchemy import exists  # noqa: E402
+
 import models  # noqa: E402
 from models import ActivityInstance, Session, SessionTemplate  # noqa: E402
 from services.plan_sections import LEGACY_ITEM_KEYS  # noqa: E402
@@ -50,14 +52,19 @@ def inventory(db_session):
                and any(key in section for key in LEGACY_ITEM_KEYS) for section in sections):
             counts["session_templates_with_legacy_item_lists"] += 1
 
-    sessions_with_instances = {
-        session_id for (session_id,) in db_session.query(ActivityInstance.session_id).distinct()
-    }
-    for session in db_session.query(Session).filter(Session.deleted_at.is_(None)).yield_per(BATCH):
+    # Mirrors SessionAnalyticsService: the legacy reader serves any session without a
+    # *live* relational instance (soft-deleted instances do not count), evaluated in SQL
+    # so memory does not grow with the activity-instance table.
+    has_live_instance = exists().where(
+        ActivityInstance.session_id == Session.id,
+        ActivityInstance.deleted_at.is_(None),
+    ).label("has_live_instance")
+    sessions = db_session.query(Session, has_live_instance).filter(Session.deleted_at.is_(None))
+    for session, session_has_live_instance in sessions.yield_per(BATCH):
         payload, sections = _sections(session.attributes)
         if isinstance(payload, dict) and payload and "session_data" not in payload:
             counts["sessions_with_unwrapped_attributes"] += 1
-        if session.id in sessions_with_instances:
+        if session_has_live_instance:
             continue
         if any(isinstance(section, dict) and isinstance(section.get("exercises"), list)
                and any(isinstance(item, dict) and item.get("type") == "activity" and item.get("activity_id")

@@ -132,6 +132,16 @@
     min-height: 0;
 }
 
+/* Bar height (one wrapped row of actions on phones) plus its 20px bottom offset. */
+.bulkBarClearance {
+    flex: 0 0 auto;
+    height: 96px;
+}
+
+@media (max-width: 768px) {
+    .bulkBarClearance { height: 148px; }
+}
+
 /* One page toolbar: navigation + continuous toggle | title | multi-day actions. */
 .pageToolbar {
     display: grid;

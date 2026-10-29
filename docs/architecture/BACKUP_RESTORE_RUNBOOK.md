@@ -84,23 +84,59 @@ proves credentials, dump, restore, and app-boot-against-restored-data all work.
 
 Drill cadence: quarterly, and once before the first invite wave.
 
-## 5. Pre-Migration Snapshot (required)
+## 5. Pre-Migration Snapshot and Release Gates (automated in `cloudbuild.yaml`)
 
-Before every production deploy that includes a new Alembic revision:
+Every Cloud Build deploy now runs these gates, in order, and stops on the first failure:
 
-```bash
-pg_dump "$SUPABASE_DIRECT_DATABASE_URL" -Fc -f pre-migrate-$(date +%Y%m%d-%H%M).dump
-```
+1. **Require Passing CI.** `scripts/deploy_gates.py require-ci` confirms the commit's
+   `migration-health`, `coverage`, `production-image`, `frontend` and `browser` checks
+   all succeeded, so only tested commits are built and deployed.
+2. **Pre-Migration Backup.** A `postgres:17` step runs `pg_dump --format=custom`, proves it
+   restorable with `pg_restore --list` (including `alembic_version`), and stores it at
+   `gs://$PROJECT_ID-premigration-backups/premigration/$BUILD_ID.dump` *before*
+   `migrate-db` runs.
+3. **Candidate rollout.** Backend and frontend deploy with `--no-traffic --tag candidate`.
+   `smoke-backend` checks `/api/readyz`, `/api/healthz` and an anonymous `/api/auth/me`
+   (must be 401); `smoke-frontend` checks the shell, its strict `script-src`, the boot
+   script, and the API proxy. Only then does `update-traffic --to-latest` promote the
+   candidate. A failed smoke leaves traffic on the previous revision. The analytics-export
+   and data-retention jobs update only after the backend is promoted.
 
-Store the dump somewhere private and durable (not the repo). Delete dumps
-older than 30 days — they contain user data.
+Migrations stay expand/contract (see the migration policy): the previous revision keeps
+serving against the migrated schema until promotion.
 
-This step is mandatory in `docs/planning/BETA_PREFLIGHT.md`. A future
-improvement is automating it as a Cloud Build step before the `migrate-db`
-job (pg_dump in a `postgres:17` step → `gsutil cp` to a locked-down GCS
-bucket); that needs a bucket + Cloud Build service-account
-`secretmanager.secretAccessor` grant, and is deliberately deferred until the
-manual step becomes a burden.
+### One-time setup (required before the next deploy)
+
+- Secret `GITHUB_CHECKS_TOKEN`: a fine-grained GitHub token with read-only **Checks**
+  access to `billwarker/fractal-goals`.
+- Bucket `gs://<project-id>-premigration-backups`, private, with an object lifecycle
+  rule matching the published retention window (for example, delete after 30 days).
+- Cloud Build service account: Secret Manager Secret Accessor (both secrets), Storage
+  Object Creator (backup bucket), Cloud Run Admin and Service Account User (already
+  needed for deploys).
+- `SUPABASE_DIRECT_DATABASE_URL` must be reachable from Cloud Build. If the direct host is
+  IPv6-only, point the backup step at the IPv4 session pooler URL instead.
+
+### Proving the gates (do once in a staging trigger)
+
+1. Push a commit whose CI is red, or run the trigger before CI finishes: the build must
+   stop at **Require Passing CI** with no image pushed.
+2. Temporarily point `smoke-backend` at a path that returns 404: the build must stop at
+   **Smoke Backend Candidate** and `gcloud run services describe fractal-backend` must
+   still show 100% traffic on the previous revision.
+3. Record both results in the Verification Log below.
+
+### Emergency override
+
+`gcloud builds submit --substitutions=_ALLOW_UNVERIFIED_DEPLOY=true` skips only the CI
+gate; the build log records the override with the commit and build ID. Backup and smoke
+gates cannot be skipped. Record every override in the Verification Log.
+
+### Manual snapshot (outside Cloud Build)
+
+For migrations run by hand, keep the previous practice:
+`pg_dump --format=custom "$SUPABASE_DIRECT_DATABASE_URL" -f premigration-$(date +%Y%m%d%H%M).dump`,
+then `pg_restore --list` it before migrating.
 
 ## 6. Verification Log
 

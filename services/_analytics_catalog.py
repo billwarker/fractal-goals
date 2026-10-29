@@ -30,6 +30,12 @@ RAW_SQL_TIMEOUT_MS = 5000
 RAW_SQL_MAX_LENGTH = 20000
 
 
+# Output budgets. Row limits and timeouts bound rows and time, not bytes: one value
+# (e.g. string_agg over generate_series) can be arbitrarily large.
+MAX_RESULT_ROW_BYTES = 64 * 1024
+MAX_RESULT_BYTES = 4 * 1024 * 1024
+
+
 READ_ONLY_SQL_RE = re.compile(r"^\s*(select|with)\b", re.IGNORECASE)
 
 

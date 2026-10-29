@@ -1,8 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root.
 test('scopes a goal in the program Goals pane and creates a child under it', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const rootId = `browser-plan-root-${suffix}`;
     const rootName = `Browser Planning ${suffix}`;
     const childName = `Weekly mobility ${suffix}`;
@@ -17,7 +18,7 @@ test('scopes a goal in the program Goals pane and creates a child under it', asy
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
 
     const openGoalsPane = async () => {
-        if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+        if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
         const sidebar = page.getByRole('complementary', { name: 'Program side pane', exact: true });
         await sidebar.getByRole('tablist', { name: 'Program side pane views', exact: true })
             .getByRole('tab', { name: 'Goals' }).click();

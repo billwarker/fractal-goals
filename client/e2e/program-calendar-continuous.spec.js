@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './support/clock.js';
 
 function nextMonthTitle(title) {
     const date = new Date(`1 ${title} UTC`);

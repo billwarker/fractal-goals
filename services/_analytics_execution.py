@@ -3,6 +3,7 @@
 Builds filters and measures, runs queries with timeouts, and suggests charts.
 """
 
+import json
 import re
 from typing import Any
 from contextlib import contextmanager
@@ -15,7 +16,12 @@ from config import config
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
 from services._analytics_datasets import CATALOG_RELATIONS, DATASETS, build_scoped_dataset_query
-from services._analytics_catalog import QUERY_SPEC_VERSION, RAW_SQL_TIMEOUT_MS
+from services._analytics_catalog import (
+    MAX_RESULT_BYTES,
+    MAX_RESULT_ROW_BYTES,
+    QUERY_SPEC_VERSION,
+    RAW_SQL_TIMEOUT_MS,
+)
 from services._analytics_sql_guard import SqlGuardError, guard_analytics_sql
 
 
@@ -93,6 +99,11 @@ class _AnalyticsExecutionMixin:
             {column["id"]: _json_value(value) for column, value in zip(columns, tuple(row))}
             for row in rows
         ]
+        # Catalog fields are input-validated, so checking the serialized size after the
+        # bounded fetch is enough here; raw SQL is measured inside PostgreSQL instead.
+        budget_error = _result_budget_error(None, len(json.dumps(row_dicts, default=str)))
+        if budget_error:
+            return None, budget_error, 400
 
         return {
             "columns": columns,
@@ -115,19 +126,30 @@ class _AnalyticsExecutionMixin:
             guarded = guard_analytics_sql(query_spec["sql"], CATALOG_RELATIONS)
         except SqlGuardError as error:
             return None, str(error), 400
-        cte_sql = self._catalog_cte_sql(current_user_id, root_ids)
+        # Qualify catalog tables with the live schema: the scope below pins search_path
+        # to pg_catalog, so only these CTEs (and built-ins) are reachable by name.
+        app_schema = self.db_session.execute(text("SELECT current_schema()")).scalar()
+        cte_sql = self._catalog_cte_sql(current_user_id, root_ids, schema=app_schema)
         limit = query_spec["limit"]
-        final_sql = (
-            f"{cte_sql} "
-            "SELECT * FROM ("
-            # Escape colons so text() never reads user literals such as 'HH24:MI' as bind params.
-            f"{guarded.sql.replace(':', chr(92) + ':')}"
-            f") AS __analytics_user_query LIMIT {limit + 1}"
+        # Escape colons so text() never reads user literals such as 'HH24:MI' as bind params.
+        limited_sql = (
+            f"SELECT * FROM ({guarded.sql.replace(':', chr(92) + ':')}) AS __analytics_user_query "
+            f"LIMIT {limit + 1}"
+        )
+        # Measured in PostgreSQL first, so an oversized value never reaches this process.
+        size_sql = (
+            f"{cte_sql} SELECT max(__row_bytes), coalesce(sum(__row_bytes), 0) FROM ("
+            f"SELECT octet_length(row_to_json(__limited)::text) AS __row_bytes FROM ({limited_sql}) AS __limited"
+            ") AS __sizes"
         )
 
-        with self._read_only_query_scope(RAW_SQL_TIMEOUT_MS, role=config.ANALYTICS_SQL_ROLE):
+        with self._read_only_query_scope(RAW_SQL_TIMEOUT_MS, role=config.ANALYTICS_SQL_ROLE, pin_search_path=True):
             try:
-                result = self.db_session.execute(text(final_sql))
+                largest_row, total_bytes = self.db_session.execute(text(size_sql)).one()
+                budget_error = _result_budget_error(largest_row, total_bytes)
+                if budget_error:
+                    return None, budget_error, 400
+                result = self.db_session.execute(text(f"{cte_sql} {limited_sql}"))
                 rows = result.mappings().all()
                 column_ids = list(result.keys())
             except DBAPIError as error:
@@ -168,14 +190,16 @@ class _AnalyticsExecutionMixin:
         return bind is not None and bind.dialect.name == "postgresql"
 
     @contextmanager
-    def _read_only_query_scope(self, timeout_ms: int, *, role: str | None = None):
+    def _read_only_query_scope(self, timeout_ms: int, *, role: str | None = None, pin_search_path: bool = False):
         """Run analytics reads inside a read-only, time-bounded savepoint.
 
         ``SET TRANSACTION READ ONLY`` inside a savepoint switches the current
         transaction to read-only; rolling the savepoint back afterwards restores the
         request's transaction mode, statement timeout, and role. The mode is read back
         rather than assumed, because setting ``default_transaction_read_only`` would
-        only affect later transactions.
+        only affect later transactions. ``pin_search_path`` limits unqualified names
+        to built-ins, so a lookalike function or overload in an application schema
+        can never be called by user-written SQL.
         """
         if not self._is_postgresql():
             yield
@@ -188,13 +212,15 @@ class _AnalyticsExecutionMixin:
                 if not _ROLE_NAME_RE.match(role):
                     raise AnalyticsReadScopeError("ANALYTICS_SQL_ROLE is not a valid role name")
                 self.db_session.execute(text(f'SET LOCAL ROLE "{role}"'))
+            if pin_search_path:
+                self.db_session.execute(text("SET LOCAL search_path = pg_catalog, pg_temp"))
             if self.db_session.execute(text("SHOW transaction_read_only")).scalar() != "on":
                 raise AnalyticsReadScopeError("Analytics read scope is not read-only")
             yield
         finally:
             savepoint.rollback()
 
-    def _catalog_cte_sql(self, current_user_id, root_ids) -> str:
+    def _catalog_cte_sql(self, current_user_id, root_ids, *, schema: str) -> str:
         bind = self.db_session.get_bind()
         ctes = []
         for dataset in DATASETS.values():
@@ -202,7 +228,12 @@ class _AnalyticsExecutionMixin:
             query = build_scoped_dataset_query(
                 self.db_session, dataset.id, root_ids, current_user_id
             ).with_entities(*columns)
-            sql = str(query.statement.compile(bind=bind, compile_kwargs={"literal_binds": True}))
+            sql = str(query.statement.compile(
+                dialect=bind.dialect,
+                schema_translate_map={None: schema},
+                render_schema_translate=True,
+                compile_kwargs={"literal_binds": True},
+            ))
             ctes.append(f"{dataset.id} AS ({sql})")
         return "WITH " + ", ".join(ctes)
 
@@ -308,3 +339,13 @@ def _query_failure_message(error: DBAPIError) -> str:
     if getattr(error.orig, "pgcode", None) == "57014":
         return "Analytics SQL exceeded its time limit"
     return f"Analytics SQL failed: {primary}" if primary else "Analytics SQL failed"
+
+
+def _result_budget_error(largest_row_bytes, total_bytes) -> str | None:
+    if largest_row_bytes is not None and largest_row_bytes > MAX_RESULT_ROW_BYTES:
+        return (f"A result row is {largest_row_bytes:,} bytes; analytics rows are limited to "
+                f"{MAX_RESULT_ROW_BYTES:,} bytes. Select fewer or shorter columns.")
+    if total_bytes > MAX_RESULT_BYTES:
+        return (f"The result is {total_bytes:,} bytes; analytics results are limited to "
+                f"{MAX_RESULT_BYTES:,} bytes. Lower the limit or select fewer columns.")
+    return None

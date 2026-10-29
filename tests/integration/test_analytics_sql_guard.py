@@ -89,6 +89,15 @@ ESCAPE_PROBES = [
     "SELECT 'a\\', (SELECT password_hash FROM users), 'b'",
     "SELECT 1; SELECT password_hash FROM users",
     "SELECT 1 -- comment",
+    # October 29 independent review (R1): qualified names, operators, and nested types.
+    "SELECT * FROM review_schema.generate_series(1, 1)",
+    "SELECT pg_catalog.lower(name) FROM sessions",
+    "SELECT review_schema.lower(name) FROM sessions",
+    "SELECT 1 OPERATOR(public.+) 2",
+    "SELECT CAST(CAST('{users}' AS pg_catalog.regclass[]) AS text) AS metadata",
+    "SELECT name::review_schema.custom_type FROM sessions",
+    "SELECT name::custom_type[] FROM sessions",
+    "SELECT public.sessions.name FROM sessions",
 ]
 
 
@@ -135,6 +144,52 @@ def test_http_raw_sql_is_refused_while_the_explorer_flag_is_off(client, db_sessi
 
     assert response.status_code == 404
     assert response.get_json()["error"] == "Analytics SQL is not enabled"
+
+
+def test_qualified_security_definer_function_cannot_read_outside_the_catalog(db_session, test_user):
+    """R1 reproduction: a definer routine shadowing an allowlisted name in another schema."""
+    schema = f"review_{uuid.uuid4().hex[:12]}"
+    db_session.execute(text(f"CREATE SCHEMA {schema}"))
+    db_session.execute(text(
+        f"CREATE FUNCTION {schema}.generate_series(integer, integer) RETURNS SETOF text "
+        f"LANGUAGE sql SECURITY DEFINER AS $$ SELECT password_hash FROM public.users "
+        f"WHERE id = '{test_user.id}' $$"
+    ))
+    db_session.commit()
+    try:
+        stranger = _user(db_session, "definerstranger")
+        payload, error, status = _run_sql(db_session, stranger.id, f"SELECT * FROM {schema}.generate_series(1, 1)")
+
+        assert payload is None
+        assert status == 400
+        assert test_user.password_hash not in (error or "")
+    finally:
+        db_session.rollback()
+        db_session.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+        db_session.commit()
+
+
+def test_unqualified_calls_resolve_to_built_ins_not_application_schema_overloads(db_session, test_user):
+    """A closer-typed overload in the app schema would win name resolution without the pinned search_path."""
+    schema = db_session.execute(text("SELECT current_schema()")).scalar()
+    db_session.execute(text(
+        f"CREATE FUNCTION {schema}.lower(character varying) RETURNS text "
+        "LANGUAGE sql AS $$ SELECT 'hijacked'::text $$"
+    ))
+    db_session.commit()
+    try:
+        root = _root(db_session, test_user, "Overload Root")
+        db_session.add(Session(id=str(uuid.uuid4()), owner_id=test_user.id, root_id=root.id, name="MiXeD"))
+        db_session.commit()
+
+        payload, error, status = _run_sql(db_session, test_user.id, "SELECT lower(name) AS lowered FROM sessions")
+
+        assert error is None, error
+        assert payload["rows"] == [{"lowered": "mixed"}]
+    finally:
+        db_session.rollback()
+        db_session.execute(text(f"DROP FUNCTION {schema}.lower(character varying)"))
+        db_session.commit()
 
 
 def test_raw_sql_cannot_be_saved_into_a_query_profile(db_session, test_user):
@@ -224,6 +279,74 @@ def test_raw_sql_statement_timeout_applies(db_session, test_user, monkeypatch):
     assert payload is None
     assert status == 400
     assert error == "Analytics SQL exceeded its time limit"
+
+
+def _row_of_bytes(size):
+    # row_to_json('{"v":"xxx..."}') adds 8 bytes of JSON framing around the value.
+    return f"SELECT repeat('x', {size - 8}) AS v"
+
+
+def test_raw_sql_accepts_a_row_exactly_at_the_row_byte_budget(db_session, test_user):
+    _root(db_session, test_user, "Budget Root")
+
+    payload, error, status = _run_sql(db_session, test_user.id, _row_of_bytes(_analytics_execution.MAX_RESULT_ROW_BYTES))
+
+    assert error is None, error
+    assert status == 200
+    assert len(payload["rows"][0]["v"]) == _analytics_execution.MAX_RESULT_ROW_BYTES - 8
+
+
+def test_raw_sql_refuses_a_row_one_byte_over_the_budget(db_session, test_user):
+    _root(db_session, test_user, "Budget Root")
+
+    payload, error, status = _run_sql(db_session, test_user.id, _row_of_bytes(_analytics_execution.MAX_RESULT_ROW_BYTES + 1))
+
+    assert payload is None
+    assert status == 400
+    assert "analytics rows are limited" in error
+
+
+def test_raw_sql_refuses_a_single_oversized_generated_value(db_session, test_user):
+    """R2 reproduction: a 2 MiB value used to come back with status 200."""
+    _root(db_session, test_user, "Budget Root")
+
+    payload, error, status = _run_sql(
+        db_session, test_user.id, "SELECT string_agg('x', '') AS oversized FROM generate_series(1, 2097152)",
+    )
+
+    assert payload is None
+    assert status == 400
+    assert "analytics rows are limited" in error
+
+
+def test_raw_sql_refuses_many_small_rows_over_the_total_budget(db_session, test_user, monkeypatch):
+    _root(db_session, test_user, "Budget Root")
+    monkeypatch.setattr(_analytics_execution, "MAX_RESULT_BYTES", 100)
+
+    payload, error, status = _run_sql(db_session, test_user.id, "SELECT g AS n FROM generate_series(1, 50) g")
+
+    assert payload is None
+    assert status == 400
+    assert "analytics results are limited" in error
+
+
+def test_structured_query_results_respect_the_total_budget(db_session, test_user, monkeypatch):
+    root = _root(db_session, test_user, "Structured Budget Root")
+    db_session.add_all([
+        Session(id=str(uuid.uuid4()), owner_id=test_user.id, root_id=root.id, name=f"Session {index}", completed=True)
+        for index in range(20)
+    ])
+    db_session.commit()
+    monkeypatch.setattr(_analytics_execution, "MAX_RESULT_BYTES", 200)
+    clear_cache()
+
+    payload, error, status = AnalyticsEngineService(db_session).run_query(test_user.id, {
+        "version": 1, "dataset": "sessions", "fields": ["id", "name"], "limit": 50,
+    })
+
+    assert payload is None
+    assert status == 400
+    assert "analytics results are limited" in error
 
 
 def test_read_only_scope_blocks_writes_and_restores_the_request_transaction(db_session):

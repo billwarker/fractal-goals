@@ -17,6 +17,35 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 
+describe('ProgramCalendarView today and status bar clearance', () => {
+    it.each([
+        // Device clock says the 28th west of UTC; the user's preference already says the 29th.
+        ['2026-10-29', '2026-10-28'],
+        // Across a month boundary in both directions.
+        ['2026-11-01', '2026-10-31'],
+        ['2026-10-31', '2026-11-01'],
+    ])('takes "today" (%s) from the timezone preference, not the device clock', (today, initialDate) => {
+        renderCalendar({ today, initialDate });
+
+        expect(mockCalendarState.props.now).toBe(today);
+    });
+
+    it('falls back to the initial date when no preference date is supplied', () => {
+        renderCalendar({ initialDate: '2026-05-17' });
+
+        expect(mockCalendarState.props.now).toBe('2026-05-17');
+    });
+
+    it('adds scroll clearance below the calendar only while the bulk status bar shows', () => {
+        const { container, rerender, props } = renderCalendar();
+        expect(container.querySelector('[class*="bulkBarClearance"]')).toBeNull();
+
+        rerender(<ProgramCalendarView {...props} statusActions={<div role="region" aria-label="Program day status actions" />} />);
+
+        expect(container.querySelector('[class*="bulkBarClearance"]')).not.toBeNull();
+    });
+});
+
 describe('ProgramCalendarView events, status, and modes', () => {
     it('renders configured SMART goal icons before calendar goal labels', () => {
         const { props } = renderCalendar({

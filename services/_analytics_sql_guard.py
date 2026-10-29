@@ -8,7 +8,9 @@ defines, and every function and cast target is allowlisted.
 
 The caller executes the SQL regenerated from the validated tree rather than the
 submitted text, so a tokenizer disagreement between sqlglot and PostgreSQL cannot
-hide a relation from validation.
+hide a relation from validation. Names are default-deny: schema-qualified functions,
+tables, columns, types, and operators are refused, and execution pins
+``search_path`` to ``pg_catalog`` so unqualified calls cannot reach a lookalike.
 """
 
 from dataclasses import dataclass
@@ -38,7 +40,7 @@ ALLOWED_FUNCTION_KEYS = frozenset({
     # Strings
     "lower", "upper", "length", "trim", "substring", "concat", "concatws", "replace", "left",
     "right", "lpad", "rpad", "initcap", "split", "splitpart", "strposition", "regexpreplace",
-    "regexplike", "regexpextract", "md5",
+    "regexplike", "regexpextract", "md5", "repeat",
     # Dates and times
     "extract", "timestamptrunc", "datetrunc", "currenttimestamp", "currentdate", "timetostr",
     "strtotime", "strtodate", "todays", "age", "makeinterval", "interval",
@@ -62,7 +64,8 @@ ALLOWED_ANONYMOUS_FUNCTIONS = frozenset({
     "regexp_split_to_array", "date", "every", "bool_and", "bool_or",
 })
 
-# Cast targets limited to plain value types; ``reg*`` and other system types are refused.
+# Types limited to plain value types anywhere in a query (casts, array elements, literals);
+# ``reg*``, custom, and schema-qualified types are refused.
 ALLOWED_CAST_TYPES = frozenset({
     "TEXT", "VARCHAR", "CHAR", "NCHAR", "NVARCHAR", "INT", "SMALLINT", "BIGINT", "TINYINT",
     "DECIMAL", "FLOAT", "DOUBLE", "BOOLEAN", "DATE", "TIME", "TIMETZ", "TIMESTAMP",
@@ -106,10 +109,19 @@ def guard_analytics_sql(sql: str, catalog_relations: frozenset[str]) -> GuardedS
     for node in tree.walk():
         if isinstance(node, _FORBIDDEN_NODES):
             raise SqlGuardError("Analytics SQL is read-only and cannot contain mutating statements")
+        if isinstance(node, exp.Operator):
+            # OPERATOR(schema.op) can name an operator outside the built-in set.
+            raise SqlGuardError("OPERATOR() syntax is not available in analytics SQL")
+        if isinstance(node, exp.Dot) and isinstance(node.expression, exp.Func):
+            # schema.fn(...) resolves outside pg_catalog, so the bare name proves nothing.
+            raise SqlGuardError("Schema-qualified functions are not available in analytics SQL")
+        if isinstance(node, exp.Column) and (node.args.get("db") or node.args.get("catalog")):
+            raise SqlGuardError("Use catalog table names without schema qualification")
         if isinstance(node, exp.Func):
             _check_function(node)
-        if isinstance(node, exp.DataType) and isinstance(node.parent, (exp.Cast, exp.TryCast)):
-            _check_cast_type(node)
+        if isinstance(node, exp.DataType):
+            # Every type, including array element types nested inside another type.
+            _check_data_type(node)
 
     _check_relations(tree, catalog_relations)
     return GuardedSql(sql=tree.sql(dialect="postgres"))
@@ -128,10 +140,11 @@ def _check_function(node: exp.Func) -> None:
         raise SqlGuardError(f"Function {node.sql_name().lower()}() is not available in analytics SQL")
 
 
-def _check_cast_type(node: exp.DataType) -> None:
+def _check_data_type(node: exp.DataType) -> None:
     type_name = node.this.name if isinstance(node.this, exp.DataType.Type) else str(node.this)
-    if type_name not in ALLOWED_CAST_TYPES:
-        raise SqlGuardError(f"Casting to {node.sql(dialect='postgres')} is not available in analytics SQL")
+    # USERDEFINED covers reg* and any schema-qualified or custom type.
+    if type_name not in ALLOWED_CAST_TYPES or node.args.get("kind") is not None:
+        raise SqlGuardError(f"The type {node.sql(dialect='postgres')} is not available in analytics SQL")
 
 
 def _check_relations(tree: exp.Query, catalog_relations: frozenset[str]) -> None:
@@ -172,10 +185,11 @@ def _relation_name(identifier: exp.Identifier) -> str:
 
 
 def _check_table(node: exp.Table, visible: frozenset[str]) -> None:
+    # Qualifiers first: a qualified table function resolves outside pg_catalog too.
+    if node.args.get("db") or node.args.get("catalog"):
+        raise SqlGuardError("Use catalog table names without schema qualification")
     if not isinstance(node.this, exp.Identifier):
         # Table functions such as generate_series(); their functions are checked separately.
         return
-    if node.args.get("db") or node.args.get("catalog"):
-        raise SqlGuardError("Use catalog table names without schema qualification")
     if _relation_name(node.this) not in visible:
         raise SqlGuardError(f"Unknown analytics table: {node.name}. Query catalog datasets only")

@@ -279,7 +279,8 @@ def main():
             # Desktop/mobile specs create independent programs under the fixture account.
             # Keep production quota enforcement active without exhausting its free-tier default.
             db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000}}))
-            for suffix in ("desktop", "mobile"):
+            # desktop-late reruns the program specs at a late-evening clock (playwright.config.js).
+            for suffix in ("desktop", "mobile", "desktop-late"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
                     Goal(

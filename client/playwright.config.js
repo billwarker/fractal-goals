@@ -12,6 +12,12 @@ export default defineConfig({
     projects: [
         { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
         { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+        // Program calendars at 22:00 New York time, when the local day is behind UTC.
+        {
+            name: 'desktop-late',
+            testMatch: /program-.*\.spec\.js/,
+            use: { ...devices['Desktop Chrome'], timezoneId: 'America/New_York', lateEveningClock: true },
+        },
     ],
     webServer: {
         command: `${process.env.PYTHON || '../fractal-goals-venv/bin/python'} ../scripts/browser_test_server.py`,

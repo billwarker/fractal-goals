@@ -74,7 +74,8 @@ test('the goal quick note bar attaches media from beside the add-note button', a
     const attach = page.getByRole('button', { name: 'Attach pictures or video', exact: true });
     const add = page.getByRole('button', { name: 'Add note', exact: true });
     const [attachBox, addBox] = [await attach.boundingBox(), await add.boundingBox()];
-    expect(attachBox.x + attachBox.width).toBeLessThanOrEqual(addBox.x);
+    // The add-note button comes first, then the paperclip (00e40d76).
+    expect(addBox.x + addBox.width).toBeLessThanOrEqual(attachBox.x);
     expect(Math.abs(attachBox.y - addBox.y)).toBeLessThan(2);
     await attach.click();
     const menu = page.getByRole('menu', { name: 'Attach from' });

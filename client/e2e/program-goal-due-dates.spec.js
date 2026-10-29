@@ -1,8 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
+import { dragBetween } from './support/pointer.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root, with no due date.
 test('sets a goal due date by dragging it onto a calendar day, with undo, on desktop only', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const rootId = `browser-plan-root-${suffix}`;
     const rootName = `Browser Planning ${suffix}`;
     const errors = [];
@@ -16,13 +18,13 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
 
     await page.goto(`/${rootId}/programs`);
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     const sidebar = page.getByRole('complementary', { name: 'Program side pane', exact: true });
     await sidebar.getByRole('tab', { name: 'Goals' }).click();
     const row = sidebar.locator(`[data-goal-id="${rootId}"]`);
     await expect(row).toBeVisible();
 
-    if (suffix === 'mobile') {
+    if (device === 'mobile') {
         // Mobile edits due dates in the goal modal; the pane offers no drag.
         await expect(row).not.toHaveAttribute('data-goal-due-drag', 'true');
         await expect(sidebar.getByText(/Drag a goal onto a day/)).toHaveCount(0);
@@ -38,13 +40,7 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     const cell = page.getByRole('gridcell', { name: targetLabel, exact: true }).first();
     await expect(cell).toBeVisible();
 
-    const from = await row.locator('[class*="sessionNodeName"]').boundingBox();
-    const to = await cell.boundingBox();
-    await page.mouse.move(from.x + 10, from.y + from.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(from.x + 30, from.y + from.height / 2, { steps: 4 });
-    await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
-    await page.mouse.up();
+    await dragBetween(page, row.locator('[class*="sessionNodeName"]'), cell, { startOffset: { x: 10 } });
 
     const toast = page.getByRole('status').filter({ hasText: `${rootName}: due` });
     await expect(toast).toBeVisible();

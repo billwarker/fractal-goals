@@ -1,5 +1,23 @@
 steps:
   # ==========================================
+  # 0. Release gate: this exact commit passed CI
+  # ==========================================
+  # Fails closed: a missing token or an unfinished/failed required check stops the
+  # build before anything is built or migrated. _ALLOW_UNVERIFIED_DEPLOY=true is an
+  # audited emergency override (see docs/architecture/BACKUP_RESTORE_RUNBOOK.md).
+  - name: 'python:3.12-slim'
+    id: 'Require Passing CI'
+    entrypoint: bash
+    secretEnv: ['GITHUB_CHECKS_TOKEN']
+    args:
+      - '-c'
+      - |
+        if [ "$_ALLOW_UNVERIFIED_DEPLOY" = "true" ]; then
+          echo "WARNING: CI gate overridden for $COMMIT_SHA (build $BUILD_ID)"; exit 0
+        fi
+        python scripts/deploy_gates.py require-ci --repo "$_GITHUB_REPO" --sha "$COMMIT_SHA"
+
+  # ==========================================
   # 1. Build Backend Image
   # ==========================================
   - name: 'gcr.io/cloud-builders/docker'
@@ -44,7 +62,30 @@ steps:
     ]
 
   # ==========================================
-  # 4. Run DB Migrations (Cloud Run Job)
+  # 4. Pre-migration backup, verified before migrating
+  # ==========================================
+  # pg_dump must be at least the server's major version (Postgres 17). The dump is
+  # proven restorable (pg_restore --list) and stored before any migration runs.
+  - name: 'postgres:17'
+    id: 'Pre-Migration Backup'
+    entrypoint: bash
+    secretEnv: ['SUPABASE_DIRECT_DATABASE_URL']
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        pg_dump --format=custom --no-owner --no-privileges --file=/workspace/premigration.dump "$$SUPABASE_DIRECT_DATABASE_URL"
+        test -s /workspace/premigration.dump
+        pg_restore --list /workspace/premigration.dump > /workspace/premigration.toc
+        grep -q 'TABLE public alembic_version' /workspace/premigration.toc
+        echo "Verified pre-migration dump: $$(wc -c < /workspace/premigration.dump) bytes, $$(grep -c ' TABLE ' /workspace/premigration.toc) tables"
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Store Pre-Migration Backup'
+    entrypoint: gsutil
+    args: ['cp', '/workspace/premigration.dump', 'gs://$PROJECT_ID-premigration-backups/premigration/$BUILD_ID.dump']
+
+  # ==========================================
+  # 4a. Run DB Migrations (Cloud Run Job)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Update Migration Job'
@@ -68,7 +109,52 @@ steps:
     ]
 
   # ==========================================
-  # 4b. Update Analytics Export Job
+  # 5. Deploy to Cloud Run (Backend)
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Deploy Backend'
+    entrypoint: gcloud
+    args: [
+      'run', 'deploy', 'fractal-backend',
+      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$BUILD_ID',
+      '--region', '$_REGION',
+      '--platform', 'managed',
+      # The candidate takes no traffic until its smoke check passes (step 5b).
+      '--no-traffic',
+      '--tag', 'candidate',
+      '--allow-unauthenticated', # Remove if auth required
+      '--set-secrets', 'SUPABASE_DATABASE_URL=SUPABASE_DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,RESEND_EMAIL_API_KEY=RESEND_EMAIL_API_KEY:latest,RESEND_WEBHOOK_SIGNING_SECRET=RESEND_WEBHOOK_SIGNING_SECRET:latest,TRUSTED_PROXY_SECRET=TRUSTED_PROXY_SECRET:latest,GOOGLE_DRIVE_CLIENT_ID=GOOGLE_DRIVE_CLIENT_ID:latest,GOOGLE_DRIVE_CLIENT_SECRET=GOOGLE_DRIVE_CLIENT_SECRET:latest,GOOGLE_PICKER_API_KEY=GOOGLE_PICKER_API_KEY:latest,STORAGE_ENCRYPTION_KEYS=STORAGE_ENCRYPTION_KEYS:latest',
+      '--set-env-vars', 'FLASK_ENV=production,FLASK_DEBUG=false,CORS_ORIGINS=https://my.fractalgoals.com;https://fractalgoals.com;https://www.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=Strict,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app,RATELIMIT_STORAGE_URI=memory://,ALLOW_IN_MEMORY_RATELIMIT=true,TRUSTED_PROXY_HOPS=3,WEB_CONCURRENCY=1,GUNICORN_THREADS=4,GUNICORN_TIMEOUT=210,EMAIL_PROVIDER=resend,EMAIL_FROM=Fractal Goals <support@fractalgoals.com>,APP_BASE_URL=https://my.fractalgoals.com,PUBLIC_MARKETING_URL=https://fractalgoals.com,LANDING_EXAMPLES_STATIC_GCS_BUCKET=$PROJECT_ID-landing-public-$PROJECT_NUMBER,LANDING_EXAMPLES_STATIC_GCS_BLOB=$_LANDING_EXAMPLES_STATIC_GCS_BLOB,LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS=10,LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES=4000000,LANDING_EXAMPLES_MAX_COMPRESSED_BYTES=500000,GOOGLE_PICKER_APP_ID=195572181270',
+      '--timeout', '240s',
+      '--max-instances', '1',
+      # Startup gates rollout on DB reachability (/api/readyz does SELECT 1);
+      # liveness stays DB-free so transient DB blips do not restart the container.
+      '--startup-probe', 'httpGet.path=/api/readyz,initialDelaySeconds=2,periodSeconds=5,timeoutSeconds=3,failureThreshold=12',
+      '--liveness-probe', 'httpGet.path=/api/healthz,periodSeconds=30,timeoutSeconds=3,failureThreshold=3',
+      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
+    ]
+
+  # ==========================================
+  # 5b. Smoke the backend candidate, then promote it
+  # ==========================================
+  # A failed check stops here: traffic stays on the previous revision, so there is
+  # nothing to roll back.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Smoke Backend Candidate'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        URL=$$(gcloud run services describe fractal-backend --region "$_REGION" --format=json | python3 scripts/deploy_gates.py tag-url --tag candidate)
+        python3 scripts/deploy_gates.py smoke-backend --url "$$URL"
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Promote Backend'
+    entrypoint: gcloud
+    args: ['run', 'services', 'update-traffic', 'fractal-backend', '--region', '$_REGION', '--to-latest']
+
+  # ==========================================
+  # 5c. Update Analytics Export Job (after promotion, so a failed deploy changes no job)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Update Analytics Export Job'
@@ -85,7 +171,7 @@ steps:
     ]
 
   # ==========================================
-  # 4c. Update Data Retention Job
+  # 5d. Update Data Retention Job
   # ==========================================
   # Executes due account erasures and every live-database retention window
   # published in the Privacy Policy. Provision the daily Scheduler trigger as
@@ -105,29 +191,6 @@ steps:
     ]
 
   # ==========================================
-  # 5. Deploy to Cloud Run (Backend)
-  # ==========================================
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    id: 'Deploy Backend'
-    entrypoint: gcloud
-    args: [
-      'run', 'deploy', 'fractal-backend',
-      '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-backend:$BUILD_ID',
-      '--region', '$_REGION',
-      '--platform', 'managed',
-      '--allow-unauthenticated', # Remove if auth required
-      '--set-secrets', 'SUPABASE_DATABASE_URL=SUPABASE_DATABASE_URL:latest,JWT_SECRET_KEY=JWT_SECRET_KEY:latest,RESEND_EMAIL_API_KEY=RESEND_EMAIL_API_KEY:latest,RESEND_WEBHOOK_SIGNING_SECRET=RESEND_WEBHOOK_SIGNING_SECRET:latest,TRUSTED_PROXY_SECRET=TRUSTED_PROXY_SECRET:latest,GOOGLE_DRIVE_CLIENT_ID=GOOGLE_DRIVE_CLIENT_ID:latest,GOOGLE_DRIVE_CLIENT_SECRET=GOOGLE_DRIVE_CLIENT_SECRET:latest,GOOGLE_PICKER_API_KEY=GOOGLE_PICKER_API_KEY:latest,STORAGE_ENCRYPTION_KEYS=STORAGE_ENCRYPTION_KEYS:latest',
-      '--set-env-vars', 'FLASK_ENV=production,FLASK_DEBUG=false,CORS_ORIGINS=https://my.fractalgoals.com;https://fractalgoals.com;https://www.fractalgoals.com;https://fractal-frontend-195572181270.us-east1.run.app,AUTH_COOKIE_SAMESITE=Strict,AUTH_COOKIE_SECURE=True,CSP_CONNECT_SRC=https://fractal-backend-195572181270.us-east1.run.app,RATELIMIT_STORAGE_URI=memory://,ALLOW_IN_MEMORY_RATELIMIT=true,TRUSTED_PROXY_HOPS=3,WEB_CONCURRENCY=1,GUNICORN_THREADS=4,GUNICORN_TIMEOUT=210,EMAIL_PROVIDER=resend,EMAIL_FROM=Fractal Goals <support@fractalgoals.com>,APP_BASE_URL=https://my.fractalgoals.com,PUBLIC_MARKETING_URL=https://fractalgoals.com,LANDING_EXAMPLES_STATIC_GCS_BUCKET=$PROJECT_ID-landing-public-$PROJECT_NUMBER,LANDING_EXAMPLES_STATIC_GCS_BLOB=$_LANDING_EXAMPLES_STATIC_GCS_BLOB,LANDING_EXAMPLES_STATIC_UPLOAD_TIMEOUT_SECONDS=10,LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES=4000000,LANDING_EXAMPLES_MAX_COMPRESSED_BYTES=500000,GOOGLE_PICKER_APP_ID=195572181270',
-      '--timeout', '240s',
-      '--max-instances', '1',
-      # Startup gates rollout on DB reachability (/api/readyz does SELECT 1);
-      # liveness stays DB-free so transient DB blips do not restart the container.
-      '--startup-probe', 'httpGet.path=/api/readyz,initialDelaySeconds=2,periodSeconds=5,timeoutSeconds=3,failureThreshold=12',
-      '--liveness-probe', 'httpGet.path=/api/healthz,periodSeconds=30,timeoutSeconds=3,failureThreshold=3',
-      '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
-    ]
-
-  # ==========================================
   # 6. Deploy to Cloud Run (Frontend)
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -138,6 +201,8 @@ steps:
       '--image', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$BUILD_ID',
       '--region', '$_REGION',
       '--platform', 'managed',
+      '--no-traffic',
+      '--tag', 'candidate',
       '--allow-unauthenticated',
       '--set-env-vars', 'BACKEND_URL=https://fractal-backend-195572181270.us-east1.run.app',
       '--set-secrets', 'TRUSTED_PROXY_SECRET=TRUSTED_PROXY_SECRET:latest',
@@ -145,16 +210,43 @@ steps:
       '--service-account', 'fractal-runtime@fractal-goals.iam.gserviceaccount.com'
     ]
 
+  # ==========================================
+  # 6b. Smoke the frontend candidate (shell, strict CSP, API proxy), then promote it
+  # ==========================================
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Smoke Frontend Candidate'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        set -euo pipefail
+        URL=$$(gcloud run services describe fractal-frontend --region "$_REGION" --format=json | python3 scripts/deploy_gates.py tag-url --tag candidate)
+        python3 scripts/deploy_gates.py smoke-frontend --url "$$URL"
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Promote Frontend'
+    entrypoint: gcloud
+    args: ['run', 'services', 'update-traffic', 'fractal-frontend', '--region', '$_REGION', '--to-latest']
+
 # Global timeout
-timeout: '1200s'
+timeout: '1800s'
 
 # The public bucket and URL are derived from Cloud Build's built-in PROJECT_ID
 # and PROJECT_NUMBER values above, keeping every environment project-isolated.
 substitutions:
+  _GITHUB_REPO: 'billwarker/fractal-goals'
+  _ALLOW_UNVERIFIED_DEPLOY: 'false'
   _REGION: 'us-east1'
   _REPOSITORY: 'fractal-repo' # Artifact Registry Repository Name
   _LANDING_EXAMPLES_STATIC_GCS_BLOB: 'landing-examples.json'
   _BIGQUERY_DATASET: 'fractal_analytics'
+
+availableSecrets:
+  secretManager:
+    # Read-only GitHub token (fine-grained: Checks read) for the CI gate.
+    - versionName: projects/$PROJECT_ID/secrets/GITHUB_CHECKS_TOKEN/versions/latest
+      env: 'GITHUB_CHECKS_TOKEN'
+    - versionName: projects/$PROJECT_ID/secrets/SUPABASE_DIRECT_DATABASE_URL/versions/latest
+      env: 'SUPABASE_DIRECT_DATABASE_URL'
 
 options:
   default_logs_bucket_behavior: REGIONAL_USER_OWNED_BUCKET

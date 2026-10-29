@@ -109,3 +109,37 @@ def test_analytics_aggregates_instances_without_hydration(db_session, history_ac
     assert goal['session_count'] == len(instances)
     assert goal['total_duration_seconds'] == len(instances) * 30
     assert sum(item['instance_count'] for item in goal['activity_breakdown']) == len(instances)
+
+
+def test_goal_analytics_stays_linear_with_stale_planner_statistics(
+    stale_statistics, db_session, test_user, sample_ultimate_goal, sample_activity_definition, record_property,
+):
+    root, activity = sample_ultimate_goal, sample_activity_definition
+    now = datetime.now(timezone.utc)
+    count = 10000
+    root.created_at = now - timedelta(minutes=count + 60)
+    sessions, instances = [], []
+    for index in range(count):
+        occurred = now - timedelta(minutes=count - index)
+        session_id = str(uuid4())
+        sessions.append(dict(id=session_id, root_id=root.id, owner_id=test_user.id, name='History',
+                             session_start=occurred, session_end=occurred + timedelta(seconds=30), completed=True,
+                             total_duration_seconds=30, created_at=occurred))
+        instances.append(dict(id=str(uuid4()), session_id=session_id, root_id=root.id,
+                              activity_definition_id=activity.id, completed=True, created_at=occurred,
+                              time_start=occurred, time_stop=occurred + timedelta(seconds=30), duration_seconds=30))
+    db_session.execute(Session.__table__.insert(), sessions)
+    db_session.execute(ActivityInstance.__table__.insert(), instances)
+    db_session.execute(activity_goal_associations.insert().values(goal_id=root.id, activity_id=activity.id))
+    db_session.execute(session_goals.insert(), [dict(goal_id=root.id, session_id=row['id'], goal_type='UltimateGoal') for row in sessions])
+    db_session.commit()
+
+    started = perf_counter()
+    payload, error, status = GoalAnalyticsService(db_session).get_goal_analytics(root.id, test_user.id)
+    elapsed_ms = (perf_counter() - started) * 1000
+    record_property('stale_stats_analytics_elapsed_ms', elapsed_ms)
+
+    assert status == 200 and error is None
+    goal = next(goal for goal in payload['goals'] if goal['id'] == root.id)
+    assert goal['session_count'] == count
+    assert elapsed_ms < 5000, 'Goal analytics must not depend on fresh planner statistics'

@@ -405,7 +405,8 @@ saved-filter toggles and the remaining controls; active conditions show as badge
 Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
 a tenant-governed semantic catalog with structured queries and a flag-gated raw SQL path whose
 parse-based relation/function allowlist, read-only savepoint, and optional least-privilege role are
-described in [Analytics SQL boundary](docs/architecture/ANALYTICS_SQL_BOUNDARY.md). Saved views are
+described in [Analytics SQL boundary](docs/architecture/ANALYTICS_SQL_BOUNDARY.md) (default-deny
+names and types, pinned `search_path`, in-database output budgets). Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;
 keep that correlation to avoid quadratic joins when tenant statistics lag behind history imports.
@@ -584,6 +585,11 @@ The broader production assessment, release-gate gaps, and test-speed evidence ar
 [Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
 The current code-quality and security assessment, its remediation, and the rerun evidence are in
 [Code Quality and Security Audit — October 28, 2026](planning/code-quality-security-audit-2026-10-28.md).
+The independent assessment of those changes and its round 2 remediation are in
+[Remediation Review — October 29, 2026](planning/remediation-independent-review-2026-10-29.md).
+Cloud Build deploys pass a CI gate, a verified pre-migration dump, and candidate smoke checks
+before promotion (`scripts/deploy_gates.py`, runbook §5). Program browser specs also run in a
+`desktop-late` project whose local date trails UTC, sharing `client/e2e/support/`.
 The nginx shell CSP forbids inline script (boot logic lives in `client/public/boot/shell.js`);
 `client/scripts/check-csp-enforcement.mjs` proves it in a real browser against the built container.
 Read-path query and payload budgets for a power-user-sized account live in

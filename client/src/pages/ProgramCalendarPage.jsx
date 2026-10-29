@@ -756,6 +756,7 @@ function ProgramCalendarPage() {
                         title={pageTitle}
                         subtitle={pageSubtitle}
                         hideTitleOnMobile
+                        singleRowActions
                         actions={viewActions}
                     />
 
@@ -787,6 +788,7 @@ function ProgramCalendarPage() {
                                     }
                                 }}
                                 initialDate={todayInTimezone}
+                                today={todayInTimezone}
                                 isMobile={isMobile}
                                 selectedDate={movePicker.draft?.targetDate || (calendarScope === 'day' ? contextDate : null)}
                                 selectedRange={selectedTimeframeDates.length ? null : selectedCalendarRange}
