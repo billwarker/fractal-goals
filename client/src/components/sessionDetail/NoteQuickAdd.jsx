@@ -76,10 +76,6 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", rootId = null }
                     className={styles.quickAddTextarea}
                     rows={1}
                 />
-                {rootId && (
-                    <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.noteSubmitBtn}
-                        onPickerClosed={() => inputRef.current?.focus()} />
-                )}
                 <button
                     type="submit"
                     disabled={!content.trim() || isSubmitting || draft.isBusy}
@@ -89,6 +85,10 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", rootId = null }
                 >
                     {isSubmitting ? '...' : <CreateNoteIcon />}
                 </button>
+                {rootId && (
+                    <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.noteSubmitBtn}
+                        onPickerClosed={() => inputRef.current?.focus()} />
+                )}
             </div>
         </form>
     );

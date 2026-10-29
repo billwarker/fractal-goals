@@ -30,10 +30,10 @@ beforeEach(() => {
 });
 
 describe('SidePaneNotePanel quick composer', () => {
-    it('offers this device and cloud storage from a single paperclip before the add-note button', () => {
+    it('offers this device and cloud storage from a single paperclip after the add-note button', () => {
         render(<SidePaneNotePanel composerOnly rootId="root" onSubmit={vi.fn()} />);
         expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label')))
-            .toEqual(['Attach pictures or video', 'Add note']);
+            .toEqual(['Add note', 'Attach pictures or video']);
         const paperclip = screen.getByRole('button', { name: 'Attach pictures or video' });
         fireEvent.click(paperclip);
         expect(paperclip).toHaveAttribute('aria-expanded', 'true');
