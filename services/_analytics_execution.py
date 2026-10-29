@@ -3,14 +3,27 @@
 Builds filters and measures, runs queries with timeouts, and suggests charts.
 """
 
+import re
+from typing import Any
+from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import distinct, func
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from config import config
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
-from services._analytics_datasets import DATASETS, build_scoped_dataset_query
+from services._analytics_datasets import CATALOG_RELATIONS, DATASETS, build_scoped_dataset_query
 from services._analytics_catalog import QUERY_SPEC_VERSION, RAW_SQL_TIMEOUT_MS
+from services._analytics_sql_guard import SqlGuardError, guard_analytics_sql
+
+
+_ROLE_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+class AnalyticsReadScopeError(RuntimeError):
+    """The database refused to establish the read-only analytics scope."""
 
 
 def _json_value(value):
@@ -34,6 +47,8 @@ def _result_type(value) -> str:
 
 
 class _AnalyticsExecutionMixin:
+    db_session: Any  # provided by the composed AnalyticsEngineService
+
     def _execute_query(self, current_user_id, root_ids, query_spec) -> ServiceResult[JsonDict]:
         dataset = DATASETS[query_spec["dataset"]]
         query = build_scoped_dataset_query(
@@ -93,27 +108,32 @@ class _AnalyticsExecutionMixin:
         }, None, 200
 
     def _execute_sql_query(self, current_user_id, root_ids, query_spec) -> ServiceResult[JsonDict]:
+        if not self._is_postgresql():
+            # Read-only enforcement relies on PostgreSQL transaction modes; fail closed elsewhere.
+            return None, "Analytics SQL requires PostgreSQL", 503
+        try:
+            guarded = guard_analytics_sql(query_spec["sql"], CATALOG_RELATIONS)
+        except SqlGuardError as error:
+            return None, str(error), 400
         cte_sql = self._catalog_cte_sql(current_user_id, root_ids)
         limit = query_spec["limit"]
         final_sql = (
             f"{cte_sql} "
             "SELECT * FROM ("
-            f"{query_spec['sql']}"
+            # Escape colons so text() never reads user literals such as 'HH24:MI' as bind params.
+            f"{guarded.sql.replace(':', chr(92) + ':')}"
             f") AS __analytics_user_query LIMIT {limit + 1}"
         )
 
-        bind = self.db_session.get_bind()
-        if bind is not None and bind.dialect.name == "postgresql":
-            self.db_session.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": RAW_SQL_TIMEOUT_MS})
-            # Defense-in-depth: enforce read-only at the database level so a query
-            # that slips past the mutation-keyword rejection still cannot write.
-            self.db_session.execute(text("SET LOCAL default_transaction_read_only = on"))
-
-        result = self.db_session.execute(text(final_sql))
-        rows = result.mappings().all()
+        with self._read_only_query_scope(RAW_SQL_TIMEOUT_MS, role=config.ANALYTICS_SQL_ROLE):
+            try:
+                result = self.db_session.execute(text(final_sql))
+                rows = result.mappings().all()
+                column_ids = list(result.keys())
+            except DBAPIError as error:
+                return None, _query_failure_message(error), 400
         truncated = len(rows) > limit
         rows = rows[:limit]
-        column_ids = list(result.keys())
         first_row = rows[0] if rows else {}
         columns = [
             {
@@ -142,6 +162,37 @@ class _AnalyticsExecutionMixin:
                 "mode": "sql",
             },
         }, None, 200
+
+    def _is_postgresql(self) -> bool:
+        bind = self.db_session.get_bind()
+        return bind is not None and bind.dialect.name == "postgresql"
+
+    @contextmanager
+    def _read_only_query_scope(self, timeout_ms: int, *, role: str | None = None):
+        """Run analytics reads inside a read-only, time-bounded savepoint.
+
+        ``SET TRANSACTION READ ONLY`` inside a savepoint switches the current
+        transaction to read-only; rolling the savepoint back afterwards restores the
+        request's transaction mode, statement timeout, and role. The mode is read back
+        rather than assumed, because setting ``default_transaction_read_only`` would
+        only affect later transactions.
+        """
+        if not self._is_postgresql():
+            yield
+            return
+        savepoint = self.db_session.begin_nested()
+        try:
+            self.db_session.execute(text("SET TRANSACTION READ ONLY"))
+            self.db_session.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": int(timeout_ms)})
+            if role:
+                if not _ROLE_NAME_RE.match(role):
+                    raise AnalyticsReadScopeError("ANALYTICS_SQL_ROLE is not a valid role name")
+                self.db_session.execute(text(f'SET LOCAL ROLE "{role}"'))
+            if self.db_session.execute(text("SHOW transaction_read_only")).scalar() != "on":
+                raise AnalyticsReadScopeError("Analytics read scope is not read-only")
+            yield
+        finally:
+            savepoint.rollback()
 
     def _catalog_cte_sql(self, current_user_id, root_ids) -> str:
         bind = self.db_session.get_bind()
@@ -248,3 +299,12 @@ class _AnalyticsExecutionMixin:
                 "spec_version": QUERY_SPEC_VERSION,
             },
         }
+
+
+def _query_failure_message(error: DBAPIError) -> str:
+    """Describe a rejected user query without echoing driver internals or SQL text."""
+    diag = getattr(error.orig, "diag", None)
+    primary = getattr(diag, "message_primary", None) if diag is not None else None
+    if getattr(error.orig, "pgcode", None) == "57014":
+        return "Analytics SQL exceeded its time limit"
+    return f"Analytics SQL failed: {primary}" if primary else "Analytics SQL failed"

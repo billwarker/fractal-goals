@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import categories from '../../../../../../tests/fixtures/note_categories.json';
-import { NOTE_CATEGORIES } from '../../../../utils/noteTypes';
+import { deriveNoteCategory, NOTE_CATEGORIES } from '../../../../utils/noteTypes';
 import NotesFilterControls from '../NotesFilterControls';
 
 const heatmap = vi.hoisted(() => ({ value: { data: null, isLoading: false } }));
@@ -22,8 +22,14 @@ beforeEach(() => { heatmap.value = { data: { days: [{ date: '2026-10-23', count:
 afterEach(() => vi.useRealTimers());
 
 describe('NotesFilterControls', () => {
-    it('mirrors the server categories', () => {
-        expect(NOTE_CATEGORIES).toEqual(categories.map(({ value, label }) => ({ value, label })));
+    it('mirrors the server categories and their context types', () => {
+        expect(NOTE_CATEGORIES).toEqual(categories.map(({ value, label, context_types: contextTypes }) => (
+            { value, label, contextTypes }
+        )));
+        categories.forEach(({ value, context_types: contextTypes }) => {
+            contextTypes.forEach((contextType) => expect(deriveNoteCategory(contextType)).toBe(value));
+        });
+        expect(deriveNoteCategory('unknown_context')).toBe('general');
     });
 
     it('orders sections heatmap, search, saved filters with Sessions-style headers and no search mode toggle', () => {

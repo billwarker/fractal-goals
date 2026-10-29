@@ -33,6 +33,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # The official nginx entrypoint renders templates in /etc/nginx/templates.
 ENV BACKEND_URL=https://fractal-backend-195572181270.us-east1.run.app
 COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY security-headers-common.conf /etc/nginx/security-headers-common.conf
 COPY security-headers.conf /etc/nginx/security-headers.conf
 
 # Expose port

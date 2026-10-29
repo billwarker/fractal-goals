@@ -1152,18 +1152,6 @@
     "StrictGoalUpdateSchema": {
       "additionalProperties": false,
       "properties": {
-        "completed": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Completed"
-        },
         "completion_condition": {
           "anyOf": [
             {
@@ -1301,18 +1289,6 @@
           ],
           "default": null,
           "title": "Review Cadence Value"
-        },
-        "review_deferred_until": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Review Deferred Until"
         },
         "review_disabled": {
           "anyOf": [

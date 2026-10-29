@@ -57,7 +57,8 @@ and record them here:
    expected data is present (`SELECT count(*) FROM users;` and spot-check
    recent rows).
 4. Check `alembic_version` matches the deployed code's expected head; if the
-   restore predates a migration, run the `migrate-db` Cloud Run job.
+   restore predates a migration, run the `migrate-db` Cloud Run job. Run
+   `ANALYZE;` if the provider's restore does not preserve statistics.
 5. Restore Cloud Run scale (`--max-instances=1`) and verify `/api/readyz`
    returns 200.
 
@@ -66,6 +67,9 @@ and record them here:
 1. Create a new Supabase project (Postgres 17).
 2. Download the latest backup, or use the newest pre-migration dump.
 3. `pg_restore --no-owner --no-privileges -d "$NEW_DIRECT_DATABASE_URL" backup.dump`
+   then `psql "$NEW_DIRECT_DATABASE_URL" -c 'ANALYZE;'`. A logical restore carries no
+   planner statistics; until they exist, goal analytics on a long history can run
+   quadratically (about 50 s for 10,000 sessions, measured October 29, 2026).
 4. Update Secret Manager: `SUPABASE_DATABASE_URL` and
    `SUPABASE_DIRECT_DATABASE_URL` with the new project's connection strings.
 5. Redeploy (or restart) the backend so it picks up the new secrets; verify

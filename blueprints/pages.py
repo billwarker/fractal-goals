@@ -134,10 +134,11 @@ def serve_vite_svg():
     return send_from_directory(CLIENT_BUILD_DIR, 'vite.svg')
 
 
-# App-shell files the offline service worker precaches. The worker itself and
-# its manifest must always revalidate so a deploy can replace them.
+# App-shell files the offline service worker precaches. The worker, its manifest,
+# and the unhashed boot script must always revalidate so a deploy can replace them.
 @pages_bp.route('/sw.js')
 @pages_bp.route('/manifest.webmanifest')
+@pages_bp.route('/boot/shell.js')
 def serve_service_worker_files():
     response = send_from_directory(CLIENT_BUILD_DIR, request.path.lstrip('/'))
     response.headers['Cache-Control'] = 'no-cache'

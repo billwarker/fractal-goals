@@ -9,5 +9,7 @@ declare module 'axios' {
         _skipCsrfFetch?: boolean;
         /** Set once a request has been retried after a token refresh. */
         _retry?: boolean;
+        /** Send time recorded by the connectivity probe (src/offline/connectivity.js). */
+        _sentAt?: number;
     }
 }

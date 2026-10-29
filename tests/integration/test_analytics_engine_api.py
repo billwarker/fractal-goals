@@ -4,6 +4,7 @@ import uuid
 
 from config import config
 from models import Session, User
+from services.feature_flag_service import FeatureFlagService
 from tests.conftest import session_headers_for
 
 
@@ -56,6 +57,7 @@ def test_analytics_catalog_and_query_run_are_authenticated(authed_client, db_ses
 
 
 def test_analytics_query_run_accepts_raw_read_only_sql(authed_client, db_session, sample_ultimate_goal):
+    FeatureFlagService(db_session).update_flags({"analytics_sql_explorer": True})
     db_session.add(Session(
         owner_id=sample_ultimate_goal.owner_id,
         id=str(uuid.uuid4()),

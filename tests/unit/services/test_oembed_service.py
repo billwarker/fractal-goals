@@ -1,8 +1,12 @@
 """Unit tests for the Instagram oEmbed proxy service."""
 
+import logging
+
 import pytest
 
 from services import oembed_service
+
+logging_formatter = logging.Formatter()
 
 
 @pytest.mark.unit
@@ -80,3 +84,33 @@ class TestGetInstagramOembed:
         result = oembed_service.get_instagram_oembed(url)
         assert result == {"configured": True, "error": "upstream_error"}
         assert oembed_service._instagram_cache.get(url) is None
+
+
+@pytest.mark.unit
+def test_upstream_http_failure_never_logs_the_access_token(monkeypatch, caplog):
+    """requests embeds the token-bearing request URL in HTTPError; logs must not."""
+    import requests
+
+    oembed_service._instagram_cache._store.clear()
+    token = 'IGQVJ-synthetic-secret-token'
+    monkeypatch.setattr(oembed_service.config, 'INSTAGRAM_OEMBED_TOKEN', token)
+
+    def failing_get(url, params=None, timeout=None):
+        prepared = requests.Request('GET', url, params=params).prepare()
+        response = requests.Response()
+        response.status_code = 400
+        response.url = prepared.url
+        response.request = prepared
+        response.raise_for_status()
+
+    monkeypatch.setattr(oembed_service.requests, 'get', failing_get)
+
+    with caplog.at_level('DEBUG', logger=oembed_service.logger.name):
+        result = oembed_service.get_instagram_oembed('https://www.instagram.com/reel/ABC123/')
+
+    assert result == {"configured": True, "error": "upstream_error"}
+    assert caplog.records, "the failure should still be logged"
+    for record in caplog.records:
+        rendered = record.getMessage() + (logging_formatter.formatException(record.exc_info) if record.exc_info else '')
+        assert token not in rendered
+    assert 'status=400' in caplog.text

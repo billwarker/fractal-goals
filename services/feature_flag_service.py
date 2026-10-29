@@ -86,6 +86,9 @@ class FeatureFlagService:
                 values[key] = bool(stored[key])
         return values
 
+    def is_enabled(self, key: str) -> bool:
+        return self._load_values()[key]
+
     def get_flags(self, *, include_definitions: bool = False) -> ServiceResult[JsonDict]:
         values = self._load_values()
         payload: JsonDict = {"flags": values}

@@ -94,3 +94,13 @@ def test_storage_telemetry_filters_sdk_span_url_variants():
     ]})
     assert result['spans'] == [{'description': 'GET https://app.test/api/goals'}]
     assert 'secret' not in str(result)
+
+
+def test_telemetry_drops_token_bearing_instagram_oembed_breadcrumbs():
+    result = scrub_storage_event({'breadcrumbs': {'values': [
+        {'data': {'url': 'https://graph.facebook.com/v20.0/instagram_oembed',
+                  'http.query': 'access_token=secret-graph-token'}},
+        {'data': {'url': 'https://app.test/api/notes'}},
+    ]}})
+    assert result['breadcrumbs']['values'] == [{'data': {'url': 'https://app.test/api/notes'}}]
+    assert 'secret' not in str(result)

@@ -122,6 +122,7 @@
     "goal_id",
     "id",
     "is_pinned",
+    "note_category",
     "note_kind",
     "note_type",
     "note_type_label",

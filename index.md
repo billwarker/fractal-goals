@@ -403,9 +403,9 @@ AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageF
 holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
 saved-filter toggles and the remaining controls; active conditions show as badges beside the note count.
 Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
-a tenant-governed semantic catalog with structured queries and a raw SQL execution path. The
-October 28 audit confirmed that raw SQL can escape catalog tenant scopes; production release
-requires closing that boundary (see the current security audit under Testing and quality). Saved views are
+a tenant-governed semantic catalog with structured queries and a flag-gated raw SQL path whose
+parse-based relation/function allowlist, read-only savepoint, and optional least-privilege role are
+described in [Analytics SQL boundary](docs/architecture/ANALYTICS_SQL_BOUNDARY.md). Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;
 keep that correlation to avoid quadratic joins when tenant statistics lag behind history imports.
@@ -582,9 +582,10 @@ The current backlog assessment and item-level evidence live in
 [Backlog Quality Audit — September 2026](planning/backlog-quality-audit-2026-09.md).
 The broader production assessment, release-gate gaps, and test-speed evidence are in
 [Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
-The current code-quality and security assessment, confirmed analytics isolation defects,
-and ordered production-hardening plan are in
+The current code-quality and security assessment, its remediation, and the rerun evidence are in
 [Code Quality and Security Audit — October 28, 2026](planning/code-quality-security-audit-2026-10-28.md).
+The nginx shell CSP forbids inline script (boot logic lives in `client/public/boot/shell.js`);
+`client/scripts/check-csp-enforcement.mjs` proves it in a real browser against the built container.
 Read-path query and payload budgets for a power-user-sized account live in
 `tests/performance/test_power_account_budgets.py`; the performance pass that introduced them is in
 [Performance Pass — September 2026](planning/performance-pass-2026-09.md).
@@ -596,6 +597,8 @@ are in [Performance Audit — October 12, 2026](planning/performance-audit-2026-
 ## Practical invariants
 
 - Preserve tenant isolation and soft-delete filters in every new query.
+- Claim single-use credentials (reset tokens, invites, OAuth codes) atomically: one conditional
+  UPDATE, or a row lock with the unused-check repeated under it.
 - Revoke sessions (`revoke_user_sessions`) in the same transaction as any credential or
   account-status change.
 - Catch the failure you expect; `except Exception` is reserved for containment boundaries.

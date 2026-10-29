@@ -100,6 +100,10 @@ def main() -> None:
                 ]
             )
 
+            # A logical restore has no planner statistics; production restores run this
+            # too (BACKUP_RESTORE_RUNBOOK.md 4b), so the drill proves it works.
+            _run([psql, restored_url, "-v", "ON_ERROR_STOP=1", "-c", "ANALYZE"])
+
             source_db = psycopg2.connect(source.render_as_string(hide_password=False))
             restored_db = psycopg2.connect(restored_url)
             try:

@@ -16,6 +16,15 @@ def load_migration(filename):
     return module
 
 
+# Later revisions that build on e2f4a6c8d0b3's tables, in upgrade order. Reversing the
+# original migration requires unwinding these first, exactly as `alembic downgrade` would.
+STORAGE_DEPENDENTS = (
+    'f3a5c7e9b1d4_storage_connection_status.py',
+    'a6c8e0b2d4f7_storage_upload_default.py',
+    'c9e1a3b5d7f2_goal_attachments.py',  # goal_attachments references media_assets.
+)
+
+
 def test_storage_migration_preserves_existing_notes(db_session, sample_ultimate_goal):
     from models import Note
     note = Note(root_id=sample_ultimate_goal.id, context_type='root', context_id=sample_ultimate_goal.id, content='Existing text')
@@ -24,16 +33,20 @@ def test_storage_migration_preserves_existing_notes(db_session, sample_ultimate_
     note_id = note.id
     db_session.commit()
     module = load_migration('e2f4a6c8d0b3_external_storage_attachments.py')
+    dependents = [load_migration(filename) for filename in STORAGE_DEPENDENTS]
     with db_session.get_bind().begin() as connection:
         with Operations.context(MigrationContext.configure(connection)):
+            for dependent in reversed(dependents):
+                dependent.downgrade()
             module.downgrade()
             assert 'media_assets' not in inspect(connection).get_table_names()
             module.upgrade()
             assert 'media_assets' in inspect(connection).get_table_names()
             assert connection.execute(text('SELECT content FROM notes WHERE id = :id'), {'id': note_id}).scalar() == 'Existing text'
             assert all(key['options']['ondelete'] == 'CASCADE' for key in inspect(connection).get_foreign_keys('note_attachments'))
-            load_migration('f3a5c7e9b1d4_storage_connection_status.py').upgrade()  # Leave the schema at head.
-            load_migration('a6c8e0b2d4f7_storage_upload_default.py').upgrade()
+            for dependent in dependents:  # Leave the schema at head.
+                dependent.upgrade()
+            assert 'goal_attachments' in inspect(connection).get_table_names()
 
 
 def test_connection_status_migration_backfills_and_reverses(db_session, test_user):

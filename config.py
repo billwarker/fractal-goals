@@ -144,6 +144,18 @@ class Config:
     # Secret Key for JWT
     # In production, we should fail if these are not set
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'default-jwt-secret-keep-it-safe')
+    # HS256 needs at least a 256-bit key; length is a floor, not proof of entropy, so
+    # deployments generate the key (e.g. `openssl rand -base64 48`).
+    MIN_JWT_SECRET_LENGTH = 32
+    KNOWN_PLACEHOLDER_SECRETS = frozenset({
+        'default-jwt-secret-keep-it-safe',
+        'change-this-to-a-secure-random-string',
+        'test-secret-key',
+        'browser-ci-secret',
+    })
+    # Optional least-privilege PostgreSQL role for analytics raw SQL (SET LOCAL ROLE). It needs
+    # SELECT on catalog tables only; see docs/architecture/ANALYTICS_SQL_BOUNDARY.md.
+    ANALYTICS_SQL_ROLE = os.getenv('ANALYTICS_SQL_ROLE', '').strip() or None
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '72'))
     JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
     # Absolute session lifetime from the original login, across all refreshes.
@@ -223,8 +235,14 @@ class Config:
     def check_production_security(cls):
         """Verify critical security settings in production/staging environments."""
         if cls.ENV not in ('development', 'testing', 'local'):
-            if cls.JWT_SECRET_KEY == 'default-jwt-secret-keep-it-safe':
+            jwt_secret = cls.JWT_SECRET_KEY or ''
+            if jwt_secret in cls.KNOWN_PLACEHOLDER_SECRETS:
                 raise ValueError(f"CRITICAL: JWT_SECRET_KEY must be set in {cls.ENV} environment!")
+            if len(jwt_secret) < cls.MIN_JWT_SECRET_LENGTH or len(set(jwt_secret)) < 8:
+                raise ValueError(
+                    f"CRITICAL: JWT_SECRET_KEY must be a generated secret of at least "
+                    f"{cls.MIN_JWT_SECRET_LENGTH} characters in {cls.ENV}"
+                )
 
             if cls.DEBUG:
                 raise ValueError(f"CRITICAL: DEBUG must be false in {cls.ENV} environment!")

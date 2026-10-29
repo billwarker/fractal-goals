@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from time import perf_counter
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 from models import ActivityInstance, Session, activity_goal_associations, session_goals
 from services.goal_analytics_service import GoalAnalyticsService
 from services.progress_service import ProgressService
@@ -30,6 +30,14 @@ def history_account(request, db_session, sample_ultimate_goal, sample_activity_d
     db_session.execute(ActivityInstance.__table__.insert(), instances)
     db_session.execute(activity_goal_associations.insert().values(goal_id=root.id, activity_id=activity.id))
     db_session.execute(session_goals.insert(), [dict(goal_id=root.id, session_id=row['id'], goal_type='UltimateGoal') for row in sessions])
+    db_session.commit()
+    # Model production statistics. Autoanalyze would catch up shortly after a bulk
+    # import, but here it races the suite's per-test table resets, and with stale
+    # (near-empty) statistics PostgreSQL nests unparameterized scans quadratically.
+    # That hazard is operational, covered by ANALYZE after restores
+    # (BACKUP_RESTORE_RUNBOOK.md); these budgets guard query structure.
+    for table in ('sessions', 'activity_instances', 'session_goals', 'activity_goal_associations'):
+        db_session.execute(text(f'ANALYZE {table}'))
     db_session.commit()
     return root, activity, instances, session_headers_for(test_user)
 

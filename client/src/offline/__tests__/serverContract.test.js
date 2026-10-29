@@ -24,6 +24,7 @@ describe('offline placeholders match the server contract', () => {
     it('note', () => {
         const note = buildPlaceholderNote({ id: 'n', data: { content: 'x', context_type: 'session', context_id: 's' } });
         expect(keysOf(note)).toEqual(contract.note);
+        expect(note.note_category).toBe('sessions');
     });
 
     it('circuit run, slot, round, and member', async () => {

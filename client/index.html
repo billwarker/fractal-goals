@@ -2,20 +2,11 @@
 <html lang="en">
 
 <head>
-  <script nonce="{{ csp_nonce() }}">
-    (function () {
-      try {
-        var saved = localStorage.getItem('theme');
-        var resolved = saved === 'light' || saved === 'dark'
-          ? saved
-          : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
-        document.documentElement.setAttribute('data-theme', resolved);
-      } catch (_) {
-        document.documentElement.setAttribute('data-theme', 'dark');
-      }
-    })();
-  </script>
   <meta charset="UTF-8" />
+  <!-- Build-time landing snapshot URL, read by /boot/shell.js. -->
+  <meta name="fg-landing-examples-static-url" content="%VITE_LANDING_EXAMPLES_STATIC_URL%" />
+  <!-- Theme, async fonts, and landing preload; external so the CSP forbids inline script. -->
+  <script src="/boot/shell.js"></script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Fractal Goals - One App for Goals, Programs & Training</title>
@@ -369,51 +360,8 @@
   <!-- Typography: DM Sans (UI body), DM Serif Display (display headings), JetBrains Mono (code/metrics) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
+  <link rel="preload" as="style" data-async-stylesheet href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" />
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" /></noscript>
-  <script>
-    // Start fetching public landing examples while the JS bundle is still
-    // downloading; src/utils/landingPrefetch.js consumes this promise.
-    // Entry-path logic mirrors isLandingEntryPath/isPublicMarketingHost in
-    // src/utils/landingPrefetch.js and src/utils/marketingHost.js — keep in sync.
-    (function () {
-      var host = window.location.hostname;
-      var path = window.location.pathname;
-      var isMarketingHost = host === 'fractalgoals.com' || host === 'www.fractalgoals.com';
-      var isLocalDevHost = host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
-      var isLocalPreviewPath = path === '/landing-preview' && isLocalDevHost;
-      var isLandingEntry = isLocalPreviewPath || (path === '/' && isMarketingHost);
-      document.documentElement.setAttribute('data-entry-surface', isLandingEntry ? 'landing' : 'app');
-      if (!isLandingEntry) return;
-      var staticUrl = '%VITE_LANDING_EXAMPLES_STATIC_URL%';
-      if (!staticUrl || staticUrl.charAt(0) === '%') staticUrl = '';
-      if (!isMarketingHost) staticUrl = '';
-      window.__fgLandingExamplesStaticUrl = staticUrl;
-      var preloadUrl = staticUrl || '/api/public/landing-examples';
-      window.__fgLandingExamplesStaticAttempted = Boolean(staticUrl);
-      var controller = typeof AbortController === 'function' ? new AbortController() : null;
-      var timeoutId = controller ? setTimeout(function () { controller.abort(); }, 2000) : null;
-      window.__fgLandingExamplesPreload = fetch(preloadUrl, {
-        credentials: staticUrl ? 'omit' : 'same-origin',
-        signal: controller ? controller.signal : undefined
-      })
-        .then(function (response) {
-          if (!response.ok) throw new Error('landing examples preload failed: ' + response.status);
-          return response.json();
-        })
-        .then(function (payload) {
-          if (!payload || !Array.isArray(payload.examples)) {
-            throw new Error('landing examples preload returned an invalid snapshot');
-          }
-          return payload;
-        })
-        .finally(function () {
-          if (timeoutId) clearTimeout(timeoutId);
-        });
-      // landingPrefetch falls back to its own request on rejection.
-      window.__fgLandingExamplesPreload.catch(function () {});
-    })();
-  </script>
 </head>
 
 <body>

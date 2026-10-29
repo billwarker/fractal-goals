@@ -5,9 +5,9 @@ import { isLandingPreviewPath, isPublicMarketingHost } from './marketingHost';
 export const LANDING_EXAMPLES_STALE_TIME = 5 * 60 * 1000;
 export const LANDING_EXAMPLES_STATIC_URL = import.meta.env.VITE_LANDING_EXAMPLES_STATIC_URL || '';
 
-// index.html starts this fetch while the JS bundle is still downloading and
-// stashes the promise on window (see the inline script there — keep the
-// entry-path logic in sync). Consume it at most once: retries and refetches
+// public/boot/shell.js starts this fetch while the JS bundle is still downloading
+// and stashes the promise on window (keep the entry-path logic there in sync).
+// Consume it at most once: retries and refetches
 // should hit the network, and a rejected preload falls back to the API call.
 const PRELOAD_GLOBAL_KEY = '__fgLandingExamplesPreload';
 const STATIC_URL_GLOBAL_KEY = '__fgLandingExamplesStaticUrl';

@@ -176,6 +176,10 @@ def _seed_goal_heatmap(db, suffix, user, now):
                 level_id=level_id, name='First clean performance', created_at=now - timedelta(days=40),
                 started_at=now - timedelta(days=40), completed=True, completed_at=now - timedelta(days=2),
                 completion_source='manual'))
+    # The add-chart workflow mutates its own goal so it never changes the chart count the
+    # saved-view workflow asserts on Heatmap Guitar while both run in parallel.
+    db.add(Goal(id=f'browser-chart-sandbox-{suffix}', root_id=root_id, parent_id=root_id, owner_id=user.id,
+                level_id=level_id, name=f'Chart Sandbox {suffix}', created_at=now - timedelta(days=30)))
     for index in range(25):
         db.add(EventLog(id=f'browser-heatmap-event-{suffix}-{index}', root_id=root_id,
             event_type='activity.associated', entity_type='activity_definition', entity_id=f'archived-{index}',
