@@ -163,7 +163,8 @@ and completed goals, count R as met.
 Goal Details shows the schedule directly under the description, with no heading of its own: "Review every 3
 months · next Jan 12", "· deferred to …", "· review due", "Reviews off" or "No review cadence". In
 edit mode, "Review (SMART)" holds a "Review this goal" checkbox (saved as `review_disabled`); when
-checked, "every [n] [unit]" follows on the same line, with "Use level default".
+checked, "every [n] [unit]" follows on the same line, marked "(level default)" until changed; picking
+the level's cadence again clears the override.
 
 When a review is due, a "Review due" banner at the top of the goal's details offers one action,
 **Review**: a `goal_review` note starting from the goal's description, progress since the last review,

@@ -1,20 +1,23 @@
 import React from 'react';
 
-import { describeCadence, describeNextReview, REVIEW_CADENCE_UNITS } from '../../utils/goalReview';
-import Button from '../atoms/Button';
+import { describeNextReview, REVIEW_CADENCE_UNITS } from '../../utils/goalReview';
 import styles from './GoalReviewCadence.module.css';
 
 /**
  * Editing a goal's review schedule (SMART's R): a "Review this goal" checkbox; when on, the goal's
- * own cadence (empty = the level's), with "Use level default", and when the next review falls under
- * it, counted from the last review (else the start date) with paused days left out.
+ * own cadence (empty = the level's; picking the level's cadence clears it), and when the next review
+ * falls under it, counted from the last review (else the start date) with paused days left out.
  */
 export default function GoalReviewCadence({
     review = null, today, startedAt = null, createdAt = null, paused = false,
     enabled = true, onEnabledChange, cadence = null, levelCadence = null, onChange,
 }) {
     const shown = cadence || levelCadence || { value: 1, unit: 'months' };
-    const set = (patch) => onChange({ ...shown, ...patch });
+    const set = (patch) => {
+        const picked = { ...shown, ...patch };
+        const isLevel = levelCadence && picked.value === levelCadence.value && picked.unit === levelCadence.unit;
+        onChange(isLevel ? null : picked);
+    };
     const toggle = onEnabledChange ? (
         <label className={styles.toggle}>
             <input type="checkbox" checked={enabled} onChange={(event) => onEnabledChange(event.target.checked)} />
@@ -45,11 +48,7 @@ export default function GoalReviewCadence({
                 >
                     {REVIEW_CADENCE_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
                 </select>
-                {cadence ? (
-                    <Button unstyled className={styles.reset} onClick={() => onChange(null)}>
-                        Use level default{levelCadence ? ` (${describeCadence(levelCadence)})` : ''}
-                    </Button>
-                ) : <span className={styles.note}>(level default)</span>}
+                {cadence ? null : <span className={styles.note}>(level default)</span>}
             </span>
             {next ? <span className={styles.next} data-testid="goal-next-review">{next}</span> : null}
         </span>

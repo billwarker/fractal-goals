@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import GoalEditForm from '../GoalEditForm';
 
@@ -71,8 +71,23 @@ describe('GoalEditForm', () => {
         const cadence = screen.getByRole('group', { name: 'Review cadence' });
         expect(screen.getByText('Review (SMART)').closest('div').contains(cadence)).toBe(true);
         expect(screen.getByLabelText('Review cadence amount')).toHaveValue(2);
-        screen.getByRole('button', { name: 'Use level default (every month)' }).click();
-        expect(setReviewCadence).toHaveBeenCalledWith(null);
+        expect(screen.queryByRole('button', { name: /Use level default/ })).toBeNull();
+        fireEvent.change(screen.getByLabelText('Review cadence amount'), { target: { value: '3' } });
+        expect(setReviewCadence).toHaveBeenLastCalledWith({ value: 3, unit: 'weeks' });
+        fireEvent.change(screen.getByLabelText('Review cadence unit'), { target: { value: 'months' } });
+        expect(setReviewCadence).toHaveBeenLastCalledWith({ value: 2, unit: 'months' });
+    });
+
+    it('clears the cadence override when the level\'s cadence is picked again', () => {
+        const setReviewCadence = vi.fn();
+        renderGoalEditForm({
+            levelConfig: { uses_reviews: true, review_cadence_value: 1, review_cadence_unit: 'months' },
+            reviewCadence: { value: 1, unit: 'weeks' },
+            setReviewCadence,
+        });
+
+        fireEvent.change(screen.getByLabelText('Review cadence unit'), { target: { value: 'months' } });
+        expect(setReviewCadence).toHaveBeenLastCalledWith(null);
     });
 
     it('turns reviews on and off with a checkbox that shows the cadence only when on', () => {
