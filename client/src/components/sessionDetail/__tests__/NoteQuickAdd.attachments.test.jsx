@@ -38,6 +38,6 @@ describe('NoteQuickAdd attachments', () => {
 
     it('stays text-only without a fractal', () => {
         render(<NoteQuickAdd onSubmit={vi.fn()} />);
-        expect(screen.queryByRole('button', { name: 'Attach pictures or video' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Attach pictures, video or audio' })).not.toBeInTheDocument();
     });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import MediaAttachment from '../MediaAttachment';
 import MarkdownNoteContent from '../MarkdownNoteContent';
@@ -34,6 +34,40 @@ describe('MediaAttachment', () => {
         const { container } = render(<MediaAttachment asset={{ ...image, mime_type: 'video/mp4' }} rootId="root" />);
         expect(container.querySelector('video')).toHaveAttribute('preload', 'none');
         expect(container.querySelector('video')).toHaveAttribute('poster', expect.stringMatching(/\/root\/media\/.+\/thumbnail$/));
+    });
+
+    describe('audio', () => {
+        const song = { ...image, name: 'Verse idea.m4a', mime_type: 'audio/mp4', alt_text: '' };
+        const playable = (answer) => vi.spyOn(HTMLMediaElement.prototype, 'canPlayType').mockReturnValue(answer);
+        afterEach(() => vi.restoreAllMocks());
+
+        it('plays in an audio player that loads nothing until played and never asks for a poster', () => {
+            playable('maybe');
+            const { container } = render(<MediaAttachment asset={song} rootId="root" />);
+            const audio = container.querySelector('audio');
+            expect(audio).toHaveAttribute('controls');
+            expect(audio).toHaveAttribute('preload', 'none');
+            expect(audio).toHaveAttribute('aria-label', 'Verse idea.m4a');
+            expect(audio.getAttribute('src')).toContain('/root/media/asset/content');
+            expect(container.querySelector('[poster]')).toBeNull();
+            expect(container.innerHTML).not.toContain('/thumbnail');
+        });
+
+        it('points to the provider when this browser cannot play the format', () => {
+            playable('');
+            const { container } = render(<MediaAttachment asset={{ ...song, name: 'Take 3.ogg', mime_type: 'audio/ogg' }} rootId="root" />);
+            expect(container.querySelector('audio')).toBeNull();
+            expect(screen.getByRole('status')).toHaveTextContent('This browser can’t play OGG audio. Open it in Google Drive');
+            expect(screen.getByRole('link', { name: /Take 3\.ogg · Google Drive/ })).toBeInTheDocument();
+        });
+
+        it('offers retry when playback fails', () => {
+            playable('probably');
+            const { container } = render(<MediaAttachment asset={song} rootId="root" />);
+            fireEvent.error(container.querySelector('audio'));
+            fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+            expect(container.querySelector('audio')).toBeInTheDocument();
+        });
     });
 
     it('renders Markdown pictures responsively with a fallback', () => {

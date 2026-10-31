@@ -36,7 +36,8 @@ async function mockConnectedStorage(page, uploads) {
     });
     await page.route('**/media/uploads/*', (route) => {
         const id = route.request().url().split('/').pop();
-        return route.fulfill({ json: { id, offset: 1, size_bytes: 1, chunk_bytes: 1048576, asset: { id: `asset-${id}`, name: `${id}.png`, mime_type: 'image/png' } } });
+        const { name, mime_type } = uploads[Number(id.replace('upload-', '')) - 1];
+        return route.fulfill({ json: { id, offset: 1, size_bytes: 1, chunk_bytes: 1048576, asset: { id: `asset-${id}`, name, mime_type } } });
     });
 }
 
@@ -71,7 +72,7 @@ test('notes explain unavailable cloud storage and preserve the draft', async ({ 
 test('the goal quick note bar attaches media from beside the add-note button', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     await openGoalNotes(page, suffix);
-    const attach = page.getByRole('button', { name: 'Attach pictures or video', exact: true });
+    const attach = page.getByRole('button', { name: 'Attach pictures, video or audio', exact: true });
     const add = page.getByRole('button', { name: 'Add note', exact: true });
     const [attachBox, addBox] = [await attach.boundingBox(), await add.boundingBox()];
     // The add-note button comes first, then the paperclip (00e40d76).
@@ -122,6 +123,29 @@ test('pasted and dropped pictures upload into connected storage before the note 
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
 });
 
+test('dropped recordings upload as audio under their canonical types', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const uploads = [];
+    await mockConnectedStorage(page, uploads);
+    await openGoalNotes(page, suffix);
+    const textbox = page.getByPlaceholder('Add a goal note...');
+    await textbox.dispatchEvent('drop', { dataTransfer: await page.evaluateHandle(() => {
+        const transfer = new DataTransfer();
+        // An iPhone Voice Memo as macOS labels it, and an MP3 bounce.
+        transfer.items.add(new File([new Uint8Array([0, 0, 0, 32, 102, 116, 121, 112])], 'Verse idea.m4a', { type: 'audio/x-m4a' }));
+        transfer.items.add(new File([new Uint8Array([73, 68, 51, 4])], 'Chorus take 2.mp3', { type: 'audio/mpeg' }));
+        return transfer;
+    }) });
+    const pending = page.getByRole('list', { name: 'Attachments for this note' });
+    await expect(pending.getByRole('listitem')).toHaveCount(2);
+    await expect(pending).toContainText('Verse idea.m4a');
+    expect(uploads.map(({ name, mime_type }) => [name, mime_type]))
+        .toEqual([['Verse idea.m4a', 'audio/mp4'], ['Chorus take 2.mp3', 'audio/mpeg']]);
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('quick-note-audio.png') });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
+});
+
 test('activity and session notes attach pictures from the same paperclip menu', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const uploads = [];
@@ -138,7 +162,7 @@ test('activity and session notes attach pictures from the same paperclip menu', 
     const textbox = page.getByPlaceholder('Add a note about this activity...');
     await expect(textbox).toBeVisible();
     const bar = page.locator('form').filter({ has: textbox });
-    await bar.getByRole('button', { name: 'Attach pictures or video', exact: true }).click();
+    await bar.getByRole('button', { name: 'Attach pictures, video or audio', exact: true }).click();
     await expect(page.getByRole('menuitem', { name: /From this device/ })).toContainText('Saved to Dropbox');
     await page.keyboard.press('Escape');
     await pasteImage(textbox);
@@ -151,7 +175,7 @@ test('activity and session notes attach pictures from the same paperclip menu', 
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Details', exact: true }).click();
     await page.getByRole('button', { name: 'Session Notes', exact: true }).click();
     const sessionBar = page.locator('form').filter({ has: page.getByPlaceholder('Add a session note...') });
-    await expect(sessionBar.getByRole('button', { name: 'Attach pictures or video', exact: true })).toBeVisible();
+    await expect(sessionBar.getByRole('button', { name: 'Attach pictures, video or audio', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
 });
 
@@ -170,13 +194,13 @@ test('a note’s options menu closes on an outside click without crashing the pa
     const card = page.locator('[class*="noteCard_"]').filter({ has: text });
     await card.getByRole('button', { name: 'Note options' }).click();
     await expect(page.getByRole('menu', { name: 'Note options' }).getByRole('menuitem'))
-        .toContainText(['Edit', 'Attach pictures or video', 'Pin note', 'Delete']);
+        .toContainText(['Edit', 'Attach pictures, video or audio', 'Pin note', 'Delete']);
     // A real press on the note text used to crash Chrome's renderer while the menu was open.
     // Press its left edge: on narrow screens the right-aligned menu covers the middle.
     await text.click({ position: { x: 4, y: 4 } });
     await expect(page.getByRole('menu', { name: 'Note options' })).toHaveCount(0);
     await card.getByRole('button', { name: 'Note options' }).click();
-    await page.getByRole('menuitem', { name: 'Attach pictures or video' }).click();
+    await page.getByRole('menuitem', { name: 'Attach pictures, video or audio' }).click();
     await expect(page.getByRole('region', { name: 'Manage attachments' })).toBeVisible();
     expect(errors).toEqual([]);
 });
@@ -208,7 +232,7 @@ test('goal descriptions and completion notes take pasted pictures into cloud sto
     const description = page.getByLabel('Description', { exact: true });
     await expect(description).toBeVisible();
     const field = page.locator('[class*="attachableField"]').filter({ has: description });
-    await expect(field.getByRole('button', { name: 'Attach pictures or video' })).toBeVisible();
+    await expect(field.getByRole('button', { name: 'Attach pictures, video or audio' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload from device' })).toHaveCount(0);
     await pasteImage(description);
     await expect(page.getByRole('list', { name: 'Attachments for this description' }).getByRole('listitem')).toHaveCount(1);

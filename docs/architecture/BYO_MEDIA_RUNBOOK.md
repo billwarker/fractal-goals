@@ -71,14 +71,21 @@ recovered without overwriting or duplicating a user's original file.
 
 ## User workflow and limits
 
-Open **Attach pictures or video** in the shared note composer or an existing editable note.
+Open **Attach pictures, video or audio** in the shared note composer or an existing editable note.
 Connect an account in the separate authorization window, return to the app and refresh its
 connection list. Choose a Drive file, choose from the Dropbox app folder, or upload a local file.
 Add a description and save the note/attachments. Notes, goal notes, goal reviews, session,
 activity and circuit note cards share this renderer and attachment editor. Text remains required.
 
-Supported formats are JPEG, PNG, WebP, GIF, MP4 and WebM. Metadata, filename extensions and
-binary signatures are checked; browser codec support still determines whether a video plays.
+Supported formats are JPEG, PNG, WebP, GIF, MP4, WebM, MP3, M4A, WAV, FLAC and OGG/Opus. One
+canonical table (`MEDIA_TYPES` in `services/storage_common.py`, mirrored by `client/src/utils/cloudUpload.js`
+and checked against `tests/fixtures/media_types.json`) owns types, kinds, extensions and the aliases
+browsers and providers use (`audio/x-m4a` → `audio/mp4`). Every boundary (upload start, Drive and
+Dropbox metadata, import, playback revision checks) stores and compares the canonical type, so an
+alias never reads as a changed file; Dropbox types come from the extension table, never the host's
+mime database. Metadata, filename extensions and binary signatures are checked; browser codec
+support still determines whether video or audio plays, and audio the browser reports it cannot
+decode shows a link to the original instead of a dead player. Audio has no poster request.
 HEIC/MOV conversion and transcoding are not implemented. There are at most 8 attachments per
 note, 1,000 media references per fractal and 16 unfinished uploads per fractal. Completed upload
 rows do not count toward the unfinished limit. Upload sessions expire after 24 hours and old
@@ -184,7 +191,8 @@ and worker budgets; use a separately scaled media service if those measurements 
 
 Real-provider acceptance must record: two accounts with cross-user/root denial; selection and
 upload without public sharing; refresh/expired consent; logout/disconnect; missing/replaced files;
-blocked third-party cookies; Safari/iOS and desktop Chromium playback; codec fallback; seeking
+blocked third-party cookies; Safari/iOS and desktop Chromium playback, including an iPhone Voice Memo
+(M4A), an MP3 and a WAV attached from each provider; codec fallback (OGG on Safari); seeking
 with `200`, `206` and `416`; quota/throttling; cancellation and lost-response recovery; and
 latency/memory/bandwidth at the supported file limit. Local protocol mocks do not establish those
 provider/browser properties. Keep the integration unconfigured until this evidence is collected.

@@ -419,7 +419,11 @@ keep that correlation to avoid quadratic joins when tenant statistics lag behind
 Media has one structured attachment boundary: `models/storage.py`, `services/media_service.py`,
 `services/storage_connection_service.py`, `services/storage_upload_service.py` and
 `blueprints/storage_api.py`. User-owned Google Drive (`drive.file` + Picker) and Dropbox App Folder
-connections retain encrypted credentials; originals stay in the provider. Notes link to scoped
+connections retain encrypted credentials; originals stay in the provider. Pictures, video and audio
+share one canonical type table (`storage_common.MEDIA_TYPES`, mirrored in `utils/cloudUpload.js`,
+checked against `tests/fixtures/media_types.json`); aliases such as `audio/x-m4a` are canonicalized at
+upload, provider-metadata and playback boundaries. `MediaAttachment` renders `<img>`, `<video>` (provider
+poster) or `<audio>` (no poster) by kind. Notes link to scoped
 media assets through `note_attachments`; goal notes/reviews/completion notes, sessions and activities reuse that
 store. Goal descriptions link through `goal_attachments`, read on demand (`GET …/goals/<id>/attachments`,
 `hooks/useGoalDescriptionAttachments.js`) so goal trees never load them, and saved with the goal update

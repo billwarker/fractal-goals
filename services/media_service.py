@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 
 from models import Goal, GoalAttachment, MediaAsset, Note, NoteAttachment, validate_root_goal
 from services import storage_providers as provider_api
-from services.storage_common import MAX_ATTACHMENTS, StorageError, serialize_asset, validate_file, validate_file_id, verify_signature
+from services.storage_common import (
+    MAX_ATTACHMENTS, StorageError, canonical_media_type, media_kind, serialize_asset, validate_file, validate_file_id, verify_signature,
+)
 from services.media_stream import bounded_range
 from services.storage_connection_service import StorageConnectionService
 
@@ -28,7 +30,7 @@ class MediaService:
         connection = self.connections.connection(user_id, provider)
         token = self.connections.access_token(connection.id, user_id)
         data = provider_api.metadata(provider, token, file_id, resource_key)
-        validate_file(data['name'], data['mime_type'], data['size_bytes'])
+        data['mime_type'] = validate_file(data['name'], data['mime_type'], data['size_bytes'])
         if data['file_id'] != file_id:
             raise StorageError('Provider returned an unexpected file', 502)
         with provider_api.download(provider, token, file_id, resource_key, 'bytes=0-31') as response:
@@ -39,7 +41,7 @@ class MediaService:
         return serialize_asset(asset)
 
     def store_asset(self, root_id, connection_id, data, resource_key=None):
-        validate_file(data['name'], data['mime_type'], data['size_bytes'])
+        data = {**data, 'mime_type': validate_file(data['name'], data['mime_type'], data['size_bytes'])}
         if not self.db.query(Goal.id).filter(Goal.id == root_id, Goal.deleted_at.is_(None)).with_for_update().first():
             raise StorageError('Fractal not found', 404)
         asset = self.db.query(MediaAsset).filter_by(root_id=root_id, connection_id=connection_id, file_id=data['file_id']).first()
@@ -175,6 +177,8 @@ class MediaService:
     def thumbnail(self, root_id, user_id, asset_id):
         """The provider's preview image for a playable file (a video's poster frame)."""
         asset = self.playable_asset(root_id, user_id, asset_id)
+        if media_kind(asset.mime_type) != 'video':
+            raise StorageError('No preview image for this file', 404, 'media_no_thumbnail')
         token = self.connections.access_token(asset.connection_id, user_id)
         return provider_api.thumbnail(asset.connection.provider, token, asset.file_id, asset.resource_key)
 
@@ -184,7 +188,8 @@ class MediaService:
             raise StorageError('Use a single valid byte range', 416, 'media_invalid_range')
         token = self.connections.access_token(asset.connection_id, user_id)
         current = provider_api.metadata(asset.connection.provider, token, asset.file_id, asset.resource_key)
-        if current['revision'] != asset.revision or current['size_bytes'] != asset.size_bytes or current['mime_type'] != asset.mime_type:
+        if (current['revision'] != asset.revision or current['size_bytes'] != asset.size_bytes
+                or canonical_media_type(current['mime_type'], asset.name) != asset.mime_type):
             raise StorageError('The source file changed. Relink a new file to preserve this evidence.', 409, 'media_revision_changed')
         response = provider_api.download(asset.connection.provider, token, asset.file_id, asset.resource_key,
                                          bounded_range(byte_range, asset.size_bytes))

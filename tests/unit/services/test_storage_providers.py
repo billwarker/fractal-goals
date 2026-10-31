@@ -67,7 +67,9 @@ def test_google_resumable_status_before_and_after_commit(requests_mock):
 
 
 @pytest.mark.parametrize('mime,head', [('image/png', b'\x89PNG\r\n\x1a\n'), ('image/jpeg', b'\xff\xd8\xff'),
-    ('image/webp', b'RIFFxxxxWEBP'), ('image/gif', b'GIF89a'), ('video/mp4', b'\0\0\0\x18ftyp'), ('video/webm', b'\x1a\x45\xdf\xa3')])
+    ('image/webp', b'RIFFxxxxWEBP'), ('image/gif', b'GIF89a'), ('video/mp4', b'\0\0\0\x18ftyp'), ('video/webm', b'\x1a\x45\xdf\xa3'),
+    ('audio/mpeg', b'ID3\x04\0'), ('audio/mpeg', b'\xff\xfb\x90\x64'), ('audio/mp4', b'\0\0\0\x20ftypM4A '),
+    ('audio/wav', b'RIFFxxxxWAVEfmt '), ('audio/flac', b'fLaC\0'), ('audio/ogg', b'OggS\0\x02')])
 def test_signature_validation(mime, head):
     verify_signature(mime, head)
     with pytest.raises(StorageError):
@@ -104,3 +106,25 @@ def test_telemetry_drops_token_bearing_instagram_oembed_breadcrumbs():
     ]}})
     assert result['breadcrumbs']['values'] == [{'data': {'url': 'https://app.test/api/notes'}}]
     assert 'secret' not in str(result)
+
+
+def test_audio_signature_rejects_another_audio_format():
+    with pytest.raises(StorageError):
+        verify_signature('audio/mpeg', b'RIFFxxxxWAVEfmt ')
+    with pytest.raises(StorageError):
+        verify_signature('audio/wav', b'RIFFxxxxWEBP')
+
+
+@pytest.mark.parametrize('name,mime', [('Voice Memo.m4a', 'audio/mp4'), ('song.mp3', 'audio/mpeg'), ('take.wav', 'audio/wav'),
+                                       ('clip.mp4', 'video/mp4'), ('notes.txt', 'application/octet-stream')])
+def test_dropbox_metadata_types_come_from_the_extension_table(name, mime):
+    row = {'id': 'id:abc', 'name': name, 'size': 10, 'content_hash': 'hash'}
+    assert providers.dropbox_metadata(row)['mime_type'] == mime
+
+
+def test_drive_metadata_canonicalizes_audio_aliases(requests_mock):
+    requests_mock.get('https://www.googleapis.com/drive/v3/files/abc', json={
+        'id': 'abc', 'name': 'Voice Memo.m4a', 'mimeType': 'audio/x-m4a', 'size': '10', 'md5Checksum': 'hash',
+        'trashed': False, 'capabilities': {'canDownload': True},
+    })
+    assert providers.metadata('google_drive', 'token', 'abc')['mime_type'] == 'audio/mp4'

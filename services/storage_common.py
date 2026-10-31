@@ -7,10 +7,24 @@ from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from config import config
 
 PROVIDERS = ('google_drive', 'dropbox')
+# Canonical type -> kind, accepted extensions and the other names browsers and providers use for it.
+# Mirrored by client/src/utils/cloudUpload.js; both are checked against tests/fixtures/media_types.json.
 MEDIA_TYPES = {
-    'image/jpeg': ('.jpg', '.jpeg'), 'image/png': ('.png',), 'image/webp': ('.webp',),
-    'image/gif': ('.gif',), 'video/mp4': ('.mp4',), 'video/webm': ('.webm',),
+    'image/jpeg': {'kind': 'image', 'extensions': ('.jpg', '.jpeg'), 'aliases': ()},
+    'image/png': {'kind': 'image', 'extensions': ('.png',), 'aliases': ()},
+    'image/webp': {'kind': 'image', 'extensions': ('.webp',), 'aliases': ()},
+    'image/gif': {'kind': 'image', 'extensions': ('.gif',), 'aliases': ()},
+    'video/mp4': {'kind': 'video', 'extensions': ('.mp4',), 'aliases': ()},
+    'video/webm': {'kind': 'video', 'extensions': ('.webm',), 'aliases': ()},
+    'audio/mpeg': {'kind': 'audio', 'extensions': ('.mp3',), 'aliases': ('audio/mp3',)},
+    'audio/mp4': {'kind': 'audio', 'extensions': ('.m4a',),
+                  'aliases': ('audio/x-m4a', 'audio/m4a', 'audio/mp4a-latm', 'audio/aac')},
+    'audio/wav': {'kind': 'audio', 'extensions': ('.wav',), 'aliases': ('audio/x-wav', 'audio/wave', 'audio/vnd.wave')},
+    'audio/flac': {'kind': 'audio', 'extensions': ('.flac',), 'aliases': ('audio/x-flac',)},
+    'audio/ogg': {'kind': 'audio', 'extensions': ('.ogg', '.opus'),
+                  'aliases': ('audio/opus', 'audio/x-opus+ogg', 'application/ogg')},
 }
+SUPPORTED_TYPES_TEXT = 'a picture (JPEG, PNG, WebP, GIF), video (MP4, WebM) or audio (MP3, M4A, WAV, FLAC, OGG) file'
 MAX_ATTACHMENTS = 8
 CHUNK_BYTES = 1024 * 1024
 
@@ -55,14 +69,37 @@ def provider_config(provider):
     return client_id, secret
 
 
+def canonical_media_type(mime_type, name=''):
+    """The canonical type for a file whose extension matches it, or None.
+
+    Aliases (`audio/x-m4a`) resolve to their canonical type; a missing or generic type falls back to
+    the extension, as browsers leave `.flac` blank and Dropbox reports no type at all.
+    """
+    mime = (mime_type or '').strip().lower() if isinstance(mime_type, str) else ''
+    lowered = name.lower() if isinstance(name, str) else ''
+    for canonical, spec in MEDIA_TYPES.items():
+        if not lowered.endswith(spec['extensions']):
+            continue
+        if mime in ('', 'application/octet-stream') or mime == canonical or mime in spec['aliases']:
+            return canonical
+    return None
+
+
+def media_kind(mime_type):
+    spec = MEDIA_TYPES.get(mime_type)
+    return spec['kind'] if spec else None
+
+
 def validate_file(name, mime_type, size):
+    """Validate an attachable file and return its canonical media type."""
     if not isinstance(name, str) or not name.strip() or len(name) > 255 or re.search(r'[/\\\x00-\x1f]', name):
         raise StorageError('Use a file name without folders or control characters')
-    extensions = MEDIA_TYPES.get(mime_type, ())
-    if not extensions or not name.lower().endswith(extensions):
-        raise StorageError('Choose a JPEG, PNG, WebP, GIF, MP4 or WebM file', 415, 'media_type_unsupported')
+    canonical = canonical_media_type(mime_type, name)
+    if not canonical:
+        raise StorageError(f'Choose {SUPPORTED_TYPES_TEXT}', 415, 'media_type_unsupported')
     if not isinstance(size, int) or isinstance(size, bool) or not 0 < size <= config.STORAGE_MAX_FILE_BYTES:
         raise StorageError('The file exceeds the configured media size limit', 413, 'media_too_large')
+    return canonical
 
 
 def validate_file_id(provider, file_id):
@@ -79,9 +116,15 @@ def verify_signature(mime_type, head):
         'image/webp': head[:4] == b'RIFF' and head[8:12] == b'WEBP',
         'video/mp4': head[4:8] == b'ftyp',
         'video/webm': head.startswith(b'\x1a\x45\xdf\xa3'),
+        # An ID3 tag, or straight into an MPEG audio frame (11 sync bits).
+        'audio/mpeg': head.startswith(b'ID3') or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0),
+        'audio/mp4': head[4:8] == b'ftyp',
+        'audio/wav': head[:4] == b'RIFF' and head[8:12] == b'WAVE',
+        'audio/flac': head.startswith(b'fLaC'),
+        'audio/ogg': head.startswith(b'OggS'),
     }
     if not matches.get(mime_type, False):
-        raise StorageError('File contents do not match a supported picture or video format', 415, 'media_type_unsupported')
+        raise StorageError('File contents do not match a supported picture, video or audio format', 415, 'media_type_unsupported')
 
 
 def serialize_asset(asset):

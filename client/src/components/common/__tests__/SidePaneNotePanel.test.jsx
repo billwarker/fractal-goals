@@ -33,8 +33,8 @@ describe('SidePaneNotePanel quick composer', () => {
     it('offers this device and cloud storage from a single paperclip after the add-note button', () => {
         render(<SidePaneNotePanel composerOnly rootId="root" onSubmit={vi.fn()} />);
         expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label')))
-            .toEqual(['Add note', 'Attach pictures or video']);
-        const paperclip = screen.getByRole('button', { name: 'Attach pictures or video' });
+            .toEqual(['Add note', 'Attach pictures, video or audio']);
+        const paperclip = screen.getByRole('button', { name: 'Attach pictures, video or audio' });
         fireEvent.click(paperclip);
         expect(paperclip).toHaveAttribute('aria-expanded', 'true');
         const menu = screen.getByRole('menu', { name: 'Attach from' });
@@ -52,10 +52,10 @@ describe('SidePaneNotePanel quick composer', () => {
         render(<SidePaneNotePanel composerOnly rootId="root" onSubmit={vi.fn()} />);
         const input = document.querySelector('input[type="file"]');
         const click = vi.spyOn(input, 'click');
-        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures or video' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures, video or audio' }));
         fireEvent.click(screen.getByRole('menuitem', { name: /From this device/ }));
         expect(click).toHaveBeenCalled();
-        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures or video' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures, video or audio' }));
         fireEvent.pointerDown(document.body);
         expect(screen.queryByRole('menu')).not.toBeInTheDocument();
     });
@@ -91,7 +91,7 @@ describe('SidePaneNotePanel quick composer', () => {
     it('adds an existing cloud file', async () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<SidePaneNotePanel composerOnly rootId="root" onSubmit={onSubmit} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures or video' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures, video or audio' }));
         fireEvent.click(screen.getByRole('menuitem', { name: 'From cloud storage' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Pick practice.mp4' }));
         expect(screen.getByRole('list', { name: 'Attachments for this note' })).toHaveTextContent('practice.mp4');

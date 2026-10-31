@@ -197,7 +197,7 @@ function GoalDetailModalRenderSurface({
         : null;
     const uncompletionCompletedAt = localCompletedAt || goal?.attributes?.completed_at || goal?.completed_at;
     const [completionNoteDraft, setCompletionNoteDraft] = useState('');
-    // Pictures and video for the completion note, saved to the user's cloud storage.
+    // Pictures, video and audio for the completion note, saved to the user's cloud storage.
     const completionAttachments = useAttachmentDraft(rootId);
     const resetCompletionAttachments = completionAttachments.reset;
     const sequenceChoice = useSequenceCompletionChoice({ rootId, goalId, goal, viewState, readOnly });

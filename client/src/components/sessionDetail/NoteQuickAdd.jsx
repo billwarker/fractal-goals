@@ -1,7 +1,7 @@
 /**
  * NoteQuickAdd - Quick input for adding notes
  *
- * Enter submits. With a rootId, pictures and video can be attached from this device or cloud
+ * Enter submits. With a rootId, pictures, video and audio can be attached from this device or cloud
  * storage, or pasted/dropped; onSubmit then receives (content, attachments) where attachments
  * are finished uploads in the server's serialized shape (useful for optimistic rendering).
  */

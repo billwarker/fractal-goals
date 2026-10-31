@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 
 import { useStorageConnections } from '../../hooks/useStorageConnections';
 import { storageApi } from '../../utils/api/storageApi';
+import { mediaKind } from '../../utils/cloudUpload';
 import { chooseGoogleDriveFile } from '../../utils/googleDrivePicker';
 import { providerLabel } from '../../utils/storageConnectionCopy';
 import Button from '../atoms/Button';
@@ -89,7 +90,7 @@ export default function CloudMediaDialog({ rootId, onAdd, onClose }) {
             {dropbox && <>
                 <p className={styles.hint}>Files in Apps/Fractal Goals. Add existing files to that folder in Dropbox.</p>
                 <ul className={styles.files}>
-                    {dropbox.files.filter((file) => /^(image|video)\//.test(file.mime_type)).map((file) => (
+                    {dropbox.files.filter((file) => mediaKind(file.mime_type)).map((file) => (
                         <li key={file.file_id}><Button disabled={busy} onClick={() => run(() => attach('dropbox', file))}>{file.name}</Button></li>
                     ))}
                 </ul>

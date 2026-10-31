@@ -45,12 +45,23 @@ describe('useAttachmentDraft', () => {
         const { result, rerender } = renderHook(() => useAttachmentDraft('root'));
         act(() => { result.current.addFiles([file('scan.heic', 'image/heic'), file('huge.jpg', 'image/jpeg', 11)]); });
         expect(result.current.items).toEqual([]);
-        expect(result.current.notice).toMatch(/scan.heic isn’t a JPEG.*huge.jpg is larger/);
+        expect(result.current.notice).toMatch(/scan.heic isn’t a picture \(JPEG.*or audio \(MP3.*huge.jpg is larger/);
         mocks.storage = { providers: [{ provider: 'dropbox', configured: true, connected: false, status: 'not_connected' }], limits: null };
         rerender();
         act(() => { result.current.addFiles([file()]); });
         expect(result.current.notice).toMatch(/Connect Google Drive or Dropbox in Settings/);
         expect(mocks.api.startUpload).not.toHaveBeenCalled();
+    });
+
+    it('uploads audio under its canonical type, whatever the browser called it', async () => {
+        mocks.api.uploadChunk.mockResolvedValue(done);
+        const { result } = renderHook(() => useAttachmentDraft('root'));
+        // macOS reports Voice Memos as audio/x-m4a; some browsers leave FLAC untyped.
+        act(() => { result.current.addFiles([file('Verse idea.m4a', 'audio/x-m4a'), file('Mix.flac', '')]); });
+        expect(result.current.notice).toBe('');
+        await waitFor(() => expect(mocks.api.startUpload).toHaveBeenCalledTimes(2));
+        const sent = mocks.api.startUpload.mock.calls.map(([, , upload]) => [upload.name, upload.type]);
+        expect(sent).toEqual([['Verse idea.m4a', 'audio/mp4'], ['Mix.flac', 'audio/flac']]);
     });
 
     it('names pasted pictures and ignores text pastes', () => {

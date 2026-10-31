@@ -195,7 +195,7 @@ function NoteCard({
     const canManageMedia = canEdit && Boolean(note.root_id);
     const menuItems = [
         canEdit && { label: 'Edit', onSelect: handleEditClick },
-        canManageMedia && { label: note.attachments?.length ? 'Manage attachments' : 'Attach pictures or video', onSelect: () => setManagingMedia(true) },
+        canManageMedia && { label: note.attachments?.length ? 'Manage attachments' : 'Attach pictures, video or audio', onSelect: () => setManagingMedia(true) },
         canPin && { label: note.is_pinned ? 'Unpin' : 'Pin note', onSelect: handlePinToggle },
         canDelete && { label: 'Delete', onSelect: handleDelete, danger: true },
     ].filter(Boolean);

@@ -72,7 +72,7 @@ This content is yours. It is visible only to you. See
 
 #### Optional connected media storage
 
-You can connect Google Drive or Dropbox to attach pictures and videos to notes and goal
+You can connect Google Drive or Dropbox to attach pictures, videos and audio to notes and goal
 descriptions. Original files remain in your provider account. When you upload a file from your
 device, we save it to a Fractal Goals folder in that account, and at your request we can rename a
 file or move it to your provider's trash. We store file references, descriptive metadata, and

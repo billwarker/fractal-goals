@@ -1,3 +1,5 @@
+import { UPLOAD_MIME_NAMES } from './cloudUpload';
+
 let loading;
 
 function loadPicker() {
@@ -44,9 +46,8 @@ export async function chooseGoogleDriveFile(credentials, signal) {
         const timeout = setTimeout(() => finish(null, new Error('Google Picker did not finish. Check access and try again.')), 120000);
         signal?.addEventListener('abort', cancel, { once: true });
         try {
-            const view = new google.picker.DocsView().setMimeTypes(
-                'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm',
-            ).setIncludeFolders(true).setSelectFolderEnabled(false);
+            const view = new google.picker.DocsView().setMimeTypes(UPLOAD_MIME_NAMES.join(','))
+                .setIncludeFolders(true).setSelectFolderEnabled(false);
             picker = new google.picker.PickerBuilder()
                 .setAppId(credentials.app_id)
                 .setDeveloperKey(credentials.api_key)

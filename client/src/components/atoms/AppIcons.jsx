@@ -149,6 +149,35 @@ export function PinIcon(props) {
     );
 }
 
+export function ImageIcon(props) {
+    return (
+        <SvgIcon {...props}>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+        </SvgIcon>
+    );
+}
+
+export function MusicIcon(props) {
+    return (
+        <SvgIcon {...props}>
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+        </SvgIcon>
+    );
+}
+
+export function VideoIcon(props) {
+    return (
+        <SvgIcon {...props}>
+            <rect x="2" y="6" width="14" height="12" rx="2" />
+            <path d="m16 10 6-3.5v11L16 14" />
+        </SvgIcon>
+    );
+}
+
 export function PlayIcon(props) {
     return (
         <SvgIcon {...props} fill="currentColor" strokeWidth={0}>
