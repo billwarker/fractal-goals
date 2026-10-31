@@ -987,9 +987,13 @@
     cursor: grabbing;
 }
 
-.sequenceStep[data-completed='true'],
-.sequenceAddCard[data-completed='true'] {
+.sequenceStep[data-completed='true'] {
     opacity: 0.5;
+}
+
+/* Still addable, so dimmed less than a done step. */
+.sequenceAddCard[data-completed='true'] {
+    opacity: 0.75;
 }
 
 .sequenceStepNumber {

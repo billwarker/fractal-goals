@@ -48,14 +48,24 @@ describe('GoalSequenceSubView', () => {
         expect(mutations.createTrack).toHaveBeenCalledWith('p', ['a', 'b', 'c']);
     });
 
-    it('lists completed siblings faded and never offers them', () => {
+    it('adds a completed sibling ahead of the first open step so it keeps an early number', async () => {
         const goal = child('a');
-        renderView(goal, [goal, child('b'), child('done', { completed: true })]);
+        const { onDone } = renderView(goal, [goal, child('b'), child('done', { completed: true })]);
 
-        const completed = screen.getByRole('button', { name: 'Goal done (completed)' });
-        expect(completed).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Add Goal b' }));
+        const completed = screen.getByRole('button', { name: 'Add Goal done (completed)' });
         expect(completed).toHaveAttribute('data-completed', 'true');
-        expect(screen.getByRole('button', { name: 'Add Goal b' })).toBeEnabled();
+        fireEvent.click(completed);
+        const items = within(screen.getByRole('list', { name: 'Sequence order' })).getAllByRole('listitem');
+        expect(items.map((item) => item.textContent)).toEqual([
+            expect.stringContaining('Goal done'), expect.stringContaining('Goal a'), expect.stringContaining('Goal b'),
+        ]);
+        expect(items[0]).toHaveTextContent('Done');
+        expect(items[1]).toHaveTextContent('Active');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create sequence' }));
+        await waitFor(() => expect(onDone).toHaveBeenCalled());
+        expect(mutations.createTrack).toHaveBeenCalledWith('p', ['done', 'a', 'b']);
     });
 
     it('marks siblings outside the scoped program', () => {
