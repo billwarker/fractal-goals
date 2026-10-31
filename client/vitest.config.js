@@ -2,6 +2,10 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { offlineCacheVersion } from './scripts/offline-cache-version.mjs';
 
+// Date-formatting tests assert local wall-clock times. Pin the zone so CI (UTC)
+// and developer machines render the same hours; worker threads share it.
+process.env.TZ = 'America/New_York';
+
 export default defineConfig({
     plugins: [react()],
     define: {
