@@ -147,7 +147,11 @@ jobs:
             python -m pytest -o addopts="" agent_adapter/tests
 
       - name: Exercise logical backup and restore
-        run: python scripts/check_backup_restore.py
+        # The suite builds the test schema from the models (head), not via Alembic,
+        # so stamp it; the drill proves the revision survives a restore.
+        run: |
+          python -m alembic stamp head
+          python scripts/check_backup_restore.py
 
       - name: Upload Coverage Artifacts
         uses: actions/upload-artifact@v4
