@@ -1,5 +1,5 @@
 import sqlalchemy as sa
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Text
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, Table, CheckConstraint, Text, event
 from sqlalchemy.orm import relationship, backref
 import uuid
 from .base import Base, utc_now, JSON_TYPE
@@ -494,7 +494,7 @@ def _install_goal_condition_tag_trigger(_target, connection, **_kwargs):
         connection.exec_driver_sql(GOAL_CONDITION_TAG_TRIGGER_SQL)
 
 
-sa.event.listen(GoalConditionTag.__table__, 'after_create', _install_goal_condition_tag_trigger)
+event.listen(GoalConditionTag.__table__, 'after_create', _install_goal_condition_tag_trigger)
 
 def get_all_root_goals(db_session):
     from sqlalchemy.orm import selectinload

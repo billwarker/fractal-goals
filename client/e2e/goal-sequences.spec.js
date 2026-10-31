@@ -99,7 +99,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
         }).toPass();
         await panel.getByRole('button', { name: 'Options', exact: true }).click();
         await panel.getByRole('button', { name: /^Sequence/ }).click();
-        await expect(panel.getByRole('button', { name: `${done.name} (completed)` })).toBeDisabled();
+        await expect(panel.getByRole('button', { name: `Add ${done.name} (completed)` })).toBeEnabled();
         await expect(page.locator('.react-flow__node').filter({ hasText: first.name })).toBeVisible();
         await expect(page.locator('.react-flow__node').filter({ hasText: child.name })).toHaveCount(0);
         if (process.env.SEQUENCE_SCREENSHOT) await page.screenshot({ path: process.env.SEQUENCE_SCREENSHOT.replace('.png', '-sequencing.png') });
