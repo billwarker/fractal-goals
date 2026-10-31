@@ -234,7 +234,9 @@ test('offline tag edits sync, and an activity added then deleted offline never r
     await page.getByRole('group', { name: 'Activity tags' }).getByRole('button', { name: 'Add tag' }).click();
     await page.getByRole('dialog', { name: 'Choose activity tags' }).getByText('Heavy day', { exact: true }).click();
     await page.getByRole('button', { name: 'Close tag picker' }).click();
-    await expect(page.getByRole('group', { name: 'Activity tags' }).getByTitle('Heavy day')).toBeVisible();
+    // Chips collapse into a titled "1 tag" summary when they don't fit, which depends on font metrics.
+    const activityTags = page.getByRole('group', { name: 'Activity tags' });
+    await expect(activityTags.getByRole('checkbox', { name: 'Heavy day', checked: true }).or(activityTags.getByTitle('Heavy day'))).toBeVisible();
 
     // Add an activity, then change your mind.
     await page.getByText('+ Add Activity').first().click();
