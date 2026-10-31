@@ -64,6 +64,9 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     await expect(dialog.getByRole('checkbox', { name: new RegExp(`Begin next goal in sequence: ${second.name}`) })).toBeChecked();
     await dialog.getByRole('button', { name: 'Complete Goal' }).click();
     await expect.poll(() => isPaused(second)).toBe(false);
+    // The completion toast lands over the mobile dialog footer and pauses while hovered; let it clear.
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole('status').filter({ hasText: `Completed: ${first.name}` })).toBeHidden({ timeout: 10_000 });
 
     // …and un-completing it pauses the second again.
     await dialog.getByRole('button', { name: 'Mark Incomplete' }).click();
