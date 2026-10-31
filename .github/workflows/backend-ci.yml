@@ -132,7 +132,11 @@ jobs:
           python scripts/check_backend_maintainability.py
 
       - name: Static type check (baseline ratchet)
-        run: basedpyright
+        # pyrightconfig.json names the local fractal-goals-venv; point that name at
+        # the runner's Python, where the dependencies above were installed.
+        run: |
+          ln -s "$(python -c 'import sys; print(sys.prefix)')" fractal-goals-venv
+          basedpyright
 
       - name: Run Coverage Suite
         run: |
