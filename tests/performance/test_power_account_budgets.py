@@ -207,7 +207,8 @@ class _HeaderClient:
 
 # Byte budgets track the slim goal payload (no duplicated attributes or per-goal level settings).
 @pytest.mark.parametrize(("path", "max_queries", "max_bytes"), [
-    ("/goals", 8, 360_000),
+    # Condition tags add one batched selectinload (constant, not per goal).
+    ("/goals", 9, 360_000),
     ("/goals/selection", 12, 90_000),
     ("/sessions?limit=20&view=summary", 12, 50_000),
     # One fixed circuit-run lookup prevents per-session/round/member lazy queries.
@@ -242,7 +243,8 @@ def test_power_account_session_goals_view_budget(client, query_counter, power_ac
     )
 
     assert_response_budget(response, max_bytes=40_000, max_ms=5000, elapsed_ms=elapsed_ms)
-    assert query_counter["total"] <= 24
+    # +1: batched condition-tag load for tag-scoped thresholds.
+    assert query_counter["total"] <= 25
 
 
 @pytest.mark.parametrize("with_detail", [False, True])

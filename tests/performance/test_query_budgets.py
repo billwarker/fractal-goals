@@ -679,7 +679,7 @@ def test_publish_landing_examples_query_budget(
     assert_response_budget(
         response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 66
+    assert query_counter["total"] <= 67  # +1: batched condition-tag load
 
 
 @pytest.mark.integration
