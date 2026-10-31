@@ -353,8 +353,17 @@ class GoalCompletionCondition(Base):
         (measure 'sets'), or its total yield reaches `target_value` (measure 'yield').
     cumulative: the summed metric (measure 'metric') or yield (measure 'yield') across the
         goal's active period reaches `target_value`.
-    consistency: `required_count` instances in the active period each have a set meeting
-        every rule (any completed instance counts when there are no rules).
+    consistency: `required_count` instances in the active period each have `min_sets` (default 1)
+        sets meeting every rule (any completed instance counts when there are no rules); with `consecutive`,
+        they must be logged in a row, so a logged instance that misses resets the count.
+
+    `set_aggregate = 'average'` (single_session and consistency, measure 'sets'): instead of
+    individual sets meeting every rule, a session qualifies when the average of each rule's metric
+    across all of its counted sets meets the rule, over at least `min_sets` sets.
+
+    `tags` narrows the evidence: only sets carrying every tag count (`tag_match = 'exact'`: only
+    sets whose effective tags are exactly these) (a set inherits its
+    instance's tags; an activity without sets is one implicit set).
     """
     __tablename__ = 'goal_completion_conditions'
 
@@ -372,6 +381,10 @@ class GoalCompletionCondition(Base):
     metric_definition_id = Column(String, ForeignKey('metric_definitions.id', ondelete='RESTRICT'), nullable=True)
     operator = Column(String, nullable=True)
     target_value = Column(sa.Numeric(14, 4), nullable=True)
+    consecutive = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    set_aggregate = Column(String, nullable=False, default='each', server_default='each')
+    # How counted sets match `tags`: 'contains' (every tag, others allowed) or 'exact' (just these).
+    tag_match = Column(String, nullable=False, default='contains', server_default='contains')
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
@@ -395,6 +408,13 @@ class GoalCompletionCondition(Base):
             name='ck_goal_conditions_total',
         ),
         CheckConstraint("measure <> 'metric' OR metric_definition_id IS NOT NULL", name='ck_goal_conditions_metric'),
+        CheckConstraint("NOT consecutive OR kind = 'consistency'", name='ck_goal_conditions_consecutive'),
+        CheckConstraint(
+            "set_aggregate = 'each' OR (set_aggregate = 'average' AND measure = 'sets'"
+            " AND kind IN ('single_session', 'consistency') AND min_sets >= 1)",
+            name='ck_goal_conditions_set_aggregate',
+        ),
+        CheckConstraint("tag_match IN ('contains', 'exact')", name='ck_goal_conditions_tag_match'),
     )
 
     goal = relationship("Goal", foreign_keys=[goal_id])
@@ -403,6 +423,10 @@ class GoalCompletionCondition(Base):
     rules = relationship(
         "GoalConditionMetricRule", back_populates="condition", cascade="all, delete-orphan",
         order_by="GoalConditionMetricRule.position",
+    )
+    tags = relationship(
+        "ActivityTagDefinition", secondary="goal_condition_tags",
+        order_by="(ActivityTagDefinition.sort_order, ActivityTagDefinition.name, ActivityTagDefinition.id)",
     )
 
 
@@ -426,6 +450,51 @@ class GoalConditionMetricRule(Base):
 
     condition = relationship("GoalCompletionCondition", back_populates="rules")
     metric = relationship("MetricDefinition")
+
+
+class GoalConditionTag(Base):
+    """A tag every set counted toward a condition must carry."""
+    __tablename__ = 'goal_condition_tags'
+
+    condition_id = Column(
+        String, ForeignKey('goal_completion_conditions.id', ondelete='CASCADE'), primary_key=True,
+    )
+    tag_definition_id = Column(
+        String, ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'), primary_key=True,
+    )
+
+    __table_args__ = (
+        sa.Index('ix_goal_condition_tags_tag', 'tag_definition_id', 'condition_id'),
+    )
+
+
+# A condition and its tags share a fractal, whatever the write path.
+GOAL_CONDITION_TAG_TRIGGER_SQL = """
+CREATE OR REPLACE FUNCTION enforce_goal_condition_tag_root() RETURNS trigger AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM goal_completion_conditions condition_row
+        JOIN activity_tag_definitions tag ON tag.root_id = condition_row.root_id
+        WHERE condition_row.id = NEW.condition_id AND tag.id = NEW.tag_definition_id
+    ) THEN
+        RAISE EXCEPTION 'condition and tag must share a fractal' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_goal_condition_tags_root ON goal_condition_tags;
+CREATE TRIGGER trg_goal_condition_tags_root BEFORE INSERT OR UPDATE ON goal_condition_tags
+FOR EACH ROW EXECUTE FUNCTION enforce_goal_condition_tag_root();
+"""
+
+
+def _install_goal_condition_tag_trigger(_target, connection, **_kwargs):
+    if connection.dialect.name == 'postgresql':
+        connection.exec_driver_sql(GOAL_CONDITION_TAG_TRIGGER_SQL)
+
+
+sa.event.listen(GoalConditionTag.__table__, 'after_create', _install_goal_condition_tag_trigger)
 
 def get_all_root_goals(db_session):
     from sqlalchemy.orm import selectinload

@@ -4,7 +4,7 @@ from .base import (
 )
 from .user import User, SignupInviteKey, BetaSignupRequest, PasswordResetToken, EmailDeliveryEvent, EmailWebhookEvent, AdminAuditEvent
 from .goal import (
-    GoalLevel, Goal, GoalPauseInterval, GoalSequenceTrack, GoalCompletionCondition, GoalConditionMetricRule,
+    GoalLevel, Goal, GoalPauseInterval, GoalSequenceTrack, GoalCompletionCondition, GoalConditionMetricRule, GoalConditionTag,
     COMPLETION_CONDITION_ACTIVITY_THRESHOLD, COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL,
     COMPLETION_CONDITIONS, COMPLETION_SOURCES, CONDITION_NAME_MAX_LENGTH, PAUSE_REASON_MANUAL, PAUSE_REASON_SEQUENCE,
     session_goals, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations,

@@ -14,7 +14,11 @@ import logging
 from services.events import event_bus, Event, Events
 from services.progress_service import ProgressService
 from services.goal_domain_rules import goal_completes_via_children
-from services.goal_condition_service import activities_with_conditions, reconcile_activity_conditions
+from services.goal_condition_service import (
+    activities_with_condition_tag,
+    activities_with_conditions,
+    reconcile_activity_conditions,
+)
 import models
 from models import (
     get_session,
@@ -188,6 +192,28 @@ def handle_activity_instance_deleted(event: Event):
     """A deleted instance stops counting; revert anything it alone satisfied."""
     root_id, activity_id = _instance_activity(event)
     _handle_evidence_change(event, root_id=root_id, activity_ids={activity_id}, trigger='activity_instance_deleted')
+
+
+@event_bus.on(Events.ACTIVITY_TAG_ASSIGNMENTS_UPDATED)
+def handle_activity_tag_assignments_updated(event: Event):
+    """Tagged thresholds count only tagged sets, so retagging changes evidence."""
+    root_id, activity_id = _instance_activity(event)
+    _handle_evidence_change(event, root_id=root_id, activity_ids={activity_id}, trigger='activity_tags_updated')
+
+
+@event_bus.on(Events.ACTIVITY_TAG_MERGED)
+def handle_activity_tag_merged(event: Event):
+    """Sets that carried a merged-away tag now carry the target; re-check thresholds on it."""
+    root_id = event.data.get('root_id')
+    tag_id = event.data.get('activity_tag_definition_id')
+    if not root_id or not tag_id:
+        return
+    db_session, owns_session = _resolve_db_session(event)
+    try:
+        activity_ids = activities_with_condition_tag(db_session, root_id, tag_id)
+    finally:
+        _close_if_owned(db_session, owns_session)
+    _handle_evidence_change(event, root_id=root_id, activity_ids=activity_ids, trigger='activity_tag_merged')
 
 
 @event_bus.on(Events.GOAL_COMPLETED)

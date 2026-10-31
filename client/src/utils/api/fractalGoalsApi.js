@@ -43,6 +43,8 @@ export const fractalGoalsApi = {
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/condition/evidence`, {
             params: { ...(since === 'all' ? { since } : {}), ...(activityId ? { activity_id: activityId } : {}) },
         }),
+    previewGoalCondition: (rootId, goalId, condition) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/condition/preview`, { condition }),
     getGoalAnalytics: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/goals/analytics${buildQueryString(options)}`),
     getGoalActivities: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activities`),
     getGoalActivityGroups: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups`),

@@ -11,7 +11,7 @@ from services.goal_condition_reads import GoalConditionReadService
 from services.goal_deadline_rules import warnings_for_goal
 from services.goal_service import GoalService
 from services.serializers import serialize_goal
-from validators import GoalConditionUpdateSchema, validate_request
+from validators import GoalConditionPreviewSchema, GoalConditionUpdateSchema, validate_request
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,24 @@ def register_goal_condition_routes(blueprint):
         except SQLAlchemyError:
             db_session.rollback()
             logger.exception('Error reading goal condition evidence')
+            return internal_error(logger, 'Goals API request failed')
+        finally:
+            db_session.close()
+
+    @blueprint.route('/<root_id>/goals/<goal_id>/condition/preview', methods=['POST'])
+    @token_required
+    @validate_request(GoalConditionPreviewSchema)
+    def preview_goal_condition(current_user, root_id, goal_id, validated_data):
+        """Evaluate an unsaved threshold against the goal's evidence; writes nothing."""
+        db_session = get_db_session()
+        try:
+            payload, error, status = GoalConditionReadService(db_session).preview(
+                root_id, current_user.id, goal_id, validated_data['condition'],
+            )
+            return (error_response(error, status) if error else (jsonify(payload), status))
+        except SQLAlchemyError:
+            db_session.rollback()
+            logger.exception('Error previewing goal condition')
             return internal_error(logger, 'Goals API request failed')
         finally:
             db_session.close()

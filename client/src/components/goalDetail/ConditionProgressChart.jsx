@@ -3,7 +3,8 @@ import { Line } from 'react-chartjs-2';
 
 import { DISABLED_CHART_ANIMATION, applyChartDensity, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
 import useActiveChartPoint from '../analytics/useActiveChartPoint';
-import { OPERATOR_SYMBOLS, formatConditionNumber } from '../../utils/goalConditions';
+import { OPERATOR_SYMBOLS } from '../../utils/goalConditions';
+import { formatConditionNumber } from '../../utils/goalConditionText';
 import { buildConditionSeries } from '../../utils/goalConditionSeries';
 import styles from './ConditionProgressChart.module.css';
 

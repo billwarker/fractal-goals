@@ -19,7 +19,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 const Chart = ({ context }) => <div data-testid="chart" data-lines={context.goalConditionLines.length} />;
 const context = (id = 'metricTrends') => ({ visualization: { id }, chartRef: { current: {} }, effectiveSelectedActivity: { id: 'a' } });
-const target = { summary: 'Weight ≥ 225 lb in one session', conditionDraft: { kind: 'single_session' } };
+const target = { summary: 'Weight ≥ 225 lb within one session', conditionDraft: { kind: 'single_session' } };
 
 describe('ChartGoalSurface', () => {
     beforeEach(() => {
@@ -32,7 +32,7 @@ describe('ChartGoalSurface', () => {
 
         fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
         const item = screen.getByRole('menuitem', { name: /Set goal here/ });
-        expect(item).toHaveTextContent('Weight ≥ 225 lb in one session');
+        expect(item).toHaveTextContent('Weight ≥ 225 lb within one session');
         fireEvent.click(item);
 
         expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('single_session');

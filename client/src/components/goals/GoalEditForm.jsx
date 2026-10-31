@@ -177,6 +177,8 @@ function GoalEditForm({
                     goalName={name}
                     canCompleteViaChildren={canCompleteViaChildren}
                     errors={conditionErrors}
+                    rootId={rootId}
+                    goalId={mode === 'create' ? null : (goal?.id ?? goal?.attributes?.id ?? null)}
                 />
             </div>
 

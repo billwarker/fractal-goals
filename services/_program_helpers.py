@@ -33,6 +33,7 @@ class _ProgramHelpersMixin:
             day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
             template_goal_load.selectinload(Goal.level),
             template_goal_load.selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
+            template_goal_load.selectinload(Goal.condition).selectinload(GoalCompletionCondition.tags),
             template_goal_load.selectinload(Goal.associated_activities),
             template_goal_load.selectinload(Goal.associated_activity_groups),
             day_load.selectinload(ProgramDay.completed_sessions),

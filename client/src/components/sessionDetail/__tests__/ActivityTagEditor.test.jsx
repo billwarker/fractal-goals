@@ -137,6 +137,51 @@ it('places a header trigger before its assigned tags', () => {
     expect(trigger.compareDocumentPosition(assignedTag) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
+it('stacks a leading label and trigger above every chosen tag, never collapsing to a count', () => {
+    const onChangeTags = vi.fn();
+    const chosen = [{ id: 'one', name: 'One' }, { id: 'two', name: 'Two' }, { id: 'three', name: 'Three' }];
+    render(
+        <ActivityTagEditor
+            rootId="root"
+            activityId="activity"
+            tags={chosen}
+            selectedTagIds={['one', 'two', 'three']}
+            onChangeTags={onChangeTags}
+            scopeLabel="Required tags"
+            leading={<span>Only count when tagged</span>}
+        />,
+    );
+
+    const editor = screen.getByRole('group', { name: 'Required tags' });
+    const [head, chipRow] = editor.children;
+    expect(within(head).getByText('Only count when tagged')).toBeInTheDocument();
+    expect(within(head).getByRole('button', { name: 'Add tag' })).toBeInTheDocument();
+    expect(within(chipRow).getAllByRole('checkbox')).toHaveLength(3);
+    expect(resizeCallback).toBeNull();
+
+    fireEvent.click(within(chipRow).getByRole('checkbox', { name: 'Two' }));
+    expect(onChangeTags).toHaveBeenCalledWith(['one', 'three']);
+});
+
+it('leaves chosen tags to the caller when stacked with showSelected off', () => {
+    render(
+        <ActivityTagEditor
+            rootId="root"
+            activityId="activity"
+            tags={[{ id: 'one', name: 'One' }]}
+            selectedTagIds={['one']}
+            onChangeTags={vi.fn()}
+            scopeLabel="Required tags"
+            leading={<span>Label</span>}
+            showSelected={false}
+        />,
+    );
+
+    const editor = screen.getByRole('group', { name: 'Required tags' });
+    expect(editor.children).toHaveLength(1);
+    expect(within(editor).queryByRole('checkbox')).not.toBeInTheDocument();
+});
+
 it('portals and viewport-clamps the picker outside narrow session containers', () => {
     render(
         <div data-testid="narrow-session-card">

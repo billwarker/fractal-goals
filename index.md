@@ -83,7 +83,11 @@ and `client/src/pages/Goals.jsx`.
 
 Each goal completes in exactly one way (`goals.completion_condition`): an **activity threshold**
 (`goal_completion_conditions` + `goal_condition_metric_rules`: single session — N sets meeting every
-rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions),
+rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions,
+optionally `consecutive`, where a logged miss resets the count; sets-based single-session and
+consistency thresholds count "at least N sets" either as Best (each set meets every rule) or as
+Average (`set_aggregate`: each rule's average across the session's counted sets); `goal_condition_tags` limits every kind
+to sets carrying all chosen tags (`tag_match = 'exact'`: exactly those), instance tags included; activities without sets are one implicit set),
 **children** (all child goals complete), or **manual**. Manual completion is always allowed and is
 recorded as `manual_override` unless the condition is `manual`. Progress is never stored: the pure
 `goal_condition_evaluator.py` runs over canonical instance evidence inside the goal's active period
@@ -91,7 +95,8 @@ recorded as `manual_override` unless the condition is `manual`. Progress is neve
 completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
 After a manual uncompletion only newer evidence re-completes a goal. Rule values are
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
-`CompletionConditionEditor` and `CompletionConditionSummary` render it, and `ConditionProgressChart`
+`goalConditionText.js` words it (never "sets" for set-free activities). `CompletionConditionEditor`
+(with a debounced `condition/preview` of the unsaved draft) and `CompletionConditionSummary` render it, and `ConditionProgressChart`
 charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
 `goalCondition` query-key root.
 Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)

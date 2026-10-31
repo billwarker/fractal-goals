@@ -222,6 +222,7 @@
   ],
   "goal_completion_conditions": [
     "activity_definition_id",
+    "consecutive",
     "created_at",
     "deleted_at",
     "goal_id",
@@ -234,6 +235,8 @@
     "operator",
     "required_count",
     "root_id",
+    "set_aggregate",
+    "tag_match",
     "target_value",
     "updated_at"
   ],

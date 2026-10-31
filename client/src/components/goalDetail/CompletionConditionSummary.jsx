@@ -2,13 +2,15 @@ import React from 'react';
 
 import { useGoalConditionProgress } from '../../hooks/useGoalConditionQueries';
 import {
-    describeCompletionSource,
-    describeCondition,
-    describeProgress,
     getGoalCompletionCondition,
     getGoalCondition,
     progressFraction,
 } from '../../utils/goalConditions';
+import {
+    describeCompletionSource,
+    describeCondition,
+    describeProgress,
+} from '../../utils/goalConditionText';
 import ChildGoalIconRow from './ChildGoalIconRow';
 import ConditionProgressBar from './ConditionProgressBar';
 import styles from './CompletionConditionSummary.module.css';

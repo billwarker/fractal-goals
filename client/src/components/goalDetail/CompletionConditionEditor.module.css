@@ -46,9 +46,31 @@
     cursor: pointer;
 }
 
-.measureDisabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.tagRow {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.checkRow {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.checkRow input {
+    margin-top: 3px;
+}
+
+.checkRow input:disabled + span {
+    opacity: 0.6;
+}
+
+.checkHint {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
 }
 
 .rules {
@@ -152,6 +174,23 @@
     border: 1px solid color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 55%, var(--color-border));
     font-size: var(--font-size-sm);
     color: var(--color-text-primary);
+}
+
+.aggregateToggle {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 2px;
+}
+
+.aggregateToggle button {
+    flex: 0 0 auto;
+    min-height: 26px;
+    padding: 2px 10px;
+}
+
+.previewTrail {
+    display: inline-flex;
+    vertical-align: middle;
 }
 
 @media (max-width: 480px) {

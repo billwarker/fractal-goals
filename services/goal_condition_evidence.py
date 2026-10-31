@@ -153,6 +153,8 @@ def collect_goal_activity_instances(
             selectinload(ActivityInstance.metric_values).selectinload(MetricValue.definition),
             selectinload(ActivityInstance.metric_values).selectinload(MetricValue.split),
             selectinload(ActivityInstance.sets).selectinload(ActivitySet.metric_values),
+            selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
+            selectinload(ActivityInstance.tags),
             selectinload(ActivityInstance.session),
         ).filter(
             ActivityInstance.root_id == root_id,
@@ -183,17 +185,31 @@ def collect_goal_activity_instances(
     return contributing
 
 
+def _tag_ids(tags) -> frozenset[str]:
+    return frozenset(tag.id for tag in (tags or []))
+
+
 def to_evidence(instance) -> EvidenceInstance:
-    """Convert an ORM instance to the evaluator's shape."""
+    """Convert an ORM instance to the evaluator's shape.
+
+    Each set carries its effective tags: its own plus the instance's. An instance without sets is
+    one implicit set holding its instance-level metrics (none at all still yields that set, so a
+    tagged condition can see the instance).
+    """
+    instance_tags = _tag_ids(getattr(instance, 'tags', None))
+    raw_sets = getattr(instance, 'sets', None) or []
     sets = []
-    for activity_set in (getattr(instance, 'sets', None) or []):
+    for activity_set in raw_sets:
         if activity_set.status in SKIPPED_SET_STATUSES:
             continue
-        sets.append(EvidenceSet(values=_metric_values(activity_set.metric_values or [])))
+        sets.append(EvidenceSet(
+            values=_metric_values(activity_set.metric_values or []),
+            tag_ids=instance_tags | _tag_ids(getattr(activity_set, 'tags', None)),
+        ))
     if not sets:
         instance_level = [metric for metric in (instance.metric_values or []) if metric.activity_set_id is None]
-        if instance_level:
-            sets.append(EvidenceSet(values=_metric_values(instance_level)))
+        if instance_level or not raw_sets:
+            sets.append(EvidenceSet(values=_metric_values(instance_level), tag_ids=instance_tags))
     return EvidenceInstance(
         id=instance.id,
         session_id=instance.session_id,

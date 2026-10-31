@@ -32,7 +32,7 @@ function singleSessionTarget(activity, points) {
         .join(', ');
     return {
         conditionDraft: { ...createConditionDraft(activity, 'single_session'), rules: rules.map(({ rule }) => rule) },
-        summary: `${summary} in one session`,
+        summary: `${summary} within one session`,
     };
 }
 
@@ -45,7 +45,7 @@ export function goalFromMetricTrend({ activity, metricId, value }) {
 }
 
 /**
- * Scatter: the point's x and y become two rules met in one session.
+ * Scatter: the point's x and y become two rules met within one session.
  * @param {{ activity: any, metricX: string, x: number, metricY: string, y: number }} input
  */
 export function goalFromScatterPoint({ activity, metricX, x, metricY, y }) {

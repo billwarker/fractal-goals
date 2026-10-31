@@ -142,6 +142,8 @@ class GoalHistoryReadModel:
                 selectinload(ActivityInstance.sets)
                 .joinedload(ActivitySet.metric_values)
                 .joinedload(MetricValue.split),
+                selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
+                selectinload(ActivityInstance.tags),
                 joinedload(ActivityInstance.definition).selectinload(
                     ActivityDefinition.group
                 ),

@@ -112,6 +112,7 @@ class _GoalLifecycleMixin:
 
         source = self.db_session.query(Goal).options(
             selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
+            selectinload(Goal.condition).selectinload(GoalCompletionCondition.tags),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()

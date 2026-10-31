@@ -17,6 +17,7 @@ def goal_serializer_relationship_loaders():
             joinedload(GoalCompletionCondition.activity),
             joinedload(GoalCompletionCondition.metric),
             selectinload(GoalCompletionCondition.rules).joinedload(GoalConditionMetricRule.metric),
+            selectinload(GoalCompletionCondition.tags),
         ),
         selectinload(Goal.associated_activities),
         selectinload(Goal.associated_activity_groups),

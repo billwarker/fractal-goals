@@ -7,10 +7,6 @@ import {
     conditionName,
     conditionToDraft,
     createConditionDraft,
-    describeCompletionSource,
-    describeCondition,
-    describeProgress,
-    formatConditionNumber,
     getGoalCompletionCondition,
     getGoalStartedAt,
     inferOperator,
@@ -19,6 +15,14 @@ import {
     validateConditionDraft,
     yieldMetricIds,
 } from '../goalConditions';
+import {
+    describeCompletionSource,
+    describeCondition,
+    describeConditionParts,
+    describeProgress,
+    displayUnit,
+    formatConditionNumber,
+} from '../goalConditionText';
 
 const benchPress = {
     id: 'bench',
@@ -32,6 +36,7 @@ const benchPress = {
 const run = {
     id: 'run',
     name: 'Run',
+    has_sets: false,
     metric_definitions: [
         { id: 'pace', name: 'Pace', unit: 'min/km', higher_is_better: false },
     ],
@@ -125,6 +130,7 @@ describe('drafts', () => {
             kind: 'consistency',
             measure: 'sets',
             required_count: 4,
+            min_sets: 3,
             rules: [
                 { metric_definition_id: 'weight', operator: '>=', value: 225 },
                 { metric_definition_id: 'reps', operator: '>=', value: 6 },
@@ -223,11 +229,11 @@ describe('validateConditionDraft', () => {
 describe('describing conditions and progress', () => {
     it('reads each kind as one sentence', () => {
         expect(describeCondition(buildConditionPayload(setsDraft()), benchPress))
-            .toBe('Bench Press: 3 sets of Weight ≥ 225 lbs and Reps ≥ 6 in one session');
+            .toBe('Bench Press: at least 3 sets of Weight ≥ 225 lbs and Reps ≥ 6 within one session');
         expect(describeCondition({ kind: 'single_session', measure: 'sets', min_sets: 1, rules: [] }, benchPress))
-            .toBe('Bench Press: 1 set of … in one session');
+            .toBe('Bench Press: at least 1 set of … within one session');
         expect(describeCondition({ kind: 'single_session', measure: 'yield', operator: '>=', target_value: 4050 }, benchPress))
-            .toBe('Bench Press: total yield ≥ 4,050 in one session');
+            .toBe('Bench Press: total yield ≥ 4,050 within one session');
         expect(describeCondition({
             kind: 'cumulative', measure: 'metric', metric_definition_id: 'reps', operator: '>=', target_value: 500,
         }, benchPress)).toBe('Bench Press: Reps ≥ 500 in total');
@@ -244,7 +250,7 @@ describe('describing conditions and progress', () => {
             measure: 'sets',
             min_sets: 2,
             rules: [{ metric_definition_id: 'x', metric_name: 'Depth', unit: 'cm', operator: '==', value: 40 }],
-        })).toBe('Squat: 2 sets of Depth = 40 cm in one session');
+        })).toBe('Squat: at least 2 sets of Depth = 40 cm within one session');
         expect(describeCondition(null)).toBe('');
     });
 
@@ -299,5 +305,110 @@ describe('prefillConditionFromInstance', () => {
         const draft = prefillConditionFromInstance({ sets: [] }, benchPress);
         expect(draft).toEqual(expect.objectContaining({ kind: 'consistency', required_count: '1', rules: [] }));
         expect(validateConditionDraft(draft, benchPress)).toEqual({});
+    });
+});
+
+describe('tags, streaks, and activities without sets', () => {
+    it('carries tags and the streak flag through drafts and payloads', () => {
+        const saved = {
+            activity_definition_id: 'bench', kind: 'consistency', measure: 'sets', required_count: 3,
+            consecutive: true, tag_ids: ['strict'], rules: [],
+        };
+        const draft = conditionToDraft({ ...saved, tags: [{ id: 'strict', name: 'Strict' }] });
+        expect(draft.tag_ids).toEqual(['strict']);
+        expect(buildConditionPayload(draft)).toEqual(saved);
+        expect(buildConditionPayload({ ...draft, tag_ids: [] })).not.toHaveProperty('tag_ids');
+        expect(changeDraftKind(draft, 'single_session', benchPress).consecutive).toBe(false);
+        expect(buildConditionPayload(changeDraftKind(draft, 'single_session', benchPress))).not.toHaveProperty('consecutive');
+        expect(changeDraftActivity(draft, run).tag_ids).toEqual(['strict']);
+        expect(buildConditionPayload({ ...draft, tag_match: 'exact' }).tag_match).toBe('exact');
+        expect(buildConditionPayload({ ...draft, tag_ids: [], tag_match: 'exact' })).not.toHaveProperty('tag_match');
+        expect(describeCondition({ kind: 'consistency', required_count: 1, rules: [], tag_match: 'exact', tags: [{ name: 'Strict' }] }, benchPress))
+            .toBe('Bench Press: 1 session with a set tagged exactly Strict');
+        expect(validateConditionDraft({ ...setsDraft(), tag_ids: Array.from({ length: 11 }, (_, index) => `t${index}`) }, benchPress).tags)
+            .toBe('Use at most 10 tags');
+    });
+
+    it('slots tags into the sentence where they qualify the counted sets', () => {
+        const strength = [{ id: 'strength', name: 'strength' }];
+        const averaged = {
+            kind: 'single_session', measure: 'sets', set_aggregate: 'average', min_sets: 1, tags: strength,
+            rules: [{ metric_definition_id: 'reps', operator: '>=', value: 5 }],
+        };
+        expect(describeCondition(averaged, benchPress))
+            .toBe('Bench Press: average Reps ≥ 5 across at least 1 set tagged strength within one session');
+        expect(describeConditionParts(averaged, benchPress))
+            .toEqual(['Bench Press: average Reps ≥ 5 across at least 1 set', ' within one session']);
+        expect(describeCondition({ kind: 'cumulative', measure: 'yield', operator: '>=', target_value: 100, tags: strength }, benchPress))
+            .toBe('Bench Press: total yield ≥ 100 from sets tagged strength across sessions');
+        expect(describeCondition({ kind: 'cumulative', measure: 'yield', operator: '>=', target_value: 100 }, benchPress))
+            .toBe('Bench Press: total yield ≥ 100 across sessions');
+        expect(describeCondition({ kind: 'single_session', measure: 'sets', min_sets: 1, tags: strength,
+            rules: [{ metric_definition_id: 'pace', operator: '<=', value: 5 }] }, run))
+            .toBe('Run: Pace ≤ 5 min/km within one session tagged strength');
+    });
+
+    it('names tags and streaks in the sentence', () => {
+        expect(describeCondition({
+            kind: 'consistency', required_count: 5, consecutive: true, tags: [{ name: 'Strict' }, { name: 'Paused' }],
+            rules: [{ metric_definition_id: 'reps', operator: '>=', value: 5 }],
+        }, benchPress)).toBe('Bench Press: 5 sessions in a row with at least 1 set of Reps ≥ 5 tagged Strict, Paused');
+        expect(describeCondition({ kind: 'consistency', required_count: 1, consecutive: true, rules: [] }, benchPress))
+            .toBe('Bench Press: 1 session');
+    });
+
+    it('never mentions sets for an activity without them', () => {
+        const rule = { metric_definition_id: 'pace', operator: '<=', value: 5 };
+        expect(describeCondition({ kind: 'single_session', measure: 'sets', min_sets: 1, rules: [rule] }, run))
+            .toBe('Run: Pace ≤ 5 min/km within one session');
+        expect(describeCondition({
+            activity_name: 'Plank', activity_has_sets: false, kind: 'single_session', measure: 'sets', min_sets: 1,
+            rules: [{ metric_definition_id: 'x', metric_name: 'Hold', unit: 's', operator: '>=', value: 60 }],
+        })).toBe('Plank: Hold ≥ 60 s within one session');
+        const condition = { kind: 'single_session', measure: 'sets', activity_has_sets: false };
+        expect(describeProgress({ current: 0, required: 1, rule_bests: [{ best: 45, value: 60 }] }, condition)).toBe('Best 45 / 60');
+        expect(describeProgress({ current: 1, required: 1, met: true, rule_bests: [] }, condition)).toBe('Met');
+        expect(validateConditionDraft({ ...createConditionDraft(run), min_sets: '', rules: [{ ...rule, value: '5' }] }, run))
+            .toEqual({});
+    });
+
+    it('labels streak progress with the best run so far', () => {
+        const condition = { kind: 'consistency', consecutive: true };
+        expect(describeProgress({ current: 1, required: 3, best_streak: 2 }, condition)).toBe('1 / 3 in a row (best 2)');
+        expect(describeProgress({ current: 3, required: 3, best_streak: 3, met: true }, condition)).toBe('3 / 3 in a row');
+    });
+
+    it('reads a blank rule value as a gap and drops units that repeat the metric', () => {
+        expect(describeCondition({
+            kind: 'single_session', measure: 'sets', min_sets: 1,
+            rules: [{ metric_definition_id: 'x', metric_name: 'Reps', unit: 'Count', operator: '>=', value: '' }],
+        })).toBe('Activity: at least 1 set of Reps ≥ … within one session');
+        expect(displayUnit({ name: 'Reps', unit: 'Count' })).toBe('');
+        expect(displayUnit({ name: 'Weight', unit: 'lbs' })).toBe('lbs');
+    });
+});
+
+describe('averages across sets', () => {
+    const averaged = {
+        kind: 'single_session', measure: 'sets', set_aggregate: 'average', min_sets: 3,
+        rules: [{ metric_definition_id: 'reps', operator: '>=', value: 5 }],
+    };
+
+    it('reads as an average across at least N sets', () => {
+        expect(describeCondition(averaged, benchPress)).toBe('Bench Press: average Reps ≥ 5 across at least 3 sets within one session');
+        expect(describeCondition({ ...averaged, kind: 'consistency', required_count: 4, consecutive: true }, benchPress))
+            .toBe('Bench Press: 4 sessions in a row averaging Reps ≥ 5 across at least 3 sets');
+    });
+
+    it('labels progress with the best average, and sends the choice only when averaging', () => {
+        expect(describeProgress({ current: 3, required: 3, rule_bests: [{ value: 5, best_average: 4.5 }] }, averaged))
+            .toBe('Best average 4.5 / 5');
+        const draft = { ...setsDraft(), set_aggregate: 'average' };
+        expect(buildConditionPayload(draft)).toEqual(expect.objectContaining({ set_aggregate: 'average', min_sets: 3 }));
+        expect(buildConditionPayload(setsDraft())).not.toHaveProperty('set_aggregate');
+        expect(conditionToDraft(averaged).set_aggregate).toBe('average');
+        expect(validateConditionDraft({ ...draft, kind: 'consistency', rules: [] }, benchPress).rules)
+            .toBe('Add at least one metric rule');
+        expect(validateConditionDraft(draft, run).measure).toBe("'Run' logs no sets to average");
     });
 });

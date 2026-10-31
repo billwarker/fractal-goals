@@ -102,6 +102,7 @@ export const queryKeys = {
     goalConditionEvidence: (rootId, goalId, since = 'active', activityId = null) => [
         'goalCondition', rootId, 'evidence', goalId, since, activityId,
     ],
+    goalConditionPreview: (rootId, goalId, payload) => ['goalCondition', rootId, 'preview', goalId, payload],
     goalMetrics: (goalId) => ['goalMetrics', goalId],
     goalMetricsRoot: () => ['goalMetrics'],
     eligibleMoveParents: (rootId, goalId) => ['goals', rootId, 'eligibleMoveParents', goalId],
