@@ -30,6 +30,7 @@ import {
     SessionItemTimerMeta,
 } from './SessionItemCardPrimitives';
 import styles from './SessionActivityItem.module.css';
+import InstanceLinkedGoalIcons from './InstanceLinkedGoalIcons';
 
 function SessionActivityItemView({
     rootId,
@@ -107,6 +108,7 @@ function SessionActivityItemView({
     onDeleteNote,
     handleAddNote,
 }) {
+    const linkedGoalIds = exercise?.associated_goal_ids || [];
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [timerConflictExtras, setTimerConflictExtras] = useState(null);
     const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
@@ -312,7 +314,7 @@ function SessionActivityItemView({
                                         </div>
                                     )}
                                 </div>
-                                {(groupLabel || averageDuration) && (
+                                {(groupLabel || averageDuration || linkedGoalIds.length > 0) && (
                                     <div className={styles.activityMetaLine}>
                                         {groupLabel && (
                                             <span className={styles.activityGroupLabel}>{groupLabel}</span>
@@ -328,6 +330,10 @@ function SessionActivityItemView({
                                                 Avg {averageDuration.label}
                                             </span>
                                         )}
+                                        {linkedGoalIds.length > 0 && (groupLabel || averageDuration) && (
+                                            <span className={styles.activityMetaSeparator}>•</span>
+                                        )}
+                                        <InstanceLinkedGoalIcons rootId={rootId} goalIds={linkedGoalIds} />
                                     </div>
                                 )}
                                 {def.description && (

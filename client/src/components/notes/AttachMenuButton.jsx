@@ -7,7 +7,7 @@ import styles from './AttachMenuButton.module.css';
 
 /**
  * Quick-bar paperclip: one button whose menu offers this device or cloud storage.
- * Pasting or dropping pictures onto the bar bypasses the menu.
+ * Pasting or dropping files onto the bar bypasses the menu.
  */
 export default function AttachMenuButton({ draft, disabled = false, className = styles.button, placement = 'up', onPickerClosed }) {
     const [open, setOpen] = useState(false);
@@ -43,11 +43,11 @@ export default function AttachMenuButton({ draft, disabled = false, className = 
                 type="button"
                 className={className}
                 disabled={blocked}
-                aria-label="Attach pictures or video"
+                aria-label="Attach pictures, video or audio"
                 aria-haspopup="menu"
                 aria-expanded={open}
                 aria-controls={open ? menuId : undefined}
-                title={draft.canAdd ? 'Attach pictures or video (you can also paste or drop them)' : 'Up to 8 attachments per note'}
+                title={draft.canAdd ? 'Attach pictures, video or audio (you can also paste or drop them)' : 'Up to 8 attachments per note'}
                 onClick={() => setOpen((value) => !value)}
             >
                 <PaperclipIcon size={20} />

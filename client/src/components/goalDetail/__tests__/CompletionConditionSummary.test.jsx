@@ -56,7 +56,7 @@ describe('CompletionConditionSummary', () => {
         renderSummary();
 
         expect(useGoalConditionProgressMock).toHaveBeenCalledWith('root-1', ['goal-1'], { enabled: true });
-        expect(screen.getByText('Pull Up: 3 sets of Reps ≥ 10 in one session')).toBeInTheDocument();
+        expect(screen.getByText('Pull Up: at least 3 sets of Reps ≥ 10 within one session')).toBeInTheDocument();
         expect(screen.getByRole('progressbar', { name: 'Progress: 2 / 3 sets' })).toHaveAttribute('aria-valuenow', '67');
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });

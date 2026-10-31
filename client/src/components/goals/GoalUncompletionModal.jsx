@@ -6,7 +6,8 @@ import {
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
 import NoteCard from '../notes/NoteCard';
-import { describeCondition, getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
+import { getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
+import { describeCondition } from '../../utils/goalConditionText';
 import styles from './GoalUncompletionModal.module.css';
 
 function GoalUncompletionModal({

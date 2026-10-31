@@ -50,6 +50,10 @@ function ProgramCalendarView({
     isMobile = false,
     showBlockControls = true,
     initialDate = new Date(),
+    // Today in the user's timezone preference (YYYY-MM-DD). FullCalendar otherwise takes
+    // "today" from the device clock, which disagrees with the rest of the app whenever
+    // the preference differs from the device zone (e.g. late evening west of UTC).
+    today = null,
     onDatesSet,
     onVisibleMonthChange,
     onVisibleRangeChange,
@@ -81,6 +85,7 @@ function ProgramCalendarView({
     const calendarRef = React.useRef(null);
     const calendarContainerRef = React.useRef(null);
     const initialDateStr = normalizeCalendarEventDate(initialDate) || formatCalendarCellDate(new Date());
+    const todayStr = normalizeCalendarEventDate(today) || initialDateStr;
     const [monthTitle, setMonthTitle] = React.useState('');
     const {
         visibleMonth,
@@ -338,6 +343,7 @@ function ProgramCalendarView({
                 // so its view and range start cleanly.
                 key={calendarKey}
                 ref={calendarRef}
+                now={todayStr}
                 plugins={[dayGridPlugin, interactionPlugin]}
                 initialView={continuousWindow ? CONTINUOUS_VIEW : 'dayGridMonth'}
                 views={continuousWindow ? {
@@ -384,6 +390,9 @@ function ProgramCalendarView({
                 } : undefined}
             />
             </div>
+            {/* The bulk status bar is fixed over the bottom of the viewport; this clearance
+                lets the last week scroll above it instead of sitting unreachable beneath. */}
+            {statusActions ? <div className={styles.bulkBarClearance} aria-hidden="true" /> : null}
         </div>
     );
 }

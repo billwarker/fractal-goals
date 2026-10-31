@@ -225,3 +225,207 @@ def test_no_evidence_is_unmet_with_zero_progress():
     assert result.progress == 0.0
     assert result.evidence_count == 0
     assert result.to_dict()['rule_bests'][0]['best'] is None
+
+
+STRICT, PAUSED = 'strict', 'paused'
+
+
+def _tagged(values, *tags):
+    return EvidenceSet(
+        values={key: value if isinstance(value, tuple) else (value,) for key, value in values.items()},
+        tag_ids=frozenset(tags),
+    )
+
+
+def _tagged_instance(instance_id, *sets, days=0):
+    return EvidenceInstance(
+        id=instance_id, session_id=f'session-{instance_id}', occurred_at=T0 + timedelta(days=days), sets=tuple(sets),
+    )
+
+
+@pytest.mark.unit
+class TestTagScoping:
+    def test_single_session_counts_only_sets_carrying_every_tag(self):
+        spec = ConditionSpec(
+            'single_session', 'sets', rules=(MetricRule(REPS, '>=', 5),), min_sets=2,
+            tag_ids=frozenset({STRICT, PAUSED}),
+        )
+        evidence = [_tagged_instance(
+            'a',
+            _tagged({REPS: 6}, STRICT, PAUSED),
+            _tagged({REPS: 9}, STRICT),  # partial match does not count
+            _tagged({REPS: 9}),
+        )]
+
+        result = evaluate_condition(spec, evidence)
+
+        assert result.met is False
+        assert result.current == 1
+        assert result.rule_bests[0].best == 6
+
+    def test_single_session_yield_and_cumulative_totals_skip_untagged_sets(self):
+        tags = frozenset({STRICT})
+        evidence = [_tagged_instance('a', _tagged({WEIGHT: 100, REPS: 5}, STRICT), _tagged({WEIGHT: 100, REPS: 50}))]
+
+        single = evaluate_condition(ConditionSpec(
+            'single_session', 'yield', operator='>=', target_value=1000, yield_metric_ids=(WEIGHT, REPS), tag_ids=tags,
+        ), evidence)
+        cumulative_metric = evaluate_condition(ConditionSpec(
+            'cumulative', 'metric', metric_definition_id=REPS, operator='>=', target_value=10, tag_ids=tags,
+        ), evidence)
+        cumulative_yield = evaluate_condition(ConditionSpec(
+            'cumulative', 'yield', operator='>=', target_value=500, yield_metric_ids=(WEIGHT, REPS), tag_ids=tags,
+        ), evidence)
+
+        assert (single.met, single.current) == (False, 500)
+        assert (cumulative_metric.met, cumulative_metric.current) == (False, 5)
+        assert (cumulative_yield.met, cumulative_yield.current) == (True, 500)
+
+    def test_rule_free_consistency_needs_a_tagged_set(self):
+        spec = ConditionSpec('consistency', 'sets', required_count=2, tag_ids=frozenset({STRICT}))
+        evidence = [
+            _tagged_instance('a', _tagged({}, STRICT), days=0),
+            _tagged_instance('b', _tagged({}), days=1),
+            _tagged_instance('c', _tagged({}, STRICT), days=2),
+        ]
+
+        result = evaluate_condition(spec, evidence)
+
+        assert result.met is True
+        assert result.achieving_instance_id == 'c'
+
+    def test_untagged_rule_free_consistency_still_counts_instances_without_sets(self):
+        spec = ConditionSpec('consistency', 'sets', required_count=1)
+
+        assert evaluate_condition(spec, [_tagged_instance('a')]).met is True
+
+
+@pytest.mark.unit
+class TestConsecutive:
+    def _evidence(self, *reps):
+        return [_tagged_instance(f'i{day}', _tagged({REPS: value}), days=day) for day, value in enumerate(reps)]
+
+    def test_a_miss_resets_the_streak(self):
+        spec = ConditionSpec('consistency', 'sets', rules=(MetricRule(REPS, '>=', 5),), required_count=3, consecutive=True)
+
+        result = evaluate_condition(spec, self._evidence(5, 6, 1, 7))
+
+        assert result.met is False
+        assert result.current == 1
+        assert result.best_streak == 2
+        assert result.progress == pytest.approx(1 / 3)
+
+    def test_streak_latches_once_met(self):
+        spec = ConditionSpec('consistency', 'sets', rules=(MetricRule(REPS, '>=', 5),), required_count=2, consecutive=True)
+
+        result = evaluate_condition(spec, self._evidence(1, 5, 6, 1, 1))
+
+        assert result.met is True
+        assert result.achieving_instance_id == 'i2'
+        assert result.current == 2
+        assert result.best_streak == 2
+        assert result.progress == 1.0
+
+    def test_without_consecutive_misses_do_not_reset(self):
+        spec = ConditionSpec('consistency', 'sets', rules=(MetricRule(REPS, '>=', 5),), required_count=3)
+
+        result = evaluate_condition(spec, self._evidence(5, 1, 6, 1, 7))
+
+        assert result.met is True
+        assert result.best_streak is None
+
+    def test_tag_misses_break_a_streak(self):
+        spec = ConditionSpec('consistency', 'sets', required_count=2, consecutive=True, tag_ids=frozenset({STRICT}))
+        evidence = [
+            _tagged_instance('a', _tagged({}, STRICT), days=0),
+            _tagged_instance('b', _tagged({}), days=1),
+            _tagged_instance('c', _tagged({}, STRICT), days=2),
+        ]
+
+        result = evaluate_condition(spec, evidence)
+
+        assert result.met is False
+        assert result.best_streak == 1
+
+
+HOLD = 'hold'
+
+
+@pytest.mark.unit
+class TestSetAverages:
+    def _session(self, instance_id, *holds, days=0, tags=()):
+        return _tagged_instance(instance_id, *(_tagged({HOLD: hold}, *tags) for hold in holds), days=days)
+
+    def test_one_session_averages_every_counted_set(self):
+        spec = ConditionSpec('single_session', 'sets', rules=(MetricRule(HOLD, '>=', 5),), min_sets=3, set_aggregate='average')
+
+        short = evaluate_condition(spec, [self._session('a', 7, 6, 1)])  # average 4.67
+        enough = evaluate_condition(spec, [self._session('a', 7, 6, 1, days=0), self._session('b', 6, 4, 5, days=1)])
+
+        assert short.met is False
+        assert short.rule_bests[0].best_average == pytest.approx(14 / 3, abs=1e-4)
+        assert enough.met is True
+        assert enough.achieving_instance_id == 'b'
+
+    def test_needs_at_least_min_sets_logging_the_metric(self):
+        spec = ConditionSpec('single_session', 'sets', rules=(MetricRule(HOLD, '>=', 5),), min_sets=3, set_aggregate='average')
+        evidence = [_tagged_instance('a', _tagged({HOLD: 9}), _tagged({HOLD: 9}), _tagged({}))]
+
+        result = evaluate_condition(spec, evidence)
+
+        assert result.met is False
+        assert result.current == 2
+        assert result.rule_bests[0].best_average is None
+
+    def test_tags_choose_which_sets_are_averaged(self):
+        spec = ConditionSpec(
+            'single_session', 'sets', rules=(MetricRule(HOLD, '>=', 5),), min_sets=2, set_aggregate='average',
+            tag_ids=frozenset({'working'}),
+        )
+        evidence = [_tagged_instance('a', _tagged({HOLD: 1}), _tagged({HOLD: 5}, 'working'), _tagged({HOLD: 6}, 'working'))]
+
+        assert evaluate_condition(spec, evidence).met is True
+
+    def test_split_sets_average_their_weakest_side(self):
+        spec = ConditionSpec('single_session', 'sets', rules=(MetricRule(HOLD, '>=', 5),), min_sets=2, set_aggregate='average')
+        evidence = [_tagged_instance('a', _tagged({HOLD: (8, 4)}), _tagged({HOLD: (6, 5)}))]
+
+        assert evaluate_condition(spec, evidence).met is False  # (4 + 5) / 2
+
+    def test_consistency_counts_sessions_whose_average_meets_and_can_streak(self):
+        spec = ConditionSpec(
+            'consistency', 'sets', rules=(MetricRule(HOLD, '>=', 5),), min_sets=2, required_count=2,
+            set_aggregate='average', consecutive=True,
+        )
+        evidence = [
+            self._session('a', 5, 6, days=0),
+            self._session('b', 3, 4, days=1),
+            self._session('c', 6, 4, days=2),
+            self._session('d', 5, 5, days=3),
+        ]
+
+        result = evaluate_condition(spec, evidence)
+
+        assert result.met is True
+        assert result.achieving_instance_id == 'd'
+
+
+@pytest.mark.unit
+def test_consistency_can_require_several_sets_meeting_the_rules():
+    spec = ConditionSpec('consistency', 'sets', rules=(MetricRule(REPS, '>=', 5),), required_count=1, min_sets=2)
+    one = _tagged_instance('a', _tagged({REPS: 6}), _tagged({REPS: 1}))
+    two = _tagged_instance('b', _tagged({REPS: 6}), _tagged({REPS: 5}), days=1)
+
+    assert evaluate_condition(spec, [one]).met is False
+    assert evaluate_condition(spec, [one, two]).achieving_instance_id == 'b'
+
+
+@pytest.mark.unit
+def test_exact_tag_match_ignores_sets_with_extra_tags():
+    rules = (MetricRule(REPS, '>=', 5),)
+    evidence = [_tagged_instance('a', _tagged({REPS: 9}, STRICT, PAUSED), _tagged({REPS: 6}, STRICT))]
+    contains = ConditionSpec('single_session', 'sets', rules=rules, min_sets=2, tag_ids=frozenset({STRICT}))
+    exact = ConditionSpec('single_session', 'sets', rules=rules, min_sets=2, tag_ids=frozenset({STRICT}), tag_match='exact')
+
+    assert evaluate_condition(contains, evidence).met is True
+    assert evaluate_condition(exact, evidence).current == 1

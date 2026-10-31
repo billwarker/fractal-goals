@@ -1,7 +1,7 @@
 /**
  * NoteQuickAdd - Quick input for adding notes
  *
- * Enter submits. With a rootId, pictures and video can be attached from this device or cloud
+ * Enter submits. With a rootId, pictures, video and audio can be attached from this device or cloud
  * storage, or pasted/dropped; onSubmit then receives (content, attachments) where attachments
  * are finished uploads in the server's serialized shape (useful for optimistic rendering).
  */
@@ -76,10 +76,6 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", rootId = null }
                     className={styles.quickAddTextarea}
                     rows={1}
                 />
-                {rootId && (
-                    <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.noteSubmitBtn}
-                        onPickerClosed={() => inputRef.current?.focus()} />
-                )}
                 <button
                     type="submit"
                     disabled={!content.trim() || isSubmitting || draft.isBusy}
@@ -89,6 +85,10 @@ function NoteQuickAdd({ onSubmit, placeholder = "Add a note...", rootId = null }
                 >
                     {isSubmitting ? '...' : <CreateNoteIcon />}
                 </button>
+                {rootId && (
+                    <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.noteSubmitBtn}
+                        onPickerClosed={() => inputRef.current?.focus()} />
+                )}
             </div>
         </form>
     );

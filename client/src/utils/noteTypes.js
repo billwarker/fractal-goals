@@ -29,8 +29,17 @@ export const GOAL_NOTE_TYPES = new Set(['goal_note', 'goal_completion_note', 'go
  * services/note_filter_spec.py; both are checked against tests/fixtures/note_categories.json.
  */
 export const NOTE_CATEGORIES = [
-    { value: 'general', label: 'General' },
-    { value: 'goals', label: 'Goals' },
-    { value: 'sessions', label: 'Sessions' },
-    { value: 'programs', label: 'Programs' },
+    { value: 'general', label: 'General', contextTypes: ['root', 'activity_definition'] },
+    { value: 'goals', label: 'Goals', contextTypes: ['goal'] },
+    { value: 'sessions', label: 'Sessions', contextTypes: ['session', 'activity_instance', 'circuit_run', 'circuit_round'] },
+    { value: 'programs', label: 'Programs', contextTypes: ['program'] },
 ];
+
+const CATEGORY_BY_CONTEXT = Object.fromEntries(NOTE_CATEGORIES.flatMap(
+    (category) => category.contextTypes.map((contextType) => [contextType, category.value]),
+));
+
+/** Mirrors derive_note_category in services/note_filter_spec.py. */
+export function deriveNoteCategory(contextType) {
+    return CATEGORY_BY_CONTEXT[contextType] || 'general';
+}

@@ -6,6 +6,7 @@ from sqlalchemy import inspect as sa_inspect
 from .goal_type_utils import get_canonical_goal_type
 from services._serialize_common import calculate_smart_status, format_utc
 from services.media_service import serialize_attachment
+from services.activity_tags import serialize_tags
 
 
 def _number(value):
@@ -21,10 +22,12 @@ def serialize_goal_condition(condition):
         return None
     activity = getattr(condition, 'activity', None)
     metric = getattr(condition, 'metric', None)
+    tags = list(getattr(condition, 'tags', None) or [])
     return {
         "id": condition.id,
         "activity_definition_id": condition.activity_definition_id,
         "activity_name": getattr(activity, 'name', None),
+        "activity_has_sets": bool(getattr(activity, 'has_sets', True)) if activity is not None else None,
         "name": condition.name,
         "kind": condition.kind,
         "measure": condition.measure,
@@ -46,6 +49,11 @@ def serialize_goal_condition(condition):
             }
             for rule in (condition.rules or [])
         ],
+        "consecutive": bool(getattr(condition, 'consecutive', False)),
+        "set_aggregate": getattr(condition, 'set_aggregate', None) or 'each',
+        "tag_match": getattr(condition, 'tag_match', None) or 'contains',
+        "tag_ids": [tag.id for tag in tags],
+        "tags": serialize_tags(tags),
     }
 
 
@@ -108,6 +116,8 @@ def serialize_goal(goal, include_children=True):
         "started_at": format_utc(getattr(goal, 'started_at', None)),
         "sequence_track_id": getattr(goal, 'sequence_track_id', None),
         "sequence_position": getattr(goal, 'sequence_position', None),
+        # A goal has at most one live activity group (services/goal_activity_group_links.py).
+        "activity_group_id": goal.associated_activity_groups[0].id if goal.associated_activity_groups else None,
         # Fields that exist nowhere else on the payload. Top-level fields are
         # canonical and are no longer duplicated here.
         "attributes": {

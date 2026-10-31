@@ -24,7 +24,7 @@ export default defineConfig({
             reporter: ['text', 'html', 'json-summary'],
             include: ['src/**/*.{js,jsx}'],
             // Ratchet the measured all-source baseline; raise these as coverage grows.
-            thresholds: { statements: 63.5, branches: 57.8, functions: 60, lines: 65.8 },
+            thresholds: { statements: 70, branches: 65, functions: 67, lines: 72 },
             exclude: ['node_modules/', 'src/test/']
         }
     }

@@ -1,13 +1,12 @@
 """Fixed-endpoint adapters. Never fetch a caller-supplied URL or follow redirects."""
 import json
-import mimetypes
 import re
 from typing import Any
 from urllib.parse import quote, urlencode, urlparse
 
 import requests
 
-from services.storage_common import StorageError, provider_config
+from services.storage_common import StorageError, canonical_media_type, provider_config
 
 GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 DROPBOX_SCOPE = 'account_info.read files.metadata.read files.content.read files.content.write'
@@ -113,7 +112,8 @@ def metadata(provider, token, file_id, resource_key=None):
         revision = data.get('md5Checksum') or data.get('headRevisionId')
         if not revision:
             raise StorageError('This file has no downloadable content revision', 409)
-        return {'file_id': data['id'], 'name': data['name'], 'mime_type': data['mimeType'],
+        return {'file_id': data['id'], 'name': data['name'],
+                'mime_type': canonical_media_type(data['mimeType'], data['name']) or data['mimeType'],
                 'size_bytes': int(data.get('size', 0)), 'revision': revision}
     data = json_call('POST', 'https://api.dropboxapi.com/2/files/get_metadata', headers=auth, json={'path': file_id})
     return dropbox_metadata(data)
@@ -121,7 +121,8 @@ def metadata(provider, token, file_id, resource_key=None):
 
 def dropbox_metadata(data):
     return {'file_id': data['id'], 'name': data['name'],
-            'mime_type': mimetypes.guess_type(data['name'])[0] or 'application/octet-stream',
+            # Dropbox reports no type; the extension decides, never the host's platform mime database.
+            'mime_type': canonical_media_type('', data['name']) or 'application/octet-stream',
             'size_bytes': int(data.get('size', 0)), 'revision': data.get('content_hash') or data.get('rev', '')}
 
 

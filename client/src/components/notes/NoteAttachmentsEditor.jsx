@@ -1,6 +1,7 @@
 import React, { forwardRef, lazy, Suspense, useRef, useState } from 'react';
 
-import { UPLOAD_ACCEPT } from '../../utils/cloudUpload';
+import { canonicalMediaType, mediaKind, UPLOAD_ACCEPT } from '../../utils/cloudUpload';
+import { ImageIcon, MusicIcon, VideoIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
 import AttachmentFileRow from './AttachmentFileRow';
 import styles from './MediaAttachment.module.css';
@@ -23,6 +24,14 @@ export function CloudPicker({ draft, onClose }) {
     );
 }
 
+const KIND_ICONS = { image: ImageIcon, video: VideoIcon, audio: MusicIcon };
+
+/** Picture, video or audio glyph, so a chip reads as a recording or a photo at a glance. */
+function MediaKindIcon({ item }) {
+    const Icon = KIND_ICONS[mediaKind(canonicalMediaType(item.mime_type || item.file?.type, item.name))];
+    return Icon ? <Icon size={14} className={styles.kindIcon} /> : null;
+}
+
 /** Uploading, failed and finished attachments. `compact` (quick bars) only offers removal. */
 export function AttachmentDraftList({ draft, disabled = false, compact = false, label = 'Attachments for this note' }) {
     if (!draft.items.length) return null;
@@ -32,7 +41,7 @@ export function AttachmentDraftList({ draft, disabled = false, compact = false, 
                 <AttachmentFileRow key={item.key} item={item} draft={draft} disabled={disabled} />
             ) : (
                 <li key={item.key} className={compact ? styles.compactFile : styles.file} data-status={item.status}>
-                    <span className={styles.fileName}>{item.name || 'Attached file'}</span>
+                    <span className={styles.fileName}><MediaKindIcon item={item} />{item.name || 'Attached file'}</span>
                     {item.status === 'uploading' && (
                         <progress aria-label={`Uploading ${item.name}`} value={item.progress || 0} max={1} />
                     )}
@@ -72,7 +81,7 @@ export default function NoteAttachmentsEditor({ draft, disabled = false }) {
                 <Button variant="secondary" disabled={blocked} onClick={() => fileInput.current?.click()}>Upload from device</Button>
                 <Button variant="secondary" disabled={blocked} onClick={() => setChoosing(true)}>Choose from cloud storage</Button>
                 <span className={styles.hint}>
-                    You can also paste or drop pictures.{draft.destinationLabel ? ` They’re saved to your ${draft.destinationLabel}.` : ''}
+                    You can also paste or drop files.{draft.destinationLabel ? ` They’re saved to your ${draft.destinationLabel}.` : ''}
                 </span>
             </div>
             <AttachmentFileInput ref={fileInput} draft={draft} />

@@ -88,9 +88,7 @@ export default function GoalSequenceSubView({ rootId, goal, goalId, treeData, on
             id, members: [...members].sort((a, b) => (a.position || 0) - (b.position || 0)),
         }));
     }, [candidates, trackId]);
-    // Completed siblings can't wait on a step, so they're listed faded but never offered.
     const unsequenced = candidates.filter((candidate) => !candidate.trackId && !steps.some((step) => step.id === candidate.id));
-    const addable = unsequenced.filter((candidate) => !candidate.completed);
     // When the page is scoped to a program, siblings outside it are still sequenceable but hidden from its tree.
     const isOutOfScope = (candidate) => Boolean(programScope?.goalIds) && !programScope.goalIds.has(candidate.id);
     const outOfScopeCount = candidates.filter((candidate) => candidate.id !== toId(goalId) && isOutOfScope(candidate)).length;
@@ -105,6 +103,11 @@ export default function GoalSequenceSubView({ rootId, goal, goalId, treeData, on
     const parentId = read(goal, 'parent_id');
 
     const update = (next) => setDraft(next.map((step) => step.id));
+    // A completed sibling keeps its number ahead of the work still to do, so it joins before the first open step.
+    const add = (candidate) => {
+        const firstOpen = candidate.completed ? steps.findIndex((step) => !step.completed) : -1;
+        update(firstOpen === -1 ? [...steps, candidate] : [...steps.slice(0, firstOpen), candidate, ...steps.slice(firstOpen)]);
+    };
     const reorder = (from, to) => {
         const next = [...steps];
         const [moved] = next.splice(from, 1);
@@ -212,21 +215,21 @@ export default function GoalSequenceSubView({ rootId, goal, goalId, treeData, on
                             key={candidate.id}
                             className={styles.sequenceAddCard}
                             data-completed={candidate.completed ? 'true' : undefined}
-                            disabled={isSaving || candidate.completed}
-                            aria-label={candidate.completed ? `${candidate.name} (completed)` : `Add ${candidate.name}`}
-                            onClick={() => update([...steps, candidate])}
+                            disabled={isSaving}
+                            aria-label={`Add ${candidate.name}${candidate.completed ? ' (completed)' : ''}`}
+                            onClick={() => add(candidate)}
                         >
                             <SequenceGoalIcon candidate={candidate} />
                             <span className={styles.sequenceStepName}>
                                 {candidate.name}
                                 {isOutOfScope(candidate) ? <OutOfScopeTag programName={programScope.name} /> : null}
                             </span>
-                            <span className={styles.sequenceStepStatus}>{candidate.completed ? 'Completed' : '+ Add'}</span>
+                            <span className={styles.sequenceStepStatus}>{candidate.completed ? '+ Add (done)' : '+ Add'}</span>
                         </Button>
                     ))}
                 </div>
             ) : null}
-            {!trackId && addable.length === 0 && otherTracks.length === 0 ? (
+            {!trackId && unsequenced.length === 0 && otherTracks.length === 0 ? (
                 <div className={styles.optionsEmptyState}>No sibling goals at this level to sequence with.</div>
             ) : null}
 

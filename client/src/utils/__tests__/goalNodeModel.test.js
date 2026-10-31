@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     findGoalNodeById,
+    getGoalNodeActivityGroupId,
     flattenGoalTree,
     flattenSessionGoalsViewGoals,
     getGoalNodeCategory,
@@ -148,5 +149,18 @@ describe('goalNodeModel', () => {
             'root',
             'immediate',
         ]);
+    });
+});
+
+describe('getGoalNodeActivityGroupId', () => {
+    it('prefers the canonical field, including an explicit null', () => {
+        expect(getGoalNodeActivityGroupId({ activity_group_id: 'g1', attributes: { associated_activity_group_ids: ['g2'] } })).toBe('g1');
+        expect(getGoalNodeActivityGroupId({ activity_group_id: null, attributes: { associated_activity_group_ids: ['g2'] } })).toBeNull();
+    });
+
+    it('falls back to the legacy id list, else null', () => {
+        expect(getGoalNodeActivityGroupId({ attributes: { associated_activity_group_ids: ['g2'] } })).toBe('g2');
+        expect(getGoalNodeActivityGroupId({ attributes: { associated_activity_group_ids: [] } })).toBeNull();
+        expect(getGoalNodeActivityGroupId(null)).toBeNull();
     });
 });

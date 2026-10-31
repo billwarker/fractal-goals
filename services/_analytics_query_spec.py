@@ -1,20 +1,24 @@
 """Mixin for AnalyticsEngineService: validating and normalizing structured and SQL query specs.
 """
 
+from typing import Any
+
 from services.service_types import JsonDict
 from services._analytics_catalog import (
-    DANGEROUS_SQL_RE,
     DEFAULT_LIMIT,
     MAX_LIMIT,
     QUERY_SPEC_VERSION,
     RAW_SQL_MAX_LENGTH,
     READ_ONLY_SQL_RE,
-    SCHEMA_BYPASS_RE,
 )
-from services._analytics_datasets import DATASETS
+from services._analytics_datasets import CATALOG_RELATIONS, DATASETS
+from services._analytics_sql_guard import SqlGuardError, guard_analytics_sql
+from services.feature_flag_service import FeatureFlagService
 
 
 class _AnalyticsQuerySpecMixin:
+    db_session: Any  # provided by the composed AnalyticsEngineService
+
     def _normalize_query_spec(self, query_spec) -> tuple[JsonDict | None, str | None, int]:
         if not isinstance(query_spec, dict):
             return None, "query_spec must be an object", 400
@@ -129,6 +133,9 @@ class _AnalyticsQuerySpecMixin:
         }, None, 200
 
     def _normalize_sql_query_spec(self, query_spec) -> tuple[JsonDict | None, str | None, int]:
+        # The flag gates the API, not only the console UI that reads it.
+        if not FeatureFlagService(self.db_session).is_enabled("analytics_sql_explorer"):
+            return None, "Analytics SQL is not enabled", 404
         sql = query_spec.get("sql")
         if not isinstance(sql, str) or not sql.strip():
             return None, "sql must be a non-empty string", 400
@@ -144,10 +151,10 @@ class _AnalyticsQuerySpecMixin:
             return None, "SQL comments are not supported in analytics queries yet", 400
         if not READ_ONLY_SQL_RE.match(normalized_sql):
             return None, "Analytics SQL must start with SELECT or WITH", 400
-        if DANGEROUS_SQL_RE.search(normalized_sql):
-            return None, "Analytics SQL is read-only and cannot contain mutating statements", 400
-        if SCHEMA_BYPASS_RE.search(normalized_sql):
-            return None, "Use catalog table names without schema qualification", 400
+        try:
+            guard_analytics_sql(normalized_sql, CATALOG_RELATIONS)
+        except SqlGuardError as error:
+            return None, str(error), 400
 
         try:
             limit = int(query_spec.get("limit") or MAX_LIMIT)

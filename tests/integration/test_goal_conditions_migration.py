@@ -40,7 +40,12 @@ LATER_REVISIONS = (
     'a4b5c6d7e8f9_drop_legacy_targets.py',
     'c6d7e8f9a0b1_retire_relevance_statements.py',
     'e8f9a0b1c2d3_goal_condition_name.py',
+    'b8d0f2a4c6e8_goal_condition_tags_and_streaks.py',
+    'c1e3a5b7d9f0_goal_condition_set_averages.py',
+    'd2f4b6c8e0a1_goal_condition_exact_tag_match.py',
 )
+# Later revisions with objects depending on A's tables, unwound before A is downgraded.
+DEPENDENT_REVISIONS = ('b8d0f2a4c6e8_goal_condition_tags_and_streaks.py',)
 
 
 @pytest.mark.integration
@@ -57,6 +62,8 @@ def test_migration_converts_targets_and_is_reversible(db_session, sample_goal_hi
     try:
         with engine.begin() as connection:
             with Operations.context(MigrationContext.configure(connection)):
+                for filename in DEPENDENT_REVISIONS:
+                    _migration(filename).downgrade()
                 module.downgrade()
                 assert 'goal_completion_conditions' not in inspect(connection).get_table_names()
                 connection.execute(text(LEGACY_TABLES))

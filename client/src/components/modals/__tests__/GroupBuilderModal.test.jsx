@@ -98,12 +98,48 @@ describe('GroupBuilderModal', () => {
                 description: '',
                 parent_id: null,
             });
-            expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child']);
+            expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child'], {});
         });
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
             id: 'group-1',
             associated_goal_ids: ['goal-child'],
         }));
         expect(onClose).toHaveBeenCalled();
+    });
+
+    describe('goals that already use another group', () => {
+        const editingGroup = { id: 'group-1', name: 'Pull', description: '', parent_id: null, associated_goal_ids: ['goal-child', 'goal-root'] };
+        const takenError = () => Object.assign(new Error('taken'), {
+            response: { status: 409, data: {
+                code: 'goal_activity_group_taken',
+                conflicts: [{ goal_id: 'goal-child', goal_name: 'Strict Handstand Push Up', current_group: { id: 'g-2', name: 'Push' } }],
+            } },
+        });
+        const renderEditing = () => {
+            const onSave = vi.fn();
+            const onClose = vi.fn();
+            render(<GroupBuilderModal isOpen onClose={onClose} editingGroup={editingGroup} rootId="root-1" activityGroups={[]} onSave={onSave} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+            return { onSave, onClose };
+        };
+
+        it('asks to move them and retries with replace', async () => {
+            mockSetActivityGroupGoals.mockRejectedValueOnce(takenError()).mockResolvedValueOnce({ id: 'group-1' });
+            const { onClose } = renderEditing();
+            expect(await screen.findByText(/“Strict Handstand Push Up” uses “Push”/)).toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Move Goal' }));
+            await waitFor(() => expect(onClose).toHaveBeenCalled());
+            expect(mockSetActivityGroupGoals).toHaveBeenCalledTimes(2);
+            expect(mockSetActivityGroupGoals).toHaveBeenLastCalledWith('root-1', 'group-1', ['goal-child', 'goal-root'], { replace: true });
+        });
+
+        it('links only the free goals when the user keeps their groups', async () => {
+            mockSetActivityGroupGoals.mockRejectedValueOnce(takenError()).mockResolvedValueOnce({ id: 'group-1' });
+            const { onClose } = renderEditing();
+            fireEvent.click(await screen.findByRole('button', { name: 'Keep Their Groups' }));
+            await waitFor(() => expect(onClose).toHaveBeenCalled());
+            expect(mockSetActivityGroupGoals).toHaveBeenCalledTimes(2);
+            expect(mockSetActivityGroupGoals).toHaveBeenLastCalledWith('root-1', 'group-1', ['goal-root'], { replace: false });
+        });
     });
 });

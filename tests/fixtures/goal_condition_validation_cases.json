@@ -1,0 +1,124 @@
+{
+  "_comment": "Invalid activity-threshold payloads and the message both validators give. Metric ids 'weight' and 'reps' stand for the test activity's Weight and Reps; 'foreign' is a metric it does not track.",
+  "cases": [
+    {
+      "name": "single session needs a rule",
+      "condition": {
+        "kind": "single_session",
+        "measure": "sets",
+        "min_sets": 1,
+        "rules": []
+      },
+      "message": "Add at least one metric rule"
+    },
+    {
+      "name": "rule on an untracked metric",
+      "condition": {
+        "kind": "single_session",
+        "measure": "sets",
+        "min_sets": 1,
+        "rules": [
+          {
+            "metric_definition_id": "foreign",
+            "operator": ">=",
+            "value": 1
+          }
+        ]
+      },
+      "message": "Rule 1 uses a metric this activity does not track"
+    },
+    {
+      "name": "duplicate rule metric",
+      "condition": {
+        "kind": "single_session",
+        "measure": "sets",
+        "min_sets": 1,
+        "rules": [
+          {
+            "metric_definition_id": "weight",
+            "operator": ">=",
+            "value": 1
+          },
+          {
+            "metric_definition_id": "weight",
+            "operator": ">=",
+            "value": 2
+          }
+        ]
+      },
+      "message": "'Weight' appears in more than one rule"
+    },
+    {
+      "name": "too few sets",
+      "condition": {
+        "kind": "single_session",
+        "measure": "sets",
+        "min_sets": 0,
+        "rules": [
+          {
+            "metric_definition_id": "weight",
+            "operator": ">=",
+            "value": 1
+          }
+        ]
+      },
+      "message": "Sets must be between 1 and 100"
+    },
+    {
+      "name": "too many times",
+      "condition": {
+        "kind": "consistency",
+        "measure": "sets",
+        "required_count": 10001,
+        "rules": []
+      },
+      "message": "Times must be between 1 and 10000"
+    },
+    {
+      "name": "cumulative metric not tracked",
+      "condition": {
+        "kind": "cumulative",
+        "measure": "metric",
+        "metric_definition_id": "foreign",
+        "operator": ">=",
+        "target_value": 10
+      },
+      "message": "Choose a metric this activity tracks"
+    },
+    {
+      "name": "too many tags",
+      "condition": {
+        "kind": "consistency",
+        "measure": "sets",
+        "required_count": 3,
+        "rules": [],
+        "tag_ids": [
+          "t0",
+          "t1",
+          "t2",
+          "t3",
+          "t4",
+          "t5",
+          "t6",
+          "t7",
+          "t8",
+          "t9",
+          "t10"
+        ]
+      },
+      "message": "Use at most 10 tags"
+    },
+    {
+      "name": "averages need a rule",
+      "condition": {
+        "kind": "consistency",
+        "measure": "sets",
+        "required_count": 3,
+        "min_sets": 2,
+        "set_aggregate": "average",
+        "rules": []
+      },
+      "message": "Add at least one metric rule"
+    }
+  ]
+}

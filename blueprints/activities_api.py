@@ -12,7 +12,8 @@ from validators import (
     ActivityGroupCreateSchema, ActivityGroupUpdateSchema,
     ActivityDefinitionCreateSchema, ActivityDefinitionUpdateSchema,
     ActivityGoalsSetSchema,
-    GoalAssociationBatchSchema, GroupReorderSchema,
+    ActivityGroupGoalsSetSchema,
+    GroupReorderSchema,
     FractalMetricCreateSchema, FractalMetricUpdateSchema,
     ActivityTagAssignmentSchema,
     ActivityTagCatalogCreateSchema, ActivityTagCatalogUpdateSchema,
@@ -22,7 +23,7 @@ from validators import (
 )
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
-from blueprints.api_utils import get_db_session, parse_optional_pagination, require_owned_root, internal_error, service_response as _service_response
+from blueprints.api_utils import error_body, get_db_session, parse_optional_pagination, require_owned_root, internal_error, service_response as _service_response
 from services.serializers import (
     serialize_activity_group, serialize_activity_definition,
     serialize_fractal_metric,
@@ -36,6 +37,7 @@ from services.activity_service import (
 from services.progress_service import ProgressService
 from services.progress_chart_settings import ProgressChartSettingsService
 from blueprints.activity_instance_goals_api import instance_goals_bp
+from blueprints.goal_activity_groups_api import goal_activity_groups_bp
 from services.activity_tag_assignment_service import ActivityTagAssignmentService
 from services.activity_tag_catalog_service import ActivityTagCatalogService
 from services.activity_tag_family_service import ActivityTagFamilyService
@@ -45,6 +47,7 @@ logger = logging.getLogger(__name__)
 # Create blueprint
 activities_bp = Blueprint('activities', __name__, url_prefix='/api')
 activities_bp.register_blueprint(instance_goals_bp)
+activities_bp.register_blueprint(goal_activity_groups_bp)
 
 def _format_validation_errors(exc):
     errors = []
@@ -524,7 +527,7 @@ def create_activity_group(current_user, root_id, validated_data):
         service = ActivityService(session)
         new_group, error, status = service.create_activity_group(root_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error_body(error)), status
         return jsonify(serialize_activity_group(new_group)), 201
     except SQLAlchemyError:
         session.rollback()
@@ -543,7 +546,7 @@ def update_activity_group(current_user, root_id, group_id, validated_data):
         service = ActivityService(session)
         group, error, status = service.update_activity_group(root_id, group_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error_body(error)), status
         return jsonify(serialize_activity_group(group)), status
     except SQLAlchemyError:
         session.rollback()
@@ -595,9 +598,13 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 
 @activities_bp.route('/<root_id>/activity-groups/<group_id>/goals', methods=['POST'])
 @token_required
-@validate_request(ActivityGoalsSetSchema)
+@validate_request(ActivityGroupGoalsSetSchema)
 def set_activity_group_goals(current_user, root_id, group_id, validated_data):
-    """Set goals associated with an activity group (replaces existing associations)."""
+    """Set goals associated with an activity group (replaces existing associations).
+
+    A goal has one activity group: goals already using another one return 409
+    `goal_activity_group_taken` with `conflicts`, unless `replace` moves them.
+    """
     session = get_db_session()
     try:
         service = ActivityService(session)
@@ -606,9 +613,10 @@ def set_activity_group_goals(current_user, root_id, group_id, validated_data):
             group_id,
             current_user.id,
             validated_data['goal_ids'],
+            replace=validated_data.get('replace', False),
         )
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error_body(error)), status
         return jsonify(serialize_activity_group(group)), status
     except SQLAlchemyError:
         session.rollback()
@@ -816,76 +824,6 @@ def get_goal_activities(current_user, root_id, goal_id):
         session.close()
 
 
-# ============================================================================
-# GOAL-ACTIVITY-GROUP ASSOCIATION ENDPOINTS (for "include entire group")
-# ============================================================================
-
-@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups', methods=['GET'])
-@token_required
-def get_goal_activity_groups(current_user, root_id, goal_id):
-    """Get all activity groups linked to a goal."""
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        payload, error, status = service.get_goal_activity_groups(root_id, goal_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/goals/<goal_id>/associations/batch', methods=['PUT'])
-@token_required
-@validate_request(GoalAssociationBatchSchema)
-def set_goal_associations_batch(current_user, root_id, goal_id, validated_data):
-    """Set both direct activity and activity-group associations for a goal in one request."""
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        payload, error, status = service.set_goal_associations_batch(
-            root_id,
-            goal_id,
-            current_user.id,
-            validated_data["activity_ids"],
-            validated_data["group_ids"],
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error setting goal associations in batch")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['POST'])
-@token_required
-def link_goal_activity_group(current_user, root_id, goal_id, group_id):
-    """Link an entire activity group to a goal (includes all current and future activities)."""
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        payload, error, status = service.link_goal_activity_group(
-            root_id,
-            goal_id,
-            group_id,
-            current_user.id,
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-        
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error linking goal activity group")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
 @activities_bp.route('/<root_id>/activity-instances/<instance_id>/progress', methods=['GET'])
 @token_required
 def get_activity_instance_progress(current_user, root_id, instance_id):
@@ -906,31 +844,6 @@ def get_activity_instance_progress(current_user, root_id, instance_id):
     except SQLAlchemyError:
         session.rollback()
         logger.exception("Error getting activity instance progress")
-        return internal_error(logger, "Activity API request failed")
-    finally:
-        session.close()
-
-
-@activities_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['DELETE'])
-@token_required
-def unlink_goal_activity_group(current_user, root_id, goal_id, group_id):
-    """Unlink an activity group from a goal."""
-    session = get_db_session()
-    try:
-        service = ActivityService(session)
-        payload, error, status = service.unlink_goal_activity_group(
-            root_id,
-            goal_id,
-            group_id,
-            current_user.id,
-        )
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-        
-    except SQLAlchemyError:
-        session.rollback()
-        logger.exception("Error unlinking goal activity group")
         return internal_error(logger, "Activity API request failed")
     finally:
         session.close()

@@ -5,6 +5,7 @@ import models
 from models import Goal, Session, User
 from services.analytics_engine import AnalyticsEngineService
 from services.analytics_query_cache import clear_cache
+from services.feature_flag_service import FeatureFlagService
 
 
 def _create_root(db_session, user, name):
@@ -153,6 +154,7 @@ def test_run_query_supports_count_distinct_measures(db_session, test_user):
 
 
 def test_run_raw_sql_supports_select_star_and_excludes_other_tenants(db_session, test_user):
+    FeatureFlagService(db_session).update_flags({"analytics_sql_explorer": True})
     clear_cache()
     other_user = _create_user(db_session, "rawsqlother")
     owned_root = _create_root(db_session, test_user, "Raw SQL Root")
@@ -193,6 +195,7 @@ def test_run_raw_sql_supports_select_star_and_excludes_other_tenants(db_session,
 
 
 def test_run_raw_sql_supports_postgres_style_aggregates(db_session, test_user):
+    FeatureFlagService(db_session).update_flags({"analytics_sql_explorer": True})
     clear_cache()
     root = _create_root(db_session, test_user, "Raw Aggregate Root")
     db_session.add_all([
@@ -215,6 +218,7 @@ def test_run_raw_sql_supports_postgres_style_aggregates(db_session, test_user):
 
 
 def test_run_raw_sql_rejects_mutation_and_schema_bypass(db_session, test_user):
+    FeatureFlagService(db_session).update_flags({"analytics_sql_explorer": True})
     service = AnalyticsEngineService(db_session)
 
     payload, error, status = service.run_query(test_user.id, {

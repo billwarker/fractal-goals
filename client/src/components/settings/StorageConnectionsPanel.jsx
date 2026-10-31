@@ -135,7 +135,7 @@ export default function StorageConnectionsPanel() {
         <div className={styles.panel}>
             <section className={styles.section} aria-labelledby="storage-settings-title">
                 <h3 id="storage-settings-title">Cloud storage</h3>
-                <p>Attach pictures and video to notes from your own cloud storage. Originals stay in your account; Fractal Goals keeps only a reference to each file.</p>
+                <p>Attach pictures, video and audio to notes from your own cloud storage. Originals stay in your account; Fractal Goals keeps only a reference to each file.</p>
             </section>
 
             {status && <p className={status.ok ? styles.success : styles.error} role={status.ok ? 'status' : 'alert'}>{status.message}</p>}
@@ -164,7 +164,7 @@ export default function StorageConnectionsPanel() {
             {connected.length > 1 && (
                 <section className={styles.section} aria-labelledby="storage-destination-title">
                     <h3 id="storage-destination-title">Save new uploads to</h3>
-                    <p>Pictures you paste, drop or upload from this device go to this account.</p>
+                    <p>Files you paste, drop or upload from this device go to this account.</p>
                     <div className={styles.destinations} role="radiogroup" aria-labelledby="storage-destination-title">
                         {connected.map((item) => (
                             <label key={item.provider} className={styles.destination}>
@@ -186,8 +186,8 @@ export default function StorageConnectionsPanel() {
                 <ul className={styles.limits}>
                     {limits?.max_file_bytes && <li>Up to {formatBytes(limits.max_file_bytes)} per file</li>}
                     {limits?.max_attachments && <li>Up to {limits.max_attachments} attachments per note</li>}
-                    <li>JPEG, PNG, WebP and GIF pictures; MP4 and WebM video</li>
-                    <li>Pictures and video need an internet connection; note text still works offline</li>
+                    <li>JPEG, PNG, WebP and GIF pictures; MP4 and WebM video; MP3, M4A, WAV, FLAC and OGG audio</li>
+                    <li>Attachments need an internet connection; note text still works offline</li>
                 </ul>
                 <p className={styles.muted}>
                     Disconnecting or deleting a note never deletes files from your storage.{' '}

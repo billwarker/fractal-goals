@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
 
 async function selectTodayAndNextWeek(page, today) {
     const rails = page.getByRole('list', { name: /^(Left|Right) column dates$/ });
@@ -13,6 +13,7 @@ async function selectTodayAndNextWeek(page, today) {
 // set-based "Bench Day" template, and no active session.
 test('program a dated plan, see it as next week\'s hints, and see it in the session', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const rootId = `browser-plan-root-${suffix}`;
     const today = new Date().toISOString().slice(0, 10);
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
@@ -26,9 +27,9 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     await page.goto(`/${rootId}/programs`);
     await page.getByRole('tab', { name: 'Days' }).click();
     // Comparing two dates is a side-pane toggle (a sheet on phones).
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     await page.getByRole('button', { name: 'Compare two days' }).click();
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
     await selectTodayAndNextWeek(page, today);
     // Today is the latest program day; next week's sits beside it.
     const cards = page.getByRole('article', { name: /^Bench Day plan/ });
@@ -74,7 +75,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
     await expect(nextCard.locator(benchKey).getByLabel('Set 1 planned Weight')).toHaveAttribute('placeholder', '100');
 
-    if (suffix === 'desktop') {
+    if (device === 'desktop') {
         // Another set on next week's Bench Press makes that card taller; the Barbell Row rows
         // below still line up side by side.
         await nextCard.locator(benchKey).getByRole('button', { name: '+ Add set' }).click();
@@ -106,7 +107,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
 
     // Back on the Days tab, today's template shows the session that is completing it, as on
     // the Sessions page, beside next week's plan.
-    if (suffix === 'desktop') {
+    if (device === 'desktop') {
         await page.goto(`/${rootId}/programs`);
         await page.getByRole('tab', { name: 'Days' }).click();
         await page.getByRole('button', { name: 'Compare two days' }).click();

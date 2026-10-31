@@ -118,6 +118,7 @@ if config.ENV == 'production':
         ]),
         'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
         'frame-ancestors': "'none'",
+        'object-src': "'none'",
         'base-uri': "'self'",
         'form-action': "'self'"
     }

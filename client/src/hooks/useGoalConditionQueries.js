@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fractalApi } from '../utils/api';
@@ -42,4 +42,32 @@ export function useGoalConditionEvidence(rootId, goalId, { since = 'active', act
         enabled: isEnabled,
         staleTime: 60 * 1000,
     });
+}
+
+const PREVIEW_DEBOUNCE_MS = 400;
+
+/**
+ * An unsaved threshold evaluated against the goal's evidence, once edits pause. `condition` is
+ * a valid API payload, or null while the draft cannot be evaluated. Writes nothing.
+ */
+export function useGoalConditionPreview(rootId, goalId, condition) {
+    const serialized = condition ? JSON.stringify(condition) : null;
+    const [settled, setSettled] = useState(serialized);
+    useEffect(() => {
+        const timer = setTimeout(() => setSettled(serialized), PREVIEW_DEBOUNCE_MS);
+        return () => clearTimeout(timer);
+    }, [serialized]);
+    const enabled = Boolean(rootId && goalId && settled);
+    const query = useQuery({
+        queryKey: queryKeys.goalConditionPreview(rootId, goalId, settled),
+        queryFn: async () => {
+            const res = await fractalApi.previewGoalCondition(rootId, goalId, JSON.parse(settled));
+            return res.data?.progress || null;
+        },
+        enabled,
+        staleTime: 30 * 1000,
+        placeholderData: (previous) => previous,
+        retry: false,
+    });
+    return { progress: enabled ? query.data || null : null, isPending: serialized !== settled || query.isFetching };
 }

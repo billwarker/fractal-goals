@@ -14,7 +14,7 @@ const activity = {
 describe('chart goal prefill', () => {
     it('turns a Metric Trends point into a one-session rule with the inferred operator', () => {
         const goal = goalFromMetricTrend({ activity, metricId: 'weight', value: 227.456 });
-        expect(goal.summary).toBe('Weight ≥ 227.46 lb in one session');
+        expect(goal.summary).toBe('Weight ≥ 227.46 lb within one session');
         expect(goal.conditionDraft).toMatchObject({
             activity_definition_id: 'bench', kind: 'single_session',
             rules: [{ metric_definition_id: 'weight', operator: '>=', value: '227.46' }],
@@ -25,7 +25,7 @@ describe('chart goal prefill', () => {
     it('turns a scatter point into two rules', () => {
         const goal = goalFromScatterPoint({ activity, metricX: 'reps', x: 8, metricY: 'weight', y: 185 });
         expect(goal.conditionDraft.rules.map((rule) => [rule.metric_definition_id, rule.value])).toEqual([['reps', '8'], ['weight', '185']]);
-        expect(goal.summary).toBe('Reps ≥ 8 reps, Weight ≥ 185 lb in one session');
+        expect(goal.summary).toBe('Reps ≥ 8 reps, Weight ≥ 185 lb within one session');
     });
 
     it('reads Metric Progress as a percentage better than the latest session, in the better direction', () => {

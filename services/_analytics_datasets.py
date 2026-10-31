@@ -318,6 +318,13 @@ def _datasets() -> dict[str, AnalyticsDataset]:
             chart_families=("table", "bar"),
         ),
         _model_dataset(
+            MetricDefinition,
+            description="Per-activity metrics that metric values record against.",
+            tenant_policy=_root_policy(MetricDefinition.root_id),
+            soft_delete_field=MetricDefinition.deleted_at,
+            default_sort=(("sort_order", "asc"),),
+        ),
+        _model_dataset(
             SplitDefinition,
             tenant_policy=_root_policy(SplitDefinition.root_id),
             soft_delete_field=SplitDefinition.deleted_at,
@@ -521,6 +528,31 @@ def _datasets() -> dict[str, AnalyticsDataset]:
 
 
 DATASETS = _datasets()
+
+# Relation names raw SQL may reference: each is shadowed by its tenant-scoped catalog CTE.
+CATALOG_RELATIONS = frozenset(DATASETS)
+
+
+def catalog_source_tables() -> frozenset[str]:
+    """Physical tables the catalog CTEs read: the grant set for ANALYTICS_SQL_ROLE."""
+    from sqlalchemy.sql.util import find_tables
+
+    tables = set()
+    for dataset in DATASETS.values():
+        base = getattr(dataset.base_model, "__table__", dataset.base_model)
+        expressions = [
+            dataset.tenant_policy(None, ["root"], "user"),
+            *(on_clause for _model, on_clause in dataset.joins),
+            *(field.expression for field in dataset.fields.values()),
+        ]
+        if dataset.soft_delete_field is not None:
+            expressions.append(dataset.soft_delete_field)
+        tables.add(base.name)
+        for model, _on_clause in dataset.joins:
+            tables.add(getattr(model, "__table__", model).name)
+        for expression in expressions:
+            tables.update(table.name for table in find_tables(expression, include_crud=False))
+    return frozenset(tables)
 
 
 def get_analytics_dataset(dataset_id: str) -> AnalyticsDataset:

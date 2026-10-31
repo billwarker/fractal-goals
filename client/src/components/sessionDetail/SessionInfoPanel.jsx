@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import useLiveActivityDuration from '../../hooks/useLiveActivityDuration';
 import { useLivePausedDuration, useLiveSessionDuration } from '../../hooks/useSessionDuration';
 import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
 import notify from '../../utils/notify';
@@ -25,11 +26,12 @@ function SessionInfoPanel() {
         rootId,
         session,
         localSessionData: sessionData,
-        calculateTotalDuration
+        activityInstances,
+        circuitRuns,
     } = useActiveSessionData();
     const { updateSession } = useActiveSessionActions();
 
-    const totalDuration = calculateTotalDuration();
+    const totalDuration = useLiveActivityDuration({ session, activityInstances, circuitRuns, sessionData });
     const liveDuration = useLiveSessionDuration(session);
     const pausedDuration = useLivePausedDuration(session);
     const [isExpanded, setIsExpanded] = useState(false);

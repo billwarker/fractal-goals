@@ -131,10 +131,11 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     expect(errors).toEqual([]);
 });
 
+// Uses its own goal: the saved-view workflow above asserts Heatmap Guitar's exact chart count.
 test('a saved session chart can be added from goal details', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const root = `browser-root-${suffix}`;
-    const goalName = `Heatmap Guitar ${suffix}`;
+    const goalName = `Chart Sandbox ${suffix}`;
     const viewName = `Session trends ${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));

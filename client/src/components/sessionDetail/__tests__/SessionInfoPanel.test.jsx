@@ -1,10 +1,10 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import SessionInfoPanel from '../SessionInfoPanel';
 
 const updateSession = vi.fn(() => Promise.resolve());
-const sessionState = vi.hoisted(() => ({ value: null }));
+const sessionState = vi.hoisted(() => ({ value: null, instances: [], circuitRuns: [] }));
 
 vi.mock('../../../contexts/ActiveSessionContext', () => ({
     useActiveSessionData: () => ({
@@ -16,7 +16,8 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
             session_end: null,
             total_duration_minutes: 30
         },
-        calculateTotalDuration: () => 120
+        activityInstances: sessionState.instances,
+        circuitRuns: sessionState.circuitRuns,
     }),
     useActiveSessionActions: () => ({
         updateSession
@@ -41,6 +42,8 @@ describe('SessionInfoPanel', () => {
             created_at: '2026-01-01T00:00:00Z',
             program_info: null,
         };
+        sessionState.instances = [{ id: 'done', duration_seconds: 120 }];
+        sessionState.circuitRuns = [];
     });
 
     it('submits edited start time through async updateSession', async () => {
@@ -114,5 +117,45 @@ describe('SessionInfoPanel', () => {
         expect(screen.getByRole('link', { name: 'Q4 2026' }).className).toContain('programValue');
         expect(screen.getByText('Month 1').className).toContain('blockValue');
         expect(screen.getByText('Day 1 — Sunday Practice').className).toContain('blockValue');
+    });
+
+    describe('live activity duration', () => {
+        const activityTime = () => screen.getByText('Activity').nextElementSibling;
+        const renderPanel = () => renderWithProviders(<SessionInfoPanel />, {
+            withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false,
+        });
+
+        afterEach(() => vi.useRealTimers());
+
+        it('adds running timers to the recorded total and keeps ticking', () => {
+            vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] });
+            vi.setSystemTime(new Date('2026-01-01T00:10:30Z'));
+            sessionState.instances = [
+                { id: 'done', duration_seconds: 120 },
+                { id: 'running', time_start: '2026-01-01T00:10:00Z', duration_seconds: null },
+            ];
+            sessionState.circuitRuns = [{ id: 'run', status: 'active', time_start: '2026-01-01T00:10:20Z' }];
+            renderPanel();
+            // 120 recorded + 30 on the running instance + 10 on the active circuit.
+            expect(activityTime()).toHaveTextContent('02:40');
+            act(() => { vi.advanceTimersByTime(1000); });
+            expect(activityTime()).toHaveTextContent('02:42');
+        });
+
+        it('holds still while the session is paused', () => {
+            vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout', 'Date'] });
+            vi.setSystemTime(new Date('2026-01-01T00:10:30Z'));
+            sessionState.value = { ...sessionState.value, is_paused: true, last_paused_at: '2026-01-01T00:10:10Z' };
+            sessionState.instances = [{ id: 'running', time_start: '2026-01-01T00:10:00Z' }];
+            renderPanel();
+            expect(activityTime()).toHaveTextContent('00:10');
+            act(() => { vi.advanceTimersByTime(5000); });
+            expect(activityTime()).toHaveTextContent('00:10');
+        });
+
+        it('shows the recorded total, unchanged, when nothing runs', () => {
+            renderPanel();
+            expect(activityTime()).toHaveTextContent('02:00');
+        });
     });
 });

@@ -326,3 +326,21 @@ def test_power_account_program_session_plan_budgets(client, db_session, query_co
     response, elapsed_ms = _budget_get(client, past_url, headers, query_counter)
     assert_response_budget(response, max_bytes=60_000, max_ms=5000, elapsed_ms=elapsed_ms)
     assert query_counter["total"] <= 30
+
+
+@pytest.mark.parametrize("path", [
+    "/goals", "/goals/analytics", "/sessions/analytics-summary", "/goals/selection", "/sessions?limit=20&view=summary",
+])
+def test_power_account_root_reads_stay_fast_with_stale_statistics(stale_statistics, client, power_account_dataset, path):
+    """After a restore or before autoanalyze, statistics can claim the tables are empty.
+
+    Every per-row lookup in these reads is a fenced key probe, so the plan cannot turn into
+    nested rescans. `stale_statistics` must be requested before the dataset fixture.
+    """
+    root_id = power_account_dataset["root"].id
+    started = datetime.now(timezone.utc)
+    response = client.get(f"/api/{root_id}{path}", headers=power_account_dataset["headers"])
+    elapsed_ms = (datetime.now(timezone.utc) - started).total_seconds() * 1000
+
+    assert response.status_code == 200
+    assert elapsed_ms < 5000, f"{path} took {elapsed_ms:.0f} ms with stale statistics"

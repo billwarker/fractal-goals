@@ -276,6 +276,11 @@ class GoalConditionUpdateSchema(BaseModel):
     condition: Optional[Dict[str, Any]] = None
 
 
+class GoalConditionPreviewSchema(BaseModel):
+    """An unsaved activity threshold to evaluate against a goal's evidence."""
+    condition: Dict[str, Any]
+
+
 class GoalAssociationBatchSchema(BaseModel):
     """Schema for replacing both direct activity and group associations for a goal."""
     activity_ids: List[str] = Field(default_factory=list)

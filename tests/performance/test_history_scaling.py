@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 from time import perf_counter
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, text
 from models import ActivityInstance, Session, activity_goal_associations, session_goals
 from services.goal_analytics_service import GoalAnalyticsService
 from services.progress_service import ProgressService
@@ -30,6 +30,14 @@ def history_account(request, db_session, sample_ultimate_goal, sample_activity_d
     db_session.execute(ActivityInstance.__table__.insert(), instances)
     db_session.execute(activity_goal_associations.insert().values(goal_id=root.id, activity_id=activity.id))
     db_session.execute(session_goals.insert(), [dict(goal_id=root.id, session_id=row['id'], goal_type='UltimateGoal') for row in sessions])
+    db_session.commit()
+    # Model production statistics. Autoanalyze would catch up shortly after a bulk
+    # import, but here it races the suite's per-test table resets, and with stale
+    # (near-empty) statistics PostgreSQL nests unparameterized scans quadratically.
+    # That hazard is operational, covered by ANALYZE after restores
+    # (BACKUP_RESTORE_RUNBOOK.md); these budgets guard query structure.
+    for table in ('sessions', 'activity_instances', 'session_goals', 'activity_goal_associations'):
+        db_session.execute(text(f'ANALYZE {table}'))
     db_session.commit()
     return root, activity, instances, session_headers_for(test_user)
 
@@ -101,3 +109,37 @@ def test_analytics_aggregates_instances_without_hydration(db_session, history_ac
     assert goal['session_count'] == len(instances)
     assert goal['total_duration_seconds'] == len(instances) * 30
     assert sum(item['instance_count'] for item in goal['activity_breakdown']) == len(instances)
+
+
+def test_goal_analytics_stays_linear_with_stale_planner_statistics(
+    stale_statistics, db_session, test_user, sample_ultimate_goal, sample_activity_definition, record_property,
+):
+    root, activity = sample_ultimate_goal, sample_activity_definition
+    now = datetime.now(timezone.utc)
+    count = 10000
+    root.created_at = now - timedelta(minutes=count + 60)
+    sessions, instances = [], []
+    for index in range(count):
+        occurred = now - timedelta(minutes=count - index)
+        session_id = str(uuid4())
+        sessions.append(dict(id=session_id, root_id=root.id, owner_id=test_user.id, name='History',
+                             session_start=occurred, session_end=occurred + timedelta(seconds=30), completed=True,
+                             total_duration_seconds=30, created_at=occurred))
+        instances.append(dict(id=str(uuid4()), session_id=session_id, root_id=root.id,
+                              activity_definition_id=activity.id, completed=True, created_at=occurred,
+                              time_start=occurred, time_stop=occurred + timedelta(seconds=30), duration_seconds=30))
+    db_session.execute(Session.__table__.insert(), sessions)
+    db_session.execute(ActivityInstance.__table__.insert(), instances)
+    db_session.execute(activity_goal_associations.insert().values(goal_id=root.id, activity_id=activity.id))
+    db_session.execute(session_goals.insert(), [dict(goal_id=root.id, session_id=row['id'], goal_type='UltimateGoal') for row in sessions])
+    db_session.commit()
+
+    started = perf_counter()
+    payload, error, status = GoalAnalyticsService(db_session).get_goal_analytics(root.id, test_user.id)
+    elapsed_ms = (perf_counter() - started) * 1000
+    record_property('stale_stats_analytics_elapsed_ms', elapsed_ms)
+
+    assert status == 200 and error is None
+    goal = next(goal for goal in payload['goals'] if goal['id'] == root.id)
+    assert goal['session_count'] == count
+    assert elapsed_ms < 5000, 'Goal analytics must not depend on fresh planner statistics'

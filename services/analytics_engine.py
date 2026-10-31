@@ -11,7 +11,7 @@ from models import (
 from services.analytics_query_cache import build_cache_key, get_cached_result, set_cached_result
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
-from services._analytics_catalog import QUERY_SPEC_VERSION, SLOW_QUERY_MS
+from services._analytics_catalog import QUERY_SPEC_VERSION, SLOW_QUERY_MS, STRUCTURED_QUERY_TIMEOUT_MS
 from services._analytics_datasets import DATASETS
 from services._analytics_datasets import (  # noqa: F401 - re-exported for existing imports
     build_scoped_dataset_query,
@@ -75,7 +75,8 @@ class AnalyticsEngineService(_AnalyticsQuerySpecMixin, _AnalyticsExecutionMixin)
         if normalized.get("mode") == "sql":
             payload, error, status = self._execute_sql_query(current_user_id, root_ids, normalized)
         else:
-            payload, error, status = self._execute_query(current_user_id, root_ids, normalized)
+            with self._read_only_query_scope(STRUCTURED_QUERY_TIMEOUT_MS):
+                payload, error, status = self._execute_query(current_user_id, root_ids, normalized)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
         if error:
             return None, error, status

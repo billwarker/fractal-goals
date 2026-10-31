@@ -1,9 +1,10 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root, and "Block 1"
 // runs from a week ago to three weeks ahead.
 test('summarizes a block in the calendar pane and adds a program day with optional goals', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const rootId = `browser-plan-root-${suffix}`;
     const rootName = `Browser Planning ${suffix}`;
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
@@ -21,23 +22,27 @@ test('summarizes a block in the calendar pane and adds a program day with option
     const sidebar = page.getByRole('complementary', { name: 'Program side pane', exact: true });
     await expect(programView).toBeVisible();
     await expect(sidebar.getByRole('tablist', { name: 'Program view', exact: true })).toHaveCount(0);
+    // Measure the settled header: once block data loads the title gains "• Block 1", and web
+    // fonts swap in after first paint; both change widths.
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Block 1');
+    await page.evaluate(() => document.fonts.ready);
     const viewBox = await programView.boundingBox();
     const optionsBox = await page.getByRole('button', { name: 'Program Options', exact: true }).boundingBox();
     expect(viewBox.x + viewBox.width).toBeLessThanOrEqual(optionsBox.x);
     // Heights can differ by a sub-pixel rounding fraction; compare to 0.01px.
     expect(viewBox.height).toBeCloseTo(optionsBox.height, 2);
-    expect(optionsBox.height).toBeCloseTo(suffix === 'mobile' ? 44 : 32, 2);
-    if (suffix === 'desktop') {
+    expect(optionsBox.height).toBeCloseTo(device === 'mobile' ? 44 : 32, 2);
+    if (device === 'desktop') {
         const sidebarButtonBox = await page.getByRole('button', { name: 'Hide Sidebar', exact: true }).boundingBox();
         expect(sidebarButtonBox.height).toBeCloseTo(optionsBox.height, 2);
     }
-    if (suffix === 'desktop') {
+    if (device === 'desktop') {
         const title = page.getByRole('heading', { level: 1 });
         const subtitle = title.locator('xpath=../following-sibling::p');
         await expect(subtitle).toBeVisible();
         expect((await subtitle.boundingBox()).y).toBeGreaterThan((await title.boundingBox()).y);
     }
-    if (suffix === 'mobile') {
+    if (device === 'mobile') {
         await page.getByRole('button', { name: 'Show Sidebar' }).click();
     }
     const block = page.getByRole('article', { name: 'Block 1' });
@@ -62,9 +67,9 @@ test('summarizes a block in the calendar pane and adds a program day with option
 
     // Program days belong to the program: they are created from the Days tab's side pane and
     // take optional goals from the program's goals.
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
     await page.getByRole('tab', { name: 'Days' }).click();
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     await expectSidebarHeader();
     await page.getByRole('button', { name: 'New program day' }).click();
     const editor = page.getByRole('dialog').filter({ has: page.getByRole('textbox', { name: 'Day Name *', exact: true }) });

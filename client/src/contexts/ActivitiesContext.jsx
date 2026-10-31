@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
-import { withNotify } from '../utils/mutationNotify';
+import { formatError, withNotify } from '../utils/mutationNotify';
+import { isGoalGroupTaken } from '../utils/goalActivityGroupErrors';
 import { queryKeys } from '../hooks/queryKeys';
 import { logError } from '../utils/logger';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
@@ -134,9 +135,13 @@ export function ActivitiesProvider({ children }) {
     ), [queryClient]);
 
     const setActivityGroupGoals = useMemo(() => withNotify(
-        async (rootId, groupId, goalIds) => {
-            const res = await fractalApi.setActivityGroupGoals(rootId, groupId, goalIds);
+        async (rootId, groupId, goalIds, options = {}) => {
+            const res = await fractalApi.setActivityGroupGoals(rootId, groupId, goalIds, options);
             const updated = res.data;
+            // Goals may have moved between groups: their payloads and catalogs change.
+            await Promise.all([
+                queryKeys.fractalTree(rootId), queryKeys.goalActivitiesRoot(rootId), queryKeys.goalActivityGroupsRoot(rootId),
+            ].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 
             if (updated?.id) {
                 queryClient.setQueryData(queryKeys.activityGroups(rootId), (prev = []) => {
@@ -151,9 +156,10 @@ export function ActivitiesProvider({ children }) {
         },
         {
             success: null,
-            error: 'Failed to update group goals',
+            // Goals already in another group are the caller's to confirm, not an error toast.
+            error: (err) => (isGoalGroupTaken(err) ? null : `Failed to update group goals: ${formatError(err)}`),
             onError: (err) => {
-                logError('Failed to set activity group goals:', err);
+                if (!isGoalGroupTaken(err)) logError('Failed to set activity group goals:', err);
             },
         },
     ), [queryClient]);

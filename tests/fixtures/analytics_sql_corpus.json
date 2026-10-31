@@ -1,0 +1,162 @@
+[
+  {
+    "id": "activities:activityFrequency:filtered",
+    "sql": "SELECT\n  ad.name AS activity_name,\n  COUNT(ai.id) AS completed_instances\nFROM activity_instances ai\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\nGROUP BY ad.name\nHAVING COUNT(ai.id) > 0\nORDER BY completed_instances DESC, activity_name ASC\nLIMIT 15"
+  },
+  {
+    "id": "activities:activityFrequency:selected",
+    "sql": "SELECT\n  ad.name AS activity_name,\n  COUNT(ai.id) AS completed_instances\nFROM activity_instances ai\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\nGROUP BY ad.name\nHAVING COUNT(ai.id) > 0\nORDER BY completed_instances DESC, activity_name ASC\nLIMIT 15"
+  },
+  {
+    "id": "activities:activityTrends:filtered",
+    "sql": "SELECT\n  DATE_TRUNC('day', COALESCE(ai.time_stop, ai.time_start, ai.created_at))::date AS day,\n  COUNT(ai.id) AS instances,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM activity_instances ai\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\nGROUP BY day\nORDER BY day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:activityTrends:selected",
+    "sql": "SELECT\n  DATE_TRUNC('day', COALESCE(ai.time_stop, ai.time_start, ai.created_at))::date AS day\nFROM activity_instances ai\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\nGROUP BY day\nORDER BY day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:groupMix:filtered",
+    "sql": "SELECT\n  COALESCE(ag.name, 'Ungrouped') AS activity_group,\n  COUNT(ai.id) AS completed_instances\nFROM activity_instances ai\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id\nLEFT JOIN activity_groups ag ON ag.id = ad.group_id\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\nGROUP BY COALESCE(ag.name, 'Ungrouped')\nHAVING COUNT(ai.id) > 0\nORDER BY completed_instances DESC, activity_group ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:groupMix:selected",
+    "sql": "SELECT\n  COALESCE(ag.name, 'Ungrouped') AS activity_group,\n  COUNT(ai.id) AS completed_instances\nFROM activity_instances ai\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id\nLEFT JOIN activity_groups ag ON ag.id = ad.group_id\nWHERE (ai.completed = true OR ai.time_stop IS NOT NULL OR COALESCE(ai.duration_seconds, 0) > 0)\nGROUP BY COALESCE(ag.name, 'Ungrouped')\nHAVING COUNT(ai.id) > 0\nORDER BY completed_instances DESC, activity_group ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:metricProgress:filtered",
+    "sql": "WITH ordered_values AS (\n  SELECT\n    ai.id AS activity_instance_id,\n    COALESCE(ai.time_stop, ai.time_start, ai.created_at)::date AS instance_date,\n    md.name AS metric_name,\n    mv.value::numeric AS metric_value,\n    LAG(mv.value::numeric) OVER (PARTITION BY mv.metric_definition_id ORDER BY COALESCE(ai.time_stop, ai.time_start, ai.created_at), ai.id) AS previous_metric_value\n  FROM metric_values mv\n  JOIN activity_instances ai ON ai.id = mv.activity_instance_id\n  JOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\n)\nSELECT\n  activity_instance_id,\n  instance_date,\n  metric_name,\n  ROUND(((metric_value - previous_metric_value) / NULLIF(previous_metric_value, 0)) * 100, 2) AS pct_change\nFROM ordered_values\nWHERE previous_metric_value IS NOT NULL\nORDER BY instance_date ASC, activity_instance_id ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:metricProgress:selected",
+    "sql": "WITH ordered_values AS (\n  SELECT\n    ai.id AS activity_instance_id,\n    COALESCE(ai.time_stop, ai.time_start, ai.created_at)::date AS instance_date,\n    md.name AS metric_name,\n    mv.value::numeric AS metric_value,\n    LAG(mv.value::numeric) OVER (PARTITION BY mv.metric_definition_id ORDER BY COALESCE(ai.time_stop, ai.time_start, ai.created_at), ai.id) AS previous_metric_value\n  FROM metric_values mv\n  JOIN activity_instances ai ON ai.id = mv.activity_instance_id\n  JOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE ai.activity_definition_id = 'activity-1'\n  AND mv.metric_definition_id IN ('speed')\n)\nSELECT\n  activity_instance_id,\n  instance_date,\n  metric_name,\n  ROUND(((metric_value - previous_metric_value) / NULLIF(previous_metric_value, 0)) * 100, 2) AS pct_change\nFROM ordered_values\nWHERE previous_metric_value IS NOT NULL\nORDER BY instance_date ASC, activity_instance_id ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:metricTrends:filtered",
+    "sql": "SELECT\n  ai.id AS activity_instance_id,\n  COALESCE(ai.time_start, ai.created_at)::date AS instance_date,\n  md.name AS metric_name,\n  MAX(mv.value::numeric) AS metric_value\nFROM metric_values mv\nJOIN activity_instances ai ON ai.id = mv.activity_instance_id\nJOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\nGROUP BY ai.id, instance_date, md.name\nORDER BY instance_date ASC, activity_instance_id ASC, metric_name ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:metricTrends:selected",
+    "sql": "SELECT\n  ai.id AS activity_instance_id,\n  COALESCE(ai.time_start, ai.created_at)::date AS instance_date,\n  md.name AS metric_name,\n  MAX(mv.value::numeric) AS metric_value\nFROM metric_values mv\nJOIN activity_instances ai ON ai.id = mv.activity_instance_id\nJOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE ai.activity_definition_id = 'activity-1'\n  AND mv.metric_definition_id IN ('speed', 'rating')\nGROUP BY ai.id, instance_date, md.name\nORDER BY instance_date ASC, activity_instance_id ASC, metric_name ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:scatterPlot:filtered",
+    "sql": "WITH metric_points AS (\n  SELECT\n    ai.id AS activity_instance_id,\n    COALESCE(ai.time_start, ai.created_at)::date AS instance_date,\n    md.id AS metric_id,\n    md.name AS metric_name,\n    mv.value::numeric AS metric_value\n  FROM metric_values mv\n  JOIN activity_instances ai ON ai.id = mv.activity_instance_id\n  JOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\n  AND ai.activity_definition_id IN ('activity-1', 'activity-2')\n), paired_points AS (\n  SELECT\n    activity_instance_id,\n    instance_date,\n    MAX(metric_value) FILTER (WHERE metric_id = 'x_metric') AS x_value,\n    MAX(metric_value) FILTER (WHERE metric_id = 'y_metric') AS y_value\n  FROM metric_points\n  GROUP BY activity_instance_id, instance_date\n)\nSELECT activity_instance_id, instance_date, x_value, y_value\nFROM paired_points\nWHERE x_value IS NOT NULL AND y_value IS NOT NULL\nORDER BY instance_date ASC, activity_instance_id ASC\nLIMIT 5000"
+  },
+  {
+    "id": "activities:scatterPlot:selected",
+    "sql": "WITH metric_points AS (\n  SELECT\n    ai.id AS activity_instance_id,\n    COALESCE(ai.time_start, ai.created_at)::date AS instance_date,\n    md.id AS metric_id,\n    md.name AS metric_name,\n    mv.value::numeric AS metric_value\n  FROM metric_values mv\n  JOIN activity_instances ai ON ai.id = mv.activity_instance_id\n  JOIN metric_definitions md ON md.id = mv.metric_definition_id\nWHERE ai.activity_definition_id = 'activity-1'\n  AND mv.metric_definition_id IN ('speed', 'rating')\n), paired_points AS (\n  SELECT\n    activity_instance_id,\n    instance_date,\n    MAX(metric_value) FILTER (WHERE metric_id = 'speed') AS x_value,\n    MAX(metric_value) FILTER (WHERE metric_id = 'rating') AS y_value\n  FROM metric_points\n  GROUP BY activity_instance_id, instance_date\n)\nSELECT activity_instance_id, instance_date, x_value, y_value\nFROM paired_points\nWHERE x_value IS NOT NULL AND y_value IS NOT NULL\nORDER BY instance_date ASC, activity_instance_id ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:completionRateByLevel:filtered",
+    "sql": "SELECT\n  COALESCE(gl.name, 'Goal') AS goal_level,\n  COUNT(g.id) AS total_goals,\n  SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END) AS completed_goals,\n  ROUND((SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(g.id), 0)) * 100)::integer AS completion_rate\nFROM goals g\nLEFT JOIN goal_levels gl ON gl.id = g.level_id\nWHERE g.id IN ('goal-1')\nGROUP BY COALESCE(gl.name, 'Goal')\nORDER BY completion_rate DESC, goal_level ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:completionRateByLevel:selected",
+    "sql": "SELECT\n  COALESCE(gl.name, 'Goal') AS goal_level,\n  COUNT(g.id) AS total_goals,\n  SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END) AS completed_goals,\n  ROUND((SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END)::numeric / NULLIF(COUNT(g.id), 0)) * 100)::integer AS completion_rate\nFROM goals g\nLEFT JOIN goal_levels gl ON gl.id = g.level_id\nGROUP BY COALESCE(gl.name, 'Goal')\nORDER BY completion_rate DESC, goal_level ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:completionTimeline:filtered",
+    "sql": "WITH completed_by_day AS (\n  SELECT\n    g.completed_at::date AS completed_day,\n    COUNT(g.id) AS completed_goals\n  FROM goals g\nWHERE g.completed_at IS NOT NULL\n  AND g.completed_at >= '2026-01-01T00:00:00'\n  AND g.completed_at <= '2026-03-31T23:59:59'\n  AND g.id IN ('goal-1')\n  GROUP BY completed_day\n)\nSELECT\n  completed_day,\n  completed_goals,\n  SUM(completed_goals) OVER (ORDER BY completed_day ASC) AS cumulative_completed_goals\nFROM completed_by_day\nORDER BY completed_day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:completionTimeline:selected",
+    "sql": "WITH completed_by_day AS (\n  SELECT\n    g.completed_at::date AS completed_day,\n    COUNT(g.id) AS completed_goals\n  FROM goals g\nWHERE g.completed_at IS NOT NULL\n  GROUP BY completed_day\n)\nSELECT\n  completed_day,\n  completed_goals,\n  SUM(completed_goals) OVER (ORDER BY completed_day ASC) AS cumulative_completed_goals\nFROM completed_by_day\nORDER BY completed_day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:goalAging:filtered",
+    "sql": "SELECT\n  CASE\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 7 THEN '0-7 days'\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 30 THEN '8-30 days'\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 90 THEN '31-90 days'\n    ELSE '90+ days'\n  END AS age_bucket,\n  COUNT(g.id) AS active_goals\nFROM goals g\nWHERE g.completed = false\n  AND g.id IN ('goal-1')\nGROUP BY age_bucket\nORDER BY MIN(g.created_at) DESC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:goalAging:selected",
+    "sql": "SELECT\n  CASE\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 7 THEN '0-7 days'\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 30 THEN '8-30 days'\n    WHEN EXTRACT(day FROM (NOW() - g.created_at)) <= 90 THEN '31-90 days'\n    ELSE '90+ days'\n  END AS age_bucket,\n  COUNT(g.id) AS active_goals\nFROM goals g\nWHERE g.completed = false\nGROUP BY age_bucket\nORDER BY MIN(g.created_at) DESC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:goalDetail:filtered",
+    "sql": "SELECT\n  COALESCE(s.session_start, s.created_at)::date AS session_day,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN session_goals sg ON sg.goal_id = g.id\nJOIN sessions s ON s.id = sg.session_id\nWHERE g.id IN ('goal-1')\n  AND COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\nGROUP BY session_day\nORDER BY session_day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:goalDetail:selected",
+    "sql": "SELECT\n  COALESCE(s.session_start, s.created_at)::date AS session_day,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN session_goals sg ON sg.goal_id = g.id\nJOIN sessions s ON s.id = sg.session_id\nWHERE g.id = 'goal-1'\nGROUP BY session_day\nORDER BY session_day ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:goalMomentum:filtered",
+    "sql": "SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS activity_minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nWHERE g.id IN ('goal-1')\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY activity_minutes DESC, goal_name ASC\nLIMIT 12"
+  },
+  {
+    "id": "goals:goalMomentum:selected",
+    "sql": "SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS activity_minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY activity_minutes DESC, goal_name ASC\nLIMIT 12"
+  },
+  {
+    "id": "goals:staleGoals:filtered",
+    "sql": "WITH direct_activity AS (\n  SELECT\n    aga.goal_id,\n    MAX(COALESCE(ai.time_stop, ai.time_start, ai.created_at)) AS last_activity_at\n  FROM activity_goal_associations aga\n  JOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\n  GROUP BY aga.goal_id\n), direct_sessions AS (\n  SELECT\n    sg.goal_id,\n    MAX(COALESCE(s.session_start, s.created_at)) AS last_session_at\n  FROM session_goals sg\n  JOIN sessions s ON s.id = sg.session_id\n  GROUP BY sg.goal_id\n), goal_activity AS (\n  SELECT\n    g.id,\n    g.name,\n    GREATEST(\n      COALESCE(da.last_activity_at, g.created_at),\n      COALESCE(ds.last_session_at, g.created_at),\n      g.created_at\n    ) AS last_activity_at\n  FROM goals g\n  LEFT JOIN direct_activity da ON da.goal_id = g.id\n  LEFT JOIN direct_sessions ds ON ds.goal_id = g.id\nWHERE g.completed = false\n  AND g.id IN ('goal-1')\n)\nSELECT\n  id AS goal_id,\n  name AS goal_name,\n  FLOOR(EXTRACT(epoch FROM (NOW() - last_activity_at)) / 86400)::integer AS days_stale\nFROM goal_activity\nWHERE last_activity_at <= NOW() - INTERVAL '14 days'\nORDER BY days_stale DESC, goal_name ASC\nLIMIT 10"
+  },
+  {
+    "id": "goals:staleGoals:selected",
+    "sql": "WITH direct_activity AS (\n  SELECT\n    aga.goal_id,\n    MAX(COALESCE(ai.time_stop, ai.time_start, ai.created_at)) AS last_activity_at\n  FROM activity_goal_associations aga\n  JOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\n  GROUP BY aga.goal_id\n), direct_sessions AS (\n  SELECT\n    sg.goal_id,\n    MAX(COALESCE(s.session_start, s.created_at)) AS last_session_at\n  FROM session_goals sg\n  JOIN sessions s ON s.id = sg.session_id\n  GROUP BY sg.goal_id\n), goal_activity AS (\n  SELECT\n    g.id,\n    g.name,\n    GREATEST(\n      COALESCE(da.last_activity_at, g.created_at),\n      COALESCE(ds.last_session_at, g.created_at),\n      g.created_at\n    ) AS last_activity_at\n  FROM goals g\n  LEFT JOIN direct_activity da ON da.goal_id = g.id\n  LEFT JOIN direct_sessions ds ON ds.goal_id = g.id\nWHERE g.completed = false\n)\nSELECT\n  id AS goal_id,\n  name AS goal_name,\n  FLOOR(EXTRACT(epoch FROM (NOW() - last_activity_at)) / 86400)::integer AS days_stale\nFROM goal_activity\nWHERE last_activity_at <= NOW() - INTERVAL '14 days'\nORDER BY days_stale DESC, goal_name ASC\nLIMIT 10"
+  },
+  {
+    "id": "goals:stats:filtered",
+    "sql": "SELECT\n  COUNT(g.id) AS total_goals,\n  SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END) AS completed_goals,\n  ROUND(AVG(EXTRACT(day FROM (COALESCE(g.completed_at, NOW()) - g.created_at))))::integer AS avg_goal_age_days,\n  ROUND(AVG(EXTRACT(day FROM (g.completed_at - g.created_at))) FILTER (WHERE g.completed_at IS NOT NULL))::integer AS avg_time_to_completion_days\nFROM goals g\nWHERE g.id IN ('goal-1')\nLIMIT 1"
+  },
+  {
+    "id": "goals:stats:selected",
+    "sql": "SELECT\n  COUNT(g.id) AS total_goals,\n  SUM(CASE WHEN g.completed = true THEN 1 ELSE 0 END) AS completed_goals,\n  ROUND(AVG(EXTRACT(day FROM (COALESCE(g.completed_at, NOW()) - g.created_at))))::integer AS avg_goal_age_days,\n  ROUND(AVG(EXTRACT(day FROM (g.completed_at - g.created_at))) FILTER (WHERE g.completed_at IS NOT NULL))::integer AS avg_time_to_completion_days\nFROM goals g\nLIMIT 1"
+  },
+  {
+    "id": "goals:timeDistribution:filtered",
+    "sql": "SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nWHERE g.id IN ('goal-1')\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(ai.time_stop, ai.time_start, ai.created_at) <= '2026-03-31T23:59:59'\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY minutes DESC, goal_name ASC\nLIMIT 5000"
+  },
+  {
+    "id": "goals:timeDistribution:selected",
+    "sql": "SELECT\n  g.id AS goal_id,\n  g.name AS goal_name,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nGROUP BY g.id, g.name\nHAVING SUM(COALESCE(ai.duration_seconds, 0)) > 0\nORDER BY minutes DESC, goal_name ASC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:durationHistogram:filtered",
+    "sql": "WITH durations AS (\n  SELECT GREATEST(0, ROUND(COALESCE(s.duration_seconds, 0) / 60.0)::integer) AS minutes\n  FROM sessions s\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\n), bounds AS (\n  SELECT GREATEST(MAX(minutes), 1) AS max_minutes FROM durations\n), buckets AS (\n  SELECT\n    generate_series(0, 4) AS bucket_index,\n    CEIL((SELECT max_minutes FROM bounds)::numeric / 5)::integer AS bucket_size\n)\nSELECT\n  bucket_index,\n  bucket_index * bucket_size AS start_minutes,\n  CASE WHEN bucket_index = 4 THEN NULL ELSE (bucket_index + 1) * bucket_size END AS end_minutes,\n  COUNT(d.minutes) AS sessions\nFROM buckets\nLEFT JOIN durations d\n  ON d.minutes >= bucket_index * bucket_size\n  AND (bucket_index = 4 OR d.minutes < (bucket_index + 1) * bucket_size)\nGROUP BY bucket_index, bucket_size\nORDER BY bucket_index ASC"
+  },
+  {
+    "id": "sessions:durationHistogram:selected",
+    "sql": "WITH durations AS (\n  SELECT GREATEST(0, ROUND(COALESCE(s.duration_seconds, 0) / 60.0)::integer) AS minutes\n  FROM sessions s\n), bounds AS (\n  SELECT GREATEST(MAX(minutes), 1) AS max_minutes FROM durations\n), buckets AS (\n  SELECT\n    generate_series(0, 4) AS bucket_index,\n    CEIL((SELECT max_minutes FROM bounds)::numeric / 5)::integer AS bucket_size\n)\nSELECT\n  bucket_index,\n  bucket_index * bucket_size AS start_minutes,\n  CASE WHEN bucket_index = 4 THEN NULL ELSE (bucket_index + 1) * bucket_size END AS end_minutes,\n  COUNT(d.minutes) AS sessions\nFROM buckets\nLEFT JOIN durations d\n  ON d.minutes >= bucket_index * bucket_size\n  AND (bucket_index = 4 OR d.minutes < (bucket_index + 1) * bucket_size)\nGROUP BY bucket_index, bucket_size\nORDER BY bucket_index ASC"
+  },
+  {
+    "id": "sessions:sectionPie:filtered",
+    "sql": "WITH expanded_sections AS (\n  SELECT\n    COALESCE(section->>'name', 'Unnamed section') AS section_name,\n    COALESCE((section->>'duration_minutes')::numeric * 60, 0) AS duration_seconds\n  FROM sessions s\n  CROSS JOIN LATERAL jsonb_array_elements(COALESCE((s.attributes::jsonb #> '{session_data,sections}'), '[]'::jsonb)) AS section\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\n)\nSELECT\n  section_name,\n  ROUND(SUM(duration_seconds) / 60.0)::integer AS minutes\nFROM expanded_sections\nGROUP BY section_name\nHAVING SUM(duration_seconds) > 0\nORDER BY minutes DESC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:sectionPie:selected",
+    "sql": "WITH expanded_sections AS (\n  SELECT\n    COALESCE(section->>'name', 'Unnamed section') AS section_name,\n    COALESCE((section->>'duration_minutes')::numeric * 60, 0) AS duration_seconds\n  FROM sessions s\n  CROSS JOIN LATERAL jsonb_array_elements(COALESCE((s.attributes::jsonb #> '{session_data,sections}'), '[]'::jsonb)) AS section\n)\nSELECT\n  section_name,\n  ROUND(SUM(duration_seconds) / 60.0)::integer AS minutes\nFROM expanded_sections\nGROUP BY section_name\nHAVING SUM(duration_seconds) > 0\nORDER BY minutes DESC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:sessionTrends:filtered",
+    "sql": "SELECT\n  DATE_TRUNC('week', COALESCE(s.session_start, s.created_at))::date AS week,\n  COUNT(s.id) AS sessions,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM sessions s\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\nGROUP BY week\nORDER BY week ASC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:sessionTrends:selected",
+    "sql": "SELECT\n  DATE_TRUNC('week', COALESCE(s.session_start, s.created_at))::date AS week\nFROM sessions s\nGROUP BY week\nORDER BY week ASC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:startDistribution:filtered",
+    "sql": "WITH hours AS (\n  SELECT generate_series(0, 23) AS hour\n)\nSELECT\n  hours.hour,\n  COUNT(s.id) FILTER (WHERE EXTRACT(hour FROM COALESCE(s.session_start, s.created_at)) = hours.hour) AS session_start\nFROM hours\nLEFT JOIN sessions s ON true\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\nGROUP BY hours.hour\nORDER BY hours.hour ASC"
+  },
+  {
+    "id": "sessions:startDistribution:selected",
+    "sql": "WITH hours AS (\n  SELECT generate_series(0, 23) AS hour\n)\nSELECT\n  hours.hour,\n  COUNT(s.id) FILTER (WHERE EXTRACT(hour FROM COALESCE(s.session_start, s.created_at)) = hours.hour) AS session_start\nFROM hours\nLEFT JOIN sessions s ON true\nGROUP BY hours.hour\nORDER BY hours.hour ASC"
+  },
+  {
+    "id": "sessions:stats:filtered",
+    "sql": "SELECT\n  COUNT(s.id) AS total_sessions,\n  SUM(CASE WHEN s.completed = true THEN 1 ELSE 0 END) AS completed_sessions,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS total_minutes,\n  ROUND(AVG(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS avg_minutes\nFROM sessions s\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\nLIMIT 1"
+  },
+  {
+    "id": "sessions:stats:selected",
+    "sql": "SELECT\n  COUNT(s.id) AS total_sessions,\n  SUM(CASE WHEN s.completed = true THEN 1 ELSE 0 END) AS completed_sessions,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS total_minutes,\n  ROUND(AVG(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS avg_minutes\nFROM sessions s\nLIMIT 1"
+  },
+  {
+    "id": "sessions:streaks:filtered",
+    "sql": "WITH practice_days AS (\n  SELECT DISTINCT COALESCE(s.session_start, s.created_at)::date AS practice_day\n  FROM sessions s\nWHERE COALESCE(s.session_start, s.created_at) >= '2026-01-01T00:00:00'\n  AND COALESCE(s.session_start, s.created_at) <= '2026-03-31T23:59:59'\n), grouped_days AS (\n  SELECT\n    practice_day,\n    practice_day - (ROW_NUMBER() OVER (ORDER BY practice_day))::integer AS streak_group\n  FROM practice_days\n)\nSELECT\n  MIN(practice_day) AS streak_start,\n  MAX(practice_day) AS streak_end,\n  COUNT(*) AS active_days\nFROM grouped_days\nGROUP BY streak_group\nORDER BY streak_start ASC\nLIMIT 5000"
+  },
+  {
+    "id": "sessions:streaks:selected",
+    "sql": "WITH practice_days AS (\n  SELECT DISTINCT COALESCE(s.session_start, s.created_at)::date AS practice_day\n  FROM sessions s\n), grouped_days AS (\n  SELECT\n    practice_day,\n    practice_day - (ROW_NUMBER() OVER (ORDER BY practice_day))::integer AS streak_group\n  FROM practice_days\n)\nSELECT\n  MIN(practice_day) AS streak_start,\n  MAX(practice_day) AS streak_end,\n  COUNT(*) AS active_days\nFROM grouped_days\nGROUP BY streak_group\nORDER BY streak_start ASC\nLIMIT 5000"
+  }
+]

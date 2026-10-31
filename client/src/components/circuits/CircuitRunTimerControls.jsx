@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
+import useSecondTicker from '../../hooks/useSecondTicker';
 import { formatForInput, validateTimerRange } from '../../utils/dateUtils';
-import { formatClockDuration } from '../../utils/sessionTime';
+import { formatClockDuration, liveCircuitSeconds } from '../../utils/sessionTime';
 import { PlayIcon } from '../atoms/AppIcons';
 import Button from '../atoms/Button';
 import CompletionButton from '../common/CompletionButton';
@@ -15,21 +16,6 @@ import useRelativeTimeAdjustment from '../sessionDetail/useRelativeTimeAdjustmen
 import activityStyles from '../sessionDetail/SessionActivityItem.module.css';
 
 
-const secondsBetween = (start, end) => {
-    const startMs = new Date(start).getTime();
-    const endMs = new Date(end).getTime();
-    return Number.isFinite(startMs) && Number.isFinite(endMs)
-        ? Math.max(0, Math.floor((endMs - startMs) / 1000))
-        : 0;
-};
-
-const elapsedSeconds = (run, now) => {
-    if (!run?.time_start || run.status === 'completed') return run?.duration_seconds || 0;
-    const end = run.status === 'paused' && run.last_paused_at ? run.last_paused_at : now;
-    return Math.max(0, secondsBetween(run.time_start, end) - (run.total_paused_seconds || 0));
-};
-
-
 export default function CircuitRunTimerControls({
     run,
     disabled,
@@ -38,13 +24,8 @@ export default function CircuitRunTimerControls({
     onAction,
 }) {
     const { timezone } = useTimezone();
-    const [now, setNow] = useState(() => new Date());
-
-    useEffect(() => {
-        if (run.status !== 'active') return undefined;
-        const timer = window.setInterval(() => setNow(new Date()), 1000);
-        return () => window.clearInterval(timer);
-    }, [run.status]);
+    // The shared clock keeps this in step with activity cards and the session's Activity total.
+    const nowMs = useSecondTicker(run.status === 'active');
 
     const actionsDisabled = disabled || pending;
     const localStartTime = formatForInput(run.time_start, timezone);
@@ -124,7 +105,7 @@ export default function CircuitRunTimerControls({
                         />
                     ) : (
                         <div className={`${activityStyles.durationDisplay} ${run.status === 'active' ? activityStyles.durationActive : activityStyles.durationInactive}`}>
-                            {formatClockDuration(elapsedSeconds(run, now))}
+                            {formatClockDuration(liveCircuitSeconds(run, nowMs))}
                         </div>
                     )}
                 </div>

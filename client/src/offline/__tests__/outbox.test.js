@@ -290,6 +290,28 @@ describe('outbox', () => {
         ]);
     });
 
+    it('gives a manually retried change a fresh failure budget', async () => {
+        let failing = true;
+        const sender = vi.fn(async (entry) => {
+            if (entry.url === '/flaky' && failing) throw httpError(500, { error: 'boom' });
+            return { status: 200, data: {} };
+        });
+        const { outbox } = setup({ send: sender });
+        const flaky = await outbox.submit(op({ url: '/flaky' }));
+        await vi.runAllTimersAsync();
+        await expect(flaky.settled).rejects.toThrow(/kept failing/);
+        const [rejected] = outbox.getSnapshot().ops;
+
+        await outbox.retry(rejected.opId);
+        await outbox.flush();
+
+        // One more failure must not exhaust the budget spent before the rejection.
+        expect(outbox.getSnapshot().ops[0]).toMatchObject({ state: OP_STATE.PENDING, serverFailures: 1 });
+        failing = false;
+        await vi.runAllTimersAsync();
+        expect(outbox.getSnapshot().ops).toHaveLength(0);
+    });
+
     it('never gives up while the device simply has no connection', async () => {
         const sender = vi.fn().mockRejectedValue(networkError());
         const { outbox, sent } = setup({ send: sender });

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { storageApi } from '../utils/api/storageApi';
-import { namePastedFile, runCloudUpload, uploadProblem } from '../utils/cloudUpload';
+import { namePastedFile, runCloudUpload, uploadProblem, withCanonicalType } from '../utils/cloudUpload';
 import { providerLabel } from '../utils/storageConnectionCopy';
 import { useStorageConnections } from './useStorageConnections';
 
@@ -61,12 +61,12 @@ export function useAttachmentDraft(rootId, initial = []) {
         setNotice('');
         if (!rootId) return 0;
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
-            setNotice('Pictures and video need an internet connection.');
+            setNotice('Attachments need an internet connection.');
             return 0;
         }
         if (!destination) {
             setNotice(providers.some((item) => item.configured)
-                ? 'Connect Google Drive or Dropbox in Settings → Cloud Storage to save pictures from this device.'
+                ? 'Connect Google Drive or Dropbox in Settings → Cloud Storage to save files from this device.'
                 : 'Cloud storage isn’t available yet. You can still paste shared links into your note.');
             return 0;
         }
@@ -77,7 +77,7 @@ export function useAttachmentDraft(rootId, initial = []) {
             const file = pasted ? namePastedFile(original, index) : original;
             const problem = uploadProblem(file, limits?.max_file_bytes);
             if (problem) problems.push(problem);
-            else if (accepted.length < room) accepted.push(file);
+            else if (accepted.length < room) accepted.push(withCanonicalType(file));
         });
         if (list.length - problems.length > room) problems.push(`A note can have up to ${MAX_ATTACHMENTS} attachments.`);
         if (problems.length) setNotice(problems.join(' '));
@@ -89,7 +89,7 @@ export function useAttachmentDraft(rootId, initial = []) {
         return queued.length;
     }, [rootId, destination, providers, limits, items.length, upload]);
 
-    /** Paste handler for a textarea: uploads clipboard images and leaves text paste alone. */
+    /** Paste handler for a textarea: uploads clipboard files and leaves text paste alone. */
     const handlePaste = useCallback((event) => {
         const files = Array.from(event.clipboardData?.files || []);
         if (!files.length) return false;

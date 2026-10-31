@@ -342,3 +342,36 @@ it('normalizes configured metric inputs when committing edits', async () => {
         });
     });
 });
+
+describe('SessionActivityItem one-off goal links', () => {
+    it("shows each linked goal's icon on the meta line without selection or scope", async () => {
+        const { QueryClient } = await import('@tanstack/react-query');
+        const { queryKeys } = await import('../../../hooks/queryKeys');
+        const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+        queryClient.setQueryData(queryKeys.fractalTree('root-1'), {
+            id: 'root-1', name: 'Guitar', type: 'UltimateGoal',
+            children: [{ id: 'song', name: 'Head Over Heels', type: 'ImmediateGoal', children: [] }],
+        });
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'instance-linked', session_id: 'session-1', activity_definition_id: 'activity-1',
+                    associated_goal_ids: ['song'], sets: [], metrics: [], duration_seconds: 0,
+                }}
+                onFocus={vi.fn()}
+                isSelected={false}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                sessionIndex={1}
+                allNotes={[]}
+                isDragging={false}
+                activityDefinition={{ id: 'activity-1', name: 'Pull Up', metric_definitions: [], split_definitions: [] }}
+            />,
+            { queryClient, withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+        );
+        expect(screen.getByRole('list', { name: 'Linked goals' })).toBeInTheDocument();
+        expect(screen.getByRole('listitem', { name: 'Linked to Head Over Heels (this instance only)' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Associate with|instance association/ })).not.toBeInTheDocument();
+    });
+});

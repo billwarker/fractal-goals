@@ -5,7 +5,8 @@ import {
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
 import AttachableField from '../notes/AttachableField';
-import { describeCondition, getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
+import { getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
+import { describeCondition } from '../../utils/goalConditionText';
 import styles from './GoalCompletionModal.module.css';
 
 function GoalCompletionModal({

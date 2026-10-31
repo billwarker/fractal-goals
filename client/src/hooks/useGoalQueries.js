@@ -48,6 +48,19 @@ export function useGoalActivities(rootId, goalId) {
     });
 }
 
+/** Definitions with instances linked one-off to the goal or a descendant: execution evidence, not catalog. */
+export function useGoalInstanceLinkedActivities(rootId, goalId) {
+    return useQuery({
+        queryKey: queryKeys.goalInstanceLinkedActivities(rootId, goalId),
+        queryFn: async () => {
+            const res = await fractalApi.getGoalInstanceLinkedActivities(rootId, goalId);
+            return res.data?.activities || [];
+        },
+        enabled: Boolean(rootId && goalId),
+        staleTime: 5 * 60 * 1000,
+    });
+}
+
 export function useGoalAssociations(rootId, goalId) {
     const isReady = Boolean(rootId && goalId);
 

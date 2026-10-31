@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useCircuitRunActions } from '../../hooks/useCircuitQueries';
 import useAnchoredMenuController from '../../hooks/useAnchoredMenuController';
+import { getGroupBreadcrumb } from '../../utils/manageActivities';
 import { EditPencilIcon } from '../atoms/AppIcons';
 import AddItemButton from '../atoms/AddItemButton';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
@@ -38,6 +39,7 @@ export default function CircuitRunCard({
     activityInstances,
     activityGoalScope = null,
     activityDefinitions,
+    activityGroups = [],
     onFocusActivity,
     selectedCircuitItem,
     onSelectCircuitItem,
@@ -357,7 +359,7 @@ export default function CircuitRunCard({
                                         >
                                             <CircuitMemberHeader
                                                 rootId={rootId} sessionId={sessionId} instance={instance} scope={activityGoalScope} isSelected={isMemberSelected}
-                                                member={member} round={round} slot={slot} tagEditor={!activitySet ? tagEditor : null}
+                                                member={member} round={round} slot={slot} groupLabel={currentDefinition?.group_id ? getGroupBreadcrumb(currentDefinition.group_id, activityGroups) || null : null} tagEditor={tagEditor}
                                             />
                                             {slot?.has_metrics && definition && (
                                                 <CircuitMemberMetrics
@@ -393,9 +395,6 @@ export default function CircuitRunCard({
                                                     })}
                                                 />
                                             )}
-                                            {activitySet && tagEditor ? (
-                                                <div className={styles.memberScopeControl}>{tagEditor}</div>
-                                            ) : null}
                                         </SessionItemCard>
                                     );
                                 })}

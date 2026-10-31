@@ -10,8 +10,10 @@ export const fractalActivitiesApi = {
     createActivityGroup: (rootId, data) => axios.post(`${API_BASE}/${rootId}/activity-groups`, data),
     updateActivityGroup: (rootId, groupId, data) =>
         axios.put(`${API_BASE}/${rootId}/activity-groups/${groupId}`, data),
-    setActivityGroupGoals: (rootId, groupId, goalIds) =>
-        axios.post(`${API_BASE}/${rootId}/activity-groups/${groupId}/goals`, { goal_ids: goalIds }),
+    setActivityGroupGoals: (rootId, groupId, goalIds, { replace = false } = {}) =>
+        axios.post(`${API_BASE}/${rootId}/activity-groups/${groupId}/goals`, {
+            goal_ids: goalIds, ...(replace ? { replace: true } : {}),
+        }),
     reorderActivityGroups: (rootId, groupIds) =>
         axios.put(`${API_BASE}/${rootId}/activity-groups/reorder`, { group_ids: groupIds }),
     deleteActivityGroup: (rootId, groupId) => axios.delete(`${API_BASE}/${rootId}/activity-groups/${groupId}`),

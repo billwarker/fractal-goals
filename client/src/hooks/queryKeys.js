@@ -79,6 +79,8 @@ export const queryKeys = {
     goalActivitiesRoot: (rootId) => ['goalActivities', rootId],
     goalActivityGroups: (rootId, goalId) => ['goalActivityGroups', rootId, goalId],
     goalActivityGroupsRoot: (rootId) => ['goalActivityGroups', rootId],
+    goalInstanceLinkedActivities: (rootId, goalId) => ['goalInstanceLinks', rootId, goalId],
+    goalInstanceLinksRoot: (rootId) => ['goalInstanceLinks', rootId],
     goalLevels: (rootId, userId = null) => userId ? ['goalLevels', rootId, userId] : ['goalLevels', rootId],
     // Share the timeline invalidation root: both are projections of the same evidence.
     goalActivityHeatmap: (rootId, goalId, includeChildren, timezone, date = null, calendarDate = null) => [
@@ -100,6 +102,7 @@ export const queryKeys = {
     goalConditionEvidence: (rootId, goalId, since = 'active', activityId = null) => [
         'goalCondition', rootId, 'evidence', goalId, since, activityId,
     ],
+    goalConditionPreview: (rootId, goalId, payload) => ['goalCondition', rootId, 'preview', goalId, payload],
     goalMetrics: (goalId) => ['goalMetrics', goalId],
     goalMetricsRoot: () => ['goalMetrics'],
     eligibleMoveParents: (rootId, goalId) => ['goals', rootId, 'eligibleMoveParents', goalId],

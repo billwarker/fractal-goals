@@ -3,14 +3,33 @@
 Builds filters and measures, runs queries with timeouts, and suggests charts.
 """
 
+import json
+import re
+from typing import Any
+from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
 from sqlalchemy import distinct, func
 from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from config import config
 from services.serializers import format_utc
 from services.service_types import JsonDict, ServiceResult
-from services._analytics_datasets import DATASETS, build_scoped_dataset_query
-from services._analytics_catalog import QUERY_SPEC_VERSION, RAW_SQL_TIMEOUT_MS
+from services._analytics_datasets import CATALOG_RELATIONS, DATASETS, build_scoped_dataset_query
+from services._analytics_catalog import (
+    MAX_RESULT_BYTES,
+    MAX_RESULT_ROW_BYTES,
+    QUERY_SPEC_VERSION,
+    RAW_SQL_TIMEOUT_MS,
+)
+from services._analytics_sql_guard import SqlGuardError, guard_analytics_sql
+
+
+_ROLE_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+class AnalyticsReadScopeError(RuntimeError):
+    """The database refused to establish the read-only analytics scope."""
 
 
 def _json_value(value):
@@ -34,6 +53,8 @@ def _result_type(value) -> str:
 
 
 class _AnalyticsExecutionMixin:
+    db_session: Any  # provided by the composed AnalyticsEngineService
+
     def _execute_query(self, current_user_id, root_ids, query_spec) -> ServiceResult[JsonDict]:
         dataset = DATASETS[query_spec["dataset"]]
         query = build_scoped_dataset_query(
@@ -78,6 +99,11 @@ class _AnalyticsExecutionMixin:
             {column["id"]: _json_value(value) for column, value in zip(columns, tuple(row))}
             for row in rows
         ]
+        # Catalog fields are input-validated, so checking the serialized size after the
+        # bounded fetch is enough here; raw SQL is measured inside PostgreSQL instead.
+        budget_error = _result_budget_error(None, len(json.dumps(row_dicts, default=str)))
+        if budget_error:
+            return None, budget_error, 400
 
         return {
             "columns": columns,
@@ -93,27 +119,43 @@ class _AnalyticsExecutionMixin:
         }, None, 200
 
     def _execute_sql_query(self, current_user_id, root_ids, query_spec) -> ServiceResult[JsonDict]:
-        cte_sql = self._catalog_cte_sql(current_user_id, root_ids)
+        if not self._is_postgresql():
+            # Read-only enforcement relies on PostgreSQL transaction modes; fail closed elsewhere.
+            return None, "Analytics SQL requires PostgreSQL", 503
+        try:
+            guarded = guard_analytics_sql(query_spec["sql"], CATALOG_RELATIONS)
+        except SqlGuardError as error:
+            return None, str(error), 400
+        # Qualify catalog tables with the live schema: the scope below pins search_path
+        # to pg_catalog, so only these CTEs (and built-ins) are reachable by name.
+        app_schema = self.db_session.execute(text("SELECT current_schema()")).scalar()
+        cte_sql = self._catalog_cte_sql(current_user_id, root_ids, schema=app_schema)
         limit = query_spec["limit"]
-        final_sql = (
-            f"{cte_sql} "
-            "SELECT * FROM ("
-            f"{query_spec['sql']}"
-            f") AS __analytics_user_query LIMIT {limit + 1}"
+        # Escape colons so text() never reads user literals such as 'HH24:MI' as bind params.
+        limited_sql = (
+            f"SELECT * FROM ({guarded.sql.replace(':', chr(92) + ':')}) AS __analytics_user_query "
+            f"LIMIT {limit + 1}"
+        )
+        # Measured in PostgreSQL first, so an oversized value never reaches this process.
+        size_sql = (
+            f"{cte_sql} SELECT max(__row_bytes), coalesce(sum(__row_bytes), 0) FROM ("
+            f"SELECT octet_length(row_to_json(__limited)::text) AS __row_bytes FROM ({limited_sql}) AS __limited"
+            ") AS __sizes"
         )
 
-        bind = self.db_session.get_bind()
-        if bind is not None and bind.dialect.name == "postgresql":
-            self.db_session.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": RAW_SQL_TIMEOUT_MS})
-            # Defense-in-depth: enforce read-only at the database level so a query
-            # that slips past the mutation-keyword rejection still cannot write.
-            self.db_session.execute(text("SET LOCAL default_transaction_read_only = on"))
-
-        result = self.db_session.execute(text(final_sql))
-        rows = result.mappings().all()
+        with self._read_only_query_scope(RAW_SQL_TIMEOUT_MS, role=config.ANALYTICS_SQL_ROLE, pin_search_path=True):
+            try:
+                largest_row, total_bytes = self.db_session.execute(text(size_sql)).one()
+                budget_error = _result_budget_error(largest_row, total_bytes)
+                if budget_error:
+                    return None, budget_error, 400
+                result = self.db_session.execute(text(f"{cte_sql} {limited_sql}"))
+                rows = result.mappings().all()
+                column_ids = list(result.keys())
+            except DBAPIError as error:
+                return None, _query_failure_message(error), 400
         truncated = len(rows) > limit
         rows = rows[:limit]
-        column_ids = list(result.keys())
         first_row = rows[0] if rows else {}
         columns = [
             {
@@ -143,7 +185,42 @@ class _AnalyticsExecutionMixin:
             },
         }, None, 200
 
-    def _catalog_cte_sql(self, current_user_id, root_ids) -> str:
+    def _is_postgresql(self) -> bool:
+        bind = self.db_session.get_bind()
+        return bind is not None and bind.dialect.name == "postgresql"
+
+    @contextmanager
+    def _read_only_query_scope(self, timeout_ms: int, *, role: str | None = None, pin_search_path: bool = False):
+        """Run analytics reads inside a read-only, time-bounded savepoint.
+
+        ``SET TRANSACTION READ ONLY`` inside a savepoint switches the current
+        transaction to read-only; rolling the savepoint back afterwards restores the
+        request's transaction mode, statement timeout, and role. The mode is read back
+        rather than assumed, because setting ``default_transaction_read_only`` would
+        only affect later transactions. ``pin_search_path`` limits unqualified names
+        to built-ins, so a lookalike function or overload in an application schema
+        can never be called by user-written SQL.
+        """
+        if not self._is_postgresql():
+            yield
+            return
+        savepoint = self.db_session.begin_nested()
+        try:
+            self.db_session.execute(text("SET TRANSACTION READ ONLY"))
+            self.db_session.execute(text("SET LOCAL statement_timeout = :timeout_ms"), {"timeout_ms": int(timeout_ms)})
+            if role:
+                if not _ROLE_NAME_RE.match(role):
+                    raise AnalyticsReadScopeError("ANALYTICS_SQL_ROLE is not a valid role name")
+                self.db_session.execute(text(f'SET LOCAL ROLE "{role}"'))
+            if pin_search_path:
+                self.db_session.execute(text("SET LOCAL search_path = pg_catalog, pg_temp"))
+            if self.db_session.execute(text("SHOW transaction_read_only")).scalar() != "on":
+                raise AnalyticsReadScopeError("Analytics read scope is not read-only")
+            yield
+        finally:
+            savepoint.rollback()
+
+    def _catalog_cte_sql(self, current_user_id, root_ids, *, schema: str) -> str:
         bind = self.db_session.get_bind()
         ctes = []
         for dataset in DATASETS.values():
@@ -151,7 +228,12 @@ class _AnalyticsExecutionMixin:
             query = build_scoped_dataset_query(
                 self.db_session, dataset.id, root_ids, current_user_id
             ).with_entities(*columns)
-            sql = str(query.statement.compile(bind=bind, compile_kwargs={"literal_binds": True}))
+            sql = str(query.statement.compile(
+                dialect=bind.dialect,
+                schema_translate_map={None: schema},
+                render_schema_translate=True,
+                compile_kwargs={"literal_binds": True},
+            ))
             ctes.append(f"{dataset.id} AS ({sql})")
         return "WITH " + ", ".join(ctes)
 
@@ -248,3 +330,22 @@ class _AnalyticsExecutionMixin:
                 "spec_version": QUERY_SPEC_VERSION,
             },
         }
+
+
+def _query_failure_message(error: DBAPIError) -> str:
+    """Describe a rejected user query without echoing driver internals or SQL text."""
+    diag = getattr(error.orig, "diag", None)
+    primary = getattr(diag, "message_primary", None) if diag is not None else None
+    if getattr(error.orig, "pgcode", None) == "57014":
+        return "Analytics SQL exceeded its time limit"
+    return f"Analytics SQL failed: {primary}" if primary else "Analytics SQL failed"
+
+
+def _result_budget_error(largest_row_bytes, total_bytes) -> str | None:
+    if largest_row_bytes is not None and largest_row_bytes > MAX_RESULT_ROW_BYTES:
+        return (f"A result row is {largest_row_bytes:,} bytes; analytics rows are limited to "
+                f"{MAX_RESULT_ROW_BYTES:,} bytes. Select fewer or shorter columns.")
+    if total_bytes > MAX_RESULT_BYTES:
+        return (f"The result is {total_bytes:,} bytes; analytics results are limited to "
+                f"{MAX_RESULT_BYTES:,} bytes. Lower the limit or select fewer columns.")
+    return None

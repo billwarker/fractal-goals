@@ -113,8 +113,16 @@ def get_instagram_oembed(url: str) -> dict:
         )
         response.raise_for_status()
         data = response.json()
-    except (requests.RequestException, ValueError):
-        logger.warning("Instagram oEmbed request failed for %s", url, exc_info=True)
+    except (requests.RequestException, ValueError) as error:
+        # Graph API requires the token as a query parameter, and requests embeds the
+        # full request URL in its exceptions; log only a classification, never the
+        # exception text or traceback, so the token cannot reach application logs.
+        logger.warning(
+            "Instagram oEmbed request failed for %s: %s (status=%s)",
+            url,
+            type(error).__name__,
+            _response_status(error),
+        )
         # Do not cache failures — the post may become available or token refreshed.
         return {"configured": True, "error": "upstream_error"}
 
@@ -128,3 +136,8 @@ def get_instagram_oembed(url: str) -> dict:
     }
     _instagram_cache.set(url, result)
     return result
+
+
+def _response_status(error: Exception) -> int | None:
+    response = getattr(error, "response", None)
+    return getattr(response, "status_code", None)

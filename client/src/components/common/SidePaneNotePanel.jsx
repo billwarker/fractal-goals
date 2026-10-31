@@ -82,10 +82,6 @@ function SidePaneNotePanel({
                         className={styles.textarea}
                         rows={1}
                     />
-                    {rootId && (
-                        <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.submitBtn}
-                            onPickerClosed={() => inputRef.current?.focus()} />
-                    )}
                     <button
                         type="submit"
                         disabled={!content.trim() || isSubmitting || draft.isBusy}
@@ -97,6 +93,10 @@ function SidePaneNotePanel({
                     >
                         {isSubmitting ? '…' : <CreateNoteIcon />}
                     </button>
+                    {rootId && (
+                        <AttachMenuButton draft={draft} disabled={isSubmitting} className={styles.submitBtn}
+                            onPickerClosed={() => inputRef.current?.focus()} />
+                    )}
                 </div>
             </form>
         </div>

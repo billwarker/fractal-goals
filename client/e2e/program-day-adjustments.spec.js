@@ -1,8 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
 
 // Create an isolated program so this workflow does not share scheduling state with other specs.
 test('move and remove recurring program days from the day sidebar', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const today = new Date().toISOString().slice(0, 10);
     const later = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     const end = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
@@ -51,7 +52,7 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     await card.getByRole('button', { name: 'Move day', exact: true }).click();
     await expect(page.getByText('Choose a destination on the calendar', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Pick on calendar' })).toHaveCount(0);
-    if (suffix === 'mobile') {
+    if (device === 'mobile') {
         await page.getByRole('button', { name: 'Collapse', exact: true }).click();
         await expect(page.getByRole('dialog', { name: 'Program sidebar' })).toHaveCount(0);
         await page.locator(`.fc-daygrid-day[data-date="${later}"] .fc-daygrid-day-number`).click();
@@ -104,11 +105,11 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
         if (!response.ok) throw new Error(`Tooltip day create failed: ${response.status}`);
     }, { root, program: created.id, token, date: hintDate });
     await page.reload();
-    if (suffix === 'mobile' && await page.getByRole('button', { name: 'Collapse', exact: true }).isVisible()) {
+    if (device === 'mobile' && await page.getByRole('button', { name: 'Collapse', exact: true }).isVisible()) {
         await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     }
     await page.getByRole('tab', { name: 'Days', exact: true }).click();
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
     await page.getByRole('button', { name: 'Edit Move Practice', exact: true }).click();
     const editor = page.getByRole('dialog', { name: 'Move Practice', exact: true });
     const interval = editor.getByLabel('Repeat every (weeks)');
@@ -119,13 +120,14 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     await occupiedWeekday.hover();
     await expect(page.getByRole('tooltip')).toBeVisible();
     await interval.fill('2');
-    if (suffix === 'desktop') {
+    if (device === 'desktop') {
         const toggle = await editor.getByRole('radiogroup', { name: 'Schedule type' }).boundingBox();
         const intervalBox = await interval.boundingBox();
         expect(intervalBox.x).toBeGreaterThan(toggle.x + toggle.width);
         expect(intervalBox.y).toBeCloseTo(toggle.y, 0);
         expect(intervalBox.height).toBeCloseTo(toggle.height, 0);
-        const weekday = await editor.getByRole('button', { name: 'Saturday', exact: true }).boundingBox();
+        // Any weekday button: the one holding the tooltip day reads "<day>, taken by …".
+        const weekday = await editor.getByRole('button', { name: /^Saturday\b/ }).boundingBox();
         expect(weekday.y - (toggle.y + toggle.height)).toBeGreaterThanOrEqual(12);
     }
     await editor.getByRole('radio', { name: 'Specific dates', exact: true }).click();
@@ -157,7 +159,7 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     await expect(updatedEditor).toHaveCount(0);
     await page.reload();
     await page.getByRole('tab', { name: 'Days', exact: true }).click();
-    if (suffix === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar', exact: true }).click();
     await page.getByRole('button', { name: 'Edit Updated practice day', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Updated practice day', exact: true }).getByLabel('Repeat every (weeks)')).toHaveValue('2');
 });

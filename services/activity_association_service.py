@@ -1,20 +1,29 @@
-from sqlalchemy import select
-
 from models import (
     ActivityDefinition,
-    ActivityGroup,
     Goal,
     activity_goal_associations,
-    goal_activity_group_associations,
     validate_root_goal,
 )
 from services.association_reconciliation import (
     append_goal_association_event,
     reconcile_association_rows,
 )
+from services._completion_context import _emit_pending_events
 from services.events import Event, Events, event_bus
 from services.effective_goal_activities import resolve_effective_activity_entries
+from services.goal_activity_group_links import (
+    GROUP_SINGLE,
+    GoalActivityGroupError,
+    current_group_ids,
+    flush_group_links,
+    live_group,
+    lock_root,
+    reconcile_group_link_conditions,
+    set_goal_activity_group,
+)
 from services.goal_loading import load_fractal_goals_for_serialization
+from services.instance_goal_evidence import load_instance_linked_activities
+from services._serialize_common import format_utc
 from services.payload_normalizers import normalize_id_list
 from services.service_types import JsonDict, JsonList, ServiceResult
 
@@ -165,6 +174,7 @@ class ActivityAssociationService:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+        lock_root(self.db_session, root_id)
 
         goals_by_id = load_fractal_goals_for_serialization(
             self.db_session,
@@ -180,13 +190,16 @@ class ActivityAssociationService:
             ActivityDefinition.id.in_(activity_ids),
             ActivityDefinition.deleted_at.is_(None),
         ).all()
-        valid_groups = self.db_session.query(ActivityGroup.id).filter(
-            ActivityGroup.root_id == root_id,
-            ActivityGroup.id.in_(group_ids),
-            ActivityGroup.deleted_at.is_(None),
-        ).all()
+        # Unknown ids are ignored, as for activities; more than one real group is rejected.
+        groups = [group for group in (live_group(self.db_session, root_id, gid) for gid in group_ids) if group]
+        if len(groups) > 1:
+            self.db_session.rollback()
+            return None, GoalActivityGroupError(
+                "A goal can have one activity group. Choose one.", 422, GROUP_SINGLE,
+            ).payload(), 422
+        group = groups[0] if groups else None
         valid_activity_ids = {row[0] for row in valid_activities}
-        valid_group_ids = {row[0] for row in valid_groups}
+        valid_group_ids = {group.id} if group else set()
 
         existing_activity_ids = {
             row[0] for row in self.db_session.execute(
@@ -209,14 +222,8 @@ class ActivityAssociationService:
             activity_goal_associations.c.activity_id,
             valid_activity_ids,
         )
-        group_delta = reconcile_association_rows(
-            self.db_session,
-            goal_activity_group_associations,
-            goal_activity_group_associations.c.goal_id,
-            goal_id,
-            goal_activity_group_associations.c.activity_group_id,
-            valid_group_ids,
-        )
+        # The batch states the goal's whole association set, so its group replaces any other.
+        group_change = set_goal_activity_group(self.db_session, root_id, goal, group, replace=True)
 
         changed_activity_ids = activity_delta.added_ids | activity_delta.removed_ids
         for activity_id in changed_activity_ids:
@@ -226,33 +233,31 @@ class ActivityAssociationService:
         activity_names = {
             activity_id: activity.name for activity_id, activity in activities_by_id.items()
         }
-        changed_group_ids = group_delta.added_ids | group_delta.removed_ids
-        groups_by_id = dict(
-            self.db_session.query(ActivityGroup.id, ActivityGroup.name).filter(
-                ActivityGroup.id.in_(changed_group_ids)
-            ).all()
-        ) if changed_group_ids else {}
-        for kind, delta, names in (
-            ("activity", activity_delta, activity_names),
-            ("activity_group", group_delta, groups_by_id),
+        for action, changed_ids in (
+            ("associated", activity_delta.added_ids),
+            ("disassociated", activity_delta.removed_ids),
         ):
-            for action, changed_ids in (
-                ("associated", delta.added_ids),
-                ("disassociated", delta.removed_ids),
-            ):
-                for association_id in changed_ids:
-                    append_goal_association_event(
-                        self.db_session,
-                        root_id=root_id,
-                        goal_id=goal_id,
-                        association_kind=kind,
-                        association_id=association_id,
-                        association_name=names.get(association_id, "Unknown"),
-                        action=action,
-                        occurred_at=delta.occurred_at,
-                    )
+            for association_id in changed_ids:
+                append_goal_association_event(
+                    self.db_session,
+                    root_id=root_id,
+                    goal_id=goal_id,
+                    association_kind="activity",
+                    association_id=association_id,
+                    association_name=activity_names.get(association_id, "Unknown"),
+                    action=action,
+                    occurred_at=activity_delta.occurred_at,
+                )
 
+        pending_events = []
+        try:
+            flush_group_links(self.db_session)
+        except GoalActivityGroupError as conflict:
+            return None, conflict.payload(), conflict.status
+        if group_change.changed:
+            reconcile_group_link_conditions(self.db_session, root_id, {goal_id}, pending_events)
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         return {
             "activity_ids": sorted(valid_activity_ids),
             "group_ids": sorted(valid_group_ids),
@@ -280,6 +285,17 @@ class ActivityAssociationService:
 
         return resolve_effective_activity_entries(goal, goals_by_id), None, 200
 
+    def get_goal_instance_linked_activities(self, root_id, goal_id, current_user_id) -> ServiceResult[JsonDict]:
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+        if not self._live_goal(root_id, goal_id):
+            return None, "Goal not found", 404
+        activities, truncated = load_instance_linked_activities(self.db_session, root_id, goal_id)
+        for entry in activities:
+            entry['last_linked_at'] = format_utc(entry['last_linked_at'])
+        return {"activities": activities, "truncated": truncated}, None, 200
+
     def get_goal_activity_groups(
         self, root_id, goal_id, current_user_id, *, validated_root=None, goals_by_id=None,
     ) -> ServiceResult[JsonList]:
@@ -301,70 +317,61 @@ class ActivityAssociationService:
         groups = [{"id": group.id, "name": group.name} for group in goal.associated_activity_groups]
         return groups, None, 200
 
-    def link_goal_activity_group(self, root_id, goal_id, group_id, current_user_id) -> ServiceResult[JsonDict]:
+    def link_goal_activity_group(
+        self, root_id, goal_id, group_id, current_user_id, *, replace=False,
+    ) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+        lock_root(self.db_session, root_id)
 
-        goal = self.db_session.query(Goal).filter_by(id=goal_id, root_id=root_id).first()
+        goal = self._live_goal(root_id, goal_id)
         if not goal:
             return None, "Goal not found", 404
-
-        group = self.db_session.query(ActivityGroup).filter_by(id=group_id, root_id=root_id).first()
+        group = live_group(self.db_session, root_id, group_id)
         if not group:
             return None, "Activity group not found", 404
 
-        existing = self.db_session.execute(
-            select(goal_activity_group_associations).where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id,
-            )
-        ).first()
-        if existing:
-            return {"message": "Group already linked"}, None, 200
-
-        self.db_session.execute(
-            goal_activity_group_associations.insert().values(
-                goal_id=goal_id,
-                activity_group_id=group_id,
-            )
-        )
-        append_goal_association_event(
-            self.db_session,
-            root_id=root_id,
-            goal_id=goal_id,
-            association_kind="activity_group",
-            association_id=group_id,
-            association_name=group.name,
-            action="associated",
-        )
+        try:
+            change = set_goal_activity_group(self.db_session, root_id, goal, group, replace=replace)
+            flush_group_links(self.db_session)
+        except GoalActivityGroupError as conflict:
+            self.db_session.rollback()
+            return None, conflict.payload(), conflict.status
+        if not change.changed:
+            self.db_session.rollback()
+            return {"message": "Group already linked", "group_id": group.id}, None, 200
+        pending_events = []
+        reconcile_group_link_conditions(self.db_session, root_id, {goal_id}, pending_events)
         self.db_session.commit()
-        return {"message": "Group linked successfully"}, None, 201
+        _emit_pending_events(pending_events)
+        return {
+            "message": "Group replaced successfully" if change.previous_group_id else "Group linked successfully",
+            "group_id": group.id,
+            "previous_group_id": change.previous_group_id,
+        }, None, 200 if change.previous_group_id else 201
 
     def unlink_goal_activity_group(self, root_id, goal_id, group_id, current_user_id) -> ServiceResult[JsonDict]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
+        lock_root(self.db_session, root_id)
 
-        result = self.db_session.execute(
-            goal_activity_group_associations.delete().where(
-                goal_activity_group_associations.c.goal_id == goal_id,
-                goal_activity_group_associations.c.activity_group_id == group_id,
-            )
-        )
-        if result.rowcount == 0:
+        goal = self._live_goal(root_id, goal_id)
+        if not goal:
+            return None, "Goal not found", 404
+        current = current_group_ids(self.db_session, [goal_id]).get(goal_id)
+        if current != group_id:
             return None, "Link not found", 404
 
-        group = self.db_session.query(ActivityGroup).filter_by(id=group_id).first()
-        append_goal_association_event(
-            self.db_session,
-            root_id=root_id,
-            goal_id=goal_id,
-            association_kind="activity_group",
-            association_id=group_id,
-            association_name=group.name if group else "Unknown",
-            action="disassociated",
-        )
-
+        set_goal_activity_group(self.db_session, root_id, goal, None, current_group_id=current)
+        pending_events = []
+        reconcile_group_link_conditions(self.db_session, root_id, {goal_id}, pending_events)
         self.db_session.commit()
+        _emit_pending_events(pending_events)
         return {"message": "Group unlinked successfully"}, None, 200
+
+    def _live_goal(self, root_id, goal_id) -> Goal | None:
+        return self.db_session.query(Goal).filter(
+            Goal.id == goal_id, Goal.root_id == root_id, Goal.deleted_at.is_(None),
+        ).first()

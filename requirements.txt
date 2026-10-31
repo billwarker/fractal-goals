@@ -13,7 +13,7 @@
 Flask==3.1.3
 Werkzeug==3.1.9
 PyJWT==2.15.1
-Authlib==1.8.0
+Authlib==1.9.1
 cryptography==50.0.2
 openai==3.16.2
 anthropic==1.7.0
@@ -33,6 +33,9 @@ redis==5.2.1
 SQLAlchemy==2.0.45
 alembic==1.15.0
 psycopg2-binary==2.9.10  # PostgreSQL driver (use psycopg2 for production builds)
+
+# Parses analytics raw SQL for the catalog relation/function allowlist (no dependencies)
+sqlglot==30.25.0
 
 # -----------------------------------------------------------------------------
 # Configuration & Environment

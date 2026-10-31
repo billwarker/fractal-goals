@@ -53,6 +53,18 @@ function CircuitActivityList({ circuit }) {
     );
 }
 
+// Inside the row's button, so it stays plain text; the title explains it on hover.
+function InstanceLinkChip({ goalName }) {
+    return (
+        <span
+            className={styles.instanceLinkChip}
+            title={`Instances of this activity were linked to ${goalName} without linking the definition.`}
+        >
+            One-off link
+        </span>
+    );
+}
+
 function GoalScopeIndicator({ activityGoalScope }) {
     const scopedGoal = activityGoalScope?.goal;
     if (!scopedGoal) return null;
@@ -129,6 +141,12 @@ export default function ActivitySelectorPanel({
         : allowCopy;
     const scopedGoal = activityGoalScope?.goal || null;
     const itemLabelPlural = selectingCircuits ? 'activity circuits' : 'activities';
+    const instanceLinkedIds = activityGoalScope?.instanceLinkedIds;
+    const renderInstanceLinkDetails = scopedGoal && instanceLinkedIds?.size
+        ? (activity) => (instanceLinkedIds.has(String(activity.id))
+            ? <InstanceLinkChip goalName={scopedGoal.name} />
+            : null)
+        : null;
 
     return (
         <ActivityPicker
@@ -183,7 +201,7 @@ export default function ActivitySelectorPanel({
             ) : null}
             renderActivityDetails={selectingCircuits
                 ? (circuit) => <CircuitActivityList circuit={circuit} />
-                : null}
+                : renderInstanceLinkDetails}
             onChange={({ activities: selectedActivities, groups: selectedGroups }) => {
                 const group = selectedGroups[0];
                 if (!selectingCircuits && group && onSelectGroup) {

@@ -17,10 +17,10 @@ describe('goal completion and description media', () => {
     it('puts the quick-note paperclip beside the completion note, with compact chips and paste', () => {
         const attachmentDraft = draft([{ key: 'a', asset_id: 'a', name: 'run.mp4', status: 'ready' }]);
         render(<GoalCompletionModal attachmentDraft={attachmentDraft} completionNote="" onCompletionNoteChange={vi.fn()} />);
-        expect(screen.getByRole('button', { name: 'Attach pictures or video' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Attach pictures, video or audio' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Upload from device' })).not.toBeInTheDocument();
         expect(screen.getByRole('list', { name: 'Attachments for this completion note' })).toHaveTextContent('run.mp4');
-        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures or video' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Attach pictures, video or audio' }));
         expect(screen.getByRole('menu', { name: 'Attach from' })).toBeInTheDocument();
         fireEvent.paste(screen.getByLabelText('Goal Completion Note (optional):'));
         expect(attachmentDraft.handlePaste).toHaveBeenCalled();
@@ -28,7 +28,7 @@ describe('goal completion and description media', () => {
 
     it('stays text-only without a fractal', () => {
         render(<GoalCompletionModal completionNote="" onCompletionNoteChange={vi.fn()} />);
-        expect(screen.queryByRole('button', { name: 'Attach pictures or video' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Attach pictures, video or audio' })).not.toBeInTheDocument();
     });
 
     it('previews only finished description media', () => {

@@ -73,7 +73,7 @@ def test_resend_transport_posts_expected_payload(db_session, monkeypatch):
 
 def test_production_security_requires_resend_config(monkeypatch):
     monkeypatch.setattr(Config, "ENV", "production")
-    monkeypatch.setattr(Config, "JWT_SECRET_KEY", "secret")
+    monkeypatch.setattr(Config, "JWT_SECRET_KEY", "Zq7vR2kLm9Xc4Tn8Bw1Hy6Pd3Fs5Gj0Ae2Ku")
     monkeypatch.setattr(Config, "DEBUG", False)
     monkeypatch.setattr(Config, "CORS_ORIGINS", ["https://my.fractalgoals.com"])
     monkeypatch.setattr(Config, "AUTH_COOKIE_SECURE", True)
@@ -88,7 +88,7 @@ def test_production_security_requires_resend_config(monkeypatch):
 
 def test_production_security_requires_resend_webhook_secret(monkeypatch):
     monkeypatch.setattr(Config, "ENV", "production")
-    monkeypatch.setattr(Config, "JWT_SECRET_KEY", "secret")
+    monkeypatch.setattr(Config, "JWT_SECRET_KEY", "Zq7vR2kLm9Xc4Tn8Bw1Hy6Pd3Fs5Gj0Ae2Ku")
     monkeypatch.setattr(Config, "DEBUG", False)
     monkeypatch.setattr(Config, "CORS_ORIGINS", ["https://my.fractalgoals.com"])
     monkeypatch.setattr(Config, "AUTH_COOKIE_SECURE", True)

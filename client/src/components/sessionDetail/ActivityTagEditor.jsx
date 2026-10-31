@@ -32,7 +32,12 @@ function ActivityTagEditor({
     setScope = false,
     // What the tags belong to, when not an activity or set (e.g. "Round 2 tags").
     scopeLabel = null,
+    // Stacked: `leading` (a label) and the trigger on one line, chosen tags wrapping beneath
+    // unless the caller shows them itself (`showSelected={false}`).
+    leading = null,
+    showSelected = true,
 }) {
+    const isStacked = leading != null;
     const isSetScope = Boolean(setId) || setScope;
     const groupLabel = scopeLabel || (isSetScope ? 'Set tags' : 'Activity tags');
     const assignmentKey = setId || instanceId;
@@ -290,14 +295,30 @@ function ActivityTagEditor({
         </Button>
     ) : null;
 
+    const tagChoice = (tag) => (
+        <label key={tag.id} className={`${styles.choice} ${selectedIds.includes(tag.id) ? styles.selected : ''}`} style={tag.color ? { '--tag-color': tag.color } : undefined}>
+            <input
+                type="checkbox"
+                checked={selectedIds.includes(tag.id)}
+                disabled={isPending || !editable}
+                onChange={() => void persist(toggle(tag)).catch(() => undefined)}
+            />
+            {tag.name}{tag.archived ? ' (archived)' : ''}
+        </label>
+    );
+
     return (
         <div
-            className={`${styles.editor} ${isSetScope ? styles.setEditor : styles.instanceEditor} ${className}`}
+            className={`${styles.editor} ${isStacked ? styles.stackedEditor : isSetScope ? styles.setEditor : styles.instanceEditor} ${className}`}
             ref={editorRef}
             role="group"
             aria-label={groupLabel}
             onClick={(event) => event.stopPropagation()}
         >
+            {isStacked ? (<>
+                <div className={styles.stackedHead}>{leading}{addTagTrigger}</div>
+                {showSelected && selectedTags.length ? <div className={styles.stackedList}>{selectedTags.map(tagChoice)}</div> : null}
+            </>) : (
             <div className={styles.tags} ref={tagOverflow.containerRef}>
                 {triggerFirst ? addTagTrigger : null}
                 <span className={styles.measure} ref={tagOverflow.measureRef} aria-hidden="true">
@@ -318,19 +339,10 @@ function ActivityTagEditor({
                     >
                         {tagOverflow.countLabel}
                     </Badge>
-                ) : selectedTags.map((tag) => (
-                    <label key={tag.id} className={`${styles.choice} ${selectedIds.includes(tag.id) ? styles.selected : ''}`} style={tag.color ? { '--tag-color': tag.color } : undefined}>
-                        <input
-                            type="checkbox"
-                            checked={selectedIds.includes(tag.id)}
-                            disabled={isPending || !editable}
-                            onChange={() => void persist(toggle(tag)).catch(() => undefined)}
-                        />
-                        {tag.name}{tag.archived ? ' (archived)' : ''}
-                    </label>
-                ))}
+                ) : selectedTags.map(tagChoice)}
                 {triggerFirst ? null : addTagTrigger}
             </div>
+            )}
             {editable && isPickerOpen && createPortal(
                 <div ref={pickerRef} className={styles.picker} role="dialog" aria-modal="true" aria-label={`Choose ${groupLabel.toLocaleLowerCase()}`}>
                     <div className={styles.pickerHeader}>

@@ -25,6 +25,14 @@ export const getGoalNodeParentId = (goal, fallbackParentId = null) => {
     return goal.parent_id ?? goal.attributes?.parent_id ?? fallbackParentId;
 };
 
+// A goal has at most one live activity group; legacy payloads only carry the id list.
+export const getGoalNodeActivityGroupId = (goal) => {
+    if (!goal) return null;
+    if (goal.activity_group_id !== undefined) return goal.activity_group_id ?? null;
+    const ids = goal.attributes?.associated_activity_group_ids;
+    return Array.isArray(ids) && ids.length > 0 ? ids[0] : null;
+};
+
 export const getGoalNodeChildren = (goal) => (
     Array.isArray(goal?.children) ? goal.children : []
 );

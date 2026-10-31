@@ -1,7 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { deviceOf, expect, test } from './support/clock.js';
 
 test('program date header, view toggle, and session options fit the sidebar', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
+    const device = deviceOf(testInfo);
     const today = new Date().toISOString().slice(0, 10);
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
     await page.goto('/');
@@ -37,7 +38,7 @@ test('program date header, view toggle, and session options fit the sidebar', as
         const tab = toggle.getByRole('tab', { name: label, exact: true });
         expect(await tab.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
     }
-    expect((await toggle.boundingBox()).height).toBeLessThanOrEqual(suffix === 'mobile' ? 44 : 33);
+    expect((await toggle.boundingBox()).height).toBeLessThanOrEqual(device === 'mobile' ? 44 : 33);
     await page.locator(`.fc-daygrid-day[data-date="${today}"] .fc-daygrid-day-number`).click();
     const pane = page.getByRole('complementary', { name: 'Program side pane' });
     await expect(pane).toBeVisible();

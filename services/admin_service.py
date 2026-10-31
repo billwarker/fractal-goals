@@ -162,9 +162,22 @@ class AdminService(_AdminBetaSignupsMixin):
             return None, "Invite key is no longer available", 400
         return invite, None, 200
 
-    def consume_invite_key(self, invite: SignupInviteKey, user_id: str):
-        invite.used_by_user_id = user_id
-        invite.used_at = utc_now()
+    def consume_invite_key(self, invite: SignupInviteKey, user_id: str) -> bool:
+        """Atomically claim ``invite`` for ``user_id``; False when another signup claimed it first.
+
+        The conditional UPDATE waits on a concurrent claimant's row lock and then
+        re-checks ``used_at``, so exactly one transaction can consume a key.
+        """
+        now = utc_now()
+        claimed = self.db_session.query(SignupInviteKey).filter(
+            SignupInviteKey.id == invite.id,
+            SignupInviteKey.used_at.is_(None),
+            SignupInviteKey.revoked_at.is_(None),
+            or_(SignupInviteKey.expires_at.is_(None), SignupInviteKey.expires_at >= now),
+        ).update({"used_by_user_id": user_id, "used_at": now}, synchronize_session=False)
+        if claimed:
+            self.db_session.refresh(invite)
+        return claimed == 1
 
     def create_invite_key(self, current_user: User, data: JsonDict) -> ServiceResult[JsonDict]:
         raw_key = generate_secret("fg_invite")

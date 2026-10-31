@@ -83,7 +83,11 @@ and `client/src/pages/Goals.jsx`.
 
 Each goal completes in exactly one way (`goals.completion_condition`): an **activity threshold**
 (`goal_completion_conditions` + `goal_condition_metric_rules`: single session — N sets meeting every
-rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions),
+rule or a total yield; cumulative — a metric or yield total; consistency — N qualifying sessions,
+optionally `consecutive`, where a logged miss resets the count; sets-based single-session and
+consistency thresholds count "at least N sets" either as Best (each set meets every rule) or as
+Average (`set_aggregate`: each rule's average across the session's counted sets); `goal_condition_tags` limits every kind
+to sets carrying all chosen tags (`tag_match = 'exact'`: exactly those), instance tags included; activities without sets are one implicit set),
 **children** (all child goals complete), or **manual**. Manual completion is always allowed and is
 recorded as `manual_override` unless the condition is `manual`. Progress is never stored: the pure
 `goal_condition_evaluator.py` runs over canonical instance evidence inside the goal's active period
@@ -91,7 +95,8 @@ recorded as `manual_override` unless the condition is `manual`. Progress is neve
 completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
 After a manual uncompletion only newer evidence re-completes a goal. Rule values are
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
-`CompletionConditionEditor` and `CompletionConditionSummary` render it, and `ConditionProgressChart`
+`goalConditionText.js` words it (never "sets" for set-free activities). `CompletionConditionEditor`
+(with a debounced `condition/preview` of the unsaved draft) and `CompletionConditionSummary` render it, and `ConditionProgressChart`
 charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
 `goalCondition` query-key root.
 Targets were converted by migration `e1a2c3d4f5b6` (report: `scripts/migrate_targets_to_conditions.py`)
@@ -155,12 +160,26 @@ reconciles affected goal conditions in the same transaction. The additive `activ
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
+A goal links at most one live activity group (partial unique index
+`uq_goal_activity_group_associations_one_active`; migration `a7c9e1b3d5f7` refuses to run while any goal
+holds several, listed by `scripts/report_multi_group_goals.py`). Every goal↔group write goes through
+`services/goal_activity_group_links.py`, which locks the root, returns 409 `goal_activity_group_taken`
+(with the current group or a `conflicts` list) unless `replace`, rejects a batch naming two real groups
+(422 `goal_activity_group_single`), and reconciles affected activity-threshold goals and ancestors in
+the same transaction. Goal payloads carry the canonical top-level `activity_group_id`
+(`getGoalNodeActivityGroupId`); association relationships ignore removed link rows and deleted groups.
+Goal↔group routes live in `blueprints/goal_activity_groups_api.py`.
+
 Session Detail exposes reversible one-off links on actual activity instances (including circuit
 members and completed sessions) through the scoped goal's icon, only when that instance is selected
-and a goal is scoped. `useActivityInstanceGoalAssociation` owns cache updates and evidence
-invalidation; duplication starts with no one-off links. Interaction details:
+and a goal is scoped; each link's goal icon is always shown on the card's meta line. While scoped, the
+add-activity picker unions the goal's catalog with definitions linked one-off to the goal or a
+descendant (`load_instance_linked_activities`, bounded, never the reusable catalog), and new
+definitions are seeded with the scoped goal and its group. `useActivityInstanceGoalAssociation` owns
+cache updates and evidence invalidation; duplication starts with no one-off links. Interaction details:
 [UI behaviour contracts](planning/ui-contracts-reference.md#session-detail-one-off-goal-links) and
-[Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md).
+[Scoped goals and instance associations audit](planning/scoped-goals-instance-associations-audit.md) and
+[Scoped-goal group prefill and one-off link visibility](planning/scoped-goal-group-prefill-and-instance-link-visibility.md).
 
 ### Sessions, activities, and progress
 
@@ -222,6 +241,11 @@ start/complete and completion writes accept `occurred_at` (the user's action tim
 `services/timer_loading.py`
 owns their response loading contract. Work-interval row locks may be reused only
 inside the same SQLAlchemy transaction or savepoint.
+
+Session Detail's "Activity" duration is live: the session's item durations plus any running activity or
+circuit timer, by the one rule in `utils/sessionTime.js` (`liveInstanceSeconds`, `liveCircuitSeconds`)
+that instance cards and circuit timers also use (`hooks/useLiveActivityDuration.js`). All of them tick on
+one shared clock, `hooks/useSecondTicker.js`, so they change together.
 
 Session Detail's main mobile workspace uses full-width hierarchy bands with depth-independent
 insets, three-column name/value/unit rows with progress hints underneath, and one mobile
@@ -384,7 +408,10 @@ AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageF
 holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
 saved-filter toggles and the remaining controls; active conditions show as badges beside the note count.
 Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
-a tenant-governed semantic catalog and structured/sanitized SQL execution. Saved views are
+a tenant-governed semantic catalog with structured queries and a flag-gated raw SQL path whose
+parse-based relation/function allowlist, read-only savepoint, and optional least-privilege role are
+described in [Analytics SQL boundary](docs/architecture/ANALYTICS_SQL_BOUNDARY.md) (default-deny
+names and types, pinned `search_path`, in-database output budgets). Saved views are
 separate from dashboard layout; registered visualizations provide explicit query explanations.
 Goal analytics resolves explicit instance sessions through a bounded primary-key lookup;
 keep that correlation to avoid quadratic joins when tenant statistics lag behind history imports.
@@ -392,7 +419,11 @@ keep that correlation to avoid quadratic joins when tenant statistics lag behind
 Media has one structured attachment boundary: `models/storage.py`, `services/media_service.py`,
 `services/storage_connection_service.py`, `services/storage_upload_service.py` and
 `blueprints/storage_api.py`. User-owned Google Drive (`drive.file` + Picker) and Dropbox App Folder
-connections retain encrypted credentials; originals stay in the provider. Notes link to scoped
+connections retain encrypted credentials; originals stay in the provider. Pictures, video and audio
+share one canonical type table (`storage_common.MEDIA_TYPES`, mirrored in `utils/cloudUpload.js`,
+checked against `tests/fixtures/media_types.json`); aliases such as `audio/x-m4a` are canonicalized at
+upload, provider-metadata and playback boundaries. `MediaAttachment` renders `<img>`, `<video>` (provider
+poster) or `<audio>` (no poster) by kind. Notes link to scoped
 media assets through `note_attachments`; goal notes/reviews/completion notes, sessions and activities reuse that
 store. Goal descriptions link through `goal_attachments`, read on demand (`GET …/goals/<id>/attachments`,
 `hooks/useGoalDescriptionAttachments.js`) so goal trees never load them, and saved with the goal update
@@ -561,6 +592,15 @@ The current backlog assessment and item-level evidence live in
 [Backlog Quality Audit — September 2026](planning/backlog-quality-audit-2026-09.md).
 The broader production assessment, release-gate gaps, and test-speed evidence are in
 [Production Quality Audit — September 7, 2026](planning/production-quality-audit-2026-09-07.md).
+The current code-quality and security assessment, its remediation, and the rerun evidence are in
+[Code Quality and Security Audit — October 28, 2026](planning/code-quality-security-audit-2026-10-28.md).
+The independent assessment of those changes and its round 2 remediation are in
+[Remediation Review — October 29, 2026](planning/remediation-independent-review-2026-10-29.md).
+Cloud Build deploys pass a CI gate, a verified pre-migration dump, and candidate smoke checks
+before promotion (`scripts/deploy_gates.py`, runbook §5). Program browser specs also run in a
+`desktop-late` project whose local date trails UTC, sharing `client/e2e/support/`.
+The nginx shell CSP forbids inline script (boot logic lives in `client/public/boot/shell.js`);
+`client/scripts/check-csp-enforcement.mjs` proves it in a real browser against the built container.
 Read-path query and payload budgets for a power-user-sized account live in
 `tests/performance/test_power_account_budgets.py`; the performance pass that introduced them is in
 [Performance Pass — September 2026](planning/performance-pass-2026-09.md).
@@ -572,6 +612,8 @@ are in [Performance Audit — October 12, 2026](planning/performance-audit-2026-
 ## Practical invariants
 
 - Preserve tenant isolation and soft-delete filters in every new query.
+- Claim single-use credentials (reset tokens, invites, OAuth codes) atomically: one conditional
+  UPDATE, or a row lock with the unused-check repeated under it.
 - Revoke sessions (`revoke_user_sessions`) in the same transaction as any credential or
   account-status change.
 - Catch the failure you expect; `except Exception` is reserved for containment boundaries.

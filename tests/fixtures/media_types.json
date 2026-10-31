@@ -1,0 +1,13 @@
+{
+  "image/jpeg": {"kind": "image", "extensions": [".jpg", ".jpeg"], "aliases": []},
+  "image/png": {"kind": "image", "extensions": [".png"], "aliases": []},
+  "image/webp": {"kind": "image", "extensions": [".webp"], "aliases": []},
+  "image/gif": {"kind": "image", "extensions": [".gif"], "aliases": []},
+  "video/mp4": {"kind": "video", "extensions": [".mp4"], "aliases": []},
+  "video/webm": {"kind": "video", "extensions": [".webm"], "aliases": []},
+  "audio/mpeg": {"kind": "audio", "extensions": [".mp3"], "aliases": ["audio/mp3"]},
+  "audio/mp4": {"kind": "audio", "extensions": [".m4a"], "aliases": ["audio/x-m4a", "audio/m4a", "audio/mp4a-latm", "audio/aac"]},
+  "audio/wav": {"kind": "audio", "extensions": [".wav"], "aliases": ["audio/x-wav", "audio/wave", "audio/vnd.wave"]},
+  "audio/flac": {"kind": "audio", "extensions": [".flac"], "aliases": ["audio/x-flac"]},
+  "audio/ogg": {"kind": "audio", "extensions": [".ogg", ".opus"], "aliases": ["audio/opus", "audio/x-opus+ogg", "application/ogg"]}
+}

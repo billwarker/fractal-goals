@@ -1,3 +1,10 @@
+// The replay SDK's compression worker, emitted as a hashed same-origin asset. Its
+// default is a Blob URL, which the CSP's worker-src 'self' refuses (silently falling
+// back to uncompressed replay); serving it from our origin keeps the CSP strict.
+import replayWorkerUrl from '@sentry-internal/replay/worker-bundler?url';
+
+export const REPLAY_WORKER_URL = replayWorkerUrl;
+
 export function privateStorageRecord(record) {
     const data = record?.data || {};
     return [data.url, data['http.url'], record?.description].some(privateStorageUrl);
@@ -41,6 +48,7 @@ export async function initializeMonitoring(dsn) {
             // section must be updated, and the change disclosed to users,
             // before replay is ever allowed to capture content.
             Sentry.replayIntegration({
+                workerUrl: REPLAY_WORKER_URL,
                 maskAllText: true,
                 maskAllInputs: true,
                 blockAllMedia: true,

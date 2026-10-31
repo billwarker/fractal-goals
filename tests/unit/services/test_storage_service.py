@@ -1,6 +1,8 @@
 """Storage ownership, OAuth replay, durable references and media lifecycle regressions."""
 from datetime import datetime, timedelta, timezone
 import hashlib
+import json
+from pathlib import Path
 from types import SimpleNamespace
 import time
 from unittest.mock import MagicMock
@@ -15,7 +17,7 @@ from services.data_export_service import DataExportService
 from services.media_service import MediaService
 from services.media_stream import media_chunks, omit_private_media, stream_headers
 from services.note_service import NoteService
-from services.storage_common import StorageError, seal, unseal, validate_file
+from services.storage_common import MEDIA_TYPES, StorageError, canonical_media_type, seal, unseal, validate_file
 from services.storage_connection_service import StorageConnectionService
 
 
@@ -54,9 +56,37 @@ def create_note(storage, attachments):
 
 
 @pytest.mark.parametrize('mime,name', [('image/jpeg', 'a.jpg'), ('image/png', 'a.png'), ('image/webp', 'a.webp'),
-                                      ('image/gif', 'a.gif'), ('video/mp4', 'a.mp4'), ('video/webm', 'a.webm')])
+                                      ('image/gif', 'a.gif'), ('video/mp4', 'a.mp4'), ('video/webm', 'a.webm'),
+                                      ('audio/mpeg', 'song.mp3'), ('audio/mp4', 'memo.m4a'), ('audio/wav', 'take.WAV'),
+                                      ('audio/flac', 'mix.flac'), ('audio/ogg', 'idea.ogg'), ('audio/ogg', 'idea.opus')])
 def test_supported_media(mime, name):
-    validate_file(name, mime, 1)
+    assert validate_file(name, mime, 1) == mime
+
+
+@pytest.mark.parametrize('mime,name,canonical', [
+    ('audio/x-m4a', 'Voice Memo.m4a', 'audio/mp4'), ('audio/mp4a-latm', 'a.m4a', 'audio/mp4'),
+    ('audio/mp3', 'a.mp3', 'audio/mpeg'), ('audio/x-wav', 'a.wav', 'audio/wav'), ('audio/x-flac', 'a.flac', 'audio/flac'),
+    ('audio/opus', 'a.opus', 'audio/ogg'), ('AUDIO/MPEG', 'a.mp3', 'audio/mpeg'),
+    # Browsers leave some audio types blank and Dropbox reports none: the extension decides.
+    ('', 'a.flac', 'audio/flac'), ('application/octet-stream', 'a.mp3', 'audio/mpeg'),
+])
+def test_aliases_resolve_to_canonical_types(mime, name, canonical):
+    assert canonical_media_type(mime, name) == canonical
+    assert validate_file(name, mime, 1) == canonical
+
+
+@pytest.mark.parametrize('mime,name', [('audio/mpeg', 'a.wav'), ('audio/x-m4a', 'a.mp4'), ('audio/aiff', 'a.aiff'),
+                                       ('', 'a.exe'), ('audio/mpeg', 'mp3')])
+def test_reject_mismatched_or_unsupported_audio(mime, name):
+    with pytest.raises(StorageError) as error:
+        validate_file(name, mime, 10)
+    assert error.value.code == 'media_type_unsupported'
+
+
+def test_media_types_match_the_shared_fixture():
+    fixture = json.loads((Path(__file__).resolve().parents[2] / 'fixtures/media_types.json').read_text())
+    assert {mime: {'kind': spec['kind'], 'extensions': list(spec['extensions']), 'aliases': list(spec['aliases'])}
+            for mime, spec in MEDIA_TYPES.items()} == fixture
 
 
 @pytest.mark.parametrize('size', [0, -1, True, None, '100', 501 * 1024 * 1024])
@@ -248,6 +278,36 @@ def test_content_revalidates_revision_and_forwards_range(storage, monkeypatch, r
     storage.metadata['revision'] = '2'
     with pytest.raises(StorageError, match='source file changed'):
         MediaService(storage.db).open_content(storage.root.id, storage.user.id, asset['id'])
+
+
+def test_audio_imports_canonically_plays_and_has_no_poster(storage, monkeypatch):
+    storage.metadata.update(name='Voice Memo.m4a', mime_type='audio/x-m4a')
+    monkeypatch.setattr(providers, 'download', lambda *args: download_head(b'\x00\x00\x00\x20ftypM4A '))
+    asset = import_asset(storage)
+    assert asset['mime_type'] == 'audio/mp4'
+    create_note(storage, [{'asset_id': asset['id']}])
+    monkeypatch.setattr(providers, 'download', lambda *args: 'response')
+    # The provider still reports the alias; that is the same file, not a changed one.
+    assert MediaService(storage.db).open_content(storage.root.id, storage.user.id, asset['id'], 'bytes=0-9')[1] == 'response'
+    monkeypatch.setattr(providers, 'thumbnail', lambda *args: pytest.fail('audio has no poster to fetch'))
+    with pytest.raises(StorageError) as error:
+        MediaService(storage.db).thumbnail(storage.root.id, storage.user.id, asset['id'])
+    assert error.value.code == 'media_no_thumbnail'
+
+
+def test_audio_import_rejects_contents_that_are_not_audio(storage, monkeypatch):
+    storage.metadata.update(name='song.mp3', mime_type='audio/mpeg')
+    monkeypatch.setattr(providers, 'download', lambda *args: download_head(b'<html><body>'))
+    with pytest.raises(StorageError) as error:
+        import_asset(storage)
+    assert error.value.code == 'media_type_unsupported'
+
+
+def download_head(head):
+    response = MagicMock()
+    response.__enter__.return_value = response
+    response.iter_content.return_value = iter([head])
+    return response
 
 
 @pytest.mark.parametrize('range_value', ['bytes=0-1,3-4', 'evil', 'bytes=a-b', 'bytes=-', 'bytes=1--2'])

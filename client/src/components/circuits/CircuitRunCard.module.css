@@ -102,12 +102,6 @@
     background: var(--color-bg-card-alt);
 }
 
-.memberScopeControl {
-    display: flex;
-    justify-content: flex-end;
-    padding-top: 8px;
-}
-
 .memberHeader {
     align-items: center;
     gap: 8px;
@@ -136,10 +130,24 @@
 
 .memberName {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 4px 7px;
     font-size: 14px;
+}
+
+.memberTags {
+    display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
+    font-size: initial;
+}
+
+/* After the name, like an instance card's tags: not stretched or pushed to the edge. */
+.memberTags > * {
+    flex: 0 1 auto;
+    width: auto;
+    justify-content: flex-start;
 }
 
 .memberMetrics {
@@ -207,7 +215,6 @@
         margin-inline: 0;
     }
 
-    :global([data-session-detail-content]) .memberScopeControl,
     :global([data-session-detail-content]) .error {
         padding-inline: 8px;
     }
@@ -282,10 +289,6 @@
 
     .memberMetrics .memberMetricsContent {
         grid-column: 1 / -1;
-    }
-
-    .memberScopeControl {
-        width: 100%;
     }
 
     .notesSection,

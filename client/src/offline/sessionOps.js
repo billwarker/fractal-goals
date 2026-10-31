@@ -3,6 +3,8 @@
 // rules so the UI reflects a tap immediately, and every acknowledgement
 // replaces the patched record with the server's version.
 
+import { deriveNoteCategory, NOTE_TYPE_LABELS } from '../utils/noteTypes';
+
 export function nowIso(now = Date.now()) {
     return new Date(now).toISOString();
 }
@@ -104,21 +106,8 @@ export function buildPlaceholderInstance({ id, sessionId, definition, groupName 
     };
 }
 
-// Mirror of services/_serialize_notes_misc.py derive_note_type / note_type_label.
-const NOTE_TYPE_LABELS = {
-    fractal_note: 'Fractal Note',
-    goal_note: 'Goal Note',
-    session_note: 'Session Note',
-    program_note: 'Program Note',
-    activity_instance_note: 'Activity Instance Note',
-    activity_set_note: 'Activity Set Note',
-    activity_definition_note: 'Activity Definition Note',
-    circuit_run_note: 'Activity Circuit Note',
-    circuit_round_note: 'Circuit Round Note',
-    goal_completion_note: 'Goal Completion Note',
-    note: 'Note',
-};
-
+// Mirror of services/_serialize_notes_misc.py derive_note_type; labels and categories
+// come from the canonical utils/noteTypes.js.
 function deriveNoteType(contextType, { setIndex = null, activitySetId = null, noteKind = null } = {}) {
     if (contextType === 'goal' && noteKind === 'goal_completion') return 'goal_completion_note';
     if (contextType === 'goal' && noteKind === 'goal_review') return 'goal_review_note';
@@ -159,6 +148,7 @@ export function buildPlaceholderNote({ id, data, session = null, setIndex = null
         note_kind: data.note_kind || null,
         note_type: noteType,
         note_type_label: NOTE_TYPE_LABELS[noteType] || 'Note',
+        note_category: deriveNoteCategory(data.context_type),
         set_index: setIndex,
         is_pinned: false,
         pinned_at: null,
@@ -181,6 +171,7 @@ export function findRunningInstance(instances, excludeId = null) {
 
 /** The same conflict shape the server returns, so the existing switch prompt works offline. */
 export function activeWorkConflictError(runningInstance) {
+    /** @type {Error & { response?: { status: number, data: object } }} */
     const error = new Error('Another session item is already accruing work time');
     error.response = {
         status: 409,
@@ -216,6 +207,11 @@ function completeInstance(instance, at) {
     };
 }
 
+/**
+ * @param {Array<object> | unknown} instances
+ * @param {{ instanceId: string, action: string, at: string, sessionPaused?: boolean,
+ *   extraData?: { target_duration_seconds?: number, switch?: boolean } }} options
+ */
 export function applyTimerAction(instances, { instanceId, action, at, sessionPaused = false, extraData = {} }) {
     if (!Array.isArray(instances)) return instances;
     return instances.map((instance) => {

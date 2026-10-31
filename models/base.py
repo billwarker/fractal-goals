@@ -135,7 +135,13 @@ def remove_session():
         _session_factory.remove()
 
 def get_session(engine):
-    """DEPRECATED: Prefer get_scoped_session()"""
+    """Return a new session with its own connection and transaction.
+
+    Request handlers use ``get_scoped_session()``. This is for work that must not
+    share the request's transaction: idempotency claims, event-log writes on the
+    background executor, completion handlers that run outside a request, scripts,
+    and tests that need independent connections. Callers own and close the session.
+    """
     DBSession = sessionmaker(bind=engine)
     return DBSession()
 

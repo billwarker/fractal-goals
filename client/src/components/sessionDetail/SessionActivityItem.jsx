@@ -35,6 +35,8 @@ import {
     buildEmptySet,
     isMetricValueEmpty,
 } from '../../utils/sessionActivityMetrics';
+import { isInstanceTimerRunning, liveInstanceSeconds } from '../../utils/sessionTime';
+import useSecondTicker from '../../hooks/useSecondTicker';
 
 /**
  * SessionActivityItem
@@ -112,7 +114,6 @@ function SessionActivityItem({
     const [startTimeDraft, setStartTimeDraft] = useState(null);
     const [stopTimeDraft, setStopTimeDraft] = useState(null);
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
-    const [realtimeDuration, setRealtimeDuration] = useState(() => exercise.duration_seconds ?? 0);
     // Pre-start duration input (MM:SS) — if set before Start, enables countdown mode
     const [targetDurationInput, setTargetDurationInput] = useState('');
     const [targetDurationError, setTargetDurationError] = useState('');
@@ -126,68 +127,20 @@ function SessionActivityItem({
         ? `Countdown ${formatDuration(parsedTargetDuration)}`
         : null;
 
-    // Real-time timer effect
+    // Live duration on the shared clock, so it ticks together with the session's Activity total.
+    const isRunning = isInstanceTimerRunning(exercise);
+    const isSessionPaused = Boolean(session?.is_paused || session?.attributes?.is_paused);
+    const nowMs = useSecondTicker(isRunning && !isSessionPaused);
+    const realtimeDuration = isRunning ? liveInstanceSeconds(exercise, session, nowMs) : (exercise.duration_seconds ?? 0);
+
+    // Auto-complete when the countdown reaches its target.
     useEffect(() => {
-        let intervalId;
-
-        const updateTimerLocal = () => {
-            if (exercise.time_start && !exercise.time_stop && !exercise.completed) {
-                const start = new Date(exercise.time_start).getTime();
-                const now = Date.now();
-
-                const totalPaused = exercise.total_paused_seconds || 0;
-
-                const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
-                const sessionLastPausedAt = session?.last_paused_at || session?.attributes?.last_paused_at;
-
-                let currentPausedStraggler = 0;
-                if (isSessionPaused && sessionLastPausedAt) {
-                    const pausedTime = new Date(sessionLastPausedAt).getTime();
-                    if (pausedTime > start) {
-                        currentPausedStraggler = Math.floor((now - pausedTime) / 1000);
-                    }
-                }
-
-                const diffSeconds = Math.floor((now - start) / 1000);
-                const activeSeconds = Math.max(0, diffSeconds - totalPaused - currentPausedStraggler);
-                setRealtimeDuration(activeSeconds);
-
-                // Auto-complete when countdown hits 0
-                const target = exercise.target_duration_seconds;
-                if (target && activeSeconds >= target && !autoCompletedRef.current) {
-                    autoCompletedRef.current = true;
-                    playCompletionSound();
-                    onUpdate('timer_action', 'complete');
-                }
-            }
-        };
-
-        if (exercise.time_start && !exercise.time_stop && !exercise.completed) {
-            updateTimerLocal();
-
-            const isSessionPaused = session?.is_paused || session?.attributes?.is_paused || false;
-            if (!isSessionPaused) {
-                intervalId = setInterval(updateTimerLocal, 1000);
-            }
-        }
-
-        return () => {
-            if (intervalId) clearInterval(intervalId);
-        };
-    }, [
-        exercise.time_start,
-        exercise.time_stop,
-        exercise.completed,
-        exercise.duration_seconds,
-        exercise.total_paused_seconds,
-        exercise.target_duration_seconds,
-        session?.is_paused,
-        session?.attributes?.is_paused,
-        session?.last_paused_at,
-        session?.attributes?.last_paused_at,
-        onUpdate,
-    ]);
-    const isRunning = Boolean(exercise.time_start && !exercise.time_stop && !exercise.completed);
+        const target = exercise.target_duration_seconds;
+        if (!isRunning || !target || realtimeDuration < target || autoCompletedRef.current) return;
+        autoCompletedRef.current = true;
+        playCompletionSound();
+        onUpdate('timer_action', 'complete');
+    }, [exercise.target_duration_seconds, isRunning, onUpdate, realtimeDuration]);
     const effectiveTarget = exercise.target_duration_seconds;
     const isCountingDown = isRunning && Boolean(effectiveTarget);
     const countdownRemaining = isCountingDown ? Math.max(0, effectiveTarget - realtimeDuration) : null;

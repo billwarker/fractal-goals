@@ -82,6 +82,11 @@
     gap: 12px;
 }
 
+.headerActionsSingleRow {
+    flex-wrap: nowrap;
+    flex-shrink: 0;
+}
+
 .headerActionsMobile {
     width: 100%;
     justify-content: flex-start;

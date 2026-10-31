@@ -176,6 +176,10 @@ def _seed_goal_heatmap(db, suffix, user, now):
                 level_id=level_id, name='First clean performance', created_at=now - timedelta(days=40),
                 started_at=now - timedelta(days=40), completed=True, completed_at=now - timedelta(days=2),
                 completion_source='manual'))
+    # The add-chart workflow mutates its own goal so it never changes the chart count the
+    # saved-view workflow asserts on Heatmap Guitar while both run in parallel.
+    db.add(Goal(id=f'browser-chart-sandbox-{suffix}', root_id=root_id, parent_id=root_id, owner_id=user.id,
+                level_id=level_id, name=f'Chart Sandbox {suffix}', created_at=now - timedelta(days=30)))
     for index in range(25):
         db.add(EventLog(id=f'browser-heatmap-event-{suffix}-{index}', root_id=root_id,
             event_type='activity.associated', entity_type='activity_definition', entity_id=f'archived-{index}',
@@ -275,7 +279,8 @@ def main():
             # Desktop/mobile specs create independent programs under the fixture account.
             # Keep production quota enforcement active without exhausting its free-tier default.
             db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000}}))
-            for suffix in ("desktop", "mobile"):
+            # desktop-late reruns the program specs at a late-evening clock (playwright.config.js).
+            for suffix in ("desktop", "mobile", "desktop-late"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
                     Goal(
@@ -422,6 +427,8 @@ def main():
                     ("circuit-tags", "Circuit Tags"),
                     ("session-width", "Session Width"),
                     ("associations", "Associations"),
+                    ("scoped-groups", "Scoped Groups"),
+                    ("activity-clock", "Activity Clock"),
                     ("quick-session", "Quick Session"),
                     ("ai", "AI"),
                     ("offline-quick", "Offline Quick"),

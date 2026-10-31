@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,9 +20,28 @@ class FakeLoadJob:
 
 
 class FakeBigQueryClient:
+    """Covers every client call the export makes, so tests behave the same whether or
+    not google-cloud-bigquery is installed (it enables the retention/prune path)."""
+
     def __init__(self, fail_tables=None):
         self.loads = []
         self.fail_tables = set(fail_tables or [])
+        self.tables = {}
+        self.table_updates = []
+        self.queries = []
+
+    def get_table(self, table_ref):
+        return self.tables.setdefault(table_ref, SimpleNamespace(
+            table_ref=table_ref, time_partitioning=SimpleNamespace(expiration_ms=None),
+        ))
+
+    def update_table(self, table, fields):
+        self.table_updates.append((table.table_ref, list(fields)))
+        return table
+
+    def query(self, sql):
+        self.queries.append(sql)
+        return FakeLoadJob()
 
     def load_table_from_json(self, rows, table_ref, job_config=None):
         table = table_ref.rsplit(".", 1)[-1]

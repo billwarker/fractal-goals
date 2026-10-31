@@ -5,16 +5,21 @@ goals per request. Evidence pages power the condition chart and the live editor 
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from sqlalchemy.orm import selectinload
 
 from models import ActivityDefinition, MetricDefinition, validate_root_goal
-from services.goal_condition_evidence import collect_goal_activity_instances
+from services.goal_condition_evaluator import evaluate_condition
+from services.goal_condition_evidence import collect_goal_activity_instances, to_evidence
 from services.goal_condition_service import (
     ConditionValidationError,
+    build_condition_spec,
     clamp_progress_goal_ids,
     condition_met_now,
     condition_progress_payload,
     evaluate_goal_condition,
+    normalize_condition_payload,
     yield_metric_ids,
 )
 from services.goal_loading import load_fractal_goals_for_serialization
@@ -86,6 +91,7 @@ class GoalConditionReadService:
             Goal, Goal.id == GoalCompletionCondition.goal_id,
         ).options(
             selectinload(GoalCompletionCondition.rules).selectinload(GoalConditionMetricRule.metric),
+            selectinload(GoalCompletionCondition.tags),
             selectinload(GoalCompletionCondition.activity),
             selectinload(GoalCompletionCondition.metric),
         ).filter(
@@ -159,6 +165,34 @@ class GoalConditionReadService:
             ],
             'progress': condition_progress_payload(goal, evaluation, goal.children),
         }, None, 200
+
+    def preview(self, root_id, current_user_id, goal_id, condition_data) -> ServiceResult[JsonDict]:
+        """Evaluate an unsaved threshold against the goal's active-period evidence (nothing is written)."""
+        goals_by_id = self._owned_goals(root_id, current_user_id)
+        if goals_by_id is None:
+            return None, 'Fractal not found or access denied', 404
+        goal = goals_by_id.get(goal_id)
+        if goal is None:
+            return None, 'Goal not found', 404
+        try:
+            normalized = normalize_condition_payload(self.db_session, root_id, condition_data)
+        except ConditionValidationError as error:
+            return None, {'error': str(error), 'field': 'condition'}, 400
+        activity = self._activity(root_id, normalized['activity_definition_id'])
+        draft = SimpleNamespace(
+            **{key: value for key, value in normalized.items() if key != 'rules'},
+            rules=[SimpleNamespace(**rule) for rule in normalized['rules']],
+        )
+        instances = collect_goal_activity_instances(
+            self.db_session, root_id, goal, goals_by_id, normalized['activity_definition_id'],
+        )
+        evaluation = evaluate_condition(
+            build_condition_spec(draft, activity), [to_evidence(instance) for instance in instances],
+        )
+        # Shaped like saved progress, as if the goal were open and completed on this threshold.
+        as_draft = SimpleNamespace(id=goal.id, completion_condition='activity_threshold', completed=False,
+                                   completion_source=None)
+        return {'goal_id': goal.id, 'progress': condition_progress_payload(as_draft, evaluation)}, None, 200
 
     def pending_completion(self, goal) -> bool:
         """True when an incomplete goal's own condition is already met (the client asks to confirm)."""

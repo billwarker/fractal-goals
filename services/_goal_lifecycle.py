@@ -8,8 +8,9 @@ from typing import Any
 
 from sqlalchemy.orm import selectinload
 
-from models import COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL, Goal, GoalCompletionCondition, activity_goal_associations, goal_activity_group_associations, get_goal_by_id, validate_root_goal
+from models import COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL, Goal, GoalCompletionCondition, activity_goal_associations, get_goal_by_id, validate_root_goal
 from services.association_reconciliation import append_goal_association_event
+from services.goal_activity_group_links import set_goal_activity_group
 from services.goal_type_utils import get_canonical_goal_type
 from services.events import event_bus, Event, Events
 from services.goal_domain_rules import goal_requires_smart_validation
@@ -111,6 +112,7 @@ class _GoalLifecycleMixin:
 
         source = self.db_session.query(Goal).options(
             selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
+            selectinload(Goal.condition).selectinload(GoalCompletionCondition.tags),
             selectinload(Goal.associated_activities),
             selectinload(Goal.associated_activity_groups),
         ).filter_by(id=goal_id, root_id=root_id, deleted_at=None).first()
@@ -155,23 +157,9 @@ class _GoalLifecycleMixin:
                 action="associated",
             )
 
-        # Copy activity group associations
-        for group in (source.associated_activity_groups or []):
-            self.db_session.execute(
-                goal_activity_group_associations.insert().values(
-                    goal_id=new_goal.id,
-                    activity_group_id=group.id,
-                )
-            )
-            append_goal_association_event(
-                self.db_session,
-                root_id=root_id,
-                goal_id=new_goal.id,
-                association_kind="activity_group",
-                association_id=group.id,
-                association_name=group.name,
-                action="associated",
-            )
+        # Copy the activity group (a goal has at most one live group).
+        for group in (source.associated_activity_groups or [])[:1]:
+            set_goal_activity_group(self.db_session, root_id, new_goal, group, current_group_id=None)
 
         self.db_session.commit()
         self.db_session.refresh(new_goal)

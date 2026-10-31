@@ -41,7 +41,7 @@ const goal = {
     },
 };
 
-const conditionText = 'Performance and Submission: 1 set of Playback Speed ≥ 100 % and Quality ≥ 8 Rating in one session';
+const conditionText = 'Performance and Submission: at least 1 set of Playback Speed ≥ 100 % and Quality ≥ 8 Rating within one session';
 
 const programs = [{
     id: 'program-1',

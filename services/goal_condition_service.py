@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 
 from models import (
     ActivityDefinition,
+    ActivityTagDefinition,
     COMPLETION_CONDITION_ACTIVITY_THRESHOLD,
     COMPLETION_CONDITION_CHILDREN,
     COMPLETION_CONDITION_MANUAL,
@@ -26,6 +27,7 @@ from models import (
     Goal,
     GoalCompletionCondition,
     GoalConditionMetricRule,
+    GoalConditionTag,
     ActivityInstance,
     MetricDefinition,
     activity_goal_associations,
@@ -55,6 +57,10 @@ KIND_MEASURES = {
 }
 TOTAL_OPERATORS = ('>=', '>', '<=', '<')
 MAX_RULES = 10
+MAX_CONDITION_TAGS = 10
+# 'each': sets meet the rules one by one; 'average': a session's counted sets meet them on average.
+SET_AGGREGATES = ('each', 'average')
+TAG_MATCHES = ('contains', 'exact')
 MAX_MIN_SETS = 100
 MAX_REQUIRED_COUNT = 10000
 MAX_VALUE = Decimal('9999999999.9999')
@@ -131,6 +137,27 @@ def _load_activity(db_session, root_id, activity_id):
     ).first()
 
 
+def _condition_tags(db_session, root_id, raw) -> list[ActivityTagDefinition]:
+    """Tags every counted set must carry. Archived tags stay valid: archiving only hides a tag."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(isinstance(tag_id, str) for tag_id in raw):
+        raise ConditionValidationError('Tags must be a list of tag ids')
+    tag_ids = list(dict.fromkeys(raw))
+    if len(tag_ids) > MAX_CONDITION_TAGS:
+        raise ConditionValidationError(f'Use at most {MAX_CONDITION_TAGS} tags')
+    if not tag_ids:
+        return []
+    tags = db_session.query(ActivityTagDefinition).filter(
+        ActivityTagDefinition.root_id == root_id,
+        ActivityTagDefinition.id.in_(tag_ids),
+    ).all()
+    if len(tags) != len(tag_ids):
+        raise ConditionValidationError('Choose tags in this fractal')
+    by_id = {tag.id: tag for tag in tags}
+    return [by_id[tag_id] for tag_id in tag_ids]
+
+
 def normalize_condition_payload(db_session, root_id, data) -> dict:
     """Validate an activity-threshold condition payload against the fractal's activities."""
     if not isinstance(data, dict):
@@ -167,20 +194,49 @@ def normalize_condition_payload(db_session, root_id, data) -> dict:
             'position': position,
         })
 
+    set_aggregate = data.get('set_aggregate') or 'each'
+    if set_aggregate not in SET_AGGREGATES:
+        raise ConditionValidationError('Count each set or the average across sets')
+    averages = set_aggregate == 'average'
+    if averages and (measure != 'sets' or kind not in ('single_session', 'consistency')):
+        raise ConditionValidationError('Only sets meeting rules can be averaged')
+    if averages and not activity.has_sets:
+        raise ConditionValidationError(f"'{activity.name}' logs no sets to average")
+    if averages and not rules:
+        raise ConditionValidationError('Add at least one metric rule')
+
+    tag_match = data.get('tag_match') or 'contains'
+    if tag_match not in TAG_MATCHES:
+        raise ConditionValidationError('Match tags by containing or exactly')
+
+    consecutive = data.get('consecutive', False)
+    if not isinstance(consecutive, bool):
+        raise ConditionValidationError('In a row must be true or false')
+    if consecutive and kind != 'consistency':
+        raise ConditionValidationError('Only consistency thresholds can require a streak')
+
     normalized = {
         'activity_definition_id': activity.id, 'name': _condition_name(data.get('name')),
         'kind': kind, 'measure': measure, 'rules': [],
         'min_sets': None, 'required_count': None, 'metric_definition_id': None, 'operator': None,
-        'target_value': None,
+        'target_value': None, 'consecutive': consecutive, 'set_aggregate': set_aggregate,
+        'tags': _condition_tags(db_session, root_id, data.get('tag_ids')),
     }
+    # Without tags there is nothing to match exactly.
+    normalized['tag_match'] = tag_match if normalized['tags'] else 'contains'
     if measure == 'sets':
         normalized['rules'] = rules
         if kind == 'single_session':
             if not rules:
                 raise ConditionValidationError('Add at least one metric rule')
-            normalized['min_sets'] = _bounded_int(data.get('min_sets', 1), 'Sets', MAX_MIN_SETS)
+            # An activity without sets is one implicit set per session.
+            normalized['min_sets'] = (
+                _bounded_int(data.get('min_sets', 1), 'Sets', MAX_MIN_SETS) if activity.has_sets else 1
+            )
         else:
             normalized['required_count'] = _bounded_int(data.get('required_count'), 'Times', MAX_REQUIRED_COUNT)
+            if rules and activity.has_sets:
+                normalized['min_sets'] = _bounded_int(data.get('min_sets', 1), 'Sets', MAX_MIN_SETS)
     else:
         if rules:
             raise ConditionValidationError('Totals do not take per-set rules')
@@ -213,12 +269,18 @@ def build_condition_spec(condition, activity) -> ConditionSpec:
         operator=condition.operator,
         target_value=float(condition.target_value) if condition.target_value is not None else None,
         yield_metric_ids=yield_metric_ids(activity) if activity is not None else (),
+        # Historical backfills pass revision-local rows that predate tags and streaks.
+        tag_ids=frozenset(tag.id for tag in (getattr(condition, 'tags', None) or [])),
+        consecutive=bool(getattr(condition, 'consecutive', False)),
+        set_aggregate=getattr(condition, 'set_aggregate', None) or 'each',
+        tag_match=getattr(condition, 'tag_match', None) or 'contains',
     )
 
 
 def live_condition(db_session, goal):
     return db_session.query(GoalCompletionCondition).options(
         selectinload(GoalCompletionCondition.rules),
+        selectinload(GoalCompletionCondition.tags),
     ).filter(
         GoalCompletionCondition.goal_id == goal.id,
         GoalCompletionCondition.deleted_at.is_(None),
@@ -250,7 +312,10 @@ def write_condition(db_session, goal, completion_condition, condition_data):
             activity_definition_id=normalized['activity_definition_id'],
         )
         db_session.add(condition)
-    for key in ('name', 'kind', 'measure', 'min_sets', 'required_count', 'metric_definition_id', 'operator', 'target_value'):
+    for key in (
+        'name', 'kind', 'measure', 'min_sets', 'required_count', 'metric_definition_id', 'operator',
+        'target_value', 'consecutive', 'set_aggregate', 'tag_match', 'tags',
+    ):
         setattr(condition, key, normalized[key])
     db_session.flush()
 
@@ -448,6 +513,17 @@ def activities_with_conditions(db_session, root_id, activity_ids) -> set[str]:
     ).distinct().all()}
 
 
+def activities_with_condition_tag(db_session, root_id, tag_id) -> set[str]:
+    """Activities whose live thresholds require `tag_id`."""
+    return {activity_id for (activity_id,) in db_session.query(GoalCompletionCondition.activity_definition_id).join(
+        GoalConditionTag, GoalConditionTag.condition_id == GoalCompletionCondition.id,
+    ).filter(
+        GoalCompletionCondition.root_id == root_id,
+        GoalCompletionCondition.deleted_at.is_(None),
+        GoalConditionTag.tag_definition_id == tag_id,
+    ).distinct().all()}
+
+
 def reconcile_activity_conditions(db_session, root_id, activity_id, pending_events, *, trigger, goals_by_id=None):
     """Re-evaluate every goal whose condition watches `activity_id`. Returns {goal_id: outcome}."""
     goal_ids = goals_with_activity_condition(db_session, root_id, activity_id)
@@ -526,6 +602,7 @@ __all__ = [
     'goals_with_activity_condition',
     'live_condition',
     'normalize_condition_payload',
+    'activities_with_condition_tag',
     'reconcile_activity_conditions',
     'reconcile_goal',
     'write_condition',

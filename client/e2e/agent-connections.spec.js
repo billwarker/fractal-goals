@@ -26,7 +26,10 @@ test('AI connection settings are keyboard accessible and revoke delegated grants
     await connectionsButton.press('Enter');
     await expect(connectionsButton).toHaveAttribute('aria-pressed', 'true');
     await expect(dialog.getByRole('heading', { name: 'Connected services' })).toBeVisible();
-    const connection = dialog.locator('article').filter({ hasText: `Browser AI Settings ${suffix}` });
+    // Exact name: "…desktop" must not also match the desktop-late seed's "…desktop-late".
+    const connection = dialog.locator('article').filter({
+        has: page.getByText(`Browser AI Settings ${suffix}`, { exact: true }),
+    });
     await expect(connection).toBeVisible();
 
     const revokeButton = connection.getByRole('button', { name: 'Revoke', exact: true });

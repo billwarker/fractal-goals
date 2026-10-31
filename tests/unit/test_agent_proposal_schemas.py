@@ -115,3 +115,38 @@ def test_adapter_preserves_explicit_null_for_nullable_update_fields():
     assert backend.operations[0].data.description is None
     assert adapter.operations[0].data.description is None
     assert adapter.model_dump(exclude_unset=True)["operations"][0]["data"] == {"description": None}
+
+
+def _goal_update(data):
+    return {"operations": [{"operation_id": "goal-1", "type": "update_goal", "goal_id": "goal-id", "data": data}]}
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("data", [
+    {"attachments": [{"asset_id": "asset-1", "alt_text": "x"}]},
+    {"completed": True},
+    {"review_deferred_until": "2026-11-01"},
+])
+def test_backend_and_adapter_both_refuse_unreviewed_goal_update_fields(data):
+    with pytest.raises(ValidationError):
+        AgentProposalSchema.model_validate(_goal_update(data))
+    with pytest.raises(ValidationError):
+        AdapterAgentProposalSchema.model_validate(_goal_update(data))
+
+
+@pytest.mark.unit
+def test_backend_and_adapter_both_accept_reviewed_goal_update_fields():
+    data = {"name": "Renamed", "review_cadence_value": 2, "review_cadence_unit": "weeks"}
+
+    backend = AgentProposalSchema.model_validate(_goal_update(data))
+    adapter = AdapterAgentProposalSchema.model_validate(_goal_update(data))
+
+    assert backend.operations[0].data.name == adapter.operations[0].data.name == "Renamed"
+
+
+@pytest.mark.unit
+def test_advertised_goal_update_fields_are_exactly_the_reviewed_set():
+    from validators.agent import SUPPORTED_AGENT_GOAL_UPDATE_FIELDS
+
+    advertised = proposal_json_schema()["$defs"]["StrictGoalUpdateSchema"]["properties"]
+    assert set(advertised) == SUPPORTED_AGENT_GOAL_UPDATE_FIELDS

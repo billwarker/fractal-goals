@@ -36,3 +36,35 @@ describe('scoped activity builder defaults', () => {
         expect(result.current.builderInitialGoalIds).toEqual([]);
     });
 });
+
+describe('scoped activity builder group', () => {
+    const withGroup = { id: 'goal-g', name: 'Head Over Heels', activity_group_id: 'group-1' };
+
+    it("seeds the scoped goal's group for create and copy drafts", () => {
+        const { result } = renderHook(() => useSessionDetailUiState(options));
+        act(() => result.current.handleToggleGoalScope(withGroup));
+        act(() => result.current.handleOpenActivityBuilder(0));
+        expect(result.current.builderInitialGroup).toEqual({ id: 'group-1', goalName: 'Head Over Heels' });
+        act(() => result.current.handleOpenActivityBuilder(0, { _builderKey: 'copy', group_id: 'other' }));
+        expect(result.current.builderInitialGroup).toEqual({ id: 'group-1', goalName: 'Head Over Heels' });
+    });
+
+    it('reads legacy goal payloads that only list group ids', () => {
+        const { result } = renderHook(() => useSessionDetailUiState(options));
+        act(() => result.current.handleToggleGoalScope({ id: 'goal-l', name: 'Legacy', attributes: { associated_activity_group_ids: ['group-2'] } }));
+        act(() => result.current.handleOpenActivityBuilder(0));
+        expect(result.current.builderInitialGroup).toEqual({ id: 'group-2', goalName: 'Legacy' });
+    });
+
+    it('has no group when editing, unscoped, or the scoped goal has none', () => {
+        const { result } = renderHook(() => useSessionDetailUiState(options));
+        act(() => result.current.handleOpenActivityBuilder(0));
+        expect(result.current.builderInitialGroup).toBeNull();
+        act(() => result.current.handleToggleGoalScope(withGroup));
+        act(() => result.current.handleOpenActivityBuilder(0, { id: 'definition' }, { mode: 'edit' }));
+        expect(result.current.builderInitialGroup).toBeNull();
+        act(() => result.current.handleToggleGoalScope(first));
+        act(() => result.current.handleOpenActivityBuilder(0));
+        expect(result.current.builderInitialGroup).toBeNull();
+    });
+});

@@ -153,7 +153,9 @@ class AuthService:
 
         self.db_session.add(new_user)
         self.db_session.flush()
-        AdminService(self.db_session).consume_invite_key(invite, new_user.id)
+        if not AdminService(self.db_session).consume_invite_key(invite, str(new_user.id)):
+            self.db_session.rollback()
+            return None, "Invite key is no longer available", 400
         self.db_session.commit()
         self.db_session.refresh(new_user)
         logger.info("Signed up user_id=%s", new_user.id)
@@ -246,20 +248,29 @@ class AuthService:
 
     def reset_password(self, data) -> ServiceResult[JsonDict]:
         token_hash = self._hash_token(data["token"])
-        reset_token = self.db_session.query(PasswordResetToken).filter_by(token_hash=token_hash).first()
-        if not reset_token or reset_token.used_at is not None:
+        now = utc_now()
+        # Claim the token with one conditional UPDATE before changing anything. A
+        # concurrent reset blocks on the row lock, then sees used_at set and claims
+        # nothing, so a token can change the password at most once.
+        claimed = self.db_session.query(PasswordResetToken).filter(
+            PasswordResetToken.token_hash == token_hash,
+            PasswordResetToken.used_at.is_(None),
+        ).update({"used_at": now}, synchronize_session=False)
+        if claimed != 1:
+            self.db_session.rollback()
             return None, "Invalid or expired reset token", 400
+        reset_token = self.db_session.query(PasswordResetToken).filter_by(token_hash=token_hash).one()
 
         expires_at = reset_token.expires_at
         if expires_at.tzinfo is None:
             expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
-        if expires_at < utc_now():
-            reset_token.used_at = utc_now()
-            self.db_session.commit()
+        if expires_at < now:
+            self.db_session.commit()  # Keep the expired token spent.
             return None, "Invalid or expired reset token", 400
 
         user = self.db_session.get(User, reset_token.user_id)
         if not user or not user.is_active:
+            self.db_session.rollback()
             return None, "Invalid or expired reset token", 400
 
         user.set_password(data["new_password"])
@@ -267,7 +278,6 @@ class AuthService:
         user.locked_until = None
         clear_force_password_change(user)
         revoke_user_sessions(user)
-        reset_token.used_at = utc_now()
         self.db_session.commit()
         logger.info("Password reset completed for user_id=%s", user.id)
         log_ops_event("auth.password_reset_completed", user_id=user.id)

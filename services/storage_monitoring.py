@@ -1,4 +1,4 @@
-"""Keep provider capabilities and OAuth callbacks out of error/trace telemetry."""
+"""Keep provider capabilities, OAuth callbacks, and token-bearing provider URLs out of telemetry."""
 from urllib.parse import urlsplit
 
 
@@ -12,7 +12,8 @@ def private_storage_url(value):
     except ValueError:
         return True
     return ('/storage/' in parsed.path or '/media' in parsed.path
-            or parsed.hostname in ('oauth2.googleapis.com', 'api.dropboxapi.com', 'content.dropboxapi.com')
+            or parsed.hostname in ('oauth2.googleapis.com', 'api.dropboxapi.com', 'content.dropboxapi.com',
+                                   'graph.facebook.com')
             or (parsed.hostname == 'www.googleapis.com' and parsed.path.startswith(('/upload/drive/', '/drive/'))))
 
 

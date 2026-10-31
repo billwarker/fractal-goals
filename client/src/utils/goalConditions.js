@@ -4,7 +4,7 @@
  *
  * Pure view-model helpers shared by the condition editor, goal detail, session panels and
  * landing snapshots. Validation mirrors services/goal_condition_service.py so the editor
- * rejects what the server would reject, with the same wording.
+ * rejects what the server would reject, with the same wording. Wording lives in goalConditionText.js.
  */
 
 import { yieldMetricIds } from './setAggregation';
@@ -28,6 +28,7 @@ export const TOTAL_OPERATORS = ['>=', '>', '<=', '<'];
 export const OPERATOR_SYMBOLS = { '>=': '≥', '>': '>', '<=': '≤', '<': '<', '==': '=' };
 
 const MAX_RULES = 10;
+export const MAX_CONDITION_TAGS = 10;
 const MAX_MIN_SETS = 100;
 const MAX_REQUIRED_COUNT = 10000;
 const MAX_VALUE = 9999999999.9999;
@@ -70,6 +71,17 @@ export function activeMetricDefinitions(activity) {
 export { yieldMetricIds };
 
 /**
+ * Whether an activity logs sets. Activities without sets are one implicit set per session, so
+ * their thresholds never talk about sets. Falls back to the serialized condition's flag.
+ * @param {any} activity
+ * @param {any} [condition]
+ */
+export function activityUsesSets(activity, condition = null) {
+    const flag = activity?.has_sets ?? condition?.activity_has_sets;
+    return flag !== false;
+}
+
+/**
  * A metric whose lower values are better (time, pace) defaults to "at most".
  * @param {any} metric
  */
@@ -95,6 +107,10 @@ export function createConditionDraft(activity, kind = 'single_session') {
         metric_definition_id: firstMetric?.id ?? '',
         operator: inferOperator(firstMetric),
         target_value: '',
+        tag_ids: [],
+        consecutive: false,
+        set_aggregate: 'each',
+        tag_match: 'contains',
         rules: kind === 'consistency' || !firstMetric ? [] : [{
             metric_definition_id: firstMetric.id,
             operator: inferOperator(firstMetric),
@@ -117,6 +133,10 @@ export function conditionToDraft(condition) {
         metric_definition_id: condition.metric_definition_id ?? '',
         operator: condition.operator ?? '>=',
         target_value: asText(condition.target_value),
+        tag_ids: [...(condition.tag_ids || (condition.tags || []).map((/** @type {any} */ tag) => tag.id))],
+        consecutive: Boolean(condition.consecutive),
+        set_aggregate: condition.set_aggregate === 'average' ? 'average' : 'each',
+        tag_match: condition.tag_match === 'exact' ? 'exact' : 'contains',
         rules: (condition.rules || []).map((/** @type {any} */ rule) => ({
             metric_definition_id: rule.metric_definition_id,
             operator: rule.operator ?? '>=',
@@ -139,6 +159,7 @@ export function changeDraftKind(draft, kind, activity) {
         ...draft,
         kind,
         measure,
+        consecutive: kind === 'consistency' ? Boolean(draft.consecutive) : false,
         rules: measure === 'sets' && kind !== 'consistency' && draft.rules.length === 0 ? fresh.rules : draft.rules,
     };
 }
@@ -148,10 +169,26 @@ export function changeDraftKind(draft, kind, activity) {
  * @param {any} activity
  */
 export function changeDraftActivity(draft, activity) {
-    const fresh = { ...createConditionDraft(activity, draft.kind), name: draft.name ?? '' };
+    // Tags belong to the fractal, not the activity, so they survive the switch.
+    const fresh = {
+        ...createConditionDraft(activity, draft.kind),
+        name: draft.name ?? '',
+        tag_ids: draft.tag_ids || [],
+        consecutive: Boolean(draft.consecutive),
+    };
     return draft.measure === 'yield' && yieldMetricIds(activity).length > 0
         ? { ...fresh, measure: 'yield', rules: [] }
         : fresh;
+}
+
+/**
+ * Whether a draft averages each rule across a session's counted sets (rather than every set
+ * meeting the rules on its own). Only sets-meeting-rules thresholds can average.
+ * @param {any} draft
+ */
+export function averagesSets(draft) {
+    return draft?.set_aggregate === 'average' && draft.measure === 'sets'
+        && (draft.kind === 'single_session' || draft.kind === 'consistency');
 }
 
 /** @param {unknown} value */
@@ -183,10 +220,15 @@ export function validateConditionDraft(draft, activity) {
     if ((draft.name || '').trim().length > MAX_CONDITION_NAME_LENGTH) {
         errors.name = `Name must be at most ${MAX_CONDITION_NAME_LENGTH} characters`;
     }
+    if ((draft.tag_ids || []).length > MAX_CONDITION_TAGS) {
+        errors.tags = `Use at most ${MAX_CONDITION_TAGS} tags`;
+    }
     const metricsById = new Map(activeMetricDefinitions(activity).map((/** @type {any} */ metric) => [metric.id, metric]));
     const usesSets = draft.measure === 'sets';
     if (usesSets) {
-        if (draft.kind === 'single_session' && draft.rules.length === 0) errors.rules = 'Add at least one metric rule';
+        const averages = averagesSets(draft);
+        if (averages && !activityUsesSets(activity)) errors.measure = `'${activity.name}' logs no sets to average`;
+        if ((draft.kind === 'single_session' || averages) && draft.rules.length === 0) errors.rules = 'Add at least one metric rule';
         if (draft.rules.length > MAX_RULES) errors.rules = `Use at most ${MAX_RULES} metric rules`;
         const seen = new Set();
         draft.rules.forEach((/** @type {any} */ rule, /** @type {number} */ index) => {
@@ -200,7 +242,8 @@ export function validateConditionDraft(draft, activity) {
             }
             seen.add(rule.metric_definition_id);
         });
-        if (draft.kind === 'single_session' && parseWhole(draft.min_sets, MAX_MIN_SETS) == null) {
+        const countsSets = activityUsesSets(activity) && (draft.kind === 'single_session' || draft.rules.length > 0);
+        if (countsSets && parseWhole(draft.min_sets, MAX_MIN_SETS) == null) {
             errors.min_sets = `Sets must be between 1 and ${MAX_MIN_SETS}`;
         }
         if (draft.kind === 'consistency' && parseWhole(draft.required_count, MAX_REQUIRED_COUNT) == null) {
@@ -224,11 +267,14 @@ export function validateConditionDraft(draft, activity) {
  */
 export function buildConditionPayload(draft) {
     const name = (draft.name || '').trim();
+    const tagIds = [...new Set(draft.tag_ids || [])];
     const base = {
         activity_definition_id: draft.activity_definition_id,
         ...(name ? { name } : {}),
         kind: draft.kind,
         measure: draft.measure,
+        ...(tagIds.length ? { tag_ids: tagIds } : {}),
+        ...(tagIds.length && draft.tag_match === 'exact' ? { tag_match: 'exact' } : {}),
     };
     if (draft.measure === 'sets') {
         return {
@@ -240,6 +286,9 @@ export function buildConditionPayload(draft) {
             })),
             ...(draft.kind === 'single_session' ? { min_sets: Number(draft.min_sets) } : {}),
             ...(draft.kind === 'consistency' ? { required_count: Number(draft.required_count) } : {}),
+            ...(draft.kind === 'consistency' && draft.consecutive ? { consecutive: true } : {}),
+            ...(draft.kind === 'consistency' && draft.rules.length > 0 ? { min_sets: Number(draft.min_sets) } : {}),
+            ...(averagesSets(draft) ? { set_aggregate: 'average' } : {}),
         };
     }
     return {
@@ -250,85 +299,6 @@ export function buildConditionPayload(draft) {
     };
 }
 
-/** @param {unknown} value */
-export function formatConditionNumber(value) {
-    const number = Number(value);
-    if (value == null || value === '' || !Number.isFinite(number)) return '–';
-    return Number.isInteger(number)
-        ? number.toLocaleString()
-        : number.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
-
-/**
- * @param {any} activity
- * @param {string} metricId
- */
-function metricFor(activity, metricId) {
-    return activeMetricDefinitions(activity).find((/** @type {any} */ metric) => metric.id === metricId) || null;
-}
-
-/**
- * @param {{metric_definition_id: string, operator: string, value: unknown, metric_name?: string, unit?: string}} rule
- * @param {any} activity
- */
-export function describeRule(rule, activity) {
-    const metric = metricFor(activity, rule.metric_definition_id);
-    const name = metric?.name ?? rule.metric_name ?? 'Metric';
-    const unit = metric?.unit ?? rule.unit ?? '';
-    const symbol = OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (rule.operator)] ?? rule.operator;
-    return `${name} ${symbol} ${formatConditionNumber(rule.value)}${unit ? ` ${unit}` : ''}`;
-}
-
-/**
- * One readable sentence for a condition, e.g. "Bench Press: 3 sets of Weight ≥ 225 lbs and Reps ≥ 6 in one session".
- * @param {any} condition
- * @param {any} [activity]
- */
-export function describeCondition(condition, activity = null) {
-    if (!condition) return '';
-    const activityName = activity?.name ?? condition.activity_name ?? 'Activity';
-    const rules = (condition.rules || []).map((/** @type {any} */ rule) => describeRule(rule, activity));
-    const ruleText = rules.join(' and ');
-    const symbol = OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (condition.operator)] ?? condition.operator;
-    let detail = '';
-    if (condition.kind === 'single_session' && condition.measure === 'yield') {
-        detail = `total yield ${symbol} ${formatConditionNumber(condition.target_value)} in one session`;
-    } else if (condition.kind === 'single_session') {
-        const sets = Number(condition.min_sets) || 1;
-        detail = `${sets} ${sets === 1 ? 'set' : 'sets'} of ${ruleText || '…'} in one session`;
-    } else if (condition.kind === 'cumulative' && condition.measure === 'yield') {
-        detail = `total yield ${symbol} ${formatConditionNumber(condition.target_value)} across sessions`;
-    } else if (condition.kind === 'cumulative') {
-        const metric = metricFor(activity, condition.metric_definition_id);
-        const name = metric?.name ?? condition.metric_name ?? 'total';
-        const unit = metric?.unit ?? condition.metric_unit ?? '';
-        detail = `${name} ${symbol} ${formatConditionNumber(condition.target_value)}${unit ? ` ${unit}` : ''} in total`;
-    } else if (condition.kind === 'consistency') {
-        const times = Number(condition.required_count) || 1;
-        detail = `${times} ${times === 1 ? 'session' : 'sessions'}${ruleText ? ` with ${ruleText}` : ''}`;
-    }
-    return `${activityName}: ${detail}`;
-}
-
-/**
- * Progress as a short label, e.g. "2 / 3 sets" or "450 / 500".
- * @param {any} progress
- * @param {any} condition
- */
-export function describeProgress(progress, condition) {
-    if (!progress) return '';
-    if (progress.completion_condition === 'children') {
-        const children = progress.children || { completed: 0, total: 0 };
-        return `${children.completed} / ${children.total} child goals`;
-    }
-    if (!condition || progress.current == null) return '';
-    const current = formatConditionNumber(progress.current);
-    const required = formatConditionNumber(progress.required);
-    if (condition.kind === 'single_session' && condition.measure === 'sets') return `${current} / ${required} sets`;
-    if (condition.kind === 'consistency') return `${current} / ${required} sessions`;
-    return `${current} / ${required}`;
-}
-
 /**
  * Fraction in [0, 1] from a progress payload.
  * @param {any} progress
@@ -337,20 +307,6 @@ export function progressFraction(progress) {
     const value = Number(progress?.progress);
     if (!Number.isFinite(value)) return 0;
     return Math.max(0, Math.min(1, value));
-}
-
-/**
- * How a completed goal got there, for completion views and badges.
- * @param {string | null | undefined} source
- */
-export function describeCompletionSource(source) {
-    switch (source) {
-        case 'condition': return 'Condition met';
-        case 'children': return 'All child goals complete';
-        case 'manual_override': return 'Completed manually (override)';
-        case 'manual': return 'Completed manually';
-        default: return '';
-    }
 }
 
 /**

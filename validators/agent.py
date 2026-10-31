@@ -94,17 +94,36 @@ class StrictGoalCreateSchema(GoalCreateSchema):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
 
 
+# Goal fields reviewed agent updates may change. The same set prunes the advertised
+# JSON schema, so agents (and the pinned adapter artifact) never see a field the
+# validator would refuse, and a new GoalUpdateSchema field stays unexposed until reviewed.
+SUPPORTED_AGENT_GOAL_UPDATE_FIELDS = frozenset({
+    "name", "description", "deadline", "started_at", "parent_id",
+    "completion_condition", "condition",
+    "inherit_parent_activities", "track_activities", "progress_settings",
+    "review_cadence_value", "review_cadence_unit", "review_disabled",
+})
+
+
+def _advertise_supported_goal_update_fields(schema, _model):
+    schema["properties"] = {
+        name: field for name, field in schema.get("properties", {}).items()
+        if name in SUPPORTED_AGENT_GOAL_UPDATE_FIELDS
+    }
+    if "required" in schema:
+        schema["required"] = [name for name in schema["required"] if name in SUPPORTED_AGENT_GOAL_UPDATE_FIELDS]
+
+
 class StrictGoalUpdateSchema(GoalUpdateSchema):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+        json_schema_extra=_advertise_supported_goal_update_fields,
+    )
 
     @model_validator(mode="after")
     def only_supported_goal_fields(self):
-        unsupported = self.model_fields_set - {
-            "name", "description", "deadline", "started_at", "parent_id",
-            "completion_condition", "condition",
-            "inherit_parent_activities", "track_activities", "progress_settings",
-            "review_cadence_value", "review_cadence_unit", "review_disabled",
-        }
+        unsupported = self.model_fields_set - SUPPORTED_AGENT_GOAL_UPDATE_FIELDS
         if unsupported:
             raise ValueError("These goal fields are not supported by reviewed updates: " + ", ".join(sorted(unsupported)))
         return self

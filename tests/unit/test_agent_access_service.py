@@ -18,9 +18,8 @@ def _pkce_challenge(verifier):
     return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
-def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
-    client, auth_headers, db_session, test_user, sample_ultimate_goal, monkeypatch,
-):
+def _connector_authorization_params(client, db_session, test_user, monkeypatch, *, challenge_method="S256"):
+    """Enable connectors and register one; return its authorization request and PKCE verifier."""
     resource = "https://mcp.example.test/mcp"
     issuer = "https://app.example.test"
     monkeypatch.setattr(config, "AGENT_MCP_RESOURCE_URI", resource)
@@ -54,9 +53,16 @@ def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
         "scope": "goals:read notes:write",
         "state": "state-123",
         "code_challenge": challenge,
-        "code_challenge_method": "S256",
+        "code_challenge_method": challenge_method,
         "resource": resource,
     }
+    return authorization_params, verifier
+
+
+def _authorize_connector(client, auth_headers, db_session, test_user, root, monkeypatch):
+    """Register a connector and approve consent; return the client id, code, verifier, and params."""
+    authorization_params, verifier = _connector_authorization_params(client, db_session, test_user, monkeypatch)
+    oauth_client_id = authorization_params["client_id"]
     authorize_url = f"/api/agent/oauth/authorize?{urlencode(authorization_params)}"
     consent = client.get(authorize_url, headers=auth_headers)
     assert consent.status_code == 200
@@ -70,7 +76,7 @@ def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
         **authorization_params,
         "csrf_token": csrf,
         "decision": "allow",
-        "root_ids": [sample_ultimate_goal.id],
+        "root_ids": [root.id],
         "scopes": ["goals:read", "notes:write"],
     }, headers=browser_form_headers)
     assert authorization.status_code == 302
@@ -78,7 +84,18 @@ def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
     callback_query = parse_qs(callback.query)
     code = callback_query["code"][0]
     assert callback_query["state"] == ["state-123"]
-    assert callback_query["iss"] == [issuer]
+    assert callback_query["iss"] == [config.AGENT_OAUTH_ISSUER]
+
+    return oauth_client_id, code, verifier, authorization_params
+
+
+def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
+    client, auth_headers, db_session, test_user, sample_ultimate_goal, monkeypatch,
+):
+    resource = "https://mcp.example.test/mcp"
+    oauth_client_id, code, verifier, authorization_params = _authorize_connector(
+        client, auth_headers, db_session, test_user, sample_ultimate_goal, monkeypatch,
+    )
 
     tokens = client.post("/api/agent/oauth/token", data={
         "grant_type": "authorization_code",
@@ -129,6 +146,41 @@ def test_oauth_code_pkce_exchange_refresh_rotation_and_revocation(
     assert db_session.query(AgentCredential).filter_by(grant_id=grant.id, revoked_at=None).count() == 0
     assert db_session.query(AgentOAuthClient).filter_by(client_id=oauth_client_id).count() == 1
     assert credential_count == 4
+
+
+@pytest.mark.parametrize("verifier_override", ["g" * 43, None])
+def test_oauth_code_exchange_rejects_a_wrong_or_missing_pkce_verifier(
+    client, auth_headers, db_session, test_user, sample_ultimate_goal, monkeypatch, verifier_override,
+):
+    oauth_client_id, code, _verifier, authorization_params = _authorize_connector(
+        client, auth_headers, db_session, test_user, sample_ultimate_goal, monkeypatch,
+    )
+    data = {
+        "grant_type": "authorization_code",
+        "client_id": oauth_client_id,
+        "code": code,
+        "redirect_uri": authorization_params["redirect_uri"],
+    }
+    if verifier_override is not None:
+        data["code_verifier"] = verifier_override
+
+    response = client.post("/api/agent/oauth/token", data=data)
+
+    assert response.status_code == 400
+    assert "access_token" not in (response.json or {})
+    assert db_session.query(AgentCredential).count() == 0
+
+
+def test_oauth_authorization_refuses_plain_pkce(client, auth_headers, db_session, test_user, monkeypatch):
+    authorization_params, _verifier = _connector_authorization_params(
+        client, db_session, test_user, monkeypatch, challenge_method="plain",
+    )
+
+    consent = client.get(f"/api/agent/oauth/authorize?{urlencode(authorization_params)}", headers=auth_headers)
+
+    assert consent.status_code == 400
+    assert "PKCE S256 is required" in consent.get_data(as_text=True)
+    assert db_session.query(AgentAuthorizationCode).count() == 0
 
 
 def test_client_registration_rejects_untrusted_redirect_uri(db_session):

@@ -13,7 +13,9 @@ export default function InstanceGoalLinkControl({ rootId, sessionId, instance, s
     if (!scope?.goal?.id) return null;
     const goalId = String(scope.goal.id);
     const linked = (instance.associated_goal_ids || []).map(String).includes(goalId);
-    const broaderLink = (scope.activityIds || []).includes(String(instance.activity_definition_id));
+    const definitionId = String(instance.activity_definition_id);
+    // One-off-only ids widen the picker but are not definition or group links.
+    const broaderLink = (scope.activityIds || []).includes(definitionId) && !scope.instanceLinkedIds?.has(definitionId);
     const actionLabel = linked ? `Remove instance association with ${scope.goal.name}` : `Associate with ${scope.goal.name}`;
     const tooltip = `${actionLabel}. This instance only.${broaderLink ? ' Definition or group links also apply; removing this link preserves them.' : ''}`;
     const presentation = scope.goal.scopePresentation;

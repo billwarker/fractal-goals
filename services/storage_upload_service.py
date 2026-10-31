@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from models import MediaAsset, StorageConnection, StorageUpload
 from services import storage_providers as provider_api
 from services.media_service import MediaService
-from services.storage_common import CHUNK_BYTES, StorageError, seal, serialize_asset, unseal, validate_file, verify_signature
+from services.storage_common import CHUNK_BYTES, StorageError, canonical_media_type, seal, serialize_asset, unseal, validate_file, verify_signature
 from services.storage_connection_service import StorageConnectionService
 
 
@@ -22,7 +22,7 @@ class StorageUploadService:
 
     def start(self, root_id, user_id, provider, name, mime_type, size):
         self.media.owned_root(root_id, user_id)
-        validate_file(name, mime_type, size)
+        mime_type = validate_file(name, mime_type, size)
         if len(name) > 180:
             raise StorageError('Use a file name shorter than 181 characters')
         connection = self.connections.connection(user_id, provider)
@@ -93,7 +93,7 @@ class StorageUploadService:
 
     def finish(self, row, user_id, provider, token, file_id):
         data = provider_api.metadata(provider, token, file_id)
-        if data['size_bytes'] != row.size_bytes or data['mime_type'] != row.mime_type:
+        if data['size_bytes'] != row.size_bytes or canonical_media_type(data['mime_type'], row.name) != row.mime_type:
             raise StorageError('Uploaded file metadata does not match. Check the original in your storage.', 409)
         asset = self.media.store_asset(row.root_id, row.connection_id, data)
         row.asset_id, row.offset = asset.id, row.size_bytes

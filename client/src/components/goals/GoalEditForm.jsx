@@ -85,7 +85,7 @@ function GoalEditForm({
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
                                 onPaste={descriptionAttachments.handlePaste}
-                                placeholder="Write your goal's description here. Optionally attach pictures or video with the paperclip, or paste or drop them in."
+                                placeholder="Write your goal's description here. Optionally attach pictures, video or audio with the paperclip, or paste or drop them in."
                                 rows={3}
                                 className={styles.textarea}
                             />
@@ -177,6 +177,8 @@ function GoalEditForm({
                     goalName={name}
                     canCompleteViaChildren={canCompleteViaChildren}
                     errors={conditionErrors}
+                    rootId={rootId}
+                    goalId={mode === 'create' ? null : (goal?.id ?? goal?.attributes?.id ?? null)}
                 />
             </div>
 

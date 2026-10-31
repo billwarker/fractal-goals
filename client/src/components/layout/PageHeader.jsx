@@ -11,6 +11,9 @@ function PageHeader({
     titleAccessory = null,
     style,
     compactMobileContext = false,
+    // Keep the action group on one row and let the title wrap instead, for pages whose
+    // title grows with loaded data (e.g. program • block • date).
+    singleRowActions = false,
 }) {
     const isMobile = useIsMobile();
     const hideHeaderCopyVisually = isMobile && hideTitleOnMobile;
@@ -33,7 +36,11 @@ function PageHeader({
             </div>
 
             {actions ? (
-                <div className={`${styles.headerActions} ${isMobile ? styles.headerActionsMobile : ''}`.trim()}>
+                <div className={[
+                    styles.headerActions,
+                    isMobile ? styles.headerActionsMobile : '',
+                    singleRowActions && !isMobile ? styles.headerActionsSingleRow : '',
+                ].filter(Boolean).join(' ')}>
                     {actions}
                 </div>
             ) : null}

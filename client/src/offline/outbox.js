@@ -25,6 +25,9 @@ import { OP_STATE } from './opKinds';
 
 export { OP_STATE };
 
+/** @typedef {import('./outboxTypes').OutboxOp} OutboxOp */
+
+/** @param {import('./outboxTypes').OutboxOptions} [options] `store` and `send` are required (checked below). */
 export function createOutbox({
     store,
     send,
@@ -219,7 +222,7 @@ export function createOutbox({
             }
             drainStats.ops += 1;
             drainStats.retries += op.attempts || 0;
-            drainStats.maxAgeMs = Math.max(drainStats.maxAgeMs, now() - Date.parse(op.createdAt || 0));
+            drainStats.maxAgeMs = Math.max(drainStats.maxAgeMs, now() - Date.parse(op.createdAt || ''));
             if (!ops.some((entry) => entry.state === OP_STATE.PENDING)) {
                 safeEmit('drained', {
                     ops: drainStats.ops,
@@ -355,7 +358,12 @@ export function createOutbox({
     async function retry(opId) {
         const op = (await store.getAll()).find((entry) => entry.opId === opId);
         if (!op) return;
-        await store.put({ ...op, state: OP_STATE.PENDING, error: null, attempts: 0, nextAttemptAt: 0 });
+        // A manual retry is a fresh start: the give-up budget counts from now, not from
+        // the failures that led to the rejection.
+        await store.put({
+            ...op, state: OP_STATE.PENDING, error: null, lastError: null,
+            attempts: 0, nextAttemptAt: 0, serverFailures: 0, firstServerFailureAt: undefined,
+        });
         announce({ type: 'changed' });
         await refresh();
         void flush();
@@ -393,7 +401,7 @@ export function createOutbox({
 
     const expireRejected = async () => {
         const expired = (await store.getAll()).filter((op) => (
-            op.state === OP_STATE.REJECTED && now() - (op.rejectedAt || Date.parse(op.createdAt || 0)) >= REJECTED_TTL_MS
+            op.state === OP_STATE.REJECTED && now() - (op.rejectedAt || Date.parse(op.createdAt || '')) >= REJECTED_TTL_MS
         ));
         for (const op of expired) await store.delete(op.opId);
         if (expired.length) {

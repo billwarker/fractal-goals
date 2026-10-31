@@ -62,6 +62,7 @@ function SessionDetailContent() {
         showBuilder,
         builderActivity,
         builderInitialGoalIds,
+        builderInitialGroup,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,
@@ -189,6 +190,7 @@ function SessionDetailContent() {
                     showBuilder={showBuilder}
                     builderActivity={builderActivity}
                 builderInitialGoalIds={builderInitialGoalIds}
+                builderInitialGroup={builderInitialGroup}
                     onCloseBuilder={handleCloseActivityBuilder}
                     onActivityCreated={handleActivityCreated}
                     selectedGoal={selectedGoal}
@@ -294,6 +296,7 @@ function SessionDetailContent() {
                 showBuilder={showBuilder}
                 builderActivity={builderActivity}
                 builderInitialGoalIds={builderInitialGoalIds}
+                builderInitialGroup={builderInitialGroup}
                 onCloseBuilder={handleCloseActivityBuilder}
                 onActivityCreated={handleActivityCreated}
                 selectedGoal={selectedGoal}

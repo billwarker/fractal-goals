@@ -30,16 +30,17 @@ RAW_SQL_TIMEOUT_MS = 5000
 RAW_SQL_MAX_LENGTH = 20000
 
 
+# Output budgets. Row limits and timeouts bound rows and time, not bytes: one value
+# (e.g. string_agg over generate_series) can be arbitrarily large.
+MAX_RESULT_ROW_BYTES = 64 * 1024
+MAX_RESULT_BYTES = 4 * 1024 * 1024
+
+
 READ_ONLY_SQL_RE = re.compile(r"^\s*(select|with)\b", re.IGNORECASE)
 
 
-DANGEROUS_SQL_RE = re.compile(
-    r"\b(insert|update|delete|truncate|alter|drop|create|grant|revoke|copy|vacuum|call|do|merge|refresh|reindex|cluster|listen|notify|set|reset|commit|rollback|savepoint)\b",
-    re.IGNORECASE,
-)
-
-
-SCHEMA_BYPASS_RE = re.compile(r"\b(public|pg_catalog|information_schema)\s*\.", re.IGNORECASE)
+# Structured queries compile from the governed catalog, so this bounds cost rather than access.
+STRUCTURED_QUERY_TIMEOUT_MS = 10000
 
 
 @dataclass(frozen=True)

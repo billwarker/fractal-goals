@@ -131,32 +131,56 @@ class _ProgressInstancesMixin:
             column('scope_program_day_id', String),
             name='progress_requests',
         ).data([tuple(request) for request in requests])
+        # Every lookup is a fenced primary-key probe keyed by the outer row, with deletion
+        # checks applied outside the fence. Inside it, a non-key predicate such as
+        # deleted_at lets a planner with stale statistics pick that index and filter by key,
+        # rescanning every session per row (5 s instead of 0.2 s after bulk churn).
+        target_instance = (
+            select(ActivityInstance.id, ActivityInstance.session_id, ActivityInstance.activity_definition_id,
+                   ActivityInstance.deleted_at, ActivityInstance.time_stop, ActivityInstance.created_at)
+            .where(ActivityInstance.id == request_rows.c.target_id)
+            .limit(1)
+            .lateral('progress_target_instance')
+        )
+        target_session = (
+            select(Session.session_start, Session.deleted_at)
+            .where(Session.id == target_instance.c.session_id)
+            .limit(1)
+            .lateral('progress_target_session')
+        )
         targets = (
-            self._active_instance_identity_query()
-            .join(request_rows, request_rows.c.target_id == ActivityInstance.id)
-            .add_columns(
-                ActivityInstance.activity_definition_id,
+            select(
+                target_instance.c.id,
+                target_instance.c.session_id,
+                func.coalesce(
+                    target_instance.c.time_stop, target_session.c.session_start, target_instance.c.created_at,
+                ).label('effective_time'),
+                target_instance.c.activity_definition_id,
                 request_rows.c.request_key,
                 request_rows.c.compare_signature,
                 request_rows.c.set_signature,
                 request_rows.c.scope_template_id,
                 request_rows.c.scope_program_day_id,
             )
+            .select_from(request_rows)
+            .join(target_instance, true())
+            .join(target_session, true())
+            .where(target_instance.c.deleted_at.is_(None), target_session.c.deleted_at.is_(None))
             .subquery('progress_targets')
         )
         # Candidates start from the target activity's own instances (indexed) and look their
-        # session up by key. The LATERAL ... OFFSET 0 keeps Postgres from flattening the join and
-        # starting from every session instead, which the optional scope filters invite.
+        # session up by primary key.
         candidate = aliased(ActivityInstance, name='candidate')
         candidate_session = (
-            select(Session.session_start, Session.template_id, Session.program_day_id)
-            .where(Session.id == candidate.session_id, Session.deleted_at.is_(None))
-            .offset(0)
+            select(Session.session_start, Session.template_id, Session.program_day_id, Session.deleted_at)
+            .where(Session.id == candidate.session_id)
+            .limit(1)
             .lateral('candidate_session')
         )
         candidate_time = func.coalesce(candidate.time_stop, candidate_session.c.session_start, candidate.created_at)
         earlier = select(candidate.id).select_from(candidate).join(candidate_session, true()).where(
             candidate.deleted_at.is_(None),
+            candidate_session.c.deleted_at.is_(None),
             candidate.activity_definition_id == targets.c.activity_definition_id,
             candidate.session_id != targets.c.session_id,
             *([candidate.session_id != exclude_session_id] if exclude_session_id else []),

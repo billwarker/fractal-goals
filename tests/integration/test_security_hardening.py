@@ -10,6 +10,7 @@ from tests.conftest import TEST_PROXY_SECRET
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+STRONG_JWT_SECRET = "Zq7vR2kLm9Xc4Tn8Bw1Hy6Pd3Fs5Gj0Ae2Ku"
 
 
 def test_oversized_json_payload_is_rejected(client):
@@ -58,7 +59,7 @@ def test_cloudbuild_does_not_bake_cross_site_api_url_into_frontend():
 
 def test_production_security_accepts_explicit_single_worker_private_beta(monkeypatch):
     monkeypatch.setattr(Config, 'ENV', 'production')
-    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', 'test-secret')
+    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', STRONG_JWT_SECRET)
     monkeypatch.setattr(Config, 'DEBUG', False)
     monkeypatch.setattr(Config, 'CORS_ORIGINS', ['https://my.fractalgoals.com'])
     monkeypatch.setattr(Config, 'AUTH_COOKIE_SECURE', True)
@@ -74,7 +75,7 @@ def test_production_security_accepts_explicit_single_worker_private_beta(monkeyp
 
 def _private_beta_production(monkeypatch):
     monkeypatch.setattr(Config, 'ENV', 'production')
-    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', 'test-secret')
+    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', STRONG_JWT_SECRET)
     monkeypatch.setattr(Config, 'DEBUG', False)
     monkeypatch.setattr(Config, 'CORS_ORIGINS', ['https://my.fractalgoals.com'])
     monkeypatch.setattr(Config, 'AUTH_COOKIE_SECURE', True)
@@ -102,6 +103,29 @@ def test_production_security_requires_strong_trusted_proxy_secret(monkeypatch, s
 
     with pytest.raises(ValueError, match='TRUSTED_PROXY_SECRET'):
         Config.check_production_security()
+
+
+@pytest.mark.parametrize('secret', [
+    '',
+    'x',
+    STRONG_JWT_SECRET[:31],
+    'a' * 64,
+    'default-jwt-secret-keep-it-safe',
+    'change-this-to-a-secure-random-string',
+])
+def test_production_security_rejects_weak_jwt_secret(monkeypatch, secret):
+    _private_beta_production(monkeypatch)
+    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', secret)
+
+    with pytest.raises(ValueError, match='JWT_SECRET_KEY'):
+        Config.check_production_security()
+
+
+def test_production_security_accepts_minimum_length_generated_jwt_secret(monkeypatch):
+    _private_beta_production(monkeypatch)
+    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', STRONG_JWT_SECRET[:32])
+
+    Config.check_production_security()
 
 
 def test_production_security_accepts_minimum_length_proxy_secret(monkeypatch):
@@ -146,7 +170,7 @@ def test_forged_forwarded_chain_without_proxy_token_shares_the_connection_bucket
 
 def test_production_security_rejects_multi_worker_memory_limiter(monkeypatch):
     monkeypatch.setattr(Config, 'ENV', 'production')
-    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', 'test-secret')
+    monkeypatch.setattr(Config, 'JWT_SECRET_KEY', STRONG_JWT_SECRET)
     monkeypatch.setattr(Config, 'DEBUG', False)
     monkeypatch.setattr(Config, 'CORS_ORIGINS', ['https://my.fractalgoals.com'])
     monkeypatch.setattr(Config, 'AUTH_COOKIE_SECURE', True)

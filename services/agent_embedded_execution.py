@@ -4,6 +4,7 @@ import datetime as dt
 import json
 import logging
 import time
+from typing import TYPE_CHECKING, cast
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_
@@ -17,6 +18,10 @@ from services.agent_harness_service import AgentHarnessService
 from services.agent_operation_registry import proposal_json_schema
 from services.feature_flag_service import FeatureFlagService
 from validators.agent import AgentProposalSchema
+
+if TYPE_CHECKING:
+    from anthropic.types import MessageParam, ToolUnionParam as AnthropicToolUnionParam
+    from openai.types.responses import ResponseInputParam, ToolParam as OpenAIToolParam
 
 
 logger = logging.getLogger(__name__)
@@ -271,9 +276,10 @@ class AgentEmbeddedExecutionMixin:
                     try:
                         response = client.responses.create(
                             model=conversation.model,
-                            input=input_items,
+                            # Built from the canonical proposal schema as plain JSON dicts.
+                            input=cast("ResponseInputParam", input_items),
                             instructions=instructions,
-                            tools=tools,
+                            tools=cast("list[OpenAIToolParam]", tools),
                             max_output_tokens=reservation["max_output_tokens"],
                             parallel_tool_calls=False,
                             store=False,
@@ -396,8 +402,9 @@ class AgentEmbeddedExecutionMixin:
                             model=conversation.model,
                             max_tokens=reservation["max_output_tokens"],
                             system=instructions,
-                            tools=tools,
-                            messages=messages,
+                            # Built from the canonical proposal schema as plain JSON dicts.
+                            tools=cast("list[AnthropicToolUnionParam]", tools),
+                            messages=cast("list[MessageParam]", messages),
                         )
                     except anthropic.APIError as error:
                         self._mark_provider_call_ambiguous(
