@@ -1,12 +1,23 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Scatter } from 'react-chartjs-2';
+import { GROUP_DIMENSION_LABELS, instanceGroups, setGroups } from '../../utils/analyticsGroupBy';
 import { goalLineAnnotations } from '../../utils/goalConditionLines';
 import { topSetPoint } from '../../utils/setAggregation';
 import { applyChartDensity, useChartDensity, useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
 import CompactChartFrame from './CompactChartFrame';
 import { withScatterPointDensity } from './scatterPointProfile';
+import { buildSeries, seriesColor } from './series/buildSeries';
+import ChartLegendPanel from './series/ChartLegendPanel';
 import useActiveChartPoint from './useActiveChartPoint';
+import layout from './visualizations/shared/BucketBarChart.module.css';
 import styles from './ScatterPlot.module.css';
+
+const SEVERAL = { key: '__several__', label: 'Several tags' };
+
+/** A point's one group; a point in several (several tags of a multi-select family) gets "Several tags". */
+function pointGroup(groups) {
+    return groups.length === 1 ? groups[0] : SEVERAL;
+}
 
 /**
  * Scatter Plot component for visualizing activity metrics
@@ -47,7 +58,10 @@ function ScatterPlot({
     highlightInstanceId = null,
     hoverInstanceId = null,
     hideTitle = false,
+    groupBy = null,
+    lookups = null,
 }) {
+    const [hiddenGroups, setHiddenGroups] = useState(() => new Set());
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
     const activityDef = selectedActivity ? activities.find(a => a.id === selectedActivity.id) : null;
@@ -128,12 +142,16 @@ function ScatterPlot({
             session_date: instance.session_date,
             tag_label: tagNames,
         };
+        const groupLookups = { session: lookups?.sessionsById.get(instance.session_id) };
+        if (groupBy) basePoint.group = pointGroup(instanceGroups(instance, groupBy, groupLookups));
 
         // For activities with sets
         if (instance.has_sets && instance.sets) {
             const allSets = [];
             instance.sets.forEach((set, setIdx) => {
                 const setPoint = { ...basePoint, set_number: setIdx + 1 };
+                // A set's effective tags are its own plus its instance's.
+                if (groupBy) setPoint.group = pointGroup(setGroups(set, instance, groupBy, groupLookups));
                 if (set.metrics) {
                     set.metrics.forEach(m => {
                         // Filter by split if applicable
@@ -219,8 +237,25 @@ function ScatterPlot({
         );
     }
 
+    // Group colours follow the series rules: stable slots, eight groups plus "Other".
+    const groupSeries = groupBy ? buildSeries({
+        entities: [...new Map(dataPoints.map((point) => [point.group.key, point.group])).values()]
+            .sort((left, right) => left.label.localeCompare(right.label)),
+        rows: dataPoints.map((point) => ({ key: point.group.key, bucket: 'all', value: 1 })),
+        buckets: ['all'],
+    }).series : null;
+    const colorByGroup = new Map();
+    (groupSeries || []).forEach((item) => {
+        const color = seriesColor(item, chartTheme);
+        if (item.folded) item.folded.forEach((entity) => colorByGroup.set(entity.key, color));
+        else colorByGroup.set(item.key, color);
+    });
+    const hiddenPoint = (point) => groupBy && [...hiddenGroups].some((key) => (
+        key === point.group.key || (groupSeries.find((item) => item.key === key)?.folded || []).some((entity) => entity.key === point.group.key)
+    ));
+
     // Prepare chart data
-    const chartDataPoints = withScatterPointDensity(dataPoints.map(p => ({
+    const chartDataPoints = withScatterPointDensity(dataPoints.filter((point) => !hiddenPoint(point)).map(p => ({
         instance_id: p.instance_id,
         x: p[xMetricToPlot.id],
         y: p[yMetricToPlot.id],
@@ -229,6 +264,7 @@ function ScatterPlot({
         aggregation: p.aggregation,
         set_number: p.set_number,
         tag_label: p.tag_label,
+        group: p.group,
     })), density === 'compact' ? COMPACT_POINT_PROFILE : undefined);
 
     const chartData = {
@@ -238,7 +274,9 @@ function ScatterPlot({
             metricX: xMetricToPlot?.id,
             metricY: yMetricToPlot?.id,
             data: chartDataPoints,
-            backgroundColor: 'rgba(33, 150, 243, 0.7)',
+            backgroundColor: groupBy
+                ? chartDataPoints.map((point) => `${colorByGroup.get(point.group.key) || chartTheme.otherSeriesColor}cc`)
+                : `${chartTheme.seriesColors[0]}b3`,
             borderColor: chartTheme.borderColor,
             borderWidth: 1,
             // The highlighted instance (e.g. the session being edited) stands out.
@@ -288,6 +326,7 @@ function ScatterPlot({
                             lines.push(`${point.densityCount} entries at this point`);
                         }
 
+                        if (point.group) lines.push(`${GROUP_DIMENSION_LABELS[groupBy.dimension]}: ${point.group.label}`);
                         if (point.tag_label) {
                             lines.push(`Tags: ${point.tag_label}`);
                         }
@@ -303,19 +342,39 @@ function ScatterPlot({
     const caption = density === 'compact'
         ? `${yMetricToPlot.name} vs ${xMetricToPlot.name} · ${sessions} session${sessions === 1 ? '' : 's'}`
         : null;
+    const canvas = (
+        <CompactChartFrame caption={caption}>
+            <ScatterCanvas
+                chartRef={chartRef}
+                data={chartData}
+                options={applyChartDensity(options, density)}
+                hoverInstanceId={hoverInstanceId}
+                compact={density === 'compact'}
+            />
+        </CompactChartFrame>
+    );
+    if (groupSeries) {
+        return (
+            <div className={layout.root}>
+                <div className={density === 'compact' ? layout.bodyCompact : layout.body}>
+                    <div className={layout.chart}>{canvas}</div>
+                    <ChartLegendPanel
+                        series={groupSeries}
+                        colorOf={(item) => seriesColor(item, chartTheme)}
+                        formatValue={(count) => `${count} ${count === 1 ? 'point' : 'points'}`}
+                        hiddenKeys={hiddenGroups}
+                        onHiddenKeysChange={setHiddenGroups}
+                        onHoverKeyChange={() => {}}
+                        compact={density === 'compact'}
+                        title={GROUP_DIMENSION_LABELS[groupBy.dimension]}
+                    />
+                </div>
+            </div>
+        );
+    }
     return (
         <div className={styles.mainContainer}>
-            <div className={styles.chartContainer}>
-                <CompactChartFrame caption={caption}>
-                    <ScatterCanvas
-                        chartRef={chartRef}
-                        data={chartData}
-                        options={applyChartDensity(options, density)}
-                        hoverInstanceId={hoverInstanceId}
-                        compact={density === 'compact'}
-                    />
-                </CompactChartFrame>
-            </div>
+            <div className={styles.chartContainer}>{canvas}</div>
         </div>
     );
 }

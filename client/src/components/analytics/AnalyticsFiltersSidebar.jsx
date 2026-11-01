@@ -218,6 +218,7 @@ function AnalyticsFiltersSidebar({
             {SelectedControls && (
                 <SelectedControls
                     context={{
+                        rootId,
                         metricDefinitions,
                         metricOptions,
                         onOpenActivityModal: () => setIsProfileActivityModalOpen(true),

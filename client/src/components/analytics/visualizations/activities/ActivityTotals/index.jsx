@@ -1,10 +1,13 @@
 import React from 'react';
 
-import ActivityTotalsChart from './ActivityTotalsChart';
+import GroupByControl from '../../shared/GroupByControl';
+import useGroupLookups from '../../shared/useGroupLookups';
+import ActivityTotalsChart, { ACTIVITY_TOTALS_GROUPS } from './ActivityTotalsChart';
 import ActivityTotalsControls from './ActivityTotalsControls';
 import styles from '../../../ProfileWindow.module.css';
 
 function ActivityTotalsVisualizationChart({ context }) {
+    const { groupBy, lookups, overlap } = useGroupLookups(context, ACTIVITY_TOTALS_GROUPS);
     return (
         <div className={styles.vizContainerHidden}>
             <ActivityTotalsChart
@@ -15,6 +18,9 @@ function ActivityTotalsVisualizationChart({ context }) {
                 activityGroups={context.data.activityGroups}
                 showGroupNames={Boolean(context.visualizationState.showGroups)}
                 limit={context.visualizationState.limit || 15}
+                groupBy={groupBy}
+                lookups={lookups}
+                overlap={overlap}
             />
         </div>
     );
@@ -22,10 +28,13 @@ function ActivityTotalsVisualizationChart({ context }) {
 
 function ActivityTotalsVisualizationControls({ context }) {
     return (
-        <ActivityTotalsControls
-            visualizationState={context.visualizationState}
-            updateVisualizationState={context.updateVisualizationState}
-        />
+        <>
+            <ActivityTotalsControls
+                visualizationState={context.visualizationState}
+                updateVisualizationState={context.updateVisualizationState}
+            />
+            <GroupByControl context={context} dimensions={ACTIVITY_TOTALS_GROUPS} />
+        </>
     );
 }
 

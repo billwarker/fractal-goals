@@ -1,8 +1,12 @@
 import React, { useMemo } from 'react';
 
-import { bucketRows, localDayKey } from '../../../../utils/chartGrain';
+import { GROUP_DIMENSION_LABELS, instanceGroups } from '../../../../utils/analyticsGroupBy';
+import { bucketRows, groupedBucketRows, localDayKey } from '../../../../utils/chartGrain';
 import BucketBarChart, { MeasureControl } from '../shared/BucketBarChart';
 import GrainControl from '../shared/GrainControl';
+import GroupByControl from '../shared/GroupByControl';
+
+export const ACTIVITY_TREND_GROUPS = ['activity', 'activityGroup', 'tag', 'template', 'programDay'];
 
 const MEASURE_OPTIONS = [
     { value: 'instances', label: 'Times done' },
@@ -35,7 +39,12 @@ export function activityTrendMeasure(state = {}) {
     return Array.isArray(state.metrics) && state.metrics[0] === 'duration' ? 'duration' : 'instances';
 }
 
-const completedInstances = (activityInstances) => Object.values(activityInstances).flat().filter(isCompletedActivityInstance);
+/** Completed instances with the activity each belongs to (the map is keyed by activity id). */
+const completedItems = (activityInstances) => Object.entries(activityInstances).flatMap(([activityId, instances]) => (
+    (instances || []).filter(isCompletedActivityInstance).map((instance) => ({ instance, activityId }))
+));
+const itemDay = ({ instance }) => getActivityInstanceDay(instance);
+const itemSeconds = ({ instance }) => instance.duration_seconds || 0;
 
 /**
  * Completed activity instances and their time per calendar bucket across the range (or the dated
@@ -43,16 +52,34 @@ const completedInstances = (activityInstances) => Object.values(activityInstance
  * @returns {{ grain: 'day' | 'week' | 'month', rows: Array<{ key: string, instances: number, durationSeconds: number }> }}
  */
 export function getActivityTrendRows(activityInstances = {}, { grain = 'auto', range = null } = {}) {
-    const result = bucketRows(completedInstances(activityInstances), {
-        dayOf: getActivityInstanceDay, secondsOf: (instance) => instance.duration_seconds || 0, grain, range,
-    });
+    const result = bucketRows(completedItems(activityInstances), { dayOf: itemDay, secondsOf: itemSeconds, grain, range });
     return { grain: result.grain, rows: result.rows.map((row) => ({ key: row.key, instances: row.count, durationSeconds: row.seconds })) };
 }
 
-export function ActivityTrendsChart({ activityInstances = {}, chartRef, grain = 'auto', measure = 'instances', range = null }) {
-    const result = useMemo(() => bucketRows(completedInstances(activityInstances), {
-        dayOf: getActivityInstanceDay, secondsOf: (instance) => instance.duration_seconds || 0, grain, range,
-    }), [activityInstances, grain, range]);
+/**
+ * @param {{ activityInstances?: object, chartRef?: any, grain?: string, measure?: string, range?: any,
+ *   groupBy?: import('../../../../utils/analyticsGroupBy').GroupBy | null, overlap?: boolean,
+ *   lookups?: { activitiesById: Map<string, any>, groupsById: Map<string, any>, sessionsById: Map<string, any> } }} props
+ */
+export function ActivityTrendsChart({
+    activityInstances = {}, chartRef, grain = 'auto', measure = 'instances', range = null, groupBy = null, overlap = false, lookups = null,
+}) {
+    const result = useMemo(() => {
+        const items = completedItems(activityInstances);
+        if (!groupBy) return { ...bucketRows(items, { dayOf: itemDay, secondsOf: itemSeconds, grain, range }), grouped: null };
+        const grouped = groupedBucketRows(items, {
+            dayOf: itemDay,
+            secondsOf: itemSeconds,
+            grain,
+            range,
+            groupsOf: ({ instance, activityId }) => instanceGroups(instance, groupBy, {
+                activity: lookups?.activitiesById.get(activityId) || { id: activityId },
+                groupsById: lookups?.groupsById,
+                session: lookups?.sessionsById.get(instance.session_id),
+            }),
+        });
+        return { ...grouped, grouped: { groups: grouped.groups, values: grouped.values, title: GROUP_DIMENSION_LABELS[groupBy.dimension] } };
+    }, [activityInstances, grain, groupBy, lookups, range]);
     return (
         <BucketBarChart
             rows={result.rows}
@@ -61,6 +88,7 @@ export function ActivityTrendsChart({ activityInstances = {}, chartRef, grain = 
             countLabel={countInstances}
             seriesLabel={measure === 'duration' ? 'Activity time' : 'Times done'}
             chartRef={chartRef}
+            grouped={result.grouped ? { ...result.grouped, overlap } : null}
             emptyDescription="Activity trends appear once activities have been done in the selected scope."
         />
     );
@@ -75,6 +103,7 @@ export function ActivityTrendsControls({ context }) {
                 onChange={(measure) => context.updateVisualizationState({ measure })}
             />
             <GrainControl context={context} />
+            <GroupByControl context={context} dimensions={ACTIVITY_TREND_GROUPS} />
         </>
     );
 }

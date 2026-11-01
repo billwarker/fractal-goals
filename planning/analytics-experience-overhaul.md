@@ -165,6 +165,27 @@ Activity and session charts group **client-side** over data `useVisualizationCon
 
 **Not in scope:** grouping the goal time chart by tag or activity. Its server evidence (`goal_analytics_queries.analytics_evidence`) doesn't carry tags. Time-by-tag is answered by activityTrends/activityTotals (duration measure) grouped by tag.
 
+**Phase 3 as built:**
+- **Grouping module:** `utils/analyticsGroupBy.js` (checkJs, unit tested) groups by activity, activity group, tag (optionally one family; "Untagged" for none), template and program day.
+  - Sets use their effective tags (set ∪ instance), the same as the condition evaluator.
+  - `groupsOverlap` reports when an item can land in several series: any tag grouping except a single-select family.
+- **Bucketing:** `chartGrain.groupedBucketRows` counts an item once in each of its groups, while each bucket's total counts it once.
+- **Shared pieces:** `visualizations/shared/GroupByControl.jsx` and `useGroupLookups.js`. The latter supplies the lookups and loads tag families only for a tag grouping.
+- **Charts:**
+  - Activity Trends: activity, group, tag, template, program day.
+  - Session Trends: template, program day (always stacked).
+  - Activity Totals: each activity's bar split by group, tag, template or program day.
+  - Scatter: points coloured by tag (set-effective), template or program day. It keeps one dataset because hover and the goal surface read `datasets[0]`; a point with several tags shows as "Several tags".
+- **Overlapping groups** are drawn side by side instead of stacked, with a footnote. Tooltips always show the true total.
+- **Deferred:**
+  - Metric Trends group-by moves to Phase 4, together with replacing its two-axis layout with small multiples.
+  - Start/End Times and the Duration Histogram aren't grouped yet.
+  - The goal charts' goal/level grouping is the roll-up from Phase 1.
+- **Catalog:** `activity_tag_families`, `activity_tag_definitions`, `activity_instance_tags` and `activity_set_tags` are now in the analytics catalog, each limited to the user's own fractals.
+  - Links on deleted instances are hidden; archived tags stay readable.
+  - The catalog snapshot is regenerated (reviewed: no credentials or another user's data).
+  - **Deploy note:** re-run `scripts/analytics_sql_role_grants.py` so the least-privilege SQL role can read the four new tables.
+
 ### Phase 4 — Annotation mode
 
 **4.1 Interaction**

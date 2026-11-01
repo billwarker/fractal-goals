@@ -33,6 +33,7 @@
     "src/utils/chartFormat.js",
     "src/utils/chartGoalPrefill.js",
     "src/utils/chartGrain.js",
+    "src/utils/analyticsGroupBy.js",
     "src/components/analytics/series/buildSeries.js",
     "src/components/analytics/visualizations/capabilities.js",
     "src/utils/goalConditionSeries.js",

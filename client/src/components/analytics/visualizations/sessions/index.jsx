@@ -9,8 +9,9 @@ import StreakTimeline from '../../StreakTimeline';
 import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
+import useGroupLookups from '../shared/useGroupLookups';
 import StatCard from '../shared/StatCard';
-import { SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
+import { SESSION_TREND_GROUPS, SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
 
 function SessionSummaryChart({ context }) {
     const { sessions } = context.scopedData;
@@ -35,6 +36,7 @@ function SessionStreaksChart({ context }) {
 }
 
 function SessionTrendsVisualizationChart({ context }) {
+    const { groupBy } = useGroupLookups(context, SESSION_TREND_GROUPS);
     return (
         <div className={styles.vizContainerHidden}>
             <SessionTrendsChart
@@ -44,6 +46,7 @@ function SessionTrendsVisualizationChart({ context }) {
                 grain={['day', 'week', 'month'].includes(context.visualizationState.grain) ? context.visualizationState.grain : 'auto'}
                 measure={sessionTrendMeasure(context.visualizationState)}
                 range={context.dateRange}
+                groupBy={groupBy}
             />
         </div>
     );

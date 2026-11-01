@@ -135,3 +135,36 @@ export function bucketRows(items, { dayOf, secondsOf = () => 0, grain = 'auto', 
     });
     return { grain: resolved, rows: [...rows.values()] };
 }
+
+/**
+ * `bucketRows`, split into groups as well: each item counts once in each of its groups
+ * (`groupsOf`), while `rows` keeps each bucket's true totals (each item once).
+ * @template T
+ * @param {T[]} items
+ * @param {{ dayOf: (item: T) => string | null, secondsOf?: (item: T) => number,
+ *   groupsOf: (item: T) => Array<{ key: string, label: string }>, grain?: string | null,
+ *   range?: { start?: string | null, end?: string | null } | null, pointBudget?: number }} options
+ */
+export function groupedBucketRows(items, { groupsOf, secondsOf = () => 0, ...options }) {
+    const totals = bucketRows(items, { ...options, secondsOf });
+    /** @type {Map<string, string>} */
+    const labels = new Map();
+    /** @type {Map<string, { key: string, bucket: string, count: number, seconds: number }>} */
+    const values = new Map();
+    items.forEach((item) => {
+        const day = options.dayOf(item);
+        if (!day) return;
+        const bucket = bucketStart(day, totals.grain);
+        groupsOf(item).forEach((group) => {
+            labels.set(group.key, group.label);
+            const id = `${group.key}\u0000${bucket}`;
+            const value = values.get(id) || { key: group.key, bucket, count: 0, seconds: 0 };
+            value.count += 1;
+            value.seconds += secondsOf(item) || 0;
+            values.set(id, value);
+        });
+    });
+    const groups = [...labels.entries()].map(([key, label]) => ({ key, label }))
+        .sort((left, right) => left.label.localeCompare(right.label));
+    return { ...totals, groups, values: [...values.values()] };
+}
