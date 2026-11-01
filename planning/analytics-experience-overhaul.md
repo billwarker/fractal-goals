@@ -217,6 +217,25 @@ Activity and session charts group **client-side** over data `useVisualizationCon
 
 **4.4 Ownership:** `ChartGoalSurface.jsx` becomes a thin host. State lives in `useChartAnnotation.js` (mode, pin, drag), and chart reading in `chartGoalTargets.js`, extended per manifest kind.
 
+**Phase 4 as built:**
+- **Toggle:** a **Set goal** button in the panel toolbar (`ProfileWindow`) appears on charts that can set goals: Metric Trends, Scatter, Metric Progress, Activity Totals and Activity Trends. **A** toggles it while the chart is focused and **Esc** leaves. Right-click and long-press "Set goal here…" stay.
+- **Crosshair:**
+  - `annotate/AnnotationCrosshair.jsx` draws dashed guides through the snapped values, with axis value labels and a live readout of the goal sentence.
+  - `chartGoalTargets.js` returns the guides with each target. Values snap through `snapMetricValue` (integer, precision, predefined values, bounds), counts are whole numbers, and categories snap to the nearest label.
+- **Popover:** `annotate/AnnotationPopover.jsx` opens on click.
+  - **Create goal…** opens the goal modal seeded with the condition and, for "by a date" goals, the deadline (`useGoalForm` now accepts `name` and `deadline` seeds).
+  - **Update a goal on this activity** lists goals that already have a threshold on it and shows a live `condition/preview` ("With this threshold: 3 / 12") before `PUT …/condition`.
+- **Running total → by a date:**
+  - Activity Trends has a **Running total** option: counts accumulate to today, and the axis runs on past today (to the range's end, or a few buckets).
+  - Clicking a future point gives "N more sessions by ‹bucket end›": a consistency goal for the remainder (the evaluator counts from the goal's start) with that deadline.
+  - It needs exactly one activity in scope. Past points, totals already reached and time measures explain why there's no goal.
+- **Scope carry-over:** `withChartScope` turns the global tag filter into `tag_ids` (`all` becomes `contains`). Template and program-day filters can't be part of a condition, so the popover says so.
+- **Still deferred:**
+  - Dragging existing goal lines to edit them.
+  - Keyboard stepping of the crosshair.
+  - Metric Trends moving from two y-axes to small multiples, and its group-by. The goal reader and the Progress pane both depend on its per-metric axes, so this needs its own change.
+  - Attaching the chart to the new goal (Phase 5).
+
 ### Phase 5 — Saved Analytics × goals
 
 **5.1 Backend**

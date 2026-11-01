@@ -22,14 +22,18 @@ import styles from './BucketBarChart.module.css';
  *   byTime: boolean, countLabel: (count: number) => string, seriesLabel: string, chartRef?: any,
  *   emptyDescription: string,
  *   grouped?: { groups: Array<{ key: string, label: string }>, values: Array<{ key: string, bucket: string, count: number, seconds: number }>,
- *     overlap: boolean, title: string } | null }} props
+ *     overlap: boolean, title: string } | null,
+ *   datasetMeta?: object | null }} props  datasetMeta: extra fields on the single dataset (read by the goal surface)
  */
-export default function BucketBarChart({ rows, grain, byTime, countLabel, seriesLabel, chartRef, emptyDescription, grouped = null }) {
+export default function BucketBarChart({
+    rows, grain, byTime, countLabel, seriesLabel, chartRef, emptyDescription, grouped = null, datasetMeta = null,
+}) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
     const [hiddenKeys, setHiddenKeys] = useState(() => new Set());
     const [hoverKey, setHoverKey] = useState(null);
-    const valueOf = (item) => (byTime ? item.seconds / 3600 : item.count);
+    // A null count is a bucket with nothing to draw (a running total's future buckets).
+    const valueOf = (item) => (item.count == null ? null : byTime ? item.seconds / 3600 : item.count);
     const formatValue = (value) => (byTime ? formatDuration(value * 3600) : countLabel(value));
 
     const series = useMemo(() => (grouped ? buildSeries({
@@ -56,6 +60,7 @@ export default function BucketBarChart({ rows, grain, byTime, countLabel, series
             };
         })
         : [{
+            ...datasetMeta,
             label: seriesLabel,
             data: rows.map(valueOf),
             backgroundColor: chartTheme.seriesColors[0],
@@ -90,6 +95,7 @@ export default function BucketBarChart({ rows, grain, byTime, countLabel, series
                             label: (ctx) => {
                                 if (series) return `${ctx.dataset.label}: ${formatValue(ctx.raw)}`;
                                 const row = rows[ctx.dataIndex];
+                                if (datasetMeta?.runningTotal) return `${seriesLabel}: ${byTime ? formatDuration(row.seconds) : countLabel(row.count)}`;
                                 return byTime ? `${formatDuration(row.seconds)} across ${countLabel(row.count)}` : countLabel(row.count);
                             },
                             footer: (items) => {

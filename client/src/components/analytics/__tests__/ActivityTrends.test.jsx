@@ -104,3 +104,26 @@ describe('ActivityTrendsChart', () => {
     });
 });
 
+
+describe('runningTotalRows', () => {
+    it('accumulates to today, then leaves future buckets empty for picking a deadline', async () => {
+        const { runningTotalRows } = await import('../visualizations/activities/ActivityTrends');
+        const result = runningTotalRows({
+            grain: 'week',
+            rows: [{ key: '2026-10-05', count: 2, seconds: 60 }, { key: '2026-10-12', count: 0, seconds: 0 }, { key: '2026-10-19', count: 3, seconds: 90 }],
+        }, null, '2026-10-28');
+        expect(result.rows.slice(0, 4)).toEqual([
+            { key: '2026-10-05', count: 2, seconds: 60 },
+            { key: '2026-10-12', count: 2, seconds: 60 },
+            { key: '2026-10-19', count: 5, seconds: 150 },
+            { key: '2026-10-26', count: 5, seconds: 150 },
+        ]);
+        expect(result.todayIndex).toBe(3);
+        expect(result.current).toBe(5);
+        expect(result.rows.slice(4).every((row) => row.count === null)).toBe(true);
+        expect(result.rows).toHaveLength(8);
+        // A range ending in the future runs the axis to its end instead.
+        expect(runningTotalRows({ grain: 'week', rows: [{ key: '2026-10-05', count: 1, seconds: 0 }] }, { end: '2026-12-31' }, '2026-10-28')
+            .rows.at(-1).key).toBe('2026-12-28');
+    });
+});

@@ -60,6 +60,8 @@ function ActivityTrendsVisualizationChart({ context }) {
                 groupBy={groupBy}
                 lookups={lookups}
                 overlap={overlap}
+                runningTotal={Boolean(context.visualizationState.runningTotal)}
+                singleActivity={context.scopedData.activities?.length === 1 ? context.scopedData.activities[0] : null}
             />
         </div>
     );

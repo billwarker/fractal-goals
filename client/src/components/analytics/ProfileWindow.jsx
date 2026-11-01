@@ -30,6 +30,7 @@ import {
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
+import { GOAL_CHART_IDS } from './chartGoalTargets';
 import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
 import pageGridSnap from './pageGridSnap';
@@ -80,6 +81,7 @@ function ProfileWindow({
     const containerRef = useRef(null);
 
     const [showSplitMenu, setShowSplitMenu] = useState(false);
+    const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
     const [isQueryOverlayOpen, setIsQueryOverlayOpen] = useState(false);
 
@@ -313,6 +315,21 @@ function ProfileWindow({
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
+                    {GOAL_CHART_IDS.has(selectedVisualization) && (
+                        <Button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAnnotating((current) => !current);
+                            }}
+                            variant={isAnnotating ? 'primary' : 'secondary'}
+                            size="sm"
+                            style={{ padding: '0 8px' }}
+                            aria-pressed={isAnnotating}
+                            title="Set a goal from a point on the chart (A)"
+                        >
+                            {isAnnotating ? 'Done' : 'Set goal'}
+                        </Button>
+                    )}
                     {showQueryInspector && selectedVisualizationMeta && (
                         <Button
                             onClick={(e) => {
@@ -521,6 +538,8 @@ function ProfileWindow({
             <ChartGoalSurface
                 Chart={VisualizationChart}
                 rootId={rootId}
+                annotating={isAnnotating}
+                onAnnotatingChange={setIsAnnotating}
                 context={{
                     data,
                     scopedData: {

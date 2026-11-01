@@ -82,3 +82,45 @@ export function goalFromActivityTotal({ activity, measure, value }) {
         summary: `${count} ${activity.name} ${count === 1 ? 'session' : 'sessions'}`,
     };
 }
+
+/**
+ * Activity Trends' running total: a point (date, total) becomes "this many more times by then".
+ * The goal counts sessions from its start, so the target is what's still to do beyond today's total.
+ * @param {{ activity: any, total: number, current: number, deadline: string, deadlineLabel: string }} input
+ */
+export function goalFromRunningTotal({ activity, total, current, deadline, deadlineLabel }) {
+    if (!activity || !Number.isFinite(total) || !deadline) return null;
+    const remaining = Math.round(total) - Math.round(current || 0);
+    if (remaining < 1) return { unsupported: `Already done ${Math.round(current || 0)} times — pick a higher total` };
+    return {
+        conditionDraft: { ...createConditionDraft(activity, 'consistency'), required_count: String(remaining) },
+        deadline,
+        summary: `${remaining} more ${activity.name} ${remaining === 1 ? 'session' : 'sessions'} by ${deadlineLabel}`,
+    };
+}
+
+/**
+ * The chart's tag scope carried into a goal: the global tag filter (`all` reads as `contains`) and a
+ * tag series under the pointer. Template and program-day scope can't be part of a condition, so the
+ * goal says so instead.
+ * @param {any} target a goal suggestion with a conditionDraft
+ * @param {{ tags?: { tagIds: string[], match: string } | null, sessions?: { templateIds: string[], programDayIds: string[] } } | null} filters
+ * @param {string | null} [seriesTagId]
+ */
+export function withChartScope(target, filters, seriesTagId = null) {
+    if (!target?.conditionDraft) return target;
+    const tagIds = [...new Set([...(filters?.tags?.tagIds || []), ...(seriesTagId ? [seriesTagId] : [])])];
+    const notes = [];
+    if (filters?.sessions?.templateIds?.length) notes.push('The template filter isn’t part of the goal condition.');
+    if (filters?.sessions?.programDayIds?.length) notes.push('The program day filter isn’t part of the goal condition.');
+    return {
+        ...target,
+        conditionDraft: {
+            ...target.conditionDraft,
+            tag_ids: tagIds,
+            tag_match: filters?.tags?.match === 'exact' && !seriesTagId ? 'exact' : 'contains',
+        },
+        notes,
+    };
+}
+
