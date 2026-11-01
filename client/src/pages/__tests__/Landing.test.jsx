@@ -326,6 +326,14 @@ function renderLanding(initialExamples = null) {
         </QueryClientProvider>
     );
 }
+// Warm the lazy feature chain once so preview waits measure rendering, not the
+// first transform of each chunk (slow under coverage on CI runners).
+beforeAll(async () => {
+    await Promise.all([
+        import('../../components/landing/LandingFeaturesSection'),
+        import('../../components/landing/LandingFeatureSession'),
+    ]);
+}, 30_000);
 describe('Landing', () => {
     beforeEach(() => {
         vi.clearAllMocks();

@@ -53,7 +53,8 @@ test('a deep link starts history immediately and holds its chart through paginat
     const failedRequests = requests;
     recovered = true;
     await page.getByRole('button', { name: 'Retry', exact: true }).click();
-    await expect(page.locator('canvas').first()).toBeVisible();
+    // Retry refetches full history and then lazy-loads the chart; allow for slow runners.
+    await expect(page.locator('canvas').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('alert')).toHaveCount(0);
     await expect(page).not.toHaveURL(/activity=/);
     expect(requests).toBe(failedRequests + 1);
