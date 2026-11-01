@@ -162,6 +162,8 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
             goals: effectiveSharedData?.goalAnalytics?.goals || EMPTY,
             goalSummary: effectiveSharedData?.goalAnalytics?.summary || null,
             sessions: effectiveSharedData?.sessions || EMPTY,
+            chartGrain: effectiveSharedData?.goalAnalytics?.metadata?.chart_grain || null,
+            timeRollup: chartRead.data?.time_rollup || null,
         },
         globalFilters: {},
         dateRange: { start: null, end: null },
@@ -175,7 +177,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
         effectiveSelectedGoal: null,
         getGoalTypeColor: effectiveSharedData?.getGoalTypeColor,
         onGlobalDateRangeChange: () => {},
-    }), [effectiveSharedData, resolved]);
+    }), [chartRead.data, effectiveSharedData, resolved]);
 
     const Chart = resolved.viz?.Chart;
 

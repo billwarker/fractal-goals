@@ -12,7 +12,9 @@ import GoalCompletionTimeline from '../../GoalCompletionTimeline';
 import GoalTimeDistribution from '../../GoalTimeDistribution';
 import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
+import { timeDistributionRollupRank } from './timeDistributionState';
 import EmptyControls from '../shared/EmptyControls';
+import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
 
 function getActivityChartData(goal) {
@@ -145,17 +147,25 @@ function GoalCompletionTimelineChart({ context }) {
 }
 
 function GoalTimeDistributionChart({ context }) {
-    const state = context.visualizationState;
     return (
         <div className={styles.vizContainerHidden}>
             <GoalTimeDistribution
-                goals={context.scopedData.goals}
+                timeRollup={context.scopedData.timeRollup}
+                requestedGrain={context.visualizationState.grain || 'auto'}
                 chartRef={context.chartRef}
-                durationMode={state.durationMode || 'activity'}
-                inheritanceMode={state.inheritanceMode || 'direct'}
+                onFocusGoal={(focusGoalId) => context.updateVisualizationState({ focusGoalId })}
             />
         </div>
     );
+}
+
+/** The goal levels present, top first, as roll-up choices. */
+function rollupLevelChoices(goals) {
+    const byRank = new Map();
+    goals.forEach((goal) => {
+        if (Number.isInteger(goal.level_rank) && !byRank.has(goal.level_rank)) byRank.set(goal.level_rank, goal.level_name || goal.type);
+    });
+    return [...byRank.entries()].sort(([left], [right]) => left - right).map(([rank, label]) => ({ rank, label }));
 }
 
 function GoalCompletionRateByLevelChart({ context }) {
@@ -242,6 +252,9 @@ export function GoalDetailControls({ context }) {
 }
 
 export function GoalTimeDistributionControls({ context }) {
+    const state = context.visualizationState;
+    const levelOptions = rollupLevelChoices(context.profileGoals || []);
+    const rank = timeDistributionRollupRank(state);
     return (
         <>
             <div className="sessions-query-chip-group">
@@ -252,7 +265,7 @@ export function GoalTimeDistributionControls({ context }) {
                     <button
                         key={option.value}
                         type="button"
-                        className={`sessions-query-chip ${(context.visualizationState.durationMode || 'activity') === option.value ? 'active' : ''}`}
+                        className={`sessions-query-chip ${(state.durationMode || 'activity') === option.value ? 'active' : ''}`}
                         onClick={() => context.updateVisualizationState({ durationMode: option.value })}
                     >
                         {option.label}
@@ -260,16 +273,20 @@ export function GoalTimeDistributionControls({ context }) {
                 ))}
             </div>
             <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                <span>Inheritance</span>
+                <span>Stack goals by level</span>
                 <select
-                    value={context.visualizationState.inheritanceMode || 'direct'}
-                    onChange={(event) => context.updateVisualizationState({ inheritanceMode: event.target.value })}
+                    value={rank ?? ''}
+                    onChange={(event) => context.updateVisualizationState({
+                        rollupRank: event.target.value === '' ? null : Number(event.target.value), focusGoalId: null,
+                    })}
                 >
-                    <option value="direct">Direct only</option>
-                    <option value="descendants">Include descendants</option>
-                    <option value="root">Roll up to root</option>
+                    <option value="">Automatic</option>
+                    {levelOptions.map((option) => (
+                        <option key={option.rank} value={option.rank}>{option.label}</option>
+                    ))}
                 </select>
             </label>
+            <GrainControl context={context} />
         </>
     );
 }
@@ -300,7 +317,7 @@ export const GOAL_VISUALIZATIONS = [
         category: 'goals',
         name: 'Time Spent Per Goal',
         iconType: 'goals:timeDistribution',
-        defaultState: { durationMode: 'activity', inheritanceMode: 'direct' },
+        defaultState: { durationMode: 'activity', focusGoalId: null, grain: 'auto' },
         selectionRequirements: {},
         Chart: GoalTimeDistributionChart,
         Controls: GoalTimeDistributionControls,

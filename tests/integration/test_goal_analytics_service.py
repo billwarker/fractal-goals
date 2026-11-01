@@ -146,3 +146,49 @@ def test_empty_activity_scope_does_not_fall_back_to_all_activities(authed_client
     response = authed_client.get(f'/api/{root_id}/goals/analytics?activity_filter=true&charts=true')
     assert response.status_code == 200
     assert all(goal['total_duration_seconds'] == 0 and goal['session_count'] == 0 for goal in response.get_json()['goals'])
+
+
+def _session_at(db_session, root, moment, seconds=60):
+    row = dict(id=str(uuid.uuid4()), root_id=root.id, owner_id=root.owner_id, name='Practice',
+               session_start=moment, session_end=moment + timedelta(seconds=seconds),
+               total_duration_seconds=seconds, completed=True, created_at=moment)
+    db_session.execute(Session.__table__.insert(), [row])
+    db_session.execute(session_goals.insert(), [dict(session_id=row['id'], goal_id=root.id, goal_type='UltimateGoal')])
+
+
+@pytest.mark.parametrize('zone, expected', [('UTC', '2026-03-02'), ('America/Los_Angeles', '2026-02-23')])
+def test_chart_buckets_are_calendar_weeks_in_the_users_timezone(zone, expected, authed_client, db_session, sample_ultimate_goal):
+    # 03:00 UTC on Monday Mar 2 is still Sunday Mar 1 in Los Angeles, so it belongs to the previous week.
+    _session_at(db_session, sample_ultimate_goal, datetime(2026, 3, 2, 3, 0))
+    _session_at(db_session, sample_ultimate_goal, datetime(2026, 3, 4, 18, 0))
+    db_session.commit()
+    payload = authed_client.get(f'/api/{sample_ultimate_goal.id}/goals/analytics', query_string={
+        'chart_goal_id': sample_ultimate_goal.id, 'grain': 'week', 'timezone': zone,
+    }).get_json()
+    chart = next(goal for goal in payload['goals'] if goal['id'] == sample_ultimate_goal.id)['session_durations_by_date']
+    assert payload['metadata']['chart_grain'] == 'week'
+    assert payload['metadata']['timezone'] == zone
+    assert chart[0]['date'] == expected
+    assert sum(row['session_count'] for row in chart) == 2
+    assert all(len(row['date']) == 10 for row in chart)
+
+
+def test_auto_grain_follows_the_chosen_range_and_coarsens_long_histories(authed_client, db_session, sample_ultimate_goal):
+    _session_at(db_session, sample_ultimate_goal, datetime(2024, 1, 3, 12, 0))
+    _session_at(db_session, sample_ultimate_goal, datetime(2026, 3, 4, 12, 0))
+    db_session.commit()
+    url = f'/api/{sample_ultimate_goal.id}/goals/analytics'
+    everything = authed_client.get(url, query_string={'charts': 'true'}).get_json()
+    assert everything['metadata']['chart_grain'] == 'month'
+    week = authed_client.get(url, query_string={
+        'charts': 'true', 'range_start': '2026-03-01T00:00:00Z', 'range_end': '2026-03-07T23:59:59Z',
+    }).get_json()
+    assert week['metadata']['chart_grain'] == 'day'
+    forced = authed_client.get(url, query_string={'charts': 'true', 'grain': 'day'}).get_json()
+    assert forced['metadata']['chart_grain'] == 'week'  # 791 days: too many days, ~114 weeks fit
+
+
+@pytest.mark.parametrize('query', ['grain=hourly', 'timezone=Mars/Olympus'])
+def test_goal_analytics_rejects_unknown_grain_and_timezone(authed_client, sample_ultimate_goal, query):
+    response = authed_client.get(f'/api/{sample_ultimate_goal.id}/goals/analytics?charts=true&{query}')
+    assert response.status_code == 400

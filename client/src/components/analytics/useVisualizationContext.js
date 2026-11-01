@@ -4,6 +4,8 @@ import { instanceMatchesScope, resolveAnalyticsGlobalFilters, sessionMatchesScop
 import { summarizeFilteredGoals } from './filteredGoalSummary';
 import useGoalAnalyticsRead from './useGoalAnalyticsRead';
 import { getVisualization } from './visualizations/registry';
+import { timeDistributionRollupRank } from './visualizations/goals/timeDistributionState';
+import { normalizeVisualizationState } from './visualizations/state';
 
 /**
  * Everything a visualization needs from one window's state: the resolved global filters, the
@@ -57,8 +59,15 @@ export default function useVisualizationContext({ data, windowState, globalDateR
         return true;
     }, [effectiveDateRange, hasActiveDateRange]);
 
+    const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
+    const rollup = useMemo(() => ({
+        rank: timeDistributionRollupRank(visualizationState),
+        focusGoalId: visualizationState.focusGoalId || null,
+        durationMode: visualizationState.durationMode || 'activity',
+    }), [visualizationState]);
     const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
-        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange });
+        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange,
+        grain: visualizationState.grain || 'auto', rollup });
     const scopedGoalAnalytics = scopedGoalQuery.data || goalAnalytics;
 
     const filteredSessions = useMemo(() => {
@@ -172,7 +181,13 @@ export default function useVisualizationContext({ data, windowState, globalDateR
         selectedVisualizationMeta,
     ]);
 
+    // The calendar grain the server bucketed goal charts by (day, week or month).
+    const chartGrain = scopedGoalAnalytics?.metadata?.chart_grain || null;
+    const timeRollup = scopedGoalQuery.data?.time_rollup || null;
+
     return {
+        chartGrain,
+        timeRollup,
         effectiveDateRange,
         hasActiveDateRange,
         resolvedGlobalFilters,

@@ -117,6 +117,8 @@ def serialize_goal_analytics_goal(
         "id": goal.id,
         "name": goal.name,
         "type": goal.level.name.replace(" ", "") if getattr(goal, "level", None) else "Goal",
+        "level_name": goal.level.name if getattr(goal, "level", None) else None,
+        "level_rank": goal.level.rank if getattr(goal, "level", None) else None,
         "description": goal.description,
         "completed": goal.completed,
         "completed_at": format_utc(goal.completed_at),

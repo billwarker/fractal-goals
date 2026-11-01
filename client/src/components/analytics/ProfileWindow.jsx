@@ -111,6 +111,8 @@ function ProfileWindow({
         updateWindowState(getVisualizationStateUpdate(windowState, updates));
     }, [updateWindowState, windowState]);
     const {
+        chartGrain,
+        timeRollup,
         effectiveDateRange,
         resolvedGlobalFilters,
         scopedActivities,
@@ -519,6 +521,8 @@ function ProfileWindow({
                         goals: filteredGoalAnalyticsGoals,
                         goalSummary: filteredGoalSummary,
                         sessions: filteredSessions,
+                        chartGrain,
+                        timeRollup,
                     },
                     globalFilters: resolvedGlobalFilters,
                     dateRange: effectiveDateRange,

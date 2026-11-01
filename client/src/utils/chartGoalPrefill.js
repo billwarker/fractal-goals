@@ -4,9 +4,8 @@
  * Pure, so each chart's mapping is tested on its own; the chart surface reads values off the chart's
  * scales and hands them here.
  */
+import { formatMetric, snapMetricValue } from './chartFormat';
 import { activeMetricDefinitions, createConditionDraft, inferOperator, OPERATOR_SYMBOLS } from './goalConditions';
-
-const roundValue = (/** @type {number} */ value) => Math.round(value * 100) / 100;
 
 /** @param {any} activity @param {string} metricId */
 function findMetric(activity, metricId) {
@@ -20,15 +19,19 @@ function findMetric(activity, metricId) {
  */
 function singleSessionTarget(activity, points) {
     const rules = points
-        .map(({ metricId, value }) => ({ metric: findMetric(activity, metricId), value }))
-        .filter(({ metric, value }) => metric && Number.isFinite(value) && value > 0)
+        .map(({ metricId, value }) => {
+            const metric = findMetric(activity, metricId);
+            return { metric, value: metric && Number.isFinite(value) ? snapMetricValue(metric, value) : null };
+        })
+        .filter(({ metric, value }) => metric && value != null && value > 0)
         .map(({ metric, value }) => ({
             metric,
-            rule: { metric_definition_id: metric.id, operator: inferOperator(metric), value: String(roundValue(value)) },
+            value,
+            rule: { metric_definition_id: metric.id, operator: inferOperator(metric), value: String(value) },
         }));
     if (rules.length === 0) return null;
     const summary = rules
-        .map(({ metric, rule }) => `${metric.name} ${OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (rule.operator)]} ${rule.value}${metric.unit ? ` ${metric.unit}` : ''}`)
+        .map(({ metric, value, rule }) => `${metric.name} ${OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (rule.operator)]} ${formatMetric(metric, value)}`)
         .join(', ');
     return {
         conditionDraft: { ...createConditionDraft(activity, 'single_session'), rules: rules.map(({ rule }) => rule) },

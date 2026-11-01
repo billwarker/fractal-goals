@@ -42,6 +42,8 @@ export default function SavedViewChart({ rootId, layout, density = 'full', data:
             goals: derived.filteredGoalAnalyticsGoals,
             goalSummary: derived.filteredGoalSummary,
             sessions: derived.filteredSessions,
+            chartGrain: derived.chartGrain,
+            timeRollup: derived.timeRollup,
         },
         globalFilters: derived.resolvedGlobalFilters,
         dateRange: derived.effectiveDateRange,

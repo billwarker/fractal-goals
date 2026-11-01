@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { fractalApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
+import { useTimezone } from '../../contexts/TimezoneContext';
 
 export default function useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
-    resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange }) {
+    resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange, grain = 'auto', rollup = null }) {
+    const { timezone } = useTimezone();
     const needsGoalChart = selectedCategory === 'goals' && ['goalDetail', 'timeDistribution'].includes(selectedVisualization);
     const chartGoalId = selectedVisualization === 'goalDetail'
         ? selectedGoal?.id || (resolvedGlobalFilters.hasGoalFilter && resolvedGlobalFilters.goalIds.size === 1
@@ -16,6 +18,16 @@ export default function useGoalAnalyticsRead({ rootId, selectedCategory, selecte
         activity_ids: resolvedGlobalFilters.hasActivityFilter ? [...resolvedGlobalFilters.activityIds].sort() : undefined,
         charts: needsGoalChart && (selectedVisualization !== 'goalDetail' || Boolean(chartGoalId)) ? 'true' : undefined,
         chart_goal_id: needsGoalChart ? chartGoalId : undefined,
+        // Chart buckets are calendar days, weeks or months in the user's timezone.
+        grain: needsGoalChart ? grain : undefined,
+        timezone: needsGoalChart ? timezone : undefined,
+        // Time Spent Per Goal stacks series the server rolls up from the evidence itself.
+        ...(selectedVisualization === 'timeDistribution' ? {
+            rollup: 'true',
+            rollup_rank: Number.isInteger(rollup?.rank) ? rollup.rank : undefined,
+            focus_goal_id: rollup?.focusGoalId || undefined,
+            duration_mode: rollup?.durationMode || 'activity',
+        } : {}),
     };
     const scopedGoalQuery = useQuery({
         queryKey: queryKeys.goalAnalytics(rootId, goalReadOptions),

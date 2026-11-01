@@ -42,6 +42,20 @@ describe('chart goal prefill', () => {
         expect(goalFromActivityTotal({ activity, measure: 'duration', value: 90 })).toBeNull();
     });
 
+    it('snaps a point to the metric’s type and precision', () => {
+        const typed = {
+            id: 'scales', name: 'Scales',
+            metric_definitions: [
+                { id: 'bpm', name: 'Tempo', unit: 'bpm', input_type: 'integer', higher_is_better: true },
+                { id: 'clean', name: 'Clean', unit: '%', input_type: 'number', precision: 1, max_value: 100 },
+            ],
+        };
+        expect(goalFromMetricTrend({ activity: typed, metricId: 'bpm', value: 119.6 }).conditionDraft.rules[0].value).toBe('120');
+        const goal = goalFromMetricTrend({ activity: typed, metricId: 'clean', value: 104.37 });
+        expect(goal.conditionDraft.rules[0].value).toBe('100');
+        expect(goal.summary).toBe('Clean ≥ 100.0 % within one session');
+    });
+
     it('ignores points below zero or off a known metric', () => {
         expect(goalFromMetricTrend({ activity, metricId: 'weight', value: -3 })).toBeNull();
         expect(goalFromMetricTrend({ activity, metricId: 'missing', value: 10 })).toBeNull();

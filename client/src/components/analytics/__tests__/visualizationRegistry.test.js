@@ -89,7 +89,10 @@ describe('analytics visualization registry', () => {
             goalTimeInheritanceMode: 'descendants',
         })).toEqual({
             durationMode: 'session',
+            // Read by the chart as a roll-up level (timeDistributionRollupLevel).
             inheritanceMode: 'descendants',
+            focusGoalId: null,
+            grain: 'auto',
         });
     });
 
