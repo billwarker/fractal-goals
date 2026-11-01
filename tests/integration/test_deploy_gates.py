@@ -126,7 +126,7 @@ def test_cloudbuild_gates_run_in_a_fail_closed_order():
     assert order.index("Promote Backend") < order.index("Update Data Retention Job")
     assert document["substitutions"]["_ALLOW_UNVERIFIED_DEPLOY"] == "false"
     assert {secret["env"] for secret in document["availableSecrets"]["secretManager"]} >= {
-        "GITHUB_CHECKS_TOKEN", "SUPABASE_DIRECT_DATABASE_URL",
+        "GITHUB_CHECKS_TOKEN", "SUPABASE_SESSION_POOLER_URL",
     }
 
 
@@ -136,5 +136,5 @@ def test_cloudbuild_shell_variables_are_escaped_from_substitution():
     text = (Path(__file__).resolve().parents[2] / "cloudbuild.yaml").read_text()
     # Cloud Build substitutes $NAME and ${NAME}; shell-only syntax must be written $$.
     assert not re.search(r"(?<!\$)\$\(", text)
-    for variable in ("URL", "SUPABASE_DIRECT_DATABASE_URL"):
+    for variable in ("URL", "SUPABASE_SESSION_POOLER_URL"):
         assert not re.search(rf"(?<!\$)\${variable}\b", text), variable
