@@ -1,3 +1,4 @@
+import os
 import pytest
 import time
 import json
@@ -28,12 +29,18 @@ from models import (
 from tests.conftest import session_token_for
 
 
+# Wall-clock budgets are calibrated on a quiet machine. Shared CI runners under
+# coverage tracing are slower and noisier, so CI scales them; query counts and
+# payload sizes stay exact everywhere.
+TIME_BUDGET_SCALE = float(os.getenv("PERF_TIME_BUDGET_SCALE", "1"))
+
+
 def assert_response_budget(
     response, *, max_bytes: int, max_ms: float, elapsed_ms: float
 ):
     assert response.status_code == 200
     assert len(response.data) <= max_bytes
-    assert elapsed_ms <= max_ms
+    assert elapsed_ms <= max_ms * TIME_BUDGET_SCALE
 
 
 def assert_mutation_budget(
@@ -41,7 +48,7 @@ def assert_mutation_budget(
 ):
     assert response.status_code == status_code
     assert len(response.data) <= max_bytes
-    assert elapsed_ms <= max_ms
+    assert elapsed_ms <= max_ms * TIME_BUDGET_SCALE
 
 
 def timed_get(client, url, *, query_counter):
