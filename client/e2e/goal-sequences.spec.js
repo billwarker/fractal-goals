@@ -65,8 +65,11 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     await dialog.getByRole('button', { name: 'Complete Goal' }).click();
     await expect.poll(() => isPaused(second)).toBe(false);
     // The completion toast lands over the mobile dialog footer and pauses while hovered; let it clear.
+    // Wait for it to appear first, or the hidden check passes before it renders.
+    const completedToast = page.getByRole('status').filter({ hasText: `Completed: ${first.name}` });
     await page.mouse.move(0, 0);
-    await expect(page.getByRole('status').filter({ hasText: `Completed: ${first.name}` })).toBeHidden({ timeout: 10_000 });
+    await expect(completedToast).toBeVisible();
+    await expect(completedToast).toBeHidden({ timeout: 10_000 });
 
     // …and un-completing it pauses the second again.
     await dialog.getByRole('button', { name: 'Mark Incomplete' }).click();
