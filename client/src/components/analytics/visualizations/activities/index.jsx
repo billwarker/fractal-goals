@@ -6,7 +6,7 @@ import styles from '../../ProfileWindow.module.css';
 import EmptyControls from '../shared/EmptyControls';
 import ActivityMetricControls from './ActivityMetricControls';
 import { ACTIVITY_TOTALS_VISUALIZATION } from './ActivityTotals';
-import { ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
+import { activityTrendMeasure, ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
 import { MetricProgressChart } from './MetricProgress';
 import { MetricTrendsChart } from './MetricTrends';
 
@@ -37,7 +37,9 @@ function ActivityTrendsVisualizationChart({ context }) {
             <ActivityTrendsChart
                 activityInstances={context.scopedData.activityInstances}
                 chartRef={context.chartRef}
-                metrics={context.visualizationState.metrics || ['instances', 'duration']}
+                grain={['day', 'week', 'month'].includes(context.visualizationState.grain) ? context.visualizationState.grain : 'auto'}
+                measure={activityTrendMeasure(context.visualizationState)}
+                range={context.dateRange}
             />
         </div>
     );
@@ -96,7 +98,8 @@ export const ACTIVITY_VISUALIZATIONS = [
         category: 'activities',
         name: 'Activity Trends',
         iconType: 'activities:activityTrends',
-        defaultState: { metrics: ['instances', 'duration'] },
+        // No default measure, so a saved view's older `metrics` list still decides it.
+        defaultState: { grain: 'auto' },
         selectionRequirements: {},
         Chart: ActivityTrendsVisualizationChart,
         Controls: ActivityTrendsVisualizationControls,

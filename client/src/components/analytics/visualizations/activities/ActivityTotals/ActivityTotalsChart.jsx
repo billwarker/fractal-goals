@@ -1,21 +1,9 @@
 import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 
-import EmptyState from '../../../../common/EmptyState';
+import { formatDuration } from '../../../../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../../ChartJSWrapper';
-
-const palette = {
-    instances: '#3b82f6',
-    duration: '#22c55e',
-};
-
-function formatDuration(seconds = 0) {
-    const total = Math.max(0, Math.round(seconds || 0));
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.round((total % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-}
+import { ChartEmpty } from '../../../ChartStates';
 
 function isCompletedActivityInstance(instance) {
     const completed = instance?.completed ?? instance?.attributes?.completed;
@@ -29,17 +17,8 @@ function isCompletedActivityInstance(instance) {
     );
 }
 
-function EmptyChart({ title, children = 'No data available yet' }) {
-    return (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {title && <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>{title}</h3>}
-            <EmptyState compact description={children} />
-        </div>
-    );
-}
-
 function buildOptions({ metric, showGroupNames, chartTheme }) {
-    const xAxisLabel = metric === 'duration' ? 'Minutes' : 'Completed instances';
+    const xAxisLabel = metric === 'duration' ? 'Hours' : 'Times done';
     return {
         responsive: true,
         maintainAspectRatio: false,
@@ -52,25 +31,18 @@ function buildOptions({ metric, showGroupNames, chartTheme }) {
                 title: { display: true, text: xAxisLabel, color: chartTheme.textColor },
                 ticks: {
                     color: chartTheme.textColor,
-                    precision: 0,
-                    stepSize: metric === 'instances' ? 1 : undefined,
-                    callback: (value) => value,
+                    ...(metric === 'duration' ? { callback: (value) => `${value}h` } : { precision: 0, stepSize: 1 }),
                 },
                 grid: { color: chartTheme.gridColor },
             },
             y: {
                 type: 'category',
                 ticks: { color: chartTheme.textColor },
-                grid: { color: chartTheme.gridColor },
+                grid: { display: false },
             },
         },
         plugins: {
-            legend: {
-                display: true,
-                position: 'top',
-                labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
-            },
-            title: { display: true, text: 'Activity Totals', color: chartTheme.textColor },
+            legend: { display: false },
             tooltip: {
                 backgroundColor: chartTheme.tooltipBg,
                 titleColor: chartTheme.tooltipText,
@@ -83,8 +55,8 @@ function buildOptions({ metric, showGroupNames, chartTheme }) {
                         return groupName ? [`Group: ${groupName}`] : [];
                     },
                     label: (ctx) => metric === 'duration'
-                        ? `Duration: ${formatDuration((ctx.raw || 0) * 60)}`
-                        : `Completed instances: ${ctx.raw}`,
+                        ? `Time: ${formatDuration((ctx.raw || 0) * 3600)}`
+                        : `Times done: ${ctx.raw}`,
                 },
             },
         },
@@ -115,12 +87,12 @@ export default function ActivityTotalsChart({
                     label: activity.name,
                     groupName: activity.group_id ? groupNamesById.get(activity.group_id) || 'Ungrouped' : 'Ungrouped',
                     count: completedInstances.length,
-                    minutes: Math.round(seconds / 60),
+                    hours: seconds / 3600,
                 };
             })
             .map((row) => ({
                 ...row,
-                value: metric === 'duration' ? row.minutes : row.count,
+                value: metric === 'duration' ? row.hours : row.count,
             }))
             .filter((row) => row.value > 0)
             .sort((a, b) => b.value - a.value)
@@ -129,18 +101,21 @@ export default function ActivityTotalsChart({
         return {
             labels: rows.map((row) => row.label),
             datasets: [{
-                label: metric === 'duration' ? 'Minutes' : 'Completed instances',
+                label: metric === 'duration' ? 'Time' : 'Times done',
                 data: rows.map((row) => row.value),
-                backgroundColor: metric === 'duration' ? palette.duration : palette.instances,
+                backgroundColor: chartTheme.seriesColors[0],
+                borderRadius: 4,
+                borderSkipped: 'start',
+                maxBarThickness: 32,
                 groupNames: rows.map((row) => row.groupName),
                 // Read by the chart's "Set goal here…" menu.
                 activityIds: rows.map((row) => row.activityId),
                 measure: metric,
             }],
         };
-    }, [activities, activityGroups, activityInstances, density, limit, metric]);
+    }, [activities, activityGroups, activityInstances, chartTheme.seriesColors, density, limit, metric]);
 
-    if (!data.labels.length) return <EmptyChart title="Activity Totals" />;
+    if (!data.labels.length) return <ChartEmpty description="Activity totals appear once activities have been done in this scope." />;
 
     return <Bar ref={chartRef} data={data} options={applyChartDensity(buildOptions({ metric, showGroupNames, chartTheme }), density)} />;
 }

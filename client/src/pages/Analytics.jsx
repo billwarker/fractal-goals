@@ -17,7 +17,6 @@ import {
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
 } from '../components/analytics/dashboardState';
-import { normalizeGlobalFilters } from '../components/analytics/analyticsGlobalFilters';
 import ProfileWindowLayout, {
     countWindows,
     getGridLayoutExtent,
@@ -38,6 +37,7 @@ import BodyPortal from '../components/layout/BodyPortal';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
 import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
 import AnalyticsOnboardingState from '../components/onboarding/AnalyticsOnboardingState';
+import useAnalyticsGlobalScope from '../components/analytics/useAnalyticsGlobalScope';
 import styles from './Analytics.module.css';
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
@@ -69,8 +69,10 @@ function Analytics() {
     const [windowStates, setWindowStates] = useState(DEFAULT_WINDOW_STATES);
     const [selectedViewId, setSelectedViewId] = useState('');
     const [currentViewName, setCurrentViewName] = useState(EMPTY_VIEW_NAME);
-    const [globalDateRange, setGlobalDateRange] = useState({ start: null, end: null });
-    const [globalFilters, setGlobalFilters] = useState(getDefaultGlobalFilters());
+    const {
+        globalDateRange, setGlobalDateRange, globalFilters, setGlobalFilters,
+        handleDateRangeChange, handleGlobalFiltersChange, handleResetGlobalFilters,
+    } = useAnalyticsGlobalScope();
     const [isFiltersPaneOpen, setIsFiltersPaneOpen] = usePersistedPaneOpen(
         `analytics-filter-pane-open:${rootId || 'default'}`,
         { defaultOpen: false, isMobile, resetKey: rootId },
@@ -105,7 +107,7 @@ function Analytics() {
         setCurrentViewName(EMPTY_VIEW_NAME);
         setGlobalDateRange({ start: null, end: null });
         setGlobalFilters(getDefaultGlobalFilters());
-    }, []);
+    }, [setGlobalDateRange, setGlobalFilters]);
 
     const fitLayoutToCurrentBounds = useCallback((incomingLayout, savedBounds = null) => {
         if (!dashboardBounds) return incomingLayout;
@@ -144,7 +146,7 @@ function Analytics() {
         setSelectedWindowId(sanitized.selectedWindowId);
         setGlobalFilters(sanitized.globalFilters || getDefaultGlobalFilters());
         return true;
-    }, [fitLayoutToCurrentBounds]);
+    }, [fitLayoutToCurrentBounds, setGlobalFilters]);
 
     useEffect(() => {
         if (!isDashboardSettling || !dashboardBounds) return undefined;
@@ -180,7 +182,7 @@ function Analytics() {
         setWindowStates({ ['window-1']: windowState });
         setSelectedWindowId('window-1');
         setGlobalFilters(linkFilters);
-    }, []);
+    }, [setGlobalFilters]);
     useAnalyticsDeepLink({ isHydrated, activities, onApply: applyDeepLink });
 
     useEffect(() => {
@@ -251,28 +253,6 @@ function Analytics() {
         rootId, evidenceLoading, evidenceError, retryEvidence, hasMoreEvidence, loadMoreEvidence,
     }), [sessions, goalAnalytics, activities, activityGroups, activityInstances, rootId, evidenceLoading, evidenceError, retryEvidence, hasMoreEvidence, loadMoreEvidence]);
 
-    const handleDateRangeChange = useCallback((nextRange) => {
-        let normalized = {
-            start: nextRange?.start || null,
-            end: nextRange?.end || null,
-        };
-        if (normalized.start && normalized.end && normalized.start > normalized.end) {
-            normalized = {
-                start: normalized.end,
-                end: normalized.start,
-            };
-        }
-        setGlobalDateRange(normalized);
-    }, []);
-
-    const handleGlobalFiltersChange = useCallback((nextFilters) => {
-        setGlobalFilters(normalizeGlobalFilters(nextFilters));
-    }, []);
-
-    const handleResetGlobalFilters = useCallback(() => {
-        setGlobalFilters(getDefaultGlobalFilters());
-    }, []);
-
     const handleSelectAnalyticsView = useCallback((viewId) => {
         if (!viewId) {
             resetToEmptyView();
@@ -290,7 +270,7 @@ function Analytics() {
             setCurrentViewName(view.name);
             setGlobalDateRange({ start: null, end: null });
         }
-    }, [analyticsViews, applyAnalyticsViewLayout, resetToEmptyView]);
+    }, [analyticsViews, applyAnalyticsViewLayout, resetToEmptyView, setGlobalDateRange]);
 
     const buildCurrentLayoutPayload = useCallback(() => createDashboardLayoutPayload({
         layout,
@@ -422,6 +402,7 @@ function Analytics() {
                     globalDateRange={globalDateRange}
                     onGlobalDateRangeChange={handleDateRangeChange}
                     globalFilters={globalFilters}
+                    onResetFilters={handleResetGlobalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
                     onPageGrid
@@ -435,6 +416,7 @@ function Analytics() {
         handleCloseWindow,
         handleDateRangeChange,
         handleOpenQueryConsole,
+        handleResetGlobalFilters,
         handleSplit,
         layout,
         selectedWindowId,

@@ -7,6 +7,7 @@ import {
 import { sanitizeDashboardLayoutPayload } from '../../analytics/dashboardState';
 import { useAnalyticsViews } from '../../../hooks/useDashboardQueries';
 import { useAnalyticsPageData } from '../../../hooks/useAnalyticsPageData';
+import { ChartError, ChartLoading } from '../../analytics/ChartStates';
 import useGoalAnalyticsRead from '../../analytics/useGoalAnalyticsRead';
 import AnalyticsEvidenceNotice from '../../analytics/AnalyticsEvidenceNotice';
 import SavedViewChart from '../../analytics/SavedViewChart';
@@ -192,7 +193,7 @@ export default function AnalyticsWidget({ state, sharedData, viewMode = 'overvie
     return (
         <div className="surface-analytics" data-no-panel-drag="true" ref={frameRef}>
             <AnalyticsEvidenceNotice {...analyticsData} />
-            {chartRead.isFetching || analyticsData.evidenceLoading ? <div role="status">Loading analytics…</div> : chartRead.isError || analyticsData.evidenceError ? <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => chartRead.isError ? chartRead.refetch() : analyticsData.retryEvidence()}>Retry</button></div> : resolved.queryProfileView ? (
+            {chartRead.isFetching || analyticsData.evidenceLoading ? <ChartLoading /> : chartRead.isError || analyticsData.evidenceError ? <ChartError onRetry={() => (chartRead.isError ? chartRead.refetch() : analyticsData.retryEvidence())} /> : resolved.queryProfileView ? (
                 renderQueryProfileView()
             ) : savedViewId && resolved.layout ? (
                 // Saved views render through the shared chart path, so their activity and goal apply.

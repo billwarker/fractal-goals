@@ -10,7 +10,7 @@ import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import StatCard from '../shared/StatCard';
-import { SessionTrendsChart, SessionTrendsControls } from './SessionTrends';
+import { SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
 
 function SessionSummaryChart({ context }) {
     const { sessions } = context.scopedData;
@@ -40,8 +40,10 @@ function SessionTrendsVisualizationChart({ context }) {
             <SessionTrendsChart
                 sessions={context.scopedData.sessions}
                 chartRef={context.chartRef}
-                grain={context.visualizationState.grain || 'week'}
-                metrics={context.visualizationState.metrics || ['sessions', 'duration']}
+                // Saved views from before calendar grains may hold "year"; those read as automatic.
+                grain={['day', 'week', 'month'].includes(context.visualizationState.grain) ? context.visualizationState.grain : 'auto'}
+                measure={sessionTrendMeasure(context.visualizationState)}
+                range={context.dateRange}
             />
         </div>
     );
@@ -149,7 +151,8 @@ export const SESSION_VISUALIZATIONS = [
         category: 'sessions',
         name: 'Session Trends',
         iconType: 'sessions:sessionTrends',
-        defaultState: { grain: 'week', metrics: ['sessions', 'duration'] },
+        // No default measure, so a saved view's older `metrics` list still decides it.
+        defaultState: { grain: 'auto' },
         selectionRequirements: {},
         Chart: SessionTrendsVisualizationChart,
         Controls: SessionTrendsControls,

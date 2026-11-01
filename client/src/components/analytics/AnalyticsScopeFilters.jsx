@@ -43,8 +43,8 @@ function programDayOptions(sessions) {
 const optionTitle = (option) => (option.group ? `${option.group.name} · ${option.name}` : option.name);
 
 const SESSION_SCOPES = [
-    { key: 'templateIds', label: 'Session template', plural: 'Templates', any: 'Any template' },
-    { key: 'programDayIds', label: 'Program day', plural: 'Program Days', any: 'Any program day' },
+    { key: 'templateIds', filterId: 'templates', label: 'Session template', plural: 'Templates', any: 'Any template' },
+    { key: 'programDayIds', filterId: 'programDays', label: 'Program day', plural: 'Program Days', any: 'Any program day' },
 ];
 
 function SectionHeader({ title, status, onClear }) {
@@ -61,13 +61,15 @@ function SectionHeader({ title, status, onClear }) {
 }
 
 /**
- * Global scope by tags, session template and program day, shown only while a chart they affect is
- * open (`relevance`: tags for activity charts, template and program day for session and activity
- * charts) or while they're set, so they can be cleared. Tags use the same chips as the Progress
- * pane's Compare with, and match either every chosen tag or exactly the chosen set (how the Progress
- * pane compares; none chosen then means untagged sessions).
+ * Global scope by tags, session template and program day. The pane decides which show (`visible`,
+ * from the charts' filter capabilities); a template or program-day filter also hides while no
+ * session has one, unless it's set. Tags use the same chips as the Progress pane's Compare with, and
+ * match either every chosen tag or exactly the chosen set (how the Progress pane compares; none
+ * chosen then means untagged sessions).
  */
-export default function AnalyticsScopeFilters({ rootId, filters, sessions = [], onUpdate, relevance = { tags: true, sessions: true } }) {
+export default function AnalyticsScopeFilters({
+    rootId, filters, sessions = [], onUpdate, visible = { tags: true, templates: true, programDays: true },
+}) {
     const { data: catalog } = useActivityTagCatalog(rootId);
     const templates = useMemo(() => templateOptions(sessions), [sessions]);
     const programDays = useMemo(() => programDayOptions(sessions), [sessions]);
@@ -77,15 +79,15 @@ export default function AnalyticsScopeFilters({ rootId, filters, sessions = [], 
 
     const setTags = (next) => onUpdate((current) => ({ ...current, tags: next }));
     const setSessions = (key, ids) => onUpdate((current) => ({ ...current, sessions: { ...current.sessions, [key]: ids } }));
-    const showTags = relevance.tags || Boolean(filters.tags);
+    const showTags = visible.tags || Boolean(filters.tags);
     const sessionSections = SESSION_SCOPES
-        .filter(({ key }) => filters.sessions[key].length > 0 || (relevance.sessions && optionsByKey[key].length > 0));
+        .filter(({ key, filterId }) => filters.sessions[key].length > 0 || (visible[filterId] && optionsByKey[key].length > 0));
     const picking = SESSION_SCOPES.find((scope) => scope.key === pickingKey) || null;
 
     return (
         <>
             {showTags ? (
-                <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label="Tag filter">
+                <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label="Tag filter" data-filter-section="tags">
                     <SectionHeader
                         title="Tags"
                         status={filters.tags ? (tagIds.length ? `${tagIds.length} selected` : 'Untagged') : 'Any'}
@@ -107,11 +109,11 @@ export default function AnalyticsScopeFilters({ rootId, filters, sessions = [], 
                     </label>
                 </section>
             ) : null}
-            {sessionSections.map(({ key, label, plural, any }) => {
+            {sessionSections.map(({ key, filterId, label, plural, any }) => {
                 const selected = filters.sessions[key];
                 const names = optionsByKey[key].filter((option) => selected.includes(option.id)).map(optionTitle);
                 return (
-                    <section key={key} className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label={`${label} filter`}>
+                    <section key={key} className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label={`${label} filter`} data-filter-section={filterId}>
                         <SectionHeader
                             title={label}
                             status={selected.length ? `${selected.length} selected` : 'Any'}

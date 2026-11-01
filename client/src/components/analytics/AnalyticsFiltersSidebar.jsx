@@ -1,12 +1,14 @@
-import React, { Suspense, lazy, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useRef, useState } from 'react';
 
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import ActivityFilterModal from '../common/ActivityFilterModal';
 import DateRangeFilter from '../common/DateRangeFilter';
 import GoalHierarchySelectionModal from '../goals/GoalHierarchySelectionModal';
-import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters, scopeFilterRelevance } from './analyticsGlobalFilters';
+import AnalyticsActiveFilterChips, { AddFilterToggles } from './AnalyticsActiveFilterChips';
+import { hasActiveGlobalFilters, normalizeGlobalFilters, resolveAnalyticsGlobalFilters } from './analyticsGlobalFilters';
 import { getVisualization } from './visualizations/registry';
+import useAnalyticsFilterPane from './useAnalyticsFilterPane';
 import {
     getVisualizationStateUpdate,
     normalizeVisualizationState,
@@ -49,14 +51,8 @@ function AnalyticsFiltersSidebar({
     const [isProfileGoalModalOpen, setIsProfileGoalModalOpen] = useState(false);
     const [isGlobalScopeCollapsed, setIsGlobalScopeCollapsed] = useState(false);
     const [isSelectedPanelCollapsed, setIsSelectedPanelCollapsed] = useState(false);
+    const sidebarRef = useRef(null);
     const normalized = useMemo(() => normalizeGlobalFilters(filters), [filters]);
-    const activeFilterCount = [
-        Boolean(dateRange?.start || dateRange?.end),
-        normalized.goals.goalIds.length > 0,
-        normalized.activities.activityIds.length > 0 || normalized.activities.groupIds.length > 0,
-        Boolean(normalized.tags),
-        normalized.sessions.templateIds.length > 0 || normalized.sessions.programDayIds.length > 0,
-    ].filter(Boolean).length;
 
     const selectedGoalNames = useMemo(
         () => goals
@@ -151,10 +147,6 @@ function AnalyticsFiltersSidebar({
         selectedGoal,
         selectedVisualizationMeta,
     ]);
-    const selectedVisualizationLabel = [
-        selectedWindowState?.selectedCategory,
-        selectedWindowState?.selectedVisualization,
-    ].filter(Boolean).join(' / ');
     const metricDefinitions = selectedActivityDef?.metric_definitions || [];
     const multiplicativeMetrics = metricDefinitions.filter((metric) => metric.is_multiplicative !== false);
     const metricOptions = [
@@ -175,11 +167,88 @@ function AnalyticsFiltersSidebar({
     ), [profileActivities, activityInstances]);
     const SelectedControls = selectedVisualizationMeta?.Controls || null;
 
+    const {
+        active, chartName, isVisible, optionalFilters, notAppliedTo, toggleShownFilter, removeFilter,
+    } = useAnalyticsFilterPane({
+        selectedWindowState, selectedVisualizationMeta, windowStates, visualizationState, normalized, dateRange,
+        updateVisualizationState, updateFilters, onDateRangeChange,
+    });
+    const editFilter = (id) => {
+        if (id === 'goals') return setIsGoalModalOpen(true);
+        if (id === 'activities') return setIsActivityModalOpen(true);
+        setIsGlobalScopeCollapsed(false);
+        return requestAnimationFrame(() => {
+            const section = sidebarRef.current?.querySelector(`[data-filter-section="${id}"]`);
+            section?.scrollIntoView?.({ block: 'nearest' });
+            section?.querySelector('button, input')?.focus();
+        });
+    };
+
+    const chartSection = (
+        <div className="sessions-query-section-group">
+            <div className="sessions-query-section-group-title-row">
+                <div className="sessions-query-section-group-title">Chart</div>
+                <button
+                    type="button"
+                    className="sessions-query-section-toggle"
+                    onClick={() => setIsSelectedPanelCollapsed((collapsed) => !collapsed)}
+                    aria-expanded={!isSelectedPanelCollapsed}
+                >
+                    {isSelectedPanelCollapsed ? 'Show' : 'Hide'}
+                </button>
+            </div>
+
+            {!isSelectedPanelCollapsed && (
+            <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">
+            {!selectedWindowState?.selectedVisualization && (
+                <div className="sessions-query-empty">
+                    Select a visualization panel to show its controls.
+                </div>
+            )}
+
+            {selectedWindowState?.selectedVisualization && (
+                <div className="sessions-query-summary">
+                    <div>{chartName || selectedWindowState.selectedVisualization}</div>
+                    {selectedPanelUsesScopedChoices && hasScopedChoices && (
+                        <div>Choices follow global scope.</div>
+                    )}
+                </div>
+            )}
+
+            {SelectedControls && (
+                <SelectedControls
+                    context={{
+                        metricDefinitions,
+                        metricOptions,
+                        onOpenActivityModal: () => setIsProfileActivityModalOpen(true),
+                        onOpenGoalModal: () => setIsProfileGoalModalOpen(true),
+                        profileActivities,
+                        profileGoals,
+                        selectedActivityDef,
+                        selectedGoalDef,
+                        selectedMetricId,
+                        selectedMetricXId,
+                        selectedMetricYId,
+                        selectedMetricY2Id,
+                        selectedWindowState,
+                        selectedVisualizationMeta,
+                        updateSelectedWindow,
+                        updateVisualizationState,
+                        visualization: selectedVisualizationMeta,
+                        visualizationState,
+                    }}
+                />
+            )}
+            </section>
+            )}
+        </div>
+    );
+
     return (
-        <div className="sessions-query-sidebar">
+        <div className="sessions-query-sidebar" ref={sidebarRef}>
             <SidePaneHeader
                 title="Filters"
-                subtitle={`${activeFilterCount} active`}
+                subtitle={`${active.length} active`}
                 actions={(
                     <>
                         <SidePaneHeaderButton
@@ -205,9 +274,26 @@ function AnalyticsFiltersSidebar({
             />
 
             <div className="sessions-query-sidebar-content">
+                {active.length > 0 && (
+                    <div className="sessions-query-section-group">
+                        <AnalyticsActiveFilterChips
+                            active={active}
+                            filters={normalized}
+                            dateRange={dateRange}
+                            goalNames={selectedGoalNames}
+                            activityNames={[...selectedActivityNames, ...selectedGroupNames]}
+                            notAppliedTo={notAppliedTo}
+                            onEdit={editFilter}
+                            onRemove={removeFilter}
+                        />
+                    </div>
+                )}
+
+                {selectedWindowState ? chartSection : null}
+
                 <div className="sessions-query-section-group">
                     <div className="sessions-query-section-group-title-row">
-                        <div className="sessions-query-section-group-title">Global Scope</div>
+                        <div className="sessions-query-section-group-title">Filters</div>
                         <button
                             type="button"
                             className="sessions-query-section-toggle"
@@ -220,126 +306,84 @@ function AnalyticsFiltersSidebar({
 
                     {!isGlobalScopeCollapsed && (
                     <>
-                    <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">
-                        <div className="sessions-query-sidebar-section-header">
-                            <h4>Time Range</h4>
-                        </div>
-                        <DateRangeFilter
-                            value={dateRange}
-                            onChange={(range) => onDateRangeChange?.(range)}
-                            classNames={SIDEBAR_DATE_RANGE_CLASSES}
-                        />
-                    </section>
+                    {isVisible('timeRange') && (
+                        <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" data-filter-section="timeRange">
+                            <div className="sessions-query-sidebar-section-header">
+                                <h4>Time Range</h4>
+                            </div>
+                            <DateRangeFilter
+                                value={dateRange}
+                                onChange={(range) => onDateRangeChange?.(range)}
+                                classNames={SIDEBAR_DATE_RANGE_CLASSES}
+                            />
+                        </section>
+                    )}
 
-                    <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">
-                        <div className="sessions-query-sidebar-section-header">
-                            <h4>Goals</h4>
-                            <span>{normalized.goals.goalIds.length} selected</span>
-                        </div>
-                        <button
-                            type="button"
-                            className="sessions-query-picker-button"
-                            onClick={() => setIsGoalModalOpen(true)}
-                            disabled={goals.length === 0}
-                        >
-                            {normalized.goals.goalIds.length > 0
-                                ? `Choose Goals (${normalized.goals.goalIds.length})`
-                                : 'Choose Goals'}
-                        </button>
-                        <div className="sessions-query-selection-preview">
-                            {selectedGoalNames.length > 0 ? selectedGoalNames.join(', ') : 'All goals'}
-                        </div>
-                    </section>
+                    {isVisible('goals') && (
+                        <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" data-filter-section="goals">
+                            <div className="sessions-query-sidebar-section-header">
+                                <h4>Goals</h4>
+                                <span>{normalized.goals.goalIds.length} selected</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="sessions-query-picker-button"
+                                onClick={() => setIsGoalModalOpen(true)}
+                                disabled={goals.length === 0}
+                            >
+                                {normalized.goals.goalIds.length > 0
+                                    ? `Choose Goals (${normalized.goals.goalIds.length})`
+                                    : 'Choose Goals'}
+                            </button>
+                            <div className="sessions-query-selection-preview">
+                                {selectedGoalNames.length > 0 ? selectedGoalNames.join(', ') : 'All goals'}
+                            </div>
+                        </section>
+                    )}
 
-                    <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">
-                        <div className="sessions-query-sidebar-section-header">
-                            <h4>Activities</h4>
-                            <span>{normalized.activities.activityIds.length + normalized.activities.groupIds.length} selected</span>
-                        </div>
-                        <button
-                            type="button"
-                            className="sessions-query-picker-button"
-                            onClick={() => setIsActivityModalOpen(true)}
-                            disabled={activities.length === 0}
-                        >
-                            {normalized.activities.activityIds.length + normalized.activities.groupIds.length > 0
-                                ? `Choose Activities (${normalized.activities.activityIds.length + normalized.activities.groupIds.length})`
-                                : 'Choose Activities'}
-                        </button>
-                        <div className="sessions-query-selection-preview">
-                            {[...selectedActivityNames, ...selectedGroupNames].length > 0
-                                ? [...selectedActivityNames, ...selectedGroupNames].join(', ')
-                                : 'All activities'}
-                        </div>
-                    </section>
-                    <Suspense fallback={null}>
-                        <AnalyticsScopeFilters
-                            rootId={rootId}
-                            filters={normalized}
-                            sessions={sessions}
-                            onUpdate={updateFilters}
-                            relevance={scopeFilterRelevance(windowStates)}
-                        />
-                    </Suspense>
+                    {isVisible('activities') && (
+                        <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" data-filter-section="activities">
+                            <div className="sessions-query-sidebar-section-header">
+                                <h4>Activities</h4>
+                                <span>{normalized.activities.activityIds.length + normalized.activities.groupIds.length} selected</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="sessions-query-picker-button"
+                                onClick={() => setIsActivityModalOpen(true)}
+                                disabled={activities.length === 0}
+                            >
+                                {normalized.activities.activityIds.length + normalized.activities.groupIds.length > 0
+                                    ? `Choose Activities (${normalized.activities.activityIds.length + normalized.activities.groupIds.length})`
+                                    : 'Choose Activities'}
+                            </button>
+                            <div className="sessions-query-selection-preview">
+                                {[...selectedActivityNames, ...selectedGroupNames].length > 0
+                                    ? [...selectedActivityNames, ...selectedGroupNames].join(', ')
+                                    : 'All activities'}
+                            </div>
+                        </section>
+                    )}
+                    {(isVisible('tags') || isVisible('templates') || isVisible('programDays')) && (
+                        <Suspense fallback={null}>
+                            <AnalyticsScopeFilters
+                                rootId={rootId}
+                                filters={normalized}
+                                sessions={sessions}
+                                onUpdate={updateFilters}
+                                visible={{ tags: isVisible('tags'), templates: isVisible('templates'), programDays: isVisible('programDays') }}
+                            />
+                        </Suspense>
+                    )}
+
+                    <AddFilterToggles
+                        chartName={chartName}
+                        optionalFilters={optionalFilters}
+                        isVisible={isVisible}
+                        active={active}
+                        onToggle={toggleShownFilter}
+                    />
                     </>
-                    )}
-                </div>
-
-                <div className="sessions-query-section-group">
-                    <div className="sessions-query-section-group-title-row">
-                        <div className="sessions-query-section-group-title">Selected Panel</div>
-                        <button
-                            type="button"
-                            className="sessions-query-section-toggle"
-                            onClick={() => setIsSelectedPanelCollapsed((collapsed) => !collapsed)}
-                            aria-expanded={!isSelectedPanelCollapsed}
-                        >
-                            {isSelectedPanelCollapsed ? 'Show' : 'Hide'}
-                        </button>
-                    </div>
-
-                    {!isSelectedPanelCollapsed && (
-                    <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact">
-                    {!selectedWindowState?.selectedVisualization && (
-                        <div className="sessions-query-empty">
-                            Select a visualization panel to show its controls.
-                        </div>
-                    )}
-
-                    {selectedWindowState?.selectedVisualization && (
-                        <div className="sessions-query-summary">
-                            <div>{selectedVisualizationLabel}</div>
-                            {selectedPanelUsesScopedChoices && hasScopedChoices && (
-                                <div>Choices follow global scope.</div>
-                            )}
-                        </div>
-                    )}
-
-                    {SelectedControls && (
-                        <SelectedControls
-                            context={{
-                                metricDefinitions,
-                                metricOptions,
-                                onOpenActivityModal: () => setIsProfileActivityModalOpen(true),
-                                onOpenGoalModal: () => setIsProfileGoalModalOpen(true),
-                                profileActivities,
-                                profileGoals,
-                                selectedActivityDef,
-                                selectedGoalDef,
-                                selectedMetricId,
-                                selectedMetricXId,
-                                selectedMetricYId,
-                                selectedMetricY2Id,
-                                selectedWindowState,
-                                selectedVisualizationMeta,
-                                updateSelectedWindow,
-                                updateVisualizationState,
-                                visualization: selectedVisualizationMeta,
-                                visualizationState,
-                            }}
-                        />
-                    )}
-                    </section>
                     )}
                 </div>
             </div>

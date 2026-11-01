@@ -34,6 +34,7 @@
     "src/utils/chartGoalPrefill.js",
     "src/utils/chartGrain.js",
     "src/components/analytics/series/buildSeries.js",
+    "src/components/analytics/visualizations/capabilities.js",
     "src/utils/goalConditionSeries.js",
     "src/utils/goalTreeCache.js",
     "src/utils/goalHierarchyFilters.js",

@@ -46,9 +46,7 @@ describe('analytics visualization registry', () => {
             showGroups: false,
             limit: 15,
         });
-        expect(getVisualizationDefaultState('activities', 'activityTrends')).toEqual({
-            metrics: ['instances', 'duration'],
-        });
+        expect(getVisualizationDefaultState('activities', 'activityTrends')).toEqual({ grain: 'auto' });
         expect(getVisualizationDefaultState('activities', 'metricTrends')).toEqual({
             setsHandling: 'top',
             selectedSplit: 'all',
@@ -57,10 +55,7 @@ describe('analytics visualization registry', () => {
         expect(getVisualizationDefaultState('activities', 'metricProgress')).toEqual({
             metric: null,
         });
-        expect(getVisualizationDefaultState('sessions', 'sessionTrends')).toEqual({
-            grain: 'week',
-            metrics: ['sessions', 'duration'],
-        });
+        expect(getVisualizationDefaultState('sessions', 'sessionTrends')).toEqual({ grain: 'auto' });
         expect(getVisualizationDefaultState('sessions', 'startDistribution')).toEqual({
             markers: ['start'],
         });
@@ -113,9 +108,7 @@ describe('analytics visualization registry', () => {
             ...getVisualizationSelectionUpdate(updatedTotals, 'activityTrends'),
         };
 
-        expect(selectedActivityTrends.visualizationState).toEqual({
-            metrics: ['instances', 'duration'],
-        });
+        expect(selectedActivityTrends.visualizationState).toEqual({ grain: 'auto' });
         expect(selectedActivityTrends.visualizationStateByKey['activities:activityFrequency']).toEqual({
             metric: 'duration',
             showGroups: false,
@@ -144,6 +137,7 @@ describe('analytics visualization registry', () => {
                 },
             },
         })).toEqual({
+            grain: 'auto',
             metrics: ['duration'],
         });
     });
@@ -158,10 +152,7 @@ describe('analytics visualization registry', () => {
         expect(normalizeVisualizationState({
             selectedCategory: 'sessions',
             selectedVisualization: 'weeklyChart',
-        })).toEqual({
-            grain: 'week',
-            metrics: ['sessions', 'duration'],
-        });
+        })).toEqual({ grain: 'auto' });
     });
 
     it('removes retired session graph cards from the sessions registry', () => {

@@ -7,7 +7,7 @@ import {
     GoalMomentumChart,
     StaleGoalsChart,
 } from '../../AnalyticsExtraCharts';
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity } from '../../ChartJSWrapper';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import GoalCompletionTimeline from '../../GoalCompletionTimeline';
 import GoalTimeDistribution from '../../GoalTimeDistribution';
 import styles from '../../ProfileWindow.module.css';
@@ -17,7 +17,7 @@ import EmptyControls from '../shared/EmptyControls';
 import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
 
-function getActivityChartData(goal) {
+function getActivityChartData(goal, color) {
     if (!goal?.activity_breakdown?.length) {
         return { labels: [], datasets: [] };
     }
@@ -27,15 +27,14 @@ function getActivityChartData(goal) {
         datasets: [{
             label: 'Instances',
             data: sortedActivities.map((activity) => activity.instance_count),
-            backgroundColor: '#2196f3',
-            borderColor: '#1976d2',
-            borderWidth: 1,
+            backgroundColor: color,
             borderRadius: 4,
+            borderSkipped: 'start',
         }],
     };
 }
 
-function getDurationChartData(goal) {
+function getDurationChartData(goal, color) {
     if (!goal?.session_durations_by_date?.length) {
         return { labels: [], datasets: [] };
     }
@@ -44,8 +43,9 @@ function getDurationChartData(goal) {
         datasets: [{
             label: 'Duration (minutes)',
             data: goal.session_durations_by_date.map((session) => Math.round(session.duration_seconds / 60)),
-            borderColor: '#4caf50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+            borderColor: color,
+            backgroundColor: `${color}1a`,
+            borderWidth: 2,
             fill: true,
             tension: 0.3,
             pointRadius: 4,
@@ -181,11 +181,16 @@ function GoalMomentumVisualizationChart({ context }) {
 }
 
 function StaleGoalsVisualizationChart({ context }) {
-    return <div className={styles.vizContainer}><StaleGoalsChart goals={context.scopedData.goals} /></div>;
+    return (
+        <div className={styles.vizContainer}>
+            <StaleGoalsChart goals={context.scopedData.goals} rootId={context.data?.rootId} getGoalColor={context.getGoalTypeColor} />
+        </div>
+    );
 }
 
 function GoalDetailChart({ context }) {
     const density = useChartDensity();
+    const chartTheme = useChartThemeDefaults();
     const { effectiveSelectedGoal, getGoalTypeColor } = context;
     const selectedChart = context.visualizationState.chart || 'duration';
     if (!effectiveSelectedGoal) {
@@ -207,11 +212,11 @@ function GoalDetailChart({ context }) {
             <div className={styles.chartContainer}>
                 {selectedChart === 'duration' ? (
                     effectiveSelectedGoal.session_durations_by_date?.length > 0
-                        ? <Line data={getDurationChartData(effectiveSelectedGoal)} options={applyChartDensity(durationChartOptions, density)} />
+                        ? <Line data={getDurationChartData(effectiveSelectedGoal, chartTheme.seriesColors[0])} options={applyChartDensity(durationChartOptions, density)} />
                         : <div className={styles.noData}>No session data available</div>
                 ) : (
                     effectiveSelectedGoal.activity_breakdown?.length > 0
-                        ? <Bar data={getActivityChartData(effectiveSelectedGoal)} options={applyChartDensity(activityChartOptions, density)} />
+                        ? <Bar data={getActivityChartData(effectiveSelectedGoal, chartTheme.seriesColors[0])} options={applyChartDensity(activityChartOptions, density)} />
                         : <div className={styles.noData}>No activities recorded</div>
                 )}
             </div>

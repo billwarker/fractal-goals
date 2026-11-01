@@ -95,6 +95,24 @@ Fix `chartGoalPrefill.js` to use `snapMetricValue` instead of `roundValue`.
 - In compact density the legend collapses to a "n series" chip that opens `ChartLegendPanel`, instead of disappearing.
 - Stale Goals moves to CSS-module rows that use the frame and open the goal on click. This is normalisation only, not a feature expansion.
 
+**Phase 1 completion (as built):**
+- **Shared states:** `ChartStates.jsx` (`ChartLoading`, `ChartError`, `ChartEmpty`, `ChartScopeProvider`) is used by `ProfileWindow`, `SavedViewChart` and `AnalyticsWidget`. On the Analytics page, an empty chart says when filters may be the reason and offers "Clear filters", which resets the global filters and the time range.
+- **No dual axes:**
+  - Session Trends and Activity Trends showed two measures on two y-axes. Each now shows one measure ("Sessions | Time" and "Times done | Time").
+  - Saved views keep their first `metrics` entry; there is deliberately no default `measure`, so the old list still decides.
+  - Both charts share `utils/chartGrain.bucketRows` and `visualizations/shared/BucketBarChart.jsx`, with calendar grain (Auto/Day/Week/Month, "Year" saved views read as Auto), gaps for empty periods, hours on the axis, and tooltips giving the bucket range.
+  - **Deferred to Phase 4:** Metric Trends still plots two metrics on two axes. The annotation code reads those per-metric axes, so it should move to small multiples alongside annotation mode.
+- **Series and colour:**
+  - Section Time and Activities by Group use `series/SeriesDoughnut.jsx`: the validated palette in stable name order, 8 slices plus "Other", and the legend panel.
+  - Every single-series bar uses `--chart-series-1`, with no legend and no in-canvas title (the panel names the chart).
+  - Metric Trends and Goal Detail take their colours from the theme tokens.
+- **Formatting:**
+  - The local duration formatters are gone; `analytics/formatDuration.js` delegates to `utils/chartFormat.js`, so "1h 0m" now reads "1h".
+  - Goal Momentum and Activity Totals show time in hours.
+  - Completion Rate shows % with "n of m" and orders levels by rank.
+- **Stale Goals:** rows are links to `/:rootId/goals?goal=<id>` (new `hooks/useGoalDeepLink.js`), which opens the goal's real details panel on the Goals page. A row shows the level colour, the level, the last activity date and the days since.
+- **Analytics page:** the global range and filter state moved into `useAnalyticsGlobalScope.js`, which also keeps the page under its size budget.
+
 ### Phase 2 — Filter pane that fits the chart
 
 Restructure `AnalyticsFiltersSidebar.jsx` from top to bottom:
@@ -107,6 +125,15 @@ Restructure `AnalyticsFiltersSidebar.jsx` from top to bottom:
 **Persistence:** each window state stores `shownFilters: string[]` (the optional filters the user added). `dashboardState.js` sanitizes it, the view layout version becomes v2, and the v1 → v2 migration happens in `sanitizeDashboardLayoutPayload`. Unsaved panels start from the manifest defaults. With several panels open, the Filters section shows the union of their core filters, and each chip names the panels it applies to.
 
 Mobile keeps `ResponsiveSidePane`. The chips row stays sticky at the top of the sheet.
+
+**As built (Phase 2):**
+- `visualizations/capabilities.js` declares each chart's filters. Category defaults follow what each filter actually reaches in `analyticsGlobalFilters.js`: goals and activities reach every chart, tags only activity charts, and template and program day reach session and activity charts. Goal charts take the range, goals and activities only. A registry entry can override with `capabilities.filters`. `scopeFilterRelevance` is retired.
+- `useAnalyticsFilterPane.js` decides which sections show (`filterSections`), which filters the selected chart ignores, toggling optional filters, and clearing a filter from its chip.
+- Chips (`AnalyticsActiveFilterChips.jsx`) use the `Badge` atom. A chip for a filter the chart ignores is dashed and dimmed, and its accessible name says "not applied to ‹chart›".
+- **Only the time range shows by default** (decided after review). Goals, Activities, Tags, Session template and Program day sit behind an always-present **+ Add filters** button: "+ Add filters for ‹chart›" with a chart selected, offering only the filters that chart uses; plain "+ Add filters" with none selected, offering what the open charts use, or everything on an empty page.
+- With no chart selected, added filters are kept for the visit (local pane state); with a chart selected, they are saved with that chart.
+- The button opens an inline list of toggles rather than a portalled menu, since the pane already scrolls. A filter that's set stays shown, so it can always be edited.
+- `shownFilters` lives in the chart's own `visualizationState`, so it is saved per chart with the view. No layout version bump was needed: older views lack the key and get the chart's defaults.
 
 ### Phase 3 — Group by
 

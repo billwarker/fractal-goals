@@ -218,10 +218,10 @@ describe('ProfileWindow', () => {
 
         expect(updateWindowState).toHaveBeenCalledWith(expect.objectContaining({
             selectedVisualization: 'activityTrends',
-            visualizationState: { metrics: ['instances', 'duration'] },
+            visualizationState: { grain: 'auto' },
             visualizationStateByKey: expect.objectContaining({
                 'activities:activityFrequency': { metric: 'duration', showGroups: false, limit: 8 },
-                'activities:activityTrends': { metrics: ['instances', 'duration'] },
+                'activities:activityTrends': { grain: 'auto' },
             }),
         }));
     });

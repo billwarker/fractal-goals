@@ -1,12 +1,17 @@
 import React, { useMemo } from 'react';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
+import { Link } from 'react-router-dom';
 
-import EmptyState from '../common/EmptyState';
+import { goalDeepLink } from '../../hooks/useGoalDeepLink';
+import { formatDuration } from '../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
-import { formatDurationSeconds } from '../../utils/formatters';
+import { ChartEmpty } from './ChartStates';
+import SeriesDoughnut from './series/SeriesDoughnut';
+import styles from './AnalyticsExtraCharts.module.css';
 
-const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#64748b'];
 const DEFAULT_TIME_MARKERS = ['start'];
+const STALE_AFTER_DAYS = 14;
+const STALE_LIMIT = 10;
 
 function getSessionDate(session) {
     const value = session?.session_start || session?.created_at;
@@ -14,55 +19,49 @@ function getSessionDate(session) {
     return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-function EmptyChart({ title, children = 'No data available yet' }) {
-    return (
-        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {title && <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>{title}</h3>}
-            <EmptyState compact description={children} />
-        </div>
-    );
-}
-
-function chartScaffoldOptions(title, yAxisLabel, chartTheme, isTimeScale = false) {
+/**
+ * Bar chart options shared by these charts. The panel header names the chart, so there's no title
+ * inside it; a single series needs no legend; values read through `formatValue`.
+ */
+function barOptions(chartTheme, { valueTitle, formatValue = null, tickFormat = undefined, horizontal = false, legend = false }) {
+    const valueAxis = horizontal ? 'x' : 'y';
+    const categoryAxis = horizontal ? 'y' : 'x';
     return {
         responsive: true,
         maintainAspectRatio: false,
+        indexAxis: horizontal ? 'y' : 'x',
         ...DISABLED_CHART_ANIMATION,
         plugins: {
             legend: {
-                display: true,
+                display: legend,
                 position: 'top',
                 labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
             },
-            title: { display: Boolean(title), text: title, color: chartTheme.textColor },
             tooltip: {
                 backgroundColor: chartTheme.tooltipBg,
                 titleColor: chartTheme.tooltipText,
                 bodyColor: chartTheme.tooltipBody,
                 padding: 12,
+                ...(formatValue ? { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatValue(ctx.raw)}` } } : {}),
             },
         },
         scales: {
-            x: {
-                type: isTimeScale ? 'time' : 'category',
-                time: isTimeScale ? { unit: 'day', displayFormats: { day: 'MMM d' } } : undefined,
-                ticks: { color: chartTheme.textColor },
-                grid: { color: chartTheme.gridColor },
-            },
-            y: {
+            [categoryAxis]: { ticks: { color: chartTheme.textColor }, grid: { display: false } },
+            [valueAxis]: {
                 beginAtZero: true,
-                title: { display: Boolean(yAxisLabel), text: yAxisLabel, color: chartTheme.textColor },
-                ticks: { color: chartTheme.textColor },
+                title: { display: Boolean(valueTitle), text: valueTitle, color: chartTheme.textColor },
+                ticks: { color: chartTheme.textColor, ...(tickFormat ? { callback: tickFormat } : { precision: 0 }) },
                 grid: { color: chartTheme.gridColor },
             },
         },
     };
 }
 
+/** Bars with rounded data ends anchored to the baseline. */
+const barMarks = (color) => ({ backgroundColor: color, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 48 });
+
 export function SessionSectionPie({ sessions = [], activityInstances = {}, chartRef }) {
-    const chartTheme = useChartThemeDefaults();
-    const density = useChartDensity();
-    const data = useMemo(() => {
+    const rows = useMemo(() => {
         const instanceDurations = new Map();
         Object.values(activityInstances).flat().forEach((instance) => {
             instanceDurations.set(instance.id, instance.duration_seconds || 0);
@@ -75,27 +74,15 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
                 if (total > 0) totals.set(sectionName, (totals.get(sectionName) || 0) + total);
             });
         });
-        const rows = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
-        return {
-            labels: rows.map(([label]) => label),
-            datasets: [{ data: rows.map(([, seconds]) => seconds), backgroundColor: rows.map((_, index) => palette[index % palette.length]), borderWidth: 0 }],
-        };
+        return [...totals.entries()].map(([label, value]) => ({ key: label, label, value }));
     }, [activityInstances, sessions]);
-    if (!data.labels.length) return <EmptyChart title="Time Spent By Session Section">Section duration appears after activities have tracked time inside session sections.</EmptyChart>;
     return (
-        <Doughnut
-            ref={chartRef}
-            data={data}
-            options={applyChartDensity({
-                responsive: true,
-                maintainAspectRatio: false,
-                ...DISABLED_CHART_ANIMATION,
-                plugins: {
-                    legend: { position: 'right', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8 } },
-                    title: { display: true, text: 'Time Spent By Session Section', color: chartTheme.textColor },
-                    tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${formatDurationSeconds(ctx.raw)}` } },
-                },
-            }, density)}
+        <SeriesDoughnut
+            rows={rows}
+            chartRef={chartRef}
+            formatValue={formatDuration}
+            title="Time by session section"
+            emptyDescription="Section time appears after activities have tracked time inside session sections."
         />
     );
 }
@@ -103,88 +90,129 @@ export function SessionSectionPie({ sessions = [], activityInstances = {}, chart
 export function GoalCompletionRateByLevel({ goals = [], chartRef }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    const data = useMemo(() => {
+    const rows = useMemo(() => {
         const counts = new Map();
-        goals.forEach((goal) => {
-            const key = (goal.type || 'Goal').replace('Goal', '') || 'Goal';
-            const current = counts.get(key) || { total: 0, completed: 0 };
-            current.total += 1;
-            if (goal.completed) current.completed += 1;
-            counts.set(key, current);
-        });
-        const rows = Array.from(counts.entries()).map(([label, value]) => ({
-            label,
-            rate: value.total ? Math.round((value.completed / value.total) * 100) : 0,
-        }));
-        return { labels: rows.map((row) => row.label), datasets: [{ label: 'Completion rate', data: rows.map((row) => row.rate), backgroundColor: palette[1] }] };
+        [...goals]
+            .sort((left, right) => (left.level_rank ?? 99) - (right.level_rank ?? 99))
+            .forEach((goal) => {
+                const key = goal.level_name || (goal.type || 'Goal').replace('Goal', '') || 'Goal';
+                const current = counts.get(key) || { total: 0, completed: 0 };
+                current.total += 1;
+                if (goal.completed) current.completed += 1;
+                counts.set(key, current);
+            });
+        return [...counts.entries()].map(([label, value]) => ({ label, ...value, rate: Math.round((value.completed / value.total) * 100) }));
     }, [goals]);
-    if (!data.labels.length) return <EmptyChart title="Goal Completion Rate By Level" />;
-    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Goal Completion Rate By Level', 'Percent', chartTheme), density)} />;
+    if (!rows.length) return <ChartEmpty description="Completion rates appear once goals exist in this scope." />;
+    const options = barOptions(chartTheme, { valueTitle: 'Completed', tickFormat: (value) => `${value}%` });
+    options.scales.y.max = 100;
+    options.plugins.tooltip.callbacks = {
+        label: (ctx) => `${rows[ctx.dataIndex].rate}% (${rows[ctx.dataIndex].completed} of ${rows[ctx.dataIndex].total})`,
+    };
+    return (
+        <Bar
+            ref={chartRef}
+            data={{ labels: rows.map((row) => row.label), datasets: [{ label: 'Completion rate', data: rows.map((row) => row.rate), ...barMarks(chartTheme.seriesColors[0]) }] }}
+            options={applyChartDensity(options, density)}
+        />
+    );
 }
 
 export function GoalAgingChart({ goals = [], chartRef }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    const data = useMemo(() => {
-        const buckets = [['0-7 days', 0], ['8-30 days', 0], ['31-90 days', 0], ['90+ days', 0]];
-        goals.filter((goal) => !goal.completed).forEach((goal) => {
+    const active = useMemo(() => goals.filter((goal) => !goal.completed), [goals]);
+    const counts = useMemo(() => {
+        const buckets = [['0–7 days', 0], ['8–30 days', 0], ['31–90 days', 0], ['90+ days', 0]];
+        active.forEach((goal) => {
             const age = goal.age_days || 0;
-            if (age <= 7) buckets[0][1] += 1;
-            else if (age <= 30) buckets[1][1] += 1;
-            else if (age <= 90) buckets[2][1] += 1;
-            else buckets[3][1] += 1;
+            const index = age <= 7 ? 0 : age <= 30 ? 1 : age <= 90 ? 2 : 3;
+            buckets[index][1] += 1;
         });
-        return { labels: buckets.map(([label]) => label), datasets: [{ label: 'Active goals', data: buckets.map(([, count]) => count), backgroundColor: palette[2] }] };
-    }, [goals]);
-    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Active Goal Aging', 'Goals', chartTheme), density)} />;
+        return buckets;
+    }, [active]);
+    if (!active.length) return <ChartEmpty description="Goal ages appear once there are active goals in this scope." />;
+    return (
+        <Bar
+            ref={chartRef}
+            data={{ labels: counts.map(([label]) => label), datasets: [{ label: 'Active goals', data: counts.map(([, count]) => count), ...barMarks(chartTheme.seriesColors[0]) }] }}
+            options={applyChartDensity(barOptions(chartTheme, { valueTitle: 'Active goals' }), density)}
+        />
+    );
 }
 
 export function GoalMomentumChart({ goals = [], chartRef }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    const data = useMemo(() => {
-        const rows = goals
-            .map((goal) => ({ label: goal.name, seconds: goal.activity_duration_seconds ?? (goal.activity_durations_by_date || []).reduce((sum, item) => sum + (item.duration_seconds || 0), 0) }))
-            .filter((row) => row.seconds > 0)
-            .sort((a, b) => b.seconds - a.seconds)
-            .slice(0, 12);
-        return { labels: rows.map((row) => row.label), datasets: [{ label: 'Activity time', data: rows.map((row) => Math.round(row.seconds / 60)), backgroundColor: palette[3] }] };
-    }, [goals]);
-    if (!data.labels.length) return <EmptyChart title="Goal Momentum" />;
-    return <Bar ref={chartRef} data={data} options={applyChartDensity({ ...chartScaffoldOptions('Goal Momentum', 'Minutes', chartTheme), indexAxis: 'y' }, density)} />;
+    const rows = useMemo(() => goals
+        .map((goal) => ({ label: goal.name, seconds: goal.activity_duration_seconds ?? (goal.activity_durations_by_date || []).reduce((sum, item) => sum + (item.duration_seconds || 0), 0) }))
+        .filter((row) => row.seconds > 0)
+        .sort((a, b) => b.seconds - a.seconds)
+        .slice(0, 12), [goals]);
+    if (!rows.length) return <ChartEmpty description="Goal momentum appears once activities on goals have tracked time." />;
+    return (
+        <Bar
+            ref={chartRef}
+            data={{ labels: rows.map((row) => row.label), datasets: [{ label: 'Activity time', data: rows.map((row) => row.seconds / 3600), ...barMarks(chartTheme.seriesColors[0]) }] }}
+            options={applyChartDensity(barOptions(chartTheme, {
+                horizontal: true, valueTitle: 'Hours', tickFormat: (value) => `${value}h`, formatValue: (hours) => formatDuration(hours * 3600),
+            }), density)}
+        />
+    );
 }
 
-export function StaleGoalsChart({ goals = [] }) {
-    const stale = useMemo(() => {
-        const now = new Date();
-        return goals
-            .filter((goal) => !goal.completed)
-            .map((goal) => {
-                const dates = [
-                    ...(goal.activity_durations_by_date || []).map((item) => item.date),
-                    ...(goal.session_durations_by_date || []).map((item) => item.date),
-                    goal.last_evidence_at,
-                    goal.created_at,
-                ].filter(Boolean).map((value) => new Date(value)).filter((date) => !Number.isNaN(date.getTime()));
-                const last = dates.length ? new Date(Math.max(...dates.map((date) => date.getTime()))) : null;
-                const days = last ? Math.floor((now - last) / 86400000) : 0;
-                return { goal, days };
-            })
-            .filter((row) => row.days >= 14)
-            .sort((a, b) => b.days - a.days)
-            .slice(0, 10);
-    }, [goals]);
-    if (!stale.length) return <EmptyChart title="Stale Goals">No active goals are stale by the current data.</EmptyChart>;
+export function staleGoalRows(goals = [], now = new Date()) {
+    return goals
+        .filter((goal) => !goal.completed)
+        .map((goal) => {
+            const dates = [
+                ...(goal.activity_durations_by_date || []).map((item) => item.date),
+                ...(goal.session_durations_by_date || []).map((item) => item.date),
+                goal.last_evidence_at,
+                goal.created_at,
+            ].filter(Boolean).map((value) => new Date(value)).filter((date) => !Number.isNaN(date.getTime()));
+            const last = dates.length ? new Date(Math.max(...dates.map((date) => date.getTime()))) : null;
+            return { goal, last, days: last ? Math.floor((now - last) / 86400000) : 0 };
+        })
+        .filter((row) => row.days >= STALE_AFTER_DAYS)
+        .sort((a, b) => b.days - a.days)
+        .slice(0, STALE_LIMIT);
+}
+
+/** Active goals with no evidence for two weeks or more, longest first; a row opens the goal. */
+export function StaleGoalsChart({ goals = [], rootId = null, getGoalColor = null }) {
+    const stale = useMemo(() => staleGoalRows(goals), [goals]);
+    if (!stale.length) {
+        return <ChartEmpty title="No stale goals" description={`Every active goal has had activity in the last ${STALE_AFTER_DAYS} days.`} />;
+    }
     return (
-        <div style={{ height: '100%', overflow: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <h3 style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>Stale Goals</h3>
-            {stale.map(({ goal, days }) => (
-                <div key={goal.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: 10, border: '1px solid var(--color-border)', borderRadius: 6 }}>
-                    <span style={{ color: 'var(--color-text-primary)' }}>{goal.name}</span>
-                    <span style={{ color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>{days} days</span>
-                </div>
-            ))}
-        </div>
+        <>
+            <p className={styles.staleIntro}>Active goals with no activity for {STALE_AFTER_DAYS} days or more.</p>
+            <ol className={styles.staleList}>
+                {stale.map(({ goal, last, days }) => {
+                    const content = (
+                        <>
+                            <span className={styles.staleDot} style={{ background: getGoalColor?.(goal.type) || 'var(--color-text-muted)' }} aria-hidden="true" />
+                            <span className={styles.staleName}>
+                                {goal.name}
+                                <span className={styles.staleMeta}>
+                                    {goal.level_name || goal.type}
+                                    {last ? ` · last activity ${last.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}` : ''}
+                                </span>
+                            </span>
+                            <span className={styles.staleDays}>{days} days</span>
+                        </>
+                    );
+                    return (
+                        <li key={goal.id}>
+                            {rootId
+                                ? <Link className={styles.staleRow} to={goalDeepLink(rootId, goal.id)}>{content}</Link>
+                                : <div className={styles.staleRow}>{content}</div>}
+                        </li>
+                    );
+                })}
+            </ol>
+        </>
     );
 }
 
@@ -192,36 +220,43 @@ export function buildSessionTimeDistributionData(sessions = [], markers = DEFAUL
     const selectedMarkers = markers.length ? markers : ['start'];
     const labels = Array.from({ length: 24 }, (_, hour) => `${hour}:00`);
     const datasets = [];
-
-    if (selectedMarkers.includes('start')) {
+    const countBy = (readDate) => {
         const counts = Array.from({ length: 24 }, () => 0);
         sessions.forEach((session) => {
-            const date = getSessionDate(session);
+            const date = readDate(session);
             if (date) counts[date.getHours()] += 1;
         });
-        datasets.push({ label: 'Session Start', data: counts, backgroundColor: palette[4] });
-    }
+        return counts;
+    };
 
+    if (selectedMarkers.includes('start')) {
+        datasets.push({ label: 'Session Start', data: countBy(getSessionDate), slot: 0 });
+    }
     if (selectedMarkers.includes('end')) {
-        const counts = Array.from({ length: 24 }, () => 0);
-        sessions.forEach((session) => {
-            const value = session?.session_end;
-            const date = value ? new Date(value) : null;
-            if (date && !Number.isNaN(date.getTime())) counts[date.getHours()] += 1;
+        datasets.push({
+            label: 'Session End',
+            slot: 1,
+            data: countBy((session) => {
+                const date = session?.session_end ? new Date(session.session_end) : null;
+                return date && !Number.isNaN(date.getTime()) ? date : null;
+            }),
         });
-        datasets.push({ label: 'Session End', data: counts, backgroundColor: palette[2] });
     }
-
     return { labels, datasets };
 }
 
 export function SessionStartDistribution({ sessions = [], chartRef, markers = DEFAULT_TIME_MARKERS }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    const data = useMemo(() => {
-        return buildSessionTimeDistributionData(sessions, markers);
-    }, [markers, sessions]);
-    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Session Start and End Time Distribution', 'Sessions', chartTheme), density)} />;
+    const data = useMemo(() => buildSessionTimeDistributionData(sessions, markers), [markers, sessions]);
+    if (!sessions.some(getSessionDate)) return <ChartEmpty description="Start and end times appear once sessions have dates in this scope." />;
+    return (
+        <Bar
+            ref={chartRef}
+            data={{ ...data, datasets: data.datasets.map(({ slot, ...dataset }) => ({ ...dataset, ...barMarks(chartTheme.seriesColors[slot]) })) }}
+            options={applyChartDensity(barOptions(chartTheme, { valueTitle: 'Sessions', legend: data.datasets.length > 1 }), density)}
+        />
+    );
 }
 
 function formatMinutesLabel(value) {
@@ -248,12 +283,7 @@ export function buildSessionDurationHistogramData(sessions = [], bucketCount = 5
         const labelEnd = index === safeBucketCount - 1
             ? `${formatMinutesLabel(start)}+`
             : `${formatMinutesLabel(end)}`;
-        return {
-            start,
-            end,
-            label: `${formatMinutesLabel(start)}-${labelEnd}`,
-            count: 0,
-        };
+        return { start, end, label: `${formatMinutesLabel(start)}–${labelEnd}`, count: 0 };
     });
 
     durations.forEach((minutes) => {
@@ -263,23 +293,26 @@ export function buildSessionDurationHistogramData(sessions = [], bucketCount = 5
 
     return {
         labels: buckets.map((bucket) => bucket.label),
-        datasets: [{ label: 'Sessions', data: buckets.map((bucket) => bucket.count), backgroundColor: palette[5] }],
+        datasets: [{ label: 'Sessions', data: buckets.map((bucket) => bucket.count) }],
     };
 }
 
 export function SessionDurationHistogram({ sessions = [], chartRef, bucketCount = 5 }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    const data = useMemo(() => {
-        return buildSessionDurationHistogramData(sessions, bucketCount);
-    }, [bucketCount, sessions]);
-    return <Bar ref={chartRef} data={data} options={applyChartDensity(chartScaffoldOptions('Session Duration Histogram', 'Sessions', chartTheme), density)} />;
+    const data = useMemo(() => buildSessionDurationHistogramData(sessions, bucketCount), [bucketCount, sessions]);
+    if (!sessions.length) return <ChartEmpty description="Session lengths appear once there are sessions in this scope." />;
+    return (
+        <Bar
+            ref={chartRef}
+            data={{ ...data, datasets: data.datasets.map((dataset) => ({ ...dataset, ...barMarks(chartTheme.seriesColors[0]), categoryPercentage: 1, barPercentage: 0.96 })) }}
+            options={applyChartDensity(barOptions(chartTheme, { valueTitle: 'Sessions' }), density)}
+        />
+    );
 }
 
 export function ActivityGroupMixChart({ activities = [], activityGroups = [], activityInstances = {}, chartRef }) {
-    const chartTheme = useChartThemeDefaults();
-    const density = useChartDensity();
-    const data = useMemo(() => {
+    const rows = useMemo(() => {
         const groups = new Map(activityGroups.map((group) => [group.id, group.name]));
         const totals = new Map();
         activities.forEach((activity) => {
@@ -287,9 +320,15 @@ export function ActivityGroupMixChart({ activities = [], activityGroups = [], ac
             const count = (activityInstances[activity.id] || []).length;
             if (count > 0) totals.set(label, (totals.get(label) || 0) + count);
         });
-        const rows = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
-        return { labels: rows.map(([label]) => label), datasets: [{ data: rows.map(([, count]) => count), backgroundColor: rows.map((_, index) => palette[index % palette.length]), borderWidth: 0 }] };
+        return [...totals.entries()].map(([label, value]) => ({ key: label, label, value }));
     }, [activities, activityGroups, activityInstances]);
-    if (!data.labels.length) return <EmptyChart title="Activity Mix By Group" />;
-    return <Doughnut ref={chartRef} data={data} options={applyChartDensity({ responsive: true, maintainAspectRatio: false, ...DISABLED_CHART_ANIMATION, plugins: { legend: { position: 'right', labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8 } }, title: { display: true, text: 'Activity Mix By Group', color: chartTheme.textColor } } }, density)} />;
+    return (
+        <SeriesDoughnut
+            rows={rows}
+            chartRef={chartRef}
+            formatValue={(count) => `${count} ${count === 1 ? 'activity' : 'activities'}`}
+            title="Activities by group"
+            emptyDescription="The group mix appears once activities have been done in this scope."
+        />
+    );
 }

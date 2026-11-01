@@ -8,8 +8,6 @@ import CompactChartFrame from '../../CompactChartFrame';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import useActiveChartPoint from '../../useActiveChartPoint';
 
-const palette = ['#3b82f6', '#22c55e'];
-
 function getInstanceDate(instance) {
     const value = instance?.session_date || instance?.time_start || instance?.created_at;
     const date = value ? new Date(value) : null;
@@ -74,6 +72,8 @@ export function buildMetricTrendData({
     selectedSplit = 'all',
     yieldIds = [],
     highlightInstanceId = null,
+    // The theme's series colours (useChartThemeDefaults().seriesColors), first two slots.
+    colors = ['#3987e5', '#d95926'],
 }) {
     const sortedInstances = [...instances].sort((a, b) => {
         const aDate = getInstanceDate(a);
@@ -88,8 +88,8 @@ export function buildMetricTrendData({
         label: metric.name,
         metricId: metric.id, // read by the chart's "Set goal here…" menu
         data: sortedInstances.map((instance) => resolveValue(instance, metric, setsHandling, selectedSplit, yieldIds)),
-        borderColor: palette[index],
-        backgroundColor: `${palette[index]}33`,
+        borderColor: colors[index],
+        backgroundColor: `${colors[index]}33`,
         borderWidth: 2,
         // The highlighted instance (e.g. the session being edited) stands out.
         pointRadius: highlightInstanceId ? instanceIds.map((id) => (id === highlightInstanceId ? 5 : 3)) : 3,
@@ -138,7 +138,8 @@ export function MetricTrendsChart({
         selectedSplit,
         yieldIds,
         highlightInstanceId,
-    }), [activity, activityInstances, highlightInstanceId, metricDefinitions, shownMetrics, selectedSplit, setsHandling, yieldIds]);
+        colors: chartTheme.seriesColors,
+    }), [activity, activityInstances, chartTheme.seriesColors, highlightInstanceId, metricDefinitions, shownMetrics, selectedSplit, setsHandling, yieldIds]);
     // A session hovered elsewhere becomes the active point on each line.
     const hoverIndex = hoverInstanceId ? chartData.instanceIds.indexOf(hoverInstanceId) : -1;
     useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : chartData.datasets

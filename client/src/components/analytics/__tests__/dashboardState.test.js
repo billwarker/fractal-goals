@@ -177,10 +177,7 @@ describe('dashboardState helpers', () => {
         });
 
         expect(sanitized.windowStates['window-1'].selectedVisualization).toBe('sessionTrends');
-        expect(sanitized.windowStates['window-1'].visualizationState).toEqual({
-            grain: 'week',
-            metrics: ['sessions', 'duration'],
-        });
+        expect(sanitized.windowStates['window-1'].visualizationState).toEqual({ grain: 'auto' });
     });
 
     it('saves a portable analytics view and restores it as a one-window layout', () => {
@@ -228,4 +225,18 @@ describe('dashboardState helpers', () => {
             'window-2': { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' },
         })).toBe(2);
     });
+
+    it('keeps the filters added to a chart when a view is saved and reopened', () => {
+        const windowState = {
+            ...getDefaultWindowState(),
+            selectedCategory: 'activities',
+            selectedVisualization: 'activityTrends',
+            visualizationState: { shownFilters: ['tags', 'templates'] },
+        };
+        const reopened = sanitizeDashboardLayoutPayload(createAnalyticsViewPayload({ windowState, globalFilters: {} }));
+        expect(reopened.windowStates['window-1'].visualizationState.shownFilters).toEqual(['tags', 'templates']);
+        expect(reopened.windowStates['window-1'].visualizationStateByKey['activities:activityTrends'].shownFilters)
+            .toEqual(['tags', 'templates']);
+    });
 });
+

@@ -28,7 +28,9 @@ import {
     normalizeVisualizationState,
 } from './visualizations/state';
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
+import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
+import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
 import pageGridSnap from './pageGridSnap';
 
@@ -67,6 +69,7 @@ function ProfileWindow({
     globalDateRange = null,
     onGlobalDateRangeChange,
     globalFilters = null,
+    onResetFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
     onPageGrid = false,
@@ -502,14 +505,19 @@ function ProfileWindow({
             isError: Boolean(data.evidenceError),
             refetch: data.hasMoreEvidence ? data.loadMoreEvidence : data.retryEvidence,
         };
-        if (readQuery.isFetching) return <div role="status">{selectedCategory === 'goals' ? 'Loading analytics…' : 'Loading full history…'}</div>;
-        if (readQuery.isError) {
-            return <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => readQuery.refetch()}>Retry</button></div>;
-        }
+        if (readQuery.isFetching) return <ChartLoading label={selectedCategory === 'goals' ? 'Loading analytics…' : 'Loading full history…'} />;
+        if (readQuery.isError) return <ChartError onRetry={readQuery.refetch} />;
         const VisualizationChart = selectedVisualizationMeta?.Chart;
         if (!VisualizationChart) return null;
+        const hasActiveScope = hasActiveGlobalFilters(globalFilters) || Boolean(globalDateRange?.start || globalDateRange?.end);
+        // An empty chart's "Clear filters": every global filter and the time range.
+        const clearAllFilters = () => {
+            onResetFilters?.();
+            onGlobalDateRangeChange?.({ start: null, end: null });
+        };
 
         return (
+            <ChartScopeProvider hasActiveFilters={hasActiveScope} onClearFilters={onResetFilters ? clearAllFilters : null}>
             <ChartGoalSurface
                 Chart={VisualizationChart}
                 rootId={rootId}
@@ -538,6 +546,7 @@ function ProfileWindow({
                     onGlobalDateRangeChange,
                 }}
             />
+            </ChartScopeProvider>
         );
     };
 

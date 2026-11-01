@@ -108,3 +108,30 @@ export function bucketStarts(first, last, grain) {
     }
     return starts;
 }
+
+/**
+ * Items counted per calendar bucket, with their seconds summed, over every bucket from the start
+ * of the range (or the first item) to its end (or the last item), so quiet periods show as gaps.
+ * The grain is the requested one (or auto), coarsened to fit `pointBudget` bars.
+ * @template T
+ * @param {T[]} items
+ * @param {{ dayOf: (item: T) => string | null, secondsOf?: (item: T) => number, grain?: string | null,
+ *   range?: { start?: string | null, end?: string | null } | null, pointBudget?: number }} options
+ * @returns {{ grain: Grain, rows: Array<{ key: string, count: number, seconds: number }> }}
+ */
+export function bucketRows(items, { dayOf, secondsOf = () => 0, grain = 'auto', range = null, pointBudget = 120 }) {
+    const dated = items.map((item) => /** @type {[T, string | null]} */ ([item, dayOf(item)])).filter(([, day]) => day);
+    if (!dated.length) return { grain: 'day', rows: [] };
+    const days = dated.map(([, day]) => /** @type {string} */ (day)).sort();
+    const first = range?.start || days[0];
+    const last = range?.end || days[days.length - 1];
+    const resolved = resolveGrain(grain, first, last, pointBudget);
+    const rows = new Map(bucketStarts(first, last, resolved).map((key) => [key, { key, count: 0, seconds: 0 }]));
+    dated.forEach(([item, day]) => {
+        const row = rows.get(bucketStart(/** @type {string} */ (day), resolved));
+        if (!row) return;
+        row.count += 1;
+        row.seconds += secondsOf(item) || 0;
+    });
+    return { grain: resolved, rows: [...rows.values()] };
+}

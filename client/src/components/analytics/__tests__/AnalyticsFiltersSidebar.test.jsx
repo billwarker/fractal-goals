@@ -30,12 +30,12 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
             />
         );
 
-        fireEvent.click(screen.getByRole('button', { name: 'Duration' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Time' }));
 
         expect(onUpdateSelectedWindowState).toHaveBeenCalledWith(expect.objectContaining({
-            visualizationState: { metrics: ['instances'] },
+            visualizationState: { grain: 'auto', metrics: ['instances', 'duration'], measure: 'duration' },
             visualizationStateByKey: expect.objectContaining({
-                'activities:activityTrends': { metrics: ['instances'] },
+                'activities:activityTrends': { grain: 'auto', metrics: ['instances', 'duration'], measure: 'duration' },
             }),
         }));
         expect(onUpdateSelectedWindowState.mock.calls[0][0]).not.toHaveProperty('selectedMetric');
@@ -68,7 +68,7 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
         }));
     });
 
-    it('renders session trend metric and grain controls', () => {
+    it('renders session trend measure and grain controls', () => {
         const onUpdateSelectedWindowState = vi.fn();
 
         render(
@@ -87,8 +87,9 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Month' }));
 
-        expect(screen.getByRole('button', { name: '# of sessions' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Sum of Session Duration' })).toBeInTheDocument();
+        // One measure at a time (no second y-axis); an old metrics list shows its first.
+        expect(screen.getByRole('button', { name: 'Sessions' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'false');
         expect(onUpdateSelectedWindowState).toHaveBeenCalledWith(expect.objectContaining({
             visualizationState: { grain: 'month', metrics: ['sessions', 'duration'] },
             visualizationStateByKey: {
@@ -235,6 +236,11 @@ describe('AnalyticsFiltersSidebar scope filters', () => {
         const { rerender } = render(
             <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} />,
         );
+        // Tags, template and program day start under "Add filters".
+        expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '+ Add filters' }));
+        const additional = screen.getByRole('list', { name: 'Additional filters' });
+        ['Tags', 'Session template', 'Program day'].forEach((name) => fireEvent.click(within(additional).getByRole('button', { name })));
         fireEvent.click(await screen.findByRole('button', { name: 'Heavy' }));
         expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: { tagIds: ['heavy'], match: 'all' } }));
         // Templates and program days are picked in a modal; nothing changes until Apply.
@@ -269,18 +275,74 @@ describe('AnalyticsFiltersSidebar scope filters', () => {
         const { rerender } = render(
             <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} windowStates={goalsOnly} />,
         );
-        await screen.findByText('Activities');
+        await screen.findByText('Time Range');
+        expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Session template filter')).not.toBeInTheDocument();
 
-        // A session chart brings back template and program day; tags need an activity chart.
+        // A session chart offers template and program day under Add filters; tags need an activity chart.
         rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}} onChange={onChange} windowStates={{ 'window-1': { selectedCategory: 'sessions' } }} />);
+        expect(screen.queryByLabelText('Session template filter')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '+ Add filters' }));
+        const additional = screen.getByRole('list', { name: 'Additional filters' });
+        expect(within(additional).queryByRole('button', { name: 'Tags' })).not.toBeInTheDocument();
+        fireEvent.click(within(additional).getByRole('button', { name: 'Session template' }));
         expect(await screen.findByLabelText('Session template filter')).toBeInTheDocument();
-        expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Done choosing filters' }));
 
         // A filter that's set stays, so it can be cleared.
         rerender(<AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{ tags: { tagIds: ['heavy'], match: 'all' } }} dateRange={{}} onChange={onChange} windowStates={goalsOnly} />);
         expect(await screen.findByLabelText('Tag filter')).toHaveTextContent('1 selected');
         expect(screen.queryByLabelText('Program day filter')).not.toBeInTheDocument();
+    });
+
+    it('shows the selected chart’s controls first, then only its filters, with more under Add filter', async () => {
+        const onUpdateSelectedWindowState = vi.fn();
+        const activityChart = {
+            selectedCategory: 'activities', selectedVisualization: 'activityTrends',
+            visualizationState: {}, visualizationStateByKey: {},
+        };
+        render(
+            <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions} filters={{}} dateRange={{}}
+                selectedWindowState={activityChart} windowStates={{ w: activityChart }}
+                onUpdateSelectedWindowState={onUpdateSelectedWindowState} />,
+        );
+        const groupTitles = [...document.querySelectorAll('.sessions-query-section-group-title')].map((node) => node.textContent);
+        expect(groupTitles).toEqual(['Chart', 'Filters']);
+        expect(screen.getByRole('heading', { name: 'Time Range' })).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Activities' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('heading', { name: 'Goals' })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Tag filter')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add filters for Activity Trends' }));
+        fireEvent.click(within(screen.getByRole('list', { name: 'Additional filters' })).getByRole('button', { name: 'Tags' }));
+        expect(onUpdateSelectedWindowState).toHaveBeenLastCalledWith(expect.objectContaining({
+            visualizationState: expect.objectContaining({ shownFilters: ['tags'] }),
+        }));
+    });
+
+    it('lists set filters as chips, muting ones the selected chart ignores, and removes them', async () => {
+        const onChange = vi.fn();
+        const onDateRangeChange = vi.fn();
+        const goalChart = {
+            selectedCategory: 'goals', selectedVisualization: 'timeDistribution',
+            visualizationState: {}, visualizationStateByKey: {},
+        };
+        render(
+            <AnalyticsFiltersSidebar rootId="root-1" sessions={sessions}
+                filters={{ tags: { tagIds: ['heavy', 'paused'], match: 'exact' } }}
+                dateRange={{ start: '2026-10-01', end: '2026-10-31' }}
+                selectedWindowState={goalChart} windowStates={{ w: goalChart }}
+                onChange={onChange} onDateRangeChange={onDateRangeChange} />,
+        );
+        const chips = screen.getByRole('list', { name: 'Active filters' });
+        expect(within(chips).getByRole('button', { name: 'Time range: Oct 1 – Oct 31. Edit' })).toBeInTheDocument();
+        const tagChip = within(chips).getByRole('button', { name: 'Tags: 2 tags · exact set (not applied to Time Spent Per Goal). Edit' });
+        expect(tagChip.closest('li')).toHaveAttribute('title', 'Not applied to Time Spent Per Goal');
+        fireEvent.click(within(chips).getByRole('button', { name: 'Remove tags filter' }));
+        expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ tags: null }));
+        fireEvent.click(within(chips).getByRole('button', { name: 'Remove time range filter' }));
+        expect(onDateRangeChange).toHaveBeenLastCalledWith({ start: null, end: null });
+        expect(screen.getByText('2 active')).toBeInTheDocument();
     });
 });
