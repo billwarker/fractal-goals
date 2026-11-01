@@ -66,15 +66,17 @@ steps:
   # ==========================================
   # pg_dump must be at least the server's major version (Postgres 17). The dump is
   # proven restorable (pg_restore --list) and stored before any migration runs.
+  # Cloud Build has no IPv6 route and the Supabase direct host is IPv6-only, so the
+  # dump goes through the IPv4 session pooler (session mode, port 5432; not 6543).
   - name: 'postgres:17'
     id: 'Pre-Migration Backup'
     entrypoint: bash
-    secretEnv: ['SUPABASE_DIRECT_DATABASE_URL']
+    secretEnv: ['SUPABASE_SESSION_POOLER_URL']
     args:
       - '-c'
       - |
         set -euo pipefail
-        pg_dump --format=custom --no-owner --no-privileges --file=/workspace/premigration.dump "$$SUPABASE_DIRECT_DATABASE_URL"
+        pg_dump --format=custom --no-owner --no-privileges --file=/workspace/premigration.dump "$$SUPABASE_SESSION_POOLER_URL"
         test -s /workspace/premigration.dump
         pg_restore --list /workspace/premigration.dump > /workspace/premigration.toc
         grep -q 'TABLE public alembic_version' /workspace/premigration.toc
@@ -245,8 +247,9 @@ availableSecrets:
     # Read-only GitHub token (fine-grained: Checks read) for the CI gate.
     - versionName: projects/$PROJECT_ID/secrets/GITHUB_CHECKS_TOKEN/versions/latest
       env: 'GITHUB_CHECKS_TOKEN'
-    - versionName: projects/$PROJECT_ID/secrets/SUPABASE_DIRECT_DATABASE_URL/versions/latest
-      env: 'SUPABASE_DIRECT_DATABASE_URL'
+    # IPv4 session-pooler URL for the pre-migration pg_dump (see that step).
+    - versionName: projects/$PROJECT_ID/secrets/SUPABASE_SESSION_POOLER_URL/versions/latest
+      env: 'SUPABASE_SESSION_POOLER_URL'
 
 options:
   default_logs_bucket_behavior: REGIONAL_USER_OWNED_BUCKET

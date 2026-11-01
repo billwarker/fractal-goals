@@ -114,8 +114,10 @@ serving against the migrated schema until promotion.
 - Cloud Build service account: Secret Manager Secret Accessor (both secrets), Storage
   Object Creator (backup bucket), Cloud Run Admin and Service Account User (already
   needed for deploys).
-- `SUPABASE_DIRECT_DATABASE_URL` must be reachable from Cloud Build. If the direct host is
-  IPv6-only, point the backup step at the IPv4 session pooler URL instead.
+- Secret `SUPABASE_SESSION_POOLER_URL`: the Supabase **session** pooler URL (port 5432,
+  user `postgres.<project-ref>`), used by the pre-migration backup. Cloud Build has no
+  IPv6 route and the direct host is IPv6-only. The transaction pooler (6543) does not
+  support `pg_dump`.
 
 ### Proving the gates (do once in a staging trigger)
 
