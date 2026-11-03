@@ -5,6 +5,7 @@ import AnalyticsLoading from '../components/analytics/AnalyticsLoading';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
 import { getChartNumbers } from '../components/analytics/chartTitles';
+import fitLayoutToBounds from '../components/analytics/fitLayoutToBounds';
 import useAnalyticsDeepLink, { useAnalyticsEvidenceDemand } from '../components/analytics/useAnalyticsDeepLink';
 import {
     createDashboardLayoutPayload,
@@ -15,13 +16,12 @@ import {
     getConfiguredWindowCount,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
+    savedStateSignature,
 } from '../components/analytics/dashboardState';
 import ProfileWindowLayout, {
     countWindows,
-    getGridLayoutExtent,
     getWindowIds,
     removeWindow,
-    rescaleGridLayout,
     splitWindow,
 } from '../components/analytics/ProfileWindowLayout';
 import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
@@ -44,9 +44,9 @@ const AnalyticsViewNameModal = lazy(() => import('../components/analytics/Analyt
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
 const MAX_WINDOWS = 4;
-const FILTER_PANE_COLUMNS = 20;
 const DEFAULT_LAYOUT = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
 const DEFAULT_WINDOW_STATES = { 'window-1': getDefaultWindowState() };
+const EMPTY_SIGNATURE = savedStateSignature({ layout: DEFAULT_LAYOUT, windowStates: DEFAULT_WINDOW_STATES, globalFilters: getDefaultGlobalFilters() });
 const EMPTY_VIEW_NAME = 'Empty Analytics View';
 let windowIdCounter = 1;
 const generateWindowId = () => `window-${++windowIdCounter}`;
@@ -70,6 +70,8 @@ function Analytics() {
     const [windowStates, setWindowStates] = useState(DEFAULT_WINDOW_STATES);
     const [selectedViewId, setSelectedViewId] = useState('');
     const [currentViewName, setCurrentViewName] = useState(EMPTY_VIEW_NAME);
+    // What was last loaded or saved, to offer Save only once something differs.
+    const [savedSignature, setSavedSignature] = useState(EMPTY_SIGNATURE);
     const {
         globalDateRange, setGlobalDateRange, globalFilters, setGlobalFilters,
         handleDateRangeChange, handleGlobalFiltersChange, handleResetGlobalFilters,
@@ -106,30 +108,14 @@ function Analytics() {
         setSelectedWindowId('window-1');
         setSelectedViewId('');
         setCurrentViewName(EMPTY_VIEW_NAME);
+        setSavedSignature(EMPTY_SIGNATURE);
         setGlobalDateRange({ start: null, end: null });
         setGlobalFilters(getDefaultGlobalFilters());
     }, [setGlobalDateRange, setGlobalFilters]);
 
-    const fitLayoutToCurrentBounds = useCallback((incomingLayout, savedBounds = null) => {
-        if (!dashboardBounds) return incomingLayout;
-        if (savedBounds?.columns && savedBounds?.rows) {
-            return rescaleGridLayout(incomingLayout, savedBounds, dashboardBounds);
-        }
-
-        const extent = getGridLayoutExtent(incomingLayout);
-        const missingColumns = dashboardBounds.columns - extent.columns;
-        const looksLikeClosedFilterPaneGap = !isFiltersPaneOpen
-            // (down to the 16 columns the pane took before it matched the other pages' sidebars)
-            && missingColumns >= FILTER_PANE_COLUMNS - 6
-            && missingColumns <= FILTER_PANE_COLUMNS + 4;
-        if (!looksLikeClosedFilterPaneGap) return incomingLayout;
-
-        return rescaleGridLayout(
-            incomingLayout,
-            { columns: extent.columns, rows: dashboardBounds.rows },
-            dashboardBounds
-        );
-    }, [dashboardBounds, isFiltersPaneOpen]);
+    const fitLayoutToCurrentBounds = useCallback((incomingLayout, savedBounds = null) => (
+        fitLayoutToBounds(incomingLayout, { savedBounds, bounds: dashboardBounds, isFiltersPaneOpen })
+    ), [dashboardBounds, isFiltersPaneOpen]);
 
     const applyAnalyticsViewLayout = useCallback((payload, { source = 'analytics-view' } = {}) => {
         const sanitized = sanitizeDashboardLayoutPayload(payload);
@@ -141,11 +127,14 @@ function Analytics() {
         }
 
         windowIdCounter = getHighestWindowIndex(sanitized.layout);
+        const fittedLayout = fitLayoutToCurrentBounds(sanitized.layout, sanitized.layoutBounds);
+        const loadedFilters = sanitized.globalFilters || getDefaultGlobalFilters();
         setIsDashboardSettling(true);
-        setLayout(fitLayoutToCurrentBounds(sanitized.layout, sanitized.layoutBounds));
+        setLayout(fittedLayout);
         setWindowStates(sanitized.windowStates);
         setSelectedWindowId(sanitized.selectedWindowId);
-        setGlobalFilters(sanitized.globalFilters || getDefaultGlobalFilters());
+        setGlobalFilters(loadedFilters);
+        setSavedSignature(savedStateSignature({ layout: fittedLayout, windowStates: sanitized.windowStates, globalFilters: loadedFilters }));
         return true;
     }, [fitLayoutToCurrentBounds, setGlobalFilters]);
 
@@ -273,6 +262,12 @@ function Analytics() {
         }
     }, [analyticsViews, applyAnalyticsViewLayout, resetToEmptyView, setGlobalDateRange]);
 
+    const currentSignature = useMemo(
+        () => savedStateSignature({ layout, windowStates, globalFilters }),
+        [globalFilters, layout, windowStates],
+    );
+    const hasUnsavedChanges = currentSignature !== savedSignature;
+
     const buildCurrentLayoutPayload = useCallback(() => createDashboardLayoutPayload({
         layout,
         windowStates,
@@ -312,6 +307,7 @@ function Analytics() {
                 });
                 if (saved) {
                     setCurrentViewName(saved.name);
+                    setSavedSignature(currentSignature);
                     notify.success(nextKind === 'view' ? 'Analytics view updated' : 'Analytics dashboard updated');
                 }
             } catch {
@@ -325,6 +321,7 @@ function Analytics() {
     }, [
         analyticsViews,
         buildCurrentSavedObjectPayload,
+        currentSignature,
         currentViewName,
         getCurrentSavedObjectKind,
         selectedViewId,
@@ -347,13 +344,14 @@ function Analytics() {
             if (created) {
                 setSelectedViewId(created.id);
                 setCurrentViewName(created.name);
+                setSavedSignature(currentSignature);
                 setIsSaveModalOpen(false);
                 notify.success(kind === 'view' ? 'Analytics view saved' : 'Analytics dashboard saved');
             }
         } catch {
             // handled by hook toast
         }
-    }, [buildCurrentSavedObjectPayload, createAnalyticsView, getCurrentSavedObjectKind, saveKind]);
+    }, [buildCurrentSavedObjectPayload, createAnalyticsView, currentSignature, getCurrentSavedObjectKind, saveKind]);
 
     const handleDeleteView = useCallback(async (viewId) => {
         try {
@@ -482,6 +480,7 @@ function Analytics() {
                     onModeChange={setActiveMode}
                     onOpenViewsModal={() => setIsViewsModalOpen(true)}
                     onSaveView={handleSaveView}
+                    hasUnsavedChanges={hasUnsavedChanges}
                     rootId={rootId}
                     savedView={analyticsViews.find((view) => view.id === selectedViewId && view.kind === 'view') || null}
                     isFiltersPaneOpen={isFiltersPaneOpen}

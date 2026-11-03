@@ -1,10 +1,11 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { Scatter } from 'react-chartjs-2';
 import { GROUP_DIMENSION_LABELS, instanceGroups, setGroups } from '../../utils/analyticsGroupBy';
-import { goalLineAnnotations } from '../../utils/goalConditionLines';
+import { goalLineAnnotations, goalMarkers } from '../../utils/goalConditionLines';
 import { topSetPoint } from '../../utils/setAggregation';
 import { applyChartDensity, useChartDensity, useChartOptions, useChartThemeDefaults } from './ChartJSWrapper';
 import CompactChartFrame from './CompactChartFrame';
+import { GoalMarkerHost } from './GoalMarkerLayer';
 import { withScatterPointDensity } from './scatterPointProfile';
 import { buildSeries, seriesColor } from './series/buildSeries';
 import ChartLegendPanel from './series/ChartLegendPanel';
@@ -30,7 +31,7 @@ function pointGroup(groups) {
 const COMPACT_POINT_PROFILE = { baseRadius: 3, radiusStep: 1, hoverOffset: 2, maxRadius: 6 };
 
 /** The canvas: a session hovered elsewhere becomes its active point (with tooltip unless compact). */
-function ScatterCanvas({ chartRef, data, options, hoverInstanceId, compact }) {
+function ScatterCanvas({ chartRef, data, options, hoverInstanceId, compact, markers = [], onOpenGoal = null }) {
     const ownRef = useRef(null);
     // Ours for the hover highlight, and the caller's (Analytics' chart menu) too.
     const setRef = useCallback((chart) => {
@@ -42,7 +43,11 @@ function ScatterCanvas({ chartRef, data, options, hoverInstanceId, compact }) {
         ? points.flatMap((point, index) => (point.instance_id === hoverInstanceId ? [{ datasetIndex: 0, index }] : []))
         : [];
     useActiveChartPoint(ownRef, active, { tooltip: !compact });
-    return <Scatter ref={setRef} data={data} options={options} />;
+    return (
+        <GoalMarkerHost chartRef={ownRef} markers={markers} onOpenGoal={onOpenGoal}>
+            <Scatter ref={setRef} data={data} options={options} />
+        </GoalMarkerHost>
+    );
 }
 
 function ScatterPlot({
@@ -55,6 +60,7 @@ function ScatterPlot({
     selectedMetricX = null,
     selectedMetricY = null,
     goalLines = [],
+    onOpenGoal = null,
     highlightInstanceId = null,
     hoverInstanceId = null,
     hideTitle = false,
@@ -292,16 +298,15 @@ function ScatterPlot({
         }]
     };
 
+    const goalScales = {
+        ...(xMetricToPlot ? { [xMetricToPlot.id]: 'x' } : {}),
+        ...(yMetricToPlot ? { [yMetricToPlot.id]: 'y' } : {}),
+    };
     const options = {
         ...baseOptions,
         plugins: {
             ...baseOptions.plugins,
-            annotation: {
-                annotations: goalLineAnnotations(goalLines, {
-                    ...(xMetricToPlot ? { [xMetricToPlot.id]: 'x' } : {}),
-                    ...(yMetricToPlot ? { [yMetricToPlot.id]: 'y' } : {}),
-                }),
-            },
+            annotation: { annotations: goalLineAnnotations(goalLines, goalScales) },
             tooltip: {
                 ...baseOptions.plugins.tooltip,
                 callbacks: {
@@ -350,6 +355,8 @@ function ScatterPlot({
                 options={applyChartDensity(options, density)}
                 hoverInstanceId={hoverInstanceId}
                 compact={density === 'compact'}
+                markers={goalMarkers(goalLines, goalScales)}
+                onOpenGoal={onOpenGoal}
             />
         </CompactChartFrame>
     );

@@ -96,7 +96,6 @@ function ProfileWindow({
     const reportShownGrain = React.useCallback((grain) => onShownGrainChange?.(windowId, grain), [onShownGrainChange, windowId]);
 
     const [isNarrow, setIsNarrow] = useState(false);
-    const [isVeryNarrow, setIsVeryNarrow] = useState(false);
 
     // Use ResizeObserver to detect width changes
     React.useEffect(() => {
@@ -106,7 +105,6 @@ function ProfileWindow({
             for (const entry of entries) {
                 const width = entry.contentRect.width;
                 setIsNarrow(width < 400);
-                setIsVeryNarrow(width < 280);
             }
         });
 
@@ -289,7 +287,7 @@ function ProfileWindow({
 
         return (
             <div
-                className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}
+                className={`${styles.header} ${isNarrow ? styles.wrap : ''}`}
                 {...(dragHandleProps || {})}
             >
                 {/* Navigation Controls (Back/Top) */}

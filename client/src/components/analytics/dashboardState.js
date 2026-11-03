@@ -100,6 +100,24 @@ export function getConfiguredWindowCount(layout, windowStates) {
     return getConfiguredWindowIds(layout, windowStates).length;
 }
 
+/**
+ * What saving would change, as a string to compare: each chart's settings, the panels' arrangement
+ * (when there's more than one chart) and the shared filters. The selected panel, the screen's size
+ * and the remembered settings of charts not on show aren't changes worth saving.
+ */
+export function savedStateSignature({ layout, windowStates, globalFilters }) {
+    const normalizedLayout = normalizeLayoutNode(layout) || layout;
+    const chartIds = getConfiguredWindowIds(normalizedLayout, windowStates);
+    const charts = chartIds.map((windowId) => {
+        const { visualizationStateByKey: _remembered, ...state } = normalizeWindowState(windowStates[windowId]);
+        return state;
+    });
+    const arrangement = chartIds.length > 1
+        ? (normalizedLayout?.panels || []).map(({ x, y, w, h }) => [x, y, w, h])
+        : null;
+    return JSON.stringify({ charts, arrangement, filters: normalizeGlobalFilters(globalFilters) });
+}
+
 export function createAnalyticsViewPayload({ windowState, globalFilters }) {
     return {
         type: 'analytics_view',

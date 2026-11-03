@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/queryKeys';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { fractalApi } from '../../utils/api';
+import { findGoalNodeById } from '../../utils/goalNodeModel';
 import { applyCreatedGoal, refreshGoalReadModels } from '../../utils/goalTreeCache';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import { formatError } from '../../utils/mutationNotify';
@@ -27,7 +28,7 @@ const LONG_PRESS_SLOP = 10;
  * set; a click pins it, and the pin offers "Create goal…" (the goal modal, seeded) or updating a
  * goal that already has a threshold on this activity, after a live preview. Right-click (or
  * long-press on touch) stays as the quick "Set goal here…". Existing goals on the activity are
- * passed to the chart as reference lines.
+ * passed to the chart, which marks them at their thresholds; clicking one opens it here.
  */
 export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {} }) {
     const queryClient = useQueryClient();
@@ -38,6 +39,7 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
     const [draftGoal, setDraftGoal] = useState(null);
     const [hover, setHover] = useState(null);
     const [pin, setPin] = useState(null);
+    const [openGoalId, setOpenGoalId] = useState(null);
     const pressRef = useRef(null);
     const surfaceRef = useRef(null);
 
@@ -47,8 +49,9 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         enabled: Boolean(rootId && activityId && supported),
         staleTime: 60 * 1000,
     });
-    const { data: tree } = useFractalTree(rootId, { enabled: Boolean(draftGoal) });
-    const chartContext = useMemo(() => ({ ...context, goalConditionLines: lines }), [context, lines]);
+    const { data: tree } = useFractalTree(rootId, { enabled: Boolean(draftGoal || openGoalId) });
+    const chartContext = useMemo(() => ({ ...context, goalConditionLines: lines, onOpenGoal: setOpenGoalId }), [context, lines]);
+    const openGoal = openGoalId && tree ? findGoalNodeById(tree, openGoalId) : null;
     const initialCompletion = useMemo(() => (draftGoal
         ? {
             completionCondition: 'activity_threshold',
@@ -202,6 +205,32 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         }
     };
 
+    // An open goal edited or completed here refreshes every goal view, and its marker on this chart.
+    const refreshGoals = () => Promise.all([
+        refreshGoalReadModels(queryClient, queryKeys, rootId),
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(rootId) }),
+    ]);
+    const updateOpenGoal = async (goalId, updates) => {
+        try {
+            const response = await fractalApi.updateGoal(rootId, goalId, updates);
+            await refreshGoals();
+            return response?.data || null;
+        } catch (error) {
+            notify.error(`Couldn’t update the goal: ${formatError(error)}`);
+            throw error;
+        }
+    };
+    const toggleOpenGoal = async (goalId, currentStatus, sequenceOptions = null) => {
+        try {
+            const response = await fractalApi.toggleGoalCompletion(rootId, goalId, !currentStatus, null, sequenceOptions);
+            await refreshGoals();
+            return response;
+        } catch (error) {
+            notify.error(`Couldn’t update the goal: ${formatError(error)}`);
+            return null;
+        }
+    };
+
     return (
         <div
             ref={surfaceRef}
@@ -241,6 +270,20 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
                         )}
                     </DropdownMenu>
                 </div>
+            ) : null}
+            {openGoal ? (
+                <Suspense fallback={null}>
+                    <GoalDetailModal
+                        isOpen
+                        goal={openGoal}
+                        rootId={rootId}
+                        treeData={tree}
+                        displayMode="modal"
+                        onUpdate={updateOpenGoal}
+                        onToggleCompletion={toggleOpenGoal}
+                        onClose={() => setOpenGoalId(null)}
+                    />
+                </Suspense>
             ) : null}
             {draftGoal && parentGoal ? (
                 <Suspense fallback={null}>

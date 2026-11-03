@@ -43,6 +43,7 @@ function ActivityScatterPlotChart({ context }) {
                 selectedSplit={context.visualizationState.selectedSplit || 'all'}
                 chartRef={context.chartRef}
                 goalLines={context.goalConditionLines}
+                onOpenGoal={context.onOpenGoal}
                 selectedMetricX={context.visualizationState.metricX}
                 selectedMetricY={context.visualizationState.metricY}
                 groupBy={groupBy}
@@ -88,6 +89,7 @@ function MetricTrendsVisualizationChart({ context }) {
                 activityInstances={context.scopedData.activityInstances}
                 chartRef={context.chartRef}
                 goalLines={context.goalConditionLines}
+                onOpenGoal={context.onOpenGoal}
                 metrics={context.visualizationState.metrics || []}
                 setsHandling={context.visualizationState.setsHandling || 'top'}
                 selectedSplit={context.visualizationState.selectedSplit || 'all'}

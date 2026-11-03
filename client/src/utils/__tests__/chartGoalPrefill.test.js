@@ -1,5 +1,5 @@
 import { goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromScatterPoint } from '../chartGoalPrefill';
-import { goalLineAnnotations } from '../goalConditionLines';
+import { goalLineAnnotations, goalMarkers } from '../goalConditionLines';
 
 const activity = {
     id: 'bench',
@@ -62,8 +62,8 @@ describe('chart goal prefill', () => {
     });
 });
 
-describe('goal reference lines', () => {
-    it('draws each per-session rule on its metric’s axis and skips cumulative totals', () => {
+describe('goal markers', () => {
+    it('marks each goal at its per-session rules on charted axes, skipping cumulative totals', () => {
         const goals = [
             { goal_id: 'a', goal_name: 'Lift 245', completed: false, condition: { kind: 'single_session', rules: [
                 { metric_definition_id: 'weight', operator: '>=', value: 245 },
@@ -71,8 +71,14 @@ describe('goal reference lines', () => {
             ] } },
             { goal_id: 'b', goal_name: 'Volume', completed: false, condition: { kind: 'cumulative', rules: [] } },
         ];
+        expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([
+            { key: 'a', goal: goals[0], rules: [{ scaleID: 'metric1', value: 245, symbol: '≥', metricId: 'weight' }] },
+        ]);
+        expect(goalMarkers(goals, { weight: 'x', reps: 'y' })[0].rules.map((rule) => rule.scaleID)).toEqual(['x', 'y']);
+        // The annotations only keep thresholds inside the axes; the markers draw the goal.
         const annotations = goalLineAnnotations(goals, { weight: 'metric1' });
         expect(Object.keys(annotations)).toEqual(['goal-a-weight']);
-        expect(annotations['goal-a-weight']).toMatchObject({ type: 'line', scaleID: 'metric1', value: 245, label: { content: 'Lift 245 (≥ 245)' } });
+        expect(annotations['goal-a-weight']).toMatchObject({ type: 'line', scaleID: 'metric1', value: 245, borderColor: 'transparent' });
+        expect(annotations['goal-a-weight'].label).toBeUndefined();
     });
 });

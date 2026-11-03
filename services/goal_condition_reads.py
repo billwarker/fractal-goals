@@ -80,7 +80,8 @@ class GoalConditionReadService:
         }
 
     def list_for_activity(self, root_id, current_user_id, activity_id) -> ServiceResult[JsonDict]:
-        """Live goals whose condition is on this activity (charts draw them as reference lines)."""
+        """Live goals whose condition is on this activity (charts mark them at their thresholds, with
+        their level for the goal's icon)."""
         from models import Goal, GoalCompletionCondition, GoalConditionMetricRule
 
         if not validate_root_goal(self.db_session, root_id, owner_id=current_user_id):
@@ -94,6 +95,7 @@ class GoalConditionReadService:
             selectinload(GoalCompletionCondition.tags),
             selectinload(GoalCompletionCondition.activity),
             selectinload(GoalCompletionCondition.metric),
+            selectinload(Goal.level),
         ).filter(
             GoalCompletionCondition.root_id == root_id,
             GoalCompletionCondition.activity_definition_id == activity_id,
@@ -104,6 +106,8 @@ class GoalConditionReadService:
         return {'goals': [{
             'goal_id': goal.id,
             'goal_name': goal.name,
+            'level_id': goal.level_id,
+            'level_name': goal.level.name if goal.level else None,
             'completed': bool(goal.completed),
             'deadline': format_utc(goal.deadline),
             'condition': serialize_goal_condition(condition),

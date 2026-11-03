@@ -2,9 +2,10 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
-import { goalLineAnnotations } from '../../../../utils/goalConditionLines';
+import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditionLines';
 import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
+import { GoalMarkerHost } from '../../GoalMarkerLayer';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import useActiveChartPoint from '../../useActiveChartPoint';
 
@@ -111,6 +112,7 @@ export function MetricTrendsChart({
     setsHandling = 'top',
     selectedSplit = 'all',
     goalLines = [],
+    onOpenGoal = null,
     highlightInstanceId = null,
     hoverInstanceId = null,
     hideTitle = false,
@@ -152,51 +154,51 @@ export function MetricTrendsChart({
 
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
+    // Each charted metric has its own y axis, metric1, metric2, …
+    const goalScales = Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]));
 
     return (
         <CompactChartFrame caption={caption}>
-        <Line
-            ref={setChartRef}
-            data={{
-                labels: chartData.labels,
-                datasets: chartData.datasets,
-            }}
-            options={applyChartDensity({
-                responsive: true,
-                maintainAspectRatio: false,
-                ...DISABLED_CHART_ANIMATION,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+        <GoalMarkerHost chartRef={ownChartRef} markers={goalMarkers(goalLines, goalScales)} onOpenGoal={onOpenGoal}>
+            <Line
+                ref={setChartRef}
+                data={{
+                    labels: chartData.labels,
+                    datasets: chartData.datasets,
+                }}
+                options={applyChartDensity({
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    ...DISABLED_CHART_ANIMATION,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
+                        },
+                        title: { display: !hideTitle, text: 'Metric Trends', color: chartTheme.textColor },
+                        annotation: { annotations: goalLineAnnotations(goalLines, goalScales) },
+                        tooltip: {
+                            backgroundColor: chartTheme.tooltipBg,
+                            titleColor: chartTheme.tooltipText,
+                            bodyColor: chartTheme.tooltipBody,
+                            padding: 12,
+                        },
                     },
-                    title: { display: !hideTitle, text: 'Metric Trends', color: chartTheme.textColor },
-                    annotation: {
-                        annotations: goalLineAnnotations(goalLines, Object.fromEntries(
-                            chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]),
-                        )),
+                    scales: {
+                        x: {
+                            ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
+                            grid: { color: chartTheme.gridColor },
+                        },
+                        ...Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [
+                            `metric${index + 1}`,
+                            buildYAxis(metric, index, chartTheme),
+                        ])),
                     },
-                    tooltip: {
-                        backgroundColor: chartTheme.tooltipBg,
-                        titleColor: chartTheme.tooltipText,
-                        bodyColor: chartTheme.tooltipBody,
-                        padding: 12,
-                    },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartTheme.gridColor },
-                    },
-                    ...Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [
-                        `metric${index + 1}`,
-                        buildYAxis(metric, index, chartTheme),
-                    ])),
-                },
-            }, density)}
-        />
+                }, density)}
+            />
+        </GoalMarkerHost>
         </CompactChartFrame>
     );
 }
