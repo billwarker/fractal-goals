@@ -7,6 +7,7 @@ import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartT
 import { ChartEmpty } from '../../../ChartStates';
 import { buildSeries, seriesColor } from '../../../series/buildSeries';
 import ChartLegendPanel from '../../../series/ChartLegendPanel';
+import { ROW_BAR_MARKS } from '../../shared/barMarks';
 import layout from '../../shared/BucketBarChart.module.css';
 
 export const ACTIVITY_TOTALS_GROUPS = ['activityGroup', 'tag', 'template', 'programDay'];
@@ -135,7 +136,7 @@ export default function ActivityTotalsChart({
             data: item.data,
             hidden: hiddenKeys.has(item.key),
             backgroundColor: seriesColor(item, chartTheme),
-            ...(overlap ? { borderRadius: 4, borderSkipped: 'start' } : {
+            ...(overlap ? ROW_BAR_MARKS : {
                 borderColor: 'transparent', borderWidth: { top: 0, right: 2, bottom: 0, left: 0 }, borderSkipped: 'start',
             }),
         }))
@@ -144,9 +145,7 @@ export default function ActivityTotalsChart({
             label: metric === 'duration' ? 'Time' : 'Times done',
             data: rows.map((row) => row.value),
             backgroundColor: chartTheme.seriesColors[0],
-            borderRadius: 4,
-            borderSkipped: 'start',
-            maxBarThickness: 32,
+            ...ROW_BAR_MARKS,
         }];
     const options = buildOptions({ metric, showGroupNames, chartTheme });
     if (series && !overlap) {

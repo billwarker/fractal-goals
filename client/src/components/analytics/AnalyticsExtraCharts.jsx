@@ -7,6 +7,7 @@ import { formatDuration } from '../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
 import { ChartEmpty } from './ChartStates';
 import SeriesDoughnut from './series/SeriesDoughnut';
+import { BAR_MARKS, HISTOGRAM_BAR_MARKS, ROW_BAR_MARKS } from './visualizations/shared/barMarks';
 import styles from './AnalyticsExtraCharts.module.css';
 
 const DEFAULT_TIME_MARKERS = ['start'];
@@ -57,8 +58,7 @@ function barOptions(chartTheme, { valueTitle, formatValue = null, tickFormat = u
     };
 }
 
-/** Bars with rounded data ends anchored to the baseline. */
-const barMarks = (color) => ({ backgroundColor: color, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 48 });
+const barMarks = (color, marks = BAR_MARKS) => ({ backgroundColor: color, ...marks });
 
 export function SessionSectionPie({ sessions = [], activityInstances = {}, chartRef }) {
     const rows = useMemo(() => {
@@ -153,7 +153,7 @@ export function GoalMomentumChart({ goals = [], chartRef }) {
     return (
         <Bar
             ref={chartRef}
-            data={{ labels: rows.map((row) => row.label), datasets: [{ label: 'Activity time', data: rows.map((row) => row.seconds / 3600), ...barMarks(chartTheme.seriesColors[0]) }] }}
+            data={{ labels: rows.map((row) => row.label), datasets: [{ label: 'Activity time', data: rows.map((row) => row.seconds / 3600), ...barMarks(chartTheme.seriesColors[0], ROW_BAR_MARKS) }] }}
             options={applyChartDensity(barOptions(chartTheme, {
                 horizontal: true, valueTitle: 'Hours', tickFormat: (value) => `${value}h`, formatValue: (hours) => formatDuration(hours * 3600),
             }), density)}
@@ -305,7 +305,7 @@ export function SessionDurationHistogram({ sessions = [], chartRef, bucketCount 
     return (
         <Bar
             ref={chartRef}
-            data={{ ...data, datasets: data.datasets.map((dataset) => ({ ...dataset, ...barMarks(chartTheme.seriesColors[0]), categoryPercentage: 1, barPercentage: 0.96 })) }}
+            data={{ ...data, datasets: data.datasets.map((dataset) => ({ ...dataset, ...barMarks(chartTheme.seriesColors[0], HISTOGRAM_BAR_MARKS) })) }}
             options={applyChartDensity(barOptions(chartTheme, { valueTitle: 'Sessions' }), density)}
         />
     );

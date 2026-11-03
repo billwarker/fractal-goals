@@ -5,6 +5,7 @@ import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
+import { ROW_BAR_MARKS } from '../shared/barMarks';
 import { timeDistributionRollupRank } from './timeDistributionState';
 import styles from '../../ProfileWindow.module.css';
 
@@ -26,8 +27,7 @@ function getActivityChartData(goal, color) {
             label: 'Instances',
             data: sortedActivities.map((activity) => activity.instance_count),
             backgroundColor: color,
-            borderRadius: 4,
-            borderSkipped: 'start',
+            ...ROW_BAR_MARKS,
         }],
     };
 }

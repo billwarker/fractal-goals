@@ -278,12 +278,13 @@ function AnalyticsScopePane({
                 </div>
                 {scopeKind !== 'global' && selectedWindowState ? chartSection : null}
 
-                {scopeKind !== 'global' && selectedWindowState?.selectedVisualization && (
+                {/* A chart with a fixed grouping has nothing to choose, so it gets no Group by section. */}
+                {scopeKind !== 'global' && selectedWindowState?.selectedVisualization && groupDimensions.length > 0 && (
                     <section className="sessions-query-section-group" aria-label="Group by">
                         <h4 className="sessions-query-section-group-title">Group by</h4>
-                        {groupDimensions.length && !visualizationState.runningTotal
-                            ? <GroupByControl context={chartContext} dimensions={groupDimensions} />
-                            : <p className="sessions-query-empty">{visualizationState.runningTotal ? 'Running totals use one series.' : 'This chart uses a fixed grouping.'}</p>}
+                        {visualizationState.runningTotal
+                            ? <p className="sessions-query-empty">Running totals use one series.</p>
+                            : <GroupByControl context={chartContext} dimensions={groupDimensions} />}
                     </section>
                 )}
             </div>

@@ -6,6 +6,7 @@ import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartT
 import { ChartEmpty } from '../../ChartStates';
 import { buildSeries, seriesColor } from '../../series/buildSeries';
 import ChartLegendPanel from '../../series/ChartLegendPanel';
+import { BAR_MARKS } from './barMarks';
 import styles from './BucketBarChart.module.css';
 
 /**
@@ -56,7 +57,7 @@ export default function BucketBarChart({
                 hoverBackgroundColor: color,
                 ...(stacked
                     ? { borderColor: 'transparent', borderWidth: { top: 2, right: 0, bottom: 0, left: 0 }, borderSkipped: 'start' }
-                    : { borderRadius: 4, borderSkipped: 'start' }),
+                    : BAR_MARKS),
             };
         })
         : [{
@@ -64,9 +65,7 @@ export default function BucketBarChart({
             label: seriesLabel,
             data: rows.map(valueOf),
             backgroundColor: chartTheme.seriesColors[0],
-            borderRadius: 4,
-            borderSkipped: 'start',
-            maxBarThickness: 48,
+            ...BAR_MARKS,
         }];
 
     const chart = (

@@ -4,6 +4,7 @@ import { Bar } from 'react-chartjs-2';
 import EmptyState from '../../common/EmptyState';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../ChartJSWrapper';
 import { formatDurationSeconds } from '../../../utils/formatters';
+import { BAR_MARKS } from '../visualizations/shared/barMarks';
 import styles from './GraphProfileModal.module.css';
 
 function formatTooltipMinutes(minutes) {
@@ -29,9 +30,8 @@ export default function GoalDurationGraph({ data = {} }) {
                 borderColor: goalColor,
                 backgroundColor: goalColor,
                 borderWidth: 1.5,
-                borderRadius: 0,
+                ...BAR_MARKS,
                 borderSkipped: false,
-                maxBarThickness: 42,
                 categoryPercentage: 0.72,
                 barPercentage: 0.9,
             },
