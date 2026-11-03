@@ -1,9 +1,12 @@
 import models
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from models import AnalyticsDashboard, GoalAnalyticsView, validate_root_goal
+from models import AnalyticsDashboard, Goal, GoalAnalyticsView, validate_root_goal
+from services.goal_chart_service import _view_window
 from services.serializers import serialize_analytics_dashboard
 from services.service_types import JsonDict, JsonList, ServiceResult
+from validators.core import MAX_NAME_LENGTH
 
 
 class DashboardService:
@@ -85,13 +88,78 @@ class DashboardService:
             AnalyticsDashboard.user_id == current_user_id,
             AnalyticsDashboard.deleted_at.is_(None),
         ).order_by(
+            AnalyticsDashboard.pinned.desc(),
+            AnalyticsDashboard.last_opened_at.desc().nulls_last(),
             AnalyticsDashboard.updated_at.desc(),
             AnalyticsDashboard.created_at.desc(),
+            AnalyticsDashboard.id.asc(),
         ).all()
+        goals_by_view = self._goals_by_view([dashboard.id for dashboard in dashboards if dashboard.kind == "view"])
 
         return {
-            "data": [serialize_analytics_dashboard(dashboard) for dashboard in dashboards]
+            "data": [self._serialize_listed(dashboard, goals_by_view) for dashboard in dashboards]
         }, None, 200
+
+    def _goals_by_view(self, view_ids):
+        """The live goals each view is attached to, in one query (not one per view)."""
+        goals_by_view = {view_id: [] for view_id in view_ids}
+        if not view_ids:
+            return goals_by_view
+        rows = self.db_session.execute(select(
+            GoalAnalyticsView.dashboard_id, Goal.id, Goal.name, Goal.level_id,
+        ).join(Goal, Goal.id == GoalAnalyticsView.goal_id).where(
+            GoalAnalyticsView.dashboard_id.in_(view_ids), Goal.deleted_at.is_(None),
+        ).order_by(Goal.name))
+        for row in rows:
+            goals_by_view[row.dashboard_id].append({"id": row.id, "name": row.name, "level_id": row.level_id})
+        return goals_by_view
+
+    @staticmethod
+    def _serialize_listed(dashboard, goals_by_view):
+        window = _view_window(dashboard.layout) if dashboard.kind == "view" else None
+        visualization = (
+            {"category": window.get("selectedCategory"), "id": window.get("selectedVisualization")} if window else None
+        )
+        return serialize_analytics_dashboard(
+            dashboard, goals=goals_by_view.get(dashboard.id, []) if dashboard.kind == "view" else [], visualization=visualization,
+        )
+
+    def mark_opened(self, root_id, dashboard_id, current_user_id) -> ServiceResult[JsonDict]:
+        """Remember that a saved view or dashboard was opened (for ordering); its updated date stays."""
+        if not self._get_root(root_id, current_user_id):
+            return None, "Fractal not found or access denied", 404
+        updated = self.db_session.query(AnalyticsDashboard).filter(
+            AnalyticsDashboard.id == dashboard_id,
+            AnalyticsDashboard.root_id == root_id,
+            AnalyticsDashboard.user_id == current_user_id,
+            AnalyticsDashboard.deleted_at.is_(None),
+        ).update({
+            AnalyticsDashboard.last_opened_at: models.utc_now(),
+            AnalyticsDashboard.updated_at: AnalyticsDashboard.updated_at,
+        }, synchronize_session=False)
+        if not updated:
+            self.db_session.rollback()
+            return None, "Analytics saved object not found", 404
+        self.db_session.commit()
+        return {"message": "Opened"}, None, 200
+
+    def duplicate_dashboard(self, root_id, dashboard_id, current_user_id) -> ServiceResult[JsonDict]:
+        """A copy named "‹name› (copy)" (or "(copy 2)" and on); goal links stay with the original."""
+        if not self._get_root(root_id, current_user_id):
+            return None, "Fractal not found or access denied", 404
+        dashboard = self._get_dashboard(root_id, dashboard_id, current_user_id)
+        if not dashboard:
+            return None, "Analytics saved object not found", 404
+        for attempt in range(1, 100):
+            suffix = " (copy)" if attempt == 1 else f" (copy {attempt})"
+            name = f"{dashboard.name[:MAX_NAME_LENGTH - len(suffix)]}{suffix}"
+            if not self._get_dashboard_by_name(root_id, current_user_id, name, include_deleted=True):
+                break
+        else:
+            return None, "Too many copies with that name", 409
+        return self.create_dashboard(root_id, current_user_id, {
+            "name": name, "kind": dashboard.kind or "dashboard", "layout": dashboard.layout,
+        })
 
     def create_dashboard(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
         root = self._get_root(root_id, current_user_id)
@@ -150,6 +218,16 @@ class DashboardService:
         if not dashboard:
             return None, "Analytics saved object not found", 404
 
+        if data.get("pinned") is not None and all(data.get(key) is None for key in ("name", "kind", "layout")):
+            # Pinning isn't an edit: the saved object's updated date stays.
+            self.db_session.query(AnalyticsDashboard).filter(AnalyticsDashboard.id == dashboard.id).update({
+                AnalyticsDashboard.pinned: bool(data["pinned"]),
+                AnalyticsDashboard.updated_at: AnalyticsDashboard.updated_at,
+            }, synchronize_session=False)
+            self.db_session.commit()
+            self.db_session.refresh(dashboard)
+            return {"data": serialize_analytics_dashboard(dashboard), "message": "Pinned" if dashboard.pinned else "Unpinned"}, None, 200
+
         kind, error, status = self._normalize_kind_and_layout(data, existing_kind=dashboard.kind or "dashboard")
         if error:
             return None, error, status
@@ -172,6 +250,8 @@ class DashboardService:
             dashboard.kind = kind
         if "layout" in data:
             dashboard.layout = data["layout"]
+        if data.get("pinned") is not None:
+            dashboard.pinned = bool(data["pinned"])
 
         conflict_error = self._commit_dashboard_change(f"An {label} with that name already exists")
         if conflict_error:

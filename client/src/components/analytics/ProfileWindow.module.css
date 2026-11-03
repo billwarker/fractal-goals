@@ -149,12 +149,8 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Global Actions (Right side) */

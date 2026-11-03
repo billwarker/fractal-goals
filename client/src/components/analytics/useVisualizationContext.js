@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 
-import { instanceMatchesScope, resolveAnalyticsGlobalFilters, sessionMatchesScope } from './analyticsGlobalFilters';
+import { instanceMatchesScope, sessionMatchesScope } from './analyticsGlobalFilters';
+import { resolveAnalyticsChartScope } from './analyticsChartScope';
 import { summarizeFilteredGoals } from './filteredGoalSummary';
 import useGoalAnalyticsRead from './useGoalAnalyticsRead';
 import { getVisualization } from './visualizations/registry';
@@ -20,13 +21,13 @@ export default function useVisualizationContext({ data, windowState, globalDateR
     const { selectedCategory, selectedVisualization, selectedActivity, selectedGoal } = windowState || {};
 
     const effectiveDateRange = globalDateRange;
-    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
-        filters: globalFilters,
+    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsChartScope({
+        globalFilters, localFilters: windowState?.localFilters,
         goalAnalytics,
         activities,
         activityGroups,
         activityInstances,
-    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics]);
+    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics, windowState?.localFilters]);
     const scopedActivities = useMemo(() => (
         resolvedGlobalFilters.hasActivityFilter
             ? activities.filter((activity) => resolvedGlobalFilters.activityIds.has(activity.id))

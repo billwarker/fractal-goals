@@ -81,6 +81,7 @@ function normalizeWindowState(state) {
     );
     return {
         ...normalizedState,
+        ...(normalizedState.localFilters ? { localFilters: normalizeGlobalFilters(normalizedState.localFilters) } : {}),
         visualizationState: normalizeVisualizationState(normalizedState),
         visualizationStateByKey: normalizeVisualizationStateByKey(normalizedState),
     };

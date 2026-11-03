@@ -9,7 +9,6 @@
     padding: 20px;
 }
 
-.sheet,
 .namingSheet {
     width: min(640px, 100%);
     max-height: 88vh;
@@ -52,13 +51,6 @@
     padding: 0;
 }
 
-.body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 20px 22px 24px;
-    overflow: auto;
-}
 
 .searchWrap {
     display: flex;
@@ -132,17 +124,6 @@
     text-transform: uppercase;
 }
 
-.viewSelectButton {
-    border: none;
-    background: transparent;
-    color: inherit;
-    padding: 0;
-    text-align: left;
-    cursor: pointer;
-    flex: 1;
-    font: inherit;
-}
-
 .viewName {
     font-size: 16px;
     font-weight: 600;
@@ -155,7 +136,6 @@
     font-size: 13px;
 }
 
-.deleteButton,
 .secondaryButton,
 .primaryButton {
     border-radius: 10px;
@@ -164,15 +144,12 @@
     cursor: pointer;
 }
 
-.deleteButton,
 .secondaryButton {
     border: 1px solid var(--color-border);
     background: transparent;
     color: var(--color-text-secondary);
 }
 
-.deleteButton:hover,
-.deleteButton:focus-visible,
 .secondaryButton:hover,
 .secondaryButton:focus-visible {
     outline: none;
@@ -228,4 +205,165 @@
     display: flex;
     justify-content: flex-end;
     gap: 12px;
+}
+
+/* Saved Analytics: list on the left, the selected item's preview on the right. */
+.sheetWide {
+    width: min(1040px, 100%);
+}
+
+.headerActions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.browse {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    min-height: 0;
+    overflow: hidden;
+}
+
+.listPane {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 20px 22px 24px;
+    overflow: auto;
+    border-right: 1px solid var(--color-border);
+}
+
+.cardList {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.card {
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.cardIcon {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+}
+
+.cardBody {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.cardBody .viewName {
+    font-size: 15px;
+    overflow-wrap: anywhere;
+}
+
+.cardBody .viewMeta {
+    margin-top: 0;
+}
+
+.cardGoals {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.preview {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    padding: 20px 22px 24px;
+    overflow: auto;
+}
+
+.previewTitle {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-text-primary);
+    overflow-wrap: anywhere;
+}
+
+.preview > .viewMeta {
+    margin-top: -8px;
+}
+
+.previewChart {
+    display: flex;
+    height: 240px;
+    min-height: 0;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+}
+
+.previewGoals ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: var(--color-text-primary);
+}
+
+.previewGoals a {
+    color: var(--color-text-primary);
+}
+
+.previewActions,
+.renameForm {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.renameForm .searchInput {
+    flex: 1 1 180px;
+}
+
+@media (max-width: 760px) {
+    .browse {
+        grid-template-columns: minmax(0, 1fr);
+        overflow: auto;
+    }
+
+    .listPane {
+        overflow: visible;
+        border-right: 0;
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .preview {
+        overflow: visible;
+    }
+}
+
+.savedBody {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.savedBody > .headerActions {
+    padding: 12px 22px 0;
+}
+
+.previewActions {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
 }

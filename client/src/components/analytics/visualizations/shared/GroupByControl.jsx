@@ -9,8 +9,8 @@ import { GROUP_DIMENSION_LABELS, normalizeGroupBy } from '../../../../utils/anal
  */
 export default function GroupByControl({ context, dimensions }) {
     const groupBy = normalizeGroupBy(context.visualizationState.groupBy, dimensions);
-    const { data: catalog } = useActivityTagCatalog(groupBy?.dimension === 'tag' ? context.rootId : null);
-    if (!dimensions?.length) return null;
+    const { data: catalog } = useActivityTagCatalog(!context.hideGroupBy && groupBy?.dimension === 'tag' ? context.rootId : null);
+    if (context.hideGroupBy || !dimensions?.length) return null;
     const families = catalog.families || [];
     return (
         <>

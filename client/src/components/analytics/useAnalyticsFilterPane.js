@@ -10,6 +10,7 @@ import { getVisualization } from './visualizations/registry';
  * removing an optional filter for the chart, and clearing a filter from its chip.
  */
 export default function useAnalyticsFilterPane({
+    scopeKind = 'single',
     selectedWindowState, selectedVisualizationMeta, windowStates, visualizationState, normalized, dateRange,
     updateVisualizationState, updateFilters, onDateRangeChange,
 }) {
@@ -57,5 +58,7 @@ export default function useAnalyticsFilterPane({
         });
     };
 
-    return { active, chartName, isVisible, optionalFilters, notAppliedTo, toggleShownFilter, removeFilter };
+    return { active, chartName, isVisible,
+        optionalFilters: scopeKind === 'chart' ? optionalFilters.filter((id) => id !== 'timeRange') : optionalFilters,
+        notAppliedTo, toggleShownFilter, removeFilter };
 }

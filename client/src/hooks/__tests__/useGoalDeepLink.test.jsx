@@ -3,7 +3,8 @@ import { render } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
-import useGoalDeepLink, { goalDeepLink } from '../useGoalDeepLink';
+import useGoalDeepLink from '../useGoalDeepLink';
+import { goalDeepLink } from '../../utils/goalDeepLink';
 
 const tree = { id: 'root', name: 'Guitar', children: [{ id: 'g1', name: 'Blues', children: [] }] };
 

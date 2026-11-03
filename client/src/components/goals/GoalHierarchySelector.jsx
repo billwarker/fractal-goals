@@ -29,6 +29,8 @@ function GoalHierarchySelector({
     lockedGoalMarker = '*',
     lockedGoalLegend = `${lockedGoalLabel} and cannot be removed.`,
     selectionDisabled = false,
+    getGoalDisabledReason,
+    getGoalSelectionMeta,
     initialHideCompletedGoals = false,
     lockHideCompletedGoals = false,
     showHideCompletedControl = true,
@@ -111,7 +113,7 @@ function GoalHierarchySelector({
     }, [onSelectionChange]);
 
     const toggleGoal = useCallback((goalId) => {
-        if (selectionDisabled || lockedIdSet.has(goalId)) return;
+        if (selectionDisabled || lockedIdSet.has(goalId) || getGoalDisabledReason?.(goalById.get(goalId))) return;
         const isCurrentlySelected = selectedIdSet.has(goalId);
 
         if (isCurrentlySelected) {
@@ -134,14 +136,14 @@ function GoalHierarchySelector({
             next.add(goalId);
         }
         emitSelection(Array.from(next));
-    }, [emitSelection, isSingleSelect, lockedIdSet, selectedIdSet, selectionDisabled]);
+    }, [emitSelection, getGoalDisabledReason, goalById, isSingleSelect, lockedIdSet, selectedIdSet, selectionDisabled]);
 
     const toggleRelatedGoals = useCallback((sourceId, relatedIds) => {
         if (selectionDisabled || !relatedIds.length) {
             return;
         }
 
-        const editableRelatedIds = relatedIds.filter((relatedId) => !lockedIdSet.has(String(relatedId)));
+        const editableRelatedIds = relatedIds.filter((relatedId) => !lockedIdSet.has(String(relatedId)) && !getGoalDisabledReason?.(goalById.get(String(relatedId))));
         if (!editableRelatedIds.length) return;
         const allSelected = editableRelatedIds.every((relatedId) => selectedIdSet.has(String(relatedId)));
         const next = new Set(selectedIdSet);
@@ -165,11 +167,12 @@ function GoalHierarchySelector({
             return nextConnectorIds;
         });
         emitSelection(Array.from(next));
-    }, [emitSelection, lockedIdSet, selectedIdSet, selectionDisabled]);
+    }, [emitSelection, getGoalDisabledReason, goalById, lockedIdSet, selectedIdSet, selectionDisabled]);
 
     const getGoalLeftSlot = useCallback((goal) => {
         const goalId = String(goal.id);
         const isLocked = lockedIdSet.has(goalId);
+        const disabledReason = getGoalDisabledReason?.(goal);
         const isSelected = effectiveSelectedIdSet.has(goalId);
         const descendantIds = collectDescendantIds(goalId, childIdsByParent);
         const ancestorIds = collectAncestorIds(goal, goalById);
@@ -182,12 +185,12 @@ function GoalHierarchySelector({
 
         return (
             <div className={styles.controlRow} onClick={(event) => event.stopPropagation()}>
-                <label className={styles.controlLabel} title="Select this goal">
+                <label className={styles.controlLabel} title={disabledReason || "Select this goal"}>
                     <input
                         type={isSingleSelect ? 'radio' : 'checkbox'}
                         name={isSingleSelect ? 'goal-hierarchy-single-select' : undefined}
                         checked={isSelected}
-                        disabled={selectionDisabled || isLocked}
+                        disabled={selectionDisabled || isLocked || Boolean(disabledReason)}
                         onChange={() => toggleGoal(goalId)}
                         aria-label={isLocked ? `${goal.name}, ${lockedGoalLabel}` : `Select ${goal.name}`}
                     />
@@ -229,6 +232,7 @@ function GoalHierarchySelector({
         );
     }, [
         childIdsByParent,
+        getGoalDisabledReason,
         effectiveSelectedIdSet,
         goalById,
         isSingleSelect,
@@ -286,6 +290,7 @@ function GoalHierarchySelector({
                 </span>
             );
         }
+        if (getGoalSelectionMeta) return getGoalSelectionMeta(goal);
         if (!showSelectionInheritanceMeta || selectedIdSet.has(String(goal.id))) {
             return null;
         }
@@ -304,6 +309,7 @@ function GoalHierarchySelector({
     }, [
         childIdsByParent,
         goalById,
+        getGoalSelectionMeta,
         lockedGoalLabel,
         lockedGoalMarker,
         lockedIdSet,
@@ -373,7 +379,7 @@ function GoalHierarchySelector({
                     variant="session"
                     density={isMobile && !compactLayout ? 'comfortable' : 'default'}
                     onGoalClick={(goal) => toggleGoal(String(goal.id))}
-                    isGoalSelectable={(goal) => !selectionDisabled && !lockedIdSet.has(String(goal.id))}
+                    isGoalSelectable={(goal) => !selectionDisabled && !lockedIdSet.has(String(goal.id)) && !getGoalDisabledReason?.(goal)}
                     getGoalLeftSlot={getGoalLeftSlot}
                     getGoalMetaLabel={getGoalMetaLabel}
                     getGoalBranchHighlightState={getGoalBranchHighlightState}

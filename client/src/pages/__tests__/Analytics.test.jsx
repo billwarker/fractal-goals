@@ -168,7 +168,7 @@ describe('Analytics page', () => {
         });
     });
 
-    it('opens the mobile sidebar from the footer with shared sheet motion, even when stored open', () => {
+    it('opens the mobile sidebar from the footer with shared sheet motion, even when stored open', async () => {
         Object.defineProperty(window, 'matchMedia', {
             value: vi.fn(() => ({
                 matches: true,
@@ -195,7 +195,7 @@ describe('Analytics page', () => {
 
         fireEvent.click(button);
         expect(button).toHaveAttribute('aria-expanded', 'true');
-        const closeButton = screen.getByRole('button', { name: 'Collapse filters panel' });
+        const closeButton = await screen.findByRole('button', { name: 'Collapse filters panel' });
         const sheet = closeButton.closest('.sessions-query-sidebar').parentElement;
         expect(sheet.parentElement).toBe(document.body);
         expect(sheet).toHaveClass('mobile-sheet-enter');
@@ -222,7 +222,7 @@ describe('Analytics page', () => {
         });
 
         expect(screen.getByRole('heading', { name: 'Query Console', level: 1 })).toBeInTheDocument();
-        expect(screen.getByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Saved Analytics' })).not.toBeInTheDocument();
         expect(screen.queryByText('Analytics panel')).not.toBeInTheDocument();
         expect(screen.queryByText('Loading analytics panel...')).not.toBeInTheDocument();

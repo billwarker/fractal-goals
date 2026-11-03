@@ -48,7 +48,8 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     // Analytics: open the saved view and add it to the goal.
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: 'Saved Analytics' }).click();
-    await page.getByRole('button', { name: new RegExp(viewName) }).click();
+    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(viewName) }).click();
+    await page.getByRole('region', { name: `${viewName} preview` }).getByRole('button', { name: 'Open', exact: true }).click();
     await page.getByRole('button', { name: 'Add to goal…' }).click();
     const picker = page.getByRole('dialog', { name: new RegExp(viewName) });
     await picker.getByLabel(`Select ${goalName}`).click();
@@ -121,9 +122,13 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     // Deleting the view names its goal, and the goal keeps only its threshold chart.
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: 'Saved Analytics' }).click();
-    await page.locator('[class*="viewRow"]').filter({ hasText: viewName }).getByRole('button', { name: 'Delete', exact: true }).click();
+    // Saved Analytics previews the chosen view; its goals are listed and Delete is one of its actions.
+    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(viewName) }).click();
+    const preview = page.getByRole('region', { name: `${viewName} preview` });
+    await expect(preview.getByRole('link', { name: goalName })).toBeVisible();
+    await preview.getByRole('button', { name: 'Delete', exact: true }).click();
     await expect(page.getByText(new RegExp(`shown on 1 goal \\(${goalName}\\)`))).toBeVisible();
-    await page.getByRole('dialog').getByRole('button', { name: 'Delete', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Delete Analytics View', exact: true }).getByRole('button', { name: 'Delete', exact: true }).click();
     await expect.poll(async () => {
         const payload = await (await page.request.get(`/api/${root}/goals/browser-heatmap-goal-${suffix}/charts`, { headers })).json();
         return [payload.default_chart, payload.charts.length];
@@ -158,4 +163,125 @@ test('a saved session chart can be added from goal details', async ({ page }, te
     await expect(charts.getByText(viewName, { exact: true })).toHaveCount(0);
     await page.request.delete(`/api/roots/${root}/dashboards/${viewId}`, { headers });
     expect(errors).toEqual([]);
+});
+
+test('saved analytics searches goals, previews one chart, and manages copies and pins', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    const name = `Saved browser ${suffix}`;
+    const renamed = `${name} renamed`;
+    const goalName = `First clean performance`;
+    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const viewId = await saveView(page, headers, root, name);
+    const attached = await page.request.put(`/api/roots/${root}/dashboards/${viewId}/goals`, {
+        headers, data: { goal_ids: [`browser-heatmap-milestone-${suffix}`] },
+    });
+    expect(attached.ok(), await attached.text()).toBeTruthy();
+    await page.goto(`/${root}/analytics`);
+    await page.getByRole('button', { name: 'Saved Analytics' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Saved Analytics', exact: true });
+    await dialog.getByRole('searchbox').fill(goalName);
+    const card = dialog.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(name) });
+    await expect(card).toBeVisible();
+    await card.click();
+    let preview = dialog.getByRole('region', { name: `${name} preview` });
+    await expect(preview.getByRole('link', { name: goalName })).toBeVisible();
+    await expect(dialog.locator('canvas')).toHaveCount(1);
+    await preview.getByRole('button', { name: 'Pin', exact: true }).click();
+    await expect(preview.getByRole('button', { name: 'Unpin', exact: true })).toBeEnabled();
+    await preview.getByRole('button', { name: 'Rename', exact: true }).click();
+    await preview.getByRole('textbox', { name: 'Name' }).fill(renamed);
+    await preview.getByRole('button', { name: 'Save', exact: true }).click();
+    preview = dialog.getByRole('region', { name: `${renamed} preview` });
+    await expect(preview).toBeVisible();
+    await dialog.getByRole('searchbox').fill(renamed);
+    await preview.getByRole('button', { name: 'Duplicate', exact: true }).click();
+    const copy = dialog.getByRole('region', { name: `${renamed} (copy) preview` });
+    await expect(copy).toBeVisible();
+    await expect(copy.getByText('Not on any goal')).toBeVisible();
+    await expect(dialog.locator('canvas')).toHaveCount(1);
+    const box = await dialog.boundingBox();
+    expect(box.width).toBeLessThanOrEqual(page.viewportSize().width);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    const objects = (await (await page.request.get(`/api/roots/${root}/dashboards`, { headers })).json()).data;
+    for (const item of objects.filter((item) => item.id === viewId || item.name === `${renamed} (copy)`)) {
+        await page.request.delete(`/api/roots/${root}/dashboards/${item.id}`, { headers });
+    }
+});
+
+test('dashboard sidebar keeps shared scope above independent chart tabs', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    const name = `Sidebar tabs ${suffix}`;
+    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const created = await page.request.post(`/api/roots/${root}/dashboards`, { headers, data: {
+        name, kind: 'dashboard', layout: { version: 3, layout: { type: 'grid', panels: [
+            { id: 'window-1', x: 0, y: 0, w: 48, h: 48 }, { id: 'window-2', x: 48, y: 0, w: 48, h: 48 },
+        ] }, window_states: {
+            'window-1': { selectedCategory: 'activities', selectedVisualization: 'activityTrends' },
+            'window-2': { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' },
+        }, selected_window_id: 'window-1', global_filters: {} },
+    } });
+    expect(created.ok(), await created.text()).toBeTruthy();
+    const id = (await created.json()).data.id;
+    const openDashboard = async () => {
+        await page.getByRole('button', { name: 'Saved Analytics', exact: true }).click();
+        const browser = page.getByRole('dialog', { name: 'Saved Analytics', exact: true });
+        await browser.getByRole('searchbox').fill(name);
+        await browser.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(name) }).click();
+        await browser.getByRole('region', { name: `${name} preview` }).getByRole('button', { name: 'Open', exact: true }).click();
+    };
+    const showSidebar = () => page.getByRole('button', { name: suffix === 'mobile' ? 'Show Sidebar' : 'Show Filters', exact: true }).click();
+    await page.goto(`/${root}/analytics`);
+    await openDashboard();
+    await showSidebar();
+    const global = page.getByRole('region', { name: 'Global filters', exact: true });
+    const firstTab = page.getByRole('tab', { name: 'Activity Trends, chart 1' });
+    const secondTab = page.getByRole('tab', { name: 'Session Trends, chart 2' });
+    const first = page.getByRole('tabpanel', { name: 'Activity Trends, chart 1' });
+    const second = page.getByRole('tabpanel', { name: 'Session Trends, chart 2' });
+    await expect(global.getByRole('heading', { name: 'Time Range' })).toHaveCount(0);
+    await expect(global.getByRole('button', { name: 'Show', exact: true })).toHaveAttribute('aria-expanded', 'false');
+    await expect(global.getByRole('list', { name: 'Additional filters' })).toHaveCount(0);
+    await global.getByRole('button', { name: 'Show', exact: true }).click();
+    const addGlobal = global.getByRole('list', { name: 'Additional filters' });
+    await addGlobal.getByRole('button', { name: 'Time range', exact: true }).click();
+    await expect(global.getByRole('heading', { name: 'Time Range' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Time Range' })).toHaveCount(1);
+    await expect(page.getByRole('list', { name: 'Active filters' })).toHaveCount(0);
+    const timeInfo = global.getByRole('button', { name: 'View time range filter selections' });
+    if (suffix === 'mobile') await timeInfo.click();
+    else await timeInfo.hover();
+    await expect(page.getByRole('tooltip')).toHaveText('All time');
+    await timeInfo.evaluate((element) => element.blur());
+    await page.mouse.move(0, 0);
+    await global.getByRole('button', { name: '7D', exact: true }).click();
+    await expect(global.getByRole('button', { name: 'Clear time range filter' })).toBeEnabled();
+    await global.getByRole('button', { name: 'Clear time range filter' }).click();
+    await expect(global.getByRole('button', { name: 'Clear time range filter' })).toBeDisabled();
+    await expect(addGlobal).toBeVisible();
+    await first.getByRole('combobox', { name: 'Group by', exact: true }).selectOption('activity');
+    await first.getByRole('list', { name: 'Additional filters' }).getByRole('button', { name: 'Tags', exact: true }).click();
+    await first.getByRole('checkbox', { name: 'Exact tag set' }).check();
+    await secondTab.click();
+    await second.getByRole('combobox', { name: 'Group by', exact: true }).selectOption('template');
+    await expect(second.getByRole('checkbox', { name: 'Exact tag set' })).toHaveCount(0);
+    await expect(global.getByRole('heading', { name: 'Time Range' })).toBeVisible();
+    await expect(first).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('dashboard-sidebar.png') });
+    await page.getByRole('button', { name: suffix === 'mobile' ? 'Hide Sidebar' : 'Hide Filters', exact: true }).click();
+    const saved = page.waitForResponse((response) => response.url().endsWith(`/dashboards/${id}`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    expect((await saved).ok()).toBeTruthy();
+    await page.reload();
+    await openDashboard();
+    await showSidebar();
+    await expect(secondTab).toHaveAttribute('aria-selected', 'true');
+    await expect(second.getByRole('combobox', { name: 'Group by', exact: true })).toHaveValue('template');
+    await firstTab.click();
+    await expect(first.getByRole('combobox', { name: 'Group by', exact: true })).toHaveValue('activity');
+    await expect(first.getByRole('checkbox', { name: 'Exact tag set' })).toBeChecked();
+    await expect(global.getByRole('checkbox', { name: 'Exact tag set' })).toHaveCount(0);
+    await page.request.delete(`/api/roots/${root}/dashboards/${id}`, { headers });
 });

@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Link } from 'react-router-dom';
 
-import { goalDeepLink } from '../../hooks/useGoalDeepLink';
+import { goalDeepLink } from '../../utils/goalDeepLink';
 import { formatDuration } from '../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
 import { ChartEmpty } from './ChartStates';

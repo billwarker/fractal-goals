@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { fireEvent, render as renderBase, screen } from '@testing-library/react';
+import { fireEvent, render as renderBase, screen, waitFor } from '@testing-library/react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -44,7 +44,7 @@ describe('ProfileWindow', () => {
     it.each([
         { evidenceLoading: true },
         { evidenceLoading: false, hasMoreEvidence: true },
-    ])('holds the chart until history is complete: %o', (loadingState) => {
+    ])('holds the chart until history is complete: %o', async (loadingState) => {
         const activity = { id: 'activity-1', name: 'Squat' };
         const data = { sessions: [], activities: [activity], activityGroups: [], activityInstances: {}, rootId: null };
         const props = {
@@ -55,8 +55,8 @@ describe('ProfileWindow', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Loading');
         expect(scatterPlot).not.toHaveBeenCalled();
         rerender(<ProfileWindow {...props} data={{ ...data, hasMoreEvidence: false }} />);
-        expect(screen.queryByRole('status')).not.toBeInTheDocument();
-        expect(scatterPlot).toHaveBeenCalled();
+        await waitFor(() => expect(scatterPlot).toHaveBeenCalled());
+        await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
     });
 
     it('offers retry instead of rendering partial history after a continuation fails', () => {
@@ -291,5 +291,28 @@ describe('ProfileWindow', () => {
 
         expect(screen.queryByRole('button', { name: 'Show chart query' })).not.toBeInTheDocument();
         expect(screen.queryByText('Chart Query')).not.toBeInTheDocument();
+    });
+
+    it('renames a chart from its header and drops the name when the chart is replaced', () => {
+        const updateWindowState = vi.fn();
+        const data = { sessions: [], goalAnalytics: { goals: [], summary: {} }, activities: [], activityGroups: [], activityInstances: {}, rootId: null };
+        const windowState = { selectedCategory: 'activities', selectedVisualization: 'activityFrequency', selectedActivity: null, selectedGoal: null };
+        const { rerender } = render(<ProfileWindow data={data} windowState={windowState} updateWindowState={updateWindowState} chartNumber={2} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /^Rename / }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Chart name' }), { target: { value: '  Weekly volume  ' } });
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'Chart name' }), { key: 'Enter' });
+        expect(updateWindowState).toHaveBeenLastCalledWith({ chartTitle: 'Weekly volume' });
+
+        rerender(<ProfileWindow data={data} windowState={{ ...windowState, chartTitle: 'Weekly volume' }} updateWindowState={updateWindowState} chartNumber={2} />);
+        expect(screen.getByText('Weekly volume')).toBeInTheDocument();
+        expect(screen.getByText('2')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rename Weekly volume' }));
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'Chart name' }), { key: 'Escape' });
+        expect(updateWindowState).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByTitle('Go Back'));
+        expect(updateWindowState).toHaveBeenLastCalledWith(expect.objectContaining({ selectedVisualization: null, chartTitle: null }));
     });
 });

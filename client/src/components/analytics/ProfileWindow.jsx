@@ -33,6 +33,8 @@ import ChartGoalSurface from './ChartGoalSurface';
 import { GOAL_CHART_IDS } from './chartGoalTargets';
 import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
+import ChartTitle from './ChartTitle';
+import ChartTitleEditor from './ChartTitleEditor';
 import pageGridSnap from './pageGridSnap';
 
 // Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
@@ -53,6 +55,7 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * @param {function} props.updateWindowState - Callback to update window state
  * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
+ * @param {number} props.chartNumber - This chart's number, matching its sidebar tab
  * @param {boolean} props.onPageGrid - Draw the panel on the page's background grid: no fill or outline
  *   until selected, and charts at 'expanded' density (no gridlines of their own, snapped to the grid)
  */
@@ -73,6 +76,7 @@ function ProfileWindow({
     onResetFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
+    chartNumber = null,
     onPageGrid = false,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
@@ -111,7 +115,8 @@ function ProfileWindow({
     } = windowState;
     const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
-    const setSelectedVisualization = (value) => updateWindowState(getVisualizationSelectionUpdate(windowState, value));
+    // A custom name belongs to the chart it was given to, so replacing the chart drops it.
+    const setSelectedVisualization = (value) => updateWindowState({ ...getVisualizationSelectionUpdate(windowState, value), chartTitle: null });
     const updateVisualizationState = React.useCallback((updates) => {
         updateWindowState(getVisualizationStateUpdate(windowState, updates));
     }, [updateWindowState, windowState]);
@@ -139,6 +144,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         }
     };
@@ -149,6 +155,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         } else if (selectedCategory) {
             updateWindowState({
@@ -156,6 +163,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         }
     };
@@ -166,6 +174,7 @@ function ProfileWindow({
             selectedVisualization: null,
             selectedActivity: null,
             selectedGoal: null,
+            chartTitle: null,
         });
     };
 
@@ -265,6 +274,10 @@ function ProfileWindow({
         }
     };
 
+    const renderTitle = () => (selectedVisualizationMeta
+        ? <ChartTitleEditor number={chartNumber} windowState={windowState} onRename={(chartTitle) => updateWindowState({ chartTitle })} />
+        : <ChartTitle name={CATEGORY_LABELS[selectedCategory] || 'Analytics'} />);
+
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
 
@@ -307,9 +320,7 @@ function ProfileWindow({
                                     ? categoryIcons[selectedCategory]
                                     : <ChartIcon size={16} />}
                         </span>
-                        <span>
-                            {selectedVisualizationMeta?.name || CATEGORY_LABELS[selectedCategory] || 'Analytics'}
-                        </span>
+                        {renderTitle()}
                     </div>
                 </div>
 
@@ -526,9 +537,10 @@ function ProfileWindow({
         if (readQuery.isError) return <ChartError onRetry={readQuery.refetch} />;
         const VisualizationChart = selectedVisualizationMeta?.Chart;
         if (!VisualizationChart) return null;
-        const hasActiveScope = hasActiveGlobalFilters(globalFilters) || Boolean(globalDateRange?.start || globalDateRange?.end);
+        const hasActiveScope = hasActiveGlobalFilters(globalFilters) || hasActiveGlobalFilters(windowState.localFilters) || Boolean(globalDateRange?.start || globalDateRange?.end);
         // An empty chart's "Clear filters": every global filter and the time range.
         const clearAllFilters = () => {
+            updateWindowState({ localFilters: null });
             onResetFilters?.();
             onGlobalDateRangeChange?.({ start: null, end: null });
         };

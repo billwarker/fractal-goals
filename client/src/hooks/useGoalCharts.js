@@ -39,9 +39,16 @@ export function useGoalCharts(rootId, goalId, { enabled = true } = {}) {
     });
 }
 
+/** A goal shows at most this many saved views (mirrors goal_chart_service.MAX_CHARTS_PER_GOAL). */
+export const MAX_CHARTS_PER_GOAL = 12;
+
 function useRefreshGoalCharts(rootId) {
     const queryClient = useQueryClient();
-    return useCallback(() => queryClient.invalidateQueries({ queryKey: queryKeys.goalChartsRoot(rootId) }), [queryClient, rootId]);
+    // Saved views list the goals they're on, so the list refreshes too.
+    return useCallback(() => Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.goalChartsRoot(rootId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.analyticsViews(rootId) }),
+    ]), [queryClient, rootId]);
 }
 
 /** Attach or remove a saved view on one goal. */
@@ -77,14 +84,8 @@ export function useViewGoals(rootId, dashboardId, { enabled = true } = {}) {
         enabled: Boolean(rootId && dashboardId && enabled),
     });
     const setGoals = useCallback(async (goalIds) => {
-        try {
-            await fractalApi.setAnalyticsViewGoals(rootId, dashboardId, goalIds);
-            await refresh();
-            return true;
-        } catch (error) {
-            notify.error(`Couldn’t update the view’s goals: ${formatError(error)}`);
-            return false;
-        }
+        await fractalApi.setAnalyticsViewGoals(rootId, dashboardId, goalIds);
+        await refresh();
     }, [dashboardId, refresh, rootId]);
     return { ...query, setGoals };
 }

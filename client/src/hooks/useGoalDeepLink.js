@@ -22,5 +22,3 @@ export default function useGoalDeepLink(fractalData, openGoal) {
         }, { replace: true });
     }, [fractalData, goalId, openGoal, setSearchParams]);
 }
-
-export const goalDeepLink = (rootId, goalId) => `/${rootId}/goals?goal=${encodeURIComponent(goalId)}`;

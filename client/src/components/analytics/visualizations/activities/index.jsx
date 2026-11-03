@@ -1,8 +1,7 @@
 import React from 'react';
 
-import { ActivityGroupMixChart } from '../../AnalyticsExtraCharts';
-import ScatterPlot from '../../ScatterPlot';
-import styles from '../../ProfileWindow.module.css';
+import lazyChart from '../../lazyChart';
+
 import EmptyControls from '../shared/EmptyControls';
 import GroupByControl from '../shared/GroupByControl';
 import useGroupLookups from '../shared/useGroupLookups';
@@ -11,6 +10,12 @@ import { ACTIVITY_TOTALS_VISUALIZATION } from './ActivityTotals';
 import { ACTIVITY_TREND_GROUPS, activityTrendMeasure, ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
 import { MetricProgressChart } from './MetricProgress';
 import { MetricTrendsChart } from './MetricTrends';
+import styles from '../../ProfileWindow.module.css';
+
+const ActivityGroupMixChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.ActivityGroupMixChart })));
+
+
+const ScatterPlot = lazyChart(() => import('../../ScatterPlot'));
 
 const SCATTER_GROUPS = ['tag', 'template', 'programDay'];
 
@@ -114,6 +119,7 @@ export const ACTIVITY_VISUALIZATIONS = [
         selectionRequirements: { activity: true },
         Chart: ActivityScatterPlotChart,
         Controls: ScatterPlotControls,
+        groupByDimensions: SCATTER_GROUPS,
     },
     {
         id: 'activityTrends',
@@ -125,6 +131,7 @@ export const ACTIVITY_VISUALIZATIONS = [
         selectionRequirements: {},
         Chart: ActivityTrendsVisualizationChart,
         Controls: ActivityTrendsVisualizationControls,
+        groupByDimensions: ACTIVITY_TREND_GROUPS,
     },
     ACTIVITY_TOTALS_VISUALIZATION,
     {

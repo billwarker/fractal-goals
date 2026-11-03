@@ -4,9 +4,8 @@ import { formatDuration } from '../components/analytics/formatDuration';
 import AnalyticsLoading from '../components/analytics/AnalyticsLoading';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
-import AnalyticsFiltersSidebar from '../components/analytics/AnalyticsFiltersSidebar';
+import { getChartNumbers } from '../components/analytics/chartTitles';
 import useAnalyticsDeepLink, { useAnalyticsEvidenceDemand } from '../components/analytics/useAnalyticsDeepLink';
-import AnalyticsQueryConsole from '../components/analytics/AnalyticsQueryConsole';
 import {
     createDashboardLayoutPayload,
     createAnalyticsViewPayload,
@@ -39,6 +38,8 @@ import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
 import AnalyticsOnboardingState from '../components/onboarding/AnalyticsOnboardingState';
 import useAnalyticsGlobalScope from '../components/analytics/useAnalyticsGlobalScope';
 import styles from './Analytics.module.css';
+const AnalyticsFiltersSidebar = lazy(() => import('../components/analytics/AnalyticsFiltersSidebar'));
+const AnalyticsQueryConsole = lazy(() => import('../components/analytics/AnalyticsQueryConsole'));
 const AnalyticsViewNameModal = lazy(() => import('../components/analytics/AnalyticsViewNameModal'));
 const AnalyticsViewsModal = lazy(() => import('../components/analytics/AnalyticsViewsModal'));
 const ProfileWindow = lazy(() => import('../components/analytics/ProfileWindow'));
@@ -372,6 +373,8 @@ function Analytics() {
         setActiveMode('query');
     }, [showSqlExplorer]);
 
+    const chartNumbers = useMemo(() => getChartNumbers(windowStates), [windowStates]);
+
     const renderWindow = useCallback((windowId, layoutControls = {}) => {
         const windowCount = countWindows(layout);
         const canSplit = windowCount < MAX_WINDOWS;
@@ -405,11 +408,13 @@ function Analytics() {
                     onResetFilters={handleResetGlobalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
+                    chartNumber={chartNumbers[windowId]}
                     onPageGrid
                 />
             </Suspense>
         );
     }, [
+        chartNumbers,
         createWindowStateUpdater,
         globalDateRange,
         globalFilters,
@@ -434,8 +439,10 @@ function Analytics() {
             backdropClassName={styles.sheetBackdrop}
             constrainToVisualViewport={false}
         >
-            <AnalyticsFiltersSidebar
+            <Suspense fallback={<AnalyticsLoading />}><AnalyticsFiltersSidebar
                 rootId={rootId} sessions={sessions} windowStates={windowStates}
+                selectedWindowId={selectedWindowId} onSelectWindow={setSelectedWindowId}
+                onUpdateWindowState={(id, updates) => createWindowStateUpdater(id)(updates)}
                 filters={globalFilters}
                 dateRange={globalDateRange}
                 goals={goalAnalytics?.goals || []}
@@ -449,7 +456,7 @@ function Analytics() {
                 onReset={handleResetGlobalFilters}
                 onToggleCollapse={() => setIsFiltersPaneOpen(false)}
                 isMobile={isMobile}
-            />
+            /></Suspense>
         </ResponsiveSidePane>
     );
 
@@ -480,7 +487,7 @@ function Analytics() {
                 <AnalyticsEvidenceNotice {...{ hasMoreEvidence, evidenceError, loadMoreEvidence }} />
 
                 {activeMode === 'query' && showSqlExplorer ? (
-                    <AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} />
+                    <Suspense fallback={<AnalyticsLoading />}><AnalyticsQueryConsole rootId={rootId} initialSql={consoleInitialSql} /></Suspense>
                 ) : (
                     <div className={styles.workspace} onMouseDown={handleWorkspaceMouseDown} data-page-grid>
                         <div

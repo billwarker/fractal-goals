@@ -51,6 +51,7 @@ export const ACTIVITY_TOTALS_VISUALIZATION = {
     selectionRequirements: {},
     Chart: ActivityTotalsVisualizationChart,
     Controls: ActivityTotalsVisualizationControls,
+    groupByDimensions: ACTIVITY_TOTALS_GROUPS,
 };
 
 export { ActivityTotalsChart, ActivityTotalsControls };

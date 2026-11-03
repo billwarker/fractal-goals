@@ -75,7 +75,7 @@
         position: fixed;
         top: var(--app-nav-height, 0px);
         right: 0;
-        bottom: 0;
+        bottom: var(--mobile-page-footer-height);
         left: 0;
         background: rgba(0, 0, 0, 0.5);
         z-index: 499;
@@ -84,11 +84,11 @@
     .rightPanel {
         position: fixed;
         right: 0;
-        bottom: 0;
+        bottom: var(--mobile-page-footer-height);
         left: 0;
         width: 100%;
         height: var(--mobile-sidebar-height);
-        max-height: var(--mobile-sidebar-height);
+        max-height: min(var(--mobile-sidebar-height), calc(var(--app-viewport-height, 100dvh) - var(--app-nav-height, 0px) - var(--mobile-page-footer-height)));
         min-height: 0;
         box-sizing: border-box;
         padding-bottom: env(safe-area-inset-bottom, 0px);

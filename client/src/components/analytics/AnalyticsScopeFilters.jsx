@@ -4,6 +4,8 @@ import { useActivityTagCatalog } from '../../hooks/useActivityTagCatalog';
 import OptionSelectionModal from '../common/OptionSelectionModal';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import TagChipPicker from '../common/TagChipPicker';
+import AnalyticsFilterHeader from './AnalyticsFilterHeader';
+import { selectionSummary, tagSelectionSummary } from './analyticsFilterSummaries';
 
 /** Session templates as options: {id, name, color, count} in name order (count: sessions). */
 function templateOptions(sessions) {
@@ -47,19 +49,6 @@ const SESSION_SCOPES = [
     { key: 'programDayIds', filterId: 'programDays', label: 'Program day', plural: 'Program Days', any: 'Any program day' },
 ];
 
-function SectionHeader({ title, status, onClear }) {
-    return (
-        <div className="sessions-query-sidebar-section-header">
-            <h4>{title}</h4>
-            {onClear ? (
-                <button type="button" className="sessions-query-section-toggle" onClick={onClear} aria-label={`Clear ${title.toLowerCase()} filter`}>
-                    {status} · Clear
-                </button>
-            ) : <span>{status}</span>}
-        </div>
-    );
-}
-
 /**
  * Global scope by tags, session template and program day. The pane decides which show (`visible`,
  * from the charts' filter capabilities); a template or program-day filter also hides while no
@@ -68,7 +57,7 @@ function SectionHeader({ title, status, onClear }) {
  * chosen then means untagged sessions).
  */
 export default function AnalyticsScopeFilters({
-    rootId, filters, sessions = [], onUpdate, visible = { tags: true, templates: true, programDays: true },
+    rootId, filters, sessions = [], onUpdate, onClearFilter, notAppliedTo = () => null, visible = { tags: true, templates: true, programDays: true },
 }) {
     const { data: catalog } = useActivityTagCatalog(rootId);
     const templates = useMemo(() => templateOptions(sessions), [sessions]);
@@ -88,11 +77,8 @@ export default function AnalyticsScopeFilters({
         <>
             {showTags ? (
                 <section className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label="Tag filter" data-filter-section="tags">
-                    <SectionHeader
-                        title="Tags"
-                        status={filters.tags ? (tagIds.length ? `${tagIds.length} selected` : 'Untagged') : 'Any'}
-                        onClear={filters.tags ? () => setTags(null) : null}
-                    />
+                    <AnalyticsFilterHeader title="Tags" summary={tagSelectionSummary(filters.tags, catalog.tags || [])}
+                        active={Boolean(filters.tags)} onClear={() => onClearFilter('tags')} ignoredBy={notAppliedTo('tags')} />
                     <TagChipPicker
                         catalog={catalog}
                         selectedIds={tagIds}
@@ -111,14 +97,11 @@ export default function AnalyticsScopeFilters({
             ) : null}
             {sessionSections.map(({ key, filterId, label, plural, any }) => {
                 const selected = filters.sessions[key];
-                const names = optionsByKey[key].filter((option) => selected.includes(option.id)).map(optionTitle);
                 return (
                     <section key={key} className="sessions-query-sidebar-section sessions-query-sidebar-section-compact" aria-label={`${label} filter`} data-filter-section={filterId}>
-                        <SectionHeader
-                            title={label}
-                            status={selected.length ? `${selected.length} selected` : 'Any'}
-                            onClear={selected.length ? () => setSessions(key, []) : null}
-                        />
+                        <AnalyticsFilterHeader title={label}
+                            summary={selectionSummary(selected, optionsByKey[key].map((option) => ({ ...option, name: optionTitle(option) })), any, `Unavailable ${label.toLowerCase()}`)}
+                            active={selected.length > 0} onClear={() => onClearFilter(filterId)} ignoredBy={notAppliedTo(filterId)} />
                         <button
                             type="button"
                             className="sessions-query-picker-button"
@@ -127,7 +110,6 @@ export default function AnalyticsScopeFilters({
                         >
                             {selected.length ? `Choose ${plural} (${selected.length})` : `Choose ${plural}`}
                         </button>
-                        <div className="sessions-query-selection-preview">{names.length ? names.join(', ') : any}</div>
                     </section>
                 );
             })}

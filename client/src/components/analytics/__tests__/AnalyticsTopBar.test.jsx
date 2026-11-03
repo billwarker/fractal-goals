@@ -8,7 +8,7 @@ vi.mock('../../../hooks/useActivityTagCatalog', () => ({
 import AnalyticsFiltersSidebar from '../AnalyticsFiltersSidebar';
 
 describe('AnalyticsFiltersSidebar', () => {
-    it('keeps custom date inputs visible after selecting the Custom preset', () => {
+    it('keeps custom date inputs visible after selecting the Custom preset', async () => {
         function Harness() {
             const [dateRange, setDateRange] = React.useState({ start: null, end: null });
 
@@ -23,7 +23,9 @@ describe('AnalyticsFiltersSidebar', () => {
 
         render(<Harness />);
 
-        fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
+        // Time range is an optional filter, shown once it's picked from the tray.
+        fireEvent.click(screen.getByRole('button', { name: 'Time range' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Custom' }));
 
         expect(screen.getByLabelText('Start')).toBeInTheDocument();
         expect(screen.getByLabelText('End')).toBeInTheDocument();

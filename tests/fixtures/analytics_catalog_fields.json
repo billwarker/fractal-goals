@@ -126,8 +126,10 @@
     "deleted_at",
     "id",
     "kind",
+    "last_opened_at",
     "layout",
     "name",
+    "pinned",
     "root_id",
     "updated_at",
     "user_id"

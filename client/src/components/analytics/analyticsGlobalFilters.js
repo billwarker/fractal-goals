@@ -45,6 +45,7 @@ export function normalizeGlobalFilters(filters) {
 }
 
 export function hasInstanceScopeFilters(filters) {
+    if (filters?.clauses) return filters.clauses.some(hasInstanceScopeFilters);
     const normalized = normalizeGlobalFilters(filters);
     return Boolean(normalized.tags)
         || normalized.sessions.templateIds.length > 0
@@ -53,6 +54,7 @@ export function hasInstanceScopeFilters(filters) {
 
 /** Whether a session falls in the template and program-day filters. */
 export function sessionMatchesScope(session, filters) {
+    if (filters?.clauses) return filters.clauses.every((clause) => sessionMatchesScope(session, clause));
     const { templateIds, programDayIds } = normalizeGlobalFilters(filters).sessions;
     if (templateIds.length && !templateIds.includes(session?.template_id)) return false;
     if (programDayIds.length && !programDayIds.includes(session?.program_day_id)) return false;
@@ -61,6 +63,7 @@ export function sessionMatchesScope(session, filters) {
 
 /** Whether an activity instance falls in the tag filter and its session in the session filters. */
 export function instanceMatchesScope(instance, session, filters) {
+    if (filters?.clauses) return filters.clauses.every((clause) => instanceMatchesScope(instance, session, clause));
     const normalized = normalizeGlobalFilters(filters);
     if (!sessionMatchesScope(session, normalized)) return false;
     if (!normalized.tags) return true;
@@ -71,6 +74,7 @@ export function instanceMatchesScope(instance, session, filters) {
 }
 
 export function hasActiveGlobalFilters(filters) {
+    if (filters?.clauses) return filters.clauses.some(hasActiveGlobalFilters);
     const normalized = normalizeGlobalFilters(filters);
     return normalized.goals.goalIds.length > 0
         || normalized.activities.activityIds.length > 0

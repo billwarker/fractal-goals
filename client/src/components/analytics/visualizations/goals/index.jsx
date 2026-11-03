@@ -1,21 +1,19 @@
 import React from 'react';
-import { Bar, Line } from 'react-chartjs-2';
-
-import {
-    GoalAgingChart,
-    GoalCompletionRateByLevel,
-    GoalMomentumChart,
-    StaleGoalsChart,
-} from '../../AnalyticsExtraCharts';
+import lazyChart from '../../lazyChart';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
-import GoalCompletionTimeline from '../../GoalCompletionTimeline';
-import GoalTimeDistribution from '../../GoalTimeDistribution';
-import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
-import { timeDistributionRollupRank } from './timeDistributionState';
 import EmptyControls from '../shared/EmptyControls';
 import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
+import { timeDistributionRollupRank } from './timeDistributionState';
+import styles from '../../ProfileWindow.module.css';
+
+const GoalAgingChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalAgingChart })));
+const GoalCompletionRateByLevel = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalCompletionRateByLevel })));
+const GoalMomentumChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalMomentumChart })));
+const StaleGoalsChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.StaleGoalsChart })));
+const GoalTimeDistribution = lazyChart(() => import('../../GoalTimeDistribution'));
+const GoalCompletionTimeline = lazyChart(() => import('../../GoalCompletionTimeline'));
 
 function getActivityChartData(goal, color) {
     if (!goal?.activity_breakdown?.length) {

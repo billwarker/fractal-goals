@@ -1,0 +1,65 @@
+.title {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.active {
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.number {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+.name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.editor {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+}
+
+.renameButton {
+    flex: 0 0 auto;
+    color: var(--color-text-muted);
+}
+
+.renameButton:hover,
+.renameButton:focus-visible {
+    color: var(--color-text-primary);
+}
+
+.input {
+    min-width: 0;
+    width: 220px;
+    max-width: 100%;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid var(--color-brand-primary);
+    border-radius: 6px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
+}

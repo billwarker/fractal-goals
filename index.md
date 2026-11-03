@@ -466,6 +466,32 @@ simplified `compact` density (`applyChartDensity`, `useContainerDensity`). Embed
 bounded data (`/activities/<id>/analytics-evidence`, 500 newest). UI lives in
 `client/src/components/goalCharts/`. See [Goal charts plan](planning/goal-analytics-charts.md).
 
+Saved Analytics lists goal links and chart identity in a batched read (`DashboardService.list_dashboards`).
+Views and dashboards can be pinned, renamed, duplicated and ordered by last opening; opening and
+pinning preserve the content edit timestamp (migration `e3a5c7b9d1f2`). The saved browser renders one
+compact view preview at a time through `SavedViewChart`. `AddViewToGoalsModal` shows per-goal chart
+capacity and preserves failed drafts; the server remains authoritative for the 12-chart limit.
+Registry chart implementations and the SQL console load on demand within the existing bundle budget.
+Goal URLs are built by `utils/goalDeepLink.js`; `useGoalDeepLink` consumes them on the Goals page.
+The filter sidebar (`AnalyticsFiltersSidebar`) composes one shared `AnalyticsScopePane` editor:
+multiple charts keep optional global filters at the top, initially collapsed and using the same
+section styling and editor/tray collapse behavior as chart filters, above
+keyboard-accessible chart tabs with independent Filters and Group by sections. Chart scope lives in
+`windowState.localFilters` and round-trips with saved layouts. The shared editor orders Filters
+(Time range first when chosen in single-chart views), Chart controls, then Group by. All filters,
+including Time range, start hidden unless active and are chosen from a bottom tray beneath
+the filter editors, with shared section padding and no separate heading. Collapsing Filters hides
+both the editors and the tray while preserving their selections. `AnalyticsFilterHeader` places a
+selection info icon beside each type heading (portalled tooltip on hover/focus/tap) and a Clear
+button on the right; there is no separate chip row or inline selection-name preview. The tray is
+`AnalyticsFilterTray`. Time range remains a global
+choice in dashboards. `analyticsChartScope.resolveAnalyticsChartScope` intersects chart scope
+with global scope in the shared visualization context, including both tag/session match clauses.
+If a dashboard is reduced to one locally filtered chart, both scopes remain editable. The sidebar
+loads on demand and its old file-size exception has been removed.
+See [Analytics experience overhaul](planning/analytics-experience-overhaul.md) for phased delivery
+and the remaining annotation work.
+
 Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/notes_api.py`,
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
 

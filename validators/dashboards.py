@@ -241,6 +241,7 @@ class DashboardUpdateSchema(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=MAX_NAME_LENGTH)
     kind: Optional[str] = None
     layout: Optional[Dict[str, Any]] = None
+    pinned: Optional[bool] = None
 
     @field_validator('name')
     @classmethod
@@ -267,8 +268,8 @@ class DashboardUpdateSchema(BaseModel):
 
     @model_validator(mode='after')
     def require_at_least_one_field(self):
-        if self.name is None and self.kind is None and self.layout is None:
-            raise ValueError('At least one of name, kind, or layout is required')
+        if self.name is None and self.kind is None and self.layout is None and self.pinned is None:
+            raise ValueError('At least one of name, kind, layout, or pinned is required')
         return self
 
 

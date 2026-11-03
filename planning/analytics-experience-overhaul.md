@@ -117,23 +117,50 @@ Fix `chartGoalPrefill.js` to use `snapMetricValue` instead of `roundValue`.
 
 Restructure `AnalyticsFiltersSidebar.jsx` from top to bottom:
 1. **Header:** "Filters · N active", Reset, Collapse (unchanged).
-2. **Active chips row:** every active filter as a chip (✕ removes it, clicking opens its editor). A chip for a filter the selected chart ignores is **muted, with a tooltip saying "Not applied to ‹chart›"**, so the scope is always honest.
+2. **Filter headings:** each filter has an info icon showing the full selection on hover/focus/tap,
+   with a Clear action on the right. The info includes any "Not applied to ‹chart›" note. No chip row.
 3. **Chart section** (moved to the top, since the chart type is chosen first): the selected panel's `Controls`, then **Group by** (Phase 3) and **Grain**.
 4. **Filters section:** Time range always shows, then the chart's `core` filters, then any optional filters the user added or that are active.
 5. **"+ Add filter"** menu: the chart's remaining `optional` filters. Filters that don't apply to this chart are not offered.
 
-**Persistence:** each window state stores `shownFilters: string[]` (the optional filters the user added). `dashboardState.js` sanitizes it, the view layout version becomes v2, and the v1 → v2 migration happens in `sanitizeDashboardLayoutPayload`. Unsaved panels start from the manifest defaults. With several panels open, the Filters section shows the union of their core filters, and each chip names the panels it applies to.
+**Persistence:** each window state stores `shownFilters: string[]` (the optional filters the user added). `dashboardState.js` sanitizes it, the view layout version becomes v2, and the v1 → v2 migration happens in `sanitizeDashboardLayoutPayload`. Unsaved panels start from the manifest defaults. With several panels open, the Filters section shows the union of their core filters, and selection tooltips explain any chart that ignores a filter.
 
-Mobile keeps `ResponsiveSidePane`. The chips row stays sticky at the top of the sheet.
+Mobile keeps `ResponsiveSidePane`. Selection tooltips use the shared portalled `Tooltip` so scrolling panes do not clip them.
 
 **As built (Phase 2):**
 - `visualizations/capabilities.js` declares each chart's filters. Category defaults follow what each filter actually reaches in `analyticsGlobalFilters.js`: goals and activities reach every chart, tags only activity charts, and template and program day reach session and activity charts. Goal charts take the range, goals and activities only. A registry entry can override with `capabilities.filters`. `scopeFilterRelevance` is retired.
-- `useAnalyticsFilterPane.js` decides which sections show (`filterSections`), which filters the selected chart ignores, toggling optional filters, and clearing a filter from its chip.
-- Chips (`AnalyticsActiveFilterChips.jsx`) use the `Badge` atom. A chip for a filter the chart ignores is dashed and dimmed, and its accessible name says "not applied to ‹chart›".
-- **Only the time range shows by default** (decided after review). Goals, Activities, Tags, Session template and Program day sit behind an always-present **+ Add filters** button: "+ Add filters for ‹chart›" with a chart selected, offering only the filters that chart uses; plain "+ Add filters" with none selected, offering what the open charts use, or everything on an empty page.
+- `useAnalyticsFilterPane.js` decides which sections show (`filterSections`), which filters the selected chart ignores, toggling optional filters, and clearing a filter from its header.
+- `AnalyticsFilterHeader` shows an info icon beside each filter heading and a separate right-aligned
+  Clear button. Shared portalled tooltips show full selection names, tag match rules and any
+  "not applied" note. They are available on hover, keyboard focus or tap. Clear is disabled without
+  an active filter. The old chip renderer, chip styles and redundant inline name previews are removed.
+  Header follow-up validation: 21 targeted tests and both desktop/mobile browser flows pass,
+  including hover/tap summaries and clearing the real time range; lint/type checks and build pass.
+- **No filters show by default** (updated 2026-11-02). Time range, Goals, Activities, Tags, Session template and Program day are choices in a bottom tray beneath the filter editors. A selected or active time range remains editable. The tray offers only the filters the chart uses; with no chart selected it offers what the open charts use, or everything on an empty page.
 - With no chart selected, added filters are kept for the visit (local pane state); with a chart selected, they are saved with that chart.
-- The button opens an inline list of toggles rather than a portalled menu, since the pane already scrolls. A filter that's set stays shown, so it can always be edited.
+- **Filter tray** (updated 2026-11-02): choices sit at the bottom of the Filters section, without an Add Filters heading or separate Show/Hide control. The tray uses shared compact section padding. Collapsing Filters hides the editors and the tray together; reopening restores the same choices. A filter that's set stays shown, so it can always be edited.
 - `shownFilters` lives in the chart's own `visualizationState`, so it is saved per chart with the view. No layout version bump was needed: older views lack the key and get the chart's defaults.
+
+**Dashboard sidebar follow-up (2026-11-01):**
+- With multiple configured charts, **Global filters** stays at the top above the chart tabs.
+  It starts collapsed and uses the same section title styling and Show/Hide control as chart
+  filters. Its editors and tray collapse together, preserving selections when reopened.
+  Time range is optional through its filter tray and remains global; it is not offered
+  in per-chart tabs. No filter editor appears by default.
+- Single-chart views put chosen **Filters**, including an optional **Time range**, above chart controls.
+  The shared editor uses **Filters → Chart → Group by** in both single-chart views and chart tabs.
+- Each chart has a tab with its independent filters, chart controls and **Group by** section.
+  Only the active chart editor renders; tabs support arrow keys and Home/End. The registry declares
+  the supported grouping dimensions. Charts with a fixed grouping explain it instead of presenting
+  an ineffective selector.
+- Per-chart scope is stored as `windowState.localFilters`, independently of keyed visualization
+  settings. The shared visualization context intersects global and local scope; tag exact/contains
+  rules and template/program-day clauses are each enforced. Empty intersections stay empty.
+- Existing saved global filters retain their meaning. Single-chart views keep the compact editor;
+  a chart retaining local scope after other panels close keeps both scopes visible for editing.
+- `AnalyticsScopePane`, `useAnalyticsChartControls` and `AnalyticsChartSelectionModals` replace the
+  old large sidebar body, reusing its editors. The sidebar itself is lazy-loaded; the former 510-line
+  size exception is removed.
 
 ### Phase 3 — Group by
 
@@ -239,7 +266,7 @@ Activity and session charts group **client-side** over data `useVisualizationCon
 ### Phase 5 — Saved Analytics × goals
 
 **5.1 Backend**
-- `dashboard_service.list_dashboards` returns for each view: `goals: [{id, name, type}]`, loaded in **one batched query** over `GoalAnalyticsView` (no N+1); `visualization: {category, id}`, derived from the layout; plus `pinned` and `last_opened_at`.
+- `dashboard_service.list_dashboards` returns for each view: `goals: [{id, name, level_id}]`, loaded in **one batched query** over `GoalAnalyticsView` (no N+1); `visualization: {category, id}`, derived from the layout; plus `pinned` and `last_opened_at`.
 - An additive migration adds `analytics_dashboards.pinned BOOLEAN NOT NULL DEFAULT false` and `last_opened_at TIMESTAMPTZ NULL`.
 - New routes: `POST …/dashboards/<id>/opened` (touches `last_opened_at`, best effort), `POST …/dashboards/<id>/duplicate` (handles name conflicts with "(copy)"), and PUT for rename and pin (extending `update_dashboard`).
 - The serializer (`_serialize_notes_misc.serialize_analytics_dashboard`) is updated.
@@ -257,6 +284,51 @@ Activity and session charts group **client-side** over data `useVisualizationCon
 - **Delete fix:** Confirm stays disabled until `useViewGoals` resolves.
 
 **5.3 In-page goal awareness:** when the open view is attached, `AnalyticsTopBar` shows a badge, "On 3 goals", whose popover lists them. Saving changes to an attached view shows "Updates the chart on 3 goals". `AddViewToGoalsModal` pre-checks the 12-per-goal cap client-side (full goals are disabled with a reason), mirroring `goal_chart_service.MAX_CHARTS_PER_GOAL`.
+
+**Phase 5 as built (2026-11-01):**
+- Saved Analytics uses the shared accessible `Modal`: search by name, chart or attached goal;
+  All / Views / Dashboards / On goals / Pinned filters; rich cards; one compact live view preview.
+  Mobile stacks the list above the preview. New view is a small action.
+- Open, Rename, Duplicate, Pin, Show on goals and Delete live beside the selected preview rather
+  than in a per-card overflow menu. Enter or double-click opens a card. Duplicating clears the
+  search and filter so the selected copy remains visible. Mutation failures retain rename drafts,
+  and pending actions are disabled.
+- Goal metadata comes with the list, so delete warnings can name attached goals immediately.
+  The Analytics header also shows linked goals and explains that saving updates their charts.
+- Attachment shows n/12 saved charts per goal. Full goals cannot be newly selected, including by
+  bulk lineage controls; existing links can still be removed. Loading and failed reads block edits,
+  and failed writes keep the draft open with the server error. The server checks capacity atomically.
+- Migration `e3a5c7b9d1f2` adds pinned/opened state. Pin and opened writes preserve `updated_at`.
+  Copies preserve kind/layout, start unpinned without links, and stay within the name length limit.
+  List goal hydration uses one batch query; query count is tested as views increase.
+- Chart implementations and the SQL console are lazy-loaded to keep the Analytics production
+  transfer below its existing 325 KiB gzip budget. Shared `lazyChart` gives each deferred chart a
+  local loading boundary; there is no second chart renderer.
+- **Scope boundary:** automatic save-and-attach from annotation-created goals remains a separate
+  workflow, alongside the explicitly deferred Phase 4 items above. Phase 5 completes saved-view
+  management and attachment from Analytics; it does not close those annotation follow-ups.
+
+**Delivery audit (2026-11-01):**
+- Saved-analytics API: 7 tests pass, including migration upgrade/reversal, tenant/deleted-object
+  access, constant-query list hydration and maximum-length duplicate names.
+- Full backend regression: 2,062 passed; its one catalog-snapshot failure was resolved by reviewing
+  the new, user-scoped `pinned` and `last_opened_at` metadata and regenerating the exposure fixture.
+  The catalog gate passes on rerun. Adapter regression: 7 passed.
+- Desktop/mobile saved-view and dashboard sidebar checks cover pin/rename/duplicate/delete,
+  one live preview, independent filters/grouping, chart tabs and save/reopen. The annotation
+  creation smoke check also passes; it now waits for the create response.
+- Final frontend regression: **430 files / 2,359 tests passed**. The revised chart-tab browser
+  flow passes on desktop and mobile, including independent scope/grouping, keyboard-tested tabs,
+  persistence and the footer remaining accessible. Screenshots were visually reviewed.
+- `./run-tests.sh lint` passes ESLint, both type checkers, maintainability and responsive audits.
+  The production build passes every existing budget: Analytics is **302.3 KiB JS gzip / 25.9 KiB
+  CSS gzip**, against 325 / 65 KiB. The shared sidebar editor is loaded on demand.
+- **Quality audit:** S+ for the delivered saved-management and sidebar scope: no known remaining
+  implementation gaps, no competing sidebar editors, and the oversized-file exception is removed.
+  The explicitly deferred annotation workflows remain the gap to the entire overhaul's S+ target.
+- Current saved-management/sidebar scope has no known implementation gaps. The annotation items
+  explicitly deferred above remain the distance to completing the entire overhaul.
+
 
 ---
 
@@ -297,7 +369,7 @@ Activity and session charts group **client-side** over data `useVisualizationCon
   - Search the Saved modal by goal name.
 - **Manual QA** on the power-user account: the screenshot's Time Spent Per Goal over All time should show at most about 8 legend entries at the default roll-up and weekly or monthly buckets, and drill-down should work.
 - `./run-tests.sh all`, `lint` and `typecheck` pass. Bundle budgets hold (the annotate code is lazy-loaded with the panel).
-- After approval, save this plan as `planning/analytics-experience-overhaul.md` and add a link in the `index.md` "Notes and analytics" section once Phase 1 ships.
+- The plan is tracked here; `index.md` links it from the Notes and analytics domain.
 
 ---
 

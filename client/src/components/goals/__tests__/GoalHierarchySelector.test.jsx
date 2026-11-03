@@ -42,6 +42,17 @@ describe('GoalHierarchySelector', () => {
         { id: 'goal-grandchild', name: 'Grandchild Goal', type: 'ShortTermGoal', parent_id: 'goal-child', childrenIds: [] },
     ];
 
+    it('disables unavailable goals and excludes them from bulk selection', () => {
+        const onSelectionChange = vi.fn();
+        render(<GoalHierarchySelector goals={goals} selectedGoalIds={[]} onSelectionChange={onSelectionChange}
+            getGoalDisabledReason={(goal) => goal?.id === 'goal-child' ? 'Already shows 12 charts' : null}
+            getGoalSelectionMeta={(goal) => goal.id === 'goal-child' ? '12/12 charts · Full' : '0/12 charts'} />);
+        expect(screen.getByLabelText('Select Child Goal')).toBeDisabled();
+        expect(screen.getByText('12/12 charts · Full')).toBeInTheDocument();
+        fireEvent.click(screen.getByLabelText('Select all descendants of Root Goal'));
+        expect(onSelectionChange).toHaveBeenLastCalledWith(['goal-grandchild']);
+    });
+
     it('keeps automatic goals locked and emits manual selections only', () => {
         const handleSelectionChange = vi.fn();
         render(

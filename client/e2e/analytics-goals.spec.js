@@ -42,7 +42,9 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
     const levelChoice = dialog.getByRole('button', { name: /Long Term Goal/ });
     if (await levelChoice.count()) await levelChoice.first().click();
     await dialog.locator('#goal-name').fill(`Practise more ${suffix}`);
+    const createdResponse = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
+    expect((await createdResponse).ok()).toBeTruthy();
     await expect(dialog).toHaveCount(0);
 
     const goals = await (await page.request.get(`/api/${root}/goals/conditions`, {

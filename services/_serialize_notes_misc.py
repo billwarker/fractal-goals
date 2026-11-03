@@ -161,18 +161,29 @@ def serialize_note_display(note):
     return result
 
 
-def serialize_analytics_dashboard(dashboard):
-    """Serialize an AnalyticsDashboard object."""
-    return {
+def serialize_analytics_dashboard(dashboard, *, goals=None, visualization=None):
+    """Serialize an AnalyticsDashboard object.
+
+    `goals` (the goals a view is attached to) and `visualization` ({category, id} of a view's chart)
+    are included when the caller loaded them; listing does, in one batched query.
+    """
+    payload = {
         "id": dashboard.id,
         "root_id": dashboard.root_id,
         "user_id": dashboard.user_id,
         "name": dashboard.name,
         "kind": dashboard.kind or "dashboard",
         "layout": dashboard.layout,
+        "pinned": bool(dashboard.pinned),
+        "last_opened_at": format_utc(dashboard.last_opened_at),
         "created_at": format_utc(dashboard.created_at),
         "updated_at": format_utc(dashboard.updated_at),
     }
+    if goals is not None:
+        payload["goals"] = goals
+    if visualization is not None:
+        payload["visualization"] = visualization
+    return payload
 
 
 def serialize_page_surface_layout(layout):

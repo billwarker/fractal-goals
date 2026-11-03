@@ -1,6 +1,6 @@
 // @ts-check
 /**
- * Which filters each chart uses. "core" filters always show (the time range); "optional" ones are
+ * Which filters each chart uses. "core" filters always show; "optional" ones are
  * offered under "Add filters" and show once added (saved in the chart's state as `shownFilters`) or
  * while set. A filter a chart doesn't use is never offered for it.
  *
@@ -26,14 +26,15 @@ export const FILTER_LABELS = /** @type {Record<FilterId, string>} */ ({
 });
 
 /** @type {Record<string, FilterCapabilities>} */
-// Only the time range shows by default; every other filter a chart uses is one click away.
+// Every filter, including the time range, is opt-in or shown while active.
 const CATEGORY_FILTERS = {
-    goals: { core: ['timeRange'], optional: ['goals', 'activities'] },
-    sessions: { core: ['timeRange'], optional: ['goals', 'activities', 'templates', 'programDays'] },
-    activities: { core: ['timeRange'], optional: ['goals', 'activities', 'tags', 'templates', 'programDays'] },
+    goals: { core: [], optional: ['timeRange', 'goals', 'activities'] },
+    sessions: { core: [], optional: ['timeRange', 'goals', 'activities', 'templates', 'programDays'] },
+    activities: { core: [], optional: ['timeRange', 'goals', 'activities', 'tags', 'templates', 'programDays'] },
 };
 
-const ALL_FILTERS = { core: FILTER_ORDER, optional: /** @type {FilterId[]} */ ([]) };
+/** @type {FilterCapabilities} */
+const ALL_FILTERS = { core: [], optional: FILTER_ORDER };
 
 /**
  * A chart's filters: its own declaration (`capabilities.filters` on the registry entry), else its
@@ -67,11 +68,6 @@ export function activeFilterIds(filters, dateRange) {
     return FILTER_ORDER.filter((id) => active[id]);
 }
 
-/** With no chart selected: the time range, with every other filter under "Add filters". */
-const PAGE_FILTERS = /** @type {FilterCapabilities} */ ({
-    core: ['timeRange'], optional: ['goals', 'activities', 'tags', 'templates', 'programDays'],
-});
-
 /**
  * The pane's filters while no chart is selected: the open charts' core filters, with the others
  * they can use as optional; with no charts open, the page defaults.
@@ -79,7 +75,7 @@ const PAGE_FILTERS = /** @type {FilterCapabilities} */ ({
  * @returns {FilterCapabilities}
  */
 export function pageFilterCapabilities(openPanels) {
-    if (!openPanels.length) return PAGE_FILTERS;
+    if (!openPanels.length) return ALL_FILTERS;
     const core = FILTER_ORDER.filter((id) => openPanels.some((panel) => panel.core.includes(id)));
     const optional = FILTER_ORDER.filter((id) => !core.includes(id) && openPanels.some((panel) => appliedFilters(panel).has(id)));
     return { core, optional };

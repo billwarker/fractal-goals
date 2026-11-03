@@ -1,17 +1,18 @@
 import React from 'react';
 
-import {
-    SessionDurationHistogram,
-    SessionSectionPie,
-    SessionStartDistribution,
-} from '../../AnalyticsExtraCharts';
+import lazyChart from '../../lazyChart';
 import StreakTimeline from '../../StreakTimeline';
-import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import useGroupLookups from '../shared/useGroupLookups';
 import StatCard from '../shared/StatCard';
 import { SESSION_TREND_GROUPS, SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
+import styles from '../../ProfileWindow.module.css';
+
+const SessionDurationHistogram = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionDurationHistogram })));
+const SessionSectionPie = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionSectionPie })));
+const SessionStartDistribution = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionStartDistribution })));
+
 
 function SessionSummaryChart({ context }) {
     const { sessions } = context.scopedData;
@@ -159,6 +160,7 @@ export const SESSION_VISUALIZATIONS = [
         selectionRequirements: {},
         Chart: SessionTrendsVisualizationChart,
         Controls: SessionTrendsControls,
+        groupByDimensions: SESSION_TREND_GROUPS,
     },
     {
         id: 'sectionPie',

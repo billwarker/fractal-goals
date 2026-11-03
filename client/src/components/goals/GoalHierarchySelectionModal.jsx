@@ -21,6 +21,8 @@ function GoalHierarchySelectionModal({
     confirmLabel,
     onClose,
     onConfirm,
+    getGoalDisabledReason,
+    getGoalSelectionMeta,
     lockedGoalIds = [],
     lockedGoalLabel,
     lockedGoalLegend,
@@ -72,6 +74,9 @@ function GoalHierarchySelectionModal({
                     connectorHighlightMode={connectorHighlightMode}
                     showGoalHighlightHalo={showGoalHighlightHalo}
                     showAncestorControls={showAncestorControls}
+                    getGoalDisabledReason={getGoalDisabledReason}
+                    getGoalSelectionMeta={getGoalSelectionMeta}
+                    selectionDisabled={isConfirming}
                     lockedGoalIds={lockedGoalIds}
                     lockedGoalLabel={lockedGoalLabel}
                     lockedGoalLegend={lockedGoalLegend}
