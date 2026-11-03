@@ -5,6 +5,7 @@ import { formatBucketLabel, formatBucketRange, formatDuration } from '../../util
 import { bucketStarts } from '../../utils/chartGrain';
 import EmptyState from '../common/EmptyState';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
+import { useReportShownGrain } from './ChartStates';
 import { buildSeries, seriesColor } from './series/buildSeries';
 import ChartLegendPanel from './series/ChartLegendPanel';
 import styles from './GoalTimeDistribution.module.css';
@@ -34,6 +35,7 @@ function GoalTimeDistribution({ timeRollup, chartRef, onFocusGoal = null, reques
     const [hiddenKeys, setHiddenKeys] = useState(() => new Set());
     const [hoverKey, setHoverKey] = useState(null);
     const grain = timeRollup?.grain || 'day';
+    useReportShownGrain(timeRollup?.grain || null);
 
     const { series, bucketTotals, uniqueTotals, buckets, breadcrumb } = useMemo(() => {
         const items = timeRollup?.series || [];

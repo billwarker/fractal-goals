@@ -2,7 +2,7 @@ import models
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from models import AnalyticsDashboard, Goal, GoalAnalyticsView, validate_root_goal
+from models import AnalyticsDashboard, Goal, GoalAnalyticsView, GoalLevel, validate_root_goal
 from services.goal_chart_service import _view_window
 from services.serializers import serialize_analytics_dashboard
 from services.service_types import JsonDict, JsonList, ServiceResult
@@ -101,17 +101,25 @@ class DashboardService:
         }, None, 200
 
     def _goals_by_view(self, view_ids):
-        """The live goals each view is attached to, in one query (not one per view)."""
+        """The live goals each view is attached to, in one query (not one per view): the highest
+        level first (rank 0 is the top), then the earliest attached, so a view's first goal is its
+        headline. The level name lets the client find the root's own copy of a customised level."""
         goals_by_view = {view_id: [] for view_id in view_ids}
         if not view_ids:
             return goals_by_view
         rows = self.db_session.execute(select(
             GoalAnalyticsView.dashboard_id, Goal.id, Goal.name, Goal.level_id,
-        ).join(Goal, Goal.id == GoalAnalyticsView.goal_id).where(
+            GoalLevel.name.label("level_name"), GoalLevel.rank.label("level_rank"),
+        ).join(Goal, Goal.id == GoalAnalyticsView.goal_id).outerjoin(GoalLevel, GoalLevel.id == Goal.level_id).where(
             GoalAnalyticsView.dashboard_id.in_(view_ids), Goal.deleted_at.is_(None),
-        ).order_by(Goal.name))
+        ).order_by(
+            GoalLevel.rank.asc().nulls_last(), GoalAnalyticsView.created_at.asc().nulls_last(), Goal.name,
+        ))
         for row in rows:
-            goals_by_view[row.dashboard_id].append({"id": row.id, "name": row.name, "level_id": row.level_id})
+            goals_by_view[row.dashboard_id].append({
+                "id": row.id, "name": row.name, "level_id": row.level_id,
+                "level_name": row.level_name, "level_rank": row.level_rank,
+            })
         return goals_by_view
 
     @staticmethod
@@ -125,7 +133,8 @@ class DashboardService:
         )
 
     def mark_opened(self, root_id, dashboard_id, current_user_id) -> ServiceResult[JsonDict]:
-        """Remember that a saved view or dashboard was opened (for ordering); its updated date stays."""
+        """Remember that a saved view or dashboard was opened (when, for ordering, and how often); its
+        updated date stays."""
         if not self._get_root(root_id, current_user_id):
             return None, "Fractal not found or access denied", 404
         updated = self.db_session.query(AnalyticsDashboard).filter(
@@ -135,6 +144,7 @@ class DashboardService:
             AnalyticsDashboard.deleted_at.is_(None),
         ).update({
             AnalyticsDashboard.last_opened_at: models.utc_now(),
+            AnalyticsDashboard.open_count: AnalyticsDashboard.open_count + 1,
             AnalyticsDashboard.updated_at: AnalyticsDashboard.updated_at,
         }, synchronize_session=False)
         if not updated:

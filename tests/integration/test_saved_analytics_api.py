@@ -22,12 +22,28 @@ class TestSavedAnalytics:
         assert _attach(authed_client, root, bench, trends).status_code == 201
 
         by_name = {item['name']: item for item in _list(authed_client, root)}
-        assert [goal['name'] for goal in by_name['Trends']['goals']] == ['Bench 225', 'Squat 315']
+        # Same level: the earliest attached comes first.
+        assert [goal['name'] for goal in by_name['Trends']['goals']] == ['Squat 315', 'Bench 225']
         assert by_name['Trends']['visualization'] == {'category': 'activities', 'id': 'metricTrends'}
         assert by_name['Board']['goals'] == [] and 'visualization' not in by_name['Board']
         # A deleted goal no longer counts.
         assert authed_client.delete(f"/api/{root}/goals/{bench}").status_code == 200
         assert [goal['name'] for goal in {i['name']: i for i in _list(authed_client, root)}['Trends']['goals']] == ['Squat 315']
+
+    def test_view_goals_lead_with_the_highest_level_and_carry_its_name(self, authed_client, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        parent = _create_goal(authed_client, root, root, name='Parent', type='MidTermGoal')['id']
+        child = _create_goal(authed_client, root, parent, name='Child')['id']
+        sibling = _create_goal(authed_client, root, root, name='Sibling', type='MidTermGoal')['id']
+        view = _view(authed_client, root, 'Trends')
+        for goal_id in (child, sibling, parent):
+            assert _attach(authed_client, root, goal_id, view).status_code == 201
+
+        goals = {item['name']: item for item in _list(authed_client, root)}['Trends']['goals']
+        # Higher levels first (the child was attached first), then the earliest attached of a level.
+        assert [goal['name'] for goal in goals] == ['Sibling', 'Parent', 'Child']
+        assert goals[0]['level_rank'] < goals[2]['level_rank']
+        assert all(goal['level_name'] for goal in goals)
 
     def test_pinned_first_then_last_opened_without_touching_updated(self, authed_client, sample_ultimate_goal):
         root = sample_ultimate_goal.id
@@ -42,6 +58,10 @@ class TestSavedAnalytics:
         assert [item['name'] for item in listed] == ['Third', 'First', 'Second']
         assert {item['id']: item['updated_at'] for item in listed} == before
         assert next(item for item in listed if item['id'] == first)['last_opened_at']
+        # Each open counts; the never-opened stay at zero.
+        assert authed_client.post(f"/api/roots/{root}/dashboards/{first}/opened").status_code == 200
+        counts = {item['id']: item['open_count'] for item in _list(authed_client, root)}
+        assert counts == {first: 2, second: 0, third: 0}
         assert authed_client.post(f"/api/roots/{root}/dashboards/missing/opened").status_code == 404
         assert second
 

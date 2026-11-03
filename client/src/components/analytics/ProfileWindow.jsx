@@ -56,6 +56,8 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
  * @param {number} props.chartNumber - This chart's number, matching its sidebar tab
+ * @param {string} props.windowId - This panel's id, passed back to onShownGrainChange
+ * @param {function} props.onShownGrainChange - Called with (windowId, the bucket grain the chart drew or null)
  * @param {boolean} props.onPageGrid - Draw the panel on the page's background grid: no fill or outline
  *   until selected, and charts at 'expanded' density (no gridlines of their own, snapped to the grid)
  */
@@ -77,6 +79,8 @@ function ProfileWindow({
     onOpenQueryConsole = null,
     showQueryInspector = true,
     chartNumber = null,
+    windowId = null,
+    onShownGrainChange = null,
     onPageGrid = false,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
@@ -88,6 +92,8 @@ function ProfileWindow({
     const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
     const [isQueryOverlayOpen, setIsQueryOverlayOpen] = useState(false);
+
+    const reportShownGrain = React.useCallback((grain) => onShownGrainChange?.(windowId, grain), [onShownGrainChange, windowId]);
 
     const [isNarrow, setIsNarrow] = useState(false);
     const [isVeryNarrow, setIsVeryNarrow] = useState(false);
@@ -546,7 +552,7 @@ function ProfileWindow({
         };
 
         return (
-            <ChartScopeProvider hasActiveFilters={hasActiveScope} onClearFilters={onResetFilters ? clearAllFilters : null}>
+            <ChartScopeProvider hasActiveFilters={hasActiveScope} onClearFilters={onResetFilters ? clearAllFilters : null} onGrainShown={reportShownGrain}>
             <ChartGoalSurface
                 Chart={VisualizationChart}
                 rootId={rootId}

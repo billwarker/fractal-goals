@@ -1,3 +1,5 @@
+/* The "Save view" naming sheet (AnalyticsViewNameModal). */
+
 .overlay {
     position: fixed;
     inset: 0;
@@ -10,7 +12,7 @@
 }
 
 .namingSheet {
-    width: min(640px, 100%);
+    width: min(460px, 100%);
     max-height: 88vh;
     overflow: hidden;
     display: flex;
@@ -19,10 +21,6 @@
     border: 1px solid var(--color-border);
     background: var(--color-bg-surface);
     box-shadow: 0 26px 70px rgba(0, 0, 0, 0.35);
-}
-
-.namingSheet {
-    width: min(460px, 100%);
 }
 
 .header {
@@ -49,91 +47,6 @@
     font-size: 28px;
     line-height: 1;
     padding: 0;
-}
-
-
-.searchWrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.searchLabel {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: uppercase;
-}
-
-.searchInput {
-    width: 100%;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    background: var(--color-bg-input);
-    color: var(--color-text-primary);
-    padding: 11px 13px;
-    font: inherit;
-}
-
-.searchInput::placeholder {
-    color: var(--color-text-muted);
-}
-
-.searchInput:focus {
-    outline: none;
-    border-color: color-mix(in srgb, var(--color-brand-primary) 70%, var(--color-border));
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
-}
-
-.viewRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    width: 100%;
-    border: 1px solid var(--color-border);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--color-bg-surface) 88%, white 12%);
-    color: var(--color-text-primary);
-    text-align: left;
-    padding: 16px 18px;
-    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.viewRow:hover,
-.viewRow:focus-visible,
-.viewRow:focus-within {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 46%, var(--color-border));
-    background: color-mix(in srgb, var(--color-bg-surface) 78%, white 22%);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 18%, transparent);
-}
-
-.selected {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
-}
-
-.sectionLabel {
-    margin: 8px 0 0;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: uppercase;
-}
-
-.viewName {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-}
-
-.viewMeta {
-    margin-top: 4px;
-    color: var(--color-text-secondary);
-    font-size: 13px;
 }
 
 .secondaryButton,
@@ -170,11 +83,6 @@
     cursor: default;
 }
 
-.emptyState {
-    padding: 14px 4px 0;
-    color: var(--color-text-muted);
-}
-
 .namingBody {
     display: flex;
     flex-direction: column;
@@ -205,165 +113,4 @@
     display: flex;
     justify-content: flex-end;
     gap: 12px;
-}
-
-/* Saved Analytics: list on the left, the selected item's preview on the right. */
-.sheetWide {
-    width: min(1040px, 100%);
-}
-
-.headerActions {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.browse {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-    min-height: 0;
-    overflow: hidden;
-}
-
-.listPane {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 0;
-    padding: 20px 22px 24px;
-    overflow: auto;
-    border-right: 1px solid var(--color-border);
-}
-
-.cardList {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-}
-
-.card {
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px 14px;
-    font: inherit;
-    cursor: pointer;
-}
-
-.cardIcon {
-    display: inline-flex;
-    flex-shrink: 0;
-    margin-top: 2px;
-    color: var(--color-text-secondary);
-}
-
-.cardBody {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-
-.cardBody .viewName {
-    font-size: 15px;
-    overflow-wrap: anywhere;
-}
-
-.cardBody .viewMeta {
-    margin-top: 0;
-}
-
-.cardGoals {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-}
-
-.preview {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 0;
-    padding: 20px 22px 24px;
-    overflow: auto;
-}
-
-.previewTitle {
-    margin: 0;
-    font-size: 18px;
-    color: var(--color-text-primary);
-    overflow-wrap: anywhere;
-}
-
-.preview > .viewMeta {
-    margin-top: -8px;
-}
-
-.previewChart {
-    display: flex;
-    height: 240px;
-    min-height: 0;
-    padding: 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 12px;
-}
-
-.previewGoals ul {
-    margin: 6px 0 0;
-    padding-left: 18px;
-    color: var(--color-text-primary);
-}
-
-.previewGoals a {
-    color: var(--color-text-primary);
-}
-
-.previewActions,
-.renameForm {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.renameForm .searchInput {
-    flex: 1 1 180px;
-}
-
-@media (max-width: 760px) {
-    .browse {
-        grid-template-columns: minmax(0, 1fr);
-        overflow: auto;
-    }
-
-    .listPane {
-        overflow: visible;
-        border-right: 0;
-        border-bottom: 1px solid var(--color-border);
-    }
-
-    .preview {
-        overflow: visible;
-    }
-}
-
-.savedBody {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    padding: 0;
-    overflow: hidden;
-}
-
-.savedBody > .headerActions {
-    padding: 12px 22px 0;
-}
-
-.previewActions {
-    margin: 0;
-    padding: 0;
-    border: 0;
-    min-width: 0;
 }

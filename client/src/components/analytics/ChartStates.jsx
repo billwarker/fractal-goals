@@ -8,13 +8,24 @@ import styles from './ChartStates.module.css';
  * charts and in surface widgets, so they look and read the same everywhere.
  *
  * The Analytics page wraps each panel in a ChartScopeProvider; when filters are set, an empty chart
- * says the filters may be why and offers to clear them.
+ * says the filters may be why and offers to clear them. A time chart reports the bucket grain it
+ * drew (`useReportShownGrain`), so the sidebar can say when a requested grain was coarsened.
  */
-const ChartScopeContext = createContext({ hasActiveFilters: false, onClearFilters: null });
+const ChartScopeContext = createContext({ hasActiveFilters: false, onClearFilters: null, onGrainShown: null });
 
-export function ChartScopeProvider({ hasActiveFilters, onClearFilters, children }) {
-    const value = React.useMemo(() => ({ hasActiveFilters, onClearFilters }), [hasActiveFilters, onClearFilters]);
+export function ChartScopeProvider({ hasActiveFilters, onClearFilters, onGrainShown = null, children }) {
+    const value = React.useMemo(() => ({ hasActiveFilters, onClearFilters, onGrainShown }), [hasActiveFilters, onClearFilters, onGrainShown]);
     return <ChartScopeContext.Provider value={value}>{children}</ChartScopeContext.Provider>;
+}
+
+/** Tell the panel which grain this chart drew; cleared when the chart goes away. */
+export function useReportShownGrain(grain) {
+    const { onGrainShown } = useContext(ChartScopeContext);
+    React.useEffect(() => {
+        if (!onGrainShown || !grain) return undefined;
+        onGrainShown(grain);
+        return () => onGrainShown(null);
+    }, [grain, onGrainShown]);
 }
 
 export function ChartLoading({ label = 'Loading analytics…' }) {

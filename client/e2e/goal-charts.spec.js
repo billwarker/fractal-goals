@@ -48,7 +48,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     // Analytics: open the saved view and add it to the goal.
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: 'Saved Analytics' }).click();
-    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(viewName) }).click();
+    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(`^${viewName}`) }).click();
     await page.getByRole('region', { name: `${viewName} preview` }).getByRole('button', { name: 'Open', exact: true }).click();
     await page.getByRole('button', { name: 'Add to goal…' }).click();
     const picker = page.getByRole('dialog', { name: new RegExp(viewName) });
@@ -123,7 +123,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: 'Saved Analytics' }).click();
     // Saved Analytics previews the chosen view; its goals are listed and Delete is one of its actions.
-    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(viewName) }).click();
+    await page.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(`^${viewName}`) }).click();
     const preview = page.getByRole('region', { name: `${viewName} preview` });
     await expect(preview.getByRole('link', { name: goalName })).toBeVisible();
     await preview.getByRole('button', { name: 'Delete', exact: true }).click();
@@ -181,7 +181,7 @@ test('saved analytics searches goals, previews one chart, and manages copies and
     await page.getByRole('button', { name: 'Saved Analytics' }).click();
     const dialog = page.getByRole('dialog', { name: 'Saved Analytics', exact: true });
     await dialog.getByRole('searchbox').fill(goalName);
-    const card = dialog.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(name) });
+    const card = dialog.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(`^${name}`) });
     await expect(card).toBeVisible();
     await card.click();
     let preview = dialog.getByRole('region', { name: `${name} preview` });
@@ -194,7 +194,10 @@ test('saved analytics searches goals, previews one chart, and manages copies and
     await preview.getByRole('button', { name: 'Save', exact: true }).click();
     preview = dialog.getByRole('region', { name: `${renamed} preview` });
     await expect(preview).toBeVisible();
+    // On a phone the list and the preview take turns.
+    if (suffix === 'mobile') await preview.getByRole('button', { name: '← All saved' }).click();
     await dialog.getByRole('searchbox').fill(renamed);
+    if (suffix === 'mobile') await dialog.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(`^${renamed}`) }).click();
     await preview.getByRole('button', { name: 'Duplicate', exact: true }).click();
     const copy = dialog.getByRole('region', { name: `${renamed} (copy) preview` });
     await expect(copy).toBeVisible();
@@ -229,7 +232,7 @@ test('dashboard sidebar keeps shared scope above independent chart tabs', async 
         await page.getByRole('button', { name: 'Saved Analytics', exact: true }).click();
         const browser = page.getByRole('dialog', { name: 'Saved Analytics', exact: true });
         await browser.getByRole('searchbox').fill(name);
-        await browser.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(name) }).click();
+        await browser.getByRole('list', { name: 'Saved analytics' }).getByRole('button', { name: new RegExp(`^${name}`) }).click();
         await browser.getByRole('region', { name: `${name} preview` }).getByRole('button', { name: 'Open', exact: true }).click();
     };
     const showSidebar = () => page.getByRole('button', { name: suffix === 'mobile' ? 'Show Sidebar' : 'Show Filters', exact: true }).click();

@@ -374,6 +374,11 @@ function Analytics() {
     }, [showSqlExplorer]);
 
     const chartNumbers = useMemo(() => getChartNumbers(windowStates), [windowStates]);
+    // The bucket grain each panel's chart drew, which can be coarser than the one asked for.
+    const [shownGrains, setShownGrains] = useState({});
+    const reportShownGrain = useCallback((windowId, grain) => {
+        setShownGrains((current) => (current[windowId] === grain ? current : { ...current, [windowId]: grain }));
+    }, []);
 
     const renderWindow = useCallback((windowId, layoutControls = {}) => {
         const windowCount = countWindows(layout);
@@ -409,6 +414,7 @@ function Analytics() {
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
                     chartNumber={chartNumbers[windowId]}
+                    onShownGrainChange={reportShownGrain}
                     onPageGrid
                 />
             </Suspense>
@@ -416,6 +422,7 @@ function Analytics() {
     }, [
         chartNumbers,
         createWindowStateUpdater,
+        reportShownGrain,
         globalDateRange,
         globalFilters,
         handleCloseWindow,
@@ -440,7 +447,7 @@ function Analytics() {
             constrainToVisualViewport={false}
         >
             <Suspense fallback={<AnalyticsLoading />}><AnalyticsFiltersSidebar
-                rootId={rootId} sessions={sessions} windowStates={windowStates}
+                rootId={rootId} sessions={sessions} windowStates={windowStates} shownGrains={shownGrains}
                 selectedWindowId={selectedWindowId} onSelectWindow={setSelectedWindowId}
                 onUpdateWindowState={(id, updates) => createWindowStateUpdater(id)(updates)}
                 filters={globalFilters}

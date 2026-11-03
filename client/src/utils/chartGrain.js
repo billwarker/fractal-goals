@@ -11,6 +11,8 @@
 export const GRAINS = ['day', 'week', 'month'];
 export const AUTO_DAY_MAX_SPAN_DAYS = 45;
 export const AUTO_WEEK_MAX_SPAN_DAYS = 400;
+/** Bars per chart before a finer grain is coarsened (about 16 months of days); matches services/goal_analytics_service.py. */
+export const MAX_CHART_POINTS = 500;
 
 const DAY_MS = 86400000;
 
@@ -119,7 +121,7 @@ export function bucketStarts(first, last, grain) {
  *   range?: { start?: string | null, end?: string | null } | null, pointBudget?: number }} options
  * @returns {{ grain: Grain, rows: Array<{ key: string, count: number, seconds: number }> }}
  */
-export function bucketRows(items, { dayOf, secondsOf = () => 0, grain = 'auto', range = null, pointBudget = 120 }) {
+export function bucketRows(items, { dayOf, secondsOf = () => 0, grain = 'auto', range = null, pointBudget = MAX_CHART_POINTS }) {
     const dated = items.map((item) => /** @type {[T, string | null]} */ ([item, dayOf(item)])).filter(([, day]) => day);
     if (!dated.length) return { grain: 'day', rows: [] };
     const days = dated.map(([, day]) => /** @type {string} */ (day)).sort();

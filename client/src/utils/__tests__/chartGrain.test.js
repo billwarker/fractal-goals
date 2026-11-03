@@ -49,7 +49,9 @@ describe('bucketRows', () => {
     });
 
     it('spans the range, coarsens to fit the budget, and is empty without dated items', () => {
-        const result = bucketRows(items, { ...options, grain: 'day', range: { start: '2026-01-01', end: '2026-12-31' } });
+        // A year of days fits the 500-bar budget; two years don't.
+        expect(bucketRows(items, { ...options, grain: 'day', range: { start: '2026-01-01', end: '2026-12-31' } }).grain).toBe('day');
+        const result = bucketRows(items, { ...options, grain: 'day', range: { start: '2025-01-01', end: '2026-12-31' } });
         expect(result.grain).toBe('week');
         expect(result.rows.find((row) => row.key === '2026-03-02')).toEqual({ key: '2026-03-02', count: 3, seconds: 100 });
         expect(bucketRows([], options)).toEqual({ grain: 'day', rows: [] });

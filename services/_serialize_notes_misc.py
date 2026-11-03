@@ -176,6 +176,7 @@ def serialize_analytics_dashboard(dashboard, *, goals=None, visualization=None):
         "layout": dashboard.layout,
         "pinned": bool(dashboard.pinned),
         "last_opened_at": format_utc(dashboard.last_opened_at),
+        "open_count": dashboard.open_count or 0,
         "created_at": format_utc(dashboard.created_at),
         "updated_at": format_utc(dashboard.updated_at),
     }

@@ -3,7 +3,7 @@ import { Bar } from 'react-chartjs-2';
 
 import { formatBucketLabel, formatBucketRange, formatDuration } from '../../../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
-import { ChartEmpty } from '../../ChartStates';
+import { ChartEmpty, useReportShownGrain } from '../../ChartStates';
 import { buildSeries, seriesColor } from '../../series/buildSeries';
 import ChartLegendPanel from '../../series/ChartLegendPanel';
 import { BAR_MARKS } from './barMarks';
@@ -33,6 +33,7 @@ export default function BucketBarChart({
     const density = useChartDensity();
     const [hiddenKeys, setHiddenKeys] = useState(() => new Set());
     const [hoverKey, setHoverKey] = useState(null);
+    useReportShownGrain(grain);
     // A null count is a bucket with nothing to draw (a running total's future buckets).
     const valueOf = (item) => (item.count == null ? null : byTime ? item.seconds / 3600 : item.count);
     const formatValue = (value) => (byTime ? formatDuration(value * 3600) : countLabel(value));

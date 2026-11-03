@@ -1,0 +1,144 @@
+/* Saved Analytics: the catalog on the left, the picked item's detail card on the right. Sizes and
+   tokens follow ManageActivityTagsModal so the two read as one family. */
+
+.sheet { max-width: 1080px; }
+.body { min-height: 0; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 1.1fr); gap: 24px; min-height: min(560px, 68vh); }
+.catalog, .detail { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+
+.summary, .detailHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.detailHeader > div:first-child { flex: 1 1 auto; }
+.headerActions { display: flex; gap: 8px; flex: 0 0 auto; white-space: nowrap; }
+.summary > div, .detailHeader > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.summary strong { font-size: 14px; font-weight: 700; color: var(--color-text-primary); }
+.summary span, .detailHeader span { color: var(--color-text-muted); font-size: 12px; }
+
+.filters { display: grid; gap: 8px; margin: 14px 0 12px; }
+.filters input,
+.renameForm input {
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 9px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 14px;
+}
+.filters input::placeholder { color: var(--color-text-muted); }
+.filters input:focus,
+.renameForm input:focus { outline: none; border-color: var(--color-brand-primary); }
+
+/* One segmented control rather than a row of chips; scrolls sideways on a narrow screen. */
+.segments {
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    scrollbar-width: none;
+}
+.segments button {
+    flex: 1 0 auto;
+    min-height: 30px;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: calc(var(--border-radius-sm) - 2px);
+    background: transparent;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.segments button:hover { color: var(--color-text-primary); }
+.segments .segmentActive { background: var(--color-bg-card); color: var(--color-text-primary); font-weight: 600; box-shadow: 0 0 0 1px var(--color-border); }
+
+.list { display: grid; align-content: start; gap: 7px; flex: 1; min-height: 0; margin: 0; padding: 0 3px 0 0; overflow-y: auto; list-style: none; }
+/* A row picks the item to preview; its Open button opens it in one click. */
+.row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding-right: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-bg-card);
+}
+.row:hover { border-color: color-mix(in srgb, var(--color-brand-primary) 45%, var(--color-border)); }
+.row.selected { border-color: var(--color-brand-primary); background: color-mix(in srgb, var(--color-brand-primary) 8%, var(--color-bg-card)); }
+.rowSelect {
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+    min-height: 58px;
+    padding: 10px 0 10px 12px;
+    border: 0;
+    border-radius: 8px 0 0 8px;
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.rowSelect:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: -2px; }
+.rowOpen { flex: 0 0 auto; }
+.rowIcon { display: inline-flex; margin-top: 2px; color: var(--color-text-secondary); }
+.identity { display: grid; gap: 2px; min-width: 0; }
+.identity strong, .identity span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.identity strong { font-size: 14px; font-weight: 600; }
+.identity span { color: var(--color-text-muted); font-size: 12px; }
+.identity .rowChart { color: var(--color-text-secondary); }
+.pinned { color: var(--color-brand-warning, var(--color-text-secondary)); font-size: 12px; }
+
+.detail { gap: 14px; padding: 20px; border: 1px solid var(--color-border); border-radius: var(--border-radius-md); background: var(--color-bg-card); }
+.detailHeader strong { font-size: 16px; font-weight: 700; color: var(--color-text-primary); overflow-wrap: anywhere; }
+.back { display: none; align-self: flex-start; padding: 0; border: 0; background: transparent; color: var(--color-brand-primary); font: inherit; font-size: 13px; cursor: pointer; }
+
+.renameForm { display: flex; flex-wrap: wrap; gap: 8px; }
+.renameForm input { flex: 1 1 180px; }
+
+.chart { display: flex; height: 240px; min-height: 0; padding: 8px; border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent); border-radius: var(--border-radius-sm); background: var(--color-bg-primary); }
+.chart > .empty { margin: auto; }
+
+.goals { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--color-border); }
+.goals h4 { margin: 0; color: var(--color-text-secondary); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.goals ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.goals li { padding: 6px 2px; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); font-size: 13px; }
+.goals li:last-child { border-bottom: 0; }
+.goals a { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-primary); text-decoration: none; }
+.goals a:hover { color: var(--color-brand-primary); }
+
+/* Secondary actions read as links, as in the tag manager; the danger one is red. */
+.actions { display: flex; flex-wrap: wrap; gap: 16px; min-width: 0; margin: auto 0 0; padding: 14px 0 0; border: 0; border-top: 1px solid var(--color-border); }
+.actions button { padding: 2px 0; border: 0; background: transparent; color: var(--color-brand-primary); font: inherit; font-size: 13px; cursor: pointer; }
+.actions button:disabled { color: var(--color-text-muted); cursor: default; opacity: .5; }
+.actions .danger { margin-left: auto; color: var(--color-brand-danger); }
+
+.empty { margin: 0; padding: 16px; color: var(--color-text-muted); font-size: 13px; }
+
+/* Phones: the list and the detail take turns, each using the whole sheet. */
+@media (max-width: 760px) {
+    .layout { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+    .layout .detail { display: none; }
+    .layout.showingPreview .catalog { display: none; }
+    .layout.showingPreview .detail { display: flex; padding: 0; border: 0; background: transparent; }
+    .back { display: inline-flex; }
+    .summary { align-items: center; }
+    .summary span { display: none; }
+    .segments button { padding: 4px 6px; font-size: 12px; }
+    .list { overflow: visible; }
+    .rowSelect { min-height: 52px; }
+    .detailHeader { flex-direction: column; align-items: stretch; }
+    .headerActions > * { flex: 1 1 0; }
+    .chart { height: 200px; }
+    .actions { gap: 20px; }
+    .actions button { min-height: 36px; }
+}

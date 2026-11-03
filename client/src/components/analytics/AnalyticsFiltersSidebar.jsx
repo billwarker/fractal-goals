@@ -10,13 +10,13 @@ import styles from './AnalyticsFiltersSidebar.module.css';
 
 /** Shared filters stay above chart tabs; each tab edits only its chart's scope and settings. */
 export default function AnalyticsFiltersSidebar(props) {
-    const { windowStates = {}, selectedWindowId, onUpdateWindowState, onSelectWindow, onToggleCollapse, isMobile } = props;
+    const { windowStates = {}, shownGrains = {}, selectedWindowId, onUpdateWindowState, onSelectWindow, onToggleCollapse, isMobile } = props;
     const [localTab, setLocalTab] = useState(selectedWindowId);
     const tabId = useId();
     const panels = Object.entries(windowStates || {}).filter(([, state]) => state?.selectedCategory && state?.selectedVisualization);
     const chartNumbers = getChartNumbers(windowStates);
     const dashboard = panels.length > 1 || panels.some(([, state]) => hasActiveGlobalFilters(state.localFilters));
-    if (!dashboard) return <AnalyticsScopePane {...props} chartNumber={chartNumbers[selectedWindowId]} />;
+    if (!dashboard) return <AnalyticsScopePane {...props} chartNumber={chartNumbers[selectedWindowId]} shownGrain={shownGrains[selectedWindowId]} />;
     const selectedId = onSelectWindow ? (selectedWindowId || localTab) : localTab;
     const [activeId, activeState] = panels.find(([id]) => id === selectedId) || panels[0];
     const select = (id) => { setLocalTab(id); onSelectWindow?.(id); };
@@ -54,7 +54,7 @@ export default function AnalyticsFiltersSidebar(props) {
                 })}
             </div>
             <div className={styles.chartPane} role="tabpanel" id={`${tabId}-panel`} aria-labelledby={`${tabId}-${activeId}`} tabIndex={0}>
-                <AnalyticsScopePane key={activeId} {...props} embedded scopeKind="chart" selectedWindowState={activeState} windowStates={{ [activeId]: activeState }}
+                <AnalyticsScopePane key={activeId} {...props} embedded scopeKind="chart" selectedWindowState={activeState} windowStates={{ [activeId]: activeState }} shownGrain={shownGrains[activeId]}
                     filters={activeState.localFilters} inheritedFilters={props.filters} dateRange={null}
                     onChange={(localFilters) => onUpdateWindowState?.(activeId, { localFilters })}
                     onReset={() => onUpdateWindowState?.(activeId, { localFilters: null })}

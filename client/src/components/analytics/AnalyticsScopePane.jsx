@@ -48,6 +48,8 @@ function AnalyticsScopePane({
     selectedWindowState = null,
     // The selected chart's number, matching its pane header.
     chartNumber = null,
+    // The bucket grain the selected chart drew, for its Bucket size control.
+    shownGrain = null,
     // Every panel's state, so scope filters only show for charts they affect.
     windowStates = null,
     onUpdateSelectedWindowState,
@@ -150,7 +152,7 @@ function AnalyticsScopePane({
 
             {SelectedControls && (
                 <SelectedControls
-                    context={{ ...chartContext, hideGroupBy: true,
+                    context={{ ...chartContext, shownGrain, hideGroupBy: true,
                         onOpenActivityModal: () => setIsProfileActivityModalOpen(true),
                         onOpenGoalModal: () => setIsProfileGoalModalOpen(true),
                     }}

@@ -11,7 +11,8 @@ from services.goal_time_rollup import plan_rollup, rollup_bucket_rows
 from services.serializers import format_utc
 from services.view_serializers import serialize_goal_analytics_goal, serialize_goal_analytics_payload
 
-MAX_CHART_POINTS = 366
+# Bars per chart before a finer grain is coarsened; matches MAX_CHART_POINTS in client/src/utils/chartGrain.js.
+MAX_CHART_POINTS = 500
 
 
 class GoalAnalyticsService:
@@ -85,7 +86,6 @@ class GoalAnalyticsService:
             })
         chart_rows = {}
         activity_chart_rows = {}
-        point_budget = MAX_CHART_POINTS if chart_goal_id else 120
         chart_grain = None
         time_rollup = None
         if charts or chart_goal_id:
@@ -97,7 +97,7 @@ class GoalAnalyticsService:
                 # A chosen range sets the span (so "7D" stays daily); open ends fall back to the evidence.
                 first = start or utc_datetime(bounds[0])
                 last = end or utc_datetime(bounds[1])
-                chart_grain = resolve_grain(grain, first.astimezone(zone).date(), last.astimezone(zone).date(), point_budget)
+                chart_grain = resolve_grain(grain, first.astimezone(zone).date(), last.astimezone(zone).date(), MAX_CHART_POINTS)
                 tz_key = getattr(zone, 'key', 'UTC')
 
                 def local_bucket(column):
@@ -161,7 +161,7 @@ class GoalAnalyticsService:
             'avg_duration_to_completion_seconds': round(average(completion_durations)),
         }, payload_goals)
         payload['metadata'] = {'aggregated': True, 'chart_goal_id': chart_goal_id, 'chart_grain': chart_grain,
-                               'timezone': getattr(zone, 'key', 'UTC'), 'max_chart_points': point_budget}
+                               'timezone': getattr(zone, 'key', 'UTC'), 'max_chart_points': MAX_CHART_POINTS}
         if rollup:
             payload['time_rollup'] = time_rollup or {'series': [], 'levels': [], 'breadcrumb': []}
         return payload, None, 200

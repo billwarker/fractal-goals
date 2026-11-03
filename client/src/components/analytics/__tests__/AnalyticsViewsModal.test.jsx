@@ -11,8 +11,11 @@ const { hooks } = vi.hoisted(() => ({
 vi.mock('../../../hooks/useDashboardQueries', () => ({ useAnalyticsViews: () => hooks }));
 vi.mock('../SavedViewChart', () => ({ default: () => <div data-testid="preview-chart" /> }));
 vi.mock('../AddViewToGoalsModal', () => ({ default: () => <div role="dialog" aria-label="Show on goals" /> }));
+vi.mock('../../../contexts/GoalLevelsContext', () => ({
+    useGoalLevels: () => ({ getGoalIcon: () => 'circle', getGoalColor: () => '#2255DD', getGoalSecondaryColor: () => '#112244' }),
+}));
 
-import AnalyticsViewsModal, { chartLabel, whenLabel } from '../AnalyticsViewsModal';
+import AnalyticsViewsModal, { chartLabel, openedLabel, usageLabel } from '../AnalyticsViewsModal';
 
 const views = [
     {
@@ -40,17 +43,18 @@ function renderModal(props = {}) {
     return { onSelectView, onDeleteView, onClose };
 }
 
-const cards = () => within(screen.getByRole('list', { name: 'Saved analytics' })).getAllByRole('button');
+// The row buttons that pick a preview (each row also has its own Open button).
+const cards = () => within(screen.getByRole('list', { name: 'Saved analytics' })).getAllByRole('button').filter((button) => button.hasAttribute('aria-pressed'));
 
 describe('AnalyticsViewsModal', () => {
     beforeEach(() => vi.clearAllMocks());
 
-    it('shows each item’s chart, goals and when it was used, previewing the first', () => {
+    it('shows each item’s chart and use, not its goals, previewing the first', () => {
         renderModal();
         expect(cards()).toHaveLength(3);
         expect(cards()[0]).toHaveTextContent('Activities · Metric Trends');
-        expect(cards()[0]).toHaveTextContent('Bench 225');
-        expect(cards()[0]).toHaveTextContent('+1');
+        expect(cards()[0]).toHaveTextContent(/Updated .* · Never opened/);
+        expect(cards()[0]).not.toHaveTextContent('Bench 225');
         const preview = screen.getByRole('region', { name: 'Bench trend preview' });
         expect(within(preview).getByTestId('preview-chart')).toBeInTheDocument();
         expect(within(preview).getByRole('link', { name: 'Dip 20' })).toHaveAttribute('href', '/root/goals?goal=g3');
@@ -121,8 +125,20 @@ describe('saved analytics helpers', () => {
         expect(chartLabel(views[1])).toBe('Sessions · Session Trends');
         expect(chartLabel(views[2])).toBe('Dashboard');
         const now = new Date('2026-11-01T12:00:00Z');
-        expect(whenLabel({ last_opened_at: '2026-10-29T10:00:00Z' }, now)).toBe('Opened 3 days ago');
-        expect(whenLabel({ last_opened_at: '2026-11-01T08:00:00Z' }, now)).toBe('Opened today');
-        expect(whenLabel({ updated_at: '2026-06-03T12:00:00Z' }, now)).toBe('Updated Jun 3, 2026');
+        expect(openedLabel({ last_opened_at: '2026-10-29T10:00:00Z' }, now)).toBe('Opened 3 days ago');
+        expect(openedLabel({ last_opened_at: '2026-11-01T08:00:00Z' }, now)).toBe('Opened today');
+        expect(openedLabel({ last_opened_at: '2026-06-03T12:00:00Z' }, now)).toBe('Opened Jun 3, 2026');
+        expect(openedLabel({}, now)).toBe('Never opened');
+        expect(usageLabel({ updated_at: '2026-06-03T12:00:00Z', last_opened_at: '2026-10-31T10:00:00Z', open_count: 12 }, now))
+            .toBe('Updated Jun 3, 2026 · Opened yesterday · 12 opens');
+        expect(usageLabel({ updated_at: '2026-06-03T12:00:00Z', open_count: 0 }, now)).toBe('Updated Jun 3, 2026 · Never opened');
+    });
+
+    it('opens a row in one click from its Open button', () => {
+        const { onSelectView, onClose } = renderModal();
+        fireEvent.click(screen.getByRole('button', { name: 'Open Weekly sessions' }));
+        expect(hooks.markAnalyticsViewOpened).toHaveBeenCalledWith('v2');
+        expect(onSelectView).toHaveBeenCalledWith('v2');
+        expect(onClose).toHaveBeenCalled();
     });
 });
