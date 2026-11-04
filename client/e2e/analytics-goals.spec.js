@@ -173,6 +173,19 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
         `/api/roots/${root}/dashboards`, { headers: { Authorization: `Bearer ${token}` } },
     )).json()).data.map((view) => view.name), { root, token });
     expect(views).toEqual([viewName]);
+
+    // Its tag picker opens above this modal (click checks nothing covers it).
+    // The toast sits over the footer on a phone, and holds while the test's pointer rests on it.
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole('status').filter({ hasText: 'Goal created' })).toHaveCount(0, { timeout: 10_000 });
+    await details.getByRole('button', { name: 'Edit', exact: true }).click();
+    await details.getByText('Only count when tagged').click();
+    await details.getByRole('button', { name: 'Add tag' }).click();
+    const picker = page.getByRole('dialog', { name: 'Choose required tags' });
+    await picker.getByPlaceholder('Create a tag').click();
+    await picker.getByRole('button', { name: 'Close tag picker' }).click();
+    await expect(picker).toHaveCount(0);
+    await details.getByRole('button', { name: 'Cancel', exact: true }).click();
     await details.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(details).toHaveCount(0);
 
