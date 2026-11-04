@@ -8,7 +8,7 @@ from models import get_session
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
 from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
-from services.completion_handlers import get_recent_achievements, get_live_progress
+from services.completion_handlers import get_recent_achievements, get_live_progress, progress_for_saved_instance
 from services.progress_service import ProgressService
 from services.timer_service import TimerService
 from validators import (
@@ -201,11 +201,7 @@ def update_activity_instance(current_user, root_id, instance_id, validated_data)
             return jsonify({"error": error}), status
 
         response_data = dict(payload["serialized"])
-        if response_data.get("completed", False):
-            response_data["progress_comparison"] = (
-                get_live_progress(instance_id)
-                or ProgressService(db_session).get_progress_for_instance(instance_id)
-            )
+        response_data["progress_comparison"] = progress_for_saved_instance(db_session, instance_id)
 
         return jsonify(response_data), status
 

@@ -9,7 +9,7 @@ import {
     applyTimerAction,
 } from './sessionOps';
 import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun } from './circuitOps';
-import { patchProgressChartSettings } from './progressChartOps';
+import { patchProgressChartSettings, patchProgressSeriesInstance } from './progressChartOps';
 
 // Every queued in-session write has a kind. Each kind knows how to show itself
 // in the cache before the server answers (`optimistic`), which is also re-run
@@ -281,6 +281,7 @@ function replaceInstance(queryClient, op, instance) {
         const exists = list.some((entry) => entry.id === instance.id);
         return exists ? list.map((entry) => (entry.id === instance.id ? instance : entry)) : [...list, instance];
     }));
+    patchProgressSeriesInstance(queryClient, { rootId: op.meta.rootId, instance });
 }
 
 export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
@@ -296,6 +297,7 @@ export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
         queryKeys.programDayReadModelRoot(rootId),
         queryKeys.activityHistoryRoot(rootId),
         queryKeys.progressRoot(),
+        ['activity-progress-timeline', rootId],
     ]);
     invalidateSessionLists(queryClient, rootId, queryKeys);
 }

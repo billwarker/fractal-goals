@@ -394,7 +394,8 @@ it('renders progress inline beside the metric unit without summary badges', () =
         );
 
         expect(screen.getByText('lbs')).toBeInTheDocument();
-        expect(screen.getByText('(last 185)')).toBeInTheDocument();
+        expect(screen.getByText('(▲2.7%)').className).toMatch(/metricInlineProgressImproved/);
+        expect(screen.queryByText('(last 185)')).not.toBeInTheDocument();
         expect(screen.queryByText(/new personal best/i)).not.toBeInTheDocument();
     });
 });

@@ -155,6 +155,7 @@ function ScatterPlot({
         if (instance.has_sets && instance.sets) {
             const allSets = [];
             instance.sets.forEach((set, setIdx) => {
+                if (set.status === 'skipped') return;
                 const setPoint = { ...basePoint, set_number: setIdx + 1 };
                 // A set's effective tags are its own plus its instance's.
                 if (groupBy) setPoint.group = pointGroup(setGroups(set, instance, groupBy, groupLookups));

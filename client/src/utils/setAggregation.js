@@ -75,7 +75,7 @@ function valuesIn(metrics, metricId, split) {
 }
 
 /**
- * Every value of a metric in an instance (its direct values and each set's), optionally one split.
+ * Every value of a metric in an instance (its direct values and each unskipped set's), optionally one split.
  * @param {any} instance
  * @param {string} metricId
  * @param {string} [split]
@@ -84,6 +84,7 @@ function valuesIn(metrics, metricId, split) {
 export function metricValues(instance, metricId, split = 'all') {
     const direct = valuesIn(instance?.metrics || instance?.metric_values || [], metricId, split);
     const fromSets = (Array.isArray(instance?.sets) ? instance.sets : [])
+        .filter((/** @type {any} */ set) => set?.status !== 'skipped')
         .flatMap((/** @type {any} */ set) => valuesIn(set?.metrics || [], metricId, split));
     return /** @type {number[]} */ ([...direct, ...fromSets]);
 }

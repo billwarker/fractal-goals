@@ -37,6 +37,15 @@ from services._completion_programs import _check_parent_completion, _update_prog
 logger = logging.getLogger(__name__)
 
 
+def progress_for_saved_instance(db_session, instance_id):
+    """The comparison a save response carries, so progress hints and charts move with the saved values."""
+    try:
+        return get_live_progress(instance_id) or ProgressService(db_session).get_progress_for_instance(instance_id)
+    except Exception as progress_err:  # The save has committed; progress is best-effort.
+        logger.warning("Error calculating progress for saved instance %s: %s", instance_id, progress_err)
+        return None
+
+
 def _resolve_db_session(event: Event):
     db_session = (event.context or {}).get('db_session')
     owns_session = db_session is None

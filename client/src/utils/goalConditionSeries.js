@@ -46,14 +46,13 @@ export function instanceYield(instance, yieldIds) {
 }
 
 /**
+ * The metric's total, or null for a session with no values (a gap on the chart, not a zero).
  * @param {any} instance
  * @param {string} metricId
  */
 function instanceMetricTotal(instance, metricId) {
-    return evidenceSets(instance).reduce(
-        (sum, values) => sum + (values.get(metricId) || []).reduce((total, value) => total + value, 0),
-        0,
-    );
+    const values = evidenceSets(instance).flatMap((row) => row.get(metricId) || []);
+    return values.length ? values.reduce((total, value) => total + value, 0) : null;
 }
 
 /**

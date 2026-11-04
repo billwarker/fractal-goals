@@ -324,10 +324,13 @@ it('invalidates the progress timeline and session summary after activity metric-
         queryClient.setQueryData(queryKeys.sessionActivities('root-1', 'session-1'), [
             { id: 'inst-1', activity_definition_id: 'act-1' },
         ]);
+        const seriesKey = [...queryKeys.activityProgressTimeline('root-1', 'act-1', 'inst-1'), 'series'];
+        queryClient.setQueryData(seriesKey, { instances: [{ id: 'inst-1', session_date: '2026-11-04', sets: [] }] });
         updateActivityInstance.mockResolvedValueOnce({
             data: {
                 id: 'inst-1',
                 activity_definition_id: 'act-1',
+                sets: [{ metrics: [{ metric_id: 'm1', value: 110 }] }],
                 progress_comparison: {
                     activity_instance_id: 'inst-1',
                     metric_comparisons: [],
@@ -346,6 +349,11 @@ it('invalidates the progress timeline and session summary after activity metric-
             });
         });
 
+        expect(queryClient.getQueryData(seriesKey).instances[0]).toMatchObject({
+            session_date: '2026-11-04',
+            sets: [{ metrics: [{ metric_id: 'm1', value: 110 }] }],
+            progress_comparison: { activity_instance_id: 'inst-1' },
+        });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.progressComparison('inst-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.activityProgressTimelineRoot('root-1', 'act-1') });
         expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: queryKeys.sessionProgressSummary('session-1') });

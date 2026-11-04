@@ -18,6 +18,15 @@ describe('setAggregation', () => {
         expect(aggregateMetric({ sets: [] }, { id: 'weight' })).toBeNull();
     });
 
+    it('leaves skipped sets out of top and average', () => {
+        const withSkipped = { sets: [
+            { metrics: [{ metric_id: 'weight', value: 100 }] },
+            { status: 'skipped', metrics: [{ metric_id: 'weight', value: 300 }] },
+        ] };
+        expect(aggregateMetric(withSkipped, { id: 'weight' }, 'top')).toBe(100);
+        expect(aggregateMetric(withSkipped, { id: 'weight' }, 'average')).toBe(100);
+    });
+
     it('combines per-set yields as the top set, the average, or the total', () => {
         expect(aggregateYield(instance, ['weight', 'reps'], 'top')).toBe(500);
         expect(aggregateYield(instance, ['weight', 'reps'], 'average')).toBe(415);

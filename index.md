@@ -360,7 +360,9 @@ there. `GET …/progress-series` feeds the pane's chart: `chart_settings` (resol
 with its metrics and set aggregation (top / average / total for yield). The choice is saved in
 `activity_progress_charts` per activity × template/program day (both NULL: activity-wide, the fallback)
 via `PUT …/activity-instances/<id>/progress-chart`; saved fields that no longer apply fall back to the
-default (goal progress, else a scatter for 2+ tracked metrics, else a trend). The client draws it with
+default (goal progress, else a scatter for 2+ tracked metrics, else a trend). Instance saves return
+`progress_comparison`, and their ack writes it and the saved values to the session cache and the cached
+series together (`patchProgressSeriesInstance`), so progress hints and the chart move as one. Hints show a saved value's change (▲/▼) even before completion, and the last value until one is entered. The client draws it with
 the Analytics charts (`ScatterPlot`, `MetricTrendsChart`) and one set-aggregation utility,
 `utils/setAggregation.js`, shared by every activity chart. Each group of sets
 with the same set tags compares with the latest earlier instance in that context holding such sets,

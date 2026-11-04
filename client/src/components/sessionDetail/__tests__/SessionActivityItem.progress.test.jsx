@@ -392,4 +392,63 @@ it('uses the lower-is-better best-set anchor when placing max hints across set r
         expect(within(setRows[0]).queryByText('(last 7)')).not.toBeInTheDocument();
         expect(within(setRows[1]).getByText('(last 7)')).toBeInTheDocument();
     });
+
+it('shows each in-progress set its change once saved, and the last value until then', () => {
+        useProgressComparison.mockReturnValue({
+            progressComparison: {
+                is_first_instance: false,
+                metric_comparisons: [{
+                    metric_id: 'm1',
+                    previous_value: 100,
+                    current_value: 90,
+                    delta: -10,
+                    pct_change: -10,
+                    improved: false,
+                    regressed: true,
+                    set_comparisons: [
+                        { set_index: 0, previous_value: 100, current_value: 90, delta: -10, pct_change: -10, improved: false, regressed: true },
+                        { set_index: 1, previous_value: 95, current_value: null, delta: null, pct_change: null, improved: false, regressed: false },
+                    ],
+                }],
+            },
+        });
+
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={{
+                    id: 'set-instance-3',
+                    session_id: 'session-1',
+                    activity_definition_id: 'activity-1',
+                    completed: false,
+                    sets: [
+                        { id: 'set-1', instance_id: 'set-1', metrics: [{ metric_id: 'm1', value: '90' }] },
+                        { id: 'set-2', instance_id: 'set-2', metrics: [] },
+                    ],
+                    metrics: [],
+                    time_start: null,
+                    time_stop: null,
+                    duration_seconds: 0,
+                }}
+                isSelected={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Bench',
+                    has_sets: true,
+                    has_metrics: true,
+                    metric_definitions: [{ id: 'm1', name: 'Weight', unit: 'kg' }],
+                    split_definitions: [],
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false,
+            }
+        );
+
+        const setRows = screen.getAllByText(/^#\d+$/).map((label) => label.parentElement);
+        expect(within(setRows[0]).getByText('(▼10%)').className).toMatch(/metricInlineProgressRegressed/);
+        expect(within(setRows[1]).getByText('(last 95)')).toBeInTheDocument();
+    });
 });

@@ -347,7 +347,7 @@ function SessionActivityItem({
         { enabled: Boolean(rootId && exercise.id && hasMetrics && !activityProgress) }
     );
 
-    // The displayed progress: prefer completion result, fall back to live query
+    // The displayed progress: prefer the last save's result, fall back to live query
     const activeProgress = activityProgress || liveProgressComparison;
     const { progressSettings } = useRootProgressSettings(rootId);
     const deltaDisplayMode = useEffectiveDeltaDisplayMode(activityDefinition, progressSettings);
@@ -456,6 +456,30 @@ function SessionActivityItem({
             return null;
         }
 
+        // A saved value shows its change; with nothing entered yet, the last value is the target.
+        const showsDelta = (item) => isCompleted || item.current_value != null;
+        const renderComparison = (item) => {
+            if (!showsDelta(item)) {
+                return (
+                    <span className={styles.metricInlinePrevious}>
+                        (last {formatMetricNumber(item.previous_value)})
+                    </span>
+                );
+            }
+            const inlineValue = formatInlineProgressValue(item, deltaDisplayMode);
+            if (!inlineValue) return null;
+            const progressClassName = item.improved
+                ? styles.metricInlineProgressImproved
+                : item.regressed
+                    ? styles.metricInlineProgressRegressed
+                    : styles.metricInlineProgressNeutral;
+            return (
+                <span className={`${styles.metricInlineProgress} ${progressClassName}`}>
+                    ({inlineValue})
+                </span>
+            );
+        };
+
         // For set-based activities, use per-set comparison data if available
         if (hasSets && options.setIndex != null) {
             const setComps = comparison.set_comparisons;
@@ -464,67 +488,26 @@ function SessionActivityItem({
                 if (!setComp || setComp.previous_value == null) {
                     return null;
                 }
-                if (isCompleted) {
-                    const inlineValue = formatInlineProgressValue(setComp, deltaDisplayMode);
-                    if (!inlineValue) return null;
-                    const progressClassName = setComp.improved
-                        ? styles.metricInlineProgressImproved
-                        : setComp.regressed
-                            ? styles.metricInlineProgressRegressed
-                            : styles.metricInlineProgressNeutral;
-                    return (
-                        <span className={`${styles.metricInlineProgress} ${progressClassName}`}>
-                            ({inlineValue})
-                        </span>
-                    );
-                }
-                return (
-                    <span className={styles.metricInlinePrevious}>
-                        (last {formatMetricNumber(setComp.previous_value)})
-                    </span>
-                );
+                return renderComparison(setComp);
             }
 
             const visibleIndexes = setProgressVisibility.get(metricId);
 
-            // Keep max-style comparisons pinned to the driving set row even
-            // before completion so best-set anchors stay spatially coherent.
-            // Other in-progress comparisons still show references on every row.
-            if (isCompleted || comparison.aggregation === 'max') {
+            // Keep max-style comparisons and saved deltas pinned to the driving
+            // set row so best-set anchors stay spatially coherent. Metrics with
+            // nothing entered yet still show references on every row.
+            if (showsDelta(comparison) || comparison.aggregation === 'max') {
                 if (visibleIndexes && !visibleIndexes.has(options.setIndex)) {
                     return null;
                 }
             }
         }
 
-        if (isCompleted) {
-            const inlineValue = formatInlineProgressValue(comparison, deltaDisplayMode);
-            if (!inlineValue) {
-                return null;
-            }
-
-            const progressClassName = comparison.improved
-                ? styles.metricInlineProgressImproved
-                : comparison.regressed
-                    ? styles.metricInlineProgressRegressed
-                    : styles.metricInlineProgressNeutral;
-
-            return (
-                <span className={`${styles.metricInlineProgress} ${progressClassName}`}>
-                    ({inlineValue})
-                </span>
-            );
-        }
-
-        if (comparison.previous_value == null) {
+        if (comparison.previous_value == null && !showsDelta(comparison)) {
             return null;
         }
 
-        return (
-            <span className={styles.metricInlinePrevious}>
-                (last {formatMetricNumber(comparison.previous_value)})
-            </span>
-        );
+        return renderComparison(comparison);
     }, [activeProgress, deltaDisplayMode, hasSets, isCompleted, metricProgressById, setProgressVisibility]);
 
     const { activityPlanNote, getSetPlanNote, renderPlannedValue } = usePlannedValues({
@@ -621,6 +604,11 @@ function SessionActivityItem({
         return true;
     };
 
+    // Entering a value selects the activity, so the Progress pane shows what the save will update.
+    const handleMetricFocus = () => {
+        if (!isSelected && onFocus) onFocus(exercise, selectedSetIndex);
+    };
+
     const renderMetricEditor = ({
         metricDef,
         value,
@@ -641,6 +629,7 @@ function SessionActivityItem({
                 unitClassName={unitClassName}
                 onDraftChange={onDraftChange}
                 onCommit={onCommit}
+                onFocus={handleMetricFocus}
                 progress={progress}
                 isDraft={isDraft}
             />

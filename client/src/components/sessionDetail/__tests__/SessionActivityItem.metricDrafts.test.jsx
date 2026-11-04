@@ -287,6 +287,59 @@ it('keeps invalid arithmetic drafts local instead of saving them', async () => {
         expect(updateInstance).not.toHaveBeenCalled();
     });
 
+it.each([
+        [false, 1],
+        [true, 0],
+    ])('selects the activity when a metric input takes focus (selected: %s)', (isSelected, selections) => {
+        const onFocus = vi.fn();
+        const exercise = {
+            id: 'instance-focus',
+            session_id: 'session-1',
+            activity_definition_id: 'activity-1',
+            sets: [],
+            metrics: [{ metric_id: 'm1', value: '5' }],
+            time_start: null,
+            time_stop: null,
+            duration_seconds: 0
+        };
+        renderWithProviders(
+            <SessionActivityItem
+                exercise={exercise}
+                onFocus={onFocus}
+                isSelected={isSelected}
+                onReorder={vi.fn()}
+                canMoveUp={false}
+                canMoveDown={false}
+                showReorderButtons={false}
+                onNoteCreated={vi.fn()}
+                allNotes={[]}
+                onAddNote={vi.fn()}
+                onUpdateNote={vi.fn()}
+                onDeleteNote={vi.fn()}
+                isDragging={false}
+                activityDefinition={{
+                    id: 'activity-1',
+                    name: 'Pull Up',
+                    metric_definitions: [{ id: 'm1', name: 'Reps', unit: 'reps', input_type: 'number' }],
+                    split_definitions: [],
+                    has_sets: false,
+                    has_splits: false
+                }}
+            />,
+            {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            }
+        );
+
+        fireEvent.focus(screen.getByDisplayValue('5.00'));
+
+        expect(onFocus).toHaveBeenCalledTimes(selections);
+        if (selections) expect(onFocus).toHaveBeenCalledWith(exercise, null);
+    });
+
 it('shows the session index and runs activity option actions', () => {
         const onDuplicate = vi.fn();
         const onClearValues = vi.fn();

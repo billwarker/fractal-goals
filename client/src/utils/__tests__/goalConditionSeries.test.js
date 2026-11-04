@@ -103,6 +103,15 @@ describe('buildConditionSeries', () => {
         expect(anySession.series[0].data).toEqual([1, 2]);
     });
 
+    it('leaves a gap for a session with no values, but keeps an entered zero', () => {
+        const row = (id, sets) => ({ id, session_date: `2026-03-0${id}T00:00:00Z`, sets });
+        const instances = [row('1', [set({ reps: 5 })]), row('2', []), row('3', [set({ reps: 0 })])];
+        const condition = { measure: 'metric', metric_definition_id: 'reps', operator: '>=', target_value: 10 };
+
+        expect(buildConditionSeries({ ...condition, kind: 'single_session' }, instances).series[0].data).toEqual([5, null, 0]);
+        expect(buildConditionSeries({ ...condition, kind: 'cumulative' }, instances).series[0].data).toEqual([5, 5, 5]);
+    });
+
     it('charts the running total for cumulative conditions and the per-session value otherwise', () => {
         const cumulative = buildConditionSeries(
             { kind: 'cumulative', measure: 'metric', metric_definition_id: 'reps', operator: '>=', target_value: '20' },
