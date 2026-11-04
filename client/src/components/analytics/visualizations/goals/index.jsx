@@ -1,11 +1,9 @@
 import React from 'react';
 import lazyChart from '../../lazyChart';
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
-import { ROW_BAR_MARKS } from '../shared/barMarks';
 import { timeDistributionRollupRank } from './timeDistributionState';
 import styles from '../../ProfileWindow.module.css';
 
@@ -15,114 +13,6 @@ const GoalMomentumChart = lazyChart(() => import('../../AnalyticsExtraCharts').t
 const StaleGoalsChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.StaleGoalsChart })));
 const GoalTimeDistribution = lazyChart(() => import('../../GoalTimeDistribution'));
 const GoalCompletionTimeline = lazyChart(() => import('../../GoalCompletionTimeline'));
-
-function getActivityChartData(goal, color) {
-    if (!goal?.activity_breakdown?.length) {
-        return { labels: [], datasets: [] };
-    }
-    const sortedActivities = [...goal.activity_breakdown].sort((a, b) => b.instance_count - a.instance_count);
-    return {
-        labels: sortedActivities.map((activity) => activity.activity_name),
-        datasets: [{
-            label: 'Instances',
-            data: sortedActivities.map((activity) => activity.instance_count),
-            backgroundColor: color,
-            ...ROW_BAR_MARKS,
-        }],
-    };
-}
-
-function getDurationChartData(goal, color) {
-    if (!goal?.session_durations_by_date?.length) {
-        return { labels: [], datasets: [] };
-    }
-    return {
-        labels: goal.session_durations_by_date.map((session) => new Date(session.date)),
-        datasets: [{
-            label: 'Duration (minutes)',
-            data: goal.session_durations_by_date.map((session) => Math.round(session.duration_seconds / 60)),
-            borderColor: color,
-            backgroundColor: `${color}1a`,
-            borderWidth: 2,
-            fill: true,
-            tension: 0.3,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-        }],
-    };
-}
-
-const activityChartOptions = {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    ...DISABLED_CHART_ANIMATION,
-    plugins: {
-        legend: { display: false },
-        tooltip: {
-            backgroundColor: 'rgba(30, 30, 30, 0.95)',
-            titleColor: '#fff',
-            bodyColor: '#ccc',
-            padding: 12,
-            callbacks: {
-                label: (ctx) => `${ctx.raw} instance${ctx.raw !== 1 ? 's' : ''}`,
-            },
-        },
-    },
-    scales: {
-        x: {
-            beginAtZero: true,
-            ticks: { color: '#888', stepSize: 1 },
-            grid: { color: '#333' },
-        },
-        y: {
-            ticks: { color: '#ccc', font: { size: 11 } },
-            grid: { display: false },
-        },
-    },
-};
-
-const durationChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    ...DISABLED_CHART_ANIMATION,
-    plugins: {
-        legend: { display: false },
-        tooltip: {
-            backgroundColor: 'rgba(30, 30, 30, 0.95)',
-            titleColor: '#fff',
-            bodyColor: '#ccc',
-            padding: 12,
-            callbacks: {
-                title: (ctx) => {
-                    const date = new Date(ctx[0].label);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                },
-                label: (ctx) => {
-                    const minutes = ctx.raw;
-                    if (minutes >= 60) {
-                        return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-                    }
-                    return `${minutes}m`;
-                },
-            },
-        },
-    },
-    scales: {
-        x: {
-            type: 'time',
-            time: { unit: 'day', displayFormats: { day: 'MMM d' } },
-            ticks: { color: '#888' },
-            grid: { color: '#333' },
-        },
-        y: {
-            beginAtZero: true,
-            title: { display: true, text: 'Duration (min)', color: '#888' },
-            ticks: { color: '#888' },
-            grid: { color: '#333' },
-        },
-    },
-};
 
 function GoalSummaryChart({ context }) {
     const { scopedData, data } = context;
@@ -183,74 +73,6 @@ function StaleGoalsVisualizationChart({ context }) {
         <div className={styles.vizContainer}>
             <StaleGoalsChart goals={context.scopedData.goals} rootId={context.data?.rootId} getGoalColor={context.getGoalTypeColor} />
         </div>
-    );
-}
-
-function GoalDetailChart({ context }) {
-    const density = useChartDensity();
-    const chartTheme = useChartThemeDefaults();
-    const { effectiveSelectedGoal, getGoalTypeColor } = context;
-    const selectedChart = context.visualizationState.chart || 'duration';
-    if (!effectiveSelectedGoal) {
-        return <div className={styles.emptyState}>Select a goal above to view details</div>;
-    }
-    return (
-        <div className={styles.vizContainer}>
-            <div className={styles.goalHeader}>
-                <Heading level={3} className={styles.goalTitle}>{effectiveSelectedGoal.name}</Heading>
-                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(effectiveSelectedGoal.type) }}>
-                    {effectiveSelectedGoal.type.replace('Goal', '')}
-                </span>
-            </div>
-            <div className={styles.statsGrid}>
-                <StatCard value={context.data.formatDuration(effectiveSelectedGoal.total_duration_seconds || 0)} label="Total Time" subLabel="Selected range" color="#2196f3" />
-                <StatCard value={effectiveSelectedGoal.session_count || 0} label="Sessions" subLabel="Selected range" color="#4caf50" />
-                <StatCard value={`${effectiveSelectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
-            </div>
-            <div className={styles.chartContainer}>
-                {selectedChart === 'duration' ? (
-                    effectiveSelectedGoal.session_durations_by_date?.length > 0
-                        ? <Line data={getDurationChartData(effectiveSelectedGoal, chartTheme.seriesColors[0])} options={applyChartDensity(durationChartOptions, density)} />
-                        : <div className={styles.noData}>No session data available</div>
-                ) : (
-                    effectiveSelectedGoal.activity_breakdown?.length > 0
-                        ? <Bar data={getActivityChartData(effectiveSelectedGoal, chartTheme.seriesColors[0])} options={applyChartDensity(activityChartOptions, density)} />
-                        : <div className={styles.noData}>No activities recorded</div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-export function GoalDetailControls({ context }) {
-    return (
-        <>
-            <button
-                type="button"
-                className="sessions-query-picker-button"
-                onClick={context.onOpenGoalModal}
-                disabled={context.profileGoals.length === 0}
-            >
-                {context.selectedGoalDef ? context.selectedGoalDef.name : 'Choose Goal'}
-            </button>
-            {context.selectedGoalDef && (
-                <div className="sessions-query-chip-group" style={{ marginTop: 10 }}>
-                    {[
-                        { value: 'duration', label: 'Duration' },
-                        { value: 'activity', label: 'Activities' },
-                    ].map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            className={`sessions-query-chip ${(context.visualizationState.chart || 'duration') === option.value ? 'active' : ''}`}
-                            onClick={() => context.updateVisualizationState({ chart: option.value })}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-        </>
     );
 }
 
@@ -364,15 +186,5 @@ export const GOAL_VISUALIZATIONS = [
         selectionRequirements: {},
         Chart: StaleGoalsVisualizationChart,
         Controls: EmptyControls,
-    },
-    {
-        id: 'goalDetail',
-        category: 'goals',
-        name: 'Goal Detail View',
-        iconType: 'goals:goalDetail',
-        defaultState: { chart: 'duration' },
-        selectionRequirements: { goal: true },
-        Chart: GoalDetailChart,
-        Controls: GoalDetailControls,
     },
 ];

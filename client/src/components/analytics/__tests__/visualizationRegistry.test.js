@@ -37,7 +37,6 @@ describe('analytics visualization registry', () => {
         });
 
         expect(getVisualization('activities', 'activityFrequency')?.name).toBe('Activity Totals');
-        expect(getVisualization('goals', 'goalDetail')?.selectionRequirements.goal).toBe(true);
     });
 
     it('keeps registry defaults as the source of truth for state defaults', () => {

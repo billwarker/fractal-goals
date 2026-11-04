@@ -10,8 +10,8 @@ function wrapper({ children }) {
     return <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>{children}</QueryClientProvider>;
 }
 const base = {
-    rootId: 'root', selectedCategory: 'goals', selectedVisualization: 'goalDetail',
-    selectedGoal: { id: 'goal' }, resolvedGlobalFilters: { hasGoalFilter: false, hasActivityFilter: false },
+    rootId: 'root', selectedCategory: 'goals', selectedVisualization: 'timeDistribution',
+    resolvedGlobalFilters: { hasGoalFilter: false, hasActivityFilter: false },
     goalAnalytics: { metadata: { aggregated: true } }, effectiveDateRange: null, hasActiveDateRange: false,
 };
 
@@ -21,7 +21,7 @@ it('fetches bounded evidence for the selected goal chart', async () => {
     getGoalAnalytics.mockResolvedValue({ data: { goals: [{ id: 'goal', total_duration_seconds: 900 }] } });
     const { result } = renderHook(() => useGoalAnalyticsRead(base), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(getGoalAnalytics).toHaveBeenCalledWith('root', expect.objectContaining({ charts: 'true', chart_goal_id: 'goal' }));
+    expect(getGoalAnalytics).toHaveBeenCalledWith('root', expect.objectContaining({ charts: 'true', rollup: 'true' }));
     expect(result.current.data.goals[0].total_duration_seconds).toBe(900);
 });
 

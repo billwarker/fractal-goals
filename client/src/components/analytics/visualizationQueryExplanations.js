@@ -43,12 +43,6 @@ function selectedActivityClauses(context, alias = 'ai') {
         : globalActivityWhereClauses(context.globalFilters, alias);
 }
 
-function selectedGoalClauses(context, alias = 'g') {
-    return context.effectiveSelectedGoal?.id
-        ? [`${alias}.id = ${quoteSql(context.effectiveSelectedGoal.id)}`]
-        : globalGoalWhereClauses(context.globalFilters, alias);
-}
-
 function completedActivityPredicate(alias = 'ai') {
     return `(${alias}.completed = true OR ${alias}.time_stop IS NOT NULL OR COALESCE(${alias}.duration_seconds, 0) > 0)`;
 }
@@ -425,39 +419,6 @@ function staleGoals(context) {
     };
 }
 
-function goalDetail(context) {
-    const chart = context.visualizationState?.chart || 'duration';
-    const clauses = selectedGoalClauses(context, 'g');
-    if (chart === 'activity') {
-        const activityClauses = [
-            ...clauses,
-            ...dateWhereClauses(context.dateRange, 'COALESCE(ai.time_stop, ai.time_start, ai.created_at)'),
-        ];
-        return {
-            sql: `SELECT\n  ad.name AS activity_name,\n  COUNT(ai.id) AS instances,\n  ROUND(SUM(COALESCE(ai.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN activity_goal_associations aga ON aga.goal_id = g.id\nJOIN activity_instances ai ON ai.activity_definition_id = aga.activity_id\nJOIN activity_definitions ad ON ad.id = ai.activity_definition_id${buildWhere(activityClauses)}\nGROUP BY ad.name\nORDER BY instances DESC, activity_name ASC\nLIMIT 5000`,
-            metadata: baseMetadata({
-                dataset: 'goals + activity_goal_associations + activity_instances + activity_definitions',
-                chartFields: ['activity_name', 'instances', 'minutes'],
-                aggregation: 'selected goal activity breakdown',
-                notes: ['Uses direct activity-goal associations from the governed catalog.'],
-            }),
-        };
-    }
-    const durationClauses = [
-        ...clauses,
-        ...dateWhereClauses(context.dateRange, 'COALESCE(s.session_start, s.created_at)'),
-    ];
-    return {
-        sql: `SELECT\n  COALESCE(s.session_start, s.created_at)::date AS session_day,\n  ROUND(SUM(COALESCE(s.duration_seconds, 0)) / 60.0)::integer AS minutes\nFROM goals g\nJOIN session_goals sg ON sg.goal_id = g.id\nJOIN sessions s ON s.id = sg.session_id${buildWhere(durationClauses)}\nGROUP BY session_day\nORDER BY session_day ASC\nLIMIT 5000`,
-        metadata: baseMetadata({
-            dataset: 'goals + session_goals + sessions',
-            chartFields: ['session_day', 'minutes'],
-            aggregation: 'selected goal duration by day',
-            notes: ['Uses direct session-goal associations from the governed catalog.'],
-        }),
-    };
-}
-
 const BUILDERS = {
     'activities:activityFrequency': activityTotals,
     'activities:activityTrends': activityTrends,
@@ -474,7 +435,6 @@ const BUILDERS = {
     'goals:completionRateByLevel': completionRateByLevel,
     'goals:completionTimeline': completionTimeline,
     'goals:goalAging': goalAging,
-    'goals:goalDetail': goalDetail,
     'goals:goalMomentum': goalMomentum,
     'goals:staleGoals': staleGoals,
     'goals:stats': goalSummary,

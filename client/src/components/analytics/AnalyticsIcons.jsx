@@ -98,13 +98,6 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <path d="M17.5 4.5 19.5 2.5M19.5 6.5l2-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
                 </svg>
             );
-        case 'goals:goalDetail':
-            return (
-                <svg {...common}>
-                    <path d="M12 3.8 19.1 8v8L12 20.2 4.9 16V8L12 3.8Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-                    <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-            );
         case 'sessions:stats':
             return (
                 <svg {...common}>

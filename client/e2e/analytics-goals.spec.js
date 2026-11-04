@@ -276,3 +276,28 @@ test('a goal from an unsaved chart gets that chart, saved under its name and sho
     const views = (await (await page.request.get(`/api/roots/${root}/dashboards`, { headers })).json()).data;
     expect(views.find((view) => view.name === goalName)).toMatchObject({ kind: 'view' });
 });
+
+test('a saved view of the removed Goal Detail View goes back to choosing a chart', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const name = `Old goal detail ${suffix}`;
+    const created = await page.request.post(`/api/roots/${root}/dashboards`, { headers, data: {
+        name, kind: 'view', layout: {
+            type: 'analytics_view', version: 1, global_filters: {},
+            profile: { selectedCategory: 'goals', selectedVisualization: 'goalDetail' },
+        },
+    } });
+    expect(created.ok()).toBeTruthy();
+
+    await page.goto(`/${root}/analytics`);
+    await page.getByRole('button', { name: 'Saved Analytics' }).click();
+    await page.getByRole('button', { name: `Open ${name}` }).click();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Summary Stats/ }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Goal Detail View/ })).toHaveCount(0);
+    await expect(page.getByText('Something went wrong')).toHaveCount(0);
+    expect(errors).toEqual([]);
+});

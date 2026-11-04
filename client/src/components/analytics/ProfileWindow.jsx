@@ -215,30 +215,6 @@ function ProfileWindow({
     };
 
     const renderVisualizationIcon = (visualization, size = 16) => {
-        if (visualization?.id === 'goalDetail') {
-            return (
-                <span
-                    className={styles.goalDetailIconWrap}
-                    style={{ width: size, height: size }}
-                    aria-hidden="true"
-                >
-                    <AnalyticsGoalIcon
-                        goal={rootGoal}
-                        getGoalColor={getGoalColor}
-                        getGoalSecondaryColor={getGoalSecondaryColor}
-                        getGoalIcon={getGoalIcon}
-                        size={Math.max(10, Math.round(size * 0.82))}
-                        className={styles.goalDetailIconShape}
-                    />
-                    <span className={styles.goalDetailIconPlus}>
-                        <svg width={Math.max(8, Math.round(size * 0.46))} height={Math.max(8, Math.round(size * 0.46))} viewBox="0 0 12 12" fill="none">
-                            <path d="M6 2.4v7.2M2.4 6h7.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                        </svg>
-                    </span>
-                </span>
-            );
-        }
-
         return <VisualizationIcon type={visualization?.iconType} size={size} />;
     };
 

@@ -120,19 +120,6 @@
     flex: 0 0 auto;
 }
 
-.goalDetailIconWrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    color: currentColor;
-}
-
-.goalDetailIconShape {
-    display: block;
-}
-
 .goalDetailIconPlus {
     position: absolute;
     right: -12%;
@@ -534,39 +521,10 @@
     flex-wrap: wrap;
 }
 
-/* Goal Detail Header */
-.goalHeader {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.goalTitle {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: 16px;
-}
-
-.goalBadge {
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    color: white;
-    /* Badge text typically white on colored bg */
-}
-
 .chartContainer {
     flex: 1;
     position: relative;
     min-height: 200px;
-}
-
-.noData {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
 }
 
 /* StatCard */

@@ -66,7 +66,7 @@ export default function useVisualizationContext({ data, windowState, globalDateR
         focusGoalId: visualizationState.focusGoalId || null,
         durationMode: visualizationState.durationMode || 'activity',
     }), [visualizationState]);
-    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
+    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization,
         resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange,
         grain: visualizationState.grain || 'auto', rollup });
     const scopedGoalAnalytics = scopedGoalQuery.data || goalAnalytics;

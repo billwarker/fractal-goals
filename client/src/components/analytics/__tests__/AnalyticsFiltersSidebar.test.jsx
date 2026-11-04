@@ -189,32 +189,6 @@ describe('AnalyticsFiltersSidebar visualization controls', () => {
         expect(screen.getByText('Choices follow this chart’s scope.')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Hold Time' })).toBeInTheDocument();
     });
-
-    it('pre-populates single-goal panel controls from a single global goal scope', () => {
-        render(
-            <AnalyticsFiltersSidebar
-                filters={{
-                    goals: { goalIds: ['goal-1'], includeDescendants: false, includeInheritedActivities: true },
-                }}
-                dateRange={{ start: null, end: null }}
-                goals={[
-                    { id: 'goal-1', name: 'Front Lever', parent_id: null },
-                    { id: 'goal-2', name: 'Planche', parent_id: null },
-                ]}
-                selectedWindowState={{
-                    selectedCategory: 'goals',
-                    selectedVisualization: 'goalDetail',
-                    selectedGoal: null,
-                    visualizationState: { chart: 'duration' },
-                    visualizationStateByKey: {},
-                }}
-                onUpdateSelectedWindowState={vi.fn()}
-            />
-        );
-
-        expect(screen.getByRole('button', { name: 'Front Lever' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Duration' })).toBeInTheDocument();
-    });
 });
 
 
