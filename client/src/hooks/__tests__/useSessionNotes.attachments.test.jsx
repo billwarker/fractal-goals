@@ -30,6 +30,22 @@ beforeEach(() => {
     mocks.outbox.current = null;
 });
 
+describe('useSessionNotes outbox delete', () => {
+    it('queues the delete by note id when given the note NoteCard hands over', async () => {
+        const submit = vi.fn().mockResolvedValue(undefined);
+        mocks.outbox.current = { submit };
+        const { result } = setup();
+        await act(() => result.current.deleteNote({ id: 'note-1', content: 'Run' }));
+        expect(submit.mock.calls[0][0]).toMatchObject({
+            method: 'delete',
+            url: '/root/notes/note-1',
+            entityIds: ['note-1'],
+            supersedes: ['note-1'],
+            meta: { noteId: 'note-1' },
+        });
+    });
+});
+
 describe('useSessionNotes attachments', () => {
     it('queues ids for the server while the optimistic note keeps full attachment metadata', async () => {
         const submit = vi.fn().mockResolvedValue(undefined);
