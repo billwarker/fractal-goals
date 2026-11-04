@@ -6,6 +6,7 @@ import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
 import useGroupLookups from '../shared/useGroupLookups';
 import StatCard from '../shared/StatCard';
+import ChartNumberField from '../shared/ChartNumberField';
 import { SESSION_TREND_GROUPS, SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
 import styles from '../../ProfileWindow.module.css';
 
@@ -112,30 +113,15 @@ export function SessionTimeDistributionControls({ context }) {
 }
 
 export function DurationHistogramControls({ context }) {
-    const bucketCount = context.visualizationState.bucketCount || 5;
-    const handleBucketChange = (event) => {
-        const rawValue = event.target.value;
-        if (rawValue === '') {
-            context.updateVisualizationState({ bucketCount: '' });
-            return;
-        }
-
-        const nextValue = Math.max(1, Math.min(30, Number(rawValue) || 5));
-        context.updateVisualizationState({ bucketCount: nextValue });
-    };
-
     return (
-        <label className="sessions-query-field">
-            <span>Buckets</span>
-            <input
-                type="number"
-                min="1"
-                max="30"
-                step="1"
-                value={bucketCount}
-                onChange={handleBucketChange}
-            />
-        </label>
+        <ChartNumberField
+            label="Buckets"
+            value={context.visualizationState.bucketCount || 5}
+            defaultValue={5}
+            min={1}
+            max={30}
+            onChange={(bucketCount) => context.updateVisualizationState({ bucketCount })}
+        />
     );
 }
 

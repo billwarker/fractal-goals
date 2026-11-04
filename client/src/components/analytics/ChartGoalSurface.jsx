@@ -18,6 +18,7 @@ import { GOAL_CHART_IDS, readChartGoalTarget } from './chartGoalTargets';
 import styles from './ChartGoalSurface.module.css';
 
 const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
+const GoalParentPicker = lazyWithRetry(() => import('./annotate/GoalParentPicker'), 'components/analytics/annotate/GoalParentPicker');
 
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP = 10;
@@ -41,7 +42,8 @@ function swallowNextClick() {
  *
  * Annotate mode (the panel's "Set goal" toggle, or "A" while the chart is focused): a crosshair follows the pointer,
  * snapped to what the metric can hold, with the values on each axis and the goal the point would
- * set; a click pins it (on touch, the point where the finger lifts), and the pin offers "Create goal…" (the goal modal, seeded) or updating a
+ * set; a click pins it (on touch, the point where the finger lifts), and the pin offers "Create goal…" (pick the goal
+ * it goes under, then the goal modal, seeded) or updating a
  * goal that already has a threshold on this activity, after a live preview. Right-click (or
  * long-press on touch) stays as the quick "Set goal here…". Existing goals on the activity are
  * passed to the chart, which marks them at their thresholds; clicking one opens it here.
@@ -157,6 +159,8 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         clearTimeout(pressRef.current?.timer);
         pressRef.current = null;
     };
+    // Modals rendered here portal away, but their events still bubble through this surface.
+    const onChart = (event) => event.currentTarget.contains(event.target) && !event.target.closest?.('[data-chart-goal-menu]');
     /** The crosshair's reading of the chart under this event. */
     const pointAt = (event) => {
         const target = read(event.nativeEvent);
@@ -184,18 +188,17 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
     };
     const annotateHandlers = {
         onPointerMove: (event) => {
-            if (!pin) setHover(pointAt(event));
+            if (!pin && event.currentTarget.contains(event.target)) setHover(pointAt(event));
         },
         onPointerLeave: () => {
             if (!pin) setHover(null);
         },
         onClick: (event) => {
-            if (pin || event.target.closest?.('[data-chart-goal-menu]')) return;
-            pinPoint(pointAt(event));
+            if (!pin && onChart(event)) pinPoint(pointAt(event));
         },
         // A touch has no hover before it lands, and lifting ends its pointer: it pins here, not on the click.
         onTouchPress: (event) => {
-            if (pin || event.target.closest?.('[data-chart-goal-menu]')) return;
+            if (pin || !onChart(event)) return;
             annotatePressRef.current = true;
             setHover(pointAt(event));
         },
@@ -211,7 +214,7 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             if (openAt(event.nativeEvent)) event.preventDefault();
         },
         onPointerDown: (event) => {
-            if (event.pointerType !== 'touch') return;
+            if (event.pointerType !== 'touch' || !event.currentTarget.contains(event.target)) return;
             if (annotating) {
                 annotateHandlers.onTouchPress(event);
                 return;
@@ -249,7 +252,7 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         ...(annotating ? { onPointerLeave: annotateHandlers.onPointerLeave, onClick: annotateHandlers.onClick } : {}),
     } : {};
 
-    const parentGoal = context.effectiveSelectedGoal || tree || null;
+    const parentGoal = draftGoal?.parentId && tree ? findGoalNodeById(tree, draftGoal.parentId) : null;
     const createGoal = async (payload) => {
         try {
             const response = await fractalApi.createGoal(rootId, payload);
@@ -361,6 +364,17 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
                         onUpdate={updateOpenGoal}
                         onToggleCompletion={toggleOpenGoal}
                         onClose={() => setOpenGoalId(null)}
+                    />
+                </Suspense>
+            ) : null}
+            {draftGoal && tree && !draftGoal.parentId ? (
+                <Suspense fallback={null}>
+                    <GoalParentPicker
+                        tree={tree}
+                        activity={draftGoal.activity || context.effectiveSelectedActivity}
+                        initialGoalId={context.effectiveSelectedGoal?.id}
+                        onPick={(parentId) => setDraftGoal((current) => ({ ...current, parentId }))}
+                        onCancel={() => setDraftGoal(null)}
                     />
                 </Suspense>
             ) : null}

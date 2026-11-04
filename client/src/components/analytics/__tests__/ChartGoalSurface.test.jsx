@@ -2,6 +2,8 @@ import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import ChartGoalSurface from '../ChartGoalSurface';
+// Loaded up front: its lazy first load can outlast a findBy wait in a busy parallel run.
+import '../annotate/GoalParentPicker';
 
 const { readTarget, queryData, setGoalCondition } = vi.hoisted(() => ({
     readTarget: vi.fn(), queryData: { lines: [] }, setGoalCondition: vi.fn(() => Promise.resolve({ data: {} })),
@@ -10,10 +12,20 @@ vi.mock('../chartGoalTargets', () => ({
     GOAL_CHART_IDS: new Set(['metricTrends']),
     readChartGoalTarget: readTarget,
 }));
-vi.mock('../../../hooks/useGoalQueries', () => ({ useFractalTree: () => ({ data: { id: 'root', name: 'Root' } }) }));
+vi.mock('../../../contexts/GoalLevelsContext', () => ({
+    useGoalLevels: () => ({
+        getGoalColor: () => '#2255DD', getGoalSecondaryColor: () => '#111111', getGoalIcon: () => 'circle',
+        getScopedCharacteristics: () => ({ icon: 'circle' }), getLevelCharacteristics: () => ({}),
+    }),
+}));
+vi.mock('../../../hooks/useGoalQueries', () => ({ useFractalTree: () => ({ data: { id: 'root', name: 'Root', type: 'UltimateGoal', children: [
+    { id: 'child', name: 'Child goal', type: 'LongTermGoal', attributes: { associated_activity_ids: ['bench'] }, children: [
+        { id: 'grandchild', name: 'Inheriting goal', type: 'MidTermGoal', attributes: { inherit_parent_activities: true }, children: [] },
+    ] },
+] } }) }));
 vi.mock('../../ConnectedGoalDetailModal', () => ({
-    default: ({ initialCompletion }) => (
-        <div role="dialog" aria-label="New goal">{initialCompletion.conditionDraft.kind} {initialCompletion.deadline}</div>
+    default: ({ initialCompletion, parentGoal }) => (
+        <div role="dialog" aria-label="New goal">{initialCompletion.conditionDraft.kind} {initialCompletion.deadline} under {parentGoal.name}</div>
     ),
 }));
 vi.mock('@tanstack/react-query', () => ({
@@ -34,6 +46,11 @@ const chartWithCanvas = () => ({
     current: { canvas: { getBoundingClientRect: () => ({ left: 0, top: 0 }) }, chartArea: { left: 0, right: 400, top: 0, bottom: 200 }, update: vi.fn() },
 });
 
+const pickParent = async () => {
+    await screen.findByRole('heading', { name: 'Which goal should this go under?' });
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+};
+
 describe('ChartGoalSurface', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -49,6 +66,7 @@ describe('ChartGoalSurface', () => {
         expect(item).toHaveTextContent('Weight ≥ 225 lb within one session');
         fireEvent.click(item);
 
+        await pickParent();
         expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('single_session');
     });
 
@@ -108,7 +126,61 @@ describe('ChartGoalSurface', () => {
         expect(popover).toHaveTextContent('15 more Bench sessions');
         expect(popover).toHaveTextContent('The template filter isn’t part of the goal condition.');
         fireEvent.click(screen.getByRole('button', { name: 'Create goal…' }));
-        expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('consistency 2026-11-15');
+        await pickParent();
+        expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('consistency 2026-11-15 under Root');
+    });
+
+    it('asks which goal a new goal goes under first, and a cancel there drops it', async () => {
+        render(<ChartGoalSurface Chart={Chart} context={context()} rootId="r" />);
+        fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
+        fireEvent.click(screen.getByRole('menuitem', { name: /Set goal here/ }));
+
+        const cancel = async () => {
+            await screen.findByRole('heading', { name: 'Which goal should this go under?' });
+            expect(screen.queryByRole('dialog', { name: 'New goal' })).not.toBeInTheDocument();
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        };
+        await cancel();
+        expect(screen.queryByRole('heading', { name: 'Which goal should this go under?' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('dialog', { name: 'New goal' })).not.toBeInTheDocument();
+
+        fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
+        fireEvent.click(screen.getByRole('menuitem', { name: /Set goal here/ }));
+        await screen.findByRole('heading', { name: 'Which goal should this go under?' });
+        fireEvent.click(screen.getByLabelText('Select Child goal'));
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('under Child goal');
+    });
+
+    it('starts on the goals associated with the activity, with a checkbox for the rest', async () => {
+        readTarget.mockReturnValue({ ...target, activity: { id: 'bench', name: 'Bench' } });
+        render(<ChartGoalSurface Chart={Chart} context={context()} rootId="r" />);
+        fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
+        fireEvent.click(screen.getByRole('menuitem', { name: /Set goal here/ }));
+
+        const only = await screen.findByLabelText('Only goals associated with Bench');
+        expect(only).toBeChecked();
+        expect(screen.getByText('Child goal')).toBeInTheDocument();
+        expect(screen.getByText('Inheriting goal')).toBeInTheDocument();
+        expect(screen.queryByText('Root')).not.toBeInTheDocument();
+
+        fireEvent.click(only);
+        expect(screen.getByText('Root')).toBeInTheDocument();
+        fireEvent.click(only);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        expect(await screen.findByRole('dialog', { name: 'New goal' })).toHaveTextContent('under Child goal');
+    });
+
+    it('shows every goal, with no checkbox, when none is associated with the activity', async () => {
+        readTarget.mockReturnValue({ ...target, activity: { id: 'squat', name: 'Squat' } });
+        render(<ChartGoalSurface Chart={Chart} context={context()} rootId="r" />);
+        fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
+        fireEvent.click(screen.getByRole('menuitem', { name: /Set goal here/ }));
+
+        await screen.findByRole('heading', { name: 'Which goal should this go under?' });
+        expect(screen.queryByLabelText(/Only goals associated/)).not.toBeInTheDocument();
+        expect(screen.getByText('Root')).toBeInTheDocument();
     });
 
     it('updates a goal already on this activity after previewing its progress', async () => {

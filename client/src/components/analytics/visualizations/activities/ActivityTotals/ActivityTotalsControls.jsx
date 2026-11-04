@@ -1,5 +1,7 @@
 import React from 'react';
 
+import ChartNumberField from '../../shared/ChartNumberField';
+
 const METRIC_OPTIONS = [
     { value: 'instances', label: 'Instances' },
     { value: 'duration', label: 'Duration' },
@@ -36,20 +38,15 @@ export default function ActivityTotalsControls({
                 />
                 <span>Show activity groups in hover</span>
             </label>
-            <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                <span>Activity Limit</span>
-                <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    step="1"
-                    value={selectedLimit}
-                    onChange={(event) => {
-                        const nextLimit = Math.min(50, Math.max(1, Number(event.target.value) || 15));
-                        updateState({ limit: nextLimit });
-                    }}
-                />
-            </label>
+            <ChartNumberField
+                label="Activity Limit"
+                style={{ marginTop: 12 }}
+                value={selectedLimit}
+                defaultValue={15}
+                min={1}
+                max={50}
+                onChange={(limit) => updateState({ limit })}
+            />
         </>
     );
 }

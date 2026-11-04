@@ -29,6 +29,7 @@ function GoalHierarchySelectionModal({
     initialHideCompletedGoals = false,
     scopeGoalIds = [],
     scopeLabel = '',
+    scopeControlLabel = '',
     initialScopeEnabled = false,
 }) {
     const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
@@ -83,6 +84,7 @@ function GoalHierarchySelectionModal({
                     initialHideCompletedGoals={initialHideCompletedGoals}
                     scopeGoalIds={scopeGoalIds}
                     scopeLabel={scopeLabel}
+                    scopeControlLabel={scopeControlLabel}
                     initialScopeEnabled={initialScopeEnabled}
                 />
                 {confirmError && <div role="alert" className={styles.error}>{confirmError}</div>}

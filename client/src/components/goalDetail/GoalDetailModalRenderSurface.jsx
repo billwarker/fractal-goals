@@ -707,9 +707,11 @@ function GoalDetailModalRenderSurface({
         );
     }
 
+    // Choosing a level is a short question: a dialog, not the full-screen form that follows on a phone.
+    const pickingLevel = needsLevelPicker && selectedChildType === null;
     const modalMarkup = (
         <ModalBackdrop
-            className={`${styles.modalOverlay} ${overlayClassName}`}
+            className={`${styles.modalOverlay} ${pickingLevel ? styles.levelPickerOverlay : ''} ${overlayClassName}`}
             onClose={handleClose}
         >
             <div
@@ -717,7 +719,7 @@ function GoalDetailModalRenderSurface({
                 aria-modal="true"
                 aria-label={mode === 'create' ? 'New goal' : (goal?.attributes?.name || goal?.name || name || 'Goal details')}
                 onClick={(e) => e.stopPropagation()}
-                className={`${styles.modalContent} ${readOnly ? styles.readOnlySurface : ''}`}
+                className={`${styles.modalContent} ${pickingLevel ? styles.levelPickerContent : ''} ${readOnly ? styles.readOnlySurface : ''}`}
                 style={{ '--goal-detail-accent': displayGoalColor }}
             >
                 <div className={styles.modalScrollArea} ref={contentScrollRef}>

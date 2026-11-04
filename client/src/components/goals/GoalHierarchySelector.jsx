@@ -36,6 +36,7 @@ function GoalHierarchySelector({
     showHideCompletedControl = true,
     scopeGoalIds = [],
     scopeLabel = '',
+    scopeControlLabel = '',
     initialScopeEnabled = false,
 }) {
     const {
@@ -344,10 +345,10 @@ function GoalHierarchySelector({
                                 type="checkbox"
                                 checked={scopeEnabled}
                                 onChange={(event) => setScopeEnabled(event.target.checked)}
-                                aria-label={`Scope to ${scopeLabel}`}
+                                aria-label={scopeControlLabel || `Scope to ${scopeLabel}`}
                             />
                             <span aria-hidden="true">{scopeEnabled ? '✓' : ''}</span>
-                            <span>Scope to {scopeLabel}</span>
+                            <span>{scopeControlLabel || `Scope to ${scopeLabel}`}</span>
                         </label>
                     )}
                     {showHideCompletedControl && (

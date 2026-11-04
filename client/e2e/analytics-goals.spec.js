@@ -38,8 +38,11 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
     await item.click();
 
     const dialog = page.getByRole('dialog');
-    await expect(dialog).toBeVisible();
-    const levelChoice = dialog.getByRole('button', { name: /Long Term Goal/ });
+    await expect(dialog.getByRole('heading', { name: 'Which goal should this go under?' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    // Guitar practice is associated with a goal, which starts selected; a level step appears if it has a choice.
+    const levelChoice = dialog.getByRole('button', { name: /(Term|Immediate) Goal$/ });
+    await expect(levelChoice.or(dialog.locator('#goal-name')).first()).toBeVisible();
     if (await levelChoice.count()) await levelChoice.first().click();
     await dialog.locator('#goal-name').fill(`Practise more ${suffix}`);
     const createdResponse = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
@@ -89,6 +92,8 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
             await call(`${root}/activity-instances/${instances[0].id}/complete`, {});
             await call(`${root}/sessions/${session.id}`, { completed: true }, 'PUT');
         }
+        const leverGoal = await call(`${root}/goals`, { name: 'Lever goal', type: 'LongTermGoal', parent_id: root });
+        await call(`${root}/activities/${activity.id}/goals`, { goal_ids: [leverGoal.id] });
         const viewName = 'Lever scatter';
         await call(`roots/${root}/dashboards`, { name: viewName, kind: 'view', layout: {
             type: 'analytics_view', version: 1, global_filters: {},
@@ -136,7 +141,22 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
     }
     await page.getByRole('button', { name: 'Create goal…' }).click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('button', { name: 'Short Term Goal' }).click();
+    // Only the goal on this activity at first; unchecking shows the others.
+    const onlyAssociated = dialog.getByLabel('Only goals associated with Front Lever');
+    await expect(onlyAssociated).toBeChecked();
+    await expect(dialog.getByText('Lever goal', { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/Axis Room/i)).toHaveCount(0);
+    await dialog.getByText('Only goals associated with Front Lever').click();
+    await expect(onlyAssociated).not.toBeChecked();
+    await expect(dialog.locator('[data-goal-id]')).not.toHaveCount(1);
+    await dialog.getByText('Only goals associated with Front Lever').click();
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await expect(dialog).toContainText('Lever goal');
+    const level = dialog.getByRole('button', { name: 'Short Term Goal' });
+    await expect(level).toBeVisible();
+    // A dialog on a phone too, not the full-screen form that follows.
+    expect((await dialog.boundingBox()).height).toBeLessThan(page.viewportSize().height * 0.75);
+    await level.click();
     const goalName = `Hold it better ${suffix}`;
     await dialog.locator('#goal-name').fill(goalName);
     const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
