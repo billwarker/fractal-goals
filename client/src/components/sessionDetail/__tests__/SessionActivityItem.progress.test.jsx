@@ -106,6 +106,13 @@ vi.mock('../../../contexts/GoalLevelsContext', async (importOriginal) => {
 });
 
 
+const renderItem = (element) => renderWithProviders(element, {
+    withTimezone: false,
+    withAuth: false,
+    withGoalLevels: false,
+    withTheme: false,
+});
+
 describe("SessionActivityItem quick mode — progress", () => {
 const quickModeDefinition = {
         id: 'activity-1',
@@ -155,18 +162,12 @@ it('shows previous metric references before the user enters a value', () => {
             },
         });
 
-        renderWithProviders(
+        renderItem(
             <SessionActivityItem
                 exercise={{ ...baseExercise, metrics: [] }}
                 isSelected={false}
                 activityDefinition={quickModeDefinition}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            />
         );
 
         expect(screen.getByText('(last 185)')).toBeInTheDocument();
@@ -192,7 +193,7 @@ it('hydrates dynamic progress for completed activities after refresh', () => {
             },
         });
 
-        renderWithProviders(
+        renderItem(
             <SessionActivityItem
                 exercise={{
                     ...baseExercise,
@@ -202,13 +203,7 @@ it('hydrates dynamic progress for completed activities after refresh', () => {
                 }}
                 isSelected={false}
                 activityDefinition={quickModeDefinition}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            />
         );
 
         expect(useProgressComparison).toHaveBeenCalledWith(
@@ -239,7 +234,7 @@ it('shows a last-aggregation progress hint only on the driving set row', () => {
             },
         });
 
-        renderWithProviders(
+        renderItem(
             <SessionActivityItem
                 exercise={{
                     id: 'set-instance-1',
@@ -282,13 +277,7 @@ it('shows a last-aggregation progress hint only on the driving set row', () => {
                     ],
                     split_definitions: [],
                 }}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            />
         );
 
         expect(screen.getAllByText('(▲15%)')).toHaveLength(1);
@@ -326,7 +315,7 @@ it('uses the lower-is-better best-set anchor when placing max hints across set r
             },
         });
 
-        renderWithProviders(
+        renderItem(
             <SessionActivityItem
                 exercise={{
                     id: 'set-instance-2',
@@ -377,13 +366,7 @@ it('uses the lower-is-better best-set anchor when placing max hints across set r
                     ],
                     split_definitions: [],
                 }}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            />
         );
 
         const setRows = screen.getAllByText(/^#\d+$/).map((label) => label.parentElement);
@@ -413,7 +396,7 @@ it('shows each in-progress set its change once saved, and the last value until t
             },
         });
 
-        renderWithProviders(
+        renderItem(
             <SessionActivityItem
                 exercise={{
                     id: 'set-instance-3',
@@ -438,13 +421,7 @@ it('shows each in-progress set its change once saved, and the last value until t
                     metric_definitions: [{ id: 'm1', name: 'Weight', unit: 'kg' }],
                     split_definitions: [],
                 }}
-            />,
-            {
-                withTimezone: false,
-                withAuth: false,
-                withGoalLevels: false,
-                withTheme: false,
-            }
+            />
         );
 
         const setRows = screen.getAllByText(/^#\d+$/).map((label) => label.parentElement);
