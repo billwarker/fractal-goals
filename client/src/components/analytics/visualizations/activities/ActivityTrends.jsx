@@ -71,14 +71,16 @@ function addDays(key, days) {
  * @param {{ grain: 'day' | 'week' | 'month', rows: Array<{ key: string, count: number, seconds: number }> }} result
  * @param {{ end?: string | null } | null} range
  * @param {string} [today]
+ * @param {number} [futureBuckets] more buckets past that, for room to set a goal further out
  */
-export function runningTotalRows(result, range, today = localDayKey(new Date())) {
+export function runningTotalRows(result, range, today = localDayKey(new Date()), futureBuckets = 0) {
     const todayKey = bucketStart(today, result.grain);
     const keys = result.rows.map((row) => row.key);
     const lastKey = [keys[keys.length - 1], todayKey].sort().pop();
     const extra = Math.max(4, Math.ceil(keys.length / 4));
     const futureEnd = range?.end && range.end > today ? bucketStart(range.end, result.grain) : null;
-    const tail = futureEnd || bucketStart(addDays(lastKey, extra * GRAIN_DAYS[result.grain]), result.grain);
+    const baseTail = futureEnd || bucketStart(addDays(lastKey, extra * GRAIN_DAYS[result.grain]), result.grain);
+    const tail = bucketStart(addDays(baseTail, futureBuckets * GRAIN_DAYS[result.grain]), result.grain);
     const byKey = new Map(result.rows.map((row) => [row.key, row]));
     let count = 0;
     let seconds = 0;
@@ -94,20 +96,20 @@ export function runningTotalRows(result, range, today = localDayKey(new Date()))
 
 /**
  * @param {{ activityInstances?: object, chartRef?: any, grain?: string, measure?: string, range?: any,
- *   runningTotal?: boolean, singleActivity?: any,
+ *   runningTotal?: boolean, singleActivity?: any, futureShare?: number,
  *   groupBy?: import('../../../../utils/analyticsGroupBy').GroupBy | null, overlap?: boolean,
  *   lookups?: { activitiesById: Map<string, any>, groupsById: Map<string, any>, sessionsById: Map<string, any> } }} props
  */
 export function ActivityTrendsChart({
     activityInstances = {}, chartRef, grain = 'auto', measure = 'instances', range = null, groupBy = null, overlap = false, lookups = null,
-    runningTotal = false, singleActivity = null,
+    runningTotal = false, singleActivity = null, futureShare = 0,
 }) {
     const result = useMemo(() => {
         const items = completedItems(activityInstances);
         if (runningTotal) {
             // A running total is one series, so a group-by doesn't apply.
             const base = bucketRows(items, { dayOf: itemDay, secondsOf: itemSeconds, grain, range });
-            const running = runningTotalRows(base, range);
+            const running = runningTotalRows(base, range, undefined, Math.ceil(base.rows.length * futureShare));
             return {
                 grain: base.grain,
                 rows: running.rows,
@@ -137,7 +139,7 @@ export function ActivityTrendsChart({
             }),
         });
         return { ...grouped, grouped: { groups: grouped.groups, values: grouped.values, title: GROUP_DIMENSION_LABELS[groupBy.dimension] } };
-    }, [activityInstances, grain, groupBy, lookups, measure, range, runningTotal, singleActivity]);
+    }, [activityInstances, futureShare, grain, groupBy, lookups, measure, range, runningTotal, singleActivity]);
     return (
         <BucketBarChart
             rows={result.rows}

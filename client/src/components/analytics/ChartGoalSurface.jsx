@@ -12,6 +12,8 @@ import notify from '../../utils/notify';
 import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import AnnotationCrosshair from './annotate/AnnotationCrosshair';
 import AnnotationPopover from './annotate/AnnotationPopover';
+import AxisExtendButtons from './annotate/AxisExtendButtons';
+import useAxisExtension from './annotate/useAxisExtension';
 import { GOAL_CHART_IDS, readChartGoalTarget } from './chartGoalTargets';
 import styles from './ChartGoalSurface.module.css';
 
@@ -50,7 +52,6 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         staleTime: 60 * 1000,
     });
     const { data: tree } = useFractalTree(rootId, { enabled: Boolean(draftGoal || openGoalId) });
-    const chartContext = useMemo(() => ({ ...context, goalConditionLines: lines, onOpenGoal: setOpenGoalId }), [context, lines]);
     const openGoal = openGoalId && tree ? findGoalNodeById(tree, openGoalId) : null;
     const initialCompletion = useMemo(() => (draftGoal
         ? {
@@ -82,6 +83,11 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         return { canvasRect, offset: { left: canvasRect.left - surfaceRect.left, top: canvasRect.top - surfaceRect.top }, area: chart.chartArea };
     }, [chartRef]);
 
+    const { controls: extendControls, extend, shrink, futureShare } = useAxisExtension({ chartRef, annotating, placement });
+    const chartContext = useMemo(() => ({
+        ...context, goalConditionLines: lines, onOpenGoal: setOpenGoalId, axisFutureShare: futureShare,
+    }), [context, futureShare, lines]);
+
     const stopAnnotating = useCallback(() => {
         onAnnotatingChange(false);
         setHover(null);
@@ -96,6 +102,19 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             setPin(null);
         }
     }
+
+    // Esc leaves annotate mode wherever focus is (clicking "Set goal" leaves it on that button). An
+    // open pin, menu or goal takes its own Esc first, and a field being typed in keeps it.
+    const escapeLeaves = annotating && !pin && !menu && !draftGoal && !openGoalId;
+    useEffect(() => {
+        if (!escapeLeaves) return undefined;
+        const leave = (event) => {
+            if (event.key !== 'Escape' || event.target.closest?.('input, textarea, select')) return;
+            stopAnnotating();
+        };
+        window.addEventListener('keydown', leave);
+        return () => window.removeEventListener('keydown', leave);
+    }, [escapeLeaves, stopAnnotating]);
 
     useEffect(() => {
         if (!menu) return undefined;
@@ -170,7 +189,6 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         onKeyDown: (event) => {
             if (event.target !== event.currentTarget) return;
             if (event.key === 'a' || event.key === 'A') onAnnotatingChange(!annotating);
-            if (event.key === 'Escape') stopAnnotating();
         },
     };
     const handlers = supported ? {
@@ -242,6 +260,14 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         >
             {React.createElement(Chart, { context: chartContext })}
             {annotating && !pin ? <AnnotationCrosshair hover={hover} /> : null}
+            {annotating && !pin ? (
+                <AxisExtendButtons
+                    controls={extendControls}
+                    onExtend={(axis, end) => { setHover(null); extend(axis, end); }}
+                    onShrink={(axis, end) => { setHover(null); shrink(axis, end); }}
+                    onPointerEnter={() => setHover(null)}
+                />
+            ) : null}
             {pin ? (
                 <AnnotationPopover
                     rootId={rootId}

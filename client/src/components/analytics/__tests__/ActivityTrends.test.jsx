@@ -122,6 +122,10 @@ describe('runningTotalRows', () => {
         expect(result.current).toBe(5);
         expect(result.rows.slice(4).every((row) => row.count === null)).toBe(true);
         expect(result.rows).toHaveLength(8);
+        // Set goal mode's extra room adds future dates past that.
+        const extended = runningTotalRows({ grain: 'week', rows: [{ key: '2026-10-05', count: 2, seconds: 60 }, { key: '2026-10-12', count: 0, seconds: 0 }, { key: '2026-10-19', count: 3, seconds: 90 }] }, null, '2026-10-28', 3);
+        expect(extended.rows).toHaveLength(11);
+        expect(extended.rows.slice(4).every((row) => row.count === null)).toBe(true);
         // A range ending in the future runs the axis to its end instead.
         expect(runningTotalRows({ grain: 'week', rows: [{ key: '2026-10-05', count: 1, seconds: 0 }] }, { end: '2026-12-31' }, '2026-10-28')
             .rows.at(-1).key).toBe('2026-12-28');

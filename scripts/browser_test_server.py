@@ -435,6 +435,7 @@ def main():
                     ("offline-circuit", "Offline Circuit"),
                     ("offline-edits", "Offline Edits"),
                     ("offline-ceiling", "Offline Ceiling"),
+                    ("axis-room", "Axis Room"),
                 ):
                     spec_root = f"browser-{slug}-root-{suffix}"
                     db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,

@@ -36,9 +36,10 @@ import { ChartDensityContext } from './ChartJSWrapper';
 import ChartTitle from './ChartTitle';
 import ChartTitleEditor from './ChartTitleEditor';
 import pageGridSnap from './pageGridSnap';
+import axisExtension from './axisExtension';
 
 // Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
-ChartJS.register(pageGridSnap);
+ChartJS.register(pageGridSnap, axisExtension);
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 

@@ -31,7 +31,7 @@ const Chart = ({ context }) => <div data-testid="chart" data-lines={context.goal
 const context = (id = 'metricTrends') => ({ visualization: { id }, chartRef: { current: {} }, effectiveSelectedActivity: { id: 'a' } });
 const target = { summary: 'Weight ≥ 225 lb within one session', conditionDraft: { kind: 'single_session' } };
 const chartWithCanvas = () => ({
-    current: { canvas: { getBoundingClientRect: () => ({ left: 0, top: 0 }) }, chartArea: { left: 0, right: 400, top: 0, bottom: 200 } },
+    current: { canvas: { getBoundingClientRect: () => ({ left: 0, top: 0 }) }, chartArea: { left: 0, right: 400, top: 0, bottom: 200 }, update: vi.fn() },
 });
 
 describe('ChartGoalSurface', () => {
@@ -144,5 +144,64 @@ describe('ChartGoalSurface', () => {
         fireEvent.keyDown(surface, { key: 'a' });
         expect(onAnnotatingChange).toHaveBeenCalledWith(true);
     });
-});
 
+    it('leaves annotate mode on Esc wherever focus is, after an open pin takes its own', () => {
+        const onAnnotatingChange = vi.fn();
+        const ctx = { ...context(), chartRef: chartWithCanvas() };
+        render(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" annotating onAnnotatingChange={onAnnotatingChange} />);
+        const surface = screen.getByTestId('chart').parentElement;
+
+        readTarget.mockReturnValue({ ...target, guides: {} });
+        fireEvent.pointerMove(surface, { clientX: 300, clientY: 75 });
+        fireEvent.click(surface);
+        expect(screen.getByRole('dialog', { name: 'Set a goal from this point' })).toBeInTheDocument();
+        fireEvent.keyDown(document.body, { key: 'Escape' });
+        expect(screen.queryByRole('dialog', { name: 'Set a goal from this point' })).toBeNull();
+        expect(onAnnotatingChange).not.toHaveBeenCalled();
+
+        // Typing in a field elsewhere (renaming the chart) keeps its Esc.
+        const field = document.body.appendChild(document.createElement('input'));
+        fireEvent.keyDown(field, { key: 'Escape' });
+        expect(onAnnotatingChange).not.toHaveBeenCalled();
+        field.remove();
+
+        fireEvent.keyDown(document.body, { key: 'Escape' });
+        expect(onAnnotatingChange).toHaveBeenCalledWith(false);
+    });
+
+    it('extends axes only in annotate mode, without pinning, and clears them on leaving', () => {
+        const scales = { x: { type: 'linear', axis: 'x', min: 2, max: 6 }, y: { type: 'linear', axis: 'y', min: 1, max: 9 } };
+        const chart = {
+            ...chartWithCanvas().current, scales,
+            update: vi.fn(function update() { this.$axisExtensionLayout?.(); }),
+        };
+        const ctx = { ...context(), chartRef: { current: chart } };
+        const { rerender } = render(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" onAnnotatingChange={vi.fn()} />);
+        expect(chart.$axisExtension).toBeUndefined();
+        expect(screen.queryByRole('group', { name: 'Extend chart axes' })).toBeNull();
+
+        rerender(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" annotating onAnnotatingChange={vi.fn()} />);
+        expect(chart.$axisExtension.y).toEqual({ low: 0.25, high: 0.25 });
+        fireEvent.click(screen.getByRole('button', { name: 'Extend vertical axis up' }));
+        expect(chart.$axisExtension.y.high).toBeCloseTo(1);
+        // Labelled by axis and direction, and an extended end can be pulled back to the headroom.
+        expect(screen.getByRole('button', { name: 'Extend vertical axis up' })).toHaveTextContent('Y↑');
+        fireEvent.click(screen.getByRole('button', { name: 'Pull top of vertical axis back down' }));
+        expect(chart.$axisExtension.y.high).toBeCloseTo(0.25);
+        expect(screen.queryByRole('button', { name: 'Pull top of vertical axis back down' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Extend vertical axis up' }));
+        expect(screen.queryByRole('dialog', { name: 'Set a goal from this point' })).toBeNull();
+
+        // Hidden while a pin is open: rescaling would move the point away from its popover.
+        readTarget.mockReturnValue({ ...target, guides: {} });
+        const surface = screen.getByTestId('chart').parentElement;
+        fireEvent.pointerMove(surface, { clientX: 300, clientY: 75 });
+        fireEvent.click(surface);
+        expect(screen.getByRole('dialog', { name: 'Set a goal from this point' })).toBeInTheDocument();
+        expect(screen.queryByRole('group', { name: 'Extend chart axes' })).toBeNull();
+
+        rerender(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" onAnnotatingChange={vi.fn()} />);
+        expect(chart.$axisExtension).toBeUndefined();
+        expect(screen.queryByRole('group', { name: 'Extend chart axes' })).toBeNull();
+    });
+});
