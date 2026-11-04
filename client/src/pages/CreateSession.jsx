@@ -590,6 +590,7 @@ function CreateSession() {
                     onClose={() => setMobileGoalsOpen(false)}
                     title="Session Goals"
                     size="xl"
+                    sheetHandle
                     overlayClassName={`${styles.mobileGoalsOverlay} mobile-sheet-backdrop-enter`}
                     className={`${styles.mobileGoalsSheet} mobile-sheet-enter`}
                     bodyClassName={styles.mobileGoalsModalBody}

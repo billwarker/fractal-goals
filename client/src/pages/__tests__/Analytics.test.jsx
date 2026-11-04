@@ -219,6 +219,7 @@ describe('Analytics page', () => {
         const sheet = closeButton.closest('.sessions-query-sidebar').parentElement;
         expect(sheet.parentElement).toBe(document.body);
         expect(sheet).toHaveClass('mobile-sheet-enter');
+        expect(sheet.querySelector('[data-sheet-handle]')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
         fireEvent.click(closeButton);
         expect(button).toHaveAttribute('aria-expanded', 'false');

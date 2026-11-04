@@ -2,6 +2,8 @@ import React from 'react';
 
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import BodyPortal from './BodyPortal';
+import SheetHandle from './SheetHandle';
+import styles from './ResponsiveSidePane.module.css';
 
 /**
  * A page's right-hand side pane: inline on desktop, and on mobile a bottom sheet
@@ -18,8 +20,7 @@ export default function ResponsiveSidePane({
     children,
 }) {
     if (!open) return null;
-    const panel = <div className={`${panelClassName} mobile-sheet-enter`}>{children}</div>;
-    if (!isMobile) return panel;
+    if (!isMobile) return <div className={`${panelClassName} mobile-sheet-enter`}>{children}</div>;
     return (
         <BodyPortal>
             <ModalBackdrop
@@ -28,7 +29,10 @@ export default function ResponsiveSidePane({
                 onClose={onClose}
                 aria-hidden="true"
             />
-            {panel}
+            <div className={`${panelClassName} ${styles.sheet} mobile-sheet-enter`}>
+                <SheetHandle onDismiss={onClose} />
+                {children}
+            </div>
         </BodyPortal>
     );
 }

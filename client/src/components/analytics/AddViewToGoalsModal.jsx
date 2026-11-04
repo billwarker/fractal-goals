@@ -7,6 +7,7 @@ import { useAnalyticsViews } from '../../hooks/useDashboardQueries';
 import { MAX_CHARTS_PER_GOAL, useViewGoals } from '../../hooks/useGoalCharts';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import styles from './SavedAnalyticsModal.module.css';
 
 /**
  * The newly chosen goals that already show the most charts a goal can, counted from the saved
@@ -61,7 +62,10 @@ export default function AddViewToGoalsModal({ rootId, view, isOpen, onClose }) {
             selectedGoalIds={selectedGoalIds}
             selectionMode="multiple"
             getGoalDisabledReason={unavailable}
-            getGoalSelectionMeta={(goal) => `${counts.get(goal.id) || 0}/${MAX_CHARTS_PER_GOAL} charts${unavailable(goal) ? " · Full" : ""}`}
+            getGoalSelectionMeta={(goal) => {
+                const count = counts.get(goal.id) || 0;
+                return <span className={styles.chartRatio} title={`Shows ${count} of ${MAX_CHARTS_PER_GOAL} charts`}>{count}/{MAX_CHARTS_PER_GOAL}</span>;
+            }}
             searchPlaceholder="Search goals..."
             emptyState="No goals available."
             highlightSelectionAncestors

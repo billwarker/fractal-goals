@@ -101,6 +101,7 @@ export default function GoalMarkerLayer({ chartRef, markers, onOpenGoal = null }
                             shape={getGoalIcon(goal)}
                             color={getGoalColor(colorKey)}
                             secondaryColor={getGoalSecondaryColor(colorKey)}
+                            isSmart={goal.is_smart}
                             size={ICON_SIZE}
                         />
                         {active ? <span className={styles.name}>{goal.goal_name}</span> : null}

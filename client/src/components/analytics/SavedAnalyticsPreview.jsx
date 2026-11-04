@@ -95,6 +95,7 @@ export default function SavedAnalyticsPreview({ rootId, item, chartLabel, onBack
                                         shape={getGoalIcon(goal)}
                                         color={getGoalColor(goal)}
                                         secondaryColor={getGoalSecondaryColor(goal)}
+                                        isSmart={goal.is_smart}
                                         size={16}
                                     />
                                     {goal.name}

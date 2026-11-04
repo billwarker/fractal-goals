@@ -155,3 +155,27 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
     await expect(save).toHaveCount(0);
     expect(errors).toEqual([]);
 });
+
+test('a saved view can be closed, back to an empty view', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    await logIn(page);
+
+    await page.goto(`/browser-root-${suffix}/analytics`);
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: /^Activities/ }).first().click();
+    await page.getByRole('button', { name: /Activity Totals/ }).first().click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    const name = `Closeable ${suffix} ${Date.now()}`;
+    await page.getByPlaceholder('Enter a name').fill(name);
+    await page.getByRole('button', { name: 'Save View' }).click();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Add to goal…' }).click();
+    await expect(page.getByRole('dialog').getByTitle('Shows 0 of 12 charts').first()).toHaveText('0/12');
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Empty Analytics View' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+});

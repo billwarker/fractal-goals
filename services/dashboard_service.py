@@ -1,9 +1,12 @@
 import models
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import selectinload
 
 from models import AnalyticsDashboard, Goal, GoalAnalyticsView, GoalLevel, validate_root_goal
+from services._serialize_common import calculate_smart_status
 from services.goal_chart_service import _view_window
+from services.goal_review_rules import attach_last_review_dates
 from services.serializers import serialize_analytics_dashboard
 from services.service_types import JsonDict, JsonList, ServiceResult
 from validators.core import MAX_NAME_LENGTH
@@ -108,17 +111,22 @@ class DashboardService:
         if not view_ids:
             return goals_by_view
         rows = self.db_session.execute(select(
-            GoalAnalyticsView.dashboard_id, Goal.id, Goal.name, Goal.level_id,
+            GoalAnalyticsView.dashboard_id, Goal,
             GoalLevel.name.label("level_name"), GoalLevel.rank.label("level_rank"),
-        ).join(Goal, Goal.id == GoalAnalyticsView.goal_id).outerjoin(GoalLevel, GoalLevel.id == Goal.level_id).where(
+        ).join(Goal, Goal.id == GoalAnalyticsView.goal_id).outerjoin(GoalLevel, GoalLevel.id == Goal.level_id).options(
+            selectinload(Goal.level), selectinload(Goal.pause_intervals),
+            selectinload(Goal.associated_activities), selectinload(Goal.associated_activity_groups),
+        ).where(
             GoalAnalyticsView.dashboard_id.in_(view_ids), Goal.deleted_at.is_(None),
         ).order_by(
             GoalLevel.rank.asc().nulls_last(), GoalAnalyticsView.created_at.asc().nulls_last(), Goal.name,
-        ))
+        )).all()
+        attach_last_review_dates(self.db_session, [row.Goal for row in rows])
         for row in rows:
             goals_by_view[row.dashboard_id].append({
-                "id": row.id, "name": row.name, "level_id": row.level_id,
+                "id": row.Goal.id, "name": row.Goal.name, "level_id": row.Goal.level_id,
                 "level_name": row.level_name, "level_rank": row.level_rank,
+                "is_smart": all(calculate_smart_status(row.Goal).values()),
             })
         return goals_by_view
 

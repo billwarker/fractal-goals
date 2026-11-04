@@ -273,7 +273,7 @@ test('dashboard sidebar keeps shared scope above independent chart tabs', async 
     await expect(global.getByRole('heading', { name: 'Time Range' })).toBeVisible();
     await expect(first).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('dashboard-sidebar.png') });
-    await page.getByRole('button', { name: suffix === 'mobile' ? 'Hide Sidebar' : 'Hide Filters', exact: true }).click();
+    await page.getByRole('button', { name: suffix === 'mobile' ? 'Collapse filters panel' : 'Hide Filters', exact: true }).click();
     const saved = page.waitForResponse((response) => response.url().endsWith(`/dashboards/${id}`) && response.request().method() === 'PUT');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     expect((await saved).ok()).toBeTruthy();

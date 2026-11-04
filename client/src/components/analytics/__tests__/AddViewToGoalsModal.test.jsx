@@ -43,7 +43,7 @@ describe('goal attachment picker', () => {
     it('shows capacity, disables full goals, and permits removing existing links', () => {
         render(<AddViewToGoalsModal rootId="root" view={view} isOpen onClose={vi.fn()} />);
         expect(screen.getByLabelText('Select Full goal')).toBeDisabled();
-        expect(screen.getByText('12/12 charts · Full')).toBeInTheDocument();
+        expect(screen.getAllByText('12/12')[0]).toHaveAttribute('title', 'Shows 12 of 12 charts');
         expect(screen.getByLabelText('Select Existing goal')).toBeEnabled();
         expect(screen.getByLabelText('Select Existing goal')).toBeChecked();
     });

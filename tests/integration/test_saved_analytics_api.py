@@ -45,6 +45,19 @@ class TestSavedAnalytics:
         assert goals[0]['level_rank'] < goals[2]['level_rank']
         assert all(goal['level_name'] for goal in goals)
 
+    def test_view_goals_say_whether_each_is_smart(self, authed_client, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        plain = _create_goal(authed_client, root, root, name='Plain', type='MidTermGoal')['id']
+        smart = _create_goal(authed_client, root, plain, name='Smart', description='Why', deadline='2030-01-01', track_activities=False)
+        assert smart['is_smart'] is True
+        view = _view(authed_client, root, 'Trends')
+        for goal_id in (plain, smart['id']):
+            assert _attach(authed_client, root, goal_id, view).status_code == 201
+
+        goals = {goal['name']: goal for goal in {item['name']: item for item in _list(authed_client, root)}['Trends']['goals']}
+        assert goals['Plain']['is_smart'] is False
+        assert goals['Smart']['is_smart'] is True
+
     def test_pinned_first_then_last_opened_without_touching_updated(self, authed_client, sample_ultimate_goal):
         root = sample_ultimate_goal.id
         first, second, third = (_view(authed_client, root, name) for name in ('First', 'Second', 'Third'))

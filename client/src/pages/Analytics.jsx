@@ -442,7 +442,6 @@ function Analytics() {
             onClose={() => setIsFiltersPaneOpen(false)}
             panelClassName={styles.rightPanel}
             backdropClassName={styles.sheetBackdrop}
-            constrainToVisualViewport={false}
         >
             <Suspense fallback={<AnalyticsLoading />}><AnalyticsFiltersSidebar
                 rootId={rootId} sessions={sessions} windowStates={windowStates} shownGrains={shownGrains}
@@ -480,6 +479,8 @@ function Analytics() {
                     onModeChange={setActiveMode}
                     onOpenViewsModal={() => setIsViewsModalOpen(true)}
                     onSaveView={handleSaveView}
+                    onCloseView={resetToEmptyView}
+                    isSavedItemOpen={Boolean(selectedViewId)}
                     hasUnsavedChanges={hasUnsavedChanges}
                     rootId={rootId}
                     savedView={analyticsViews.find((view) => view.id === selectedViewId && view.kind === 'view') || null}

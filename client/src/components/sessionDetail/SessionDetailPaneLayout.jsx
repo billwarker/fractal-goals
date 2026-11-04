@@ -2,6 +2,7 @@ import React from 'react';
 
 import CloseButton from '../atoms/CloseButton';
 import ModalBackdrop from '../atoms/ModalBackdrop';
+import SheetHandle from '../layout/SheetHandle';
 import SessionSidePane from './SessionSidePane';
 import styles from '../../pages/SessionDetail.module.css';
 
@@ -31,6 +32,7 @@ function SessionDetailPaneLayout({
                         className={`${styles.mobilePaneSheet} mobile-sheet-enter`}
                         onClick={(event) => event.stopPropagation()}
                     >
+                        <SheetHandle onDismiss={onCloseMobilePane} />
                         <div className={styles.mobilePaneHeader}>
                             <div className={styles.mobilePaneTitle}>{selectedModeLabel}</div>
                             <CloseButton
