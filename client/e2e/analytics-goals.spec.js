@@ -126,7 +126,14 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
         await page.mouse.move(x, y);
     }
     await expect(readout).toBeVisible();
-    await page.mouse.click(x, y);
+    if (suffix === 'mobile') {
+        // A real tap on a phone: no pointer sits over the chart before the touch.
+        await page.mouse.move(0, 0);
+        await expect(readout).toBeHidden();
+        await page.touchscreen.tap(x, y);
+    } else {
+        await page.mouse.click(x, y);
+    }
     await page.getByRole('button', { name: 'Create goal…' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Short Term Goal' }).click();

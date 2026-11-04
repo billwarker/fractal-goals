@@ -8,11 +8,14 @@ import {
     AnalyticsGoalIcon,
     BackIcon,
     ChartIcon,
+    CrosshairIcon,
     HomeIcon,
     LightningIcon,
     MinimizeHeaderIcon,
     RestoreHeaderIcon,
+    SplitHorizontalIcon,
     SplitIcon,
+    SplitVerticalIcon,
     TimerIcon,
     VisualizationIcon,
 } from './AnalyticsIcons';
@@ -88,6 +91,7 @@ function ProfileWindow({
     const { goalAnalytics, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
+    const splitMenuRef = useRef(null);
 
     const [showSplitMenu, setShowSplitMenu] = useState(false);
     const [isAnnotating, setIsAnnotating] = useState(false);
@@ -97,6 +101,21 @@ function ProfileWindow({
     const reportShownGrain = React.useCallback((grain) => onShownGrainChange?.(windowId, grain), [onShownGrainChange, windowId]);
 
     const [isNarrow, setIsNarrow] = useState(false);
+
+    // The split menu closes on a press anywhere else, or on Esc.
+    React.useEffect(() => {
+        if (!showSplitMenu) return undefined;
+        const close = (event) => {
+            if (event.type === 'keydown' ? event.key !== 'Escape' : splitMenuRef.current?.contains(event.target)) return;
+            setShowSplitMenu(false);
+        };
+        window.addEventListener('pointerdown', close);
+        window.addEventListener('keydown', close);
+        return () => {
+            window.removeEventListener('pointerdown', close);
+            window.removeEventListener('keydown', close);
+        };
+    }, [showSplitMenu]);
 
     // Use ResizeObserver to detect width changes
     React.useEffect(() => {
@@ -343,7 +362,8 @@ function ProfileWindow({
                             aria-pressed={isAnnotating}
                             title="Set a goal from a point on the chart (A)"
                         >
-                            {isAnnotating ? 'Done' : 'Set goal'}
+                            <CrosshairIcon size={15} />
+                            <span>{isAnnotating ? 'Done' : 'Set goal'}</span>
                         </Button>
                     )}
                     {showQueryInspector && selectedVisualizationMeta && (
@@ -362,7 +382,7 @@ function ProfileWindow({
                         </Button>
                     )}
                     {canSplit && (
-                        <div style={{ position: 'relative' }}>
+                        <div ref={splitMenuRef} style={{ position: 'relative' }}>
                             <Button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -379,11 +399,11 @@ function ProfileWindow({
                                 <div className={styles.splitMenu}>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('vertical'); setShowSplitMenu(false); }}
                                         className={styles.splitMenuItem}>
-                                        <span className={styles.menuIcon}><SplitIcon size={15} /></span> Split Vertical
+                                        <span className={styles.menuIcon}><SplitVerticalIcon size={15} /></span> Split Vertical
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('horizontal'); setShowSplitMenu(false); }}
                                         className={styles.splitMenuItem}>
-                                        <span className={styles.menuIcon}><SplitIcon size={15} /></span> Split Horizontal
+                                        <span className={styles.menuIcon}><SplitHorizontalIcon size={15} /></span> Split Horizontal
                                     </button>
                                 </div>
                             )}

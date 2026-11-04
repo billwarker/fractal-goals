@@ -21,13 +21,27 @@ const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'
 
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP = 10;
+const POPOVER_WIDTH = 260;
+const POPOVER_HEIGHT = 200;
+const POPOVER_MARGIN = 4;
+const GHOST_CLICK_MS = 400;
+
+/** The click a browser sends after a touch ends would land on whatever just appeared under the finger. */
+function swallowNextClick() {
+    const swallow = (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+    };
+    window.addEventListener('click', swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), GHOST_CLICK_MS);
+}
 
 /**
  * Analytics charts as a goal-setting surface.
  *
  * Annotate mode (the panel's "Set goal" toggle, or "A" while the chart is focused): a crosshair follows the pointer,
  * snapped to what the metric can hold, with the values on each axis and the goal the point would
- * set; a click pins it, and the pin offers "Create goal…" (the goal modal, seeded) or updating a
+ * set; a click pins it (on touch, the point where the finger lifts), and the pin offers "Create goal…" (the goal modal, seeded) or updating a
  * goal that already has a threshold on this activity, after a live preview. Right-click (or
  * long-press on touch) stays as the quick "Set goal here…". Existing goals on the activity are
  * passed to the chart, which marks them at their thresholds; clicking one opens it here.
@@ -43,6 +57,7 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
     const [pin, setPin] = useState(null);
     const [openGoalId, setOpenGoalId] = useState(null);
     const pressRef = useRef(null);
+    const annotatePressRef = useRef(false);
     const surfaceRef = useRef(null);
 
     const { data: lines = [] } = useQuery({
@@ -80,7 +95,12 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         if (!chart?.canvas || !surface) return null;
         const canvasRect = chart.canvas.getBoundingClientRect();
         const surfaceRect = surface.getBoundingClientRect();
-        return { canvasRect, offset: { left: canvasRect.left - surfaceRect.left, top: canvasRect.top - surfaceRect.top }, area: chart.chartArea };
+        return {
+            canvasRect,
+            offset: { left: canvasRect.left - surfaceRect.left, top: canvasRect.top - surfaceRect.top },
+            area: chart.chartArea,
+            surfaceSize: { width: surfaceRect.width, height: surfaceRect.height },
+        };
     }, [chartRef]);
 
     const { controls: extendControls, extend, shrink, futureShare } = useAxisExtension({ chartRef, annotating, placement });
@@ -137,30 +157,53 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
         clearTimeout(pressRef.current?.timer);
         pressRef.current = null;
     };
+    /** The crosshair's reading of the chart under this event. */
+    const pointAt = (event) => {
+        const target = read(event.nativeEvent);
+        const where = target ? placement() : null;
+        return target && where && where.area ? {
+            target,
+            offset: where.offset,
+            area: where.area,
+            surfaceSize: where.surfaceSize,
+            touch: event.pointerType === 'touch',
+            pointer: { x: event.clientX - where.canvasRect.left, y: event.clientY - where.canvasRect.top },
+        } : null;
+    };
+    /** Pins a point that can set a goal, inside the surface however narrow the chart. */
+    const pinPoint = (point) => {
+        if (!point?.target?.conditionDraft) return false;
+        const { offset, area, pointer, surfaceSize } = point;
+        const fit = (value, room) => Math.max(POPOVER_MARGIN, Math.min(value, room - POPOVER_MARGIN));
+        setPin({
+            target: point.target,
+            left: fit(offset.left + Math.min(pointer.x + 12, area.right - POPOVER_WIDTH), surfaceSize.width - POPOVER_WIDTH),
+            top: fit(offset.top + Math.max(area.top, pointer.y - 20), surfaceSize.height - POPOVER_HEIGHT),
+        });
+        return true;
+    };
     const annotateHandlers = {
         onPointerMove: (event) => {
-            if (pin) return;
-            const target = read(event.nativeEvent);
-            const where = target ? placement() : null;
-            setHover(target && where && where.area ? {
-                target,
-                offset: where.offset,
-                area: where.area,
-                pointer: { x: event.clientX - where.canvasRect.left, y: event.clientY - where.canvasRect.top },
-            } : null);
+            if (!pin) setHover(pointAt(event));
         },
         onPointerLeave: () => {
             if (!pin) setHover(null);
         },
         onClick: (event) => {
             if (pin || event.target.closest?.('[data-chart-goal-menu]')) return;
-            if (!hover?.target?.conditionDraft) return;
-            const { offset, area, pointer } = hover;
-            setPin({
-                target: hover.target,
-                left: offset.left + Math.min(pointer.x + 12, area.right - 260),
-                top: offset.top + Math.max(area.top, pointer.y - 20),
-            });
+            pinPoint(pointAt(event));
+        },
+        // A touch has no hover before it lands, and lifting ends its pointer: it pins here, not on the click.
+        onTouchPress: (event) => {
+            if (pin || event.target.closest?.('[data-chart-goal-menu]')) return;
+            annotatePressRef.current = true;
+            setHover(pointAt(event));
+        },
+        onTouchLift: (event) => {
+            if (!annotatePressRef.current) return;
+            annotatePressRef.current = false;
+            setHover(null);
+            if (!pin && pinPoint(pointAt(event))) swallowNextClick();
         },
     };
     const menuHandlers = {
@@ -168,7 +211,11 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             if (openAt(event.nativeEvent)) event.preventDefault();
         },
         onPointerDown: (event) => {
-            if (event.pointerType !== 'touch' || annotating) return;
+            if (event.pointerType !== 'touch') return;
+            if (annotating) {
+                annotateHandlers.onTouchPress(event);
+                return;
+            }
             const native = event.nativeEvent;
             pressRef.current = {
                 x: event.clientX,
@@ -184,8 +231,14 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             if (press && Math.hypot(event.clientX - press.x, event.clientY - press.y) > LONG_PRESS_SLOP) cancelPress();
             if (annotating) annotateHandlers.onPointerMove(event);
         },
-        onPointerUp: cancelPress,
-        onPointerCancel: cancelPress,
+        onPointerUp: (event) => {
+            cancelPress();
+            if (annotating && event.pointerType === 'touch') annotateHandlers.onTouchLift(event);
+        },
+        onPointerCancel: () => {
+            cancelPress();
+            annotatePressRef.current = false;
+        },
         onKeyDown: (event) => {
             if (event.target !== event.currentTarget) return;
             if (event.key === 'a' || event.key === 'A') onAnnotatingChange(!annotating);

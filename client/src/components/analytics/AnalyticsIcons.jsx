@@ -225,6 +225,36 @@ export function SplitIcon({ size = 16, className = '', ...props }) {
     );
 }
 
+/** A window split into side-by-side panes, or stacked ones; the filled pane is the new one. */
+export function SplitVerticalIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M12 5h5.5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H12V5Z" fill="currentColor" />
+            <rect x="4.5" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 5v14" stroke="currentColor" strokeWidth="1.7" />
+        </svg>
+    );
+}
+
+export function SplitHorizontalIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M4.5 12h15v5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-5Z" fill="currentColor" />
+            <rect x="4.5" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M4.5 12h15" stroke="currentColor" strokeWidth="1.7" />
+        </svg>
+    );
+}
+
+export function CrosshairIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <circle cx="12" cy="12" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 2.5v5.5M12 16v5.5M2.5 12H8M16 12h5.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+    );
+}
+
 export function MinimizeHeaderIcon({ size = 16, className = '', ...props }) {
     return (
         <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>

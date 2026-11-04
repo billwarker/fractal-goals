@@ -137,6 +137,32 @@ describe('ChartGoalSurface', () => {
         expect(onAnnotatingChange).toHaveBeenCalledWith(false);
     });
 
+    it('pins where a touch lifts, with no hover before it, and ignores the click that follows', () => {
+        const ctx = { ...context(), chartRef: chartWithCanvas() };
+        render(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" annotating onAnnotatingChange={vi.fn()} />);
+        const chart = screen.getByTestId('chart');
+
+        fireEvent.pointerDown(chart, { pointerType: 'touch', clientX: 40, clientY: 50 });
+        expect(screen.getByText('Lift to set a goal here')).toBeInTheDocument();
+        fireEvent.pointerUp(chart, { pointerType: 'touch', clientX: 60, clientY: 50 });
+        fireEvent.pointerLeave(chart, { pointerType: 'touch' });
+
+        const create = screen.getByRole('button', { name: 'Create goal…' });
+        fireEvent.click(create);
+        expect(screen.queryByRole('dialog', { name: 'New goal' })).not.toBeInTheDocument();
+        expect(create).toBeInTheDocument();
+    });
+
+    it('keeps a pin inside a surface narrower than its popover would need', () => {
+        const ctx = { ...context(), chartRef: chartWithCanvas() };
+        ctx.chartRef.current.chartArea = { left: 40, right: 200, top: 0, bottom: 200 };
+        render(<ChartGoalSurface Chart={Chart} context={ctx} rootId="r" annotating onAnnotatingChange={vi.fn()} />);
+
+        fireEvent.click(screen.getByTestId('chart'), { clientX: 60, clientY: 50 });
+        const popover = screen.getByRole('button', { name: 'Create goal…' }).closest('[role="dialog"]');
+        expect(parseFloat(popover.style.left)).toBeGreaterThanOrEqual(4);
+    });
+
     it('toggles annotate mode with A while focused', () => {
         const onAnnotatingChange = vi.fn();
         render(<ChartGoalSurface Chart={Chart} context={context()} rootId="r" onAnnotatingChange={onAnnotatingChange} />);

@@ -11,7 +11,7 @@ import styles from './Annotation.module.css';
  */
 export default function AnnotationCrosshair({ hover }) {
     if (!hover) return null;
-    const { target, offset, area, pointer } = hover;
+    const { target, offset, area, pointer, touch } = hover;
     const { x, y } = target.guides || {};
     const left = (value) => offset.left + value;
     const top = (value) => offset.top + value;
@@ -31,12 +31,12 @@ export default function AnnotationCrosshair({ hover }) {
             ) : null}
             <div
                 className={styles.readout}
-                style={{ left: left(Math.min(pointer.x + 14, area.right - 220)), top: top(Math.max(area.top, pointer.y - 56)) }}
+                style={{ left: Math.max(0, left(Math.min(pointer.x + 14, area.right - 220))), top: top(Math.max(area.top, pointer.y - 56)) }}
             >
                 {target.unsupported ? <span className={styles.muted}>{target.unsupported}</span> : (
                     <>
                         <strong>{target.summary}</strong>
-                        <span className={styles.muted}>Click to set a goal here</span>
+                        <span className={styles.muted}>{touch ? 'Lift to set a goal here' : 'Click to set a goal here'}</span>
                     </>
                 )}
             </div>

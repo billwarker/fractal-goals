@@ -315,4 +315,30 @@ describe('ProfileWindow', () => {
         fireEvent.click(screen.getByTitle('Go Back'));
         expect(updateWindowState).toHaveBeenLastCalledWith(expect.objectContaining({ selectedVisualization: null, chartTitle: null }));
     });
+
+    it('closes the split menu on a press elsewhere or Esc, but not on one inside it', () => {
+        const onSplit = vi.fn();
+        render(<ProfileWindow
+            data={{ sessions: [], activities: [], activityGroups: [], activityInstances: {}, rootId: null }}
+            windowState={{}}
+            updateWindowState={vi.fn()}
+            canSplit
+            onSplit={onSplit}
+        />);
+        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split', exact: true }));
+        const item = () => screen.queryByRole('button', { name: 'Split Vertical' });
+
+        open();
+        fireEvent.pointerDown(document.body);
+        expect(item()).not.toBeInTheDocument();
+
+        open();
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(item()).not.toBeInTheDocument();
+
+        open();
+        fireEvent.pointerDown(item());
+        fireEvent.click(item());
+        expect(onSplit).toHaveBeenCalledWith('vertical');
+    });
 });
