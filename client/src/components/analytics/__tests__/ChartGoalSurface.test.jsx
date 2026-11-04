@@ -5,9 +5,12 @@ import ChartGoalSurface from '../ChartGoalSurface';
 // Loaded up front: its lazy first load can outlast a findBy wait in a busy parallel run.
 import '../annotate/GoalParentPicker';
 
-const { readTarget, queryData, setGoalCondition } = vi.hoisted(() => ({
+const { readTarget, queryData, setGoalCondition, createGoal, saveChart, notifyError } = vi.hoisted(() => ({
     readTarget: vi.fn(), queryData: { lines: [] }, setGoalCondition: vi.fn(() => Promise.resolve({ data: {} })),
+    createGoal: vi.fn(), saveChart: vi.fn(), notifyError: vi.fn(),
 }));
+vi.mock('../annotate/saveChartToGoal', () => ({ default: saveChart }));
+vi.mock('../../../utils/notify', () => ({ default: { error: notifyError, success: vi.fn() } }));
 vi.mock('../chartGoalTargets', () => ({
     GOAL_CHART_IDS: new Set(['metricTrends']),
     readChartGoalTarget: readTarget,
@@ -24,15 +27,18 @@ vi.mock('../../../hooks/useGoalQueries', () => ({ useFractalTree: () => ({ data:
     ] },
 ] } }) }));
 vi.mock('../../ConnectedGoalDetailModal', () => ({
-    default: ({ initialCompletion, parentGoal }) => (
-        <div role="dialog" aria-label="New goal">{initialCompletion.conditionDraft.kind} {initialCompletion.deadline} under {parentGoal.name}</div>
-    ),
+    default: ({ goal, initialCompletion, parentGoal, onCreate }) => (goal ? <div role="dialog" aria-label={goal.name} /> : (
+        <div role="dialog" aria-label="New goal">
+            {initialCompletion.conditionDraft.kind} {initialCompletion.deadline} under {parentGoal.name}
+            <button type="button" onClick={() => onCreate({}).catch(() => {})}>Submit</button>
+        </div>
+    )),
 }));
 vi.mock('@tanstack/react-query', () => ({
     useQuery: () => ({ data: queryData.lines }),
     useQueryClient: () => ({ invalidateQueries: vi.fn() }),
 }));
-vi.mock('../../../utils/api', () => ({ fractalApi: { setGoalCondition, createGoal: vi.fn() } }));
+vi.mock('../../../utils/api', () => ({ fractalApi: { setGoalCondition, createGoal } }));
 vi.mock('../../../utils/goalTreeCache', () => ({ applyCreatedGoal: vi.fn(), refreshGoalReadModels: vi.fn() }));
 vi.mock('../../../hooks/useGoalConditionQueries', () => ({
     useGoalConditionPreview: (_root, goalId) => ({ progress: goalId ? { current: 3, required: 12, completion_condition: 'activity_threshold' } : null, isPending: false }),
@@ -181,6 +187,35 @@ describe('ChartGoalSurface', () => {
         await screen.findByRole('heading', { name: 'Which goal should this go under?' });
         expect(screen.queryByLabelText(/Only goals associated/)).not.toBeInTheDocument();
         expect(screen.getByText('Root')).toBeInTheDocument();
+    });
+
+    describe('a new goal', () => {
+        const chartToSave = { windowState: { selectedCategory: 'activities' }, globalFilters: null, reusableViewId: 'view' };
+        const createFromMenu = async () => {
+            render(<ChartGoalSurface Chart={Chart} context={context()} rootId="r" chartToSave={chartToSave} />);
+            fireEvent.contextMenu(screen.getByTestId('chart'), { clientX: 40, clientY: 50 });
+            fireEvent.click(screen.getByRole('menuitem', { name: /Set goal here/ }));
+            await pickParent();
+            fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
+        };
+        beforeEach(() => {
+            createGoal.mockResolvedValue({ data: { id: 'child', name: 'Child goal' } });
+            saveChart.mockResolvedValue(undefined);
+        });
+
+        it('gets the chart it was set from, then opens', async () => {
+            await createFromMenu();
+            expect(await screen.findByRole('dialog', { name: 'Child goal' })).toBeInTheDocument();
+            expect(saveChart).toHaveBeenCalledWith(expect.objectContaining({ rootId: 'r', goalId: 'child', goalName: 'Child goal', reusableViewId: 'view' }));
+            expect(notifyError).not.toHaveBeenCalled();
+        });
+
+        it('still stands and opens if the chart can’t be saved', async () => {
+            saveChart.mockRejectedValue(new Error('nope'));
+            await createFromMenu();
+            expect(await screen.findByRole('dialog', { name: 'Child goal' })).toBeInTheDocument();
+            expect(notifyError).toHaveBeenCalledWith('Goal created, but its chart couldn’t be saved');
+        });
     });
 
     it('updates a goal already on this activity after previewing its progress', async () => {

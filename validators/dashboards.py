@@ -216,6 +216,8 @@ class DashboardCreateSchema(BaseModel):
     name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
     kind: str = Field('dashboard')
     layout: Dict[str, Any] = Field(...)
+    # Take a free name ("Name (2)") rather than failing on one already used.
+    suffix_name_on_conflict: bool = False
 
     @field_validator('name')
     @classmethod

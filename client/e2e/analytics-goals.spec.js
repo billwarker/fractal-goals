@@ -48,7 +48,7 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
     const createdResponse = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     expect((await createdResponse).ok()).toBeTruthy();
-    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: `Practise more ${suffix}` })).toBeVisible();
 
     const goals = await (await page.request.get(`/api/${root}/goals/conditions`, {
         headers, params: { activity_id: `browser-heatmap-activity-${suffix}` },
@@ -162,7 +162,19 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
     const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     expect((await created).ok()).toBeTruthy();
-    await expect(dialog).toHaveCount(0);
+
+    // The goal opens on the open saved view itself, not a copy, with the goal marked on it.
+    const details = page.getByRole('dialog', { name: goalName });
+    const goalCharts = details.getByRole('region', { name: 'Analytics' });
+    await expect(goalCharts.getByText('1 of 2', { exact: true })).toBeVisible();
+    await expect(goalCharts.getByText(viewName, { exact: true })).toBeVisible();
+    await expect(goalCharts.getByTitle(new RegExp(`^${goalName} \\(`))).toBeVisible();
+    const views = await page.evaluate(async ({ root, token }) => (await (await fetch(
+        `/api/roots/${root}/dashboards`, { headers: { Authorization: `Bearer ${token}` } },
+    )).json()).data.map((view) => view.name), { root, token });
+    expect(views).toEqual([viewName]);
+    await details.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(details).toHaveCount(0);
 
     const { goals } = await page.evaluate(async ({ root, activityId, token }) => (await fetch(
         `/api/${root}/goals/conditions?activity_id=${activityId}`, { headers: { Authorization: `Bearer ${token}` } },
@@ -205,4 +217,49 @@ test('a saved view can be closed, back to an empty view', async ({ page }, testI
     await expect(page.getByRole('heading', { name: 'Empty Analytics View' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+});
+
+test('a goal from an unsaved chart gets that chart, saved under its name and shown first', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+
+    await page.goto(`/${root}/analytics`);
+    await page.getByRole('button', { name: /^Activities/ }).first().click();
+    await page.getByRole('button', { name: /Activity Totals/ }).first().click();
+    const canvas = page.locator('canvas').first();
+    await expect(canvas).toBeVisible();
+    await page.getByRole('button', { name: 'Set goal', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+    const box = await canvas.boundingBox();
+    const create = page.getByRole('button', { name: 'Create goal…' });
+    await expect(async () => {
+        if (suffix === 'mobile') await page.touchscreen.tap(box.x + box.width * 0.6, box.y + box.height * 0.5);
+        else await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.5);
+        await expect(create).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await create.click();
+
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    const levelChoice = dialog.getByRole('button', { name: /(Term|Immediate) Goal$/ });
+    await expect(levelChoice.or(dialog.locator('#goal-name')).first()).toBeVisible();
+    if (await levelChoice.count()) await levelChoice.first().click();
+    const goalName = `Saved chart goal ${suffix}`;
+    await dialog.locator('#goal-name').fill(goalName);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+
+    const details = page.getByRole('dialog', { name: goalName });
+    const goalCharts = details.getByRole('region', { name: 'Analytics' });
+    await expect(goalCharts.getByText('1 of 2', { exact: true })).toBeVisible();
+    await expect(goalCharts.getByText(goalName, { exact: true })).toBeVisible();
+    await goalCharts.getByRole('button', { name: 'Next chart' }).click();
+    await expect(goalCharts.getByTitle(/^Progress toward/)).toBeVisible();
+
+    // The page behind stays as it was: not switched to the new view.
+    await details.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(details).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Empty Analytics View' })).toBeVisible();
+    const views = (await (await page.request.get(`/api/roots/${root}/dashboards`, { headers })).json()).data;
+    expect(views.find((view) => view.name === goalName)).toMatchObject({ kind: 'view' });
 });

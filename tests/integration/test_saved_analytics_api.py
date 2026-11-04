@@ -58,6 +58,33 @@ class TestSavedAnalytics:
         assert goals['Plain']['is_smart'] is False
         assert goals['Smart']['is_smart'] is True
 
+    def test_a_taken_name_gets_a_suffix_only_when_asked(self, authed_client, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        first = _view(authed_client, root, 'Bench 225')
+        layout = authed_client.get(f"/api/roots/{root}/dashboards").get_json()['data'][0]['layout']
+        create = lambda **extra: authed_client.post(f"/api/roots/{root}/dashboards", json={
+            'name': 'Bench 225', 'kind': 'view', 'layout': layout, **extra,
+        })
+
+        assert create().status_code == 409
+        second = create(suffix_name_on_conflict=True)
+        assert second.status_code == 201 and second.get_json()['data']['name'] == 'Bench 225 (2)'
+
+        # A deleted view's name is passed over, not revived.
+        assert authed_client.delete(f"/api/roots/{root}/dashboards/{first}").status_code == 200
+        third = create(suffix_name_on_conflict=True)
+        assert third.get_json()['data']['name'] == 'Bench 225 (3)'
+        assert 'Bench 225' not in {item['name'] for item in _list(authed_client, root)}
+
+    def test_deleting_a_goal_keeps_its_view(self, authed_client, sample_ultimate_goal):
+        root = sample_ultimate_goal.id
+        goal = _create_goal(authed_client, root, root, name='Bench 225')['id']
+        assert _attach(authed_client, root, goal, _view(authed_client, root, 'Bench 225')).status_code == 201
+
+        assert authed_client.delete(f"/api/{root}/goals/{goal}").status_code == 200
+        kept = {item['name']: item for item in _list(authed_client, root)}['Bench 225']
+        assert kept['goals'] == []
+
     def test_pinned_first_then_last_opened_without_touching_updated(self, authed_client, sample_ultimate_goal):
         root = sample_ultimate_goal.id
         first, second, third = (_view(authed_client, root, name) for name in ('First', 'Second', 'Third'))

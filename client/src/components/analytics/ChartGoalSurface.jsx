@@ -13,6 +13,7 @@ import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import AnnotationCrosshair from './annotate/AnnotationCrosshair';
 import AnnotationPopover from './annotate/AnnotationPopover';
 import AxisExtendButtons from './annotate/AxisExtendButtons';
+import saveChartToGoal from './annotate/saveChartToGoal';
 import useAxisExtension from './annotate/useAxisExtension';
 import { GOAL_CHART_IDS, readChartGoalTarget } from './chartGoalTargets';
 import styles from './ChartGoalSurface.module.css';
@@ -45,10 +46,11 @@ function swallowNextClick() {
  * set; a click pins it (on touch, the point where the finger lifts), and the pin offers "Create goal…" (pick the goal
  * it goes under, then the goal modal, seeded) or updating a
  * goal that already has a threshold on this activity, after a live preview. Right-click (or
- * long-press on touch) stays as the quick "Set goal here…". Existing goals on the activity are
+ * long-press on touch) stays as the quick "Set goal here…". A new goal gets this chart (`chartToSave`), saved
+ * under its name and shown first, then opens here. Existing goals on the activity are
  * passed to the chart, which marks them at their thresholds; clicking one opens it here.
  */
-export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {} }) {
+export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {}, chartToSave = null }) {
     const queryClient = useQueryClient();
     const visualizationId = context.visualization?.id;
     const supported = GOAL_CHART_IDS.has(visualizationId);
@@ -258,7 +260,20 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             const response = await fractalApi.createGoal(rootId, payload);
             await applyCreatedGoal(queryClient, queryKeys, rootId, response.data);
             await queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(rootId) });
+            if (chartToSave) {
+                // The goal stands either way.
+                try {
+                    await saveChartToGoal({ rootId, goalId: response.data.id, goalName: response.data.name, ...chartToSave });
+                    await Promise.all([
+                        queryClient.invalidateQueries({ queryKey: queryKeys.goalCharts(rootId, response.data.id) }),
+                        queryClient.invalidateQueries({ queryKey: queryKeys.analyticsViews(rootId) }),
+                    ]);
+                } catch {
+                    notify.error('Goal created, but its chart couldn’t be saved');
+                }
+            }
             setDraftGoal(null);
+            setOpenGoalId(response.data.id);
             return response.data;
         } catch (error) {
             notify.error(`Couldn’t create the goal: ${formatError(error)}`);

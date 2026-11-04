@@ -58,7 +58,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     const viewGoals = await (await page.request.get(`/api/roots/${root}/dashboards/${viewId}/goals`, { headers })).json();
     expect(viewGoals.goals.map((goal) => goal.goal_name)).toEqual([goalName]);
 
-    // Goal details: the threshold chart first, then the view; compact, cycled with the arrows.
+    // Goal details: the view first, then the threshold chart; compact, cycled with the arrows.
     await page.evaluate(() => localStorage.clear());
     await page.goto(`/${root}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
@@ -68,12 +68,14 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
         await expect(charts).toBeVisible({ timeout: 2000 });
     }).toPass();
     await expect(charts.getByText('1 of 2', { exact: true })).toBeVisible();
+    await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
+    await charts.getByRole('button', { name: 'Next chart' }).click();
+    await expect(charts.getByText('2 of 2', { exact: true })).toBeVisible();
     await expect(charts.getByTitle(/^Progress toward Heatmap Guitar/)).toBeVisible();
     // Nothing in the goal's active period yet, matching its 0 / 20 progress.
     await expect(charts.getByText('No contributing sessions yet.')).toBeVisible();
-    await charts.getByRole('button', { name: 'Next chart' }).click();
+    await charts.getByRole('button', { name: 'Previous chart' }).click();
     await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
-    await expect(charts.getByText('2 of 2', { exact: true })).toBeVisible();
     await expect(charts.locator('[data-density="compact"] canvas')).toBeVisible();
     // The mini chart is a preview: its canvas takes no hover, so no data tooltips.
     expect(await charts.locator('[data-density="compact"] canvas').evaluate((canvas) => getComputedStyle(canvas).pointerEvents)).toBe('none');

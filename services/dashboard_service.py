@@ -161,6 +161,16 @@ class DashboardService:
         self.db_session.commit()
         return {"message": "Opened"}, None, 200
 
+    def _free_name(self, root_id, current_user_id, base, suffix_for):
+        """The first free name from `base` with `suffix_for(attempt)` added; a deleted view's name is taken too,
+        since creating with it would revive that view. None after too many tries."""
+        for attempt in range(1, 100):
+            suffix = suffix_for(attempt)
+            name = f"{base[:MAX_NAME_LENGTH - len(suffix)]}{suffix}"
+            if not self._get_dashboard_by_name(root_id, current_user_id, name, include_deleted=True):
+                return name
+        return None
+
     def duplicate_dashboard(self, root_id, dashboard_id, current_user_id) -> ServiceResult[JsonDict]:
         """A copy named "‹name› (copy)" (or "(copy 2)" and on); goal links stay with the original."""
         if not self._get_root(root_id, current_user_id):
@@ -168,12 +178,11 @@ class DashboardService:
         dashboard = self._get_dashboard(root_id, dashboard_id, current_user_id)
         if not dashboard:
             return None, "Analytics saved object not found", 404
-        for attempt in range(1, 100):
-            suffix = " (copy)" if attempt == 1 else f" (copy {attempt})"
-            name = f"{dashboard.name[:MAX_NAME_LENGTH - len(suffix)]}{suffix}"
-            if not self._get_dashboard_by_name(root_id, current_user_id, name, include_deleted=True):
-                break
-        else:
+        name = self._free_name(
+            root_id, current_user_id, dashboard.name,
+            lambda attempt: " (copy)" if attempt == 1 else f" (copy {attempt})",
+        )
+        if not name:
             return None, "Too many copies with that name", 409
         return self.create_dashboard(root_id, current_user_id, {
             "name": name, "kind": dashboard.kind or "dashboard", "layout": dashboard.layout,
@@ -187,6 +196,14 @@ class DashboardService:
         if error:
             return None, error, status
         label = self._label_for_kind(kind)
+
+        if data.get("suffix_name_on_conflict"):
+            name = self._free_name(
+                root_id, current_user_id, data["name"], lambda attempt: "" if attempt == 1 else f" ({attempt})",
+            )
+            if not name:
+                return None, f"Too many of that name for another {label}", 409
+            data = {**data, "name": name}
 
         existing = self._get_dashboard_by_name(root_id, current_user_id, data["name"])
         if existing:

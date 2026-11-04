@@ -79,6 +79,7 @@ function ProfileWindow({
     globalDateRange = null,
     onGlobalDateRangeChange,
     globalFilters = null,
+    reusableViewId = null,
     onResetFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
@@ -577,6 +578,7 @@ function ProfileWindow({
                 rootId={rootId}
                 annotating={isAnnotating}
                 onAnnotatingChange={setIsAnnotating}
+                chartToSave={{ windowState, globalFilters, reusableViewId }}
                 context={{
                     data,
                     scopedData: {

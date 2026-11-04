@@ -1,8 +1,7 @@
 """Goal charts: saved analytics views attached to goals, and the bounded data they read.
 
-A goal shows its charts one at a time: first the default "progress toward the threshold" chart
-(derived from an activity-threshold condition, never stored), then the saved views linked to it in
-order. Links point at the view, so edits to the view show everywhere. Only activity and goal views
+A goal shows its charts one at a time: first the saved views linked to it in order, then the default
+"progress toward the threshold" chart (derived from an activity-threshold condition, never stored). Links point at the view, so edits to the view show everywhere. Only activity and goal views
 attach; session views need the whole session history, so they stay on the Analytics page.
 """
 

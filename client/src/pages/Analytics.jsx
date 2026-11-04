@@ -378,6 +378,8 @@ function Analytics() {
         setShownGrains((current) => (current[windowId] === grain ? current : { ...current, [windowId]: grain }));
     }, []);
 
+    // A new goal can show this view itself, rather than a copy of it.
+    const reusableViewId = !hasUnsavedChanges && analyticsViews.some((view) => view.id === selectedViewId && view.kind === 'view') ? selectedViewId : null;
     const renderWindow = useCallback((windowId, layoutControls = {}) => {
         const windowCount = countWindows(layout);
         const canSplit = windowCount < MAX_WINDOWS;
@@ -408,6 +410,7 @@ function Analytics() {
                     globalDateRange={globalDateRange}
                     onGlobalDateRangeChange={handleDateRangeChange}
                     globalFilters={globalFilters}
+                    reusableViewId={reusableViewId}
                     onResetFilters={handleResetGlobalFilters}
                     onOpenQueryConsole={handleOpenQueryConsole}
                     showQueryInspector={showSqlExplorer}
@@ -429,6 +432,7 @@ function Analytics() {
         handleResetGlobalFilters,
         handleSplit,
         layout,
+        reusableViewId,
         selectedWindowId,
         sharedData,
         showSqlExplorer,
