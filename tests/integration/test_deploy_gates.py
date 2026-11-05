@@ -130,6 +130,27 @@ def test_cloudbuild_gates_run_in_a_fail_closed_order():
     }
 
 
+def test_cloudbuild_runs_every_gate_in_a_python_image():
+    _, _, steps = _cloudbuild_steps()
+
+    gate_steps = [step for step in steps.values() if "deploy_gates.py" in " ".join(step.get("args", []))]
+    assert {step["id"] for step in gate_steps} == {
+        "Require Passing CI", "Smoke Backend Candidate", "Smoke Frontend Candidate",
+    }
+    for step in gate_steps:
+        assert step["name"].startswith("python:"), step["id"]
+
+
+def test_cloudbuild_smoke_steps_read_the_description_their_describe_step_writes():
+    _, order, steps = _cloudbuild_steps()
+
+    for service in ("Backend", "Frontend"):
+        path = f"/workspace/{service.lower()}-service.json"
+        assert f"> {path}" in " ".join(steps[f"Describe {service} Candidate"]["args"])
+        assert f"< {path}" in " ".join(steps[f"Smoke {service} Candidate"]["args"])
+        assert order.index(f"Deploy {service}") < order.index(f"Describe {service} Candidate") < order.index(f"Smoke {service} Candidate")
+
+
 def test_cloudbuild_shell_variables_are_escaped_from_substitution():
     import re
 
