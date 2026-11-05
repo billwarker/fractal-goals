@@ -30,6 +30,18 @@ describe('useVisualizationContext', () => {
         expect(result.current.hasActiveDateRange).toBe(false);
     });
 
+    it('intersects local activity scope with shared filters without widening either', () => {
+        const windowState = { selectedCategory: 'activities', selectedVisualization: 'activityTrends', localFilters: { activities: { activityIds: ['squat'] } } };
+        const { result, rerender } = renderHook(({ globalFilters }) => useVisualizationContext({ data, windowState, globalFilters }),
+            { wrapper, initialProps: { globalFilters: { activities: { activityIds: ['bench'] } } } });
+        expect(result.current.scopedActivities).toEqual([]);
+        expect(result.current.filteredActivityInstances.squat).toEqual([]);
+        rerender({ globalFilters: {} });
+        expect(result.current.scopedActivities).toEqual([squat]);
+        expect(result.current.filteredActivityInstances.bench).toEqual([]);
+        expect(result.current.filteredActivityInstances.squat).toHaveLength(1);
+    });
+
     it('drops a selected activity that the filters leave out of scope', () => {
         const windowState = { selectedCategory: 'activities', selectedVisualization: 'metricTrends', selectedActivity: { id: 'gone' } };
         const { result } = renderHook(() => useVisualizationContext({ data, windowState }), { wrapper });

@@ -7,11 +7,17 @@ export const CHART_CHANGE_EVENT = 'fractal-goals:goal-chart-change';
 export const viewChartKey = (dashboardId) => `view:${dashboardId}`;
 
 /**
- * A goal's charts in display order: the threshold chart first (when the goal has one), then the
- * attached saved views.
+ * A goal's charts in display order: the attached saved views, which someone chose, then the threshold
+ * chart (when the goal has one).
  */
 export function buildGoalChartItems(payload, goal) {
-    const items = [];
+    const items = (payload?.charts || []).map((chart) => ({
+        key: viewChartKey(chart.dashboard_id),
+        kind: 'view',
+        dashboardId: chart.dashboard_id,
+        name: chart.name,
+        layout: chart.layout,
+    }));
     if (payload?.default_chart === DEFAULT_CHART_KEY) {
         const condition = getGoalCondition(goal);
         items.push({
@@ -20,13 +26,6 @@ export function buildGoalChartItems(payload, goal) {
             name: condition ? `Progress toward ${conditionName(condition, goal)}` : 'Progress toward the goal',
         });
     }
-    (payload?.charts || []).forEach((chart) => items.push({
-        key: viewChartKey(chart.dashboard_id),
-        kind: 'view',
-        dashboardId: chart.dashboard_id,
-        name: chart.name,
-        layout: chart.layout,
-    }));
     return items;
 }
 

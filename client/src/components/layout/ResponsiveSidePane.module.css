@@ -1,0 +1,10 @@
+/* The handle keeps its height; the pane's content fills the rest of the sheet. */
+.sheet {
+    display: flex;
+    flex-direction: column;
+}
+
+.sheet > :not(:first-child) {
+    flex: 1 1 0;
+    min-height: 0;
+}

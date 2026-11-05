@@ -1,297 +1,205 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Bar } from 'react-chartjs-2';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
+
+import { formatBucketLabel, formatBucketRange, formatDuration } from '../../utils/chartFormat';
+import { bucketStarts } from '../../utils/chartGrain';
 import EmptyState from '../common/EmptyState';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
+import { useAlignedBuckets } from './alignedAxes/AlignedAxesContext';
+import { useReportShownGrain } from './ChartStates';
+import { buildSeries, seriesColor } from './series/buildSeries';
+import ChartLegendPanel from './series/ChartLegendPanel';
+import styles from './GoalTimeDistribution.module.css';
+
+/** "#rrggbb" at an opacity, for dimming the series that aren't highlighted. */
+function withAlpha(hex, alpha) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex)) return hex;
+    const channel = (offset) => parseInt(hex.slice(offset, offset + 2), 16);
+    return `rgba(${channel(1)}, ${channel(3)}, ${channel(5)}, ${alpha})`;
+}
+
+const GRAIN_LABELS = { day: 'Daily', week: 'Weekly', month: 'Monthly' };
+
+/** "LongTermGoal" -> "Long Term Goal" */
+const levelLabel = (type) => String(type || 'Goals').replace(/([a-z])([A-Z])/g, '$1 $2');
 
 /**
- * GoalTimeDistribution - Stacked bar chart showing time spent working towards goals over time
- * 
- * Features:
- * - X-axis: Dates
- * - Y-axis: Duration (hours) spent per day
- * - Stacked by goal, using cosmic colors based on goal type
- * - Option to roll-up child goal time to parent goals
- * - Option to measure by activity duration vs session duration
+ * Time Spent Per Goal: time per calendar bucket, stacked by the goals at one level (or a focused
+ * goal's children). The server rolls the series up from the evidence itself, so a goal is never
+ * stacked with its ancestor (services/goal_time_rollup.py), and sends each bucket's total with
+ * every session counted once. Clicking a goal with sub-goals drills into it; the breadcrumb steps
+ * back out.
  */
-function GoalTimeDistribution({
-    goals,
-    chartRef,
-    inheritanceMode = 'direct',
-    durationMode = 'activity',
-}) {
-    const { getGoalColor } = useGoalLevels();;
+function GoalTimeDistribution({ timeRollup, chartRef, onFocusGoal = null, requestedGrain = 'auto' }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
+    const [hiddenKeys, setHiddenKeys] = useState(() => new Set());
+    const [hoverKey, setHoverKey] = useState(null);
+    const grain = timeRollup?.grain || 'day';
+    useReportShownGrain(timeRollup?.grain || null);
 
-    // Format duration in hours and minutes
-    const formatDuration = (seconds) => {
-        if (!seconds || seconds === 0) return '0m';
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        if (hours > 0) {
-            return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-        }
-        return `${minutes}m`;
-    };
+    // The axis spans the whole range (or all evidence), not just the dates these goals have time on.
+    const ownAxis = useMemo(() => (timeRollup?.first_bucket && timeRollup?.last_bucket
+        ? bucketStarts(timeRollup.first_bucket, timeRollup.last_bucket, grain)
+        : []), [grain, timeRollup]);
+    const alignedAxis = useAlignedBuckets({ chartRef, grain, keys: ownAxis, enabled: Boolean(timeRollup?.series?.length) });
 
-    // Process goals data into time series
-    const chartData = useMemo(() => {
-        if (!goals || goals.length === 0) {
-            return { labels: [], datasets: [] };
-        }
-
-        const goalMap = {};
-        goals.forEach(goal => {
-            goalMap[goal.id] = goal;
-        });
-
-        // Collect all unique dates and build time series data per goal
-        const dateSet = new Set();
-        const goalTimeData = {}; // { goalId: { date: seconds } }
-
-        goals.forEach(goal => {
-            // Use appropriate data source based on duration mode
-            const durations = durationMode === 'activity'
-                ? (goal.activity_durations_by_date || goal.session_durations_by_date || [])
-                : (goal.session_durations_by_date || []);
-
-            durations.forEach(item => {
-                const dateKey = item.date;
-                dateSet.add(dateKey);
-
-                const targetGoalIds = [goal.id];
-
-                if (inheritanceMode === 'descendants') {
-                    let current = goal;
-                    while (current.parent_id && goalMap[current.parent_id]) {
-                        current = goalMap[current.parent_id];
-                        targetGoalIds.push(current.id);
-                    }
-                } else if (inheritanceMode === 'root') {
-                    let current = goal;
-                    while (current.parent_id && goalMap[current.parent_id]) {
-                        current = goalMap[current.parent_id];
-                    }
-                    targetGoalIds.splice(0, targetGoalIds.length, current.id);
-                }
-
-                targetGoalIds.forEach((targetGoalId) => {
-                    if (!goalTimeData[targetGoalId]) {
-                        goalTimeData[targetGoalId] = {};
-                    }
-
-                    if (!goalTimeData[targetGoalId][dateKey]) {
-                        goalTimeData[targetGoalId][dateKey] = 0;
-                    }
-                    goalTimeData[targetGoalId][dateKey] += item.duration_seconds || 0;
-                });
-            });
-        });
-
-        // Sort dates chronologically
-        const sortedDates = Array.from(dateSet).sort();
-
-        if (sortedDates.length === 0) {
-            return { labels: [], datasets: [] };
-        }
-
-        // Format date labels
-        const labels = sortedDates.map(d => {
-            const date = new Date(d);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        });
-
-        // Create datasets - one per goal that has time data
-        const goalsWithData = Object.keys(goalTimeData).filter(goalId => {
-            const goal = goalMap[goalId];
-            return goal && Object.values(goalTimeData[goalId]).some(v => v > 0);
-        });
-
-        // Sort goals by type hierarchy: children first (bottom of stack), parents last (top of stack)
-        const goalTypesHierarchy = [
-            'ImmediateGoal',
-            'ShortTermGoal', 'MidTermGoal', 'LongTermGoal', 'UltimateGoal'
-        ];
-
-        goalsWithData.sort((a, b) => {
-            const goalA = goalMap[a];
-            const goalB = goalMap[b];
-            const typeIndexA = goalTypesHierarchy.indexOf(goalA?.type);
-            const typeIndexB = goalTypesHierarchy.indexOf(goalB?.type);
-            // If type not found, put at end
-            return (typeIndexA === -1 ? 999 : typeIndexA) - (typeIndexB === -1 ? 999 : typeIndexB);
-        });
-
-        const datasets = goalsWithData.map((goalId) => {
-            const goal = goalMap[goalId];
-            const color = getGoalColor(goal?.type);
-
-            // Create semi-transparent version for fill
-            const hexToRgba = (hex, alpha) => {
-                const r = parseInt(hex.slice(1, 3), 16);
-                const g = parseInt(hex.slice(3, 5), 16);
-                const b = parseInt(hex.slice(5, 7), 16);
-                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-            };
-
-            const data = sortedDates.map(dateKey => {
-                const seconds = goalTimeData[goalId][dateKey] || 0;
-                return seconds / 3600; // Convert to hours
-            });
-
-            return {
-                label: goal?.name || 'Unknown',
-                data,
-                backgroundColor: hexToRgba(color, 0.7),
-                borderColor: color,
-                borderWidth: 1,
-                goalId,
-                goalType: goal?.type,
-                // Store raw seconds for tooltip
-                rawData: sortedDates.map(dateKey => goalTimeData[goalId][dateKey] || 0)
-            };
-        });
-
+    const { series, bucketTotals, uniqueTotals, buckets, breadcrumb } = useMemo(() => {
+        const items = timeRollup?.series || [];
+        const entities = items.map((item) => ({
+            key: item.key,
+            label: item.remainder ? `${item.name} · other` : item.name,
+            group: item.remainder ? 'Not in a sub-goal' : levelLabel(item.type),
+            meta: { goalId: item.goal_id, drillable: item.drillable },
+        }));
+        const rows = items.flatMap((item) => item.buckets.map((bucket) => ({
+            key: item.key, bucket: bucket.date, value: bucket.duration_seconds,
+        })));
+        const axis = alignedAxis || ownAxis;
+        const unique = new Map((timeRollup?.unique_totals || []).map((total) => [total.date, total.duration_seconds]));
         return {
-            labels,
-            datasets,
-            sortedDates // Keep for tooltip formatting
+            ...buildSeries({ entities, rows, buckets: axis }),
+            uniqueTotals: axis.map((bucket) => unique.get(bucket) || 0),
+            buckets: axis,
+            breadcrumb: timeRollup?.breadcrumb || [],
         };
-    }, [durationMode, getGoalColor, goals, inheritanceMode]);
+    }, [alignedAxis, ownAxis, timeRollup]);
+
+    const colorOf = (item) => seriesColor(item, chartTheme);
+    const chartData = useMemo(() => ({
+        labels: buckets.map((bucket) => formatBucketLabel(bucket, grain)),
+        datasets: series.map((item) => {
+            const color = seriesColor(item, chartTheme);
+            const dimmed = hoverKey && hoverKey !== item.key;
+            return {
+                label: item.label,
+                data: item.data.map((seconds) => seconds / 3600),
+                rawData: item.data,
+                seriesKey: item.key,
+                meta: item.meta,
+                hidden: hiddenKeys.has(item.key),
+                backgroundColor: dimmed ? withAlpha(color, 0.2) : color,
+                hoverBackgroundColor: color,
+                // A transparent top border leaves a 2px gap between stacked segments.
+                borderColor: 'transparent',
+                borderWidth: { top: 2, right: 0, bottom: 0, left: 0 },
+                borderSkipped: 'start',
+            };
+        }),
+    }), [buckets, chartTheme, grain, hiddenKeys, hoverKey, series]);
 
     const chartOptions = useMemo(() => ({
-        indexAxis: 'x', // Explicit: vertical bars (dates on X-axis)
+        indexAxis: 'x',
         responsive: true,
         maintainAspectRatio: false,
         ...DISABLED_CHART_ANIMATION,
+        onClick: (_event, elements) => {
+            const dataset = elements[0] ? chartData.datasets[elements[0].datasetIndex] : null;
+            if (dataset?.meta?.drillable && onFocusGoal) onFocusGoal(dataset.meta.goalId);
+        },
+        onHover: (event, elements) => {
+            const dataset = elements[0] ? chartData.datasets[elements[0].datasetIndex] : null;
+            if (event.native?.target) event.native.target.style.cursor = dataset?.meta?.drillable && onFocusGoal ? 'pointer' : 'default';
+        },
         plugins: {
-            legend: {
-                display: true,
-                position: 'top',
-                labels: {
-                    color: chartTheme.textColor,
-                    usePointStyle: true,
-                    pointStyle: 'circle',
-                    padding: 12,
-                    font: { size: 10 },
-                    boxWidth: 8
-                }
-            },
+            legend: { display: false },
             tooltip: {
                 backgroundColor: chartTheme.tooltipBg,
                 titleColor: chartTheme.tooltipText,
                 bodyColor: chartTheme.tooltipBody,
+                footerColor: chartTheme.tooltipText,
                 padding: 12,
+                filter: (item) => (item.dataset.rawData?.[item.dataIndex] || 0) > 0,
+                itemSort: (left, right) => right.raw - left.raw,
                 callbacks: {
-                    title: (ctx) => {
-                        const dataIndex = ctx[0]?.dataIndex;
-                        if (dataIndex !== undefined && chartData.sortedDates) {
-                            const dateStr = chartData.sortedDates[dataIndex];
-                            // Handle ISO datetime strings (YYYY-MM-DDTHH:MM:SS) or date strings (YYYY-MM-DD)
-                            const datePart = dateStr.split('T')[0];
-                            const [year, month, day] = datePart.split('-').map(Number);
-                            const date = new Date(year, month - 1, day);
-                            return date.toLocaleDateString('en-US', {
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                            });
+                    title: (items) => (items[0] ? formatBucketRange(buckets[items[0].dataIndex], grain) : ''),
+                    label: (item) => `${item.dataset.label}: ${formatDuration(item.dataset.rawData[item.dataIndex])}`,
+                    footer: (items) => {
+                        if (!items[0]) return '';
+                        const index = items[0].dataIndex;
+                        const lines = [`Total: ${formatDuration(uniqueTotals[index])}`];
+                        if (bucketTotals[index] - uniqueTotals[index] >= 60) {
+                            lines.push(`Stacked: ${formatDuration(bucketTotals[index])} (shared sessions count for each goal)`);
                         }
-                        return ctx[0]?.label || '';
+                        return lines;
                     },
-                    label: (ctx) => {
-                        const rawSeconds = ctx.dataset.rawData?.[ctx.dataIndex] || 0;
-                        if (rawSeconds > 0) {
-                            return `${ctx.dataset.label}: ${formatDuration(rawSeconds)}`;
-                        }
-                        return null;
-                    }
-                }
-            }
+                },
+            },
         },
         scales: {
             x: {
                 stacked: true,
-                title: {
-                    display: true,
-                    text: 'Date',
-                    color: chartTheme.textColor,
-                    font: { size: 12 }
-                },
-                ticks: {
-                    color: chartTheme.textColor,
-                    maxRotation: 45,
-                    minRotation: 0,
-                    autoSkip: true,
-                    maxTicksLimit: 15
-                },
-                grid: { color: chartTheme.gridColor }
+                ticks: { color: chartTheme.textColor, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+                grid: { display: false },
             },
             y: {
                 stacked: true,
                 beginAtZero: true,
-                title: {
-                    display: true,
-                    text: 'Time (hours)',
-                    color: chartTheme.textColor,
-                    font: { size: 12 }
-                },
-                ticks: {
-                    color: chartTheme.textColor,
-                    callback: (value) => `${value}h`
-                },
-                grid: { color: chartTheme.gridColor }
-            }
-        }
-    }), [chartData.sortedDates, chartTheme]);
+                title: { display: true, text: 'Hours', color: chartTheme.textColor, font: { size: 12 } },
+                ticks: { color: chartTheme.textColor, callback: (value) => `${value}h` },
+                grid: { color: chartTheme.gridColor },
+            },
+        },
+    }), [bucketTotals, buckets, chartData.datasets, chartTheme, grain, onFocusGoal, uniqueTotals]);
 
-    // Empty state
-    if (!chartData.datasets.length) {
+    const crumbs = breadcrumb.length ? (
+        <nav className={styles.breadcrumb} aria-label="Goal drill-down">
+            <button type="button" onClick={() => onFocusGoal?.(null)}>All goals</button>
+            {breadcrumb.map((crumb, index) => (
+                <React.Fragment key={crumb.id}>
+                    <span aria-hidden="true">›</span>
+                    {index === breadcrumb.length - 1
+                        ? <span aria-current="page">{crumb.name}</span>
+                        : <button type="button" onClick={() => onFocusGoal?.(crumb.id)}>{crumb.name}</button>}
+                </React.Fragment>
+            ))}
+        </nav>
+    ) : null;
+
+    const coarsened = requestedGrain !== 'auto' && requestedGrain !== grain;
+    const caption = buckets.length ? (
+        <p className={styles.caption}>
+            {GRAIN_LABELS[grain]} · {formatBucketRange(buckets[0], grain).split(' – ')[0]} – {formatBucketRange(buckets[buckets.length - 1], grain).split(' – ').pop()}
+            {coarsened ? ` · ${GRAIN_LABELS[requestedGrain]} buckets would be too many for this range` : ''}
+        </p>
+    ) : null;
+
+    if (!series.length) {
         return (
-            <div style={{
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column'
-            }}>
-                {/* Header with toggle */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '16px'
-                }}>
-                    <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                        Time Invested Over Time
-                    </h3>
-                </div>
-
+            <div className={styles.root}>
+                {crumbs}
                 <EmptyState
                     compact
-                    title="No Time Recorded Yet"
-                    description="Start working on goals to see time distribution over time."
+                    title="No time recorded"
+                    description={breadcrumb.length ? 'No time on this goal in the selected range.' : 'Work on goals to see where your time goes.'}
                 />
             </div>
         );
     }
 
+    const compact = density === 'compact';
     return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{
-                display: 'flex',
-                justifyContent: 'flex-start',
-                alignItems: 'center',
-                marginBottom: '12px',
-            }}>
-                <h3 style={{ margin: 0, fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                    Time Invested Over Time
-                </h3>
+        <div className={styles.root}>
+            {crumbs}
+            {compact ? null : caption}
+            <div className={compact ? styles.bodyCompact : styles.body}>
+                <div className={styles.chart}>
+                    <Bar ref={chartRef} data={chartData} options={applyChartDensity(chartOptions, density)} />
+                </div>
+                <ChartLegendPanel
+                    series={series}
+                    colorOf={colorOf}
+                    formatValue={formatDuration}
+                    hiddenKeys={hiddenKeys}
+                    onHiddenKeysChange={setHiddenKeys}
+                    onHoverKeyChange={setHoverKey}
+                    compact={compact}
+                    title="Goals"
+                />
             </div>
-
-            <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-                <Bar ref={chartRef} data={chartData} options={applyChartDensity(chartOptions, density)} />
-            </div>
+            {!compact && series.length > 1 ? (
+                <p className={styles.footnote}>A session linked to several goals counts toward each of them.</p>
+            ) : null}
         </div>
     );
 }

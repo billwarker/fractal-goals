@@ -162,8 +162,9 @@ describe('useSessionNotes', () => {
         });
 
         await act(async () => {
-            await result.current.deleteNote('note-1');
+            await result.current.deleteNote({ id: 'note-1', content: 'Existing note' });
         });
+        expect(deleteNote).toHaveBeenCalledWith('root-1', 'note-1');
 
         await waitFor(() => {
             expect(queryClient.getQueryData(queryKeys.sessionNotes('root-1', 'session-1'))).toEqual([]);

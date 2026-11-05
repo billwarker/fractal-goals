@@ -22,6 +22,7 @@ describe('SessionDetailPaneLayout', () => {
         const overlay = screen.getByRole('presentation');
         const sheet = overlay.firstElementChild;
         expect(sheet).toHaveClass('mobile-sheet-enter');
+        expect(sheet.querySelector('[data-sheet-handle]')).toBeInTheDocument();
         expect(overlay).toHaveClass('mobile-sheet-backdrop-enter');
     });
 });

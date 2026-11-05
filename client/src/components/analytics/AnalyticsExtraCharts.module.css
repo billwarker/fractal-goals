@@ -1,0 +1,65 @@
+.staleIntro {
+    margin: 0 0 10px;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.staleList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    list-style: none;
+}
+
+.staleRow {
+    display: grid;
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    text-decoration: none;
+}
+
+a.staleRow:hover,
+a.staleRow:focus-visible {
+    background: var(--color-bg-hover);
+}
+
+.staleRow:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: -2px;
+}
+
+.staleDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.staleName {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.staleMeta {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.staleDays {
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}

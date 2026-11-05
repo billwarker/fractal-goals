@@ -145,6 +145,96 @@ describe('session op handlers', () => {
         expect(invalidatedKeys).toContain(JSON.stringify(activitiesKey));
     });
 
+    describe('progress chart on save', () => {
+        const seriesKey = (scope = 'all') => [...queryKeys.activityProgressTimeline(rootId, 'a1', 'i1'), 'series', 60, scope];
+        const row = { id: 'i1', session_date: '2026-11-04T09:00:00Z', sets: [{ metrics: [{ metric_id: 'm1', value: 100 }] }], metrics: [], progress_comparison: null };
+        const past = { id: 'past', session_date: '2026-11-01T09:00:00Z', sets: [{ metrics: [{ metric_id: 'm1', value: 90 }] }], metrics: [] };
+        const saved = {
+            id: 'i1',
+            activity_definition_id: 'a1',
+            completed: false,
+            sets: [{ metrics: [{ metric_id: 'm1', value: 120 }] }],
+            metrics: [],
+            progress_comparison: { previous_instance_id: 'past', metric_comparisons: [{ metric_id: 'm1', current_value: 120 }] },
+        };
+        const update = (serverResponse, updates = { sets: saved.sets }) => ({
+            kind: SESSION_OP.INSTANCE_UPDATE,
+            entityIds: ['i1'],
+            meta: { instanceId: 'i1', updates, serverResponse },
+        });
+
+        beforeEach(() => {
+            env.queryClient.setQueryData(activitiesKey, [{ id: 'i1', activity_definition_id: 'a1', sets: row.sets, progress_comparison: null }]);
+            env.queryClient.setQueryData(seriesKey(), { chart_settings: {}, instances: [past, row] });
+        });
+
+        it('moves the point and the hints together when a save is acknowledged', async () => {
+            const { queryClient, outbox, goOnline } = env;
+            await enqueue(outbox, queryClient, update(saved));
+
+            // Queued but unconfirmed: the session shows the edit, the chart still shows confirmed values.
+            expect(queryClient.getQueryData(seriesKey()).instances[1].sets).toEqual(row.sets);
+            await goOnline();
+
+            const instance = queryClient.getQueryData(activitiesKey)[0];
+            const [pastRow, currentRow] = queryClient.getQueryData(seriesKey()).instances;
+            expect(instance.progress_comparison).toEqual(saved.progress_comparison);
+            expect(currentRow.progress_comparison).toEqual(saved.progress_comparison);
+            expect(currentRow.sets).toEqual(saved.sets);
+            expect(currentRow.session_date).toBe(row.session_date);
+            expect(pastRow).toEqual(past);
+        });
+
+        it('holds both until the newest queued edit is acknowledged', async () => {
+            const newest = { ...saved, sets: [{ metrics: [{ metric_id: 'm1', value: 130 }] }] };
+            const betweenAcks = [];
+            env.cleanup();
+            env = harness({
+                send: async (op) => {
+                    betweenAcks.push({
+                        seriesSets: env.queryClient.getQueryData(seriesKey()).instances[1].sets,
+                        comparison: env.queryClient.getQueryData(activitiesKey)[0].progress_comparison,
+                    });
+                    return { status: 200, data: op.meta.serverResponse };
+                },
+            });
+            const { queryClient, outbox, goOnline } = env;
+            queryClient.setQueryData(activitiesKey, [{ id: 'i1', activity_definition_id: 'a1', sets: row.sets, progress_comparison: null }]);
+            queryClient.setQueryData(seriesKey(), { chart_settings: {}, instances: [past, row] });
+            await enqueue(outbox, queryClient, update(saved));
+            await enqueue(outbox, queryClient, update(newest, { sets: newest.sets }));
+            await goOnline();
+
+            // The second send runs after the first ack: neither surface moved for the older save.
+            expect(betweenAcks).toHaveLength(2);
+            expect(betweenAcks[1]).toEqual({ seriesSets: row.sets, comparison: null });
+            expect(queryClient.getQueryData(seriesKey()).instances[1].sets).toEqual(newest.sets);
+            expect(queryClient.getQueryData(activitiesKey)[0].progress_comparison).toEqual(newest.progress_comparison);
+        });
+
+        it('leaves the chart alone when a save is rejected', async () => {
+            env.cleanup();
+            env = harness({ send: async () => { const error = new Error('Rejected'); error.response = { status: 400, data: { error: 'Rejected' } }; throw error; } });
+            const { queryClient, outbox, goOnline } = env;
+            queryClient.setQueryData(activitiesKey, [{ id: 'i1', activity_definition_id: 'a1', sets: row.sets }]);
+            queryClient.setQueryData(seriesKey(), { chart_settings: {}, instances: [past, row] });
+            await enqueue(outbox, queryClient, update(saved));
+            await goOnline();
+
+            expect(queryClient.getQueryData(seriesKey()).instances[1]).toEqual(row);
+        });
+
+        it('refreshes the chart once the queue drains', async () => {
+            const { queryClient, outbox, goOnline } = env;
+            const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+            await enqueue(outbox, queryClient, update(saved));
+            await goOnline();
+
+            const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters.queryKey));
+            expect(keys).toContain(JSON.stringify(['activity-progress-timeline', rootId]));
+        });
+    });
+
     it('finds which cached session an instance or set belongs to', () => {
         env.queryClient.setQueryData(activitiesKey, [{ id: 'i1', sets: [{ id: 'set-1' }] }]);
         expect(findSessionForActivity(env.queryClient, rootId, { instanceId: 'i1' })).toEqual({ sessionId, instanceId: 'i1' });

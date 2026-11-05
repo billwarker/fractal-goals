@@ -1,247 +1,80 @@
 import React, { useMemo } from 'react';
-import { Bar } from 'react-chartjs-2';
 
-import EmptyState from '../../../common/EmptyState';
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { GROUP_DIMENSION_LABELS, sessionGroups } from '../../../../utils/analyticsGroupBy';
+import { bucketRows, groupedBucketRows, localDayKey } from '../../../../utils/chartGrain';
+import BucketBarChart, { MeasureControl } from '../shared/BucketBarChart';
+import GrainControl from '../shared/GrainControl';
+import GroupByControl from '../shared/GroupByControl';
 
-const GRAIN_OPTIONS = [
-    { value: 'day', label: 'Day' },
-    { value: 'week', label: 'Week' },
-    { value: 'month', label: 'Month' },
-    { value: 'year', label: 'Year' },
+export const SESSION_TREND_GROUPS = ['template', 'programDay'];
+
+const MEASURE_OPTIONS = [
+    { value: 'sessions', label: 'Sessions' },
+    { value: 'duration', label: 'Time' },
 ];
 
-const METRIC_OPTIONS = [
-    { value: 'sessions', label: '# of sessions', color: '#3b82f6' },
-    { value: 'duration', label: 'Sum of Session Duration', color: '#f59e0b' },
-];
-
-function getSessionDate(session) {
+function getSessionDay(session) {
     const value = session?.session_start || session?.created_at;
     const date = value ? new Date(value) : null;
-    return date && !Number.isNaN(date.getTime()) ? date : null;
+    return date && !Number.isNaN(date.getTime()) ? localDayKey(date) : null;
 }
 
-function startOfWeek(date) {
-    const next = new Date(date);
-    const day = next.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    next.setDate(next.getDate() + diff);
-    next.setHours(0, 0, 0, 0);
-    return next;
+const countSessions = (count) => `${count} ${count === 1 ? 'session' : 'sessions'}`;
+
+/**
+ * One measure per chart. Saved views from before chose a `metrics` list; they show its first.
+ */
+export function sessionTrendMeasure(state = {}) {
+    if (state.measure === 'sessions' || state.measure === 'duration') return state.measure;
+    return Array.isArray(state.metrics) && state.metrics[0] === 'duration' ? 'duration' : 'sessions';
 }
 
-function bucketDate(date, grain) {
-    const bucket = new Date(date);
-    bucket.setHours(0, 0, 0, 0);
-
-    if (grain === 'week') {
-        return startOfWeek(bucket);
-    }
-
-    if (grain === 'month') {
-        bucket.setDate(1);
-        return bucket;
-    }
-
-    if (grain === 'year') {
-        bucket.setMonth(0, 1);
-        return bucket;
-    }
-
-    return bucket;
-}
-
-function bucketKey(date, grain) {
-    const bucket = bucketDate(date, grain);
-    if (grain === 'year') return String(bucket.getFullYear());
-    if (grain === 'month') return `${bucket.getFullYear()}-${String(bucket.getMonth() + 1).padStart(2, '0')}`;
-    return [
-        bucket.getFullYear(),
-        String(bucket.getMonth() + 1).padStart(2, '0'),
-        String(bucket.getDate()).padStart(2, '0'),
-    ].join('-');
-}
-
-function formatBucketLabel(key, grain) {
-    const [year, month, day] = key.split('-').map(Number);
-    if (grain === 'year') return key;
-    if (grain === 'month') {
-        return new Date(year, month - 1, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-    }
-    if (grain === 'week') {
-        return `Week of ${new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-    }
-    return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatDuration(seconds = 0) {
-    const total = Math.max(0, Math.round(seconds || 0));
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.round((total % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-}
-
-function EmptySessionTrends() {
-    return <EmptyState compact description="Session trends appear once sessions have dates in the selected scope." />;
-}
-
-export function getSessionTrendRows(sessions = [], grain = 'week') {
-    const rowsByKey = new Map();
-
-    sessions.forEach((session) => {
-        const date = getSessionDate(session);
-        if (!date) return;
-
-        const key = bucketKey(date, grain);
-        const row = rowsByKey.get(key) || { key, label: formatBucketLabel(key, grain), sessions: 0, durationSeconds: 0 };
-        row.sessions += 1;
-        row.durationSeconds += session.total_duration_seconds || 0;
-        rowsByKey.set(key, row);
+/**
+ * Sessions and their time per calendar bucket across the range (or the dated sessions).
+ * @returns {{ grain: 'day' | 'week' | 'month', rows: Array<{ key: string, sessions: number, durationSeconds: number }> }}
+ */
+export function getSessionTrendRows(sessions = [], { grain = 'auto', range = null } = {}) {
+    const result = bucketRows(sessions, {
+        dayOf: getSessionDay, secondsOf: (session) => session.total_duration_seconds || 0, grain, range,
     });
-
-    return Array.from(rowsByKey.values()).sort((a, b) => a.key.localeCompare(b.key));
+    return { grain: result.grain, rows: result.rows.map((row) => ({ key: row.key, sessions: row.count, durationSeconds: row.seconds })) };
 }
 
-export function SessionTrendsChart({ sessions = [], chartRef, grain = 'week', metrics = ['sessions', 'duration'] }) {
-    const chartTheme = useChartThemeDefaults();
-    const density = useChartDensity();
-    const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['sessions']), [metrics]);
-    const rows = useMemo(() => getSessionTrendRows(sessions, grain), [grain, sessions]);
+const sessionSeconds = (session) => session.total_duration_seconds || 0;
 
-    const chartData = useMemo(() => ({
-        labels: rows.map((row) => row.label),
-        datasets: METRIC_OPTIONS
-            .filter((metric) => selectedMetrics.includes(metric.value))
-            .map((metric) => ({
-                label: metric.label,
-                data: rows.map((row) => metric.value === 'duration'
-                    ? Math.round(row.durationSeconds / 60)
-                    : row.sessions),
-                backgroundColor: `${metric.color}cc`,
-                borderColor: metric.color,
-                borderWidth: 1,
-                borderRadius: 0,
-                borderSkipped: false,
-                yAxisID: metric.value === 'duration' ? 'duration' : 'sessions',
-            })),
-    }), [rows, selectedMetrics]);
-
-    if (!rows.length || chartData.datasets.length === 0) {
-        return <EmptySessionTrends />;
-    }
-
+export function SessionTrendsChart({ sessions = [], chartRef, grain = 'auto', measure = 'sessions', range = null, groupBy = null }) {
+    const result = useMemo(() => {
+        if (!groupBy) return { ...bucketRows(sessions, { dayOf: getSessionDay, secondsOf: sessionSeconds, grain, range }), grouped: null };
+        const grouped = groupedBucketRows(sessions, {
+            dayOf: getSessionDay, secondsOf: sessionSeconds, grain, range, groupsOf: (session) => sessionGroups(session, groupBy),
+        });
+        // A session has one template and one program day, so the groups stack.
+        return { ...grouped, grouped: { groups: grouped.groups, values: grouped.values, overlap: false, title: GROUP_DIMENSION_LABELS[groupBy.dimension] } };
+    }, [grain, groupBy, range, sessions]);
     return (
-        <Bar
-            ref={chartRef}
-            data={chartData}
-            options={applyChartDensity({
-                responsive: true,
-                maintainAspectRatio: false,
-                ...DISABLED_CHART_ANIMATION,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: chartTheme.textColor,
-                            usePointStyle: true,
-                            boxWidth: 8,
-                            font: { size: 11 },
-                        },
-                    },
-                    tooltip: {
-                        backgroundColor: chartTheme.tooltipBg,
-                        titleColor: chartTheme.tooltipText,
-                        bodyColor: chartTheme.tooltipBody,
-                        padding: 12,
-                        callbacks: {
-                            label: (ctx) => {
-                                if (ctx.dataset.yAxisID === 'duration') {
-                                    return `${ctx.dataset.label}: ${formatDuration((ctx.parsed.y || 0) * 60)}`;
-                                }
-                                const count = ctx.parsed.y || 0;
-                                return `${ctx.dataset.label}: ${count}`;
-                            },
-                        },
-                    },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartTheme.gridColor },
-                    },
-                    sessions: {
-                        type: 'linear',
-                        beginAtZero: true,
-                        position: 'left',
-                        display: selectedMetrics.includes('sessions'),
-                        ticks: { color: chartTheme.textColor, precision: 0 },
-                        grid: { color: chartTheme.gridColor },
-                        title: { display: true, text: 'Sessions', color: chartTheme.textColor },
-                    },
-                    duration: {
-                        type: 'linear',
-                        beginAtZero: true,
-                        position: selectedMetrics.includes('sessions') ? 'right' : 'left',
-                        display: selectedMetrics.includes('duration'),
-                        ticks: { color: chartTheme.textColor },
-                        grid: { drawOnChartArea: !selectedMetrics.includes('sessions'), color: chartTheme.gridColor },
-                        title: { display: true, text: 'Minutes', color: chartTheme.textColor },
-                    },
-                },
-            }, density)}
+        <BucketBarChart
+            rows={result.rows}
+            grain={result.grain}
+            byTime={measure === 'duration'}
+            countLabel={countSessions}
+            seriesLabel={measure === 'duration' ? 'Session time' : 'Sessions'}
+            chartRef={chartRef}
+            grouped={result.grouped}
+            emptyDescription="Session trends appear once sessions have dates in the selected scope."
         />
     );
 }
 
 export function SessionTrendsControls({ context }) {
-    const state = context.visualizationState || {};
-    const selectedMetrics = state.metrics?.length ? state.metrics : ['sessions', 'duration'];
-    const selectedGrain = state.grain || 'week';
-
-    const toggleMetric = (metric) => {
-        const nextMetrics = selectedMetrics.includes(metric)
-            ? selectedMetrics.filter((value) => value !== metric)
-            : [...selectedMetrics, metric];
-        context.updateVisualizationState({ metrics: nextMetrics.length ? nextMetrics : selectedMetrics });
-    };
-
     return (
         <>
-            <div className="sessions-query-sidebar-section-header">
-                <h4>Metrics</h4>
-            </div>
-            <div className="sessions-query-chip-group">
-                {METRIC_OPTIONS.map((option) => (
-                    <button
-                        key={option.value}
-                        type="button"
-                        className={`sessions-query-chip ${selectedMetrics.includes(option.value) ? 'active' : ''}`}
-                        onClick={() => toggleMetric(option.value)}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-            </div>
-
-            <div className="sessions-query-sidebar-section-header" style={{ marginTop: 14 }}>
-                <h4>Grain</h4>
-            </div>
-            <div className="sessions-query-chip-group">
-                {GRAIN_OPTIONS.map((option) => (
-                    <button
-                        key={option.value}
-                        type="button"
-                        className={`sessions-query-chip ${selectedGrain === option.value ? 'active' : ''}`}
-                        onClick={() => context.updateVisualizationState({ grain: option.value })}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-            </div>
+            <MeasureControl
+                options={MEASURE_OPTIONS}
+                value={sessionTrendMeasure(context.visualizationState || {})}
+                onChange={(measure) => context.updateVisualizationState({ measure })}
+            />
+            <GrainControl context={context} />
+            <GroupByControl context={context} dimensions={SESSION_TREND_GROUPS} />
         </>
     );
 }

@@ -1,128 +1,18 @@
 import React from 'react';
-import { Bar, Line } from 'react-chartjs-2';
-
-import {
-    GoalAgingChart,
-    GoalCompletionRateByLevel,
-    GoalMomentumChart,
-    StaleGoalsChart,
-} from '../../AnalyticsExtraCharts';
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity } from '../../ChartJSWrapper';
-import GoalCompletionTimeline from '../../GoalCompletionTimeline';
-import GoalTimeDistribution from '../../GoalTimeDistribution';
-import styles from '../../ProfileWindow.module.css';
+import lazyChart from '../../lazyChart';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
+import GrainControl from '../shared/GrainControl';
 import StatCard from '../shared/StatCard';
+import { timeDistributionRollupRank } from './timeDistributionState';
+import styles from '../../ProfileWindow.module.css';
 
-function getActivityChartData(goal) {
-    if (!goal?.activity_breakdown?.length) {
-        return { labels: [], datasets: [] };
-    }
-    const sortedActivities = [...goal.activity_breakdown].sort((a, b) => b.instance_count - a.instance_count);
-    return {
-        labels: sortedActivities.map((activity) => activity.activity_name),
-        datasets: [{
-            label: 'Instances',
-            data: sortedActivities.map((activity) => activity.instance_count),
-            backgroundColor: '#2196f3',
-            borderColor: '#1976d2',
-            borderWidth: 1,
-            borderRadius: 4,
-        }],
-    };
-}
-
-function getDurationChartData(goal) {
-    if (!goal?.session_durations_by_date?.length) {
-        return { labels: [], datasets: [] };
-    }
-    return {
-        labels: goal.session_durations_by_date.map((session) => new Date(session.date)),
-        datasets: [{
-            label: 'Duration (minutes)',
-            data: goal.session_durations_by_date.map((session) => Math.round(session.duration_seconds / 60)),
-            borderColor: '#4caf50',
-            backgroundColor: 'rgba(76, 175, 80, 0.1)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-        }],
-    };
-}
-
-const activityChartOptions = {
-    indexAxis: 'y',
-    responsive: true,
-    maintainAspectRatio: false,
-    ...DISABLED_CHART_ANIMATION,
-    plugins: {
-        legend: { display: false },
-        tooltip: {
-            backgroundColor: 'rgba(30, 30, 30, 0.95)',
-            titleColor: '#fff',
-            bodyColor: '#ccc',
-            padding: 12,
-            callbacks: {
-                label: (ctx) => `${ctx.raw} instance${ctx.raw !== 1 ? 's' : ''}`,
-            },
-        },
-    },
-    scales: {
-        x: {
-            beginAtZero: true,
-            ticks: { color: '#888', stepSize: 1 },
-            grid: { color: '#333' },
-        },
-        y: {
-            ticks: { color: '#ccc', font: { size: 11 } },
-            grid: { display: false },
-        },
-    },
-};
-
-const durationChartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    ...DISABLED_CHART_ANIMATION,
-    plugins: {
-        legend: { display: false },
-        tooltip: {
-            backgroundColor: 'rgba(30, 30, 30, 0.95)',
-            titleColor: '#fff',
-            bodyColor: '#ccc',
-            padding: 12,
-            callbacks: {
-                title: (ctx) => {
-                    const date = new Date(ctx[0].label);
-                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                },
-                label: (ctx) => {
-                    const minutes = ctx.raw;
-                    if (minutes >= 60) {
-                        return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
-                    }
-                    return `${minutes}m`;
-                },
-            },
-        },
-    },
-    scales: {
-        x: {
-            type: 'time',
-            time: { unit: 'day', displayFormats: { day: 'MMM d' } },
-            ticks: { color: '#888' },
-            grid: { color: '#333' },
-        },
-        y: {
-            beginAtZero: true,
-            title: { display: true, text: 'Duration (min)', color: '#888' },
-            ticks: { color: '#888' },
-            grid: { color: '#333' },
-        },
-    },
-};
+const GoalAgingChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalAgingChart })));
+const GoalCompletionRateByLevel = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalCompletionRateByLevel })));
+const GoalMomentumChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.GoalMomentumChart })));
+const StaleGoalsChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.StaleGoalsChart })));
+const GoalTimeDistribution = lazyChart(() => import('../../GoalTimeDistribution'));
+const GoalCompletionTimeline = lazyChart(() => import('../../GoalCompletionTimeline'));
 
 function GoalSummaryChart({ context }) {
     const { scopedData, data } = context;
@@ -145,17 +35,25 @@ function GoalCompletionTimelineChart({ context }) {
 }
 
 function GoalTimeDistributionChart({ context }) {
-    const state = context.visualizationState;
     return (
         <div className={styles.vizContainerHidden}>
             <GoalTimeDistribution
-                goals={context.scopedData.goals}
+                timeRollup={context.scopedData.timeRollup}
+                requestedGrain={context.visualizationState.grain || 'auto'}
                 chartRef={context.chartRef}
-                durationMode={state.durationMode || 'activity'}
-                inheritanceMode={state.inheritanceMode || 'direct'}
+                onFocusGoal={(focusGoalId) => context.updateVisualizationState({ focusGoalId })}
             />
         </div>
     );
+}
+
+/** The goal levels present, top first, as roll-up choices. */
+function rollupLevelChoices(goals) {
+    const byRank = new Map();
+    goals.forEach((goal) => {
+        if (Number.isInteger(goal.level_rank) && !byRank.has(goal.level_rank)) byRank.set(goal.level_rank, goal.level_name || goal.type);
+    });
+    return [...byRank.entries()].sort(([left], [right]) => left - right).map(([rank, label]) => ({ rank, label }));
 }
 
 function GoalCompletionRateByLevelChart({ context }) {
@@ -171,77 +69,17 @@ function GoalMomentumVisualizationChart({ context }) {
 }
 
 function StaleGoalsVisualizationChart({ context }) {
-    return <div className={styles.vizContainer}><StaleGoalsChart goals={context.scopedData.goals} /></div>;
-}
-
-function GoalDetailChart({ context }) {
-    const density = useChartDensity();
-    const { effectiveSelectedGoal, getGoalTypeColor } = context;
-    const selectedChart = context.visualizationState.chart || 'duration';
-    if (!effectiveSelectedGoal) {
-        return <div className={styles.emptyState}>Select a goal above to view details</div>;
-    }
     return (
         <div className={styles.vizContainer}>
-            <div className={styles.goalHeader}>
-                <Heading level={3} className={styles.goalTitle}>{effectiveSelectedGoal.name}</Heading>
-                <span className={styles.goalBadge} style={{ background: getGoalTypeColor(effectiveSelectedGoal.type) }}>
-                    {effectiveSelectedGoal.type.replace('Goal', '')}
-                </span>
-            </div>
-            <div className={styles.statsGrid}>
-                <StatCard value={context.data.formatDuration(effectiveSelectedGoal.total_duration_seconds || 0)} label="Total Time" subLabel="Selected range" color="#2196f3" />
-                <StatCard value={effectiveSelectedGoal.session_count || 0} label="Sessions" subLabel="Selected range" color="#4caf50" />
-                <StatCard value={`${effectiveSelectedGoal.age_days || 0}d`} label="Goal Age" color="#ff9800" />
-            </div>
-            <div className={styles.chartContainer}>
-                {selectedChart === 'duration' ? (
-                    effectiveSelectedGoal.session_durations_by_date?.length > 0
-                        ? <Line data={getDurationChartData(effectiveSelectedGoal)} options={applyChartDensity(durationChartOptions, density)} />
-                        : <div className={styles.noData}>No session data available</div>
-                ) : (
-                    effectiveSelectedGoal.activity_breakdown?.length > 0
-                        ? <Bar data={getActivityChartData(effectiveSelectedGoal)} options={applyChartDensity(activityChartOptions, density)} />
-                        : <div className={styles.noData}>No activities recorded</div>
-                )}
-            </div>
+            <StaleGoalsChart goals={context.scopedData.goals} rootId={context.data?.rootId} getGoalColor={context.getGoalTypeColor} />
         </div>
     );
 }
 
-export function GoalDetailControls({ context }) {
-    return (
-        <>
-            <button
-                type="button"
-                className="sessions-query-picker-button"
-                onClick={context.onOpenGoalModal}
-                disabled={context.profileGoals.length === 0}
-            >
-                {context.selectedGoalDef ? context.selectedGoalDef.name : 'Choose Goal'}
-            </button>
-            {context.selectedGoalDef && (
-                <div className="sessions-query-chip-group" style={{ marginTop: 10 }}>
-                    {[
-                        { value: 'duration', label: 'Duration' },
-                        { value: 'activity', label: 'Activities' },
-                    ].map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            className={`sessions-query-chip ${(context.visualizationState.chart || 'duration') === option.value ? 'active' : ''}`}
-                            onClick={() => context.updateVisualizationState({ chart: option.value })}
-                        >
-                            {option.label}
-                        </button>
-                    ))}
-                </div>
-            )}
-        </>
-    );
-}
-
 export function GoalTimeDistributionControls({ context }) {
+    const state = context.visualizationState;
+    const levelOptions = rollupLevelChoices(context.profileGoals || []);
+    const rank = timeDistributionRollupRank(state);
     return (
         <>
             <div className="sessions-query-chip-group">
@@ -252,7 +90,7 @@ export function GoalTimeDistributionControls({ context }) {
                     <button
                         key={option.value}
                         type="button"
-                        className={`sessions-query-chip ${(context.visualizationState.durationMode || 'activity') === option.value ? 'active' : ''}`}
+                        className={`sessions-query-chip ${(state.durationMode || 'activity') === option.value ? 'active' : ''}`}
                         onClick={() => context.updateVisualizationState({ durationMode: option.value })}
                     >
                         {option.label}
@@ -260,16 +98,20 @@ export function GoalTimeDistributionControls({ context }) {
                 ))}
             </div>
             <label className="sessions-query-field" style={{ marginTop: 12 }}>
-                <span>Inheritance</span>
+                <span>Stack goals by level</span>
                 <select
-                    value={context.visualizationState.inheritanceMode || 'direct'}
-                    onChange={(event) => context.updateVisualizationState({ inheritanceMode: event.target.value })}
+                    value={rank ?? ''}
+                    onChange={(event) => context.updateVisualizationState({
+                        rollupRank: event.target.value === '' ? null : Number(event.target.value), focusGoalId: null,
+                    })}
                 >
-                    <option value="direct">Direct only</option>
-                    <option value="descendants">Include descendants</option>
-                    <option value="root">Roll up to root</option>
+                    <option value="">Automatic</option>
+                    {levelOptions.map((option) => (
+                        <option key={option.rank} value={option.rank}>{option.label}</option>
+                    ))}
                 </select>
             </label>
+            <GrainControl context={context} />
         </>
     );
 }
@@ -300,7 +142,7 @@ export const GOAL_VISUALIZATIONS = [
         category: 'goals',
         name: 'Time Spent Per Goal',
         iconType: 'goals:timeDistribution',
-        defaultState: { durationMode: 'activity', inheritanceMode: 'direct' },
+        defaultState: { durationMode: 'activity', focusGoalId: null, grain: 'auto' },
         selectionRequirements: {},
         Chart: GoalTimeDistributionChart,
         Controls: GoalTimeDistributionControls,
@@ -344,15 +186,5 @@ export const GOAL_VISUALIZATIONS = [
         selectionRequirements: {},
         Chart: StaleGoalsVisualizationChart,
         Controls: EmptyControls,
-    },
-    {
-        id: 'goalDetail',
-        category: 'goals',
-        name: 'Goal Detail View',
-        iconType: 'goals:goalDetail',
-        defaultState: { chart: 'duration' },
-        selectionRequirements: { goal: true },
-        Chart: GoalDetailChart,
-        Controls: GoalDetailControls,
     },
 ];

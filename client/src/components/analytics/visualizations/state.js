@@ -20,11 +20,15 @@ const VISUALIZATION_ID_ALIASES = {
     },
 };
 
+// Charts no longer offered: a saved panel showing one goes back to choosing a chart.
+const REMOVED_VISUALIZATIONS = { goals: ['goalDetail'] };
+
 function isPlainObject(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function normalizeSelectedVisualization(category, visualization) {
+    if (REMOVED_VISUALIZATIONS[category]?.includes(visualization)) return null;
     return VISUALIZATION_ID_ALIASES[category]?.[visualization] || visualization;
 }
 
@@ -37,8 +41,6 @@ export function getLegacyVisualizationState(state = {}) {
                 durationMode: state.goalTimeDurationMode || 'activity',
                 inheritanceMode: state.goalTimeInheritanceMode || 'direct',
             };
-        case 'goals:goalDetail':
-            return { chart: state.selectedGoalChart || 'duration' };
         case 'activities:scatterPlot':
             return {
                 setsHandling: state.setsHandling || 'top',

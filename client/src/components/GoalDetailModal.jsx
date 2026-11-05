@@ -60,7 +60,7 @@ function GoalDetailModal({
     onMobileCollapse,
     readOnly = false, portalTarget = null, overlayClassName = '',
     initialActivities = [], initialActivityGroups = [], // Create-mode associations
-    initialCompletion = null, // Create-mode { completionCondition, conditionDraft } seed
+    initialCompletion = null, // Create-mode { completionCondition, conditionDraft, name?, deadline? } seed
     initialView = 'goal', initialViewKey = 0,
 }) {
     const {

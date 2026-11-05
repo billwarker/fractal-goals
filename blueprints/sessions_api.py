@@ -22,7 +22,7 @@ from blueprints.api_utils import get_db_session, parse_optional_pagination, inte
 from services.serializers import serialize_activity_instance, serialize_session
 from services.session_service import SessionService
 from services.progress_service import ProgressService
-from services.completion_handlers import get_live_progress
+from services.completion_handlers import progress_for_saved_instance
 from services.owned_entity_queries import get_owned_session
 
 # Create blueprint
@@ -534,9 +534,11 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
             current_user.id,
             validated_data,
         )
-        if error:
+        if error or payload is None:
             return jsonify({"error": error}), status
-        return jsonify(serialize_activity_instance(payload["instance"]))
+        response_data = serialize_activity_instance(payload["instance"])
+        response_data['progress_comparison'] = progress_for_saved_instance(db_session, instance_id)
+        return jsonify(response_data)
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error updating activity instance")
@@ -591,7 +593,7 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
                 return jsonify(error), status
             return jsonify({"error": error}), status
         response_data = dict(payload["serialized"])
-        response_data['progress_comparison'] = get_live_progress(instance_id)
+        response_data['progress_comparison'] = progress_for_saved_instance(db_session, instance_id)
         return jsonify(response_data)
 
     except SQLAlchemyError:

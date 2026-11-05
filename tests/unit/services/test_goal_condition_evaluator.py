@@ -135,6 +135,58 @@ class TestYield:
         assert evaluate_condition(spec, exactly).current == 3000
         assert evaluate_condition(spec, short).met is False
 
+    def _set_yield_spec(self, target=1000, min_sets=1, **extra):
+        return ConditionSpec(
+            'single_session', 'set_yield', operator=extra.pop('operator', '>='), target_value=target, min_sets=min_sets,
+            yield_metric_ids=(WEIGHT, REPS), **extra,
+        )
+
+    def test_set_yield_needs_one_set_to_reach_it_not_the_session_total(self):
+        spec = self._set_yield_spec()
+        total_only = [_instance('a', {WEIGHT: 100, REPS: 6}, {WEIGHT: 100, REPS: 6})]
+        one_set = [_instance('a', {WEIGHT: 100, REPS: 6}, {WEIGHT: 200, REPS: 5})]
+
+        missed = evaluate_condition(spec, total_only)
+        assert (missed.met, missed.current, missed.required) == (False, 600, 1000)
+        assert missed.progress == pytest.approx(0.6)
+        met = evaluate_condition(spec, one_set)
+        assert (met.met, met.current, met.progress) == (True, 1000, 1.0)
+        assert met.achieving_instance_id == 'a'
+
+    def test_set_yield_can_require_several_sets_in_one_session(self):
+        spec = self._set_yield_spec(min_sets=2)
+        across_sessions = [
+            _instance('a', {WEIGHT: 200, REPS: 5}), _instance('b', {WEIGHT: 200, REPS: 5}, days=1),
+        ]
+        same_session = [_instance('a', {WEIGHT: 200, REPS: 5}, {WEIGHT: 250, REPS: 4})]
+
+        missed = evaluate_condition(spec, across_sessions)
+        assert (missed.met, missed.current, missed.required) == (False, 1, 2)
+        assert evaluate_condition(spec, same_session).met is True
+
+    def test_set_yield_average_needs_enough_sets(self):
+        spec = self._set_yield_spec(min_sets=2, set_aggregate='average')
+        too_few = [_instance('a', {WEIGHT: 200, REPS: 5})]
+        averaged = [_instance('a', {WEIGHT: 200, REPS: 6}, {WEIGHT: 200, REPS: 4})]
+        low = [_instance('a', {WEIGHT: 200, REPS: 6}, {WEIGHT: 100, REPS: 4})]
+
+        assert evaluate_condition(spec, too_few).met is False
+        assert evaluate_condition(spec, too_few).current == 0
+        assert evaluate_condition(spec, averaged).met is True
+        assert evaluate_condition(spec, averaged).current == 1000
+        assert evaluate_condition(spec, low).met is False
+
+    def test_set_yield_skips_sets_missing_a_metric_and_can_be_lower_is_better(self):
+        spec = self._set_yield_spec()
+        assert evaluate_condition(spec, [_instance('a', {WEIGHT: 500})]).met is False
+        lower = self._set_yield_spec(target=100, operator='<=')
+        assert evaluate_condition(lower, [_instance('a', {WEIGHT: 50, REPS: 3}, {WEIGHT: 10, REPS: 5})]).current == 50
+        assert evaluate_condition(lower, [_instance('a', {WEIGHT: 50, REPS: 3}, {WEIGHT: 10, REPS: 5})]).met is True
+
+    def test_set_yield_uses_a_split_metrics_largest_value(self):
+        spec = self._set_yield_spec()
+        assert evaluate_condition(spec, [_instance('a', {WEIGHT: (100, 200), REPS: 5})]).current == 1000
+
     def test_sets_missing_a_yield_metric_add_nothing(self):
         spec = ConditionSpec(
             'single_session', 'yield', operator='>=', target_value=1000, yield_metric_ids=(WEIGHT, REPS),

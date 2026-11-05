@@ -98,13 +98,6 @@ export function VisualizationIcon({ type, size = 16, className = '', ...props })
                     <path d="M17.5 4.5 19.5 2.5M19.5 6.5l2-2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
                 </svg>
             );
-        case 'goals:goalDetail':
-            return (
-                <svg {...common}>
-                    <path d="M12 3.8 19.1 8v8L12 20.2 4.9 16V8L12 3.8Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-                    <path d="M8.5 12h7M12 8.5v7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-                </svg>
-            );
         case 'sessions:stats':
             return (
                 <svg {...common}>
@@ -221,6 +214,36 @@ export function SplitIcon({ size = 16, className = '', ...props }) {
         <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
             <rect x="4.5" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
             <path d="M12 5v14M4.5 12h15" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        </svg>
+    );
+}
+
+/** A window split into side-by-side panes, or stacked ones; the filled pane is the new one. */
+export function SplitVerticalIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M12 5h5.5a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H12V5Z" fill="currentColor" />
+            <rect x="4.5" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 5v14" stroke="currentColor" strokeWidth="1.7" />
+        </svg>
+    );
+}
+
+export function SplitHorizontalIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <path d="M4.5 12h15v5a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-5Z" fill="currentColor" />
+            <rect x="4.5" y="5" width="15" height="14" rx="2" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M4.5 12h15" stroke="currentColor" strokeWidth="1.7" />
+        </svg>
+    );
+}
+
+export function CrosshairIcon({ size = 16, className = '', ...props }) {
+    return (
+        <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
+            <circle cx="12" cy="12" r="6.5" stroke="currentColor" strokeWidth="1.7" />
+            <path d="M12 2.5v5.5M12 16v5.5M2.5 12H8M16 12h5.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
         </svg>
     );
 }

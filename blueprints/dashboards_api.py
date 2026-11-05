@@ -83,3 +83,30 @@ def delete_dashboard(current_user, root_id, dashboard_id):
         return internal_error(logger, "Error deleting saved analytics")
     finally:
         db_session.close()
+
+
+def _run(action, message):
+    db_session = get_db_session()
+    try:
+        payload, error, status = action(DashboardService(db_session))
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception(message)
+        return internal_error(logger, message)
+    finally:
+        db_session.close()
+
+
+@dashboards_bp.route('/api/roots/<root_id>/dashboards/<dashboard_id>/opened', methods=['POST'])
+@token_required
+def mark_dashboard_opened(current_user, root_id, dashboard_id):
+    return _run(lambda service: service.mark_opened(root_id, dashboard_id, current_user.id), "Error recording analytics opened")
+
+
+@dashboards_bp.route('/api/roots/<root_id>/dashboards/<dashboard_id>/duplicate', methods=['POST'])
+@token_required
+def duplicate_dashboard(current_user, root_id, dashboard_id):
+    return _run(lambda service: service.duplicate_dashboard(root_id, dashboard_id, current_user.id), "Error duplicating saved analytics")

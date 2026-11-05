@@ -1,3 +1,5 @@
+/* The "Save view" naming sheet (AnalyticsViewNameModal). */
+
 .overlay {
     position: fixed;
     inset: 0;
@@ -9,9 +11,8 @@
     padding: 20px;
 }
 
-.sheet,
 .namingSheet {
-    width: min(640px, 100%);
+    width: min(460px, 100%);
     max-height: 88vh;
     overflow: hidden;
     display: flex;
@@ -20,10 +21,6 @@
     border: 1px solid var(--color-border);
     background: var(--color-bg-surface);
     box-shadow: 0 26px 70px rgba(0, 0, 0, 0.35);
-}
-
-.namingSheet {
-    width: min(460px, 100%);
 }
 
 .header {
@@ -52,110 +49,6 @@
     padding: 0;
 }
 
-.body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    padding: 20px 22px 24px;
-    overflow: auto;
-}
-
-.searchWrap {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 4px;
-}
-
-.searchLabel {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: uppercase;
-}
-
-.searchInput {
-    width: 100%;
-    border: 1px solid var(--color-border);
-    border-radius: 10px;
-    background: var(--color-bg-input);
-    color: var(--color-text-primary);
-    padding: 11px 13px;
-    font: inherit;
-}
-
-.searchInput::placeholder {
-    color: var(--color-text-muted);
-}
-
-.searchInput:focus {
-    outline: none;
-    border-color: color-mix(in srgb, var(--color-brand-primary) 70%, var(--color-border));
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
-}
-
-.viewRow {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    width: 100%;
-    border: 1px solid var(--color-border);
-    border-radius: 14px;
-    background: color-mix(in srgb, var(--color-bg-surface) 88%, white 12%);
-    color: var(--color-text-primary);
-    text-align: left;
-    padding: 16px 18px;
-    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.viewRow:hover,
-.viewRow:focus-visible,
-.viewRow:focus-within {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 46%, var(--color-border));
-    background: color-mix(in srgb, var(--color-bg-surface) 78%, white 22%);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 18%, transparent);
-}
-
-.selected {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
-}
-
-.sectionLabel {
-    margin: 8px 0 0;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: uppercase;
-}
-
-.viewSelectButton {
-    border: none;
-    background: transparent;
-    color: inherit;
-    padding: 0;
-    text-align: left;
-    cursor: pointer;
-    flex: 1;
-    font: inherit;
-}
-
-.viewName {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-}
-
-.viewMeta {
-    margin-top: 4px;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-}
-
-.deleteButton,
 .secondaryButton,
 .primaryButton {
     border-radius: 10px;
@@ -164,15 +57,12 @@
     cursor: pointer;
 }
 
-.deleteButton,
 .secondaryButton {
     border: 1px solid var(--color-border);
     background: transparent;
     color: var(--color-text-secondary);
 }
 
-.deleteButton:hover,
-.deleteButton:focus-visible,
 .secondaryButton:hover,
 .secondaryButton:focus-visible {
     outline: none;
@@ -191,11 +81,6 @@
 .primaryButton:disabled {
     opacity: 0.5;
     cursor: default;
-}
-
-.emptyState {
-    padding: 14px 4px 0;
-    color: var(--color-text-muted);
 }
 
 .namingBody {

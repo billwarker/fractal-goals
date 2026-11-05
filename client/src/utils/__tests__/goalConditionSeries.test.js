@@ -66,6 +66,22 @@ describe('rule bests (matching the server evaluator)', () => {
     });
 });
 
+describe('buildConditionSeries for yield per set', () => {
+    const session = instance('a', '2026-03-01T00:00:00Z', [set({ weight: 100, reps: 5 }), set({ weight: 200, reps: 2 })]);
+    const options = { yieldMetricIds: ['weight', 'reps'] };
+
+    it('charts the best set, or the lowest for a lower-is-better goal, against the threshold', () => {
+        const condition = { kind: 'single_session', measure: 'set_yield', operator: '>=', target_value: 300 };
+        expect(buildConditionSeries(condition, [session], options).series[0]).toMatchObject({ label: 'Top set yield', threshold: 300, data: [500] });
+        expect(buildConditionSeries({ ...condition, operator: '<=' }, [session], options).series[0].data).toEqual([400]);
+    });
+
+    it('charts the average set when the goal averages', () => {
+        const condition = { kind: 'single_session', measure: 'set_yield', set_aggregate: 'average', operator: '>=', target_value: 300 };
+        expect(buildConditionSeries(condition, [session], options).series[0]).toMatchObject({ label: 'Average set yield', data: [450] });
+    });
+});
+
 describe('buildConditionSeries', () => {
     const later = instance('b', '2026-03-05T00:00:00Z', [set({ weight: 225, reps: 4 })]);
     const earlier = instance('a', '2026-03-01T00:00:00Z', [set({ weight: 205, reps: 8 })]);
@@ -101,6 +117,15 @@ describe('buildConditionSeries', () => {
         expect(series).toEqual([expect.objectContaining({ id: 'count', threshold: 2, data: [1, 1] })]);
         const anySession = buildConditionSeries({ ...condition, rules: [] }, [earlier, later]);
         expect(anySession.series[0].data).toEqual([1, 2]);
+    });
+
+    it('leaves a gap for a session with no values, but keeps an entered zero', () => {
+        const row = (id, sets) => ({ id, session_date: `2026-03-0${id}T00:00:00Z`, sets });
+        const instances = [row('1', [set({ reps: 5 })]), row('2', []), row('3', [set({ reps: 0 })])];
+        const condition = { measure: 'metric', metric_definition_id: 'reps', operator: '>=', target_value: 10 };
+
+        expect(buildConditionSeries({ ...condition, kind: 'single_session' }, instances).series[0].data).toEqual([5, null, 0]);
+        expect(buildConditionSeries({ ...condition, kind: 'cumulative' }, instances).series[0].data).toEqual([5, 5, 5]);
     });
 
     it('charts the running total for cumulative conditions and the per-session value otherwise', () => {

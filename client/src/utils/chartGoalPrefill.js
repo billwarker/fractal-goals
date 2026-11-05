@@ -4,9 +4,8 @@
  * Pure, so each chart's mapping is tested on its own; the chart surface reads values off the chart's
  * scales and hands them here.
  */
-import { activeMetricDefinitions, createConditionDraft, inferOperator, OPERATOR_SYMBOLS } from './goalConditions';
-
-const roundValue = (/** @type {number} */ value) => Math.round(value * 100) / 100;
+import { formatMetric, snapMetricValue } from './chartFormat';
+import { activeMetricDefinitions, activityUsesSets, createConditionDraft, inferOperator, OPERATOR_SYMBOLS } from './goalConditions';
 
 /** @param {any} activity @param {string} metricId */
 function findMetric(activity, metricId) {
@@ -20,15 +19,19 @@ function findMetric(activity, metricId) {
  */
 function singleSessionTarget(activity, points) {
     const rules = points
-        .map(({ metricId, value }) => ({ metric: findMetric(activity, metricId), value }))
-        .filter(({ metric, value }) => metric && Number.isFinite(value) && value > 0)
+        .map(({ metricId, value }) => {
+            const metric = findMetric(activity, metricId);
+            return { metric, value: metric && Number.isFinite(value) ? snapMetricValue(metric, value) : null };
+        })
+        .filter(({ metric, value }) => metric && value != null && value > 0)
         .map(({ metric, value }) => ({
             metric,
-            rule: { metric_definition_id: metric.id, operator: inferOperator(metric), value: String(roundValue(value)) },
+            value,
+            rule: { metric_definition_id: metric.id, operator: inferOperator(metric), value: String(value) },
         }));
     if (rules.length === 0) return null;
     const summary = rules
-        .map(({ metric, rule }) => `${metric.name} ${OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (rule.operator)]} ${rule.value}${metric.unit ? ` ${metric.unit}` : ''}`)
+        .map(({ metric, value, rule }) => `${metric.name} ${OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (rule.operator)]} ${formatMetric(metric, value)}`)
         .join(', ');
     return {
         conditionDraft: { ...createConditionDraft(activity, 'single_session'), rules: rules.map(({ rule }) => rule) },
@@ -42,6 +45,26 @@ function singleSessionTarget(activity, points) {
  */
 export function goalFromMetricTrend({ activity, metricId, value }) {
     return singleSessionTarget(activity, [{ metricId, value }]);
+}
+
+/**
+ * Metric Trends' Yield line: a goal on what the line plots, a session's top set, average set or total.
+ * An activity without sets has one value per session, which is simply its total.
+ * @param {{ activity: any, value: number, setsHandling?: string }} input
+ * @returns {{ conditionDraft: any, summary: string } | null}
+ */
+export function goalFromYieldTrend({ activity, value, setsHandling = 'top' }) {
+    const target = Math.round(value);
+    if (!Number.isFinite(target) || target <= 0) return null;
+    const base = { ...createConditionDraft(activity, 'single_session'), rules: [], operator: '>=', target_value: String(target) };
+    if (setsHandling === 'total' || !activityUsesSets(activity)) {
+        return { conditionDraft: { ...base, measure: 'yield' }, summary: `Total yield ≥ ${target} within one session` };
+    }
+    const averages = setsHandling === 'average';
+    return {
+        conditionDraft: { ...base, measure: 'set_yield', min_sets: '1', set_aggregate: averages ? 'average' : 'each' },
+        summary: `${averages ? 'Average set yield' : 'Top set yield'} ≥ ${target} within one session`,
+    };
 }
 
 /**
@@ -79,3 +102,45 @@ export function goalFromActivityTotal({ activity, measure, value }) {
         summary: `${count} ${activity.name} ${count === 1 ? 'session' : 'sessions'}`,
     };
 }
+
+/**
+ * Activity Trends' running total: a point (date, total) becomes "this many more times by then".
+ * The goal counts sessions from its start, so the target is what's still to do beyond today's total.
+ * @param {{ activity: any, total: number, current: number, deadline: string, deadlineLabel: string }} input
+ */
+export function goalFromRunningTotal({ activity, total, current, deadline, deadlineLabel }) {
+    if (!activity || !Number.isFinite(total) || !deadline) return null;
+    const remaining = Math.round(total) - Math.round(current || 0);
+    if (remaining < 1) return { unsupported: `Already done ${Math.round(current || 0)} times — pick a higher total` };
+    return {
+        conditionDraft: { ...createConditionDraft(activity, 'consistency'), required_count: String(remaining) },
+        deadline,
+        summary: `${remaining} more ${activity.name} ${remaining === 1 ? 'session' : 'sessions'} by ${deadlineLabel}`,
+    };
+}
+
+/**
+ * The chart's tag scope carried into a goal: the global tag filter (`all` reads as `contains`) and a
+ * tag series under the pointer. Template and program-day scope can't be part of a condition, so the
+ * goal says so instead.
+ * @param {any} target a goal suggestion with a conditionDraft
+ * @param {{ tags?: { tagIds: string[], match: string } | null, sessions?: { templateIds: string[], programDayIds: string[] } } | null} filters
+ * @param {string | null} [seriesTagId]
+ */
+export function withChartScope(target, filters, seriesTagId = null) {
+    if (!target?.conditionDraft) return target;
+    const tagIds = [...new Set([...(filters?.tags?.tagIds || []), ...(seriesTagId ? [seriesTagId] : [])])];
+    const notes = [];
+    if (filters?.sessions?.templateIds?.length) notes.push('The template filter isn’t part of the goal condition.');
+    if (filters?.sessions?.programDayIds?.length) notes.push('The program day filter isn’t part of the goal condition.');
+    return {
+        ...target,
+        conditionDraft: {
+            ...target.conditionDraft,
+            tag_ids: tagIds,
+            tag_match: filters?.tags?.match === 'exact' && !seriesTagId ? 'exact' : 'contains',
+        },
+        notes,
+    };
+}
+

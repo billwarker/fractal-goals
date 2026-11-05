@@ -18,6 +18,7 @@ vi.mock('../ChartJSWrapper', () => ({
         textColor: '#ddd',
         gridColor: '#333',
         primaryColor: '#4f46e5',
+        seriesColors: ['#111111'],
         secondaryColor: '#10b981',
         borderColor: '#4f46e5',
         font: { family: 'Inter, sans-serif' },
@@ -51,7 +52,7 @@ describe('ActivityTotalsChart', () => {
         expect(barChart.mock.calls.at(-1)[0].data.labels).toHaveLength(5);
     });
 
-    it('renders completed activity totals with numeric duration axis, limit, and group hover metadata', () => {
+    it('renders completed activity time in hours, with the limit and group hover metadata', () => {
         render(
             <ActivityTotalsChart
                 metric="duration"
@@ -83,8 +84,8 @@ describe('ActivityTotalsChart', () => {
             data: expect.objectContaining({
                 labels: ['Handstand Practice'],
                 datasets: [expect.objectContaining({
-                    label: 'Minutes',
-                    data: [15],
+                    label: 'Time',
+                    data: [0.25],
                     groupNames: ['Skill Work'],
                 })],
             }),
@@ -100,6 +101,8 @@ describe('ActivityTotalsChart', () => {
 
         const options = barChart.mock.calls[0][0].options;
         expect(options.plugins.tooltip.callbacks.afterTitle([{ dataset: { groupNames: ['Skill Work'] }, dataIndex: 0 }])).toEqual(['Group: Skill Work']);
-        expect(options.plugins.tooltip.callbacks.label({ raw: 15 })).toBe('Duration: 15m');
+        expect(options.plugins.tooltip.callbacks.label({ raw: 0.25 })).toBe('Time: 15m');
+        expect(options.scales.x.ticks.callback(1.5)).toBe('1.5h');
+        expect(options.plugins.legend.display).toBe(false);
     });
 });

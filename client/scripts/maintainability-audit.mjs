@@ -31,7 +31,6 @@ const sizeExceptions = new Map([
   ['src/components/GoalDetailModal.module.css', 850],
   ['src/components/__tests__/GoalDetailModal.test.jsx', 1081],
   ['src/components/analytics/AnalyticsQueryConsole.jsx', 831],
-  ['src/components/analytics/AnalyticsFiltersSidebar.jsx', 510],
   ['src/components/analytics/LineGraph.jsx', 775],
   ['src/components/analytics/ProfileWindow.jsx', 702],
   ['src/components/analytics/visualizationQueryExplanations.js', 527],

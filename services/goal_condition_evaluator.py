@@ -21,6 +21,8 @@ Kinds:
 - single_session/sets: one instance has at least `min_sets` sets that meet every rule.
 - single_session/yield: one instance's total yield (sum over sets of the product of the yield
   metrics) meets the total.
+- single_session/set_yield: one instance has at least `min_sets` sets whose own yield meets the target
+  (with `set_aggregate = 'average'`, the average yield across at least `min_sets` sets does).
 - cumulative/metric | cumulative/yield: the running total across instances meets the total.
 - consistency/sets: `required_count` instances qualify (at least `min_sets`, default 1, of its sets
   meet every rule, or any instance with a counted set when there are no rules). With `consecutive`, they must qualify in a row:
@@ -326,6 +328,64 @@ def _evaluate_single_session_average(spec: ConditionSpec, instances: list[Eviden
     return evaluation
 
 
+def _set_yields(spec: ConditionSpec, instance: EvidenceInstance) -> list[float]:
+    """The yield of each set that logs every yield metric."""
+    yields = (set_yield(row, spec.yield_metric_ids) for row in instance.sets)
+    return [value for value in yields if value is not None]
+
+
+def _evaluate_single_session_set_yield(spec: ConditionSpec, instances: list[EvidenceInstance]) -> ConditionEvaluation:
+    """With one set required, `current` is the best set's yield; with more, the most sets that met it."""
+    operator = spec.operator or '>='
+    threshold = spec.target_value or 0.0
+    min_sets = max(1, spec.min_sets or 1)
+    evaluation = ConditionEvaluation(met=False, progress=0.0, current=0, required=threshold if min_sets == 1 else min_sets)
+    best = None
+    most_met = 0
+    for instance in instances:
+        yields = _set_yields(spec, instance)
+        met_sets = sum(1 for value in yields if compare(value, operator, threshold))
+        most_met = max(most_met, met_sets)
+        for value in yields:
+            if _better(value, best, operator):
+                best = value
+        scores = sorted((closeness(value, operator, threshold) for value in yields), reverse=True)[:min_sets]
+        evaluation.progress = max(evaluation.progress, sum(scores) / min_sets)
+        if met_sets >= min_sets and not evaluation.met:
+            evaluation.met = True
+            _achieved(evaluation, instance)
+    evaluation.current = (best or 0.0) if min_sets == 1 else most_met
+    if evaluation.met:
+        evaluation.progress = 1.0
+    return evaluation
+
+
+def _evaluate_single_session_set_yield_average(spec: ConditionSpec, instances: list[EvidenceInstance]) -> ConditionEvaluation:
+    """`current` is the best average over a session with enough sets."""
+    operator = spec.operator or '>='
+    threshold = spec.target_value or 0.0
+    min_sets = max(1, spec.min_sets or 1)
+    evaluation = ConditionEvaluation(met=False, progress=0.0, current=0.0, required=threshold)
+    best = None
+    for instance in instances:
+        yields = _set_yields(spec, instance)
+        if not yields:
+            continue
+        average = sum(yields) / len(yields)
+        evaluation.progress = max(evaluation.progress, closeness(average, operator, threshold) * min(1.0, len(yields) / min_sets))
+        if len(yields) < min_sets:
+            continue
+        if _better(average, best, operator):
+            best = average
+        if compare(average, operator, threshold) and not evaluation.met:
+            evaluation.met = True
+            _achieved(evaluation, instance)
+    evaluation.current = best or 0.0
+    if evaluation.met:
+        evaluation.progress = 1.0
+    return evaluation
+
+
 def _evaluate_single_session_yield(spec: ConditionSpec, instances: list[EvidenceInstance]) -> ConditionEvaluation:
     threshold = spec.target_value or 0.0
     evaluation = ConditionEvaluation(met=False, progress=0.0, current=0.0, required=threshold)
@@ -408,6 +468,10 @@ def evaluate_condition(spec: ConditionSpec, instances) -> ConditionEvaluation:
         evaluation = _evaluate_single_session_sets(spec, ordered)
     elif spec.kind == 'single_session' and spec.measure == 'yield':
         evaluation = _evaluate_single_session_yield(spec, ordered)
+    elif spec.kind == 'single_session' and spec.measure == 'set_yield' and spec.averages:
+        evaluation = _evaluate_single_session_set_yield_average(spec, ordered)
+    elif spec.kind == 'single_session' and spec.measure == 'set_yield':
+        evaluation = _evaluate_single_session_set_yield(spec, ordered)
     elif spec.kind == 'cumulative':
         evaluation = _evaluate_cumulative(spec, ordered)
     elif spec.kind == 'consistency':

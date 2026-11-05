@@ -377,3 +377,87 @@ def test_progress_series_plots_scoped_history_then_the_current_instance(authed_c
     assert [row['id'] for row in limited['instances']] == [newer.id, current.id]
     assert limited['truncated'] is True
     assert len(authed_client.get(f'{url}&same_template=false').get_json()['instances']) == 4
+
+
+def _save_sets(client, root_id, instance, metric, weights):
+    return client.put(f'/api/{root_id}/activity-instances/{instance.id}', json={
+        'session_id': instance.session_id,
+        'activity_definition_id': instance.activity_definition_id,
+        'sets': [{'metrics': [{'metric_id': metric.id, 'value': weight}]} for weight in weights],
+    })
+
+
+def _weight_comparison(payload, metric):
+    return next(row for row in payload['progress_comparison']['metric_comparisons'] if row['metric_id'] == metric.id)
+
+
+@pytest.mark.integration
+def test_saving_sets_on_an_in_progress_instance_returns_its_comparison(authed_client, history):
+    root_id, metric, log = history['root_id'], history['metric'], history['log']
+    log(0, [(100, [])])
+    current = log(1, [], completed=False)
+
+    response = _save_sets(authed_client, root_id, current, metric, [120])
+    assert response.status_code == 200, response.get_json()
+    payload = response.get_json()
+
+    assert payload['completed'] is False
+    assert payload['sets'][0]['metrics'][0]['value'] == 120
+    assert _weight_comparison(payload, metric)['current_value'] == 120
+    assert _weight_comparison(payload, metric)['previous_value'] == 100
+    assert payload['progress_comparison'] == _progress(authed_client, root_id, current.id)
+
+
+@pytest.mark.integration
+def test_saving_metrics_on_an_in_progress_instance_returns_its_comparison(authed_client, db_session, history):
+    root_id, activity, metric, log = history['root_id'], history['activity'], history['metric'], history['log']
+    activity.has_sets = False
+    db_session.commit()
+    past = log(0, [])
+    db_session.add(MetricValue(activity_instance_id=past.id, metric_definition_id=metric.id, value=100))
+    db_session.commit()
+    current = log(1, [], completed=False)
+
+    response = authed_client.put(
+        f'/api/{root_id}/sessions/{current.session_id}/activities/{current.id}/metrics',
+        json={'metrics': [{'metric_id': metric.id, 'value': 130}]},
+    )
+    assert response.status_code == 200, response.get_json()
+    payload = response.get_json()
+
+    assert _weight_comparison(payload, metric)['current_value'] == 130
+    assert _weight_comparison(payload, metric)['previous_value'] == 100
+
+
+@pytest.mark.integration
+def test_a_failed_comparison_still_returns_the_saved_instance(authed_client, monkeypatch, history):
+    root_id, metric, log = history['root_id'], history['metric'], history['log']
+    current = log(0, [], completed=False)
+
+    def fail(self, instance_id):
+        raise RuntimeError('comparison failed')
+
+    monkeypatch.setattr('services.progress_service.ProgressService.get_progress_for_instance', fail)
+    response = _save_sets(authed_client, root_id, current, metric, [120])
+
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()['sets'][0]['metrics'][0]['value'] == 120
+    assert response.get_json()['progress_comparison'] is None
+
+
+@pytest.mark.integration
+def test_the_save_comparison_does_not_query_per_set(authed_client, history, query_counter):
+    root_id, log = history['root_id'], history['log']
+    log(0, [(100, []), (100, [])])
+    one_set = log(1, [(100, [])], completed=False)
+    six_sets = log(2, [(weight, []) for weight in range(100, 106)], completed=False)
+
+    def comparison_queries(instance):
+        query_counter['total'] = 0
+        _progress(authed_client, root_id, instance.id)
+        return query_counter['total']
+
+    # Warm each instance's first read, so both measurements start equal.
+    comparison_queries(one_set)
+    comparison_queries(six_sets)
+    assert comparison_queries(six_sets) == comparison_queries(one_set)

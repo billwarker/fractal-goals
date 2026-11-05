@@ -5,7 +5,7 @@
  * conditions chart the running total, and consistency charts the running count of sessions.
  */
 
-import { aggregateYield, evidenceSets, toNumber } from './setAggregation';
+import { aggregateYield, evidenceSets, setYields, toNumber } from './setAggregation';
 
 export { evidenceSets };
 
@@ -46,14 +46,47 @@ export function instanceYield(instance, yieldIds) {
 }
 
 /**
+ * What a per-set yield goal judges in a session: its average set, or its best set for the goal's direction.
+ * @param {any} instance
+ * @param {string[]} yieldIds
+ * @param {any} condition
+ */
+function instanceSetYield(instance, yieldIds, condition) {
+    if (condition.set_aggregate === 'average') return aggregateYield(instance, yieldIds, 'average');
+    const yields = setYields(instance, yieldIds);
+    if (!yields.length) return null;
+    return lowerIsBetter(condition.operator) ? Math.min(...yields) : Math.max(...yields);
+}
+
+/**
+ * The metric's total, or null for a session with no values (a gap on the chart, not a zero).
  * @param {any} instance
  * @param {string} metricId
  */
 function instanceMetricTotal(instance, metricId) {
-    return evidenceSets(instance).reduce(
-        (sum, values) => sum + (values.get(metricId) || []).reduce((total, value) => total + value, 0),
-        0,
-    );
+    const values = evidenceSets(instance).flatMap((row) => row.get(metricId) || []);
+    return values.length ? values.reduce((total, value) => total + value, 0) : null;
+}
+
+/**
+ * The one line a condition's chart plots per session, as Metric Trends would draw it, or null: a
+ * running total or count isn't a session's value, and two rules plot on two axes.
+ * @param {any} condition
+ * @returns {{ metricId: string, setsHandling: string } | null}
+ */
+export function conditionLine(condition) {
+    if (condition?.kind !== 'single_session') return null;
+    if (condition.measure === 'yield') return { metricId: 'yield', setsHandling: 'total' };
+    if (condition.measure === 'set_yield') {
+        return { metricId: 'yield', setsHandling: condition.set_aggregate === 'average' ? 'average' : 'top' };
+    }
+    if (condition.measure === 'metric') {
+        return condition.metric_definition_id ? { metricId: condition.metric_definition_id, setsHandling: 'top' } : null;
+    }
+    const rules = condition.rules || [];
+    return condition.measure === 'sets' && rules.length === 1
+        ? { metricId: rules[0].metric_definition_id, setsHandling: 'top' }
+        : null;
 }
 
 /**
@@ -101,6 +134,20 @@ export function buildConditionSeries(condition, instances, { metricsById = new M
         return {
             points,
             series: [{ id: 'count', label: 'Qualifying sessions', unit: '', threshold: toNumber(condition.required_count), operator: '>=', data }],
+        };
+    }
+
+    if (condition.measure === 'set_yield') {
+        return {
+            points,
+            series: [{
+                id: 'yield',
+                label: condition.set_aggregate === 'average' ? 'Average set yield' : 'Top set yield',
+                unit: '',
+                threshold: toNumber(condition.target_value),
+                operator: condition.operator,
+                data: ordered.map(({ instance }) => instanceSetYield(instance, yieldMetricIds, condition)),
+            }],
         };
     }
 

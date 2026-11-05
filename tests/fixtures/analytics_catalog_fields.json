@@ -46,6 +46,11 @@
     "sort_order",
     "updated_at"
   ],
+  "activity_instance_tags": [
+    "activity_instance_id",
+    "created_at",
+    "tag_definition_id"
+  ],
   "activity_instances": [
     "activity_definition_id",
     "completed",
@@ -75,6 +80,11 @@
     "total_paused_seconds",
     "updated_at"
   ],
+  "activity_set_tags": [
+    "activity_set_id",
+    "created_at",
+    "tag_definition_id"
+  ],
   "activity_sets": [
     "activity_instance_id",
     "created_at",
@@ -87,13 +97,40 @@
     "tag_signature",
     "updated_at"
   ],
+  "activity_tag_definitions": [
+    "color",
+    "created_at",
+    "deleted_at",
+    "family_id",
+    "id",
+    "name",
+    "normalized_name",
+    "root_id",
+    "sort_order",
+    "updated_at",
+    "version"
+  ],
+  "activity_tag_families": [
+    "created_at",
+    "id",
+    "name",
+    "normalized_name",
+    "root_id",
+    "single_select",
+    "sort_order",
+    "updated_at",
+    "version"
+  ],
   "analytics_dashboards": [
     "created_at",
     "deleted_at",
     "id",
     "kind",
+    "last_opened_at",
     "layout",
     "name",
+    "open_count",
+    "pinned",
     "root_id",
     "updated_at",
     "user_id"

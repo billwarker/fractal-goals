@@ -18,6 +18,7 @@ export default function MetricValueEditor({
     unitClassName,
     onDraftChange,
     onCommit,
+    onFocus,
     progress = null,
     valueAction = null,
     isDraft = false,
@@ -52,6 +53,7 @@ export default function MetricValueEditor({
                         className={`${inputClassName} ${styles.metricSelect}`}
                         value={allowedValues.includes(String(selectedAllowedValue)) ? String(selectedAllowedValue) : ''}
                         disabled={disabled || readOnly}
+                        onFocus={onFocus}
                         onChange={(event) => {
                             const nextValue = allowedValues.includes(event.target.value) ? event.target.value : '';
                             onDraftChange(nextValue);
@@ -77,6 +79,7 @@ export default function MetricValueEditor({
                         defaultValue={formattedValue}
                         disabled={disabled}
                         readOnly={readOnly}
+                        onFocus={onFocus}
                         onChange={(event) => {
                             const nextValue = event.target.value;
                             onDraftChange(nextValue);

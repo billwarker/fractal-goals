@@ -20,6 +20,7 @@ describe('ProgramMobileSidePane', () => {
 
         const dialog = screen.getByRole('dialog', { name: 'Program sidebar' });
         expect(dialog).toHaveClass('mobile-sheet-enter');
+        expect(dialog.querySelector('[data-sheet-handle]')).toBeInTheDocument();
         expect(dialog.parentElement).toHaveClass('mobile-sheet-backdrop-enter');
         await waitFor(() => expect(screen.getByRole('button', { name: 'First action' })).toHaveFocus());
 

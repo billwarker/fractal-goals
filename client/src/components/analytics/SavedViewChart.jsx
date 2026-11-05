@@ -6,6 +6,7 @@ import { queryKeys } from '../../hooks/queryKeys';
 import { readSavedView, useGoalChartData } from '../../hooks/useGoalCharts';
 import { fractalApi } from '../../utils/api';
 import { ChartDensityContext } from './ChartJSWrapper';
+import { ChartError, ChartLoading } from './ChartStates';
 import useVisualizationContext from './useVisualizationContext';
 import { normalizeVisualizationState } from './visualizations/state';
 import styles from './SavedViewChart.module.css';
@@ -42,6 +43,8 @@ export default function SavedViewChart({ rootId, layout, density = 'full', data:
             goals: derived.filteredGoalAnalyticsGoals,
             goalSummary: derived.filteredGoalSummary,
             sessions: derived.filteredSessions,
+            chartGrain: derived.chartGrain,
+            timeRollup: derived.timeRollup,
         },
         globalFilters: derived.resolvedGlobalFilters,
         dateRange: derived.effectiveDateRange,
@@ -60,14 +63,8 @@ export default function SavedViewChart({ rootId, layout, density = 'full', data:
     }), [data, density, derived, getGoalColor, goalLines, windowState]);
 
     const Chart = derived.selectedVisualizationMeta?.Chart;
-    if (!providedData && loaded.isLoading) return <div className={styles.status} role="status">Loading chart…</div>;
-    if (!providedData && loaded.isError) {
-        return (
-            <div className={styles.status} role="alert">
-                This chart couldn’t load. <button type="button" className={styles.retry} onClick={loaded.retry}>Retry</button>
-            </div>
-        );
-    }
+    if (!providedData && loaded.isLoading) return <ChartLoading label="Loading chart…" />;
+    if (!providedData && loaded.isError) return <ChartError message="This chart couldn’t load." onRetry={loaded.retry} />;
     if (!Chart) return <div className={styles.status}>This view has no chart.</div>;
     return (
         <ChartDensityContext.Provider value={density}>

@@ -42,6 +42,12 @@ export function useAnalyticsViews(rootId) {
         onError: (error) => notify.error(getErrorMessage(error, 'Failed to update saved analytics')),
     });
 
+    const duplicateMutation = useMutation({
+        mutationFn: (dashboardId) => fractalApi.duplicateAnalyticsView(rootId, dashboardId),
+        onSuccess: invalidate,
+        onError: (error) => notify.error(getErrorMessage(error, 'Failed to duplicate saved analytics')),
+    });
+
     const deleteMutation = useMutation({
         mutationFn: (dashboardId) => fractalApi.deleteAnalyticsView(rootId, dashboardId),
         onSuccess: invalidate,
@@ -66,6 +72,15 @@ export function useAnalyticsViews(rootId) {
         deleteAnalyticsView: async (dashboardId) => {
             await deleteMutation.mutateAsync(dashboardId);
         },
+        duplicateAnalyticsView: async (dashboardId) => {
+            const response = await duplicateMutation.mutateAsync(dashboardId);
+            return response.data?.data || null;
+        },
+        pinAnalyticsView: (dashboardId, pinned) => updateMutation.mutateAsync({ dashboardId, pinned }),
+        /** Remember the view was opened (for ordering); a failure isn't worth telling anyone about. */
+        markAnalyticsViewOpened: (dashboardId) => fractalApi.markAnalyticsViewOpened(rootId, dashboardId)
+            .then(() => queryClient.invalidateQueries({ queryKey }))
+            .catch(() => {}),
     };
 }
 

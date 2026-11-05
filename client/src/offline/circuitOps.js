@@ -2,6 +2,7 @@
 // serialize_circuit_run so the existing circuit views render placeholders as-is;
 // the server's copy replaces each one when its write is acknowledged.
 
+import { getSectionItems, withSectionItems } from '../hooks/sessionItemMutationUtils';
 import { buildPlaceholderInstance } from './sessionOps';
 import {
     initialRoundId,
@@ -178,4 +179,54 @@ export function applyTagChange(run, { roundId = null, data }) {
         ...run,
         rounds: (run.rounds || []).map((round) => (round.id === roundId ? { ...round, tags: change(round.tags) } : round)),
     };
+}
+
+/** A circuit run after a timing action taken offline. */
+export function patchRun(run, action, at, value = null) {
+    if (action === 'startRun') {
+        return { ...run, status: 'active', time_start: at, time_stop: null, duration_seconds: null };
+    }
+    if (action === 'completeRun') {
+        const start = run.time_start || at;
+        const elapsed = Math.max(0, Math.floor((Date.parse(at) - Date.parse(start)) / 1000));
+        return {
+            ...run,
+            status: 'completed',
+            time_start: start,
+            time_stop: at,
+            completed_at: at,
+            is_paused: false,
+            duration_seconds: Math.max(0, elapsed - (run.total_paused_seconds || 0)),
+        };
+    }
+    if (action === 'updateRunTiming') {
+        return { ...run, ...(value || {}) };
+    }
+    if (action === 'resetRun') {
+        return {
+            ...run,
+            status: 'planned',
+            time_start: null,
+            time_stop: null,
+            duration_seconds: null,
+            completed_at: null,
+            total_paused_seconds: 0,
+        };
+    }
+    return run;
+}
+
+/** Mirror of the server's append_circuit_run_item on the cached session. */
+export function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, runId }) {
+    const sections = Array.isArray(sessionData?.sections) && sessionData.sections.length
+        ? [...sessionData.sections]
+        : [{ name: 'Main', items: [] }];
+    const section = sections[sectionIndex];
+    if (!section) return sessionData;
+    const items = getSectionItems(section).filter((item) => !(item?.type === 'circuit' && item.circuit_run_id === runId));
+    const entry = { type: 'circuit', circuit_run_id: runId };
+    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex <= items.length) items.splice(itemIndex, 0, entry);
+    else items.push(entry);
+    sections[sectionIndex] = withSectionItems(section, items);
+    return { ...(sessionData || {}), sections };
 }

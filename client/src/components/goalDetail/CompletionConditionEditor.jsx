@@ -37,7 +37,7 @@ const KIND_HINTS = {
     consistency: 'Repeat it a number of times in the goal’s active period.',
 };
 
-const MEASURE_LABELS = { sets: 'Sets meeting rules', metric: 'A metric total', yield: 'Total yield' };
+const MEASURE_LABELS = { sets: 'Sets meeting rules', metric: 'A metric total', yield: 'Total yield', set_yield: 'Yield per set' };
 const NO_SETS_MEASURE_LABELS = { ...MEASURE_LABELS, sets: 'Meets metric rules' };
 const EMPTY_CATALOG = { families: [], tags: [] };
 
@@ -120,9 +120,11 @@ function ThresholdEditor({
     const updateDraft = (patch) => onDraftChange({ ...draft, ...patch });
     const usedMetricIds = new Set((draft?.rules || []).map((rule) => rule.metric_definition_id));
     const nextMetric = metrics.find((metric) => !usedMetricIds.has(metric.id));
-    // Yield is offered only where the activity has one; otherwise it is noise.
+    // Yield is offered only where the activity has one, and per set only where it logs sets.
     const measures = draft
-        ? (CONDITION_KINDS[draft.kind]?.measures || ['sets']).filter((measure) => measure !== 'yield' || hasYield)
+        ? (CONDITION_KINDS[draft.kind]?.measures || ['sets']).filter((measure) => (
+            (measure !== 'yield' || hasYield) && (measure !== 'set_yield' || (hasYield && usesSets))
+        ))
         : [];
     const requiredTags = tagIds.map((id) => tagsById.get(id)).filter(Boolean);
     const previewCondition = draft && activity ? {
@@ -330,6 +332,25 @@ function ThresholdEditor({
                                     ) : null}
                                 </div>
                             ) : (
+                                <>
+                                {draft.measure === 'set_yield' ? (
+                                    <div className={styles.countRow}>
+                                        <span>At least</span>
+                                        <Input
+                                            type="number"
+                                            min="1"
+                                            step="1"
+                                            value={draft.min_sets}
+                                            aria-label="Sets"
+                                            aria-invalid={Boolean(errors.min_sets)}
+                                            className={styles.countInput}
+                                            onChange={(event) => updateDraft({ min_sets: event.target.value })}
+                                        />
+                                        <span>{Number(draft.min_sets) === 1 ? 'set where' : 'sets where'}</span>
+                                        <SetAggregateToggle value={draft.set_aggregate} onChange={(set_aggregate) => updateDraft({ set_aggregate })} />
+                                        <span>is</span>
+                                    </div>
+                                ) : null}
                                 <div className={styles.totalRow}>
                                     {draft.measure === 'metric' ? (
                                         <Select
@@ -343,7 +364,7 @@ function ThresholdEditor({
                                         >
                                             {metrics.map((metric) => <option key={metric.id} value={metric.id}>{metric.name}</option>)}
                                         </Select>
-                                    ) : <span className={styles.totalLabel}>Total yield</span>}
+                                    ) : <span className={styles.totalLabel}>{draft.measure === 'set_yield' ? 'Yield' : 'Total yield'}</span>}
                                     <OperatorSelect
                                         value={draft.operator}
                                         operators={TOTAL_OPERATORS}
@@ -355,12 +376,13 @@ function ThresholdEditor({
                                         inputMode="decimal"
                                         step="any"
                                         value={draft.target_value}
-                                        aria-label="Total"
+                                        aria-label={draft.measure === 'set_yield' ? 'Yield' : 'Total'}
                                         aria-invalid={Boolean(errors.target_value)}
                                         onChange={(event) => updateDraft({ target_value: event.target.value })}
                                     />
                                     {errors.target_value ? <span className={styles.error} role="alert">{errors.target_value}</span> : null}
                                 </div>
+                                </>
                             )}
 
                             {tagCatalog ? (

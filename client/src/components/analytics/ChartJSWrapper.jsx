@@ -237,6 +237,16 @@ export function useChartOptions({
     return options;
 }
 
+/** The theme's categorical series colors (`--chart-series-1..8`) and the "Other" color. */
+function readSeriesColors() {
+    return {
+        seriesColors: SERIES_FALLBACK.map((fallback, index) => getCSSVar(`--chart-series-${index + 1}`) || fallback),
+        otherSeriesColor: getCSSVar('--chart-series-other') || '#7d8794',
+    };
+}
+
+const SERIES_FALLBACK = ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767'];
+
 export function useChartThemeDefaults() {
     const [defaults, setDefaults] = useState(() => ({
         backgroundColor: chartDefaults.backgroundColor,
@@ -250,6 +260,7 @@ export function useChartThemeDefaults() {
         tooltipBody: getCSSVar('--color-text-secondary') || '#ddd',
         tooltipBorder: getCSSVar('--color-border') || '#444',
         font: chartDefaults.font,
+        ...readSeriesColors(),
     }));
 
     useEffect(() => {
@@ -266,6 +277,7 @@ export function useChartThemeDefaults() {
                 tooltipBody: getCSSVar('--color-text-secondary') || '#ddd',
                 tooltipBorder: getCSSVar('--color-border') || '#444',
                 font: chartDefaults.font,
+                ...readSeriesColors(),
             });
         };
 

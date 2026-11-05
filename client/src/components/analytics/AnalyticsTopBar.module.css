@@ -104,6 +104,7 @@
 
     .rightActions {
         width: auto;
+        margin-left: auto;
         justify-content: flex-start;
         align-items: center;
     }

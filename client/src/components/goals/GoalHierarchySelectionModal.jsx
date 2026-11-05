@@ -21,12 +21,15 @@ function GoalHierarchySelectionModal({
     confirmLabel,
     onClose,
     onConfirm,
+    getGoalDisabledReason,
+    getGoalSelectionMeta,
     lockedGoalIds = [],
     lockedGoalLabel,
     lockedGoalLegend,
     initialHideCompletedGoals = false,
     scopeGoalIds = [],
     scopeLabel = '',
+    scopeControlLabel = '',
     initialScopeEnabled = false,
 }) {
     const [draftGoalIds, setDraftGoalIds] = useState(selectedGoalIds);
@@ -72,12 +75,16 @@ function GoalHierarchySelectionModal({
                     connectorHighlightMode={connectorHighlightMode}
                     showGoalHighlightHalo={showGoalHighlightHalo}
                     showAncestorControls={showAncestorControls}
+                    getGoalDisabledReason={getGoalDisabledReason}
+                    getGoalSelectionMeta={getGoalSelectionMeta}
+                    selectionDisabled={isConfirming}
                     lockedGoalIds={lockedGoalIds}
                     lockedGoalLabel={lockedGoalLabel}
                     lockedGoalLegend={lockedGoalLegend}
                     initialHideCompletedGoals={initialHideCompletedGoals}
                     scopeGoalIds={scopeGoalIds}
                     scopeLabel={scopeLabel}
+                    scopeControlLabel={scopeControlLabel}
                     initialScopeEnabled={initialScopeEnabled}
                 />
                 {confirmError && <div role="alert" className={styles.error}>{confirmError}</div>}

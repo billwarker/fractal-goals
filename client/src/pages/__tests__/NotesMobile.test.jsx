@@ -102,6 +102,7 @@ describe('Notes mobile compose shell', () => {
         fireEvent.click(button);
         expect(screen.getByText('Filters')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-enter')).toBeInTheDocument();
+        expect(document.querySelector('.mobile-sheet-enter [data-sheet-handle]')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
         expect(button).toHaveAttribute('aria-expanded', 'true');
         fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));

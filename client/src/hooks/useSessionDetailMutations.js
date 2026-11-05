@@ -2,6 +2,7 @@ import { logError } from '../utils/logger';
 import { useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
+import { patchProgressSeriesInstance } from '../offline/progressChartOps';
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
 import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
@@ -346,6 +347,7 @@ export function useSessionDetailMutations({
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) =>
                     previous.map((instance) => instance.id === instanceId ? response.data : instance)
                 );
+                patchProgressSeriesInstance(queryClient, { rootId, instance: response.data });
             } else {
                 queryClient.invalidateQueries({ queryKey: sessionActivitiesKey });
             }

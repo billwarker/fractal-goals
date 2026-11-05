@@ -350,7 +350,8 @@ class GoalCompletionCondition(Base):
     """The activity threshold a goal completes on (one live row per goal).
 
     single_session: one activity instance reaches `min_sets` sets meeting every rule
-        (measure 'sets'), or its total yield reaches `target_value` (measure 'yield').
+        (measure 'sets'), its total yield reaches `target_value` (measure 'yield'), or `min_sets`
+        of its sets each have a yield reaching `target_value` (measure 'set_yield').
     cumulative: the summed metric (measure 'metric') or yield (measure 'yield') across the
         goal's active period reaches `target_value`.
     consistency: `required_count` instances in the active period each have `min_sets` (default 1)
@@ -359,7 +360,8 @@ class GoalCompletionCondition(Base):
 
     `set_aggregate = 'average'` (single_session and consistency, measure 'sets'): instead of
     individual sets meeting every rule, a session qualifies when the average of each rule's metric
-    across all of its counted sets meets the rule, over at least `min_sets` sets.
+    across all of its counted sets meets the rule, over at least `min_sets` sets. With measure
+    'set_yield' (single_session), it's the average yield across those sets that meets `target_value`.
 
     `tags` narrows the evidence: only sets carrying every tag count (`tag_match = 'exact'`: only
     sets whose effective tags are exactly these) (a set inherits its
@@ -396,21 +398,24 @@ class GoalCompletionCondition(Base):
         ),
         CheckConstraint("kind IN ('single_session', 'cumulative', 'consistency')", name='ck_goal_conditions_kind'),
         CheckConstraint(
-            "(kind = 'single_session' AND measure IN ('sets', 'yield'))"
+            "(kind = 'single_session' AND measure IN ('sets', 'yield', 'set_yield'))"
             " OR (kind = 'cumulative' AND measure IN ('metric', 'yield'))"
             " OR (kind = 'consistency' AND measure = 'sets')",
             name='ck_goal_conditions_kind_measure',
         ),
-        CheckConstraint("measure <> 'sets' OR kind <> 'single_session' OR min_sets >= 1", name='ck_goal_conditions_min_sets'),
+        CheckConstraint(
+            "measure NOT IN ('sets', 'set_yield') OR kind <> 'single_session' OR min_sets >= 1",
+            name='ck_goal_conditions_min_sets',
+        ),
         CheckConstraint("kind <> 'consistency' OR required_count >= 1", name='ck_goal_conditions_required_count'),
         CheckConstraint(
-            "measure NOT IN ('yield', 'metric') OR (target_value IS NOT NULL AND operator IN ('>=', '>', '<=', '<'))",
+            "measure NOT IN ('yield', 'set_yield', 'metric') OR (target_value IS NOT NULL AND operator IN ('>=', '>', '<=', '<'))",
             name='ck_goal_conditions_total',
         ),
         CheckConstraint("measure <> 'metric' OR metric_definition_id IS NOT NULL", name='ck_goal_conditions_metric'),
         CheckConstraint("NOT consecutive OR kind = 'consistency'", name='ck_goal_conditions_consecutive'),
         CheckConstraint(
-            "set_aggregate = 'each' OR (set_aggregate = 'average' AND measure = 'sets'"
+            "set_aggregate = 'each' OR (set_aggregate = 'average' AND measure IN ('sets', 'set_yield')"
             " AND kind IN ('single_session', 'consistency') AND min_sets >= 1)",
             name='ck_goal_conditions_set_aggregate',
         ),

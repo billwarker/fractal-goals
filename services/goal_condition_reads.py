@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from sqlalchemy.orm import selectinload
 
 from models import ActivityDefinition, MetricDefinition, validate_root_goal
+from services._serialize_common import calculate_smart_status
 from services.goal_condition_evaluator import evaluate_condition
 from services.goal_condition_evidence import collect_goal_activity_instances, to_evidence
 from services.goal_condition_service import (
@@ -23,6 +24,7 @@ from services.goal_condition_service import (
     yield_metric_ids,
 )
 from services.goal_loading import load_fractal_goals_for_serialization
+from services.goal_review_rules import attach_last_review_dates
 from services.serializers import (
     format_utc,
     serialize_activity_instance_for_analytics,
@@ -80,7 +82,8 @@ class GoalConditionReadService:
         }
 
     def list_for_activity(self, root_id, current_user_id, activity_id) -> ServiceResult[JsonDict]:
-        """Live goals whose condition is on this activity (charts draw them as reference lines)."""
+        """Live goals whose condition is on this activity (charts mark them at their thresholds, with
+        their level for the goal's icon)."""
         from models import Goal, GoalCompletionCondition, GoalConditionMetricRule
 
         if not validate_root_goal(self.db_session, root_id, owner_id=current_user_id):
@@ -94,6 +97,10 @@ class GoalConditionReadService:
             selectinload(GoalCompletionCondition.tags),
             selectinload(GoalCompletionCondition.activity),
             selectinload(GoalCompletionCondition.metric),
+            selectinload(Goal.level),
+            selectinload(Goal.pause_intervals),
+            selectinload(Goal.associated_activities),
+            selectinload(Goal.associated_activity_groups),
         ).filter(
             GoalCompletionCondition.root_id == root_id,
             GoalCompletionCondition.activity_definition_id == activity_id,
@@ -101,10 +108,14 @@ class GoalConditionReadService:
             Goal.deleted_at.is_(None),
             Goal.completion_condition == 'activity_threshold',
         ).order_by(Goal.completed.asc(), Goal.created_at.desc(), Goal.id).limit(CHART_CONDITION_LIMIT).all()
+        attach_last_review_dates(self.db_session, [goal for _, goal in rows])
         return {'goals': [{
             'goal_id': goal.id,
             'goal_name': goal.name,
+            'level_id': goal.level_id,
+            'level_name': goal.level.name if goal.level else None,
             'completed': bool(goal.completed),
+            'is_smart': all(calculate_smart_status(goal).values()),
             'deadline': format_utc(goal.deadline),
             'condition': serialize_goal_condition(condition),
         } for condition, goal in rows]}, None, 200

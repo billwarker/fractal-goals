@@ -92,6 +92,71 @@ def _goal(db_session, goal_id):
 
 @pytest.mark.integration
 class TestConditionWrites:
+    def _yield_activity(self, db_session, activity):
+        for metric in activity.metric_definitions:
+            metric.is_multiplicative = True
+        db_session.commit()
+        return activity
+
+    def test_a_yield_per_set_goal_completes_on_one_set_not_the_session_total(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        activity = self._yield_activity(db_session, sample_activity_definition)
+        goal = _create_goal(authed_client, root.id, root.id, {
+            "activity_definition_id": activity.id, "kind": "single_session", "measure": "set_yield",
+            "min_sets": 1, "operator": ">=", "target_value": 1000,
+        })
+        condition = goal["condition"]
+        assert condition["measure"] == "set_yield"
+        assert condition["min_sets"] == 1 and condition["set_aggregate"] == "each"
+        assert float(condition["target_value"]) == 1000 and condition["operator"] == ">="
+
+        session = _session(db_session, root, started=_now() + timedelta(minutes=1))
+        total_only = _instance(db_session, session, activity, [{"Weight": 100, "Reps": 6}, {"Weight": 100, "Reps": 6}],
+                               occurred=_now() + timedelta(minutes=1))
+        assert _complete(authed_client, root.id, total_only)["completed_goals"] == []
+        one_set = _instance(db_session, session, activity, [{"Weight": 200, "Reps": 5}],
+                            occurred=_now() + timedelta(minutes=2))
+        assert _complete(authed_client, root.id, one_set)["completed_goals"] == [{"id": goal["id"], "name": goal["name"]}]
+        assert _goal(db_session, goal["id"]).completed is True
+
+    def test_a_yield_per_set_goal_can_average_across_sets(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        activity = self._yield_activity(db_session, sample_activity_definition)
+        goal = _create_goal(authed_client, root.id, root.id, {
+            "activity_definition_id": activity.id, "kind": "single_session", "measure": "set_yield",
+            "min_sets": 2, "operator": ">=", "target_value": 500, "set_aggregate": "average",
+        })
+        assert goal["condition"]["set_aggregate"] == "average"
+        session = _session(db_session, root, started=_now() + timedelta(minutes=1))
+        instance = _instance(db_session, session, activity, [{"Weight": 100, "Reps": 8}, {"Weight": 100, "Reps": 2}],
+                             occurred=_now() + timedelta(minutes=1))
+        assert _complete(authed_client, root.id, instance)["completed_goals"] == [{"id": goal["id"], "name": goal["name"]}]
+
+    def test_yield_per_set_needs_sets_and_a_yield(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        condition = {
+            "activity_definition_id": sample_activity_definition.id, "kind": "single_session", "measure": "set_yield",
+            "min_sets": 1, "operator": ">=", "target_value": 1000,
+        }
+        post = lambda: authed_client.post(f"/api/{root.id}/goals", json={
+            "name": "No yield", "type": "ShortTermGoal", "parent_id": root.id,
+            "completion_condition": "activity_threshold", "condition": condition,
+        })
+        no_yield = post()
+        assert no_yield.status_code == 400 and "has no yield" in no_yield.get_json()["error"]
+
+        self._yield_activity(db_session, sample_activity_definition)
+        sample_activity_definition.has_sets = False
+        db_session.commit()
+        no_sets = post()
+        assert no_sets.status_code == 400 and "logs no sets" in no_sets.get_json()["error"]
+
     def test_creating_a_threshold_goal_stores_it_and_associates_the_activity(
         self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
     ):

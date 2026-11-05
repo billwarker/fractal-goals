@@ -72,7 +72,13 @@
 
 .header.wrap {
     flex-wrap: wrap;
+    row-gap: 6px;
 }
+
+/* A narrow panel: the buttons share the first row and the chart's name gets the second to itself. */
+.header.wrap .navGroup { order: 1; }
+.header.wrap .globalActions { order: 2; }
+.header.wrap .mainActions { order: 3; flex: 1 0 100%; min-width: 0; }
 
 /* Header Navigation Group (Back/Top) */
 .navGroup {
@@ -114,19 +120,6 @@
     flex: 0 0 auto;
 }
 
-.goalDetailIconWrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 auto;
-    color: currentColor;
-}
-
-.goalDetailIconShape {
-    display: block;
-}
-
 .goalDetailIconPlus {
     position: absolute;
     right: -12%;
@@ -149,12 +142,8 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
-    color: var(--color-text-secondary);
-    font-size: 13px;
-    font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Global Actions (Right side) */
@@ -532,39 +521,10 @@
     flex-wrap: wrap;
 }
 
-/* Goal Detail Header */
-.goalHeader {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.goalTitle {
-    margin: 0;
-    color: var(--color-text-primary);
-    font-size: 16px;
-}
-
-.goalBadge {
-    padding: 4px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    color: white;
-    /* Badge text typically white on colored bg */
-}
-
 .chartContainer {
     flex: 1;
     position: relative;
     min-height: 200px;
-}
-
-.noData {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
 }
 
 /* StatCard */

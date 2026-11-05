@@ -1,0 +1,30 @@
+{
+  "bucket_start": [
+    { "day": "2026-03-05", "grain": "day", "expected": "2026-03-05" },
+    { "day": "2026-03-05", "grain": "week", "expected": "2026-03-02" },
+    { "day": "2026-03-02", "grain": "week", "expected": "2026-03-02" },
+    { "day": "2026-03-08", "grain": "week", "expected": "2026-03-02" },
+    { "day": "2027-01-01", "grain": "week", "expected": "2026-12-28" },
+    { "day": "2026-03-31", "grain": "month", "expected": "2026-03-01" }
+  ],
+  "bucket_count": [
+    { "first": "2026-03-05", "last": "2026-03-05", "grain": "day", "expected": 1 },
+    { "first": "2026-03-01", "last": "2026-03-31", "grain": "day", "expected": 31 },
+    { "first": "2026-03-08", "last": "2026-03-09", "grain": "week", "expected": 2 },
+    { "first": "2026-03-02", "last": "2026-03-08", "grain": "week", "expected": 1 },
+    { "first": "2025-12-31", "last": "2026-01-01", "grain": "month", "expected": 2 },
+    { "first": "2026-01-15", "last": "2026-12-15", "grain": "month", "expected": 12 }
+  ],
+  "resolve_grain": [
+    { "requested": "auto", "first": "2026-01-01", "last": "2026-02-15", "budget": 120, "expected": "day" },
+    { "requested": "auto", "first": "2026-01-01", "last": "2026-02-16", "budget": 120, "expected": "week" },
+    { "requested": null, "first": "2026-01-01", "last": "2027-02-05", "budget": 120, "expected": "week" },
+    { "requested": "auto", "first": "2026-01-01", "last": "2027-02-06", "budget": 120, "expected": "month" },
+    { "requested": "day", "first": "2026-01-01", "last": "2026-12-31", "budget": 120, "expected": "week" },
+    { "requested": "day", "first": "2026-01-01", "last": "2026-04-30", "budget": 120, "expected": "day" },
+    { "requested": "day", "first": "2026-01-01", "last": "2026-05-01", "budget": 120, "expected": "week" },
+    { "requested": "week", "first": "2000-01-01", "last": "2026-12-31", "budget": 120, "expected": "month" },
+    { "requested": "month", "first": "1990-01-01", "last": "2026-12-31", "budget": 120, "expected": "month" },
+    { "requested": "bogus", "first": "2026-01-01", "last": "2026-01-10", "budget": 120, "expected": "day" }
+  ]
+}

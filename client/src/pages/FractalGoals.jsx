@@ -1,5 +1,6 @@
 import React, { Suspense, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import useGoalDeepLink from '../hooks/useGoalDeepLink';
 import FractalView from '../components/FractalView';
 import ErrorBoundary from '../components/ErrorBoundary';
 import AlertModal from '../components/modals/AlertModal';
@@ -679,6 +680,7 @@ function FractalGoals() {
         setViewingGoal(nodeDatum);
         setSidebarMode('goal-details');
     }, []);
+    useGoalDeepLink(fractalData, handleGoalNameClick);
 
     const handleAddChildClick = useCallback((nodeDatum) => {
         const parentType = nodeDatum.attributes?.type || nodeDatum.type;

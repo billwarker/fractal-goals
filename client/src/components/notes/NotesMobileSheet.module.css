@@ -24,15 +24,6 @@
     flex-direction: column;
 }
 
-.handle {
-    width: 44px;
-    height: 5px;
-    border-radius: 999px;
-    background: var(--color-border-hover);
-    margin: 10px auto 0;
-    flex-shrink: 0;
-}
-
 .header {
     display: flex;
     justify-content: space-between;

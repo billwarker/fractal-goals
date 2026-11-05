@@ -458,6 +458,13 @@ def get_goal_analytics(current_user, root_id):
     try:
         if any(request.args.get(key) not in (None, 'true', 'false') for key in ('charts', 'activity_filter')):
             return jsonify({"error": "Analytics flags must be true or false"}), 400
+        rollup = None
+        if request.args.get('rollup') == 'true':
+            rank = request.args.get('rollup_rank')
+            if (rank is not None and not rank.isdigit()) or request.args.get('duration_mode', 'activity') not in ('activity', 'session'):
+                return jsonify({"error": "rollup_rank must be a level rank and duration_mode activity or session"}), 400
+            rollup = {'rank': int(rank) if rank is not None else None, 'focus_goal_id': request.args.get('focus_goal_id'),
+                      'duration_mode': request.args.get('duration_mode', 'activity')}
 
         service = GoalAnalyticsService(db_session)
         payload, error, status = service.get_goal_analytics(
@@ -465,6 +472,7 @@ def get_goal_analytics(current_user, root_id):
             range_end=request.args.get('range_end'),
             activity_ids=request.args.getlist('activity_ids') if 'activity_ids' in request.args or request.args.get('activity_filter') == 'true' else None,
             chart_goal_id=request.args.get('chart_goal_id'), charts=request.args.get('charts') == 'true',
+            grain=request.args.get('grain'), timezone_name=request.args.get('timezone'), rollup=rollup,
         )
         if error:
             return jsonify({'error': error}), status

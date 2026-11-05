@@ -180,6 +180,12 @@ def _seed_goal_heatmap(db, suffix, user, now):
     # saved-view workflow asserts on Heatmap Guitar while both run in parallel.
     db.add(Goal(id=f'browser-chart-sandbox-{suffix}', root_id=root_id, parent_id=root_id, owner_id=user.id,
                 level_id=level_id, name=f'Chart Sandbox {suffix}', created_at=now - timedelta(days=30)))
+    # Goals set from a Guitar practice chart go under this one, for the same reason: the heatmap
+    # workflow asserts Heatmap Guitar's exact timeline count.
+    db.add(Goal(id=f'browser-chart-parent-{suffix}', root_id=root_id, parent_id=root_id, owner_id=user.id,
+                level_id=level_id, name=f'Chart Parent {suffix}', created_at=now - timedelta(days=30)))
+    db.flush()
+    db.execute(activity_goal_associations.insert().values(goal_id=f'browser-chart-parent-{suffix}', activity_id=f'browser-heatmap-activity-{suffix}'))
     for index in range(25):
         db.add(EventLog(id=f'browser-heatmap-event-{suffix}-{index}', root_id=root_id,
             event_type='activity.associated', entity_type='activity_definition', entity_id=f'archived-{index}',
@@ -278,7 +284,7 @@ def main():
             ))
             # Desktop/mobile specs create independent programs under the fixture account.
             # Keep production quota enforcement active without exhausting its free-tier default.
-            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000}}))
+            db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000, "activities": 1000, "metrics": 1000}}))
             # desktop-late reruns the program specs at a late-evening clock (playwright.config.js).
             for suffix in ("desktop", "mobile", "desktop-late"):
                 root_id = f"browser-root-{suffix}"
@@ -435,6 +441,13 @@ def main():
                     ("offline-circuit", "Offline Circuit"),
                     ("offline-edits", "Offline Edits"),
                     ("offline-ceiling", "Offline Ceiling"),
+                    ("axis-room", "Axis Room"),
+                    ("trend-goals", "Trend Goals"),
+                    ("aligned-sessions", "Aligned Sessions"),
+                    ("aligned-boards", "Aligned Boards"),
+                    ("progress-goals", "Progress Goals"),
+                    ("progress-goal-chart", "Progress Goal Chart"),
+                    ("sheet-handle", "Sheet Handle"),
                 ):
                     spec_root = f"browser-{slug}-root-{suffix}"
                     db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,

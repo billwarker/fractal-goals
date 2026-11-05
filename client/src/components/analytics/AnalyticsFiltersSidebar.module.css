@@ -1,0 +1,61 @@
+.sidebar {
+    min-height: 0;
+}
+
+.global {
+    flex: 0 0 auto;
+    max-height: 42%;
+    overflow: auto;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.global :global(.sessions-query-sidebar-content) {
+    padding-bottom: 0;
+}
+
+.global > div,
+.chartPane > div {
+    height: auto;
+    background: transparent;
+}
+
+.tabs {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 4px;
+    padding: 4px 10px 0;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--color-border);
+    scrollbar-width: thin;
+}
+
+.tab {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 9px 8px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.tab[aria-selected='true'] {
+    border-bottom-color: var(--color-brand-primary);
+}
+
+.tab:focus-visible,
+.chartPane:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: -3px;
+}
+
+.chartPane {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}

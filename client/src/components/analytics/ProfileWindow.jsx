@@ -12,7 +12,9 @@ import {
     LightningIcon,
     MinimizeHeaderIcon,
     RestoreHeaderIcon,
+    SplitHorizontalIcon,
     SplitIcon,
+    SplitVerticalIcon,
     TimerIcon,
     VisualizationIcon,
 } from './AnalyticsIcons';
@@ -28,12 +30,21 @@ import {
     normalizeVisualizationState,
 } from './visualizations/state';
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
+import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
+import SetGoalButton from './annotate/SetGoalButton';
+import { AlignedAxisWindow } from './alignedAxes/AlignedAxesContext';
+import alignedCrosshair from './alignedAxes/alignedCrosshair';
+import { canSetGoalFromChart } from './chartGoalTargets';
+import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
+import ChartTitle from './ChartTitle';
+import ChartTitleEditor from './ChartTitleEditor';
 import pageGridSnap from './pageGridSnap';
+import axisExtension from './axisExtension';
 
 // Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
-ChartJS.register(pageGridSnap);
+ChartJS.register(pageGridSnap, axisExtension, alignedCrosshair);
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 
@@ -50,6 +61,9 @@ const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((categor
  * @param {function} props.updateWindowState - Callback to update window state
  * @param {boolean} props.isSelected - Whether this window is selected
  * @param {function} props.onSelect - Callback when the window is clicked to select it
+ * @param {number} props.chartNumber - This chart's number, matching its sidebar tab
+ * @param {string} props.windowId - This panel's id, passed back to onShownGrainChange
+ * @param {function} props.onShownGrainChange - Called with (windowId, the bucket grain the chart drew or null)
  * @param {boolean} props.onPageGrid - Draw the panel on the page's background grid: no fill or outline
  *   until selected, and charts at 'expanded' density (no gridlines of their own, snapped to the grid)
  */
@@ -67,21 +81,44 @@ function ProfileWindow({
     globalDateRange = null,
     onGlobalDateRangeChange,
     globalFilters = null,
+    reusableViewId = null,
+    onResetFilters = null,
     onOpenQueryConsole = null,
     showQueryInspector = true,
+    chartNumber = null,
+    windowId = null,
+    onShownGrainChange = null,
     onPageGrid = false,
 }) {
     const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const { goalAnalytics, rootId } = data;
     const chartRef = useRef(null);
     const containerRef = useRef(null);
+    const splitMenuRef = useRef(null);
 
     const [showSplitMenu, setShowSplitMenu] = useState(false);
+    const [isAnnotating, setIsAnnotating] = useState(false);
     const [isHeaderMinimized, setIsHeaderMinimized] = useState(false);
     const [isQueryOverlayOpen, setIsQueryOverlayOpen] = useState(false);
 
+    const reportShownGrain = React.useCallback((grain) => onShownGrainChange?.(windowId, grain), [onShownGrainChange, windowId]);
+
     const [isNarrow, setIsNarrow] = useState(false);
-    const [isVeryNarrow, setIsVeryNarrow] = useState(false);
+
+    // The split menu closes on a press anywhere else, or on Esc.
+    React.useEffect(() => {
+        if (!showSplitMenu) return undefined;
+        const close = (event) => {
+            if (event.type === 'keydown' ? event.key !== 'Escape' : splitMenuRef.current?.contains(event.target)) return;
+            setShowSplitMenu(false);
+        };
+        window.addEventListener('pointerdown', close);
+        window.addEventListener('keydown', close);
+        return () => {
+            window.removeEventListener('pointerdown', close);
+            window.removeEventListener('keydown', close);
+        };
+    }, [showSplitMenu]);
 
     // Use ResizeObserver to detect width changes
     React.useEffect(() => {
@@ -91,7 +128,6 @@ function ProfileWindow({
             for (const entry of entries) {
                 const width = entry.contentRect.width;
                 setIsNarrow(width < 400);
-                setIsVeryNarrow(width < 280);
             }
         });
 
@@ -106,11 +142,14 @@ function ProfileWindow({
     } = windowState;
     const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
 
-    const setSelectedVisualization = (value) => updateWindowState(getVisualizationSelectionUpdate(windowState, value));
+    // A custom name belongs to the chart it was given to, so replacing the chart drops it.
+    const setSelectedVisualization = (value) => updateWindowState({ ...getVisualizationSelectionUpdate(windowState, value), chartTitle: null });
     const updateVisualizationState = React.useCallback((updates) => {
         updateWindowState(getVisualizationStateUpdate(windowState, updates));
     }, [updateWindowState, windowState]);
     const {
+        chartGrain,
+        timeRollup,
         effectiveDateRange,
         resolvedGlobalFilters,
         scopedActivities,
@@ -124,6 +163,10 @@ function ProfileWindow({
         effectiveSelectedGoal,
     } = useVisualizationContext({ data, windowState, globalDateRange, globalFilters });
 
+    // Adding a second metric to Metric Trends takes the chart out of Set goal mode.
+    const canSetGoal = canSetGoalFromChart(selectedVisualization, effectiveSelectedActivity, visualizationState.metrics);
+    if (isAnnotating && !canSetGoal) setIsAnnotating(false);
+
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
         if (category !== selectedCategory) {
@@ -132,6 +175,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         }
     };
@@ -142,6 +186,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         } else if (selectedCategory) {
             updateWindowState({
@@ -149,6 +194,7 @@ function ProfileWindow({
                 selectedVisualization: null,
                 selectedActivity: null,
                 selectedGoal: null,
+                chartTitle: null,
             });
         }
     };
@@ -159,6 +205,7 @@ function ProfileWindow({
             selectedVisualization: null,
             selectedActivity: null,
             selectedGoal: null,
+            chartTitle: null,
         });
     };
 
@@ -174,30 +221,6 @@ function ProfileWindow({
     };
 
     const renderVisualizationIcon = (visualization, size = 16) => {
-        if (visualization?.id === 'goalDetail') {
-            return (
-                <span
-                    className={styles.goalDetailIconWrap}
-                    style={{ width: size, height: size }}
-                    aria-hidden="true"
-                >
-                    <AnalyticsGoalIcon
-                        goal={rootGoal}
-                        getGoalColor={getGoalColor}
-                        getGoalSecondaryColor={getGoalSecondaryColor}
-                        getGoalIcon={getGoalIcon}
-                        size={Math.max(10, Math.round(size * 0.82))}
-                        className={styles.goalDetailIconShape}
-                    />
-                    <span className={styles.goalDetailIconPlus}>
-                        <svg width={Math.max(8, Math.round(size * 0.46))} height={Math.max(8, Math.round(size * 0.46))} viewBox="0 0 12 12" fill="none">
-                            <path d="M6 2.4v7.2M2.4 6h7.2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                        </svg>
-                    </span>
-                </span>
-            );
-        }
-
         return <VisualizationIcon type={visualization?.iconType} size={size} />;
     };
 
@@ -258,12 +281,16 @@ function ProfileWindow({
         }
     };
 
+    const renderTitle = () => (selectedVisualizationMeta
+        ? <ChartTitleEditor number={chartNumber} windowState={windowState} onRename={(chartTitle) => updateWindowState({ chartTitle })} />
+        : <ChartTitle name={CATEGORY_LABELS[selectedCategory] || 'Analytics'} />);
+
     const renderUnifiedHeader = () => {
         const hasCategory = !!selectedCategory;
 
         return (
             <div
-                className={`${styles.header} ${isVeryNarrow ? styles.wrap : ''}`}
+                className={`${styles.header} ${isNarrow ? styles.wrap : ''}`}
                 {...(dragHandleProps || {})}
             >
                 {/* Navigation Controls (Back/Top) */}
@@ -300,14 +327,15 @@ function ProfileWindow({
                                     ? categoryIcons[selectedCategory]
                                     : <ChartIcon size={16} />}
                         </span>
-                        <span>
-                            {selectedVisualizationMeta?.name || CATEGORY_LABELS[selectedCategory] || 'Analytics'}
-                        </span>
+                        {renderTitle()}
                     </div>
                 </div>
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
+                    {canSetGoal && (
+                        <SetGoalButton annotating={isAnnotating} onToggle={() => setIsAnnotating((current) => !current)} />
+                    )}
                     {showQueryInspector && selectedVisualizationMeta && (
                         <Button
                             onClick={(e) => {
@@ -324,7 +352,7 @@ function ProfileWindow({
                         </Button>
                     )}
                     {canSplit && (
-                        <div style={{ position: 'relative' }}>
+                        <div ref={splitMenuRef} style={{ position: 'relative' }}>
                             <Button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -341,11 +369,11 @@ function ProfileWindow({
                                 <div className={styles.splitMenu}>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('vertical'); setShowSplitMenu(false); }}
                                         className={styles.splitMenuItem}>
-                                        <span className={styles.menuIcon}><SplitIcon size={15} /></span> Split Vertical
+                                        <span className={styles.menuIcon}><SplitVerticalIcon size={15} /></span> Split Vertical
                                     </button>
                                     <button onClick={(e) => { e.stopPropagation(); onSplit('horizontal'); setShowSplitMenu(false); }}
                                         className={styles.splitMenuItem}>
-                                        <span className={styles.menuIcon}><SplitIcon size={15} /></span> Split Horizontal
+                                        <span className={styles.menuIcon}><SplitHorizontalIcon size={15} /></span> Split Horizontal
                                     </button>
                                 </div>
                             )}
@@ -500,17 +528,27 @@ function ProfileWindow({
             isError: Boolean(data.evidenceError),
             refetch: data.hasMoreEvidence ? data.loadMoreEvidence : data.retryEvidence,
         };
-        if (readQuery.isFetching) return <div role="status">{selectedCategory === 'goals' ? 'Loading analytics…' : 'Loading full history…'}</div>;
-        if (readQuery.isError) {
-            return <div role="alert">Analytics could not be loaded. <button type="button" onClick={() => readQuery.refetch()}>Retry</button></div>;
-        }
+        if (readQuery.isFetching) return <ChartLoading label={selectedCategory === 'goals' ? 'Loading analytics…' : 'Loading full history…'} />;
+        if (readQuery.isError) return <ChartError onRetry={readQuery.refetch} />;
         const VisualizationChart = selectedVisualizationMeta?.Chart;
         if (!VisualizationChart) return null;
+        const hasActiveScope = hasActiveGlobalFilters(globalFilters) || hasActiveGlobalFilters(windowState.localFilters) || Boolean(globalDateRange?.start || globalDateRange?.end);
+        // An empty chart's "Clear filters": every global filter and the time range.
+        const clearAllFilters = () => {
+            updateWindowState({ localFilters: null });
+            onResetFilters?.();
+            onGlobalDateRangeChange?.({ start: null, end: null });
+        };
 
         return (
+            <ChartScopeProvider hasActiveFilters={hasActiveScope} onClearFilters={onResetFilters ? clearAllFilters : null} onGrainShown={reportShownGrain}>
             <ChartGoalSurface
                 Chart={VisualizationChart}
                 rootId={rootId}
+                annotating={isAnnotating}
+                canSetGoal={canSetGoal}
+                onAnnotatingChange={setIsAnnotating}
+                chartToSave={{ windowState, globalFilters, reusableViewId }}
                 context={{
                     data,
                     scopedData: {
@@ -519,6 +557,8 @@ function ProfileWindow({
                         goals: filteredGoalAnalyticsGoals,
                         goalSummary: filteredGoalSummary,
                         sessions: filteredSessions,
+                        chartGrain,
+                        timeRollup,
                     },
                     globalFilters: resolvedGlobalFilters,
                     dateRange: effectiveDateRange,
@@ -534,6 +574,7 @@ function ProfileWindow({
                     onGlobalDateRangeChange,
                 }}
             />
+            </ChartScopeProvider>
         );
     };
 
@@ -549,11 +590,13 @@ function ProfileWindow({
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderQueryOverlay()}
-            {onPageGrid ? (
-                <ChartDensityContext.Provider value="expanded">
-                    {renderVisualizationContent()}
-                </ChartDensityContext.Provider>
-            ) : renderVisualizationContent()}
+            <AlignedAxisWindow windowId={windowId}>
+                {onPageGrid ? (
+                    <ChartDensityContext.Provider value="expanded">
+                        {renderVisualizationContent()}
+                    </ChartDensityContext.Provider>
+                ) : renderVisualizationContent()}
+            </AlignedAxisWindow>
         </div>
     );
 }

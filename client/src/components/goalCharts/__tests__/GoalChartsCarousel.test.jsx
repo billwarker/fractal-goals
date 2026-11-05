@@ -43,15 +43,15 @@ beforeEach(() => {
 });
 
 describe('buildGoalChartItems', () => {
-    it('puts the threshold chart first, then attached views', () => {
+    it('puts attached views first, then the threshold chart', () => {
         const items = buildGoalChartItems(payload, goal);
-        expect(items.map((item) => item.key)).toEqual(['condition_progress', 'view:v1', 'view:v2']);
-        expect(items[0].name).toBe('Progress toward Bench 500');
+        expect(items.map((item) => item.key)).toEqual(['view:v1', 'view:v2', 'condition_progress']);
+        expect(items[2].name).toBe('Progress toward Bench 500');
     });
 
     it('names the threshold chart after the threshold when it has its own name', () => {
         const named = { ...goal, condition: { ...goal.condition, name: 'Bench volume' } };
-        expect(buildGoalChartItems(payload, named)[0].name).toBe('Progress toward Bench volume');
+        expect(buildGoalChartItems(payload, named)[2].name).toBe('Progress toward Bench volume');
     });
 
     it('has no default chart without a threshold', () => {
@@ -62,12 +62,13 @@ describe('buildGoalChartItems', () => {
 describe('GoalChartsCarousel', () => {
     it('cycles charts with the buttons and arrow keys, compact, and remembers the last one', () => {
         renderCarousel();
-        expect(screen.getByTestId('chart-view')).toHaveTextContent('condition_progress');
+        expect(screen.getByTestId('chart-view')).toHaveTextContent('view:v1');
         expect(screen.getByTestId('chart-view')).toHaveAttribute('data-density', 'compact');
+        expect(screen.getByText('Bench trend')).toBeInTheDocument();
         expect(screen.getByText('1 of 3')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: 'Next chart' }));
-        expect(screen.getByText('Bench trend')).toBeInTheDocument();
+        expect(screen.getByTestId('chart-view')).toHaveTextContent('view:v2');
         expect(screen.getByText('2 of 3')).toBeInTheDocument();
 
         fireEvent.keyDown(screen.getByRole('region', { name: 'Analytics' }), { key: 'ArrowRight' });
@@ -75,21 +76,22 @@ describe('GoalChartsCarousel', () => {
         fireEvent.keyDown(screen.getByRole('region', { name: 'Analytics' }), { key: 'ArrowRight' });
         expect(screen.getByText('1 of 3')).toBeInTheDocument();
         fireEvent.keyDown(screen.getByRole('region', { name: 'Analytics' }), { key: 'ArrowLeft' });
-        expect(readRememberedChart('goal-1')).toBe('view:v2');
+        expect(readRememberedChart('goal-1')).toBe('condition_progress');
     });
 
     it('opens on the remembered chart', () => {
         window.localStorage.setItem('fractal-goals:goal-chart:goal-1', 'view:v2');
         renderCarousel();
-        expect(screen.getByText('3 of 3')).toBeInTheDocument();
+        expect(screen.getByText('2 of 3')).toBeInTheDocument();
     });
 
     it('removes attached views but never the default chart', () => {
         renderCarousel();
-        expect(screen.queryByRole('button', { name: 'Remove this chart' })).not.toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Next chart' }));
         fireEvent.click(screen.getByRole('button', { name: 'Remove this chart' }));
         expect(detachMock).toHaveBeenCalledWith('v1');
+        fireEvent.click(screen.getByRole('button', { name: 'Previous chart' }));
+        expect(screen.getByTestId('chart-view')).toHaveTextContent('condition_progress');
+        expect(screen.queryByRole('button', { name: 'Remove this chart' })).not.toBeInTheDocument();
     });
 
     it('expands by clicking the chart, only when the page supports it', () => {
@@ -102,9 +104,9 @@ describe('GoalChartsCarousel', () => {
         renderCarousel({ chartExpansion: { goalId: null, expand, collapse: vi.fn() } });
         expect(screen.queryByRole('button', { name: 'Expand' })).not.toBeInTheDocument();
         fireEvent.click(screen.getByTestId('chart-view'));
-        expect(expand).toHaveBeenCalledWith({ goalId: 'goal-1', chartKey: 'condition_progress' });
+        expect(expand).toHaveBeenCalledWith({ goalId: 'goal-1', chartKey: 'view:v1' });
 
-        fireEvent.keyDown(screen.getByRole('button', { name: /^Expand chart: Progress toward/ }), { key: 'Enter' });
+        fireEvent.keyDown(screen.getByRole('button', { name: /^Expand chart: Bench trend/ }), { key: 'Enter' });
         expect(expand).toHaveBeenCalledTimes(2);
     });
 
@@ -191,6 +193,6 @@ describe('ExpandedGoalChart', () => {
         renderCarousel({ chartExpansion: { goalId: 'goal-1', expand: vi.fn(), collapse: vi.fn() } });
         render(<ExpandedGoalChart rootId="root-1" goal={goal} goalId="goal-1" initialKey="condition_progress" onClose={() => {}} />);
         fireEvent.click(screen.getByRole('button', { name: 'Next chart' }));
-        expect(screen.getByTestId('chart-view')).toHaveTextContent('view:v1');
+        expect(screen.getByTestId('chart-view')).toHaveTextContent('view:v2');
     });
 });

@@ -21,6 +21,9 @@ def test_lists_live_goals_on_the_activity_open_first(authed_client, sample_ultim
     goals = response.get_json()["goals"]
     assert [(goal["goal_name"], goal["completed"]) for goal in goals] == [("Lift 245", False), ("Lift 200", True)]
     assert [rule["value"] for rule in goals[0]["condition"]["rules"]] == [245, 5]
+    # Each carries its level, so a chart can mark it with the goal's icon.
+    assert goals[0]["level_id"] and goals[0]["level_name"] == "Short Term Goal"
+    assert goals[0]["is_smart"] is False
 
 
 @pytest.mark.integration

@@ -3,6 +3,7 @@ import React from 'react';
 import Button from '../atoms/Button';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import BodyPortal from '../layout/BodyPortal';
+import SheetHandle from '../layout/SheetHandle';
 import styles from './NotesMobileSheet.module.css';
 
 /**
@@ -22,7 +23,7 @@ export default function NotesMobileSheet({
         <BodyPortal when={open}>
             <ModalBackdrop className={`${styles.backdrop} mobile-sheet-backdrop-enter`} onClose={onClose}>
                 <div className={`${styles.card} mobile-sheet-enter`} onClick={(event) => event.stopPropagation()}>
-                    <div className={styles.handle} />
+                    <SheetHandle onDismiss={onClose} />
                     <div className={styles.header}>
                         <div className={styles.headerCopy}>
                             <div className={styles.title}>{composing ? 'Associator' : 'Filters'}</div>

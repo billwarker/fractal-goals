@@ -13,9 +13,10 @@ function buildInitialGoalFormState(goal, mode, initialCompletion) {
     }
 
     return {
-        name: mode === 'create' ? '' : (goal?.name || ''),
+        // A create seed may carry a name and due date (a goal set from a chart point).
+        name: mode === 'create' ? (initialCompletion?.name ?? '') : (goal?.name || ''),
         description: mode === 'create' ? '' : (goal?.attributes?.description || goal?.description || ''),
-        deadline: mode === 'create' ? '' : deadline,
+        deadline: mode === 'create' ? (initialCompletion?.deadline ?? '') : deadline,
         startedAt: mode === 'create' ? '' : getGoalStartedAt(goal),
         completionCondition: mode === 'create'
             ? (initialCompletion?.completionCondition ?? 'manual')

@@ -18,7 +18,7 @@ export const COMPLETION_CONDITION_LABELS = {
 };
 
 export const CONDITION_KINDS = {
-    single_session: { label: 'Single session', measures: ['sets', 'yield'] },
+    single_session: { label: 'Single session', measures: ['sets', 'yield', 'set_yield'] },
     cumulative: { label: 'Cumulative', measures: ['metric', 'yield'] },
     consistency: { label: 'Consistency', measures: ['sets'] },
 };
@@ -176,19 +176,20 @@ export function changeDraftActivity(draft, activity) {
         tag_ids: draft.tag_ids || [],
         consecutive: Boolean(draft.consecutive),
     };
-    return draft.measure === 'yield' && yieldMetricIds(activity).length > 0
-        ? { ...fresh, measure: 'yield', rules: [] }
-        : fresh;
+    const keepsYield = (draft.measure === 'yield' || (draft.measure === 'set_yield' && activityUsesSets(activity)))
+        && yieldMetricIds(activity).length > 0;
+    return keepsYield ? { ...fresh, measure: draft.measure, rules: [] } : fresh;
 }
 
 /**
  * Whether a draft averages each rule across a session's counted sets (rather than every set
- * meeting the rules on its own). Only sets-meeting-rules thresholds can average.
+ * meeting the rules on its own), or the yield of those sets. Only per-set thresholds can average.
  * @param {any} draft
  */
 export function averagesSets(draft) {
-    return draft?.set_aggregate === 'average' && draft.measure === 'sets'
-        && (draft.kind === 'single_session' || draft.kind === 'consistency');
+    if (draft?.set_aggregate !== 'average') return false;
+    if (draft.measure === 'set_yield') return draft.kind === 'single_session';
+    return draft.measure === 'sets' && (draft.kind === 'single_session' || draft.kind === 'consistency');
 }
 
 /** @param {unknown} value */
@@ -251,8 +252,13 @@ export function validateConditionDraft(draft, activity) {
         }
     } else {
         if (parseNumber(draft.target_value) == null) errors.target_value = 'Total must be a number';
-        if (draft.measure === 'yield' && yieldMetricIds(activity).length === 0) {
+        if ((draft.measure === 'yield' || draft.measure === 'set_yield') && yieldMetricIds(activity).length === 0) {
             errors.measure = `'${activity.name}' has no yield (it needs two or more multiplied metrics)`;
+        } else if (draft.measure === 'set_yield' && !activityUsesSets(activity)) {
+            errors.measure = `'${activity.name}' logs no sets to measure yield per set`;
+        }
+        if (draft.measure === 'set_yield' && parseWhole(draft.min_sets, MAX_MIN_SETS) == null) {
+            errors.min_sets = `Sets must be between 1 and ${MAX_MIN_SETS}`;
         }
         if (draft.measure === 'metric' && !metricsById.has(draft.metric_definition_id)) {
             errors.metric = 'Choose a metric this activity tracks';
@@ -296,6 +302,8 @@ export function buildConditionPayload(draft) {
         operator: draft.operator,
         target_value: Number(draft.target_value),
         ...(draft.measure === 'metric' ? { metric_definition_id: draft.metric_definition_id } : {}),
+        ...(draft.measure === 'set_yield' ? { min_sets: Number(draft.min_sets) } : {}),
+        ...(draft.measure === 'set_yield' && averagesSets(draft) ? { set_aggregate: 'average' } : {}),
     };
 }
 

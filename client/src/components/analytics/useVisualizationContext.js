@@ -1,9 +1,12 @@
 import React, { useMemo } from 'react';
 
-import { instanceMatchesScope, resolveAnalyticsGlobalFilters, sessionMatchesScope } from './analyticsGlobalFilters';
+import { instanceMatchesScope, sessionMatchesScope } from './analyticsGlobalFilters';
+import { resolveAnalyticsChartScope } from './analyticsChartScope';
 import { summarizeFilteredGoals } from './filteredGoalSummary';
 import useGoalAnalyticsRead from './useGoalAnalyticsRead';
 import { getVisualization } from './visualizations/registry';
+import { timeDistributionRollupRank } from './visualizations/goals/timeDistributionState';
+import { normalizeVisualizationState } from './visualizations/state';
 
 /**
  * Everything a visualization needs from one window's state: the resolved global filters, the
@@ -18,13 +21,13 @@ export default function useVisualizationContext({ data, windowState, globalDateR
     const { selectedCategory, selectedVisualization, selectedActivity, selectedGoal } = windowState || {};
 
     const effectiveDateRange = globalDateRange;
-    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsGlobalFilters({
-        filters: globalFilters,
+    const resolvedGlobalFilters = useMemo(() => resolveAnalyticsChartScope({
+        globalFilters, localFilters: windowState?.localFilters,
         goalAnalytics,
         activities,
         activityGroups,
         activityInstances,
-    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics]);
+    }), [activities, activityGroups, activityInstances, globalFilters, goalAnalytics, windowState?.localFilters]);
     const scopedActivities = useMemo(() => (
         resolvedGlobalFilters.hasActivityFilter
             ? activities.filter((activity) => resolvedGlobalFilters.activityIds.has(activity.id))
@@ -57,8 +60,15 @@ export default function useVisualizationContext({ data, windowState, globalDateR
         return true;
     }, [effectiveDateRange, hasActiveDateRange]);
 
-    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization, selectedGoal,
-        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange });
+    const visualizationState = useMemo(() => normalizeVisualizationState(windowState), [windowState]);
+    const rollup = useMemo(() => ({
+        rank: timeDistributionRollupRank(visualizationState),
+        focusGoalId: visualizationState.focusGoalId || null,
+        durationMode: visualizationState.durationMode || 'activity',
+    }), [visualizationState]);
+    const scopedGoalQuery = useGoalAnalyticsRead({ rootId, selectedCategory, selectedVisualization,
+        resolvedGlobalFilters, goalAnalytics, effectiveDateRange, hasActiveDateRange,
+        grain: visualizationState.grain || 'auto', rollup });
     const scopedGoalAnalytics = scopedGoalQuery.data || goalAnalytics;
 
     const filteredSessions = useMemo(() => {
@@ -172,7 +182,13 @@ export default function useVisualizationContext({ data, windowState, globalDateR
         selectedVisualizationMeta,
     ]);
 
+    // The calendar grain the server bucketed goal charts by (day, week or month).
+    const chartGrain = scopedGoalAnalytics?.metadata?.chart_grain || null;
+    const timeRollup = scopedGoalQuery.data?.time_rollup || null;
+
     return {
+        chartGrain,
+        timeRollup,
         effectiveDateRange,
         hasActiveDateRange,
         resolvedGlobalFilters,

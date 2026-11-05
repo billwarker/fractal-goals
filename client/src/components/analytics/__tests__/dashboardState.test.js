@@ -5,6 +5,7 @@ import {
     getConfiguredWindowCount,
     getHighestWindowIndex,
     sanitizeDashboardLayoutPayload,
+    savedStateSignature,
 } from '../dashboardState';
 
 describe('dashboardState helpers', () => {
@@ -177,10 +178,7 @@ describe('dashboardState helpers', () => {
         });
 
         expect(sanitized.windowStates['window-1'].selectedVisualization).toBe('sessionTrends');
-        expect(sanitized.windowStates['window-1'].visualizationState).toEqual({
-            grain: 'week',
-            metrics: ['sessions', 'duration'],
-        });
+        expect(sanitized.windowStates['window-1'].visualizationState).toEqual({ grain: 'auto' });
     });
 
     it('saves a portable analytics view and restores it as a one-window layout', () => {
@@ -227,5 +225,31 @@ describe('dashboardState helpers', () => {
             'window-1': { selectedCategory: 'goals', selectedVisualization: 'stats' },
             'window-2': { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' },
         })).toBe(2);
+    });
+
+    it('keeps the filters added to a chart when a view is saved and reopened', () => {
+        const windowState = {
+            ...getDefaultWindowState(),
+            selectedCategory: 'activities',
+            selectedVisualization: 'activityTrends',
+            visualizationState: { shownFilters: ['tags', 'templates'] },
+        };
+        const reopened = sanitizeDashboardLayoutPayload(createAnalyticsViewPayload({ windowState, globalFilters: {} }));
+        expect(reopened.windowStates['window-1'].visualizationState.shownFilters).toEqual(['tags', 'templates']);
+        expect(reopened.windowStates['window-1'].visualizationStateByKey['activities:activityTrends'].shownFilters)
+            .toEqual(['tags', 'templates']);
+    });
+
+    it('signs what a save would change, ignoring the selected panel, screen size and hidden charts', () => {
+        const chart = { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' };
+        const layout = { type: 'grid', panels: [{ id: 'window-1', x: 0, y: 0, w: 96, h: 48 }] };
+        const base = savedStateSignature({ layout, windowStates: { 'window-1': chart }, globalFilters: {} });
+
+        // Remembered settings of other charts and empty panels aren't edits.
+        expect(savedStateSignature({ layout, windowStates: { 'window-1': { ...chart, visualizationStateByKey: { 'goals:stats': { a: 1 } } } }, globalFilters: {} })).toBe(base);
+        // Renaming, a different chart, or a filter are.
+        expect(savedStateSignature({ layout, windowStates: { 'window-1': { ...chart, chartTitle: 'Mine' } }, globalFilters: {} })).not.toBe(base);
+        expect(savedStateSignature({ layout, windowStates: { 'window-1': { ...chart, selectedVisualization: 'sessionHeatmap' } }, globalFilters: {} })).not.toBe(base);
+        expect(savedStateSignature({ layout, windowStates: { 'window-1': chart }, globalFilters: { goals: { goalIds: ['g1'] } } })).not.toBe(base);
     });
 });

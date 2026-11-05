@@ -27,6 +27,7 @@ vi.mock('../../goalDetail/ConditionProgressChart', () => ({
 }));
 
 vi.mock('../ProgressChartView', () => ({
+    progressGoalChart: (series) => (series?.chart_settings?.kind === 'scatter' ? { id: 'scatterPlot', setsHandling: 'top' } : null),
     default: ({ series, density }) => (
         <div data-testid="progress-chart">{density}:{series.instances.length}:{series.chart_settings.kind}</div>
     ),
@@ -162,6 +163,32 @@ describe('Expanded Progress chart', () => {
         expect(setChart).toHaveBeenLastCalledWith(expect.objectContaining({
             settings: expect.objectContaining({ kind: 'scatter', set_aggregation: 'average' }),
         }));
+    });
+
+    it('offers Set goal only on a chart that can set one, and Escape leaves that mode before closing', () => {
+        const onClose = vi.fn();
+        const { unmount } = renderWithProviders(
+            <ExpandedProgressChart rootId="root-1" chart={{ activityId: 'activity-def-1', instanceId: instance.id }} instances={[instance]} onClose={onClose} />,
+            providers,
+        );
+        expect(screen.queryByRole('button', { name: 'Set goal' })).not.toBeInTheDocument();
+        unmount();
+
+        useActivityProgressSeries.mockReturnValue({ data: {
+            ...SERIES, chart_settings: { kind: 'scatter', x_metric_id: 'x', y_metric_id: 'y', set_aggregation: 'top' },
+        }, isLoading: false });
+        renderWithProviders(
+            <ExpandedProgressChart rootId="root-1" chart={{ activityId: 'activity-def-1', instanceId: instance.id }} instances={[instance]} onClose={onClose} />,
+            providers,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Set goal' }));
+        expect(screen.getByRole('button', { name: 'Done' })).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.keyDown(document.body, { key: 'Escape' });
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+        fireEvent.keyDown(document.body, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+        useActivityProgressSeries.mockReturnValue({ data: SERIES, isLoading: false });
     });
 
     it('opens a scatter in Analytics as a scatter, with its axes and set handling', () => {

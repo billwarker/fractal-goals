@@ -17,7 +17,7 @@ import styles from './ProgressPanel.module.css';
 function goalMetricIds(chart) {
     const condition = chart?.condition;
     if (!condition) return [];
-    if (condition.measure === 'yield') return [YIELD_METRIC_ID];
+    if (condition.measure === 'yield' || condition.measure === 'set_yield') return [YIELD_METRIC_ID];
     if (condition.measure === 'sets') return (condition.rules || []).slice(0, 2).map((rule) => rule.metric_definition_id);
     return condition.metric_definition_id ? [condition.metric_definition_id] : [];
 }

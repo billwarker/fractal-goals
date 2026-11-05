@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Bar } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
+import { useAlignedAxis } from '../../alignedAxes/AlignedAxesContext';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 
 const improvedColor = '#22c55e';
@@ -66,6 +67,8 @@ export function buildMetricProgressRows({ instances = [], selectedMetricId = nul
             const value = progressValue(comparison);
             if (value == null) return null;
             return {
+                key: instance.id,
+                at: getInstanceDate(instance)?.getTime() || 0,
                 label: formatInstanceLabel(instance, index),
                 value,
                 metricName: comparison?.metric_name || 'Metric',
@@ -90,6 +93,18 @@ export function MetricProgressChart({
         instances: activity ? activityInstances[activity.id] || [] : [],
         selectedMetricId,
     }), [activity, activityInstances, selectedMetricId]);
+    const ownChartRef = useRef(null);
+    const setChartRef = useCallback((chart) => {
+        ownChartRef.current = chart;
+        if (chartRef) chartRef.current = chart;
+    }, [chartRef]);
+    const slots = useAlignedAxis({ chartRef: ownChartRef, identity: activity && rows.length ? `sessions:${activity.id}` : null, points: rows });
+    // Aligned with other charts: a slot for each of their sessions, empty where this one has no comparison.
+    const shownRows = useMemo(() => {
+        if (!slots) return rows;
+        const byKey = new Map(rows.map((row) => [row.key, row]));
+        return slots.map((slot) => byKey.get(slot.key) || { key: slot.key, label: slot.label, value: null });
+    }, [rows, slots]);
 
     if (!activity) return <EmptyMetricProgress>Select an activity in the filters panel.</EmptyMetricProgress>;
     if (activity.track_progress === false || !metricDefinitions.some((item) => item.track_progress !== false)) {
@@ -99,19 +114,19 @@ export function MetricProgressChart({
 
     return (
         <Bar
-            ref={chartRef}
+            ref={setChartRef}
             data={{
-                labels: rows.map((row) => row.label),
+                labels: shownRows.map((row) => row.label),
                 datasets: [{
                     label: '% improvement',
                     metricId: selectedMetricId, // read by the chart's "Set goal here…" menu
-                    data: rows.map((row) => row.value),
-                    backgroundColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
-                    borderColor: rows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
+                    data: shownRows.map((row) => row.value),
+                    backgroundColor: shownRows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
+                    borderColor: shownRows.map((row) => (row.improved ? improvedColor : row.regressed ? regressedColor : neutralColor)),
                     borderWidth: 1,
                     borderRadius: 0,
                     borderSkipped: false,
-                    metricNames: rows.map((row) => row.metricName),
+                    metricNames: shownRows.map((row) => row.metricName),
                 }],
             }}
             options={applyChartDensity({

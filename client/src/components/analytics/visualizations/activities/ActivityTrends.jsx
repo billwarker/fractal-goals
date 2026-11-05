@@ -1,39 +1,22 @@
 import React, { useMemo } from 'react';
-import { Bar } from 'react-chartjs-2';
 
-import EmptyState from '../../../common/EmptyState';
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
+import { GROUP_DIMENSION_LABELS, instanceGroups } from '../../../../utils/analyticsGroupBy';
+import { bucketRows, bucketStart, bucketStarts, groupedBucketRows, localDayKey } from '../../../../utils/chartGrain';
+import BucketBarChart, { MeasureControl } from '../shared/BucketBarChart';
+import GrainControl from '../shared/GrainControl';
+import GroupByControl from '../shared/GroupByControl';
 
-const METRIC_OPTIONS = [
-    { value: 'instances', label: 'Instances', color: '#3b82f6', type: 'bar' },
-    { value: 'duration', label: 'Duration', color: '#22c55e', type: 'line' },
+export const ACTIVITY_TREND_GROUPS = ['activity', 'activityGroup', 'tag', 'template', 'programDay'];
+
+const MEASURE_OPTIONS = [
+    { value: 'instances', label: 'Times done' },
+    { value: 'duration', label: 'Time' },
 ];
 
-function getActivityInstanceDate(instance) {
+function getActivityInstanceDay(instance) {
     const value = instance?.session_date || instance?.time_start || instance?.created_at;
     const date = value ? new Date(value) : null;
-    return date && !Number.isNaN(date.getTime()) ? date : null;
-}
-
-function dayKey(date) {
-    return [
-        date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, '0'),
-        String(date.getDate()).padStart(2, '0'),
-    ].join('-');
-}
-
-function formatDayLabel(key) {
-    const [year, month, day] = key.split('-').map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatDuration(seconds = 0) {
-    const total = Math.max(0, Math.round(seconds || 0));
-    const hours = Math.floor(total / 3600);
-    const minutes = Math.round((total % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    return date && !Number.isNaN(date.getTime()) ? localDayKey(date) : null;
 }
 
 function isCompletedActivityInstance(instance) {
@@ -48,163 +31,148 @@ function isCompletedActivityInstance(instance) {
     );
 }
 
-function EmptyActivityTrends() {
-    return <EmptyState compact description="Activity trends appear once activity instances have dates in the selected scope." />;
+const countInstances = (count) => `${count} ${count === 1 ? 'time' : 'times'} done`;
+
+/** One measure per chart. Saved views from before chose a `metrics` list; they show its first. */
+export function activityTrendMeasure(state = {}) {
+    if (state.measure === 'instances' || state.measure === 'duration') return state.measure;
+    return Array.isArray(state.metrics) && state.metrics[0] === 'duration' ? 'duration' : 'instances';
 }
 
-export function getActivityTrendRows(activityInstances = {}) {
-    const rowsByKey = new Map();
+/** Completed instances with the activity each belongs to (the map is keyed by activity id). */
+const completedItems = (activityInstances) => Object.entries(activityInstances).flatMap(([activityId, instances]) => (
+    (instances || []).filter(isCompletedActivityInstance).map((instance) => ({ instance, activityId }))
+));
+const itemDay = ({ instance }) => getActivityInstanceDay(instance);
+const itemSeconds = ({ instance }) => instance.duration_seconds || 0;
 
-    Object.values(activityInstances).flat().forEach((instance) => {
-        if (!isCompletedActivityInstance(instance)) return;
+/**
+ * Completed activity instances and their time per calendar bucket across the range (or the dated
+ * instances).
+ * @returns {{ grain: 'day' | 'week' | 'month', rows: Array<{ key: string, instances: number, durationSeconds: number }> }}
+ */
+export function getActivityTrendRows(activityInstances = {}, { grain = 'auto', range = null } = {}) {
+    const result = bucketRows(completedItems(activityInstances), { dayOf: itemDay, secondsOf: itemSeconds, grain, range });
+    return { grain: result.grain, rows: result.rows.map((row) => ({ key: row.key, instances: row.count, durationSeconds: row.seconds })) };
+}
 
-        const date = getActivityInstanceDate(instance);
-        if (!date) return;
+const GRAIN_DAYS = { day: 1, week: 7, month: 31 };
 
-        const key = dayKey(date);
-        const row = rowsByKey.get(key) || {
-            key,
-            label: formatDayLabel(key),
-            instances: 0,
-            durationSeconds: 0,
-        };
-        row.instances += 1;
-        row.durationSeconds += instance.duration_seconds || 0;
-        rowsByKey.set(key, row);
+/** "YYYY-MM-DD" plus some days. */
+function addDays(key, days) {
+    const [year, month, day] = key.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/**
+ * A running total: counts and time accumulate up to today's bucket; the axis runs on past today
+ * (to the range's end, or a few buckets) so a future date can be picked for a goal, and those
+ * buckets stay empty.
+ * @param {{ grain: 'day' | 'week' | 'month', rows: Array<{ key: string, count: number, seconds: number }> }} result
+ * @param {{ end?: string | null } | null} range
+ * @param {string} [today]
+ * @param {number} [futureBuckets] more buckets past that, for room to set a goal further out
+ */
+export function runningTotalRows(result, range, today = localDayKey(new Date()), futureBuckets = 0) {
+    const todayKey = bucketStart(today, result.grain);
+    const keys = result.rows.map((row) => row.key);
+    const lastKey = [keys[keys.length - 1], todayKey].sort().pop();
+    const extra = Math.max(4, Math.ceil(keys.length / 4));
+    const futureEnd = range?.end && range.end > today ? bucketStart(range.end, result.grain) : null;
+    const baseTail = futureEnd || bucketStart(addDays(lastKey, extra * GRAIN_DAYS[result.grain]), result.grain);
+    const tail = bucketStart(addDays(baseTail, futureBuckets * GRAIN_DAYS[result.grain]), result.grain);
+    const byKey = new Map(result.rows.map((row) => [row.key, row]));
+    let count = 0;
+    let seconds = 0;
+    const rows = bucketStarts(keys[0] || todayKey, tail, result.grain).map((key) => {
+        if (key > todayKey) return { key, count: null, seconds: null };
+        count += byKey.get(key)?.count || 0;
+        seconds += byKey.get(key)?.seconds || 0;
+        return { key, count, seconds };
     });
-
-    return Array.from(rowsByKey.values()).sort((a, b) => a.key.localeCompare(b.key));
+    const todayIndex = rows.findIndex((row) => row.key === todayKey);
+    return { rows, todayIndex, current: todayIndex >= 0 ? rows[todayIndex].count : count };
 }
 
-export function ActivityTrendsChart({ activityInstances = {}, chartRef, metrics = ['instances', 'duration'] }) {
-    const chartTheme = useChartThemeDefaults();
-    const density = useChartDensity();
-    const selectedMetrics = useMemo(() => (metrics.length ? metrics : ['instances']), [metrics]);
-    const rows = useMemo(() => getActivityTrendRows(activityInstances), [activityInstances]);
-
-    const chartData = useMemo(() => ({
-        labels: rows.map((row) => row.label),
-        datasets: METRIC_OPTIONS
-            .filter((metric) => selectedMetrics.includes(metric.value))
-            .map((metric) => ({
-                type: metric.type,
-                label: metric.label,
-                data: rows.map((row) => metric.value === 'duration'
-                    ? Math.round(row.durationSeconds / 60)
-                    : row.instances),
-                backgroundColor: metric.type === 'bar' ? `${metric.color}cc` : `${metric.color}33`,
-                borderColor: metric.color,
-                borderWidth: metric.type === 'bar' ? 1 : 2,
-                borderRadius: 0,
-                borderSkipped: false,
-                order: metric.type === 'line' ? 1 : 2,
-                pointRadius: metric.type === 'line' ? 3 : 0,
-                pointHoverRadius: metric.type === 'line' ? 4 : 0,
-                tension: metric.type === 'line' ? 0.2 : 0,
-                yAxisID: metric.value,
-            })),
-    }), [rows, selectedMetrics]);
-
-    if (!rows.length || chartData.datasets.length === 0) {
-        return <EmptyActivityTrends />;
-    }
-
+/**
+ * @param {{ activityInstances?: object, chartRef?: any, grain?: string, measure?: string, range?: any,
+ *   runningTotal?: boolean, singleActivity?: any, futureShare?: number,
+ *   groupBy?: import('../../../../utils/analyticsGroupBy').GroupBy | null, overlap?: boolean,
+ *   lookups?: { activitiesById: Map<string, any>, groupsById: Map<string, any>, sessionsById: Map<string, any> } }} props
+ */
+export function ActivityTrendsChart({
+    activityInstances = {}, chartRef, grain = 'auto', measure = 'instances', range = null, groupBy = null, overlap = false, lookups = null,
+    runningTotal = false, singleActivity = null, futureShare = 0,
+}) {
+    const result = useMemo(() => {
+        const items = completedItems(activityInstances);
+        if (runningTotal) {
+            // A running total is one series, so a group-by doesn't apply.
+            const base = bucketRows(items, { dayOf: itemDay, secondsOf: itemSeconds, grain, range });
+            const running = runningTotalRows(base, range, undefined, Math.ceil(base.rows.length * futureShare));
+            return {
+                grain: base.grain,
+                rows: running.rows,
+                grouped: null,
+                // Read by the chart's goal surface: "this many by then".
+                meta: {
+                    runningTotal: {
+                        activity: measure === 'instances' ? singleActivity : null,
+                        current: running.current,
+                        todayIndex: running.todayIndex,
+                        bucketKeys: running.rows.map((row) => row.key),
+                        grain: base.grain,
+                    },
+                },
+            };
+        }
+        if (!groupBy) return { ...bucketRows(items, { dayOf: itemDay, secondsOf: itemSeconds, grain, range }), grouped: null };
+        const grouped = groupedBucketRows(items, {
+            dayOf: itemDay,
+            secondsOf: itemSeconds,
+            grain,
+            range,
+            groupsOf: ({ instance, activityId }) => instanceGroups(instance, groupBy, {
+                activity: lookups?.activitiesById.get(activityId) || { id: activityId },
+                groupsById: lookups?.groupsById,
+                session: lookups?.sessionsById.get(instance.session_id),
+            }),
+        });
+        return { ...grouped, grouped: { groups: grouped.groups, values: grouped.values, title: GROUP_DIMENSION_LABELS[groupBy.dimension] } };
+    }, [activityInstances, futureShare, grain, groupBy, lookups, measure, range, runningTotal, singleActivity]);
     return (
-        <Bar
-            ref={chartRef}
-            data={chartData}
-            options={applyChartDensity({
-                responsive: true,
-                maintainAspectRatio: false,
-                ...DISABLED_CHART_ANIMATION,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: {
-                            color: chartTheme.textColor,
-                            usePointStyle: true,
-                            boxWidth: 8,
-                            font: { size: 11 },
-                        },
-                    },
-                    title: { display: true, text: 'Activity Trends', color: chartTheme.textColor },
-                    tooltip: {
-                        backgroundColor: chartTheme.tooltipBg,
-                        titleColor: chartTheme.tooltipText,
-                        bodyColor: chartTheme.tooltipBody,
-                        padding: 12,
-                        callbacks: {
-                            label: (ctx) => {
-                                if (ctx.dataset.yAxisID === 'duration') {
-                                    return `${ctx.dataset.label}: ${formatDuration((ctx.parsed.y || 0) * 60)}`;
-                                }
-                                return `${ctx.dataset.label}: ${ctx.parsed.y || 0}`;
-                            },
-                        },
-                    },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
-                        grid: { color: chartTheme.gridColor },
-                    },
-                    instances: {
-                        type: 'linear',
-                        beginAtZero: true,
-                        position: 'left',
-                        display: selectedMetrics.includes('instances'),
-                        ticks: { color: chartTheme.textColor, precision: 0 },
-                        grid: { color: chartTheme.gridColor },
-                        title: { display: true, text: 'Instances', color: chartTheme.textColor },
-                    },
-                    duration: {
-                        type: 'linear',
-                        beginAtZero: true,
-                        position: selectedMetrics.includes('instances') ? 'right' : 'left',
-                        display: selectedMetrics.includes('duration'),
-                        ticks: { color: chartTheme.textColor },
-                        grid: {
-                            drawOnChartArea: !selectedMetrics.includes('instances'),
-                            color: chartTheme.gridColor,
-                        },
-                        title: { display: true, text: 'Minutes', color: chartTheme.textColor },
-                    },
-                },
-            }, density)}
+        <BucketBarChart
+            rows={result.rows}
+            grain={result.grain}
+            byTime={measure === 'duration'}
+            countLabel={countInstances}
+            seriesLabel={`${measure === 'duration' ? 'Activity time' : 'Times done'}${runningTotal ? ' so far' : ''}`}
+            chartRef={chartRef}
+            grouped={result.grouped ? { ...result.grouped, overlap } : null}
+            datasetMeta={result.meta || null}
+            emptyDescription="Activity trends appear once activities have been done in the selected scope."
         />
     );
 }
 
 export function ActivityTrendsControls({ context }) {
-    const state = context.visualizationState || {};
-    const selectedMetrics = state.metrics?.length ? state.metrics : ['instances', 'duration'];
-
-    const toggleMetric = (metric) => {
-        const nextMetrics = selectedMetrics.includes(metric)
-            ? selectedMetrics.filter((value) => value !== metric)
-            : [...selectedMetrics, metric];
-        context.updateVisualizationState({ metrics: nextMetrics.length ? nextMetrics : selectedMetrics });
-    };
-
     return (
         <>
-            <div className="sessions-query-sidebar-section-header">
-                <h4>Metrics</h4>
-            </div>
-            <div className="sessions-query-chip-group">
-                {METRIC_OPTIONS.map((option) => (
-                    <button
-                        key={option.value}
-                        type="button"
-                        className={`sessions-query-chip ${selectedMetrics.includes(option.value) ? 'active' : ''}`}
-                        onClick={() => toggleMetric(option.value)}
-                    >
-                        {option.label}
-                    </button>
-                ))}
-            </div>
+            <MeasureControl
+                options={MEASURE_OPTIONS}
+                value={activityTrendMeasure(context.visualizationState || {})}
+                onChange={(measure) => context.updateVisualizationState({ measure })}
+            />
+            <GrainControl context={context} />
+            <label className="sessions-query-checkbox-row sessions-query-field-spaced">
+                <input
+                    type="checkbox"
+                    checked={Boolean(context.visualizationState.runningTotal)}
+                    onChange={(event) => context.updateVisualizationState({ runningTotal: event.target.checked })}
+                />
+                <span>Running total (set “by a date” goals)</span>
+            </label>
+            {!context.visualizationState.runningTotal && <GroupByControl context={context} dimensions={ACTIVITY_TREND_GROUPS} />}
         </>
     );
 }

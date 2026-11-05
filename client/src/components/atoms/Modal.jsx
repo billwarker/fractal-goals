@@ -5,6 +5,7 @@ import Card from './Card';
 import CloseButton from './CloseButton';
 import { Heading } from './Typography';
 import ModalBackdrop from './ModalBackdrop';
+import SheetHandle from '../layout/SheetHandle';
 
 const openModalLevels = new Map();
 
@@ -22,6 +23,7 @@ const Modal = ({
     title,
     children,
     size = 'md', // sm, md, lg, xl
+    sheetHandle = false, // A bottom sheet's bar above the header
     className = '',
     overlayClassName = '',
     bodyClassName = '',
@@ -117,6 +119,7 @@ const Modal = ({
                 onClick={e => e.stopPropagation()}
             >
                 <Card className={styles.content} padding="none">
+                    {sheetHandle ? <SheetHandle onDismiss={onClose} /> : null}
                     <div className={styles.header}>
                         {title && (
                             <Heading id={titleId} level={3} className={styles.title}>

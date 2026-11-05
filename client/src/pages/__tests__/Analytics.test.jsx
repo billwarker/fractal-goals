@@ -85,8 +85,25 @@ vi.mock('../../hooks/useFeatureFlags', () => ({
     isFeatureEnabled: (flags, key) => flags?.[key] === true,
 }));
 
+// jsdom has no size to lay panels out in, so render each window in turn.
+vi.mock('../../components/analytics/ProfileWindowLayout', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+        default: ({ layout, renderWindow }) => (
+            <div>{actual.getWindowIds(layout).map((id) => <div key={id}>{renderWindow(id)}</div>)}</div>
+        ),
+    };
+});
 vi.mock('../../components/analytics/ProfileWindow', () => ({
-    default: () => <div>Analytics panel</div>,
+    default: ({ updateWindowState }) => (
+        <div>
+            Analytics panel
+            <button type="button" onClick={() => updateWindowState({ selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' })}>
+                Pick chart
+            </button>
+        </div>
+    ),
 }));
 
 describe('Analytics page', () => {
@@ -111,12 +128,18 @@ describe('Analytics page', () => {
         cleanup();
     });
 
-    it('creates a saved analytics view from Empty Analytics View', async () => {
+    it('offers Save once a chart is picked, saves it as a view, and hides Save again', async () => {
         render(<Analytics />);
 
         expect(screen.getByText('Empty Analytics View')).toBeInTheDocument();
         expect(screen.queryByRole('contentinfo', { name: 'Analytics sidebar controls' })).not.toBeInTheDocument();
+        // Nothing to save until something changes.
+        expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+        await act(async () => { await vi.dynamicImportSettled(); });
 
+        await act(async () => {
+            fireEvent.click(await screen.findByRole('button', { name: 'Pick chart' }));
+        });
         await act(async () => {
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
         });
@@ -142,14 +165,10 @@ describe('Analytics page', () => {
                 layout: {
                     type: 'analytics_view',
                     version: 1,
-                    profile: {
-                        selectedActivity: null,
-                        selectedCategory: null,
-                        selectedGoal: null,
-                        selectedVisualization: null,
-                        visualizationState: {},
-                        visualizationStateByKey: {},
-                    },
+                    profile: expect.objectContaining({
+                        selectedCategory: 'sessions',
+                        selectedVisualization: 'sessionTrends',
+                    }),
                     global_filters: {
                         goals: {
                             goalIds: [],
@@ -166,9 +185,10 @@ describe('Analytics page', () => {
                 },
             });
         });
+        await waitFor(() => expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument());
     });
 
-    it('opens the mobile sidebar from the footer with shared sheet motion, even when stored open', () => {
+    it('opens the mobile sidebar from the footer with shared sheet motion, even when stored open', async () => {
         Object.defineProperty(window, 'matchMedia', {
             value: vi.fn(() => ({
                 matches: true,
@@ -195,10 +215,11 @@ describe('Analytics page', () => {
 
         fireEvent.click(button);
         expect(button).toHaveAttribute('aria-expanded', 'true');
-        const closeButton = screen.getByRole('button', { name: 'Collapse filters panel' });
+        const closeButton = await screen.findByRole('button', { name: 'Collapse filters panel' });
         const sheet = closeButton.closest('.sessions-query-sidebar').parentElement;
         expect(sheet.parentElement).toBe(document.body);
         expect(sheet).toHaveClass('mobile-sheet-enter');
+        expect(sheet.querySelector('[data-sheet-handle]')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
         fireEvent.click(closeButton);
         expect(button).toHaveAttribute('aria-expanded', 'false');
@@ -212,7 +233,7 @@ describe('Analytics page', () => {
     it('opens the query console from the analytics header mode switch', async () => {
         render(<Analytics />);
 
-        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Saved Analytics' })).toBeInTheDocument();
         expect(
             screen.queryByText('Analytics panel') || screen.queryByText('Loading analytics panel...')
         ).toBeInTheDocument();
@@ -222,7 +243,7 @@ describe('Analytics page', () => {
         });
 
         expect(screen.getByRole('heading', { name: 'Query Console', level: 1 })).toBeInTheDocument();
-        expect(screen.getByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
+        expect(await screen.findByRole('region', { name: 'Analytics query console' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Saved Analytics' })).not.toBeInTheDocument();
         expect(screen.queryByText('Analytics panel')).not.toBeInTheDocument();
         expect(screen.queryByText('Loading analytics panel...')).not.toBeInTheDocument();
@@ -235,7 +256,7 @@ describe('Analytics page', () => {
 
         expect(screen.queryByRole('tab', { name: 'Dashboard' })).not.toBeInTheDocument();
         expect(screen.queryByRole('tab', { name: 'Query Console' })).not.toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Saved Analytics' })).toBeInTheDocument();
         expect(screen.queryByRole('region', { name: 'Analytics query console' })).not.toBeInTheDocument();
     });
 });

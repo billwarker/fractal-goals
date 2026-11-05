@@ -1,16 +1,35 @@
 import React from 'react';
 
-import { ActivityGroupMixChart } from '../../AnalyticsExtraCharts';
-import ScatterPlot from '../../ScatterPlot';
-import styles from '../../ProfileWindow.module.css';
+import lazyChart from '../../lazyChart';
+
 import EmptyControls from '../shared/EmptyControls';
+import GroupByControl from '../shared/GroupByControl';
+import useGroupLookups from '../shared/useGroupLookups';
 import ActivityMetricControls from './ActivityMetricControls';
 import { ACTIVITY_TOTALS_VISUALIZATION } from './ActivityTotals';
-import { ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
+import { ACTIVITY_TREND_GROUPS, activityTrendMeasure, ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
 import { MetricProgressChart } from './MetricProgress';
 import { MetricTrendsChart } from './MetricTrends';
+import styles from '../../ProfileWindow.module.css';
+
+const ActivityGroupMixChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.ActivityGroupMixChart })));
+
+
+const ScatterPlot = lazyChart(() => import('../../ScatterPlot'));
+
+const SCATTER_GROUPS = ['tag', 'template', 'programDay'];
+
+function ScatterPlotControls({ context }) {
+    return (
+        <>
+            <ActivityMetricControls context={context} />
+            <GroupByControl context={context} dimensions={SCATTER_GROUPS} />
+        </>
+    );
+}
 
 function ActivityScatterPlotChart({ context }) {
+    const { groupBy, lookups } = useGroupLookups(context, SCATTER_GROUPS);
     if (!context.effectiveSelectedActivity) {
         return <div className={styles.emptyState}>Select an activity in the filters panel</div>;
     }
@@ -24,20 +43,32 @@ function ActivityScatterPlotChart({ context }) {
                 selectedSplit={context.visualizationState.selectedSplit || 'all'}
                 chartRef={context.chartRef}
                 goalLines={context.goalConditionLines}
+                onOpenGoal={context.onOpenGoal}
                 selectedMetricX={context.visualizationState.metricX}
                 selectedMetricY={context.visualizationState.metricY}
+                groupBy={groupBy}
+                lookups={lookups}
             />
         </div>
     );
 }
 
 function ActivityTrendsVisualizationChart({ context }) {
+    const { groupBy, lookups, overlap } = useGroupLookups(context, ACTIVITY_TREND_GROUPS);
     return (
         <div className={styles.vizContainerHidden}>
             <ActivityTrendsChart
                 activityInstances={context.scopedData.activityInstances}
                 chartRef={context.chartRef}
-                metrics={context.visualizationState.metrics || ['instances', 'duration']}
+                grain={['day', 'week', 'month'].includes(context.visualizationState.grain) ? context.visualizationState.grain : 'auto'}
+                measure={activityTrendMeasure(context.visualizationState)}
+                range={context.dateRange}
+                groupBy={groupBy}
+                lookups={lookups}
+                overlap={overlap}
+                runningTotal={Boolean(context.visualizationState.runningTotal)}
+                singleActivity={context.scopedData.activities?.length === 1 ? context.scopedData.activities[0] : null}
+                futureShare={context.axisFutureShare}
             />
         </div>
     );
@@ -59,6 +90,7 @@ function MetricTrendsVisualizationChart({ context }) {
                 activityInstances={context.scopedData.activityInstances}
                 chartRef={context.chartRef}
                 goalLines={context.goalConditionLines}
+                onOpenGoal={context.onOpenGoal}
                 metrics={context.visualizationState.metrics || []}
                 setsHandling={context.visualizationState.setsHandling || 'top'}
                 selectedSplit={context.visualizationState.selectedSplit || 'all'}
@@ -89,17 +121,20 @@ export const ACTIVITY_VISUALIZATIONS = [
         defaultState: { setsHandling: 'top', selectedSplit: 'all', metricX: null, metricY: null },
         selectionRequirements: { activity: true },
         Chart: ActivityScatterPlotChart,
-        Controls: ActivityMetricControls,
+        Controls: ScatterPlotControls,
+        groupByDimensions: SCATTER_GROUPS,
     },
     {
         id: 'activityTrends',
         category: 'activities',
         name: 'Activity Trends',
         iconType: 'activities:activityTrends',
-        defaultState: { metrics: ['instances', 'duration'] },
+        // No default measure, so a saved view's older `metrics` list still decides it.
+        defaultState: { grain: 'auto' },
         selectionRequirements: {},
         Chart: ActivityTrendsVisualizationChart,
         Controls: ActivityTrendsVisualizationControls,
+        groupByDimensions: ACTIVITY_TREND_GROUPS,
     },
     ACTIVITY_TOTALS_VISUALIZATION,
     {

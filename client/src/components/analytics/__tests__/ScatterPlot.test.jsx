@@ -115,6 +115,39 @@ describe('ScatterPlot', () => {
         ]));
     });
 
+    it('leaves skipped sets out of the plot', () => {
+        const activities = [{
+            id: 'press',
+            name: 'Press',
+            metric_definitions: [{ id: 'weight', name: 'Weight', unit: 'kg' }, { id: 'reps', name: 'Reps', unit: '' }],
+        }];
+        const activityInstances = {
+            press: [{
+                id: 'current',
+                has_sets: true,
+                session_date: '2026-06-01T00:00:00.000Z',
+                sets: [
+                    { metrics: [{ metric_id: 'weight', value: 60 }, { metric_id: 'reps', value: 5 }] },
+                    { status: 'skipped', metrics: [{ metric_id: 'weight', value: 200 }, { metric_id: 'reps', value: 50 }] },
+                ],
+            }],
+        };
+
+        render(
+            <ScatterPlot
+                selectedActivity={activities[0]}
+                activityInstances={activityInstances}
+                activities={activities}
+                selectedMetricX="weight"
+                selectedMetricY="reps"
+            />
+        );
+
+        const { data } = chartMocks.scatter.mock.calls.at(-1)[0].data.datasets[0];
+        expect(data).toHaveLength(1);
+        expect(data[0]).toEqual(expect.objectContaining({ x: 60, y: 5 }));
+    });
+
     it('plots each session\'s top set by the y metric\'s direction, highlighting the current session', () => {
         const activities = [{
             id: 'pike',

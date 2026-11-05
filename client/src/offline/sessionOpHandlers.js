@@ -1,5 +1,4 @@
 import { queryKeys } from '../hooks/queryKeys';
-import { getSectionItems, withSectionItems } from '../hooks/sessionItemMutationUtils';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { SESSION_OP } from './opKinds';
@@ -8,8 +7,8 @@ import {
     applySessionResume,
     applyTimerAction,
 } from './sessionOps';
-import { addRoundToRun, applyTagChange, cascadeMemberMetric, removeRoundFromRun } from './circuitOps';
-import { patchProgressChartSettings } from './progressChartOps';
+import { addRoundToRun, applyTagChange, cascadeMemberMetric, insertCircuitItem, patchRun, removeRoundFromRun } from './circuitOps';
+import { patchProgressChartSettings, patchProgressSeriesInstance } from './progressChartOps';
 
 // Every queued in-session write has a kind. Each kind knows how to show itself
 // in the cache before the server answers (`optimistic`), which is also re-run
@@ -29,40 +28,6 @@ const keysFor = ({ rootId, sessionId }) => ({
     notes: queryKeys.sessionNotes(rootId, sessionId),
     circuits: queryKeys.sessionCircuitRuns(rootId, sessionId),
 });
-
-function patchRun(run, action, at, value = null) {
-    if (action === 'startRun') {
-        return { ...run, status: 'active', time_start: at, time_stop: null, duration_seconds: null };
-    }
-    if (action === 'completeRun') {
-        const start = run.time_start || at;
-        const elapsed = Math.max(0, Math.floor((Date.parse(at) - Date.parse(start)) / 1000));
-        return {
-            ...run,
-            status: 'completed',
-            time_start: start,
-            time_stop: at,
-            completed_at: at,
-            is_paused: false,
-            duration_seconds: Math.max(0, elapsed - (run.total_paused_seconds || 0)),
-        };
-    }
-    if (action === 'updateRunTiming') {
-        return { ...run, ...(value || {}) };
-    }
-    if (action === 'resetRun') {
-        return {
-            ...run,
-            status: 'planned',
-            time_start: null,
-            time_stop: null,
-            duration_seconds: null,
-            completed_at: null,
-            total_paused_seconds: 0,
-        };
-    }
-    return run;
-}
 
 const mapList = (updater) => (previous) => (Array.isArray(previous) ? updater(previous) : previous);
 
@@ -89,21 +54,6 @@ function addInstances(queryClient, meta) {
         const added = meta.instances.filter((instance) => !known.has(instance.id));
         return added.length ? [...list, ...added] : list;
     });
-}
-
-/** Mirror of the server's append_circuit_run_item on the cached session. */
-function insertCircuitItem(sessionData, { sectionIndex = 0, itemIndex = null, runId }) {
-    const sections = Array.isArray(sessionData?.sections) && sessionData.sections.length
-        ? [...sessionData.sections]
-        : [{ name: 'Main', items: [] }];
-    const section = sections[sectionIndex];
-    if (!section) return sessionData;
-    const items = getSectionItems(section).filter((item) => !(item?.type === 'circuit' && item.circuit_run_id === runId));
-    const entry = { type: 'circuit', circuit_run_id: runId };
-    if (Number.isInteger(itemIndex) && itemIndex >= 0 && itemIndex <= items.length) items.splice(itemIndex, 0, entry);
-    else items.push(entry);
-    sections[sectionIndex] = withSectionItems(section, items);
-    return { ...(sessionData || {}), sections };
 }
 
 const OPTIMISTIC = {
@@ -281,6 +231,7 @@ function replaceInstance(queryClient, op, instance) {
         const exists = list.some((entry) => entry.id === instance.id);
         return exists ? list.map((entry) => (entry.id === instance.id ? instance : entry)) : [...list, instance];
     }));
+    patchProgressSeriesInstance(queryClient, { rootId: op.meta.rootId, instance });
 }
 
 export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
@@ -296,6 +247,7 @@ export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
         queryKeys.programDayReadModelRoot(rootId),
         queryKeys.activityHistoryRoot(rootId),
         queryKeys.progressRoot(),
+        ['activity-progress-timeline', rootId],
     ]);
     invalidateSessionLists(queryClient, rootId, queryKeys);
 }

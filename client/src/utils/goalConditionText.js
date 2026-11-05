@@ -82,7 +82,12 @@ export function describeConditionParts(condition, activity = null) {
     const hasTags = (condition.tags || condition.tag_ids || []).length > 0;
     const fromSets = hasTags && usesSets ? ` from sets${T}` : T;
     let detail = '';
-    if (condition.kind === 'single_session' && condition.measure === 'yield') {
+    if (condition.kind === 'single_session' && condition.measure === 'set_yield') {
+        const target = `yield ${symbol} ${formatConditionNumber(condition.target_value)}`;
+        detail = condition.set_aggregate === 'average'
+            ? `average ${target} across ${setCount}${T} within one session`
+            : `${setCount} of ${target}${T} within one session`;
+    } else if (condition.kind === 'single_session' && condition.measure === 'yield') {
         detail = `total yield ${symbol} ${formatConditionNumber(condition.target_value)}${fromSets} within one session`;
     } else if (condition.kind === 'single_session' && !usesSets) {
         detail = `${ruleText || '…'} within one session${T}`;
@@ -138,6 +143,10 @@ export function describeProgress(progress, condition) {
     if (!condition || progress.current == null) return '';
     const current = formatConditionNumber(progress.current);
     const required = formatConditionNumber(progress.required);
+    if (condition.kind === 'single_session' && condition.measure === 'set_yield') {
+        if (condition.set_aggregate === 'average') return `Best average ${current} / ${required}`;
+        return Number(condition.min_sets) > 1 ? `${current} / ${required} sets` : `Top set ${current} / ${required}`;
+    }
     if (condition.kind === 'single_session' && condition.measure === 'sets' && condition.set_aggregate === 'average') {
         const bests = progress.rule_bests || [];
         if (bests.length === 1 && bests[0].best_average != null) {

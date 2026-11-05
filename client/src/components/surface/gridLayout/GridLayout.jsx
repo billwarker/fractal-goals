@@ -111,9 +111,9 @@ function rescalePanels(panels, prevBounds, nextBounds) {
     if (prevCols === nextCols && prevRows === nextRows) return panels;
     const sx = nextCols / prevCols;
     const sy = nextRows / prevRows;
-    const scaled = panels.map((panel) => {
-        const w = clamp(Math.max(MIN_PANEL_W, Math.round(panel.w * sx)), MIN_PANEL_W, nextCols);
-        const h = clamp(Math.max(MIN_PANEL_H, Math.round(panel.h * sy)), MIN_PANEL_H, nextRows);
+    const scaled = panels.map((panel) => { // Rounds edges, not sizes, so touching panels keep touching and can't overlap.
+        const w = clamp(Math.max(MIN_PANEL_W, Math.round((panel.x + panel.w) * sx) - Math.round(panel.x * sx)), MIN_PANEL_W, nextCols);
+        const h = clamp(Math.max(MIN_PANEL_H, Math.round((panel.y + panel.h) * sy) - Math.round(panel.y * sy)), MIN_PANEL_H, nextRows);
         const x = clamp(Math.round(panel.x * sx), 0, nextCols - w);
         const y = clamp(Math.round(panel.y * sy), 0, nextRows - h);
         return { ...panel, x, y, w, h };

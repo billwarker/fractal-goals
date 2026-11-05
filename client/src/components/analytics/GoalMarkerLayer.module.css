@@ -1,0 +1,88 @@
+.host {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+}
+
+.layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+/* The icon sits on the threshold; the name shows beside it on hover or focus (to its left near the right edge). */
+.marker {
+    position: absolute;
+    display: inline-flex;
+    /* Near the host's right edge an absolute box would otherwise shrink to the room left. */
+    width: max-content;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    cursor: default;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
+    transition: transform 0.12s ease;
+}
+
+button.marker { cursor: pointer; }
+
+.marker.active { z-index: 1; transform: translate(-50%, -50%) scale(1.12); }
+.marker:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+
+.marker.completed { opacity: 0.7; }
+.marker.completed.active { opacity: 1; }
+
+.name {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 8px);
+    max-width: 220px;
+    padding: 4px 8px;
+    overflow: hidden;
+    border: 1px solid var(--color-brand-primary);
+    border-radius: 999px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+.flipped .name { left: auto; right: calc(100% + 8px); }
+
+.vLine,
+.hLine {
+    position: absolute;
+    border-color: var(--color-text-secondary);
+    border-style: dashed;
+    border-width: 0;
+    opacity: 0.8;
+}
+
+.vLine { border-left-width: 1px; }
+.hLine { border-top-width: 1px; }
+
+.axisValue {
+    position: absolute;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--color-text-primary);
+    color: var(--color-bg-surface);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.xValue { transform: translate(-50%, 4px); }
+.yValue { transform: translate(calc(-100% - 4px), -50%); }

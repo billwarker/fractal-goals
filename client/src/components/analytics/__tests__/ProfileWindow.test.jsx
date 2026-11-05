@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { fireEvent, render as renderBase, screen } from '@testing-library/react';
+import { fireEvent, render as renderBase, screen, waitFor } from '@testing-library/react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -44,7 +44,7 @@ describe('ProfileWindow', () => {
     it.each([
         { evidenceLoading: true },
         { evidenceLoading: false, hasMoreEvidence: true },
-    ])('holds the chart until history is complete: %o', (loadingState) => {
+    ])('holds the chart until history is complete: %o', async (loadingState) => {
         const activity = { id: 'activity-1', name: 'Squat' };
         const data = { sessions: [], activities: [activity], activityGroups: [], activityInstances: {}, rootId: null };
         const props = {
@@ -55,8 +55,8 @@ describe('ProfileWindow', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Loading');
         expect(scatterPlot).not.toHaveBeenCalled();
         rerender(<ProfileWindow {...props} data={{ ...data, hasMoreEvidence: false }} />);
-        expect(screen.queryByRole('status')).not.toBeInTheDocument();
-        expect(scatterPlot).toHaveBeenCalled();
+        await waitFor(() => expect(scatterPlot).toHaveBeenCalled());
+        await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
     });
 
     it('offers retry instead of rendering partial history after a continuation fails', () => {
@@ -218,10 +218,10 @@ describe('ProfileWindow', () => {
 
         expect(updateWindowState).toHaveBeenCalledWith(expect.objectContaining({
             selectedVisualization: 'activityTrends',
-            visualizationState: { metrics: ['instances', 'duration'] },
+            visualizationState: { grain: 'auto' },
             visualizationStateByKey: expect.objectContaining({
                 'activities:activityFrequency': { metric: 'duration', showGroups: false, limit: 8 },
-                'activities:activityTrends': { metrics: ['instances', 'duration'] },
+                'activities:activityTrends': { grain: 'auto' },
             }),
         }));
     });
@@ -291,5 +291,54 @@ describe('ProfileWindow', () => {
 
         expect(screen.queryByRole('button', { name: 'Show chart query' })).not.toBeInTheDocument();
         expect(screen.queryByText('Chart Query')).not.toBeInTheDocument();
+    });
+
+    it('renames a chart from its header and drops the name when the chart is replaced', () => {
+        const updateWindowState = vi.fn();
+        const data = { sessions: [], goalAnalytics: { goals: [], summary: {} }, activities: [], activityGroups: [], activityInstances: {}, rootId: null };
+        const windowState = { selectedCategory: 'activities', selectedVisualization: 'activityFrequency', selectedActivity: null, selectedGoal: null };
+        const { rerender } = render(<ProfileWindow data={data} windowState={windowState} updateWindowState={updateWindowState} chartNumber={2} />);
+
+        fireEvent.click(screen.getByRole('button', { name: /^Rename / }));
+        fireEvent.change(screen.getByRole('textbox', { name: 'Chart name' }), { target: { value: '  Weekly volume  ' } });
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'Chart name' }), { key: 'Enter' });
+        expect(updateWindowState).toHaveBeenLastCalledWith({ chartTitle: 'Weekly volume' });
+
+        rerender(<ProfileWindow data={data} windowState={{ ...windowState, chartTitle: 'Weekly volume' }} updateWindowState={updateWindowState} chartNumber={2} />);
+        expect(screen.getByText('Weekly volume')).toBeInTheDocument();
+        expect(screen.getByText('2')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rename Weekly volume' }));
+        fireEvent.keyDown(screen.getByRole('textbox', { name: 'Chart name' }), { key: 'Escape' });
+        expect(updateWindowState).toHaveBeenCalledTimes(1);
+
+        fireEvent.click(screen.getByTitle('Go Back'));
+        expect(updateWindowState).toHaveBeenLastCalledWith(expect.objectContaining({ selectedVisualization: null, chartTitle: null }));
+    });
+
+    it('closes the split menu on a press elsewhere or Esc, but not on one inside it', () => {
+        const onSplit = vi.fn();
+        render(<ProfileWindow
+            data={{ sessions: [], activities: [], activityGroups: [], activityInstances: {}, rootId: null }}
+            windowState={{}}
+            updateWindowState={vi.fn()}
+            canSplit
+            onSplit={onSplit}
+        />);
+        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split', exact: true }));
+        const item = () => screen.queryByRole('button', { name: 'Split Vertical' });
+
+        open();
+        fireEvent.pointerDown(document.body);
+        expect(item()).not.toBeInTheDocument();
+
+        open();
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(item()).not.toBeInTheDocument();
+
+        open();
+        fireEvent.pointerDown(item());
+        fireEvent.click(item());
+        expect(onSplit).toHaveBeenCalledWith('vertical');
     });
 });

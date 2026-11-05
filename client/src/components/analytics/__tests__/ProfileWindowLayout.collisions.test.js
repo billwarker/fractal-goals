@@ -163,4 +163,13 @@ describe('ProfileWindowLayout guarded updates', () => {
         expect(result.conflictIds).toEqual(['b', 'a']);
         expect(result.layout).toEqual(layout);
     });
+
+    it('keeps stacked panels apart when rescaling rounds their heights up', () => {
+        const stacked = [{ id: 'a', x: 0, y: 0, w: 60, h: 18 }, { id: 'b', x: 0, y: 18, w: 60, h: 18 }];
+        const [first, second] = rescalePanels(stacked, { columns: 60, rows: 36 }, { columns: 62, rows: 27 });
+        expect(first.y).toBe(0);
+        expect(second.y).toBe(first.y + first.h);
+        expect(second.y + second.h).toBeLessThanOrEqual(27);
+        expect(first.w).toBe(second.w);
+    });
 });

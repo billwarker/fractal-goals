@@ -1,16 +1,19 @@
 import React from 'react';
 
-import {
-    SessionDurationHistogram,
-    SessionSectionPie,
-    SessionStartDistribution,
-} from '../../AnalyticsExtraCharts';
+import lazyChart from '../../lazyChart';
 import StreakTimeline from '../../StreakTimeline';
-import styles from '../../ProfileWindow.module.css';
 import { Heading } from '../../../atoms/Typography';
 import EmptyControls from '../shared/EmptyControls';
+import useGroupLookups from '../shared/useGroupLookups';
 import StatCard from '../shared/StatCard';
-import { SessionTrendsChart, SessionTrendsControls } from './SessionTrends';
+import ChartNumberField from '../shared/ChartNumberField';
+import { SESSION_TREND_GROUPS, SessionTrendsChart, SessionTrendsControls, sessionTrendMeasure } from './SessionTrends';
+import styles from '../../ProfileWindow.module.css';
+
+const SessionDurationHistogram = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionDurationHistogram })));
+const SessionSectionPie = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionSectionPie })));
+const SessionStartDistribution = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.SessionStartDistribution })));
+
 
 function SessionSummaryChart({ context }) {
     const { sessions } = context.scopedData;
@@ -35,13 +38,17 @@ function SessionStreaksChart({ context }) {
 }
 
 function SessionTrendsVisualizationChart({ context }) {
+    const { groupBy } = useGroupLookups(context, SESSION_TREND_GROUPS);
     return (
         <div className={styles.vizContainerHidden}>
             <SessionTrendsChart
                 sessions={context.scopedData.sessions}
                 chartRef={context.chartRef}
-                grain={context.visualizationState.grain || 'week'}
-                metrics={context.visualizationState.metrics || ['sessions', 'duration']}
+                // Saved views from before calendar grains may hold "year"; those read as automatic.
+                grain={['day', 'week', 'month'].includes(context.visualizationState.grain) ? context.visualizationState.grain : 'auto'}
+                measure={sessionTrendMeasure(context.visualizationState)}
+                range={context.dateRange}
+                groupBy={groupBy}
             />
         </div>
     );
@@ -106,30 +113,15 @@ export function SessionTimeDistributionControls({ context }) {
 }
 
 export function DurationHistogramControls({ context }) {
-    const bucketCount = context.visualizationState.bucketCount || 5;
-    const handleBucketChange = (event) => {
-        const rawValue = event.target.value;
-        if (rawValue === '') {
-            context.updateVisualizationState({ bucketCount: '' });
-            return;
-        }
-
-        const nextValue = Math.max(1, Math.min(30, Number(rawValue) || 5));
-        context.updateVisualizationState({ bucketCount: nextValue });
-    };
-
     return (
-        <label className="sessions-query-field">
-            <span>Buckets</span>
-            <input
-                type="number"
-                min="1"
-                max="30"
-                step="1"
-                value={bucketCount}
-                onChange={handleBucketChange}
-            />
-        </label>
+        <ChartNumberField
+            label="Buckets"
+            value={context.visualizationState.bucketCount || 5}
+            defaultValue={5}
+            min={1}
+            max={30}
+            onChange={(bucketCount) => context.updateVisualizationState({ bucketCount })}
+        />
     );
 }
 
@@ -149,10 +141,12 @@ export const SESSION_VISUALIZATIONS = [
         category: 'sessions',
         name: 'Session Trends',
         iconType: 'sessions:sessionTrends',
-        defaultState: { grain: 'week', metrics: ['sessions', 'duration'] },
+        // No default measure, so a saved view's older `metrics` list still decides it.
+        defaultState: { grain: 'auto' },
         selectionRequirements: {},
         Chart: SessionTrendsVisualizationChart,
         Controls: SessionTrendsControls,
+        groupByDimensions: SESSION_TREND_GROUPS,
     },
     {
         id: 'sectionPie',

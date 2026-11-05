@@ -72,6 +72,10 @@ class AnalyticsDashboard(Base):
     name = Column(String, nullable=False)
     kind = Column(String, nullable=False, server_default='dashboard', default='dashboard')
     layout = Column(JSON_TYPE, nullable=False)
+    # Pinned saved analytics list first; last_opened_at orders the rest (opening doesn't touch updated_at).
+    pinned = Column(Boolean, nullable=False, default=False, server_default=sa.text('false'))
+    last_opened_at = Column(DateTime, nullable=True)
+    open_count = Column(Integer, nullable=False, default=0, server_default=sa.text('0'))
 
     __table_args__ = (
         sa.Index('ix_analytics_dashboards_root_user_deleted', 'root_id', 'user_id', 'deleted_at'),

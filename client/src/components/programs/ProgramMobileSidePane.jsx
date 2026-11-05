@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import ModalBackdrop from '../atoms/ModalBackdrop';
+import SheetHandle from '../layout/SheetHandle';
 import styles from './ProgramSidePane.module.css';
 
 const FOCUSABLE_SELECTOR = [
@@ -79,6 +80,7 @@ function ProgramMobileSidePane({ children, onClose }) {
                 tabIndex={-1}
                 onClick={(event) => event.stopPropagation()}
             >
+                <SheetHandle onDismiss={() => onCloseRef.current()} />
                 {children}
             </div>
         </ModalBackdrop>

@@ -1,6 +1,7 @@
 import React, { Suspense, lazy, useState } from 'react';
 
-import Button from '../atoms/Button';
+import ConfirmationModal from '../ConfirmationModal';
+import HeaderButton from '../layout/HeaderButton';
 import { viewAttachProblem } from '../../hooks/useGoalCharts';
 import styles from './AnalyticsTopBar.module.css';
 
@@ -12,6 +13,9 @@ function AnalyticsTopBar({
     onModeChange,
     onOpenViewsModal,
     onSaveView,
+    onCloseView,
+    isSavedItemOpen = false,
+    hasUnsavedChanges = false,
     rootId = null,
     savedView = null,
     isFiltersPaneOpen = false,
@@ -20,32 +24,48 @@ function AnalyticsTopBar({
     showFiltersToggle = true,
 }) {
     const [isAddToGoalOpen, setIsAddToGoalOpen] = useState(false);
+    const [isConfirmingClose, setIsConfirmingClose] = useState(false);
     const addToGoalProblem = savedView ? viewAttachProblem(savedView) : null;
+    // A saved view on goals: saving updates those goals' charts too.
+    const viewGoals = savedView?.goals || [];
+    const onGoals = `${viewGoals.length} ${viewGoals.length === 1 ? 'goal' : 'goals'}`;
     return (
         <div className={styles.topBar}>
             <div className={styles.viewSection}>
                 <div className={styles.viewMeta}>
                     <h1 className={styles.pageTitle}>{activeMode === 'query' ? 'Query Console' : currentViewName}</h1>
                 </div>
-                {activeMode === 'dashboard' && (
+                {activeMode === 'dashboard' && (savedView || hasUnsavedChanges || isSavedItemOpen) && (
                     <div className={styles.actions}>
-                        <Button variant="secondary" size="sm" onClick={onOpenViewsModal}>
-                            Saved Analytics
-                        </Button>
                         {savedView ? (
-                            <Button
+                            <HeaderButton
                                 variant="secondary"
-                                size="sm"
                                 onClick={() => setIsAddToGoalOpen(true)}
                                 disabled={Boolean(addToGoalProblem)}
                                 title={addToGoalProblem || 'Show this view on goals'}
                             >
                                 Add to goal…
-                            </Button>
+                            </HeaderButton>
                         ) : null}
-                        <Button variant="primary" size="sm" onClick={onSaveView}>
-                            Save
-                        </Button>
+                        {/* Only once something has changed since the view was opened or saved. */}
+                        {hasUnsavedChanges ? (
+                            <HeaderButton
+                                variant="primary"
+                                onClick={onSaveView}
+                                title={viewGoals.length ? `Saving updates this chart on ${onGoals}` : undefined}
+                            >
+                                Save
+                            </HeaderButton>
+                        ) : null}
+                        {isSavedItemOpen ? (
+                            <HeaderButton
+                                variant="secondary"
+                                onClick={() => (hasUnsavedChanges ? setIsConfirmingClose(true) : onCloseView?.())}
+                                title="Close and go back to an empty view"
+                            >
+                                Close
+                            </HeaderButton>
+                        ) : null}
                     </div>
                 )}
             </div>
@@ -73,10 +93,15 @@ function AnalyticsTopBar({
                         </button>
                     </div>
                 )}
+                {activeMode === 'dashboard' && (
+                    <HeaderButton variant="secondary" onClick={onOpenViewsModal}>
+                        Saved Analytics
+                    </HeaderButton>
+                )}
                 {activeMode === 'dashboard' && showFiltersToggle && (
-                    <Button variant="secondary" size="sm" onClick={onToggleFiltersPane}>
+                    <HeaderButton variant="secondary" onClick={onToggleFiltersPane}>
                         {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
-                    </Button>
+                    </HeaderButton>
                 )}
             </div>
             {isAddToGoalOpen && savedView ? (
@@ -84,6 +109,15 @@ function AnalyticsTopBar({
                     <AddViewToGoalsModal rootId={rootId} view={savedView} isOpen onClose={() => setIsAddToGoalOpen(false)} />
                 </Suspense>
             ) : null}
+            <ConfirmationModal
+                isOpen={isConfirmingClose}
+                onClose={() => setIsConfirmingClose(false)}
+                onConfirm={() => onCloseView?.()}
+                title="Discard unsaved changes?"
+                message={`Your changes to “${currentViewName}” haven’t been saved.`}
+                confirmText="Discard and close"
+                cancelText="Keep editing"
+            />
         </div>
     );
 }

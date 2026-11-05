@@ -188,7 +188,8 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         updateNote: (id, content) => (
             offlineNotes ? offlineNotes.updateNote(id, content) : updateNoteMutation.mutateAsync({ noteId: id, content })
         ),
-        deleteNote: (id) => (offlineNotes ? offlineNotes.deleteNote(id) : deleteNoteMutation.mutateAsync(id)),
+        // NoteCard hands over the whole note, as it does for the Notes page and goal notes.
+        deleteNote: (note) => (offlineNotes ? offlineNotes.deleteNote(note.id) : deleteNoteMutation.mutateAsync(note.id)),
         refreshNotes
     };
 }

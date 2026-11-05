@@ -45,6 +45,7 @@ export function normalizeGlobalFilters(filters) {
 }
 
 export function hasInstanceScopeFilters(filters) {
+    if (filters?.clauses) return filters.clauses.some(hasInstanceScopeFilters);
     const normalized = normalizeGlobalFilters(filters);
     return Boolean(normalized.tags)
         || normalized.sessions.templateIds.length > 0
@@ -53,6 +54,7 @@ export function hasInstanceScopeFilters(filters) {
 
 /** Whether a session falls in the template and program-day filters. */
 export function sessionMatchesScope(session, filters) {
+    if (filters?.clauses) return filters.clauses.every((clause) => sessionMatchesScope(session, clause));
     const { templateIds, programDayIds } = normalizeGlobalFilters(filters).sessions;
     if (templateIds.length && !templateIds.includes(session?.template_id)) return false;
     if (programDayIds.length && !programDayIds.includes(session?.program_day_id)) return false;
@@ -61,6 +63,7 @@ export function sessionMatchesScope(session, filters) {
 
 /** Whether an activity instance falls in the tag filter and its session in the session filters. */
 export function instanceMatchesScope(instance, session, filters) {
+    if (filters?.clauses) return filters.clauses.every((clause) => instanceMatchesScope(instance, session, clause));
     const normalized = normalizeGlobalFilters(filters);
     if (!sessionMatchesScope(session, normalized)) return false;
     if (!normalized.tags) return true;
@@ -70,21 +73,8 @@ export function instanceMatchesScope(instance, session, filters) {
     return own.size === chosen.length && chosen.every((tagId) => own.has(tagId));
 }
 
-/**
- * Which scope filters apply to the open charts: tags filter activity instances (activity charts);
- * session template and program day filter sessions (session and activity charts). Without panel
- * states (e.g. tests), everything applies.
- */
-export function scopeFilterRelevance(windowStates) {
-    if (!windowStates) return { tags: true, sessions: true };
-    const categories = new Set(Object.values(windowStates).map((state) => state?.selectedCategory).filter(Boolean));
-    return {
-        tags: categories.has('activities'),
-        sessions: categories.has('activities') || categories.has('sessions'),
-    };
-}
-
 export function hasActiveGlobalFilters(filters) {
+    if (filters?.clauses) return filters.clauses.some(hasActiveGlobalFilters);
     const normalized = normalizeGlobalFilters(filters);
     return normalized.goals.goalIds.length > 0
         || normalized.activities.activityIds.length > 0
