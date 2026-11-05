@@ -534,7 +534,7 @@ def update_activity_instance_in_session(current_user, root_id, session_id, insta
             current_user.id,
             validated_data,
         )
-        if error:
+        if error or payload is None:
             return jsonify({"error": error}), status
         response_data = serialize_activity_instance(payload["instance"])
         response_data['progress_comparison'] = progress_for_saved_instance(db_session, instance_id)
