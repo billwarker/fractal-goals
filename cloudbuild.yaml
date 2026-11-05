@@ -140,16 +140,21 @@ steps:
   # 5b. Smoke the backend candidate, then promote it
   # ==========================================
   # A failed check stops here: traffic stays on the previous revision, so there is
-  # nothing to roll back.
+  # nothing to roll back. The cloud-sdk image has no python3, so gcloud describes the
+  # service in one step and the gates read that from /workspace in a Python image.
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Describe Backend Candidate'
+    entrypoint: bash
+    args: ['-c', 'gcloud run services describe fractal-backend --region "$_REGION" --format=json > /workspace/backend-service.json']
+  - name: 'python:3.12-slim'
     id: 'Smoke Backend Candidate'
     entrypoint: bash
     args:
       - '-c'
       - |
         set -euo pipefail
-        URL=$$(gcloud run services describe fractal-backend --region "$_REGION" --format=json | python3 scripts/deploy_gates.py tag-url --tag candidate)
-        python3 scripts/deploy_gates.py smoke-backend --url "$$URL"
+        URL=$$(python scripts/deploy_gates.py tag-url --tag candidate < /workspace/backend-service.json)
+        python scripts/deploy_gates.py smoke-backend --url "$$URL"
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Promote Backend'
     entrypoint: gcloud
@@ -216,14 +221,18 @@ steps:
   # 6b. Smoke the frontend candidate (shell, strict CSP, API proxy), then promote it
   # ==========================================
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'Describe Frontend Candidate'
+    entrypoint: bash
+    args: ['-c', 'gcloud run services describe fractal-frontend --region "$_REGION" --format=json > /workspace/frontend-service.json']
+  - name: 'python:3.12-slim'
     id: 'Smoke Frontend Candidate'
     entrypoint: bash
     args:
       - '-c'
       - |
         set -euo pipefail
-        URL=$$(gcloud run services describe fractal-frontend --region "$_REGION" --format=json | python3 scripts/deploy_gates.py tag-url --tag candidate)
-        python3 scripts/deploy_gates.py smoke-frontend --url "$$URL"
+        URL=$$(python scripts/deploy_gates.py tag-url --tag candidate < /workspace/frontend-service.json)
+        python scripts/deploy_gates.py smoke-frontend --url "$$URL"
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     id: 'Promote Frontend'
     entrypoint: gcloud
