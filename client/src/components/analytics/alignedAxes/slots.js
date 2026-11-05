@@ -19,6 +19,26 @@ export function mergeSlots(pointLists) {
 }
 
 /**
+ * The range each of a chart's value axes shares with panels beside it, for axes that mean the same
+ * thing: wide enough to hold every panel's values. Axes with no match aren't included.
+ *
+ * @typedef {{ scaleId: string, identity: string, min: number, max: number }} ValueAxis
+ * @param {ValueAxis[]} own
+ * @param {ValueAxis[][]} peers
+ * @returns {Record<string, { min: number, max: number }>}
+ */
+export function sharedRanges(own, peers) {
+    return Object.fromEntries(own.flatMap((axis) => {
+        const matching = peers.flat().filter((other) => other.identity === axis.identity);
+        if (!matching.length) return [];
+        return [[axis.scaleId, {
+            min: Math.min(axis.min, ...matching.map((other) => other.min)),
+            max: Math.max(axis.max, ...matching.map((other) => other.max)),
+        }]];
+    }));
+}
+
+/**
  * A chart's values laid out over the slots, with a gap where it has none.
  * @template T
  * @param {string[]} keys the chart's own point keys

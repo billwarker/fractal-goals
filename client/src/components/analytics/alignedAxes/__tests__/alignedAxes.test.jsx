@@ -2,10 +2,10 @@ import React from 'react';
 import { act, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { AlignedAxesProvider, AlignedAxisWindow, useAlignedAxis } from '../AlignedAxesContext';
+import { AlignedAxesProvider, AlignedAxisWindow, useAlignedAxis, useAlignedBuckets, useAlignedRanges } from '../AlignedAxesContext';
 import { createEdgeGroup } from '../edgeGroup';
 import { panelGroups } from '../panelGroups';
-import { mergeSlots, valuesOnSlots } from '../slots';
+import { mergeSlots, sharedRanges, valuesOnSlots } from '../slots';
 
 const panel = (id, x, y, w, h) => ({ id, x, y, w, h });
 
@@ -44,6 +44,20 @@ describe('slots', () => {
 
     it('lays a chart out over the slots with gaps', () => {
         expect(valuesOnSlots(['a', 'c'], [10, 30], [point('a', 1), point('b', 1), point('c', 2)])).toEqual([10, null, 30]);
+    });
+});
+
+describe('sharedRanges', () => {
+    const axis = (scaleId, identity, min, max) => ({ scaleId, identity, min, max });
+
+    it('spans every panel on axes that mean the same thing, and leaves others out', () => {
+        const own = [axis('metric1', 'weight', 40, 60), axis('metric2', 'reps', 3, 8)];
+        const peers = [[axis('metric1', 'weight', 20, 50), axis('metric2', 'tempo', 1, 2)]];
+        expect(sharedRanges(own, peers)).toEqual({ metric1: { min: 20, max: 60 } });
+    });
+
+    it('matches on meaning, not on which axis it is', () => {
+        expect(sharedRanges([axis('metric2', 'weight', 40, 60)], [[axis('metric1', 'weight', 10, 50)]])).toEqual({ metric2: { min: 10, max: 60 } });
     });
 });
 
@@ -93,6 +107,48 @@ describe('useAlignedAxis', () => {
         });
         expect(screen.getByTestId('a').textContent.split(',').sort()).toEqual(['s1', 's2', 's3']);
         expect(screen.getByTestId('b').textContent).toBe(screen.getByTestId('a').textContent);
+    });
+
+    it('fills quiet periods between panels of calendar buckets, per grain', async () => {
+        const Buckets = ({ name, grain, keys }) => {
+            const shared = useAlignedBuckets({ chartRef: { current: null }, grain, keys });
+            return <div data-testid={name}>{shared ? shared.join(',') : 'own'}</div>;
+        };
+        const board = (first, second) => (
+            <AlignedAxesProvider layout={{ type: 'grid', panels: [panel('a', 0, 0, 96, 24), panel('b', 0, 24, 96, 24)] }}>
+                <AlignedAxisWindow windowId="a"><Buckets name="a" {...first} /></AlignedAxisWindow>
+                <AlignedAxisWindow windowId="b"><Buckets name="b" {...second} /></AlignedAxisWindow>
+            </AlignedAxesProvider>
+        );
+        let view;
+        await act(async () => { view = render(board({ grain: 'day', keys: ['2026-03-01'] }, { grain: 'day', keys: ['2026-03-03'] })); });
+        expect(screen.getByTestId('a')).toHaveTextContent('2026-03-01,2026-03-02,2026-03-03');
+        expect(screen.getByTestId('b')).toHaveTextContent('2026-03-01,2026-03-02,2026-03-03');
+        view.unmount();
+
+        await act(async () => { render(board({ grain: 'day', keys: ['2026-03-01'] }, { grain: 'week', keys: ['2026-03-02'] })); });
+        expect(screen.getByTestId('a')).toHaveTextContent('own');
+    });
+
+    it('shares ranges between side-by-side panels, not stacked ones', async () => {
+        const Ranges = ({ name, min, max }) => {
+            const ranges = useAlignedRanges({ chartRef: { current: null }, axes: [{ scaleId: 'metric1', identity: 'weight', min, max }] });
+            return <div data-testid={name}>{ranges ? `${ranges.metric1.min}-${ranges.metric1.max}` : 'own'}</div>;
+        };
+        const board = (panels) => (
+            <AlignedAxesProvider layout={{ type: 'grid', panels }}>
+                <AlignedAxisWindow windowId="a"><Ranges name="a" min={40} max={60} /></AlignedAxisWindow>
+                <AlignedAxisWindow windowId="b"><Ranges name="b" min={20} max={50} /></AlignedAxisWindow>
+            </AlignedAxesProvider>
+        );
+        let view;
+        await act(async () => { view = render(board([panel('a', 0, 0, 48, 24), panel('b', 48, 0, 48, 24)])); });
+        expect(screen.getByTestId('a')).toHaveTextContent('20-60');
+        expect(screen.getByTestId('b')).toHaveTextContent('20-60');
+        view.unmount();
+
+        await act(async () => { render(board([panel('a', 0, 0, 96, 24), panel('b', 0, 24, 96, 24)])); });
+        expect(screen.getByTestId('a')).toHaveTextContent('own');
     });
 
     it('keeps different axes, unequal panels and phones apart', async () => {

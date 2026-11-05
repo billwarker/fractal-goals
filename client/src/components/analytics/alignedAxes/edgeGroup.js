@@ -1,14 +1,15 @@
 // @ts-check
 /**
- * Charts whose plots must share left and right edges. pageGridSnap reports the space each chart has
- * (in page-grid coordinates) and lays the plot out in what they all share; when that shared space
- * changes, the others lay out again. Notifying is capped, so charts that keep changing each other's
- * tick labels settle instead of looping.
+ * Charts whose plots must share two edges: left and right (`$alignedEdges`), or top and bottom
+ * (`$alignedRows`, reported as start and end). pageGridSnap reports the space each chart has (in
+ * page-grid coordinates) and lays the plot out in what they all share; when that shared space changes,
+ * the others lay out again. Notifying is capped, so charts that keep changing each other's tick labels
+ * settle instead of looping.
  */
 
 const MAX_NOTIFICATIONS = 8;
 
-export function createEdgeGroup() {
+export function createEdgeGroup(property = '$alignedEdges') {
     /** @type {Map<any, { left: number, right: number }>} */
     const members = new Map();
     let notifications = 0;
@@ -49,12 +50,12 @@ export function createEdgeGroup() {
         /** @param {any} chart */
         join(chart) {
             notifications = 0;
-            chart.$alignedEdges = this;
+            chart[property] = this;
             chart.update('none');
         },
         /** @param {any} chart */
         leave(chart) {
-            delete chart.$alignedEdges;
+            delete chart[property];
             chart.$pageGridPasses = 0;
             if (chart.canvas) chart.update('none');
             if (members.delete(chart) && members.size) refresh(chart);

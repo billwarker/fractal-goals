@@ -7,7 +7,7 @@ import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditio
 import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
 import { GoalMarkerHost } from '../../GoalMarkerLayer';
-import { useAlignedAxis } from '../../alignedAxes/AlignedAxesContext';
+import { useAlignedAxis, useAlignedRanges } from '../../alignedAxes/AlignedAxesContext';
 import { valuesOnSlots } from '../../alignedAxes/slots';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import useActiveChartPoint from '../../useActiveChartPoint';
@@ -43,10 +43,12 @@ function EmptyMetricTrends({ children = 'Metric trends appear once the selected 
     return <EmptyState compact description={children} />;
 }
 
-function buildYAxis(metric, index, chartTheme) {
+function buildYAxis(metric, index, chartTheme, sharedRange = null) {
     return {
         type: 'linear',
         beginAtZero: false,
+        // Shared with a panel beside this one: the same limits give the same ticks.
+        ...(sharedRange ? { suggestedMin: sharedRange.min, suggestedMax: sharedRange.max } : {}),
         position: index === 0 ? 'left' : 'right',
         ticks: { color: chartTheme.textColor },
         grid: { drawOnChartArea: index === 0, color: chartTheme.gridColor },
@@ -162,6 +164,25 @@ export function MetricTrendsChart({
             data: valuesOnSlots(chartData.instanceIds, dataset.data, slots),
         })),
     } : chartData), [chartData, slots]);
+    // Each charted metric has its own y axis, metric1, metric2, …
+    // Without sets, the Yield line plots one value per session, whichever handling is chosen.
+    const yieldLine = activityUsesSets(activity) ? setsHandling : 'total';
+    const goalScales = useMemo(() => Object.fromEntries(
+        chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]),
+    ), [chartData.selectedMetricDefs]);
+    const markers = useMemo(() => goalMarkers(goalLines, goalScales, yieldLine), [goalLines, goalScales, yieldLine]);
+    // What each axis must hold: its values and goal thresholds. Panels beside it showing the same metric share them.
+    const valueAxes = useMemo(() => chartData.selectedMetricDefs.flatMap((metric, index) => {
+        const scaleId = `metric${index + 1}`;
+        const values = [
+            ...chartData.datasets.filter((dataset) => dataset.yAxisID === scaleId).flatMap((dataset) => dataset.data),
+            ...markers.flatMap((marker) => marker.rules.filter((rule) => rule.scaleID === scaleId).map((rule) => rule.value)),
+        ].filter((value) => value != null);
+        if (!values.length) return [];
+        const measure = metric.id === YIELD_METRIC_ID ? `yield:${activity?.id}` : metric.fractal_metric_id || metric.id;
+        return [{ scaleId, identity: `metric:${measure}:${setsHandling}:${selectedSplit}`, min: Math.min(...values), max: Math.max(...values) }];
+    }), [activity?.id, chartData, markers, selectedSplit, setsHandling]);
+    const ranges = useAlignedRanges({ chartRef: ownChartRef, axes: valueAxes });
     // A session hovered elsewhere becomes the active point on each line.
     const hoverIndex = hoverInstanceId ? shown.instanceIds.indexOf(hoverInstanceId) : -1;
     useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : shown.datasets
@@ -174,14 +195,9 @@ export function MetricTrendsChart({
 
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
-    // Each charted metric has its own y axis, metric1, metric2, …
-    // Without sets, the Yield line plots one value per session, whichever handling is chosen.
-    const yieldLine = activityUsesSets(activity) ? setsHandling : 'total';
-    const goalScales = Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]));
-
     return (
         <CompactChartFrame caption={caption}>
-        <GoalMarkerHost chartRef={ownChartRef} markers={goalMarkers(goalLines, goalScales, yieldLine)} onOpenGoal={onOpenGoal}>
+        <GoalMarkerHost chartRef={ownChartRef} markers={markers} onOpenGoal={onOpenGoal}>
             <Line
                 ref={setChartRef}
                 data={{
@@ -217,7 +233,7 @@ export function MetricTrendsChart({
                         },
                         ...Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [
                             `metric${index + 1}`,
-                            buildYAxis(metric, index, chartTheme),
+                            buildYAxis(metric, index, chartTheme, ranges?.[`metric${index + 1}`]),
                         ])),
                     },
                 }, density)}

@@ -305,7 +305,7 @@ test('a saved view of the removed Goal Detail View goes back to choosing a chart
 test('Metric Trends offers Set goal with one metric showing, and not with two', async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     const suffix = testInfo.project.name;
-    const root = `browser-axis-room-root-${suffix}`;
+    const root = `browser-trend-goals-root-${suffix}`;
     const token = await logIn(page);
     const seed = await page.evaluate(async ({ token, root }) => {
         const call = async (path, body, method = 'POST') => {
@@ -399,7 +399,7 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
 test('stacked Metric Trends and Progress panels for one activity line up their x axes', async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     test.skip(testInfo.project.name !== 'desktop', 'Phones show panels without this layout.');
-    const root = 'browser-axis-room-root-desktop';
+    const root = 'browser-aligned-sessions-root-desktop';
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     const token = await logIn(page);
@@ -428,6 +428,14 @@ test('stacked Metric Trends and Progress panels for one activity line up their x
         const panelState = (selectedVisualization, visualizationState) => ({
             selectedCategory: 'activities', selectedVisualization,
             selectedActivity: { id: activity.id, name: activity.name }, visualizationState,
+        });
+        // A goal marker rebuilds the chart once goals load, which must not take it out of the group.
+        await call(`${root}/goals`, {
+            name: 'Aligned goal', type: 'LongTermGoal', parent_id: root, completion_condition: 'activity_threshold',
+            condition: {
+                activity_definition_id: activity.id, kind: 'single_session', measure: 'sets', min_sets: 1,
+                rules: [{ metric_definition_id: load.id, operator: '>=', value: 90 }],
+            },
         });
         const name = 'Aligned board';
         await call(`roots/${root}/dashboards`, { name, kind: 'dashboard', layout: {
@@ -458,13 +466,104 @@ test('stacked Metric Trends and Progress panels for one activity line up their x
     const [plot] = await plots();
     // Every session has a slot on both, though Progress has no comparison for the first.
     expect(plot.split(':')[2]).toBe('4');
+
+    // The goal has loaded and rebuilt the chart by now, and the rebuilt chart is still aligned.
+    await expect(page.getByTitle(/^Aligned goal \(/)).toBeVisible();
+    await expect.poll(async () => {
+        const [first, second] = await plots();
+        return Boolean(first) && first === second;
+    }).toBe(true);
+
     const boxes = await canvases.evaluateAll((items) => items.map((canvas) => {
         const { left, top, bottom } = canvas.getBoundingClientRect();
         return { left, top, bottom };
     }));
     expect(Math.abs(boxes[0].left - boxes[1].left)).toBeLessThan(1);
     expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
-    await page.screenshot({ path: testInfo.outputPath('aligned.png') });
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    expect(errors).toEqual([]);
+});
+
+test('stacked time-bucket charts share their x axis, and side-by-side panels of one metric their y axis', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    test.skip(testInfo.project.name !== 'desktop', 'Phones show panels without this layout.');
+    const root = 'browser-aligned-boards-root-desktop';
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await logIn(page);
+    await page.evaluate(async ({ token, root }) => {
+        const call = async (path, body, method = 'POST') => {
+            const response = await fetch(`/api/${path}`, {
+                method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
+            return response.json();
+        };
+        const metric = await call(`${root}/fractal-metrics`, { name: 'Shared load', unit: 'Lbs', input_type: 'number' });
+        const activityWith = async (name, values) => {
+            const activity = await call(`${root}/activities`, { name, has_metrics: true, has_sets: true, metrics: [
+                { name: 'Shared load', unit: 'Lbs', input_type: 'number', fractal_metric_id: metric.id },
+            ] });
+            const [load] = activity.metric_definitions;
+            for (const value of values) {
+                const session = await call(`${root}/sessions`, { name: `${name} practice`, goal_ids: [root], session_data: {
+                    sections: [{ name: 'Practice', items: [{ type: 'activity', activity_definition_id: activity.id }] }],
+                } });
+                const instances = await (await fetch(`/api/${root}/sessions/${session.id}/activities`, { headers: { Authorization: `Bearer ${token}` } })).json();
+                await call(`${root}/sessions/${session.id}/activities/${instances[0].id}/metrics`, { metrics: [{ metric_id: load.id, value }] }, 'PUT');
+                await call(`${root}/activity-instances/${instances[0].id}/complete`, {});
+                await call(`${root}/sessions/${session.id}`, { completed: true }, 'PUT');
+            }
+            return { activity, load };
+        };
+        const heavy = await activityWith('Heavy press', [200, 240]);
+        const light = await activityWith('Light press', [40, 60]);
+        const trends = ({ activity, load }) => ({
+            selectedCategory: 'activities', selectedVisualization: 'metricTrends',
+            selectedActivity: { id: activity.id, name: activity.name }, visualizationState: { metrics: [load.id] },
+        });
+        const dashboard = (name, panels, windowStates) => call(`roots/${root}/dashboards`, { name, kind: 'dashboard', layout: {
+            version: 3, selected_window_id: 'window-1', global_filters: {},
+            layout: { type: 'grid', panels }, layout_bounds: { columns: 60, rows: 36 }, window_states: windowStates,
+        } });
+        await dashboard('Buckets board', [
+            { id: 'window-1', x: 0, y: 0, w: 60, h: 18 }, { id: 'window-2', x: 0, y: 18, w: 60, h: 18 },
+        ], {
+            'window-1': { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends', visualizationState: { grain: 'day' } },
+            'window-2': { selectedCategory: 'activities', selectedVisualization: 'activityTrends', visualizationState: { grain: 'day' } },
+        });
+        await dashboard('Beside board', [
+            { id: 'window-1', x: 0, y: 0, w: 30, h: 36 }, { id: 'window-2', x: 30, y: 0, w: 30, h: 36 },
+        ], { 'window-1': trends(heavy), 'window-2': trends(light) });
+    }, { token, root });
+
+    const open = async (name) => {
+        await page.goto(`/${root}/analytics`);
+        await page.getByRole('button', { name: 'Saved Analytics' }).click();
+        await page.getByRole('button', { name: `Open ${name}` }).click();
+        await expect(page.locator('canvas')).toHaveCount(2);
+    };
+    const settledOn = async (attribute) => {
+        const canvases = page.locator('canvas');
+        await expect.poll(async () => {
+            const [first, second] = await canvases.evaluateAll((items, key) => items.map((item) => item.dataset[key]), attribute);
+            return Boolean(first) && first === second;
+        }).toBe(true);
+        return canvases.first().evaluate((item, key) => item.dataset[key], attribute);
+    };
+
+    await open('Buckets board');
+    await settledOn('alignedPlot');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+
+    await open('Beside board');
+    const rows = await settledOn('alignedRows');
+    const [, , min, max] = rows.split(':').map(Number);
+    // Both hold the heavy activity's 240 and the light one's 40.
+    expect(min).toBeLessThanOrEqual(40);
+    expect(max).toBeGreaterThanOrEqual(240);
+    await expect(page.locator('canvas')).toHaveCount(2);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
 });

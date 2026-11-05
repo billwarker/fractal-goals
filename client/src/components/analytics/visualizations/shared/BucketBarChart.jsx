@@ -4,6 +4,7 @@ import { Bar } from 'react-chartjs-2';
 import { formatBucketLabel, formatBucketRange, formatDuration } from '../../../../utils/chartFormat';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import { ChartEmpty, useReportShownGrain } from '../../ChartStates';
+import { useAlignedBuckets } from '../../alignedAxes/AlignedAxesContext';
 import { buildSeries, seriesColor } from '../../series/buildSeries';
 import ChartLegendPanel from '../../series/ChartLegendPanel';
 import { BAR_MARKS } from './barMarks';
@@ -27,13 +28,23 @@ import styles from './BucketBarChart.module.css';
  *   datasetMeta?: object | null }} props  datasetMeta: extra fields on the single dataset (read by the goal surface)
  */
 export default function BucketBarChart({
-    rows, grain, byTime, countLabel, seriesLabel, chartRef, emptyDescription, grouped = null, datasetMeta = null,
+    rows: ownRows, grain, byTime, countLabel, seriesLabel, chartRef, emptyDescription, grouped = null, datasetMeta = null,
 }) {
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
     const [hiddenKeys, setHiddenKeys] = useState(() => new Set());
     const [hoverKey, setHoverKey] = useState(null);
     useReportShownGrain(grain);
+    const ownKeys = useMemo(() => ownRows.map((row) => row.key), [ownRows]);
+    // A running total reads its future dates by position, so it keeps its own axis.
+    const alignedKeys = useAlignedBuckets({
+        chartRef, grain, keys: ownKeys, enabled: !datasetMeta?.runningTotal && ownRows.some((row) => row.count > 0),
+    });
+    const rows = useMemo(() => {
+        if (!alignedKeys) return ownRows;
+        const byKey = new Map(ownRows.map((row) => [row.key, row]));
+        return alignedKeys.map((key) => byKey.get(key) || { key, count: 0, seconds: 0 });
+    }, [alignedKeys, ownRows]);
     // A null count is a bucket with nothing to draw (a running total's future buckets).
     const valueOf = (item) => (item.count == null ? null : byTime ? item.seconds / 3600 : item.count);
     const formatValue = (value) => (byTime ? formatDuration(value * 3600) : countLabel(value));

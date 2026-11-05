@@ -5,6 +5,7 @@ import { formatBucketLabel, formatBucketRange, formatDuration } from '../../util
 import { bucketStarts } from '../../utils/chartGrain';
 import EmptyState from '../common/EmptyState';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
+import { useAlignedBuckets } from './alignedAxes/AlignedAxesContext';
 import { useReportShownGrain } from './ChartStates';
 import { buildSeries, seriesColor } from './series/buildSeries';
 import ChartLegendPanel from './series/ChartLegendPanel';
@@ -37,6 +38,12 @@ function GoalTimeDistribution({ timeRollup, chartRef, onFocusGoal = null, reques
     const grain = timeRollup?.grain || 'day';
     useReportShownGrain(timeRollup?.grain || null);
 
+    // The axis spans the whole range (or all evidence), not just the dates these goals have time on.
+    const ownAxis = useMemo(() => (timeRollup?.first_bucket && timeRollup?.last_bucket
+        ? bucketStarts(timeRollup.first_bucket, timeRollup.last_bucket, grain)
+        : []), [grain, timeRollup]);
+    const alignedAxis = useAlignedBuckets({ chartRef, grain, keys: ownAxis, enabled: Boolean(timeRollup?.series?.length) });
+
     const { series, bucketTotals, uniqueTotals, buckets, breadcrumb } = useMemo(() => {
         const items = timeRollup?.series || [];
         const entities = items.map((item) => ({
@@ -48,10 +55,7 @@ function GoalTimeDistribution({ timeRollup, chartRef, onFocusGoal = null, reques
         const rows = items.flatMap((item) => item.buckets.map((bucket) => ({
             key: item.key, bucket: bucket.date, value: bucket.duration_seconds,
         })));
-        // The axis spans the whole range (or all evidence), not just the dates these goals have time on.
-        const axis = timeRollup?.first_bucket && timeRollup?.last_bucket
-            ? bucketStarts(timeRollup.first_bucket, timeRollup.last_bucket, grain)
-            : [];
+        const axis = alignedAxis || ownAxis;
         const unique = new Map((timeRollup?.unique_totals || []).map((total) => [total.date, total.duration_seconds]));
         return {
             ...buildSeries({ entities, rows, buckets: axis }),
@@ -59,7 +63,7 @@ function GoalTimeDistribution({ timeRollup, chartRef, onFocusGoal = null, reques
             buckets: axis,
             breadcrumb: timeRollup?.breadcrumb || [],
         };
-    }, [grain, timeRollup]);
+    }, [alignedAxis, ownAxis, timeRollup]);
 
     const colorOf = (item) => seriesColor(item, chartTheme);
     const chartData = useMemo(() => ({

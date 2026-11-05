@@ -436,6 +436,9 @@ def main():
                     ("offline-edits", "Offline Edits"),
                     ("offline-ceiling", "Offline Ceiling"),
                     ("axis-room", "Axis Room"),
+                    ("trend-goals", "Trend Goals"),
+                    ("aligned-sessions", "Aligned Sessions"),
+                    ("aligned-boards", "Aligned Boards"),
                 ):
                     spec_root = f"browser-{slug}-root-{suffix}"
                     db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,
