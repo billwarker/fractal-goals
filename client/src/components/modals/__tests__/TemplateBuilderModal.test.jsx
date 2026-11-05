@@ -184,7 +184,8 @@ describe('TemplateBuilderModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Select Press' }));
         fireEvent.click(screen.getByRole('button', { name: 'Save Circuit' }));
 
-        await waitFor(() => expect(screen.queryByRole('button', { name: 'Save Circuit' })).not.toBeInTheDocument());
+        // The button reads "Saving…" mid-save, so wait for the builder to close, not just the label to change.
+        await waitFor(() => expect(screen.queryByRole('button', { name: /^(Save Circuit|Saving…)$/ })).not.toBeInTheDocument());
         expect(onCreateCircuitDefinition).toHaveBeenCalledWith(expect.objectContaining({
             name: 'Push Pair',
             slots: [{ activity_definition_id: 'activity-1' }],
