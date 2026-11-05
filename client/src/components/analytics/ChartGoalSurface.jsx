@@ -50,7 +50,7 @@ function swallowNextClick() {
  * under its name and shown first, then opens here. Existing goals on the activity are
  * passed to the chart, which marks them at their thresholds; clicking one opens it here.
  */
-export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {}, chartToSave = null }) {
+export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {}, chartToSave = null, canSetGoal = true }) {
     const queryClient = useQueryClient();
     const visualizationId = context.visualization?.id;
     const supported = GOAL_CHART_IDS.has(visualizationId);
@@ -249,7 +249,7 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             if (event.key === 'a' || event.key === 'A') onAnnotatingChange(!annotating);
         },
     };
-    const handlers = supported ? {
+    const handlers = supported && canSetGoal ? {
         ...menuHandlers,
         ...(annotating ? { onPointerLeave: annotateHandlers.onPointerLeave, onClick: annotateHandlers.onClick } : {}),
     } : {};
@@ -325,8 +325,8 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
             ref={surfaceRef}
             className={styles.surface}
             style={annotating ? { cursor: 'crosshair', touchAction: 'none' } : undefined}
-            tabIndex={supported ? 0 : undefined}
-            aria-label={supported ? 'Chart. Press A to set a goal from a point on it.' : undefined}
+            tabIndex={supported && canSetGoal ? 0 : undefined}
+            aria-label={supported && canSetGoal ? 'Chart. Press A to set a goal from a point on it.' : undefined}
             {...handlers}
         >
             {React.createElement(Chart, { context: chartContext })}

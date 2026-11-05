@@ -63,22 +63,40 @@ describe('chart goal prefill', () => {
 });
 
 describe('goal markers', () => {
-    it('marks each goal at its per-session rules on charted axes, skipping cumulative totals', () => {
-        const goals = [
-            { goal_id: 'a', goal_name: 'Lift 245', completed: false, condition: { kind: 'single_session', rules: [
-                { metric_definition_id: 'weight', operator: '>=', value: 245 },
-                { metric_definition_id: 'reps', operator: '>=', value: 5 },
-            ] } },
-            { goal_id: 'b', goal_name: 'Volume', completed: false, condition: { kind: 'cumulative', rules: [] } },
-        ];
+    const rule = (metric, value) => ({ metric_definition_id: metric, operator: '>=', value });
+    const goal = (id, rules, kind = 'single_session') => ({ goal_id: id, goal_name: id, completed: false, condition: { kind, rules } });
+
+    it('marks a one-rule goal on its axis, skipping cumulative totals', () => {
+        const goals = [goal('a', [rule('weight', 245)]), goal('b', [], 'cumulative')];
         expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([
             { key: 'a', goal: goals[0], rules: [{ scaleID: 'metric1', value: 245, symbol: '≥', metricId: 'weight' }] },
         ]);
-        expect(goalMarkers(goals, { weight: 'x', reps: 'y' })[0].rules.map((rule) => rule.scaleID)).toEqual(['x', 'y']);
         // The annotations only keep thresholds inside the axes; the markers draw the goal.
         const annotations = goalLineAnnotations(goals, { weight: 'metric1' });
         expect(Object.keys(annotations)).toEqual(['goal-a-weight']);
         expect(annotations['goal-a-weight']).toMatchObject({ type: 'line', scaleID: 'metric1', value: 245, borderColor: 'transparent' });
         expect(annotations['goal-a-weight'].label).toBeUndefined();
+    });
+
+    it('marks a two-rule goal only where one point shows both: a scatter plot\'s x and y', () => {
+        const goals = [goal('a', [rule('weight', 245), rule('reps', 5)])];
+        expect(goalMarkers(goals, { weight: 'x', reps: 'y' })[0].rules.map((item) => item.scaleID)).toEqual(['x', 'y']);
+        // Metric Trends: each metric on its own value axis.
+        expect(goalMarkers(goals, { weight: 'metric1', reps: 'metric2' })).toEqual([]);
+        expect(goalLineAnnotations(goals, { weight: 'metric1', reps: 'metric2' })).toEqual({});
+    });
+
+    it('marks a session-yield goal on the Yield line\'s axis, and not on a chart without it', () => {
+        const goals = [{ goal_id: 'y', goal_name: 'y', completed: false, condition: {
+            kind: 'single_session', measure: 'yield', operator: '>=', target_value: 300, rules: [],
+        } }];
+        expect(goalMarkers(goals, { yield: 'metric1' })[0].rules).toEqual([{ scaleID: 'metric1', value: 300, symbol: '≥', metricId: 'yield' }]);
+        expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([]);
+    });
+
+    it('leaves out a goal with a rule off the chart', () => {
+        const goals = [goal('a', [rule('weight', 245), rule('reps', 5)])];
+        expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([]);
+        expect(goalMarkers(goals, { weight: 'x', tempo: 'y' })).toEqual([]);
     });
 });

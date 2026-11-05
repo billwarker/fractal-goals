@@ -301,3 +301,83 @@ test('a saved view of the removed Goal Detail View goes back to choosing a chart
     await expect(page.getByText('Something went wrong')).toHaveCount(0);
     expect(errors).toEqual([]);
 });
+
+test('Metric Trends offers Set goal with one metric showing, and not with two', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-axis-room-root-${suffix}`;
+    const token = await logIn(page);
+    const seed = await page.evaluate(async ({ token, root }) => {
+        const call = async (path, body, method = 'POST') => {
+            const response = await fetch(`/api/${path}`, {
+                method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
+            return response.json();
+        };
+        const activity = await call(`${root}/activities`, { name: 'Trend press', has_metrics: true, metrics: [
+            { name: 'Load', unit: 'Lbs', input_type: 'number' },
+            { name: 'Count', unit: 'Reps', input_type: 'number' },
+        ] });
+        const [load, count] = activity.metric_definitions;
+        for (const [loadValue, countValue] of [[40, 5], [60, 7]]) {
+            const session = await call(`${root}/sessions`, { name: 'Press practice', goal_ids: [root], session_data: {
+                sections: [{ name: 'Practice', items: [{ type: 'activity', activity_definition_id: activity.id }] }],
+            } });
+            const instances = await (await fetch(`/api/${root}/sessions/${session.id}/activities`, { headers: { Authorization: `Bearer ${token}` } })).json();
+            await call(`${root}/sessions/${session.id}/activities/${instances[0].id}/metrics`, { metrics: [
+                { metric_id: load.id, value: loadValue }, { metric_id: count.id, value: countValue },
+            ] }, 'PUT');
+            await call(`${root}/activity-instances/${instances[0].id}/complete`, {});
+            await call(`${root}/sessions/${session.id}`, { completed: true }, 'PUT');
+        }
+        const view = (name, metrics) => call(`roots/${root}/dashboards`, { name, kind: 'view', layout: {
+            type: 'analytics_view', version: 1, global_filters: {},
+            profile: {
+                selectedCategory: 'activities', selectedVisualization: 'metricTrends',
+                selectedActivity: { id: activity.id, name: activity.name },
+                visualizationState: { metrics },
+            },
+        } });
+        await view('Press both', [load.id, count.id]);
+        await view('Press load', [load.id]);
+        await view('Press yield', ['yield']);
+        return { name: activity.name };
+    }, { token, root });
+    expect(seed.name).toBe('Trend press');
+
+    const open = async (name) => {
+        await page.goto(`/${root}/analytics`);
+        await page.getByRole('button', { name: 'Saved Analytics' }).click();
+        await page.getByRole('button', { name: `Open ${name}` }).click();
+        await expect(page.locator('canvas').first()).toBeVisible();
+    };
+    const setGoal = page.getByRole('button', { name: 'Set goal', exact: true });
+    await open('Press both');
+    await expect(setGoal).toHaveCount(0);
+    await open('Press load');
+    await expect(setGoal).toBeVisible();
+
+    // The Yield line reads as a goal too, with the crosshair on its axis.
+    await open('Press yield');
+    await setGoal.click();
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+    const box = await page.locator('canvas').first().boundingBox();
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.45);
+    await expect(page.getByText(/^Total yield ≥ \d+ within one session$/)).toBeVisible();
+
+    // It saves as a real goal, marked on the Yield line.
+    await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.45);
+    await page.getByRole('button', { name: 'Create goal…' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Short Term Goal' }).click();
+    const goalName = `Yield goal ${suffix}`;
+    await dialog.locator('#goal-name').fill(goalName);
+    const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    expect((await created).ok()).toBeTruthy();
+    const goalCharts = page.getByRole('dialog', { name: goalName }).getByRole('region', { name: 'Analytics' });
+    await expect(goalCharts.getByTitle(new RegExp(`^${goalName} \\(`))).toBeVisible();
+});
+

@@ -7,12 +7,23 @@
  */
 import { formatBucketRange, formatMetric, snapMetricValue } from '../../utils/chartFormat';
 import {
-    goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromRunningTotal, goalFromScatterPoint, withChartScope,
+    goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromRunningTotal, goalFromScatterPoint, goalFromYieldTrend,
+    withChartScope,
 } from '../../utils/chartGoalPrefill';
 import { activeMetricDefinitions } from '../../utils/goalConditions';
-import { buildMetricTrendData } from './visualizations/activities/MetricTrends';
+import { activityYieldIds, buildMetricTrendData, getSelectedMetricDefs, YIELD_METRIC_ID } from './visualizations/activities/MetricTrends';
 
 export const GOAL_CHART_IDS = new Set(['metricTrends', 'metricProgress', 'scatterPlot', 'activityFrequency', 'activityTrends']);
+
+/**
+ * Whether goals can be set from this chart. Metric Trends draws each metric on its own axis, so only
+ * with one showing does a point name one goal; two metrics together belong on the scatter plot.
+ */
+export function canSetGoalFromChart(visualizationId, activity, metrics = []) {
+    if (!GOAL_CHART_IDS.has(visualizationId)) return false;
+    if (visualizationId !== 'metricTrends') return true;
+    return getSelectedMetricDefs(activity?.metric_definitions || [], metrics, activityYieldIds(activity)).length <= 1;
+}
 
 function pointerOnChart(chart, clientX, clientY) {
     const rect = chart.canvas.getBoundingClientRect();
@@ -98,12 +109,24 @@ export function readChartGoalTarget({ visualizationId, chart, nativeEvent, conte
     if (visualizationId === 'activityTrends') {
         target = readRunningTotal({ chart, point });
     } else if (visualizationId === 'metricTrends') {
-        const [nearest] = chart.getElementsAtEventForMode(nativeEvent, 'nearest', { intersect: false, axis: 'xy' }, false);
-        const dataset = datasets[nearest?.datasetIndex ?? 0];
-        const metric = activity && dataset?.metricId ? findMetric(activity, dataset.metricId) : null;
+        // One height reads a different value on each metric's axis, so it can't name one goal.
+        const charted = datasets.filter((dataset) => dataset.metricId);
+        if (charted.length > 1) return null;
+        const dataset = charted[0];
+        if (activity && dataset?.metricId === YIELD_METRIC_ID) {
+            const scale = chart.scales[dataset.yAxisID];
+            const value = Math.max(0, Math.round(scale.getValueForPixel(point.y)));
+            guides = { y: { value, pixel: scale.getPixelForValue(value), label: String(value) } };
+            target = goalFromYieldTrend({ activity, value, setsHandling: context.visualizationState?.setsHandling });
+            if (!target) return { unsupported: 'No goal at this point', guides };
+            const yieldGoal = withChartScope({ activity, ...target }, context.globalFilters?.filters || null);
+            return { ...yieldGoal, notes: [...target.notes, ...(yieldGoal.notes || [])], guides };
+        }
+        const metric = activity && dataset ? findMetric(activity, dataset.metricId) : null;
         if (!metric) return null;
         const y = metricGuide(chart.scales[dataset.yAxisID], metric, chart.scales[dataset.yAxisID]?.getValueForPixel(point.y));
-        guides = { x: categoryGuide(chart, chart.scales.x, point.x), y };
+        // A rule holds in any session, so the date under the pointer plays no part.
+        guides = { y };
         target = y ? goalFromMetricTrend({ activity, metricId: metric.id, value: y.value }) : null;
     } else if (visualizationId === 'scatterPlot') {
         const dataset = datasets[0];
@@ -118,10 +141,8 @@ export function readChartGoalTarget({ visualizationId, chart, nativeEvent, conte
         const dataset = datasets[0];
         if (!activity || !dataset?.metricId) return null;
         const percent = Math.round(chart.scales.y.getValueForPixel(point.y));
-        guides = {
-            x: categoryGuide(chart, chart.scales.x, point.x),
-            y: { pixel: chart.scales.y.getPixelForValue(percent), label: `${percent > 0 ? '+' : ''}${percent}%` },
-        };
+        // Measured from the latest session, whichever bar is under the pointer.
+        guides = { y: { pixel: chart.scales.y.getPixelForValue(percent), label: `${percent > 0 ? '+' : ''}${percent}%` } };
         target = goalFromMetricProgress({
             activity, metricId: dataset.metricId, percent, latestValue: latestValue(context, activity, dataset.metricId),
         });

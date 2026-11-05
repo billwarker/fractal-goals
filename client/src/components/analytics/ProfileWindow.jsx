@@ -33,7 +33,7 @@ import {
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
-import { GOAL_CHART_IDS } from './chartGoalTargets';
+import { canSetGoalFromChart } from './chartGoalTargets';
 import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
 import ChartTitle from './ChartTitle';
@@ -160,6 +160,10 @@ function ProfileWindow({
         filteredGoalSummary,
         effectiveSelectedGoal,
     } = useVisualizationContext({ data, windowState, globalDateRange, globalFilters });
+
+    // Adding a second metric to Metric Trends takes the chart out of Set goal mode.
+    const canSetGoal = canSetGoalFromChart(selectedVisualization, effectiveSelectedActivity, visualizationState.metrics);
+    if (isAnnotating && !canSetGoal) setIsAnnotating(false);
 
     // Reset visualization when category changes
     const handleCategoryChange = (category) => {
@@ -327,7 +331,7 @@ function ProfileWindow({
 
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
-                    {GOAL_CHART_IDS.has(selectedVisualization) && (
+                    {canSetGoal && (
                         <Button
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -553,6 +557,7 @@ function ProfileWindow({
                 Chart={VisualizationChart}
                 rootId={rootId}
                 annotating={isAnnotating}
+                canSetGoal={canSetGoal}
                 onAnnotatingChange={setIsAnnotating}
                 chartToSave={{ windowState, globalFilters, reusableViewId }}
                 context={{

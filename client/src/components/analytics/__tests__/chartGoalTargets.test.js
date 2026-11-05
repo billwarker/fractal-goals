@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readChartGoalTarget } from '../chartGoalTargets';
+import { canSetGoalFromChart, readChartGoalTarget } from '../chartGoalTargets';
 
 /** A linear scale over pixels [start, end] for values [min, max]. */
 function linear(min, max, start, end) {
@@ -53,8 +53,45 @@ describe('readChartGoalTarget', () => {
         expect(result.conditionDraft.rules[0].value).toBe('120.6');
         expect(result.guides.y).toMatchObject({ value: 120.6, label: '120.6 lb' });
         expect(result.guides.y.pixel).toBeCloseTo(79.4);
-        expect(result.guides.x).toMatchObject({ index: 1, label: 'Mar 8', pixel: 100 });
+        // A rule holds in any session, so no date is on offer.
+        expect(result.guides.x).toBeUndefined();
         expect(result.summary).toBe('Weight ≥ 120.6 lb within one session');
+    });
+
+    it('reads the Yield line as a session total yield goal, with a crosshair on its axis', () => {
+        const chart = fakeChart({
+            scales: { x: category(100), metric1: linear(0, 400, 200, 0) },
+            datasets: [{ metricId: 'yield', yAxisID: 'metric1' }],
+            labels: ['Mar 1', 'Mar 8'],
+        });
+        const read = (setsHandling) => readChartGoalTarget({
+            visualizationId: 'metricTrends', chart, nativeEvent: at(110, 100), context: baseContext({ visualizationState: { setsHandling } }),
+        });
+        const result = read('top');
+        expect(result.guides.y).toMatchObject({ value: 200, label: '200', pixel: 100 });
+        expect(result.summary).toBe('Total yield ≥ 200 within one session');
+        expect(result.conditionDraft).toMatchObject({ kind: 'single_session', measure: 'yield', operator: '>=', target_value: '200', rules: [] });
+        expect(result.notes[0]).toMatch(/total yield/);
+        expect(read('total').notes).toEqual([]);
+    });
+
+    it('sets no goal on Metric Trends showing more than one metric', () => {
+        const chart = fakeChart({
+            scales: { x: category(100), metric1: linear(0, 200, 200, 0), metric2: linear(0, 20, 200, 0) },
+            datasets: [{ metricId: 'weight', yAxisID: 'metric1' }, { metricId: 'reps', yAxisID: 'metric2' }],
+            labels: ['Mar 1', 'Mar 8'],
+        });
+        expect(readChartGoalTarget({ visualizationId: 'metricTrends', chart, nativeEvent: at(110, 100), context: baseContext() })).toBeNull();
+    });
+
+    it('offers goal setting on Metric Trends only with one metric showing', () => {
+        expect(canSetGoalFromChart('metricTrends', bench, ['weight'])).toBe(true);
+        expect(canSetGoalFromChart('metricTrends', bench, ['weight', 'reps'])).toBe(false);
+        // With none picked, it shows an activity's first two.
+        expect(canSetGoalFromChart('metricTrends', bench, [])).toBe(false);
+        expect(canSetGoalFromChart('metricTrends', { metric_definitions: [bench.metric_definitions[0]] }, [])).toBe(true);
+        expect(canSetGoalFromChart('scatterPlot', bench, [])).toBe(true);
+        expect(canSetGoalFromChart('summary', bench, [])).toBe(false);
     });
 
     it('snaps both scatter axes and ignores points outside the plot', () => {
@@ -80,6 +117,17 @@ describe('readChartGoalTarget', () => {
         const result = readChartGoalTarget({ visualizationId: 'metricTrends', chart, nativeEvent: at(10, 100), context });
         expect(result.conditionDraft).toMatchObject({ tag_ids: ['heavy'], tag_match: 'contains' });
         expect(result.notes).toEqual(['The template filter isn’t part of the goal condition.']);
+    });
+
+    it('reads Metric Progress as a percentage with no date, since it measures from the latest session', () => {
+        const chart = fakeChart({
+            scales: { x: category(100), y: linear(-50, 50, 200, 0) },
+            datasets: [{ metricId: 'weight' }],
+            labels: ['Mar 1', 'Mar 8'],
+        });
+        const result = readChartGoalTarget({ visualizationId: 'metricProgress', chart, nativeEvent: at(110, 80), context: baseContext() });
+        expect(result.guides.y).toMatchObject({ label: '+10%' });
+        expect(result.guides.x).toBeUndefined();
     });
 
     it('reads Activity Totals counts as whole times, and refuses time totals', () => {

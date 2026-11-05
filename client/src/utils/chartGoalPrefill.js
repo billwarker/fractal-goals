@@ -48,6 +48,24 @@ export function goalFromMetricTrend({ activity, metricId, value }) {
 }
 
 /**
+ * Metric Trends' Yield line: a session's total yield reaching the value. Goals count the total, so a
+ * line drawn from each session's top set or average gets a note saying so.
+ * @param {{ activity: any, value: number, setsHandling?: string }} input
+ * @returns {{ conditionDraft: any, summary: string, notes: string[] } | null}
+ */
+export function goalFromYieldTrend({ activity, value, setsHandling = 'top' }) {
+    const target = Math.round(value);
+    if (!Number.isFinite(target) || target <= 0) return null;
+    return {
+        conditionDraft: {
+            ...createConditionDraft(activity, 'single_session'), measure: 'yield', rules: [], operator: '>=', target_value: String(target),
+        },
+        summary: `Total yield ≥ ${target} within one session`,
+        notes: setsHandling === 'total' ? [] : ['This goal counts each session’s total yield, not the line’s per-set value.'],
+    };
+}
+
+/**
  * Scatter: the point's x and y become two rules met within one session.
  * @param {{ activity: any, metricX: string, x: number, metricY: string, y: number }} input
  */
