@@ -5,7 +5,9 @@
  * `plugins.pageGridSnap.enabled` (applyChartDensity's 'expanded' density), and the expanded goal
  * chart and the Analytics page's panels register it, keeping it out of other routes. It works through the chart's scriptable layout
  * padding: each layout measures the plot, and if it's off the grid the padding is adjusted and the
- * chart re-laid out (a few passes at most, since tick counts can shift).
+ * chart re-laid out (a few passes at most, since tick counts can shift). A chart aligned with others
+ * (`chart.$alignedEdges`, alignedAxes/) lays out within the space they all share, so equal inputs snap
+ * to the same grid lines.
  */
 
 const MAX_PASSES = 4;
@@ -61,11 +63,18 @@ function gridFor(canvas) {
     return { cell, x: box.left - origin.left, y: box.top - origin.top };
 }
 
+/** Called when the chart settles after re-laying itself out, which happens without a React render. */
+export function onGridLayoutSettled(chart, listener) {
+    if (listener) chart.$onGridLayout = listener;
+    else delete chart.$onGridLayout;
+}
+
 const pageGridSnap = {
     id: 'pageGridSnap',
     defaults: { enabled: false },
     resize(chart) {
         chart.$pageGridPasses = 0;
+        chart.$alignedEdges?.restart();
     },
     afterLayout(chart, _args, options) {
         if (!options?.enabled || !chart.chartArea) return;
@@ -80,27 +89,32 @@ const pageGridSnap = {
         const top = grid.y + area.top - (current.top - base.top);
         const right = grid.x + area.right + (current.right - base.right);
         const bottom = grid.y + area.bottom + (current.bottom - base.bottom);
+        const shared = chart.$alignedEdges?.report(chart, { left, right }) || { left, right };
 
-        const shiftLeft = gridShift(left, cell);
+        const shiftLeft = gridShift(shared.left, cell);
         const shiftTop = gridShift(top, cell);
         const x = divisions(primaryScale(chart, 'x'), cell);
         const y = divisions(primaryScale(chart, 'y'), cell);
-        const width = snappedLength(right - left - shiftLeft, cell, x.segments, x.unit);
+        const width = snappedLength(shared.right - shared.left - shiftLeft, cell, x.segments, x.unit);
         const height = snappedLength(bottom - top - shiftTop, cell, y.segments, y.unit);
         // Whole-cell steps can leave slack; split it in whole cells so the plot stays centred.
-        const slackX = Math.max(0, right - left - shiftLeft - width);
+        const slackX = Math.max(0, shared.right - shared.left - shiftLeft - width);
         const slackY = Math.max(0, bottom - top - shiftTop - height);
         const leadX = Math.floor(slackX / 2 / cell) * cell;
         const leadY = Math.floor(slackY / 2 / cell) * cell;
+        const plotLeft = shared.left + shiftLeft + leadX;
         const next = {
-            left: base.left + shiftLeft + leadX,
+            left: base.left + (plotLeft - left),
             top: base.top + shiftTop + leadY,
-            right: base.right + slackX - leadX,
+            right: base.right + (right - (plotLeft + width)),
             bottom: base.bottom + slackY - leadY,
         };
         const changed = SIDES.some((side) => Math.abs(next[side] - current[side]) >= 0.5);
         if (!changed) {
             chart.$pageGridPasses = 0;
+            chart.$onGridLayout?.();
+            // For tests and debugging: where an aligned plot settled, and how many slots it has.
+            if (chart.$alignedEdges) chart.canvas.dataset.alignedPlot = `${plotLeft}:${plotLeft + width}:${x.segments}`;
             return;
         }
         if ((chart.$pageGridPasses || 0) >= MAX_PASSES) return;

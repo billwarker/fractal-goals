@@ -18,12 +18,8 @@ import {
     sanitizeDashboardLayoutPayload,
     savedStateSignature,
 } from '../components/analytics/dashboardState';
-import ProfileWindowLayout, {
-    countWindows,
-    getWindowIds,
-    removeWindow,
-    splitWindow,
-} from '../components/analytics/ProfileWindowLayout';
+import { countWindows, getWindowIds, removeWindow, splitWindow } from '../components/analytics/ProfileWindowLayout';
+import AlignedDashboardLayout from '../components/analytics/alignedAxes/AlignedDashboardLayout';
 import { useAnalyticsPageData } from '../hooks/useAnalyticsPageData';
 import { useAnalyticsViews } from '../hooks/useDashboardQueries';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
@@ -505,7 +501,8 @@ function Analytics() {
                             className={`${styles.gridSurface} ${debugMode ? styles.gridSurfaceDebug : ''} ${isDashboardSettling ? styles.gridSurfaceSettling : ''}`}
                             onMouseDown={handleWorkspaceMouseDown}
                         >
-                            <ProfileWindowLayout
+                            <AlignedDashboardLayout
+                                alignAxes={!isMobile}
                                 layout={layout}
                                 onLayoutChange={setLayout}
                                 onBoundsChange={setDashboardBounds}

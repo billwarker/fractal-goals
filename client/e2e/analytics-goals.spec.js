@@ -395,3 +395,76 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
     await expect(details.getByText(/average yield ≥ \d+ across at least 1 set within one session/)).toBeVisible();
 });
 
+
+test('stacked Metric Trends and Progress panels for one activity line up their x axes', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    test.skip(testInfo.project.name !== 'desktop', 'Phones show panels without this layout.');
+    const root = 'browser-axis-room-root-desktop';
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await logIn(page);
+    const dashboardName = await page.evaluate(async ({ token, root }) => {
+        const call = async (path, body, method = 'POST') => {
+            const response = await fetch(`/api/${path}`, {
+                method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
+            return response.json();
+        };
+        const activity = await call(`${root}/activities`, { name: 'Aligned press', has_metrics: true, has_sets: true, metrics: [
+            { name: 'Load', unit: 'Lbs', input_type: 'number' },
+        ] });
+        const [load] = activity.metric_definitions;
+        for (const value of [40, 60, 50, 70]) {
+            const session = await call(`${root}/sessions`, { name: 'Aligned practice', goal_ids: [root], session_data: {
+                sections: [{ name: 'Practice', items: [{ type: 'activity', activity_definition_id: activity.id }] }],
+            } });
+            const instances = await (await fetch(`/api/${root}/sessions/${session.id}/activities`, { headers: { Authorization: `Bearer ${token}` } })).json();
+            await call(`${root}/sessions/${session.id}/activities/${instances[0].id}/metrics`, { metrics: [{ metric_id: load.id, value }] }, 'PUT');
+            await call(`${root}/activity-instances/${instances[0].id}/complete`, {});
+            await call(`${root}/sessions/${session.id}`, { completed: true }, 'PUT');
+        }
+        const panelState = (selectedVisualization, visualizationState) => ({
+            selectedCategory: 'activities', selectedVisualization,
+            selectedActivity: { id: activity.id, name: activity.name }, visualizationState,
+        });
+        const name = 'Aligned board';
+        await call(`roots/${root}/dashboards`, { name, kind: 'dashboard', layout: {
+            version: 3, selected_window_id: 'window-1', global_filters: {},
+            layout: { type: 'grid', panels: [
+                { id: 'window-1', x: 0, y: 0, w: 60, h: 18 },
+                { id: 'window-2', x: 0, y: 18, w: 60, h: 18 },
+            ] },
+            layout_bounds: { columns: 60, rows: 36 },
+            window_states: {
+                'window-1': panelState('metricTrends', { metrics: [load.id] }),
+                'window-2': panelState('metricProgress', { metric: load.id }),
+            },
+        } });
+        return name;
+    }, { token, root });
+
+    await page.goto(`/${root}/analytics`);
+    await page.getByRole('button', { name: 'Saved Analytics' }).click();
+    await page.getByRole('button', { name: `Open ${dashboardName}` }).click();
+    const canvases = page.locator('canvas');
+    await expect(canvases).toHaveCount(2);
+    const plots = () => canvases.evaluateAll((items) => items.map((canvas) => canvas.dataset.alignedPlot));
+    await expect.poll(async () => {
+        const [first, second] = await plots();
+        return Boolean(first) && first === second;
+    }).toBe(true);
+    const [plot] = await plots();
+    // Every session has a slot on both, though Progress has no comparison for the first.
+    expect(plot.split(':')[2]).toBe('4');
+    const boxes = await canvases.evaluateAll((items) => items.map((canvas) => {
+        const { left, top, bottom } = canvas.getBoundingClientRect();
+        return { left, top, bottom };
+    }));
+    expect(Math.abs(boxes[0].left - boxes[1].left)).toBeLessThan(1);
+    expect(boxes[0].bottom).toBeLessThanOrEqual(boxes[1].top);
+    await page.screenshot({ path: testInfo.outputPath('aligned.png') });
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+    expect(errors).toEqual([]);
+});

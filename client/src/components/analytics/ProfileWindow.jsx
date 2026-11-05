@@ -33,6 +33,7 @@ import {
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
+import { AlignedAxisWindow } from './alignedAxes/AlignedAxesContext';
 import { canSetGoalFromChart } from './chartGoalTargets';
 import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
@@ -601,11 +602,13 @@ function ProfileWindow({
         >
             {isHeaderMinimized ? renderMinimizedHeaderOverlay() : renderUnifiedHeader()}
             {renderQueryOverlay()}
-            {onPageGrid ? (
-                <ChartDensityContext.Provider value="expanded">
-                    {renderVisualizationContent()}
-                </ChartDensityContext.Provider>
-            ) : renderVisualizationContent()}
+            <AlignedAxisWindow windowId={windowId}>
+                {onPageGrid ? (
+                    <ChartDensityContext.Provider value="expanded">
+                        {renderVisualizationContent()}
+                    </ChartDensityContext.Provider>
+                ) : renderVisualizationContent()}
+            </AlignedAxisWindow>
         </div>
     );
 }

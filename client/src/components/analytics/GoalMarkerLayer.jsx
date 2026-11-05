@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import GoalIcon from '../atoms/GoalIcon';
+import { onGridLayoutSettled } from './pageGridSnap';
 import styles from './GoalMarkerLayer.module.css';
 
 const NAME_ROOM = 200;
@@ -67,11 +68,13 @@ export default function GoalMarkerLayer({ chartRef, markers, onOpenGoal = null }
             });
         };
         update();
+        onGridLayoutSettled(chart, update);
         const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
         observer?.observe(chart.canvas);
         return () => {
             cancelAnimationFrame(frame);
             observer?.disconnect();
+            onGridLayoutSettled(chart, null);
         };
     });
 

@@ -7,6 +7,8 @@ import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditio
 import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
 import { GoalMarkerHost } from '../../GoalMarkerLayer';
+import { useAlignedAxis } from '../../alignedAxes/AlignedAxesContext';
+import { valuesOnSlots } from '../../alignedAxes/slots';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import useActiveChartPoint from '../../useActiveChartPoint';
 
@@ -102,7 +104,8 @@ export function buildMetricTrendData({
         yAxisID: `metric${index + 1}`,
     })).filter((dataset) => dataset.data.some((value) => value != null));
 
-    return { labels, datasets, selectedMetricDefs, instanceIds };
+    const instanceTimes = sortedInstances.map((instance) => getInstanceDate(instance)?.getTime() || 0);
+    return { labels, datasets, selectedMetricDefs, instanceIds, instanceTimes };
 }
 
 export function MetricTrendsChart({
@@ -143,9 +146,25 @@ export function MetricTrendsChart({
         highlightInstanceId,
         colors: chartTheme.seriesColors,
     }), [activity, activityInstances, chartTheme.seriesColors, highlightInstanceId, metricDefinitions, shownMetrics, selectedSplit, setsHandling, yieldIds]);
+    const axisPoints = useMemo(() => chartData.instanceIds.map((key, index) => ({
+        key, at: chartData.instanceTimes[index], label: chartData.labels[index],
+    })), [chartData]);
+    const slots = useAlignedAxis({
+        chartRef: ownChartRef,
+        identity: activity && chartData.datasets.length ? `sessions:${activity.id}` : null,
+        points: axisPoints,
+    });
+    const shown = useMemo(() => (slots ? {
+        labels: slots.map((slot) => slot.label),
+        instanceIds: slots.map((slot) => slot.key),
+        datasets: chartData.datasets.map((dataset) => ({
+            ...dataset,
+            data: valuesOnSlots(chartData.instanceIds, dataset.data, slots),
+        })),
+    } : chartData), [chartData, slots]);
     // A session hovered elsewhere becomes the active point on each line.
-    const hoverIndex = hoverInstanceId ? chartData.instanceIds.indexOf(hoverInstanceId) : -1;
-    useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : chartData.datasets
+    const hoverIndex = hoverInstanceId ? shown.instanceIds.indexOf(hoverInstanceId) : -1;
+    useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : shown.datasets
         .map((dataset, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: dataset.data[hoverIndex] }))
         .filter((element) => element.value != null), { tooltip: density !== 'compact' });
     const hiddenCount = selectedDefs.length - chartData.selectedMetricDefs.length;
@@ -166,8 +185,8 @@ export function MetricTrendsChart({
             <Line
                 ref={setChartRef}
                 data={{
-                    labels: chartData.labels,
-                    datasets: chartData.datasets,
+                    labels: shown.labels,
+                    datasets: shown.datasets,
                 }}
                 options={applyChartDensity({
                     responsive: true,
@@ -191,6 +210,8 @@ export function MetricTrendsChart({
                     },
                     scales: {
                         x: {
+                            // Aligned with a bar chart: its bars sit at slot centres, so these points do too.
+                            ...(slots ? { offset: true } : {}),
                             ticks: { color: chartTheme.textColor, maxRotation: 45, minRotation: 0 },
                             grid: { color: chartTheme.gridColor },
                         },
