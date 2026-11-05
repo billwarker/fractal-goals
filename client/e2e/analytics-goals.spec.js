@@ -39,8 +39,9 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
 
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Which goal should this go under?' })).toBeVisible();
+    await dialog.getByText(`Chart Parent ${suffix}`, { exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
-    // Guitar practice is associated with a goal, which starts selected; a level step appears if it has a choice.
+    // A level step appears if the goal has a choice.
     const levelChoice = dialog.getByRole('button', { name: /(Term|Immediate) Goal$/ });
     await expect(levelChoice.or(dialog.locator('#goal-name')).first()).toBeVisible();
     if (await levelChoice.count()) await levelChoice.first().click();
@@ -254,6 +255,7 @@ test('a goal from an unsaved chart gets that chart, saved under its name and sho
     await create.click();
 
     const dialog = page.getByRole('dialog');
+    await dialog.getByText(`Chart Parent ${suffix}`, { exact: true }).click();
     await dialog.getByRole('button', { name: 'Next', exact: true }).click();
     const levelChoice = dialog.getByRole('button', { name: /(Term|Immediate) Goal$/ });
     await expect(levelChoice.or(dialog.locator('#goal-name')).first()).toBeVisible();

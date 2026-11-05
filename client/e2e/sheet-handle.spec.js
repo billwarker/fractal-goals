@@ -5,7 +5,7 @@ const SHEETS = [
     { name: 'Notes', path: 'browser-root-mobile/notes', open: { name: 'Show Filters' } },
     { name: 'Analytics', path: 'browser-root-mobile/analytics', open: { name: 'Show Sidebar' } },
     { name: 'Session Detail', path: 'browser-root-mobile/session/browser-session-mobile', open: { name: 'Details', exact: true } },
-    { name: 'Create Session', path: 'browser-plan-root-mobile/create-session?program_id=browser-plan-program-mobile', open: { name: 'Show Session Goals' } },
+    { name: 'Create Session', path: 'browser-sheet-handle-root-mobile/create-session', open: { name: 'Show Session Goals' } },
     { name: 'Programs', path: 'browser-plan-root-mobile/programs', open: { name: 'Show Sidebar' } },
 ];
 
