@@ -42,6 +42,11 @@ describe('slots', () => {
         expect(merged.map((slot) => slot.key)).toEqual(['a', 'b', 'c']);
     });
 
+    it('keeps same-day points in their charts\' own order, not by key', () => {
+        const merged = mergeSlots([[point('z', 1), point('a', 1), point('m', 1)], [point('a', 1), point('m', 1)]]);
+        expect(merged.map((slot) => slot.key)).toEqual(['z', 'a', 'm']);
+    });
+
     it('lays a chart out over the slots with gaps', () => {
         expect(valuesOnSlots(['a', 'c'], [10, 30], [point('a', 1), point('b', 1), point('c', 2)])).toEqual([10, null, 30]);
     });

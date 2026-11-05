@@ -56,9 +56,14 @@ export function createEdgeGroup(property = '$alignedEdges') {
         /** @param {any} chart */
         leave(chart) {
             delete chart[property];
+            delete chart.$alignedHover;
             chart.$pageGridPasses = 0;
             if (chart.canvas) chart.update('none');
             if (members.delete(chart) && members.size) refresh(chart);
+        },
+        /** The charts in this group. */
+        charts() {
+            return [...members.keys()];
         },
         /** A panel resized or a chart changed: charts may move for real again. */
         restart() {

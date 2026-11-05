@@ -15,7 +15,8 @@ export function mergeSlots(pointLists) {
     pointLists.flat().forEach((point) => {
         if (!byKey.has(point.key)) byKey.set(point.key, point);
     });
-    return [...byKey.values()].sort((a, b) => a.at - b.at || String(a.key).localeCompare(String(b.key)));
+    // A stable sort: points at the same time, such as a day's sessions, stay in their charts' own order.
+    return [...byKey.values()].sort((a, b) => a.at - b.at);
 }
 
 /**

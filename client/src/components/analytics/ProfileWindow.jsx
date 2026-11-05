@@ -34,6 +34,7 @@ import { buildVisualizationQueryExplanation } from './visualizationQueryExplanat
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
 import { AlignedAxisWindow } from './alignedAxes/AlignedAxesContext';
+import alignedCrosshair from './alignedAxes/alignedCrosshair';
 import { canSetGoalFromChart } from './chartGoalTargets';
 import { ChartError, ChartLoading, ChartScopeProvider } from './ChartStates';
 import { ChartDensityContext } from './ChartJSWrapper';
@@ -43,7 +44,7 @@ import pageGridSnap from './pageGridSnap';
 import axisExtension from './axisExtension';
 
 // Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
-ChartJS.register(pageGridSnap, axisExtension);
+ChartJS.register(pageGridSnap, axisExtension, alignedCrosshair);
 
 const CATEGORY_LABELS = Object.fromEntries(VISUALIZATION_CATEGORIES.map((category) => [category.id, category.name]));
 

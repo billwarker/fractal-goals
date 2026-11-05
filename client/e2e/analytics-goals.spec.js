@@ -474,6 +474,20 @@ test('stacked Metric Trends and Progress panels for one activity line up their x
         return Boolean(first) && first === second;
     }).toBe(true);
 
+    // Hovering one chart moves the crosshair across both, to the same slot.
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(300);
+    const trendsBefore = await canvases.first().evaluate((canvas) => canvas.toDataURL());
+    const box = await canvases.nth(1).boundingBox();
+    const [plotLeft, plotRight] = plot.split(':').map(Number);
+    const grid = await page.locator('[data-page-grid]').boundingBox();
+    const slotX = (index) => grid.x + plotLeft + ((plotRight - plotLeft) * (index + 0.5)) / 4;
+    await page.mouse.move(slotX(2), box.y + box.height * 0.45);
+    await expect.poll(async () => canvases.evaluateAll((items) => items.map((item) => item.dataset.alignedHover))).toEqual(['2', '2']);
+    // The other chart really draws it: its line and highlighted point, not just its state.
+    await expect.poll(async () => (await canvases.first().evaluate((canvas) => canvas.toDataURL())) !== trendsBefore).toBe(true);
+    await page.mouse.move(0, 0);
+    await expect.poll(async () => canvases.evaluateAll((items) => items.map((item) => item.dataset.alignedHover ?? null))).toEqual([null, null]);
     const boxes = await canvases.evaluateAll((items) => items.map((canvas) => {
         const { left, top, bottom } = canvas.getBoundingClientRect();
         return { left, top, bottom };
