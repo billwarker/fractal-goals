@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import EmptyState from '../../../common/EmptyState';
+import { activityUsesSets } from '../../../../utils/goalConditions';
 import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditionLines';
 import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
@@ -155,11 +156,13 @@ export function MetricTrendsChart({
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
     // Each charted metric has its own y axis, metric1, metric2, …
+    // Without sets, the Yield line plots one value per session, whichever handling is chosen.
+    const yieldLine = activityUsesSets(activity) ? setsHandling : 'total';
     const goalScales = Object.fromEntries(chartData.selectedMetricDefs.map((metric, index) => [metric.id, `metric${index + 1}`]));
 
     return (
         <CompactChartFrame caption={caption}>
-        <GoalMarkerHost chartRef={ownChartRef} markers={goalMarkers(goalLines, goalScales)} onOpenGoal={onOpenGoal}>
+        <GoalMarkerHost chartRef={ownChartRef} markers={goalMarkers(goalLines, goalScales, yieldLine)} onOpenGoal={onOpenGoal}>
             <Line
                 ref={setChartRef}
                 data={{
@@ -178,7 +181,7 @@ export function MetricTrendsChart({
                             labels: { color: chartTheme.textColor, usePointStyle: true, boxWidth: 8, font: { size: 11 } },
                         },
                         title: { display: !hideTitle, text: 'Metric Trends', color: chartTheme.textColor },
-                        annotation: { annotations: goalLineAnnotations(goalLines, goalScales) },
+                        annotation: { annotations: goalLineAnnotations(goalLines, goalScales, yieldLine) },
                         tooltip: {
                             backgroundColor: chartTheme.tooltipBg,
                             titleColor: chartTheme.tooltipText,

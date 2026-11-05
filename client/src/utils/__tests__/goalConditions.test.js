@@ -107,6 +107,26 @@ describe('drafts', () => {
         expect(conditionToDraft(null)).toBeNull();
     });
 
+    it('round-trips a yield per set threshold, keeping its sets count and average', () => {
+        const saved = {
+            activity_definition_id: 'bench', kind: 'single_session', measure: 'set_yield',
+            operator: '>=', target_value: 200, min_sets: 2, set_aggregate: 'average',
+        };
+        expect(buildConditionPayload(conditionToDraft(saved))).toEqual(saved);
+        const { set_aggregate: _each, ...best } = saved;
+        expect(buildConditionPayload(conditionToDraft(best))).toEqual(best);
+    });
+
+    it('describes a yield per set threshold and its progress', () => {
+        const condition = { kind: 'single_session', measure: 'set_yield', operator: '>=', target_value: 200, min_sets: 2 };
+        expect(describeConditionParts(condition, { name: 'Bench', has_sets: true }).join('')).toBe('Bench: at least 2 sets of yield ≥ 200 within one session');
+        expect(describeConditionParts({ ...condition, set_aggregate: 'average' }, { name: 'Bench', has_sets: true }).join(''))
+            .toBe('Bench: average yield ≥ 200 across at least 2 sets within one session');
+        expect(describeProgress({ current: 1, required: 2 }, condition)).toBe('1 / 2 sets');
+        expect(describeProgress({ current: 184, required: 200 }, { ...condition, min_sets: 1 })).toBe('Top set 184 / 200');
+        expect(describeProgress({ current: 150, required: 200 }, { ...condition, set_aggregate: 'average' })).toBe('Best average 150 / 200');
+    });
+
     it('carries a trimmed name into the payload, and only when one is set', () => {
         const named = conditionToDraft({ activity_definition_id: 'bench', name: 'Heavy triple', kind: 'consistency', required_count: 3 });
         expect(named.name).toBe('Heavy triple');

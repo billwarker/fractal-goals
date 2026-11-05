@@ -5,7 +5,7 @@
  * scales and hands them here.
  */
 import { formatMetric, snapMetricValue } from './chartFormat';
-import { activeMetricDefinitions, createConditionDraft, inferOperator, OPERATOR_SYMBOLS } from './goalConditions';
+import { activeMetricDefinitions, activityUsesSets, createConditionDraft, inferOperator, OPERATOR_SYMBOLS } from './goalConditions';
 
 /** @param {any} activity @param {string} metricId */
 function findMetric(activity, metricId) {
@@ -48,20 +48,22 @@ export function goalFromMetricTrend({ activity, metricId, value }) {
 }
 
 /**
- * Metric Trends' Yield line: a session's total yield reaching the value. Goals count the total, so a
- * line drawn from each session's top set or average gets a note saying so.
+ * Metric Trends' Yield line: a goal on what the line plots, a session's top set, average set or total.
+ * An activity without sets has one value per session, which is simply its total.
  * @param {{ activity: any, value: number, setsHandling?: string }} input
- * @returns {{ conditionDraft: any, summary: string, notes: string[] } | null}
+ * @returns {{ conditionDraft: any, summary: string } | null}
  */
 export function goalFromYieldTrend({ activity, value, setsHandling = 'top' }) {
     const target = Math.round(value);
     if (!Number.isFinite(target) || target <= 0) return null;
+    const base = { ...createConditionDraft(activity, 'single_session'), rules: [], operator: '>=', target_value: String(target) };
+    if (setsHandling === 'total' || !activityUsesSets(activity)) {
+        return { conditionDraft: { ...base, measure: 'yield' }, summary: `Total yield ≥ ${target} within one session` };
+    }
+    const averages = setsHandling === 'average';
     return {
-        conditionDraft: {
-            ...createConditionDraft(activity, 'single_session'), measure: 'yield', rules: [], operator: '>=', target_value: String(target),
-        },
-        summary: `Total yield ≥ ${target} within one session`,
-        notes: setsHandling === 'total' ? [] : ['This goal counts each session’s total yield, not the line’s per-set value.'],
+        conditionDraft: { ...base, measure: 'set_yield', min_sets: '1', set_aggregate: averages ? 'average' : 'each' },
+        summary: `${averages ? 'Average set yield' : 'Top set yield'} ≥ ${target} within one session`,
     };
 }
 

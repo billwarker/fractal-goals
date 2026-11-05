@@ -5,7 +5,7 @@
  * conditions chart the running total, and consistency charts the running count of sessions.
  */
 
-import { aggregateYield, evidenceSets, toNumber } from './setAggregation';
+import { aggregateYield, evidenceSets, setYields, toNumber } from './setAggregation';
 
 export { evidenceSets };
 
@@ -43,6 +43,19 @@ export function bestRuleValue(instance, metricId, operator) {
  */
 export function instanceYield(instance, yieldIds) {
     return aggregateYield(instance, yieldIds, 'total');
+}
+
+/**
+ * What a per-set yield goal judges in a session: its average set, or its best set for the goal's direction.
+ * @param {any} instance
+ * @param {string[]} yieldIds
+ * @param {any} condition
+ */
+function instanceSetYield(instance, yieldIds, condition) {
+    if (condition.set_aggregate === 'average') return aggregateYield(instance, yieldIds, 'average');
+    const yields = setYields(instance, yieldIds);
+    if (!yields.length) return null;
+    return lowerIsBetter(condition.operator) ? Math.min(...yields) : Math.max(...yields);
 }
 
 /**
@@ -100,6 +113,20 @@ export function buildConditionSeries(condition, instances, { metricsById = new M
         return {
             points,
             series: [{ id: 'count', label: 'Qualifying sessions', unit: '', threshold: toNumber(condition.required_count), operator: '>=', data }],
+        };
+    }
+
+    if (condition.measure === 'set_yield') {
+        return {
+            points,
+            series: [{
+                id: 'yield',
+                label: condition.set_aggregate === 'average' ? 'Average set yield' : 'Top set yield',
+                unit: '',
+                threshold: toNumber(condition.target_value),
+                operator: condition.operator,
+                data: ordered.map(({ instance }) => instanceSetYield(instance, yieldMetricIds, condition)),
+            }],
         };
     }
 

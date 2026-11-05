@@ -303,6 +303,7 @@ test('a saved view of the removed Goal Detail View goes back to choosing a chart
 });
 
 test('Metric Trends offers Set goal with one metric showing, and not with two', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
     const suffix = testInfo.project.name;
     const root = `browser-axis-room-root-${suffix}`;
     const token = await logIn(page);
@@ -315,7 +316,7 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
             if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
             return response.json();
         };
-        const activity = await call(`${root}/activities`, { name: 'Trend press', has_metrics: true, metrics: [
+        const activity = await call(`${root}/activities`, { name: 'Trend press', has_metrics: true, has_sets: true, metrics: [
             { name: 'Load', unit: 'Lbs', input_type: 'number' },
             { name: 'Count', unit: 'Reps', input_type: 'number' },
         ] });
@@ -364,7 +365,7 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
     await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
     const box = await page.locator('canvas').first().boundingBox();
     await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.45);
-    await expect(page.getByText(/^Total yield ≥ \d+ within one session$/)).toBeVisible();
+    await expect(page.getByText(/^Top set yield ≥ \d+ within one session$/)).toBeVisible();
 
     // It saves as a real goal, marked on the Yield line.
     await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.45);
@@ -377,7 +378,20 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
     const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Create', exact: true }).click();
     expect((await created).ok()).toBeTruthy();
-    const goalCharts = page.getByRole('dialog', { name: goalName }).getByRole('region', { name: 'Analytics' });
+    const details = page.getByRole('dialog', { name: goalName });
+    const goalCharts = details.getByRole('region', { name: 'Analytics' });
     await expect(goalCharts.getByTitle(new RegExp(`^${goalName} \\(`))).toBeVisible();
+
+    // The form shows it as yield per set, and can switch it to the average.
+    await page.mouse.move(0, 0);
+    await expect(page.getByRole('status').filter({ hasText: 'Goal created' })).toHaveCount(0, { timeout: 10_000 });
+    await details.getByRole('button', { name: 'Edit', exact: true }).click();
+    await expect(details.getByRole('radio', { name: 'Yield per set' })).toBeChecked();
+    await details.getByRole('tab', { name: 'Average', exact: true }).click();
+    await expect(details.getByText(/average yield ≥ \d+ across at least 1 set within one session/)).toBeVisible();
+    const saved = page.waitForResponse((response) => ['PUT', 'PATCH'].includes(response.request().method()) && response.url().includes('/goals/'));
+    await details.getByRole('button', { name: 'Save', exact: true }).click();
+    expect((await saved).ok()).toBeTruthy();
+    await expect(details.getByText(/average yield ≥ \d+ across at least 1 set within one session/)).toBeVisible();
 });
 

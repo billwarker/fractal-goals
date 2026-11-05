@@ -66,6 +66,22 @@ describe('rule bests (matching the server evaluator)', () => {
     });
 });
 
+describe('buildConditionSeries for yield per set', () => {
+    const session = instance('a', '2026-03-01T00:00:00Z', [set({ weight: 100, reps: 5 }), set({ weight: 200, reps: 2 })]);
+    const options = { yieldMetricIds: ['weight', 'reps'] };
+
+    it('charts the best set, or the lowest for a lower-is-better goal, against the threshold', () => {
+        const condition = { kind: 'single_session', measure: 'set_yield', operator: '>=', target_value: 300 };
+        expect(buildConditionSeries(condition, [session], options).series[0]).toMatchObject({ label: 'Top set yield', threshold: 300, data: [500] });
+        expect(buildConditionSeries({ ...condition, operator: '<=' }, [session], options).series[0].data).toEqual([400]);
+    });
+
+    it('charts the average set when the goal averages', () => {
+        const condition = { kind: 'single_session', measure: 'set_yield', set_aggregate: 'average', operator: '>=', target_value: 300 };
+        expect(buildConditionSeries(condition, [session], options).series[0]).toMatchObject({ label: 'Average set yield', data: [450] });
+    });
+});
+
 describe('buildConditionSeries', () => {
     const later = instance('b', '2026-03-05T00:00:00Z', [set({ weight: 225, reps: 4 })]);
     const earlier = instance('a', '2026-03-01T00:00:00Z', [set({ weight: 205, reps: 8 })]);

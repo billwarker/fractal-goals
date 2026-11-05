@@ -12,7 +12,8 @@
 import { OPERATOR_SYMBOLS } from './goalConditions';
 
 /**
- * A session-yield goal sits on the Yield line's axis, when that's charted.
+ * A yield goal sits on the Yield line's axis only when the line plots what it measures: a session's
+ * top set, average set or total.
  *
  * @typedef {{ scaleID: string, value: number, symbol: string, metricId: string }} GoalMarkerRule
  * @typedef {{ key: string, goal: any, rules: GoalMarkerRule[] }} GoalMarker
@@ -25,17 +26,27 @@ function onOnePoint(rules) {
     return scales.length === 2 && scales[0] === 'x' && scales[1] === 'y';
 }
 
+/** Whether a yield goal measures what the Yield line plots under this sets handling. @param {any} condition @param {string} setsHandling */
+function matchesYieldLine(condition, setsHandling) {
+    if (setsHandling === 'total') return condition.measure === 'yield';
+    const averages = condition.set_aggregate === 'average';
+    return condition.measure === 'set_yield' && (setsHandling === 'average' ? averages : !averages);
+}
+
 /**
  * One marker per goal that a single point on this chart can show.
  * @param {Array<{ goal_id: string, goal_name: string, completed: boolean, condition: any }>} goals
  * @param {Record<string, string>} scaleByMetricId metric id → the chart scale id showing it
+ * @param {string} [setsHandling] what the chart's Yield line plots
  * @returns {GoalMarker[]}
  */
-export function goalMarkers(goals = [], scaleByMetricId = {}) {
+export function goalMarkers(goals = [], scaleByMetricId = {}, setsHandling = 'top') {
     return goals.flatMap((goal) => {
         const condition = goal.condition;
         if (!condition || condition.kind === 'cumulative') return [];
-        const conditionRules = condition.measure === 'yield'
+        const isYield = condition.measure === 'yield' || condition.measure === 'set_yield';
+        if (isYield && !matchesYieldLine(condition, setsHandling)) return [];
+        const conditionRules = isYield
             ? [{ metric_definition_id: 'yield', operator: condition.operator, value: condition.target_value }]
             : condition.rules || [];
         const rules = conditionRules.flatMap((/** @type {any} */ rule) => {
@@ -55,12 +66,13 @@ export function goalMarkers(goals = [], scaleByMetricId = {}) {
  * Invisible lines at each goal's thresholds, so the axes reach them.
  * @param {Array<{ goal_id: string, goal_name: string, completed: boolean, condition: any }>} goals
  * @param {Record<string, string>} scaleByMetricId
+ * @param {string} [setsHandling]
  * @returns {Record<string, object>}
  */
-export function goalLineAnnotations(goals = [], scaleByMetricId = {}) {
+export function goalLineAnnotations(goals = [], scaleByMetricId = {}, setsHandling = 'top') {
     /** @type {Record<string, object>} */
     const annotations = {};
-    goalMarkers(goals, scaleByMetricId).forEach(({ key, rules }) => {
+    goalMarkers(goals, scaleByMetricId, setsHandling).forEach(({ key, rules }) => {
         rules.forEach((rule) => {
             annotations[`goal-${key}-${rule.metricId}`] = {
                 type: 'line',

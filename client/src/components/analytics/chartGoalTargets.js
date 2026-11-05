@@ -118,16 +118,14 @@ export function readChartGoalTarget({ visualizationId, chart, nativeEvent, conte
             const value = Math.max(0, Math.round(scale.getValueForPixel(point.y)));
             guides = { y: { value, pixel: scale.getPixelForValue(value), label: String(value) } };
             target = goalFromYieldTrend({ activity, value, setsHandling: context.visualizationState?.setsHandling });
-            if (!target) return { unsupported: 'No goal at this point', guides };
-            const yieldGoal = withChartScope({ activity, ...target }, context.globalFilters?.filters || null);
-            return { ...yieldGoal, notes: [...target.notes, ...(yieldGoal.notes || [])], guides };
+        } else {
+            const metric = activity && dataset ? findMetric(activity, dataset.metricId) : null;
+            if (!metric) return null;
+            const y = metricGuide(chart.scales[dataset.yAxisID], metric, chart.scales[dataset.yAxisID]?.getValueForPixel(point.y));
+            // A rule holds in any session, so the date under the pointer plays no part.
+            guides = { y };
+            target = y ? goalFromMetricTrend({ activity, metricId: metric.id, value: y.value }) : null;
         }
-        const metric = activity && dataset ? findMetric(activity, dataset.metricId) : null;
-        if (!metric) return null;
-        const y = metricGuide(chart.scales[dataset.yAxisID], metric, chart.scales[dataset.yAxisID]?.getValueForPixel(point.y));
-        // A rule holds in any session, so the date under the pointer plays no part.
-        guides = { y };
-        target = y ? goalFromMetricTrend({ activity, metricId: metric.id, value: y.value }) : null;
     } else if (visualizationId === 'scatterPlot') {
         const dataset = datasets[0];
         const metricX = activity && dataset?.metricX ? findMetric(activity, dataset.metricX) : null;

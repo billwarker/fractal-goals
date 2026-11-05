@@ -90,8 +90,19 @@ describe('goal markers', () => {
         const goals = [{ goal_id: 'y', goal_name: 'y', completed: false, condition: {
             kind: 'single_session', measure: 'yield', operator: '>=', target_value: 300, rules: [],
         } }];
-        expect(goalMarkers(goals, { yield: 'metric1' })[0].rules).toEqual([{ scaleID: 'metric1', value: 300, symbol: '≥', metricId: 'yield' }]);
-        expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([]);
+        expect(goalMarkers(goals, { yield: 'metric1' }, 'total')[0].rules).toEqual([{ scaleID: 'metric1', value: 300, symbol: '≥', metricId: 'yield' }]);
+        expect(goalMarkers(goals, { weight: 'metric1' }, 'total')).toEqual([]);
+    });
+
+    it('marks a yield goal only when the Yield line plots what it measures', () => {
+        const yieldGoal = (id, measure, set_aggregate = 'each') => ({ goal_id: id, goal_name: id, completed: false, condition: {
+            kind: 'single_session', measure, set_aggregate, operator: '>=', target_value: 300, rules: [],
+        } });
+        const goals = [yieldGoal('total', 'yield'), yieldGoal('best', 'set_yield'), yieldGoal('average', 'set_yield', 'average')];
+        const marked = (setsHandling) => goalMarkers(goals, { yield: 'metric1' }, setsHandling).map((marker) => marker.key);
+        expect(marked('top')).toEqual(['best']);
+        expect(marked('average')).toEqual(['average']);
+        expect(marked('total')).toEqual(['total']);
     });
 
     it('leaves out a goal with a rule off the chart', () => {

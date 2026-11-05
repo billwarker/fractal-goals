@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 CONDITION_KINDS = ('single_session', 'cumulative', 'consistency')
 KIND_MEASURES = {
-    'single_session': ('sets', 'yield'),
+    'single_session': ('sets', 'yield', 'set_yield'),
     'cumulative': ('metric', 'yield'),
     'consistency': ('sets',),
 }
@@ -198,11 +198,11 @@ def normalize_condition_payload(db_session, root_id, data) -> dict:
     if set_aggregate not in SET_AGGREGATES:
         raise ConditionValidationError('Count each set or the average across sets')
     averages = set_aggregate == 'average'
-    if averages and (measure != 'sets' or kind not in ('single_session', 'consistency')):
+    if averages and (measure not in ('sets', 'set_yield') or kind not in ('single_session', 'consistency')):
         raise ConditionValidationError('Only sets meeting rules can be averaged')
     if averages and not activity.has_sets:
         raise ConditionValidationError(f"'{activity.name}' logs no sets to average")
-    if averages and not rules:
+    if averages and measure == 'sets' and not rules:
         raise ConditionValidationError('Add at least one metric rule')
 
     tag_match = data.get('tag_match') or 'contains'
@@ -245,8 +245,12 @@ def normalize_condition_payload(db_session, root_id, data) -> dict:
             raise ConditionValidationError('Totals compare with >, >=, <, or <=')
         normalized['operator'] = operator
         normalized['target_value'] = _decimal(data.get('target_value'), 'Total')
-        if measure == 'yield' and not yield_metric_ids(activity):
+        if measure in ('yield', 'set_yield') and not yield_metric_ids(activity):
             raise ConditionValidationError(f"'{activity.name}' has no yield (it needs two or more multiplied metrics)")
+        if measure == 'set_yield':
+            if not activity.has_sets:
+                raise ConditionValidationError(f"'{activity.name}' logs no sets to measure yield per set")
+            normalized['min_sets'] = _bounded_int(data.get('min_sets', 1), 'Sets', MAX_MIN_SETS)
         if measure == 'metric':
             metric_id = data.get('metric_definition_id')
             if metric_id not in metrics_by_id:

@@ -58,7 +58,7 @@ describe('readChartGoalTarget', () => {
         expect(result.summary).toBe('Weight ≥ 120.6 lb within one session');
     });
 
-    it('reads the Yield line as a session total yield goal, with a crosshair on its axis', () => {
+    it('reads the Yield line as a goal on what it plots, with a crosshair on its axis', () => {
         const chart = fakeChart({
             scales: { x: category(100), metric1: linear(0, 400, 200, 0) },
             datasets: [{ metricId: 'yield', yAxisID: 'metric1' }],
@@ -67,12 +67,23 @@ describe('readChartGoalTarget', () => {
         const read = (setsHandling) => readChartGoalTarget({
             visualizationId: 'metricTrends', chart, nativeEvent: at(110, 100), context: baseContext({ visualizationState: { setsHandling } }),
         });
-        const result = read('top');
-        expect(result.guides.y).toMatchObject({ value: 200, label: '200', pixel: 100 });
-        expect(result.summary).toBe('Total yield ≥ 200 within one session');
-        expect(result.conditionDraft).toMatchObject({ kind: 'single_session', measure: 'yield', operator: '>=', target_value: '200', rules: [] });
-        expect(result.notes[0]).toMatch(/total yield/);
-        expect(read('total').notes).toEqual([]);
+        const top = read('top');
+        expect(top.guides.y).toMatchObject({ value: 200, label: '200', pixel: 100 });
+        expect(top.summary).toBe('Top set yield ≥ 200 within one session');
+        expect(top.conditionDraft).toMatchObject({
+            kind: 'single_session', measure: 'set_yield', min_sets: '1', set_aggregate: 'each', operator: '>=', target_value: '200', rules: [],
+        });
+        expect(read('average').conditionDraft).toMatchObject({ measure: 'set_yield', set_aggregate: 'average' });
+        expect(read('average').summary).toBe('Average set yield ≥ 200 within one session');
+        expect(read('total').conditionDraft).toMatchObject({ measure: 'yield', target_value: '200' });
+        expect(read('total').summary).toBe('Total yield ≥ 200 within one session');
+
+        // Without sets, each session has one value: its total.
+        const noSets = readChartGoalTarget({
+            visualizationId: 'metricTrends', chart, nativeEvent: at(110, 100),
+            context: baseContext({ effectiveSelectedActivity: { ...bench, has_sets: false }, visualizationState: { setsHandling: 'top' } }),
+        });
+        expect(noSets.conditionDraft).toMatchObject({ measure: 'yield', target_value: '200' });
     });
 
     it('sets no goal on Metric Trends showing more than one metric', () => {
