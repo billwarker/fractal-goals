@@ -129,6 +129,7 @@
     "last_opened_at",
     "layout",
     "name",
+    "open_count",
     "pinned",
     "root_id",
     "updated_at",

@@ -841,7 +841,8 @@ def test_reset_activity_timer_mutation_query_budget(
     assert_mutation_budget(
         response, status_code=200, max_bytes=40_000, max_ms=500, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 13
+    # Includes the progress comparison every instance save returns.
+    assert query_counter["total"] <= 18
 
 
 @pytest.mark.integration
