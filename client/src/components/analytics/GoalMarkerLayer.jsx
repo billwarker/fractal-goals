@@ -7,6 +7,7 @@ import styles from './GoalMarkerLayer.module.css';
 
 const NAME_ROOM = 200;
 const ICON_SIZE = 24;
+const ICON_STEP = ICON_SIZE + 2;
 
 /** Where each marker's thresholds land in the layer, from the chart's scales. */
 function measure(chart, layer, markers) {
@@ -40,9 +41,21 @@ function measure(chart, layer, markers) {
 
 const samePlacement = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
+/** Where each marker's icon goes: on its point, or stepped left of any icon already there, so goals at one threshold all show. */
+export function spreadIconLefts(points) {
+    const taken = [];
+    return points.map(({ left, top }) => {
+        let shifted = left;
+        const covered = (other) => Math.abs(other.left - shifted) < ICON_SIZE && Math.abs(other.top - top) < ICON_SIZE;
+        while (taken.some(covered)) shifted -= ICON_STEP;
+        taken.push({ left: shifted, top });
+        return shifted;
+    });
+}
+
 /**
  * Goals marked on a chart at their thresholds: the goal's icon where its values meet (or at the
- * end of the line, for a goal with a threshold on one axis). Hovering or focusing one names it and
+ * end of the line, for a goal with a threshold on one axis), side by side where they'd cover each other. Hovering or focusing one names it and
  * draws its guide lines to the axes; clicking it opens the goal. Sits over the chart as an absolutely
  * positioned layer, so its parent must be positioned.
  *
@@ -80,14 +93,19 @@ export default function GoalMarkerLayer({ chartRef, markers, onOpenGoal = null }
 
     if (!markers.length) return null;
     const byKey = new Map(markers.map((marker) => [marker.key, marker]));
+    const points = placed.map(({ x, y, area, dx, dy }) => ({
+        left: x == null ? area.right : x + dx,
+        top: y == null ? area.top : y + dy,
+    }));
+    const iconLefts = spreadIconLefts(points);
     return (
         <div ref={layerRef} className={styles.layer}>
-            {placed.map(({ key, x, y, xRule, yRule, area, dx, dy }) => {
+            {placed.map(({ key, x, y, xRule, yRule, area }, index) => {
                 const marker = byKey.get(key);
                 if (!marker) return null;
                 const { goal } = marker;
-                const left = x == null ? area.right : x + dx;
-                const top = y == null ? area.top : y + dy;
+                const { left: pointLeft, top } = points[index];
+                const left = iconLefts[index];
                 const active = activeKey === key;
                 const colorKey = goal.completed ? 'Completed' : goal;
                 const thresholds = [xRule, yRule].filter(Boolean).map((rule) => `${rule.symbol} ${rule.value}`).join(', ');
@@ -115,13 +133,13 @@ export default function GoalMarkerLayer({ chartRef, markers, onOpenGoal = null }
                     <React.Fragment key={key}>
                         {active && x != null ? (
                             <>
-                                <span className={styles.vLine} style={{ left, top, height: area.bottom - top }} />
-                                <span className={`${styles.axisValue} ${styles.xValue}`} style={{ left, top: area.bottom }}>{xRule.symbol} {xRule.value}</span>
+                                <span className={styles.vLine} style={{ left: pointLeft, top, height: area.bottom - top }} />
+                                <span className={`${styles.axisValue} ${styles.xValue}`} style={{ left: pointLeft, top: area.bottom }}>{xRule.symbol} {xRule.value}</span>
                             </>
                         ) : null}
                         {active && y != null ? (
                             <>
-                                <span className={styles.hLine} style={{ top, left: area.left, width: left - area.left }} />
+                                <span className={styles.hLine} style={{ top, left: area.left, width: (x == null ? left : pointLeft) - area.left }} />
                                 <span className={`${styles.axisValue} ${styles.yValue}`} style={{ top, left: area.left }}>{yRule.symbol} {yRule.value}</span>
                             </>
                         ) : null}

@@ -16,6 +16,8 @@
 .marker {
     position: absolute;
     display: inline-flex;
+    /* Near the host's right edge an absolute box would otherwise shrink to the room left. */
+    width: max-content;
     padding: 0;
     border: 0;
     border-radius: 50%;
