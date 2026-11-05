@@ -1,3 +1,15 @@
+/* Doubled to outrank Button's own variant. */
+.setGoal.setGoal {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.setGoal.setGoal:hover:not(:disabled) {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-border-hover);
+}
+
 .overlay {
     position: absolute;
     inset: 0;

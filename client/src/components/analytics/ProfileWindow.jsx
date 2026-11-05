@@ -8,7 +8,6 @@ import {
     AnalyticsGoalIcon,
     BackIcon,
     ChartIcon,
-    CrosshairIcon,
     HomeIcon,
     LightningIcon,
     MinimizeHeaderIcon,
@@ -33,6 +32,7 @@ import {
 import { buildVisualizationQueryExplanation } from './visualizationQueryExplanations';
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import ChartGoalSurface from './ChartGoalSurface';
+import SetGoalButton from './annotate/SetGoalButton';
 import { AlignedAxisWindow } from './alignedAxes/AlignedAxesContext';
 import alignedCrosshair from './alignedAxes/alignedCrosshair';
 import { canSetGoalFromChart } from './chartGoalTargets';
@@ -334,20 +334,7 @@ function ProfileWindow({
                 {/* Global Actions (Annotations, Split, Close) */}
                 <div className={styles.globalActions}>
                     {canSetGoal && (
-                        <Button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsAnnotating((current) => !current);
-                            }}
-                            variant={isAnnotating ? 'primary' : 'secondary'}
-                            size="sm"
-                            style={{ padding: '0 8px' }}
-                            aria-pressed={isAnnotating}
-                            title="Set a goal from a point on the chart (A)"
-                        >
-                            <CrosshairIcon size={15} />
-                            <span>{isAnnotating ? 'Done' : 'Set goal'}</span>
-                        </Button>
+                        <SetGoalButton annotating={isAnnotating} onToggle={() => setIsAnnotating((current) => !current)} />
                     )}
                     {showQueryInspector && selectedVisualizationMeta && (
                         <Button
