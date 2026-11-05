@@ -439,6 +439,8 @@ def main():
                     ("trend-goals", "Trend Goals"),
                     ("aligned-sessions", "Aligned Sessions"),
                     ("aligned-boards", "Aligned Boards"),
+                    ("progress-goals", "Progress Goals"),
+                    ("progress-goal-chart", "Progress Goal Chart"),
                 ):
                     spec_root = f"browser-{slug}-root-{suffix}"
                     db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,

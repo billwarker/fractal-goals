@@ -581,3 +581,170 @@ test('stacked time-bucket charts share their x axis, and side-by-side panels of 
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
     expect(errors).toEqual([]);
 });
+
+test('a goal can be set from an expanded Progress chart on a session', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    test.skip(testInfo.project.name !== 'desktop', 'The pane stays open beside the session on desktop.');
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await logIn(page);
+    const root = 'browser-progress-goals-root-desktop';
+    const headers = { Authorization: `Bearer ${token}` };
+    const api = async (method, path, data) => {
+        const response = await page.request[method](`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${response.status()}`).toBe(true);
+        return response.json();
+    };
+    const activity = await api('post', 'activities', {
+        name: 'Progress press', has_metrics: true, metrics: [{ name: 'Press load', unit: 'Lbs', input_type: 'number' }],
+    });
+    const metricId = activity.metric_definitions[0].id;
+    const sessionWith = (name) => api('post', 'sessions', {
+        name, goal_ids: [root],
+        session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_definition_id: activity.id }] }] },
+    });
+    for (const value of [40, 60]) {
+        const past = await sessionWith(`Earlier ${value}`);
+        const [instance] = await api('get', `sessions/${past.id}/activities`);
+        await api('put', `sessions/${past.id}/activities/${instance.id}/metrics`, { metrics: [{ metric_id: metricId, value }] });
+        await api('post', `activity-instances/${instance.id}/complete`, {});
+        await api('put', `sessions/${past.id}`, { completed: true });
+    }
+    const session = await sessionWith('Today');
+
+    await page.goto(`/${root}/session/${session.id}`);
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click();
+    await page.getByLabel('Press load', { exact: true }).focus();
+    await page.getByRole('button', { name: /Expand chart$/ }).first().click();
+    const expanded = page.getByTestId('expanded-progress-chart');
+    await expect(expanded.locator('canvas')).toBeVisible();
+
+    await expanded.getByRole('button', { name: 'Set goal', exact: true }).click();
+    await expect(expanded.getByRole('button', { name: 'Done', exact: true })).toBeVisible();
+    // Escape leaves the mode, not the chart.
+    await page.keyboard.press('Escape');
+    await expect(expanded.getByRole('button', { name: 'Set goal', exact: true })).toBeVisible();
+    await expanded.getByRole('button', { name: 'Set goal', exact: true }).click();
+
+    const box = await expanded.locator('canvas').boundingBox();
+    const x = box.x + box.width * 0.5;
+    const y = box.y + box.height * 0.3;
+    await page.mouse.move(x, y);
+    await expect(page.getByText(/^Press load ≥ .+ within one session$/)).toBeVisible();
+    await page.mouse.click(x, y);
+    await page.getByRole('button', { name: 'Create goal…' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Short Term Goal' }).click();
+    const goalName = 'Goal from progress';
+    await dialog.locator('#goal-name').fill(goalName);
+    const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    const goal = await (await created).json();
+    expect(goal.condition.rules[0].metric_definition_id).toBe(metricId);
+
+    // It opens on this chart, saved under its name and marked at the threshold.
+    const details = page.getByRole('dialog', { name: goalName });
+    const goalCharts = details.getByRole('region', { name: 'Analytics' });
+    await expect(goalCharts.getByText(goalName, { exact: true })).toBeVisible();
+    await expect(goalCharts.getByTitle(new RegExp(`^${goalName} \\(`))).toBeVisible();
+    await details.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(expanded).toBeVisible();
+    expect(errors).toEqual([]);
+});
+
+test('a goal’s progress chart marks the goal and sets new ones', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    test.skip(testInfo.project.name !== 'desktop', 'The pane stays open beside the session on desktop.');
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await logIn(page);
+    const root = 'browser-progress-goal-chart-root-desktop';
+    const headers = { Authorization: `Bearer ${token}` };
+    const api = async (method, path, data) => {
+        const response = await page.request[method](`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${response.status()}`).toBe(true);
+        return response.json();
+    };
+    const activity = await api('post', 'activities', {
+        name: 'Goal chart hold', has_metrics: true, metrics: [{ name: 'Hold rating', unit: 'Rating', input_type: 'number' }],
+    });
+    const metricId = activity.metric_definitions[0].id;
+    // Another goal at the same threshold; the newest, Hold nine, is the chart's goal.
+    await api('post', 'goals', {
+        name: 'Also nine', type: 'ImmediateGoal', parent_id: root, completion_condition: 'activity_threshold',
+        condition: {
+            activity_definition_id: activity.id, kind: 'single_session', measure: 'sets', min_sets: 1,
+            rules: [{ metric_definition_id: metricId, operator: '>=', value: 9 }],
+        },
+    });
+    await api('post', 'goals', {
+        name: 'Hold nine', type: 'LongTermGoal', parent_id: root, completion_condition: 'activity_threshold',
+        condition: {
+            activity_definition_id: activity.id, kind: 'single_session', measure: 'sets', min_sets: 1,
+            rules: [{ metric_definition_id: metricId, operator: '>=', value: 9 }],
+        },
+    });
+    const sessionWith = (name) => api('post', 'sessions', {
+        name, goal_ids: [root],
+        session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_definition_id: activity.id }] }] },
+    });
+    for (const value of [4, 6]) {
+        const past = await sessionWith(`Earlier ${value}`);
+        const [instance] = await api('get', `sessions/${past.id}/activities`);
+        await api('put', `sessions/${past.id}/activities/${instance.id}/metrics`, { metrics: [{ metric_id: metricId, value }] });
+        await api('post', `activity-instances/${instance.id}/complete`, {});
+        await api('put', `sessions/${past.id}`, { completed: true });
+    }
+    const session = await sessionWith('Today');
+
+    await page.goto(`/${root}/session/${session.id}`);
+    await page.getByRole('tab', { name: 'Progress', exact: true }).click();
+    await page.getByRole('button', { name: /Expand chart$/ }).first().click();
+    const expanded = page.getByTestId('expanded-progress-chart');
+    await expect(expanded.getByRole('heading', { name: /Goal: Hold nine/ })).toBeVisible();
+    await expect(expanded.locator('canvas')).toBeVisible();
+    const marker = expanded.getByRole('button', { name: /^Open goal Hold nine \(≥ 9\)$/ });
+    await expect(marker).toBeVisible();
+    // The page grid can leave less room right of the plot than the icon is wide; it keeps its size.
+    const widthWithLittleRoom = await marker.evaluate((element) => {
+        const { left } = element.style;
+        element.style.left = `${element.parentElement.clientWidth - 12}px`;
+        const { width } = element.getBoundingClientRect();
+        element.style.left = left;
+        return width;
+    });
+    expect(widthWithLittleRoom).toBe(24);
+
+    // Both show, side by side, with this chart's goal at the end of the line.
+    const other = await expanded.getByRole('button', { name: /^Open goal Also nine \(≥ 9\)$/ }).boundingBox();
+    const own = await marker.boundingBox();
+    expect(other.x + other.width).toBeLessThanOrEqual(own.x);
+    expect(other.y).toBe(own.y);
+
+    await expanded.getByRole('button', { name: 'Set goal', exact: true }).click();
+    const box = await expanded.locator('canvas').boundingBox();
+    const x = box.x + box.width * 0.5;
+    const y = box.y + box.height * 0.5;
+    await page.mouse.move(x, y);
+    await expect(page.getByText(/^Hold rating ≥ .+ within one session$/)).toBeVisible();
+    await page.mouse.click(x, y);
+    await page.getByRole('button', { name: 'Create goal…' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Next', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Short Term Goal' }).click();
+    const goalName = 'Goal from goal chart';
+    await dialog.locator('#goal-name').fill(goalName);
+    const created = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/goals`) && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
+    const goal = await (await created).json();
+    expect(goal.condition.rules[0].metric_definition_id).toBe(metricId);
+
+    // Saved as a trend of this metric, marked at its threshold.
+    const details = page.getByRole('dialog', { name: goalName });
+    const goalCharts = details.getByRole('region', { name: 'Analytics' });
+    await expect(goalCharts.getByTitle(new RegExp(`^${goalName} \\(`))).toBeVisible();
+    await details.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(expanded.getByRole('button', { name: new RegExp(`^Open goal ${goalName} `) })).toBeVisible();
+    expect(errors).toEqual([]);
+});

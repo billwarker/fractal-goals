@@ -69,6 +69,27 @@ function instanceMetricTotal(instance, metricId) {
 }
 
 /**
+ * The one line a condition's chart plots per session, as Metric Trends would draw it, or null: a
+ * running total or count isn't a session's value, and two rules plot on two axes.
+ * @param {any} condition
+ * @returns {{ metricId: string, setsHandling: string } | null}
+ */
+export function conditionLine(condition) {
+    if (condition?.kind !== 'single_session') return null;
+    if (condition.measure === 'yield') return { metricId: 'yield', setsHandling: 'total' };
+    if (condition.measure === 'set_yield') {
+        return { metricId: 'yield', setsHandling: condition.set_aggregate === 'average' ? 'average' : 'top' };
+    }
+    if (condition.measure === 'metric') {
+        return condition.metric_definition_id ? { metricId: condition.metric_definition_id, setsHandling: 'top' } : null;
+    }
+    const rules = condition.rules || [];
+    return condition.measure === 'sets' && rules.length === 1
+        ? { metricId: rules[0].metric_definition_id, setsHandling: 'top' }
+        : null;
+}
+
+/**
  * @param {any} condition
  * @param {any[]} instances
  * @param {{ metricsById?: Map<string, any>, yieldMetricIds?: string[] }} [context]

@@ -1,19 +1,21 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import { DISABLED_CHART_ANIMATION, applyChartDensity, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
+import { GoalMarkerHost } from '../analytics/GoalMarkerLayer';
 import useActiveChartPoint from '../analytics/useActiveChartPoint';
+import { goalChartMarkers, goalLineAnnotations, isMarkedThreshold } from '../../utils/goalConditionLines';
 import { OPERATOR_SYMBOLS } from '../../utils/goalConditions';
 import { formatConditionNumber } from '../../utils/goalConditionText';
-import { buildConditionSeries } from '../../utils/goalConditionSeries';
+import { buildConditionSeries, conditionLine } from '../../utils/goalConditionSeries';
 import styles from './ConditionProgressChart.module.css';
 
 const SERIES_PALETTE = ['#3b82f6', '#22c55e'];
 
-function thresholdAnnotations(series, chartTheme) {
-    return Object.fromEntries(series
-        .filter((row) => row.threshold != null)
-        .map((row, index) => [`threshold-${row.id}`, {
+/** A line for each threshold no goal marker stands on (the marker brings its own guide line). */
+function thresholdAnnotations(series, chartTheme, markers) {
+    return Object.fromEntries(series.flatMap((row, index) => (
+        row.threshold == null || isMarkedThreshold(markers, `y${index}`, row.threshold) ? [] : [[`threshold-${row.id}`, {
             type: 'line',
             yMin: row.threshold,
             yMax: row.threshold,
@@ -31,19 +33,28 @@ function thresholdAnnotations(series, chartTheme) {
                 color: SERIES_PALETTE[index],
                 font: { size: 10 },
             },
-        }]));
+        }]]
+    )));
 }
 
 /**
  * A goal's activity threshold over time: each contributing session against the threshold line.
  * Compact density (goal details) keeps only the series and the threshold, with a one-line caption.
+ * With `goalLines` (the activity's goals), the goal (`goalId`) and any others on these axes are marked
+ * on the chart; each series carries its `metricId` for setting a goal from a point on it.
  */
 function ConditionProgressChart({
     condition, instances, activity, density = 'full', highlightInstanceId = null, hoverInstanceId = null,
+    chartRef, goalLines = [], goalId = null, onOpenGoal = null,
 }) {
     const chartTheme = useChartThemeDefaults();
     const compact = density === 'compact';
-    const chartRef = useRef(null);
+    const ownChartRef = useRef(null);
+    // Ours for the hover highlight and the markers, and the caller's (the goal surface) too.
+    const setChartRef = useCallback((chart) => {
+        ownChartRef.current = chart;
+        if (chartRef) chartRef.current = chart;
+    }, [chartRef]);
     const { points, series } = useMemo(() => buildConditionSeries(condition, instances, {
         metricsById: new Map((activity?.metric_definitions || []).map((metric) => [metric.id, metric])),
         yieldMetricIds: activity?.yield_metric_ids || [],
@@ -54,7 +65,16 @@ function ConditionProgressChart({
     const activePoints = hoverIndex < 0 ? [] : series
         .map((row, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: row.data[hoverIndex] }))
         .filter((element) => element.value != null);
-    useActiveChartPoint(chartRef, activePoints, { tooltip: !compact });
+    useActiveChartPoint(ownChartRef, activePoints, { tooltip: !compact });
+    // A running total or count shares no axis with a goal on one session.
+    const goalScales = useMemo(() => (condition?.kind === 'single_session'
+        ? Object.fromEntries(series.map((row, index) => [row.id, `y${index}`]))
+        : {}), [condition?.kind, series]);
+    const yieldLine = conditionLine(condition)?.setsHandling;
+    const markers = useMemo(
+        () => goalChartMarkers(goalLines, goalId, goalScales, yieldLine, series),
+        [goalId, goalLines, goalScales, series, yieldLine],
+    );
 
     if (points.length === 0) {
         return <p className={styles.empty}>No contributing sessions yet.</p>;
@@ -63,6 +83,7 @@ function ConditionProgressChart({
         labels: points.map((point) => point.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })),
         datasets: series.map((row, index) => ({
             label: row.label,
+            metricId: row.id, // read when setting a goal from the chart
             data: row.data,
             unit: row.unit,
             borderColor: SERIES_PALETTE[index],
@@ -95,7 +116,9 @@ function ConditionProgressChart({
                     label: (ctx) => `${ctx.dataset.label}: ${formatConditionNumber(ctx.parsed.y)}${ctx.dataset.unit ? ` ${ctx.dataset.unit}` : ''}`,
                 },
             },
-            annotation: { annotations: thresholdAnnotations(series, chartTheme) },
+            annotation: {
+                annotations: { ...goalLineAnnotations(goalLines, goalScales, yieldLine), ...thresholdAnnotations(series, chartTheme, markers) },
+            },
         },
         scales: {
             x: { ticks: { color: chartTheme.textColor, maxRotation: 45 }, grid: { color: chartTheme.gridColor } },
@@ -118,7 +141,9 @@ function ConditionProgressChart({
     return (
         <div className={styles.frame} data-density={density}>
             <div className={styles.chart} data-testid="condition-evidence-chart">
-                <Line ref={chartRef} data={data} options={options} />
+                <GoalMarkerHost chartRef={ownChartRef} markers={markers} onOpenGoal={onOpenGoal}>
+                    <Line ref={setChartRef} data={data} options={options} />
+                </GoalMarkerHost>
             </div>
             {caption ? <p className={styles.caption}>{caption}</p> : null}
         </div>

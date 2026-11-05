@@ -63,6 +63,38 @@ export function goalMarkers(goals = [], scaleByMetricId = {}, setsHandling = 'to
 }
 
 /**
+ * The goals to mark on one goal's progress chart: others on the per-session axes it shares with them,
+ * and that goal itself, first, at its threshold, whatever it measures, since the whole chart is about it.
+ * @param {Array<{ goal_id: string, goal_name: string, completed: boolean, condition: any }>} goals
+ * @param {string | null | undefined} goalId the chart's goal
+ * @param {Record<string, string>} scaleByMetricId metric id → the chart scale id showing it
+ * @param {string} [setsHandling]
+ * @param {Array<{ id: string, threshold: number | null, operator: string }>} [series] the chart's series
+ * @returns {GoalMarker[]}
+ */
+export function goalChartMarkers(goals = [], goalId, scaleByMetricId = {}, setsHandling = 'top', series = []) {
+    const markers = goalMarkers(goals, scaleByMetricId, setsHandling);
+    const own = markers.find((marker) => marker.key === goalId);
+    if (own) return [own, ...markers.filter((marker) => marker !== own)];
+    const goal = goals.find((row) => row.goal_id === goalId);
+    const scaleIndex = series.findIndex((row) => row.threshold != null);
+    if (!goal || scaleIndex < 0) return markers;
+    const { id: metricId, threshold, operator } = series[scaleIndex];
+    const symbol = OPERATOR_SYMBOLS[/** @type {keyof typeof OPERATOR_SYMBOLS} */ (operator)] || operator || '';
+    return [{ key: goal.goal_id, goal, rules: [{ scaleID: `y${scaleIndex}`, value: Number(threshold), symbol, metricId }] }, ...markers];
+}
+
+/**
+ * Whether a goal's marker stands at this value on this scale, so it needs no line of its own.
+ * @param {GoalMarker[]} markers
+ * @param {string} scaleID
+ * @param {number} value
+ */
+export const isMarkedThreshold = (markers, scaleID, value) => markers.some(({ rules }) => (
+    rules.some((rule) => rule.scaleID === scaleID && rule.value === value)
+));
+
+/**
  * Invisible lines at each goal's thresholds, so the axes reach them.
  * @param {Array<{ goal_id: string, goal_name: string, completed: boolean, condition: any }>} goals
  * @param {Record<string, string>} scaleByMetricId

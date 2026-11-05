@@ -1,5 +1,5 @@
 import { goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromScatterPoint } from '../chartGoalPrefill';
-import { goalLineAnnotations, goalMarkers } from '../goalConditionLines';
+import { goalChartMarkers, goalLineAnnotations, goalMarkers, isMarkedThreshold } from '../goalConditionLines';
 
 const activity = {
     id: 'bench',
@@ -109,5 +109,39 @@ describe('goal markers', () => {
         const goals = [goal('a', [rule('weight', 245), rule('reps', 5)])];
         expect(goalMarkers(goals, { weight: 'metric1' })).toEqual([]);
         expect(goalMarkers(goals, { weight: 'x', tempo: 'y' })).toEqual([]);
+    });
+});
+
+describe('goal chart markers', () => {
+    const seriesAt = (threshold) => [{ id: 'count', threshold, operator: '>=' }];
+
+    it('marks the chart’s goal at its threshold, whatever it measures', () => {
+        const goals = [{ goal_id: 'g1', goal_name: 'Ten sessions', completed: false, condition: { kind: 'consistency', measure: 'sets', required_count: 10, rules: [] } }];
+        expect(goalChartMarkers(goals, 'g1', {}, 'top', seriesAt(10))).toEqual([
+            { key: 'g1', goal: goals[0], rules: [{ scaleID: 'y0', value: 10, symbol: '≥', metricId: 'count' }] },
+        ]);
+    });
+
+    it('marks it once, alongside other goals on the chart’s axes', () => {
+        const rule = (value) => ({ metric_definition_id: 'weight', operator: '>=', value });
+        const goals = ['g1', 'g2'].map((goal_id, index) => ({
+            goal_id, goal_name: goal_id, completed: false, condition: { kind: 'single_session', measure: 'sets', rules: [rule(100 + index)] },
+        }));
+        const series = [{ id: 'weight', threshold: 100, operator: '>=' }];
+        expect(goalChartMarkers(goals, 'g1', { weight: 'y0' }, 'top', series).map((marker) => marker.key)).toEqual(['g1', 'g2']);
+        expect(goalChartMarkers(goals, 'g2', { weight: 'y0' }, 'top', series).map((marker) => marker.key)).toEqual(['g2', 'g1']);
+    });
+
+    it('marks nothing extra for a chart without a goal or a threshold', () => {
+        const goals = [{ goal_id: 'g1', goal_name: 'g1', completed: false, condition: { kind: 'consistency', rules: [] } }];
+        expect(goalChartMarkers(goals, null, {}, 'top', seriesAt(10))).toEqual([]);
+        expect(goalChartMarkers(goals, 'g1', {}, 'top', seriesAt(null))).toEqual([]);
+    });
+
+    it('says which thresholds a marker stands on', () => {
+        const markers = [{ key: 'g1', goal: {}, rules: [{ scaleID: 'y0', value: 9, symbol: '≥', metricId: 'rating' }] }];
+        expect(isMarkedThreshold(markers, 'y0', 9)).toBe(true);
+        expect(isMarkedThreshold(markers, 'y1', 9)).toBe(false);
+        expect(isMarkedThreshold(markers, 'y0', 8)).toBe(false);
     });
 });
