@@ -28,6 +28,17 @@ export function describeOp(op) {
         case SESSION_OP.NOTE_DELETE: return 'Deleted note';
         case SESSION_OP.CIRCUIT_RUN: return CIRCUIT_LABELS[op.meta?.action] || 'Circuit change';
         case SESSION_OP.CIRCUIT_MEMBER: return 'Circuit result';
+        case SESSION_OP.CIRCUIT_CREATE: return 'Added circuit';
+        case SESSION_OP.CIRCUIT_ROUND_ADD: return 'Added circuit round';
+        case SESSION_OP.CIRCUIT_ROUND_REMOVE: return 'Removed circuit round';
+        case SESSION_OP.CIRCUIT_CASCADE: return 'Circuit values';
+        case SESSION_OP.CIRCUIT_TAG: return 'Circuit tags';
+        case SESSION_OP.INSTANCE_TAGS: return 'Activity tags';
+        case SESSION_OP.SET_TAGS: return 'Set tags';
+        case SESSION_OP.PROGRESS_COMPARISON: return 'Progress comparison';
+        case SESSION_OP.PROGRESS_CHART: return 'Progress chart';
+        case SESSION_OP.INSTANCE_GOAL_LINK: return op.meta?.remove ? 'Removed goal link' : 'Linked goal';
+        case SESSION_OP.QUICK_COMPLETE: return 'Completed quick session';
         default: return 'Change';
     }
 }

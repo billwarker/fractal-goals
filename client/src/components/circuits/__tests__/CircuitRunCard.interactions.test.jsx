@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 const mutateAsync = vi.fn();
+vi.mock('../../../hooks/useSessionQueries', async (original) => ({ ...(await original()), useSessionGoalsView: () => ({ data: null }) }));
 vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuitRunActions: () => ({ mutateAsync, isPending: false }),
 }));

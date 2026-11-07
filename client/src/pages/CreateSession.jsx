@@ -27,7 +27,9 @@ import useIsMobile from '../hooks/useIsMobile';
 import { isQuickSession } from '../utils/sessionRuntime';
 import { buildTemplateSessionPayload } from '../utils/createSessionPayload';
 import { buildQueuedQuickSession, sanitizeMetrics, sanitizeSets } from '../utils/createSessionQuickDraft';
-import { programSessionToTemplate } from '../utils/createSessionProgramDay';
+import { buildPreviousProgramDays, programSessionToTemplate } from '../utils/createSessionProgramDay';
+import { useProgramPlanOccurrences } from '../hooks/useProgramSessionPlans';
+import CreateSessionSubtitle from '../components/createSession/CreateSessionSubtitle';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import Modal from '../components/atoms/Modal';
@@ -89,6 +91,7 @@ function CreateSession() {
         programDays,
         programsById,
         activeProgram,
+        activePrograms = [],
         activityDefinitions,
         activityGroups,
         allGoals,
@@ -123,7 +126,8 @@ function CreateSession() {
         if (programIds.length === 1 && templates.length === 0) {
             return 'program';
         }
-        if (programIds.length === 0 && templates.length > 0) {
+        // With nothing scheduled today, templates stay first; the program's previous days are a choice away.
+        if (templates.length > 0 && (programIds.length === 0 || (programIds.length === 1 && programDays.length === 0))) {
             return 'template';
         }
         return null;
@@ -292,7 +296,19 @@ function CreateSession() {
         rootId, userId: user?.id, todayISO, programDays, selectedProgramDay, activeProgram,
         goalTree, allGoals, manualGoalIds, quickTemplateSelected,
     });
-    const planChoice = useSessionPlanChoice(rootId, selectedTemplate, todayISO, programContext?.day_id || null);
+    const planChoice = useSessionPlanChoice(
+        rootId, selectedTemplate, todayISO, programContext?.day_id || null, Boolean(selectedProgramDay?.is_previous),
+    );
+    const programForPreviousDays = effectiveSessionSource === 'program'
+        ? activePrograms.find((program) => String(program.id) === String(effectiveSelectedProgramId)) || null
+        : null;
+    const previousDaysQuery = useProgramPlanOccurrences(rootId, programForPreviousDays?.id, timezone || 'UTC');
+    const previousProgramDays = useMemo(() => buildPreviousProgramDays({
+        program: programForPreviousDays,
+        occurrencesByDay: previousDaysQuery.data,
+        templates,
+        todayISO, scheduledToday: programDays,
+    }), [previousDaysQuery.data, programDays, programForPreviousDays, templates, todayISO]);
     const scopePreviewQuery = useQuery({
         queryKey: queryKeys.sessionGoalScopePreview(
             rootId,
@@ -420,25 +436,7 @@ function CreateSession() {
         <div className={headerStyles.pageShell}>
             <PageHeader
                 title="Create Session"
-                subtitle={selectedProgramDay
-                    ? <>Day {selectedProgramDay.day_number || selectedProgramDay.day_name} of{' '}
-                        <strong
-                            className={styles.selectedBlockName}
-                            style={{ color: selectedProgramDay.block_color || 'var(--color-brand-primary)' }}
-                        >{selectedProgramDay.block_name}</strong>
-                        {' '}· <ProgramName
-                            name={selectedProgramDay.program_name}
-                            color={selectedProgramDay.program_color}
-                        /></>
-                    : programContext
-                        ? <>In {programContext.block_name ? <><strong
-                            className={styles.selectedBlockName}
-                            style={{ color: programContext.block_color || programContext.program_color }}
-                        >{programContext.block_name}</strong>{' '}· </> : null}<ProgramName
-                            name={programContext.program_name}
-                            color={programContext.program_color}
-                        /></>
-                        : 'Select a template or program day to begin your session.'}
+                subtitle={<CreateSessionSubtitle selectedProgramDay={selectedProgramDay} programContext={programContext} />}
                 actions={isMobile ? (
                     <HeaderButton
                         variant="secondary"
@@ -521,6 +519,8 @@ function CreateSession() {
                         {(effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
                             <ProgramDayPicker
                                 programDays={currentProgramDays}
+                                previousDays={previousProgramDays}
+                                previousDaysLoading={Boolean(programForPreviousDays) && previousDaysQuery.isLoading}
                                 selectedProgramDay={selectedProgramDay}
                                 selectedProgramSession={selectedProgramSession}
                                 hasTemplates={hasTemplates}
@@ -530,9 +530,9 @@ function CreateSession() {
                             />
                         )}
 
-                        {selectedTemplateIsNormal ? <SessionPlanChooser {...planChoice} /> : null}
+                        {selectedTemplateIsNormal ? <SessionPlanChooser {...planChoice} emptyMessage={selectedProgramDay?.is_previous ? 'No saved plans for this day. This session will use the template.' : null} /> : null}
                         {/* Step 1: Select Template */}
-                        {(effectiveSessionSource === 'template' || (!hasProgramDays && hasTemplates)) && (
+                        {(effectiveSessionSource === 'template' || (!effectiveSessionSource && !hasProgramDays && hasTemplates)) && (
                             <TemplatePicker
                                 templates={templates}
                                 selectedTemplate={selectedTemplate}

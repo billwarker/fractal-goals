@@ -57,8 +57,8 @@ Remote records live in TanStack Query. Components do not mirror API collections 
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
 affected read models. In-session writes go through the per-user outbox (`client/src/offline/`)
 instead. They patch the cache, persist, and sync in
-order with `Idempotency-Key` and `occurred_at`; the session's queries are invalidated once its
-queue drains. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
+order with `Idempotency-Key` and `occurred_at`, sending under a separate lock so saving never waits on
+the network; the session's queries refetch once its queue drains and stays quiet. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
 mirrored in `offline/circuitIds.js`). Quick-session drafts persist per user and fractal.
 See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 
@@ -172,7 +172,9 @@ Goal↔group routes live in `blueprints/goal_activity_groups_api.py`.
 
 Session Detail exposes reversible one-off links on actual activity instances (including circuit
 members and completed sessions) through the scoped goal's icon, only when that instance is selected
-and a goal is scoped; each link's goal icon is always shown on the card's meta line. While scoped, the
+and a goal is scoped. Cards always show the lowest goal on each branch the instance counts toward
+(`InstanceGoalIcons`, the same resolution as the Goal Hierarchy pane); picking a one-off-only activity from
+the scoped picker links the new instance to the scoped goal. While scoped, the
 add-activity picker unions the goal's catalog with definitions linked one-off to the goal or a
 descendant (`load_instance_linked_activities`, bounded, never the reusable catalog), and new
 definitions are seeded with the scoped goal and its group. `useActivityInstanceGoalAssociation` owns
@@ -311,7 +313,8 @@ coverage and streak evaluation.
 program day, template, and date. Plans are virtual until saved (an unplanned occurrence *is* the
 template), save with `row_version` (409 on conflict), never get rewritten by template edits, and are
 materialized into a session's transaction when chosen in Create Session
-(`sessions.program_session_plan_id`).
+(`sessions.program_session_plan_id`). Create Session also lists previous days and plans; a session started
+from one happens today and never credits the past date.
 
 **UI ownership.** `pages/ProgramCalendarPage.jsx` composes the Calendar and Days views;
 `components/programs/` owns the calendar, side pane, blocks panel, and `ProgramOptionsModal`;
@@ -466,7 +469,8 @@ a derived (never stored) "Progress toward…" chart. `useVisualizationContext` i
 context for `ProfileWindow`, `AnalyticsWidget` and `SavedViewChart`; small containers render the
 simplified `compact` density (`applyChartDensity`, `useContainerDensity`). Embedded charts read
 bounded data (`/activities/<id>/analytics-evidence`, 500 newest). UI lives in
-`client/src/components/goalCharts/`. See [Goal charts plan](planning/goal-analytics-charts.md).
+`client/src/components/goalCharts/`. Expanded goal charts and Session Detail's expanded Progress chart
+share `analytics/ExpandedChartFrame` and `ChartGoalSurface`. See [Goal charts plan](planning/goal-analytics-charts.md).
 
 Saved Analytics lists goal links and chart identity in a batched read (`DashboardService.list_dashboards`).
 Views and dashboards can be pinned, renamed, duplicated and ordered by last opening; opening and

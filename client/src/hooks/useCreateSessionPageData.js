@@ -25,8 +25,9 @@ function dedupeProgramDays(programDays) {
         });
 }
 
-function groupProgramDaysById(programDays) {
-    return programDays.reduce((grouped, day) => {
+// Active programs stay choosable with nothing scheduled today: their previous days are still there.
+function groupProgramDaysById(programDays, activePrograms = []) {
+    const grouped = programDays.reduce((grouped, day) => {
         const programId = String(day.program_id);
         if (!grouped[programId]) {
             grouped[programId] = {
@@ -39,6 +40,12 @@ function groupProgramDaysById(programDays) {
         grouped[programId].days.push(day);
         return grouped;
     }, {});
+    activePrograms.forEach((program) => {
+        const programId = String(program.id);
+        if (grouped[programId]) return;
+        grouped[programId] = { program_id: program.id, program_name: program.name, program_color: program.color, days: [] };
+    });
+    return grouped;
 }
 
 export function useCreateSessionPageData(rootId, todayISO, timezone) {
@@ -108,14 +115,15 @@ export function useCreateSessionPageData(rootId, todayISO, timezone) {
         [programDaysQuery.data]
     );
 
-    const programsById = useMemo(
-        () => groupProgramDaysById(programDays),
-        [programDays]
-    );
-    const activeProgram = useMemo(
-        () => getActivePrograms(programsQuery.data || [], todayISO)[0] || null,
+    const activePrograms = useMemo(
+        () => getActivePrograms(programsQuery.data || [], todayISO),
         [programsQuery.data, todayISO]
     );
+    const programsById = useMemo(
+        () => groupProgramDaysById(programDays, activePrograms),
+        [activePrograms, programDays]
+    );
+    const activeProgram = activePrograms[0] || null;
 
     return {
         templates: templatesQuery.data || [],
@@ -124,6 +132,7 @@ export function useCreateSessionPageData(rootId, todayISO, timezone) {
         programDays,
         programsById,
         activeProgram,
+        activePrograms,
         activityDefinitions: activitiesQuery.data || [],
         activityGroups: activityGroupsQuery.data || [],
         loading: results.some((result) => result.isLoading),

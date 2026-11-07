@@ -1,4 +1,7 @@
-import { defaultId, defaultLock, describeError, classifyFailure } from './outboxTransport';
+import { createDrainWaiters, planRetry } from './outboxRetry';
+import {
+    classifyFailure, defaultDrainLock, defaultId, defaultLock, describeError, isLockStolen,
+} from './outboxTransport';
 export { classifyFailure } from './outboxTransport';
 export { createMemoryStore } from './memoryStore';
 
@@ -9,15 +12,11 @@ export { createMemoryStore } from './memoryStore';
 // retry with backoff; only a definitive server rejection (4xx) removes it from
 // the queue, and even then it stays visible as "rejected" until reviewed.
 //
-// The store is the source of truth: each flush re-reads it under a cross-tab
-// lock, so two open tabs never send the same op concurrently.
+// The store is the source of truth. Two cross-tab locks keep the network out of every tap: `lock`
+// guards short store changes; `drainLock`, held while sending, stops two tabs sending at once.
 
-const BASE_BACKOFF_MS = 1000;
-const MAX_BACKOFF_MS = 60000;
-// A change the server keeps failing (not one waiting for signal) is given up on
-// after this, so it can never block every later change behind it.
-const MAX_SERVER_FAILURES = 8;
-const MAX_SERVER_FAILURE_AGE_MS = 24 * 60 * 60 * 1000;
+// Must outlast a request's timeout: other tabs won't coalesce or cancel an op while this holds.
+const SEND_LEASE_MS = 30000;
 // Rejected changes wait for review this long, then are discarded so they can't linger forever.
 const REJECTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -33,6 +32,9 @@ export function createOutbox({
     send,
     isOnline = () => true,
     lock = defaultLock,
+    drainLock = defaultDrainLock,
+    // Fixes what a request sends, once: a retry must repeat the first attempt byte for byte.
+    prepareBody = (body) => body,
     channel = null,
     now = () => Date.now(),
     random = Math.random,
@@ -48,7 +50,6 @@ export function createOutbox({
 
     const handlers = new Map();
     const settlers = new Map();
-    const drainWaiters = new Map();
     const listeners = new Set();
     let ops = [];
     const syncedAt = {};
@@ -57,7 +58,7 @@ export function createOutbox({
     let pausedForAuth = false;
     let flushing = null;
     let flushAgain = false;
-    let inFlightOpId = null;
+    let sendingHere = false;
     let drainStats = { ops: 0, maxAgeMs: 0, retries: 0 };
     let retryTimer = null;
     let hydrated = null;
@@ -70,7 +71,7 @@ export function createOutbox({
     const refresh = async () => {
         ops = (await store.getAll()).sort((left, right) => left.seq - right.seq);
         emit();
-        resolveDrained();
+        drainWaiters.resolve();
     };
 
     const announce = (message) => {
@@ -82,14 +83,7 @@ export function createOutbox({
     };
 
     const pendingFor = (scope) => ops.filter((op) => op.state === OP_STATE.PENDING && (!scope || op.scope === scope));
-
-    function resolveDrained() {
-        drainWaiters.forEach((waiters, scope) => {
-            if (pendingFor(scope === '*' ? null : scope).length > 0) return;
-            drainWaiters.delete(scope);
-            waiters.forEach((resolve) => resolve());
-        });
-    }
+    const drainWaiters = createDrainWaiters({ hasPending: (scope) => pendingFor(scope).length > 0, setTimer, clearTimer });
 
     const settle = (opId, outcome) => {
         const entry = settlers.get(opId);
@@ -125,11 +119,6 @@ export function createOutbox({
         }, Math.max(0, at - now()));
     };
 
-    const backoff = (attempts) => {
-        const base = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS * 2 ** Math.max(0, attempts - 1));
-        return Math.round(base / 2 + random() * (base / 2));
-    };
-
     const rejectOp = async (op, error) => {
         const rejected = { ...op, state: OP_STATE.REJECTED, error, rejectedAt: now() };
         await store.put(rejected);
@@ -158,21 +147,35 @@ export function createOutbox({
         .filter((op) => op.state === OP_STATE.PENDING)
         .sort((left, right) => left.seq - right.seq)[0];
 
-    const drainOnce = async () => {
+    const isBeingSent = (op) => Boolean(op.sendingUntil) && op.sendingUntil > now();
+
+    /** Marks the op as being sent and fixes its body; null when it changed while waiting for the lock. */
+    const claimForSending = (opId) => lock(async () => {
+        const current = (await store.getAll()).find((entry) => entry.opId === opId);
+        if (!current || current.state !== OP_STATE.PENDING) return null;
+        const body = current.bodyPrepared ? current.body : prepareBody(current.body);
+        const claimed = { ...current, body, bodyPrepared: true, sendingUntil: now() + SEND_LEASE_MS };
+        await store.put(claimed);
+        return claimed;
+    });
+
+    const drainOnce = async (run = {}) => {
         // Re-read the head each time: cascades, discards and other tabs change the queue.
-        for (let op = await nextPending(); op; op = await nextPending()) {
-            if (pausedForAuth || !isOnline()) return;
-            if (op.nextAttemptAt && op.nextAttemptAt > now()) {
-                scheduleRetry(op.nextAttemptAt);
+        for (let head = await nextPending(); head; head = await nextPending()) {
+            if (pausedForAuth || !isOnline() || run.stolen) return;
+            if (head.nextAttemptAt && head.nextAttemptAt > now()) {
+                scheduleRetry(head.nextAttemptAt);
                 return;
             }
+            const op = /** @type {OutboxOp | null} */ (await claimForSending(head.opId));
+            if (!op) continue;
 
             let response;
-            inFlightOpId = op.opId;
+            sendingHere = true;
             try {
                 response = await send(op);
             } catch (error) {
-                inFlightOpId = null;
+                sendingHere = false;
                 const verdict = classifyFailure(error);
                 if (verdict === 'reject') {
                     await rejectOp(op, describeError(error));
@@ -180,14 +183,8 @@ export function createOutbox({
                     continue;
                 }
                 const described = describeError(error);
-                // Only failures the server answered count toward giving up; offline waits forever.
-                const answered = Boolean(error?.response) && verdict !== 'auth';
-                const serverFailures = (op.serverFailures || 0) + (answered ? 1 : 0);
-                const firstServerFailureAt = op.firstServerFailureAt || (answered ? now() : null);
-                if (answered && (
-                    serverFailures >= MAX_SERVER_FAILURES
-                    || now() - firstServerFailureAt >= MAX_SERVER_FAILURE_AGE_MS
-                )) {
+                const retry = planRetry(op, error, verdict, now(), random);
+                if (retry.giveUp) {
                     await rejectOp(op, {
                         ...described,
                         code: 'retry_exhausted',
@@ -196,11 +193,8 @@ export function createOutbox({
                     await refresh();
                     continue;
                 }
-                const attempts = (op.attempts || 0) + 1;
-                const nextAttemptAt = now() + backoff(attempts);
-                await store.put({
-                    ...op, attempts, nextAttemptAt, serverFailures, firstServerFailureAt, lastError: described,
-                });
+                const { nextAttemptAt } = retry;
+                await store.put({ ...op, ...retry.fields, nextAttemptAt, lastError: described, sendingUntil: 0 });
                 if (verdict === 'auth') {
                     pausedForAuth = true;
                 } else {
@@ -209,7 +203,7 @@ export function createOutbox({
                 return;
             }
 
-            inFlightOpId = null;
+            sendingHere = false;
             // Another tab may have discarded it while it was in flight.
             await store.delete(op.opId);
             // Handlers ask "is anything newer still queued?"; this op no longer is.
@@ -235,6 +229,29 @@ export function createOutbox({
         }
     };
 
+    /** A stolen lock means another tab took over: this drain stops at its next step. */
+    const runDrain = async (options) => {
+        const run = { stolen: false };
+        try {
+            await drainLock(() => drainOnce(run), options);
+        } catch (error) {
+            if (!isLockStolen(error)) throw error;
+            run.stolen = true;
+        }
+    };
+
+    /**
+     * A frozen background tab keeps its drain lock forever. Once its lease on the head op has
+     * lapsed with no answer, the visible tab takes over; idempotency covers a request it had sent.
+     */
+    async function reclaimStalledDrain() {
+        await hydrated;
+        if (sendingHere) return;
+        const head = await nextPending();
+        if (!head?.sendingUntil || isBeingSent(head)) return;
+        await runDrain({ steal: true });
+    }
+
     async function flush() {
         await hydrated;
         if (flushing) {
@@ -247,7 +264,7 @@ export function createOutbox({
             try {
                 do {
                     flushAgain = false;
-                    await lock(drainOnce);
+                    await runDrain();
                 } while (flushAgain && !pausedForAuth && isOnline());
             } finally {
                 flushing = null;
@@ -309,7 +326,7 @@ export function createOutbox({
         let cancelled = false;
         await lock(async () => {
             const stored = await store.getAll();
-            const unsent = (existing) => existing.state === OP_STATE.PENDING && existing.opId !== inFlightOpId;
+            const unsent = (existing) => existing.state === OP_STATE.PENDING && !isBeingSent(existing);
             if (coalesceKey) {
                 for (const existing of stored) {
                     // The server may already be applying an in-flight one; the newer value follows it.
@@ -362,7 +379,7 @@ export function createOutbox({
         // the failures that led to the rejection.
         await store.put({
             ...op, state: OP_STATE.PENDING, error: null, lastError: null,
-            attempts: 0, nextAttemptAt: 0, serverFailures: 0, firstServerFailureAt: undefined,
+            attempts: 0, nextAttemptAt: 0, serverFailures: 0, firstServerFailureAt: undefined, sendingUntil: 0,
         });
         announce({ type: 'changed' });
         await refresh();
@@ -374,16 +391,6 @@ export function createOutbox({
         pausedForAuth = false;
         emit();
         void flush();
-    }
-
-    function whenDrained(scope = null) {
-        const key = scope || '*';
-        if (pendingFor(scope).length === 0) return Promise.resolve();
-        return new Promise((resolve) => {
-            const waiters = drainWaiters.get(key) || [];
-            waiters.push(resolve);
-            drainWaiters.set(key, waiters);
-        });
     }
 
     async function clear() {
@@ -415,11 +422,12 @@ export function createOutbox({
     return {
         submit,
         flush,
+        reclaimStalledDrain,
         discard,
         retry,
         clear,
         resumeAfterAuth,
-        whenDrained,
+        whenDrained: drainWaiters.whenDrained,
         hasPending: (scope = null) => pendingFor(scope).length > 0,
         hasPendingEntity: (entityId) => ops.some((op) => (
             op.state === OP_STATE.PENDING && (op.entityIds || []).includes(entityId)

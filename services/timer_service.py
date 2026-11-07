@@ -649,7 +649,9 @@ class TimerService:
         if quick_error:
             return None, *quick_error
         if session.is_paused:
-            return None, "Session is already paused", 400
+            # Already what was asked for: another tab or device, or a replay after a lost claim.
+            current = self._load_session_for_response(root_id, session_id) or session
+            return {"session": current, "serialized": serialize_session(current)}, None, 200
 
         now, time_error = resolve_occurred_at(self.db_session, session, occurred_at)
         if time_error:
@@ -712,7 +714,8 @@ class TimerService:
         if quick_error:
             return None, *quick_error
         if not session.is_paused:
-            return None, "Session is not paused", 400
+            current = self._load_session_for_response(root_id, session_id) or session
+            return {"session": current, "serialized": serialize_session(current)}, None, 200
 
         now, time_error = resolve_occurred_at(self.db_session, session, occurred_at)
         if time_error:

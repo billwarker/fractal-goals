@@ -1,3 +1,5 @@
+import { getGoalNodeChildren, normalizeGoalNode } from './goalNodeModel';
+
 export function mergeUniqueIds(existing = [], additions = []) {
     return Array.from(new Set([
         ...(Array.isArray(existing) ? existing : []),
@@ -50,4 +52,44 @@ export function getCurrentSessionActivityDefIds({
             .filter(Boolean)
             .map((activityId) => String(activityId))
     );
+}
+
+/** Every goal an instance counts toward: its definition's and group's, plus its own one-off links. */
+export function instanceGoalIds(instance, activityGoalIdsByActivity = {}) {
+    const definitionId = instance?.activity_definition_id || instance?.activity_id;
+    return new Set(
+        [...(activityGoalIdsByActivity[String(definitionId)] || []), ...(instance?.associated_goal_ids || [])]
+            .map((goalId) => String(goalId)),
+    );
+}
+
+/** Normalized goals by id, and each goal's parent, from a session goal tree. */
+export function indexGoalTree(tree) {
+    const nodeById = new Map();
+    const parentById = new Map();
+    const stack = tree ? [{ node: tree, parentId: null }] : [];
+    while (stack.length > 0) {
+        const { node, parentId } = stack.pop();
+        const id = String(node.id);
+        nodeById.set(id, normalizeGoalNode(node, { parentId }));
+        if (parentId) parentById.set(id, String(parentId));
+        getGoalNodeChildren(node).forEach((child) => stack.push({ node: child, parentId: node.id }));
+    }
+    return { nodeById, parentById };
+}
+
+/** Drops every goal with a descendant in the set, leaving the lowest goal on each branch. */
+export function lowestGoalIdsPerBranch(goalIds, parentById) {
+    const ids = new Set(goalIds);
+    const ancestors = new Set();
+    ids.forEach((goalId) => {
+        const visited = new Set([goalId]);
+        let current = parentById.get(goalId);
+        while (current && !visited.has(current)) {
+            visited.add(current);
+            ancestors.add(current);
+            current = parentById.get(current);
+        }
+    });
+    return [...ids].filter((goalId) => !ancestors.has(goalId));
 }

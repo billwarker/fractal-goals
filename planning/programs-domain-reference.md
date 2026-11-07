@@ -260,3 +260,11 @@ Detailed design:
 - [Calendar events and occurrence scheduling](program-calendar-periods-and-scheduling.md)
 - [Viewport-driven calendar feed](program-calendar-viewport-feed.md)
 - [Calendar invariants and optional templates](program-calendar-invariants-and-optional-templates.md)
+
+## Goals due in the day pane
+
+`ProgramDayPane` shows a "Goals due" card for the selected date, beneath the program day card, including dates with no program day. It lists what the calendar badges that date (`goalsBadgedOnDate`, built from the same events), and rows open the goal record itself, since event props overwrite a goal's level `type`.
+
+## Previous days on Create Session
+
+An active program stays choosable with nothing scheduled today. Previous days lists each other day type once (`buildPreviousProgramDays`, from `plan-occurrences`, most recently occurred first, leaving out days scheduled today); the Plan dropdown then offers that day's stored plans by date (`plan_candidates`: 60-day lookback, newest 30, executed ones marked). A program day scheduled today is selected by default, the first of several, with its template chosen when only one is required or available. The session happens today, with today's block, and the past date's status and streaks never change. A previous day defaults to its newest stored plan, otherwise template only; the automatic default never picks an executed plan or one older than 14 days.

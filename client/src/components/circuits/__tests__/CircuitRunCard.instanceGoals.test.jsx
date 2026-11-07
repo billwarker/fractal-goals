@@ -15,9 +15,9 @@ vi.mock('../../../contexts/GoalLevelsContext', () => ({
 
 it('offers one-off links only for the selected member instance while goal-scoped', () => {
     const client = new QueryClient();
-    client.setQueryData(['fractalTree', 'root'], { id: 'root', name: 'Root', type: 'UltimateGoal', children: [
+    client.setQueryData(['session-goals-view', 'root', 'session'], { activity_goal_ids_by_activity: {}, goal_tree: { id: 'root', name: 'Root', type: 'UltimateGoal', children: [
         { id: 'goal', name: 'Practice', type: 'ImmediateGoal', children: [] },
-    ] });
+    ] } });
     const run = { id: 'run', name: 'Circuit', status: 'completed', round_count: 1,
         slots: [
             { id: 'slot-a', activity_name: 'Press', sort_order: 0, activity_instance_id: 'one' },
@@ -52,9 +52,9 @@ it('offers one-off links only for the selected member instance while goal-scoped
 
 it('shows the member group and linked goals under the name, with the link button beside the name', () => {
     const client = new QueryClient();
-    client.setQueryData(['fractalTree', 'root'], { id: 'root', name: 'Root', type: 'UltimateGoal', children: [
+    client.setQueryData(['session-goals-view', 'root', 'session'], { activity_goal_ids_by_activity: {}, goal_tree: { id: 'root', name: 'Root', type: 'UltimateGoal', children: [
         { id: 'goal', name: 'Practice', type: 'ImmediateGoal', children: [] },
-    ] });
+    ] } });
     const run = { id: 'run', name: 'Circuit', status: 'completed', round_count: 1,
         slots: [{ id: 'slot-a', activity_name: 'Full Front Lever', activity_definition_id: 'def', sort_order: 0, activity_instance_id: 'one' }],
         rounds: [{ id: 'round', round_number: 1, members: [

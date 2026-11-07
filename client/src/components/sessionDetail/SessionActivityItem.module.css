@@ -108,16 +108,18 @@
 
 .activityNameFlex {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 4px 8px;
     min-width: 0;
 }
 
 .activityHeaderActions {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
 }
@@ -1011,7 +1013,6 @@
     }
 
     .activityHeaderActions {
-        flex-wrap: nowrap;
         align-items: center;
     }
 

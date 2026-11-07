@@ -3,12 +3,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { queryKeys } from '../../hooks/queryKeys';
 import { fractalApi } from '../../utils/api';
-import ChartGoalSurface from '../analytics/ChartGoalSurface';
+import ChartGoalSurface, { PresetSurfaceChart } from '../analytics/ChartGoalSurface';
 import { ChartDensityContext } from '../analytics/ChartJSWrapper';
-import { canSetGoalFromChart } from '../analytics/chartGoalTargets';
+import { canSetGoalFromChart, conditionGoalChart } from '../analytics/chartGoalTargets';
 import ScatterPlot from '../analytics/ScatterPlot';
 import { MetricTrendsChart } from '../analytics/visualizations/activities/MetricTrends';
-import { conditionLine } from '../../utils/goalConditionSeries';
 import ConditionProgressChart from '../goalDetail/ConditionProgressChart';
 import { trendMetricIds } from './progressChartSettings';
 
@@ -21,19 +20,10 @@ export function progressGoalChart(series) {
     const settings = series?.chart_settings;
     const setsHandling = settings?.set_aggregation || 'top';
     if (settings?.kind === 'scatter') return { id: 'scatterPlot', setsHandling };
-    if (settings?.kind === 'goal') {
-        const line = conditionLine(series.chart?.condition);
-        return line ? { id: 'metricTrends', metrics: [line.metricId], setsHandling: line.setsHandling } : null;
-    }
+    if (settings?.kind === 'goal') return conditionGoalChart(series.chart?.condition);
     if (settings?.kind !== 'activity_trend' && settings?.kind !== 'metric_trend') return null;
     const metrics = trendMetricIds(settings);
     return canSetGoalFromChart('metricTrends', series.activity_definition, metrics) ? { id: 'metricTrends', metrics, setsHandling } : null;
-}
-
-/** A chart on the goal surface, taking what it adds from the context. */
-function GoalSurfaceChart({ context }) {
-    const { Chart, props } = context.progressChart;
-    return <Chart {...props} chartRef={context.chartRef} goalLines={context.goalConditionLines} onOpenGoal={context.onOpenGoal} />;
 }
 
 /**
@@ -108,7 +98,7 @@ export default function ProgressChartView({ rootId, series, density = 'compact',
     if (goalChart) {
         chart = (
             <ChartGoalSurface
-                Chart={GoalSurfaceChart}
+                Chart={PresetSurfaceChart}
                 rootId={rootId}
                 annotating={goalSurface.annotating}
                 onAnnotatingChange={goalSurface.onAnnotatingChange}
@@ -120,7 +110,7 @@ export default function ProgressChartView({ rootId, series, density = 'compact',
                     scopedData: { activities, activityInstances },
                     visualizationState: { setsHandling: goalChart.setsHandling },
                     globalFilters: null,
-                    progressChart: { Chart: chart.type, props: chart.props },
+                    presetChart: { Chart: chart.type, props: chart.props },
                 }}
             />
         );

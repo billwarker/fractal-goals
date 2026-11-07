@@ -144,3 +144,23 @@
     font-size: 14px;
     font-weight: bold;
 }
+
+.programDayRowUnavailable {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.previousDays {
+    margin-top: 20px;
+}
+
+.sectionTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.previousHint {
+    margin: 4px 0 10px;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}

@@ -6,6 +6,7 @@ import MetaField from '../common/MetaField';
 import SectionHeader from '../common/SectionHeader';
 import { useActiveSessionActions, useActiveSessionData, useActiveSessionUi } from '../../contexts/ActiveSessionContext';
 import useIsMobile from '../../hooks/useIsMobile';
+import { useAddActivityFromPicker } from '../../hooks/useActivityInstanceGoalAssociation';
 import ModalBackdrop from '../atoms/ModalBackdrop';
 import CircuitRunCard from '../circuits/CircuitRunCard';
 import InstanceGoalLinkControl from './InstanceGoalLinkControl';
@@ -74,6 +75,7 @@ const SessionSection = ({
         reorderActivity,
     } = useActiveSessionActions();
 
+    const addFromPicker = useAddActivityFromPicker(rootId, sessionId, addActivity);
     const [isDragOver, setIsDragOver] = useState(false);
     const [circuitError, setCircuitError] = useState('');
     const [selectedCircuitItem, setSelectedCircuitItem] = useState(null);
@@ -224,7 +226,7 @@ const SessionSection = ({
             activityGroups={activityGroups}
             activityGoalScope={activityGoalScope}
             onClose={closeSelector}
-            onSelectActivity={(activity) => addActivity(sectionIndex, activity.id, activity)}
+            onSelectActivity={(activity) => addFromPicker(sectionIndex, activity, activityGoalScope)}
             onSelectCircuit={(circuit) => addCircuit(circuit.id)}
             onCreateActivityDefinition={handleCreateActivityDefinition}
             onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}

@@ -30,6 +30,7 @@ ALLOWED_EVENTS = frozenset({
     "offline_sync_drained",
     "offline_op_rejected",
     "offline_boot",
+    "offline_detected",
     "offline_ops_expired",
 })
 

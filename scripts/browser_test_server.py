@@ -431,6 +431,8 @@ def main():
                 for slug, label in (
                     ("offline", "Offline"),
                     ("circuit-tags", "Circuit Tags"),
+                    ("session-tags", "Session Tags"),
+                    ("circuit-tag-width", "Circuit Tag Width"),
                     ("session-width", "Session Width"),
                     ("associations", "Associations"),
                     ("scoped-groups", "Scoped Groups"),

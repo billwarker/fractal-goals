@@ -19,8 +19,9 @@ function Tooltip({ children, label, className = '', portal = false }) {
         open: portal && open,
         anchorRef,
         overlayRef: tooltipRef,
-        align: 'right',
+        align: 'center',
         maxWidth: 300,
+        fitContent: true,
         estimatedHeight: 92,
     });
 

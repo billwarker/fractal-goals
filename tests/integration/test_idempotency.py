@@ -142,7 +142,9 @@ class TestIdempotentWrites:
         assert first.status_code == 200
         assert second.status_code == 200
         assert second.headers.get('Idempotent-Replayed') == 'true'
-        assert unkeyed.status_code == 400
+        # Another tab's pause isn't a replay, but the session is already as asked.
+        assert unkeyed.status_code == 200
+        assert 'Idempotent-Replayed' not in unkeyed.headers
 
     def test_expired_records_for_user_are_pruned_on_next_claim(
         self, client, auth_headers, db_session, test_user, sample_practice_session, sample_activity_definition,

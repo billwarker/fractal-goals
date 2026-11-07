@@ -89,9 +89,9 @@ export function useCreateSessionAutoSelection({
                 && (!deepLinkedDate || deepLinkedDate === todayISO)
             ))
             : null;
-        const onlyDay = programDays.length === 1 ? programDays[0] : null;
-        const requiredSessions = (onlyDay?.sessions || []).filter((session) => session.is_required !== false);
-        const autoDay = deepLinkedDayId ? matchedDay : (!sessionSource && requiredSessions.length === 1 ? onlyDay : null);
+        // A program day today is the default, the first of several; a template is picked only when unambiguous.
+        const autoDay = deepLinkedDayId ? matchedDay : (!sessionSource ? programDays[0] || null : null);
+        const requiredSessions = (autoDay?.sessions || []).filter((session) => session.is_required !== false);
         if (!deepLinkedDayId && !autoDay) return;
 
         hasAutoSelectedRef.current = true;
@@ -108,7 +108,7 @@ export function useCreateSessionAutoSelection({
             ? (deepLinkedTemplateId
                 ? autoDay.sessions?.find((session) => String(session.template_id) === deepLinkedTemplateId)
                 : (autoDay.sessions?.length === 1 ? autoDay.sessions[0] : null))
-            : requiredSessions[0];
+            : (requiredSessions.length === 1 ? requiredSessions[0] : (autoDay.sessions?.length === 1 ? autoDay.sessions[0] : null));
         setSelectedProgramId(String(autoDay.program_id));
         setSessionSource('program');
         setSelectedProgramDay(autoDay);

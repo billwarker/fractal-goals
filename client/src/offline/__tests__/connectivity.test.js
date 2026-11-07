@@ -6,6 +6,7 @@ vi.mock('../../utils/api/globalApi', () => ({ globalApi: { probeHealth } }));
 import {
     checkConnectivity,
     getClockOffsetMs,
+    getOfflineReason,
     isOnline,
     recordClockSample,
     reportRequestFailed,
@@ -26,6 +27,29 @@ describe('connectivity', () => {
     afterEach(() => {
         resetConnectivityForTests();
         vi.useRealTimers();
+    });
+
+    it('stays online when a request times out but the server answers a probe', async () => {
+        probeHealth.mockResolvedValue({});
+        const listener = vi.fn();
+        subscribeConnectivity(listener);
+
+        reportRequestFailed(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(probeHealth).toHaveBeenCalledTimes(1);
+        expect(isOnline()).toBe(true);
+        expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('goes offline when a timed-out request is followed by an unanswered probe', async () => {
+        probeHealth.mockRejectedValue(networkError());
+
+        reportRequestFailed(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }));
+        await vi.advanceTimersByTimeAsync(0);
+
+        expect(isOnline()).toBe(false);
+        expect(getOfflineReason()).toBe('timeout');
     });
 
     it('goes offline on a transport failure and notifies subscribers', () => {

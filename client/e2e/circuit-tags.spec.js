@@ -49,6 +49,8 @@ test('circuit and round tags use activity chips and the shared catalog', async (
     await page.reload();
     await expect(circuitTags.getByTitle('Shared strength', { exact: true })).toBeVisible();
     await expect(roundTags.getByTitle('Shared strength', { exact: true })).toBeVisible();
+    await expect(circuitTags.getByLabel('1 tag assigned')).toHaveCount(0);
+    await expect(roundTags.getByLabel('1 tag assigned')).toHaveCount(0);
     const catalog = await page.request.get(`/api/${root}/activity-tags`, { headers: { Authorization: `Bearer ${token}` } });
     expect(catalog.ok()).toBe(true);
     const matches = (await catalog.json()).tags.filter((item) => item.name === 'Shared strength');
@@ -64,5 +66,62 @@ test('circuit and round tags use activity chips and the shared catalog', async (
     expect(tagBox.x - (nameBox.x + nameBox.width)).toBeLessThan(24);
     expect(Math.abs((tagBox.y + tagBox.height / 2) - (nameBox.y + nameBox.height / 2))).toBeLessThan(tagBox.height);
     await page.screenshot({ path: testInfo.outputPath('circuit-member-tags.png') });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
+});
+
+test('circuit tags show by name beside a long name, and a many-tag badge lines up with the chips', async ({ page }, testInfo) => {
+    await page.goto('/');
+    await page.getByText('LOG IN', { exact: true }).click();
+    await page.getByLabel('Username or Email').fill('browser_user');
+    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
+    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
+    const { token } = await (await login).json();
+    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    const root = `browser-circuit-tag-width-root-${testInfo.project.name}`;
+    const names = ['ear-training', 'left-hand-focus', 'slow-tempo', 'metronome-on', 'fretboard-recall', 'sight-reading', 'improvisation', 'chord-melody', 'alternate-picking', 'hybrid-picking', 'string-skipping', 'position-shifts'];
+    const session = await page.evaluate(async ({ root, token, names, stamp }) => {
+        const post = async (path, body, method = 'POST') => {
+            const response = await fetch(`/api/${root}/${path}`, {
+                method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
+            return response.json();
+        };
+        const member = await post('activities', { name: `Wide header member ${stamp}` });
+        const circuit = await post('circuits', { name: 'Straddle Half Lay FL/Pike Push Up Superset', slots: [{ activity_definition_id: member.id }] });
+        const session = await post('sessions', { name: 'Circuit tag width QA', goal_ids: [root], session_data: { sections: [{ name: 'Main', items: [] }] } });
+        const assign = async (name, run) => post(`circuit-runs/${run.id}/tags`, { name, assigned: true }, 'PATCH');
+        const single = await post(`sessions/${session.id}/circuit-runs`, { circuit_definition_id: circuit.id, section_index: 0 });
+        const many = await post(`sessions/${session.id}/circuit-runs`, { circuit_definition_id: circuit.id, section_index: 0 });
+        await assign(names[0], single);
+        for (const name of names) await assign(name, many);
+        return session;
+    }, { root, token, names, stamp: Date.now() });
+    await page.goto(`/${root}/session/${session.id}`);
+
+    const groups = page.getByRole('group', { name: 'Circuit tags', exact: true });
+    const single = groups.first();
+    const many = groups.nth(1);
+    await expect(single.getByTitle(names[0], { exact: true })).toBeVisible();
+
+    // Selecting adds header buttons; the one tag must keep its name.
+    await page.getByText('Straddle Half Lay FL/Pike Push Up Superset', { exact: true }).first().click();
+    await expect(single.getByRole('button', { name: 'Add circuit tags' })).toBeVisible();
+    await expect(single.getByTitle(names[0], { exact: true })).toBeVisible();
+    await expect(single.getByLabel('1 tag assigned')).toHaveCount(0);
+    await page.screenshot({ path: testInfo.outputPath('circuit-tags-selected.png') });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(single.getByTitle(names[0], { exact: true })).toBeVisible();
+    await expect(single.getByLabel('1 tag assigned')).toHaveCount(0);
+    const badge = many.getByLabel('12 tags assigned');
+    await expect(badge).toBeVisible();
+    const chipHeight = (await single.getByTitle(names[0], { exact: true }).boundingBox()).height;
+    const badgeStyle = await badge.evaluate((element) => ({ height: element.getBoundingClientRect().height, align: getComputedStyle(element).alignItems }));
+    expect(badgeStyle.align).toBe('center');
+    expect(Math.abs(badgeStyle.height - chipHeight)).toBeLessThanOrEqual(2);
+    await page.screenshot({ path: testInfo.outputPath('circuit-tags-phone.png') });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
 });

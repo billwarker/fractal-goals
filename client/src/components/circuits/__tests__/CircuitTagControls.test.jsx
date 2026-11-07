@@ -16,6 +16,14 @@ describe('circuit scope tag controls', () => {
         expect(chip).toHaveStyle({ '--tag-color': '#FF0000' });
     });
 
+    it('wraps a whole circuit\'s tags under its name; a round keeps its one row', () => {
+        const run = render(<CircuitRunTagControl run={{ tags: [{ id: 'scope', name: 'Strength' }] }} availableTags={catalog([])} onPerform={vi.fn()} />);
+        expect(screen.getByRole('group', { name: 'Circuit tags' })).toHaveClass(styles.wrappingEditor);
+        run.unmount();
+        render(<CircuitRoundTagControl round={{ round_number: 1, tags: [{ id: 'scope', name: 'Strength' }] }} availableTags={catalog([])} onPerform={vi.fn()} />);
+        expect(screen.getByRole('group', { name: 'Round 1 tags' })).not.toHaveClass(styles.wrappingEditor);
+    });
+
     it('selects an existing logical tag for the whole circuit', async () => {
         const onPerform = vi.fn().mockResolvedValue(true);
         render(
@@ -144,7 +152,7 @@ describe('circuit scope tag controls', () => {
         expect(within(control).queryByRole('button', { name: 'Add round 1 tags' })).not.toBeInTheDocument();
     });
 
-    it('summarizes circuit tags before they overflow the timer row', () => {
+    it('summarizes circuit tags past two rows', () => {
         let resizeCallback;
         vi.stubGlobal('ResizeObserver', class ResizeObserver {
             constructor(callback) {
@@ -169,7 +177,7 @@ describe('circuit scope tag controls', () => {
         const measure = tagRow.querySelector('[data-tag-label]').parentElement;
         const trigger = within(control).getByRole('button', { name: 'Add circuit tags' });
         Object.defineProperty(tagRow, 'clientWidth', { configurable: true, value: 180 });
-        Object.defineProperty(measure, 'scrollWidth', { configurable: true, value: 240 });
+        [...measure.children].forEach((item) => { item.getBoundingClientRect = () => ({ width: 100 }); });
         trigger.getBoundingClientRect = () => ({ width: 52 });
 
         act(() => resizeCallback());

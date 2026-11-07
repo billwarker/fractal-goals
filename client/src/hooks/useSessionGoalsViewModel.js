@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { normalizeGoalNode } from '../utils/goalNodeModel';
-import { getCurrentSessionActivityDefIds } from '../utils/sessionGoalScope';
+import { getCurrentSessionActivityDefIds, instanceGoalIds } from '../utils/sessionGoalScope';
 import { getGoalStatus } from '../utils/sessionGoalStatus';
 
 /**
@@ -98,10 +98,7 @@ export function useSessionGoalsViewModel({
 
     const selectedActivityGoalIds = useMemo(() => {
         if (!activeActivityDefId || !selectedActivityInSession) return new Set();
-        return new Set(
-            [...(activityGoalIdsByActivity[String(activeActivityDefId)] || []), ...(selectedActivity?.associated_goal_ids || [])]
-                .map((goalId) => String(goalId))
-        );
+        return instanceGoalIds(selectedActivity, activityGoalIdsByActivity);
     }, [activeActivityDefId, activityGoalIdsByActivity, selectedActivityInSession, selectedActivity]);
 
     const selectedActivityAncestorIds = useMemo(() => {

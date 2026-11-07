@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import SessionSection from '../SessionSection';
 
@@ -74,6 +74,19 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     }),
 }));
 
+const mockLinkInstanceToGoal = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('../../../hooks/useActivityInstanceGoalAssociation', async (original) => {
+    const actual = await original();
+    return {
+        ...actual,
+        useAddActivityFromPicker: (_root, _session, addActivity) => async (sectionIndex, activity, scope) => {
+            const instance = await addActivity(sectionIndex, activity.id, activity);
+            if (instance?.id && scope?.instanceLinkedIds?.has(String(activity.id))) {
+                await mockLinkInstanceToGoal({ instanceId: instance.id, goalId: String(scope.goal.id) });
+            }
+        },
+    };
+});
 vi.mock('../../../hooks/useIsMobile', () => ({
     default: () => false,
 }));
@@ -143,6 +156,38 @@ describe('SessionSection', () => {
         };
         createCircuitDefinition.mockResolvedValue({ data: { id: 'created-circuit' } });
         createCircuitRun.mockResolvedValue({});
+    });
+
+    describe('auto-linking from the scoped picker', () => {
+        const pickFrom = async (activityGoalScope, added = { id: 'new-instance' }) => {
+            addActivity.mockResolvedValueOnce(added);
+            sessionDataState.activities = [{ id: 'activity-1', name: 'Bench Press', group_id: null, metric_definitions: [], split_definitions: [] }];
+            const element = () => sectionElement({ activityGoalScope });
+            const { rerender } = render(element());
+            fireEvent.click(screen.getByRole('button', { name: /\+ Add Activity/ }));
+            rerender(element());
+            fireEvent.click(await screen.findByText('Bench Press'));
+            await waitFor(() => expect(addActivity).toHaveBeenCalled());
+            await act(async () => {});
+        };
+        const scope = (instanceLinkedIds) => ({
+            goal: { id: 'goal-1', name: 'Chapter 5' }, activityIds: ['activity-1'], instanceLinkedIds,
+        });
+
+        beforeEach(() => mockLinkInstanceToGoal.mockClear());
+        afterEach(() => {
+            sessionDataState.activities = [];
+        });
+
+        it('links the new instance when the activity is offered only through one-off links', async () => {
+            await pickFrom(scope(new Set(['activity-1'])));
+            expect(mockLinkInstanceToGoal).toHaveBeenCalledWith({ instanceId: 'new-instance', goalId: 'goal-1' });
+        });
+
+        it("leaves catalog activities alone: they already count through their definition", async () => {
+            await pickFrom(scope(new Set()));
+            expect(mockLinkInstanceToGoal).not.toHaveBeenCalled();
+        });
     });
 
     it('offers circuits through Add Activity without a separate Add Circuit button', async () => {

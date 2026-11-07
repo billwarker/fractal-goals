@@ -86,6 +86,15 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     await expect(expanded).toBeVisible();
     await expect(expanded.locator('[data-density="expanded"] canvas')).toBeVisible();
     await expect(expanded.getByRole('heading', { name: viewName })).toBeVisible();
+    // The same surface as Session Detail's expanded chart.
+    const setGoal = expanded.getByRole('button', { name: /Set goal/ });
+    await expect(setGoal).toBeVisible();
+    // This view has no selected activity, and an Analytics link needs one.
+    await expect(expanded.getByRole('link', { name: 'Open in Analytics' })).toHaveCount(0);
+    await setGoal.click();
+    await page.keyboard.press('Escape');
+    await expect(expanded).toBeVisible();
+    await expect(setGoal).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('.react-flow__node')).toHaveCount(0);
     await expect(page.locator('.flowtree-options-pane')).toHaveCount(0);
     await expect(expanded.getByRole('button', { name: /Add chart/ })).toHaveCount(0);

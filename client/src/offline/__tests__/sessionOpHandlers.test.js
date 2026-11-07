@@ -139,10 +139,28 @@ describe('session op handlers', () => {
         expect(invalidate).not.toHaveBeenCalled();
 
         await goOnline();
+        expect(invalidate).not.toHaveBeenCalled();
 
+        await vi.waitFor(() => expect(invalidate).toHaveBeenCalled(), { timeout: 3000 });
         const invalidatedKeys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters.queryKey));
         expect(invalidatedKeys).toContain(JSON.stringify(sessionKey));
         expect(invalidatedKeys).toContain(JSON.stringify(activitiesKey));
+    });
+
+    it('refreshes once after a burst of saves, and only other pages go stale without refetching', async () => {
+        const { queryClient, outbox, goOnline } = env;
+        const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+        const pause = { kind: SESSION_OP.PAUSE, entityIds: [sessionId], meta: { occurredAt: '2026-10-13T10:00:00.000Z', serverResponse: { id: sessionId } } };
+        await enqueue(outbox, queryClient, pause);
+        await goOnline();
+        await enqueue(outbox, queryClient, pause);
+        await outbox.flush();
+
+        await vi.waitFor(() => expect(invalidate).toHaveBeenCalled(), { timeout: 3000 });
+        const sessionCalls = invalidate.mock.calls.filter(([filters]) => JSON.stringify(filters.queryKey) === JSON.stringify(sessionKey));
+        expect(sessionCalls).toHaveLength(1);
+        const programRoot = invalidate.mock.calls.find(([filters]) => filters.queryKey[0] === queryKeys.programDayReadModelRoot(rootId)[0]);
+        expect(programRoot?.[0].refetchType).toBe('none');
     });
 
     describe('progress chart on save', () => {
@@ -230,6 +248,7 @@ describe('session op handlers', () => {
             await enqueue(outbox, queryClient, update(saved));
             await goOnline();
 
+            await vi.waitFor(() => expect(invalidate).toHaveBeenCalled(), { timeout: 3000 });
             const keys = invalidate.mock.calls.map(([filters]) => JSON.stringify(filters.queryKey));
             expect(keys).toContain(JSON.stringify(['activity-progress-timeline', rootId]));
         });

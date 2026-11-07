@@ -22,8 +22,11 @@ Once a session is open, in-session writes are **device-first**:
 1. The mutation hook patches the TanStack Query cache immediately.
 2. It persists an op to a per-user IndexedDB **outbox** (`client/src/offline/outbox.js`) before
    any network call.
-3. One tab at a time (Web Locks) sends ops strictly in submission order, each with an
-   `Idempotency-Key` and, for timing actions, the user's action time as `occurred_at`.
+3. One tab at a time (a drain Web Lock) sends ops strictly in submission order, each with an
+   `Idempotency-Key` and, for timing actions, the user's action time as `occurred_at`. Store
+   changes use a separate short lock, so saving a change never waits on a request. A lease
+   (`sendingUntil`) stops other tabs coalescing or cancelling the op being sent, and a visible tab
+   takes the drain lock from a frozen one once that lease lapses.
 
 Supporting rules:
 
@@ -33,7 +36,7 @@ Supporting rules:
   `idempotency_in_flight`, which the client retries.
 - **Action time.** `services/occurred_at.py` accepts `occurred_at` on timer, pause/resume,
   circuit start/complete, and session completion. The value is clamped to no earlier than the
-  session's latest timing boundary and no later than server time. Values older than 24 h are
+  session's latest timing boundary and no later than server time. Values older than 7 days are
   rejected. Without `occurred_at`, server time is used as before. The rule that completing a
   paused session ends it at the pause still applies.
 - **Client IDs.** Activity instances, session notes and quick sessions created offline use
@@ -47,11 +50,13 @@ Supporting rules:
 - **Failures.** Network errors, 5xx, 408 and 429 keep the op and retry with backoff. Other 4xx
   responses mark it *rejected* and roll back only that op; the sync indicator lists it for Retry
   or Discard.
-  - **Retry ceiling:** a failure the server *answered* counts toward a ceiling (8 attempts or
-    24 h), after which the op is rejected with `retry_exhausted`. Offline (no response) never
-    exhausts.
+  - **Retry ceiling:** a 5xx other than 502/503/504 counts toward giving up, and the op is rejected
+    with `retry_exhausted` after 8 of them and at least 30 minutes. Any answered failure, including
+    408, 429, 502/503/504 and `idempotency_in_flight`, ends at 24 h. `Retry-After` is honoured.
+    Offline (no response) never exhausts.
   - **Expiry:** rejected ops expire after 7 days.
-  - **Auth:** a network failure never signs the user out.
+  - **Auth:** a network failure never signs the user out. A 401, or a failure from `/auth/*` or a
+    CSRF check, pauses the queue and rejects nothing.
 - **Replays.** Creates with client IDs are idempotent beyond the idempotency record: a matching
   existing row returns 200.
 - **Supersede.** Deletes supersede queued edits to the same record, and a create followed by a
@@ -62,7 +67,8 @@ Supporting rules:
   - **When it applies:** only after the op is durable ("shown means saved"), and again whenever
     server data lands while the op is still queued.
   - **On confirmation:** the server's copy replaces the patch only if nothing newer is queued
-    for that record. The session's query keys are invalidated once, when its queue drains.
+    for that record. The session's query keys are refetched once, 1.5 s after its queue drains
+    and stays empty; other pages' read models only go stale.
 - **Loading.** The engine (`offline/engine.js`) loads on demand. Hooks import only
   `offline/opKinds.js`, so no route's initial bundle carries it.
 - **Server contract.** `offline/serverContract.json` is recorded from real responses by
@@ -78,7 +84,10 @@ Supporting rules:
 - **Quick sessions.** A draft with entered values is kept in IndexedDB per user and fractal, so a
   reload or an accidental close can resume it from Create Session.
 - **Clock skew.** The client keeps a median offset from response `Date` headers and corrects
-  `occurred_at` when sending. The server accepts action times up to 7 days old.
+  `occurred_at` once, at first send, then persists that body: a retry must match the first attempt
+  byte for byte. The server accepts action times up to 7 days old.
+- **Connectivity.** A connection error marks the app offline. A timeout only triggers a probe, and
+  the app goes offline if that goes unanswered, so one slow request never reads as lost signal.
 - **Kill switch.** The admin flag `offline_service_worker_disabled` unregisters the service
   worker and clears its caches on every device at next load. A failed flag load never triggers it.
 - **Opening the app offline.** `vite-plugin-pwa` precaches the app shell; `/api/*` is never
@@ -91,8 +100,8 @@ Supporting rules:
 - **Status.** The session page shows its own sync indicator; every other page shows an app-wide
   one for all queued changes, with the same review list.
 - **Health telemetry.** `offline_sync_drained` (op count, maximum queued age, retries),
-  `offline_op_rejected` (kind, status, code) and `offline_boot` (seconds offline, recorded on
-  reconnect) carry counts and codes only, never content.
+  `offline_op_rejected` (kind, status, code), `offline_detected` (reason) and `offline_boot`
+  (seconds offline, recorded on reconnect) carry counts and codes only, never content.
 
 ## Consequences
 

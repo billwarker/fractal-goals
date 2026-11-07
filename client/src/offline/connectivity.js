@@ -36,7 +36,11 @@ export function getClockOffsetMs() {
     return Math.abs(median) >= CLOCK_MIN_CORRECTION_MS ? Math.round(median) : 0;
 }
 
+const TIMEOUT_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+
 const listeners = new Set();
+let offlineReason = null;
+let verifyingReachability = false;
 let online = typeof navigator === 'undefined' ? true : navigator.onLine !== false;
 let probeTimer = null;
 let probeDelay = PROBE_MIN_DELAY_MS;
@@ -46,9 +50,10 @@ function emit() {
     listeners.forEach((listener) => listener(online));
 }
 
-function setOnline(next) {
+function setOnline(next, reason = null) {
     if (next === online) return;
     online = next;
+    offlineReason = next ? null : reason;
     if (online) {
         probeDelay = PROBE_MIN_DELAY_MS;
         clearTimeout(probeTimer);
@@ -90,8 +95,31 @@ export function reportRequestSucceeded() {
     setOnline(true);
 }
 
+/** One slow request isn't a lost connection: only an unanswered probe says that. */
+async function verifyReachability() {
+    if (verifyingReachability) return;
+    verifyingReachability = true;
+    try {
+        await globalApi.probeHealth();
+    } catch {
+        setOnline(false, 'timeout');
+    } finally {
+        verifyingReachability = false;
+    }
+}
+
 export function reportRequestFailed(error) {
-    if (isNetworkError(error)) setOnline(false);
+    if (!isNetworkError(error) || !online) return;
+    if (TIMEOUT_CODES.has(error.code)) {
+        void verifyReachability();
+        return;
+    }
+    setOnline(false, 'network_error');
+}
+
+/** Why the app last went offline: `network_error`, `timeout` or `browser`. */
+export function getOfflineReason() {
+    return offlineReason;
 }
 
 /** Check now (e.g. the tab became visible) instead of waiting for the backoff. */
@@ -106,7 +134,7 @@ export function installConnectivity() {
     if (installed || typeof window === 'undefined') return;
     installed = true;
 
-    window.addEventListener('offline', () => setOnline(false));
+    window.addEventListener('offline', () => setOnline(false, 'browser'));
     window.addEventListener('online', checkConnectivity);
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') checkConnectivity();
@@ -144,6 +172,8 @@ export function resetConnectivityForTests({ initialOnline = true } = {}) {
     probeTimer = null;
     probeDelay = PROBE_MIN_DELAY_MS;
     online = initialOnline;
+    offlineReason = null;
+    verifyingReachability = false;
     clockSamples = [];
     listeners.clear();
     installed = false;

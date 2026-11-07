@@ -246,3 +246,11 @@ def test_uncaught_application_error_returns_json_500(client, auth_headers, sampl
 
 def test_http_errors_keep_their_status_under_the_json_error_handler(client):
     assert client.get('/api/definitely-not-a-route').status_code == 404
+
+
+def test_default_read_limits_leave_room_for_a_live_session():
+    from extensions import limiter
+
+    limits = {str(limit.limit) for group in limiter.limit_manager._default_limits for limit in group}
+    assert any('3000 per 1 hour' in value for value in limits), limits
+    assert any('20000 per 1 day' in value for value in limits), limits

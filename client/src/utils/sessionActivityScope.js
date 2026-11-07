@@ -37,6 +37,14 @@ export function buildGoalScopeActivityIds({
     return { activityIds: [...catalogIds, ...instanceLinkedIds], instanceLinkedIds };
 }
 
+/**
+ * Picking an activity the scoped goal only offers through earlier one-off links links this instance
+ * too. Catalog activities already count toward the goal through their definition or group.
+ */
+export function shouldAutoLinkToScopedGoal(activityGoalScope, activityId) {
+    return Boolean(activityGoalScope?.goal?.id && activityGoalScope.instanceLinkedIds?.has(String(activityId)));
+}
+
 export function filterActivitiesForGoalScope(activities = [], activityGoalScope = null) {
     if (!activityGoalScope) return activities;
     if (activityGoalScope.isLoading || activityGoalScope.isError) return [];

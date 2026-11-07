@@ -10,6 +10,7 @@ import {
     goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromRunningTotal, goalFromScatterPoint, goalFromYieldTrend,
     withChartScope,
 } from '../../utils/chartGoalPrefill';
+import { conditionLine } from '../../utils/goalConditionSeries';
 import { activeMetricDefinitions } from '../../utils/goalConditions';
 import { activityYieldIds, buildMetricTrendData, getSelectedMetricDefs, YIELD_METRIC_ID } from './visualizations/activities/MetricTrends';
 
@@ -23,6 +24,33 @@ export function canSetGoalFromChart(visualizationId, activity, metrics = []) {
     if (!GOAL_CHART_IDS.has(visualizationId)) return false;
     if (visualizationId !== 'metricTrends') return true;
     return getSelectedMetricDefs(activity?.metric_definitions || [], metrics, activityYieldIds(activity)).length <= 1;
+}
+
+/**
+ * The Analytics chart a goal can be set from on a threshold's chart, or null: a running total or
+ * two rules can't name a single goal from one point.
+ */
+export function conditionGoalChart(condition) {
+    const line = conditionLine(condition);
+    return line ? { id: 'metricTrends', metrics: [line.metricId], setsHandling: line.setsHandling } : null;
+}
+
+/** A chart that isn't a saved view, as an Analytics view, for a goal set from it to show. */
+export function activityChartToSave(goalChart, settings, activity) {
+    const scatter = goalChart.id === 'scatterPlot';
+    return {
+        windowState: {
+            selectedCategory: 'activities',
+            selectedVisualization: goalChart.id,
+            selectedActivity: { id: activity.id, name: activity.name },
+            visualizationState: {
+                setsHandling: goalChart.setsHandling,
+                ...(scatter ? { metricX: settings?.x_metric_id, metricY: settings?.y_metric_id } : { metrics: goalChart.metrics }),
+            },
+        },
+        globalFilters: null,
+        reusableViewId: null,
+    };
 }
 
 function pointerOnChart(chart, clientX, clientY) {

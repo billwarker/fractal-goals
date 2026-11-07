@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
+import GoalDueText from '../goals/GoalDueText';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { sortProgramDays } from '../../utils/programViewModel';
@@ -28,6 +29,38 @@ function ProgramDayPlanCard({ date, program, onScheduleDay, onCreateDay }) {
                 <button type="button" onClick={() => onCreateDay?.(date)}>
                     New program day
                 </button>
+            </div>
+        </section>
+    );
+}
+
+function DueGoalsCard({ dueGoals, today, onGoalClick }) {
+    return (
+        <section className={styles.card} aria-label="Goals due on this date">
+            <div className={styles.cardTitle}><h3>Goals due</h3></div>
+            <div className={styles.dueGoalList}>
+                {dueGoals.map(({ goal, icon, completed }) => {
+                    const deadline = goal.deadline ?? goal.attributes?.deadline;
+                    return (
+                        <button key={goal.id} type="button" className={styles.dueGoal} onClick={() => onGoalClick?.(goal)}>
+                            <GoalIcon
+                                shape={icon?.shape || 'circle'}
+                                color={icon?.color || 'var(--color-brand-primary)'}
+                                secondaryColor={icon?.secondaryColor}
+                                isSmart={icon?.isSmart}
+                                size={16}
+                            />
+                            <span className={styles.dueGoalText}>
+                                <span className={styles.dueGoalName}>{goal.name || goal.attributes?.name}</span>
+                                <span className={styles.dueGoalMeta}>
+                                    {completed
+                                        ? <span className={styles.dueGoalCompleted}>Completed</span>
+                                        : <GoalDueText deadline={deadline} today={today} />}
+                                </span>
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
         </section>
     );
@@ -67,7 +100,7 @@ function StartActions({ rootId, program, occurrence, date, sessionsById }) {
 }
 
 export default function ProgramDayPane({
-    rootId, date, today, query, program,
+    rootId, date, today, query, program, dueGoals = [],
     onScheduleDay, onUnscheduleDay, onMoveDay, onCreateDay,
     moveDraft, onMoveDraftChange,
     goals = [], onGoalClick, getGoalIcon, getGoalColor, getGoalSecondaryColor,
@@ -80,9 +113,14 @@ export default function ProgramDayPane({
     onEditPlan,
 }) {
     const detail = query.data?.detail;
-    if (query.isLoading && !detail) return <div className={styles.state} aria-busy="true">Loading day details…</div>;
-    if (query.error) return <div className={styles.state} role="alert">Day details could not be loaded. <button onClick={() => query.refetch()}>Retry</button></div>;
-    if (!detail) return <div className={styles.state}>No program schedule on {formatLiteralDate(date)}.</div>;
+    // A goal can fall due on any date, so its card never waits on the day's own details.
+    const dueGoalsCard = dueGoals.length
+        ? <DueGoalsCard dueGoals={dueGoals} today={today} onGoalClick={onGoalClick} />
+        : null;
+    const withDueGoals = (content) => (dueGoalsCard ? <div className={styles.scopedContent}>{content}{dueGoalsCard}</div> : content);
+    if (query.isLoading && !detail) return withDueGoals(<div className={styles.state} aria-busy="true">Loading day details…</div>);
+    if (query.error) return withDueGoals(<div className={styles.state} role="alert">Day details could not be loaded. <button onClick={() => query.refetch()}>Retry</button></div>);
+    if (!detail) return withDueGoals(<div className={styles.state}>No program schedule on {formatLiteralDate(date)}.</div>);
 
     const observed = date <= today;
     const sessions = detail.sessions || [];
@@ -259,6 +297,7 @@ export default function ProgramDayPane({
                     {query.isFetchingNextPage ? 'Loading…' : 'Load more sessions'}
                 </Button>
             ) : null}
+            {dueGoalsCard}
         </div>
     );
 }
