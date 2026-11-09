@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 
 import ProgramSidePane from '../ProgramSidePane';
 
+// Date notes are covered by ProgramDateNotes.test.jsx; they need a query client.
+vi.mock('../ProgramDateNotes', () => ({ default: () => null }));
+
 function renderEmptyPane(contextDate) {
     return render(
         <ProgramSidePane

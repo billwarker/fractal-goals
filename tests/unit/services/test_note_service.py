@@ -301,31 +301,6 @@ def test_get_all_notes_scopes_program_notes_to_selected_program(db_session, samp
     assert notes['notes'][0]['program_name'] == 'Previous Program'
 
 
-def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, sample_activity_instance, test_user):
-    activity_set = ActivitySet(activity_instance_id=sample_activity_instance.id, sort_order=0)
-    db_session.add(activity_set)
-    db_session.flush()
-    note = Note(
-        id=str(uuid.uuid4()),
-        root_id=sample_goal_hierarchy['ultimate'].id,
-        context_type='activity_instance',
-        context_id=sample_activity_instance.id,
-        activity_instance_id=sample_activity_instance.id,
-        activity_definition_id=sample_activity_instance.activity_definition_id,
-        activity_set_id=activity_set.id,
-        content='Set-specific note',
-    )
-    db_session.add(note)
-    db_session.commit()
-
-    service = NoteService(db_session)
-    payload, error, status = service.pin_note(sample_goal_hierarchy['ultimate'].id, note.id, test_user.id)
-
-    assert payload is None
-    assert status == 400
-    assert error == 'Activity set notes cannot be pinned'
-
-
 def test_get_session_notes_includes_session_template_name(
     db_session,
     sample_goal_hierarchy,

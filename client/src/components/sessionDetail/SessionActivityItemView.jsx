@@ -13,6 +13,8 @@ import Linkify from '../atoms/Linkify';
 import CloseIcon from '../atoms/CloseIcon';
 import RemoveButton from '../atoms/RemoveButton';
 import { DeletedBadge } from '../ui/DeletedEntityFallback';
+import { carriedNotesForInstance } from '../../utils/carriedNotes';
+import ActivityPlanNote from './ActivityPlanNote';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import SessionActivityProgressSummary, { SummaryDelta } from './SessionActivityProgressSummary';
@@ -106,9 +108,12 @@ function SessionActivityItemView({
     activityNotes,
     onUpdateNote,
     onDeleteNote,
+    notePins = null,
     handleAddNote,
 }) {
     const lowestGoals = useInstanceLowestGoals(rootId, exercise?.session_id, exercise);
+    // Notes pinned to this activity from earlier sessions lead its own notes.
+    const timelineNotes = [...carriedNotesForInstance(notePins?.carried, exercise), ...(activityNotes || [])];
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [timerConflictExtras, setTimerConflictExtras] = useState(null);
     const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
@@ -553,7 +558,7 @@ function SessionActivityItemView({
 
             {/* Content Area */}
             <div className={styles.contentArea}>
-                {activityPlanNote && <p className={styles.planNote}>{activityPlanNote}</p>}
+                <ActivityPlanNote planNote={activityPlanNote} />
 
                 {/* SETS VIEW */}
                 {hasSets ? (
@@ -783,12 +788,13 @@ function SessionActivityItemView({
                 {/* Notes Section - Timeline + Quick Add */}
                 {!quickMode && (
                     <div className={styles.notesSection}>
-                        {activityNotes.length > 0 && (
+                        {timelineNotes.length > 0 && (
                             <div className={styles.notesTimelineContainer}>
                                 <NoteTimeline
-                                    notes={activityNotes}
+                                    notes={timelineNotes}
                                     onUpdate={onUpdateNote}
                                     onDelete={onDeleteNote}
+                                    onCarryForward={notePins?.setCarryForward}
                                     compact={false}
                                 />
                             </div>

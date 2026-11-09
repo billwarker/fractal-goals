@@ -22,7 +22,6 @@ export function filterConditionLabels({ filters, savedFilters, activeSavedIds, g
         ...filters.categories.map((category) => CATEGORY_LABELS[category]),
         ...namesOf(filters.goalIds, goalNames, 'Goal', 'goals'),
         ...namesOf(filters.activityIds, activityNames, 'Activity', 'activities'),
-        filters.pinnedOnly && 'Pinned',
         filters.day && formatDay(filters.day),
     ].filter(Boolean);
 }

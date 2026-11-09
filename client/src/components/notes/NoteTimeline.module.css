@@ -5,18 +5,24 @@
 }
 
 /*
- * Timeline presentation: one rail runs through every day. Each marker is placed from the
- * same variables, so breakpoints only change the variables.
- *   --rail-x      rail centre, from the feed's left edge
- *   --rail-gap    where content starts, from the feed's left edge
+ * Timeline presentation: one rail runs through every day. Every vertical line and indent is a whole
+ * step of the app's background grid (--grid-unit), and the Notes page starts the feed on a grid line,
+ * so the rail, the session and activity brackets, and each level's text sit on the grid:
+ *   rail (dates, sessions)  →  +1 unit: session badge, lone note, date text; session bracket
+ *   session bracket         →  +1 unit: its notes and activity headers; activity bracket
+ *   activity bracket        →  +1 unit: that activity's notes
+ *   --rail-x      rail centre, from the feed's left edge (a host may set --timeline-rail-x)
+ *   --rail-gap    where content starts, from the feed's left edge (a host may set --timeline-rail-gap)
  *   --node        day and session node size; --node-small for standalone notes
  *   --header-h    session header height (its node sits on the header's centre line)
  */
 .continuousTimeline {
-    --rail-x: 7px;
-    --rail-gap: 22px;
+    --grid: var(--grid-unit, 20px);
+    --rail-x: var(--timeline-rail-x, var(--grid));
+    --rail-gap: var(--timeline-rail-gap, calc(var(--grid) * 2));
     --node: 11px;
     --node-small: 7px;
+    --tree-node: 18px;
     --header-h: 34px;
     --rail-color: color-mix(in srgb, var(--color-border) 90%, transparent);
     gap: 0;
@@ -38,7 +44,6 @@
 
 /* Shared node look: filled dot with a page-coloured ring that cuts the rail. */
 .continuousTimeline .dateHeader::before,
-.sessionGroup::before,
 .standaloneNote::before {
     content: '';
     position: absolute;
@@ -86,12 +91,50 @@
     margin: 2px 0 6px;
 }
 
-.sessionGroup::before {
-    top: calc(var(--header-h) / 2 - var(--node) / 2);
-    left: calc(var(--rail-x) - var(--rail-gap) - var(--node) / 2);
-    width: var(--node);
-    height: var(--node);
-    background: var(--session-color);
+/*
+ * Directory nodes: the Analytics category icons on the timeline's lines, each centred on its parent's
+ * line with a page-coloured ring that cuts it. Sessions and lone goal or activity notes sit on the rail;
+ * an activity sits on its session's bracket. Labels stay one grid unit to the right.
+ */
+.treeNode {
+    --node-color: var(--color-text-secondary);
+    position: absolute;
+    z-index: 1;
+    display: grid;
+    box-sizing: border-box;
+    width: var(--tree-node);
+    height: var(--tree-node);
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--node-color) 55%, var(--color-border));
+    border-radius: 5px;
+    background: var(--color-bg-primary, var(--color-bg-surface));
+    box-shadow: 0 0 0 3px var(--color-bg-primary, var(--color-bg-surface));
+    color: var(--node-color);
+}
+
+.sessionNode {
+    --node-color: var(--session-color);
+    top: calc(var(--header-h) / 2 - var(--tree-node) / 2);
+    left: calc(var(--rail-x) - var(--rail-gap) - var(--tree-node) / 2);
+}
+
+.goalNode {
+    top: 14px;
+    left: calc(var(--rail-x) - var(--rail-gap) - var(--tree-node) / 2);
+}
+
+.activityBranch {
+    position: relative;
+}
+
+/* On the session's bracket, one grid unit left of the activity's label, level with its first line. */
+.activityNode {
+    top: 14px;
+    left: calc(var(--grid) * -1 - var(--tree-node) / 2);
+}
+
+.groupedBranch .activityNode {
+    top: 10px;
 }
 
 .sessionHeader {
@@ -107,6 +150,20 @@
     max-width: min(100%, 420px);
 }
 
+.sessionLink {
+    flex-shrink: 0;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    white-space: nowrap;
+}
+
+.sessionLink:hover {
+    color: var(--color-brand-primary);
+}
+
 .sessionCount {
     flex-shrink: 0;
     margin-left: auto;
@@ -115,16 +172,55 @@
     white-space: nowrap;
 }
 
-/* A light bracket in the session's colour groups its notes under the header. */
+/* A light bracket in the session's colour, centred on the badge's grid line, groups its notes one unit in. */
 .sessionNotes {
     min-width: 0;
-    margin-left: 4px;
-    padding-left: 12px;
+    margin-left: -1px;
+    padding-left: calc(var(--grid, 20px) - 1px);
     border-left: 2px solid color-mix(in srgb, var(--session-color) 45%, transparent);
+}
+
+.activityGroup {
+    min-width: 0;
+    padding: 10px 0 4px;
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent);
+}
+
+.activityGroup:first-child {
+    border-top: none;
+}
+
+.activityHeader {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+}
+
+.activityName {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* The group's notes sit under one activity: a bracket on its header's grid line, notes one unit in. */
+.activityNotes {
+    min-width: 0;
+    margin-left: -1px;
+    padding-left: calc(var(--grid, 20px) - 1px);
+    border-left: 2px solid color-mix(in srgb, var(--color-border) 80%, transparent);
 }
 
 .standaloneNote {
     position: relative;
+}
+
+.standaloneNote.withNode::before {
+    display: none;
 }
 
 .standaloneNote::before {
@@ -141,19 +237,6 @@
     font-size: 14px;
     padding: 24px 0;
     text-align: center;
-}
-
-.pinnedSection {
-    margin-bottom: 8px;
-}
-
-.sectionHeader {
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-    padding: 6px 0 4px;
 }
 
 .dateGroup {
@@ -176,16 +259,8 @@
     margin-top: 0;
 }
 
-.continuousTimeline .pinnedSection {
-    margin-bottom: 14px;
-    border-bottom: 1px solid var(--color-border);
-    padding-bottom: 10px;
-}
-
 @media (max-width: 640px) {
     .continuousTimeline {
-        --rail-x: 5px;
-        --rail-gap: 16px;
         --node: 9px;
     }
 

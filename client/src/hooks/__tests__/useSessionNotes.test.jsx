@@ -8,7 +8,7 @@ import { queryKeys } from '../queryKeys';
 const {
     getSessionNotes,
     getPreviousSessionNotes,
-    getActivityDefinitionNotes,
+    getCarriedNotes,
     createNote,
     updateNote,
     deleteNote,
@@ -16,7 +16,7 @@ const {
 } = vi.hoisted(() => ({
     getSessionNotes: vi.fn(),
     getPreviousSessionNotes: vi.fn(),
-    getActivityDefinitionNotes: vi.fn(),
+    getCarriedNotes: vi.fn(),
     createNote: vi.fn(),
     updateNote: vi.fn(),
     deleteNote: vi.fn(),
@@ -26,11 +26,13 @@ const {
     },
 }));
 
+vi.mock('../../utils/api/fractalNotesApi', () => ({
+    fractalNotesApi: { getCarriedNotes: (...args) => getCarriedNotes(...args) },
+}));
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getSessionNotes: (...args) => getSessionNotes(...args),
         getPreviousSessionNotes: (...args) => getPreviousSessionNotes(...args),
-        getActivityDefinitionNotes: (...args) => getActivityDefinitionNotes(...args),
         createNote: (...args) => createNote(...args),
         updateNote: (...args) => updateNote(...args),
         deleteNote: (...args) => deleteNote(...args),
@@ -64,7 +66,7 @@ describe('useSessionNotes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getPreviousSessionNotes.mockResolvedValue({ data: [] });
-        getActivityDefinitionNotes.mockResolvedValue({ data: [] });
+        getCarriedNotes.mockResolvedValue({ data: { pending: [], delivered: [] } });
     });
 
     it('keeps the session-notes cache coherent after adding a note', async () => {
@@ -84,7 +86,7 @@ describe('useSessionNotes', () => {
         });
 
         const { result } = renderHook(
-            () => useSessionNotes('root-1', 'session-1', 'activity-1'),
+            () => useSessionNotes('root-1', 'session-1'),
             { wrapper: createWrapper(queryClient) }
         );
 
@@ -120,7 +122,7 @@ describe('useSessionNotes', () => {
         });
 
         const { result } = renderHook(
-            () => useSessionNotes('root-1', 'session-1', 'activity-1'),
+            () => useSessionNotes('root-1', 'session-1'),
             { wrapper: createWrapper(queryClient) }
         );
 
@@ -153,7 +155,7 @@ describe('useSessionNotes', () => {
         deleteNote.mockResolvedValue({ data: { ok: true } });
 
         const { result } = renderHook(
-            () => useSessionNotes('root-1', 'session-1', 'activity-1'),
+            () => useSessionNotes('root-1', 'session-1'),
             { wrapper: createWrapper(queryClient) }
         );
 

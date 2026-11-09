@@ -24,7 +24,6 @@ export function normalizeNoteFilters(filters = {}) {
         goal_ids: sortedList(filters.goal_ids),
         activity_definition_ids: sortedList(filters.activity_definition_ids),
         activity_group_ids: sortedList(filters.activity_group_ids),
-        pinned_only: filters.pinned_only ? true : undefined,
         saved_filter_ids: sortedList(filters.saved_filter_ids),
         day: filters.day || undefined,
         timezone: filters.timezone || undefined,
@@ -85,12 +84,6 @@ export function useNotesPageQuery(rootId, filters = {}) {
         queryClient.invalidateQueries({ queryKey: queryKeys.goalNotesRoot(rootId) });
     };
 
-    const createNoteMutation = useMutation({
-        mutationFn: (noteData) => fractalNotesApi.createNote(rootId, noteData),
-        onSuccess: () => { invalidate(); },
-        onError: () => notify.error('Failed to create note'),
-    });
-
     const updateNoteMutation = useMutation({
         mutationFn: ({ noteId, content, attachments }) => fractalNotesApi.updateNote(rootId, noteId, { content, ...(attachments ? { attachments } : {}) }),
         onSuccess: () => { invalidate(); },
@@ -103,16 +96,10 @@ export function useNotesPageQuery(rootId, filters = {}) {
         onError: () => notify.error('Failed to delete note'),
     });
 
-    const pinNoteMutation = useMutation({
-        mutationFn: (noteId) => fractalNotesApi.pinNote(rootId, noteId),
+    const carryForwardMutation = useMutation({
+        mutationFn: ({ noteId, on }) => fractalNotesApi.setCarryForward(rootId, noteId, on),
         onSuccess: () => { invalidate(); },
-        onError: () => notify.error('Failed to pin note'),
-    });
-
-    const unpinNoteMutation = useMutation({
-        mutationFn: (noteId) => fractalNotesApi.unpinNote(rootId, noteId),
-        onSuccess: () => { invalidate(); },
-        onError: () => notify.error('Failed to unpin note'),
+        onError: () => notify.error('Failed to change the pin'),
     });
 
     return {
@@ -123,10 +110,9 @@ export function useNotesPageQuery(rootId, filters = {}) {
         isFetching: isFetching || isFetchingNextPage,
         error,
         loadNextPage: () => fetchNextPage(),
-        createNote: (data) => createNoteMutation.mutateAsync(data),
         updateNote: (noteId, content, attachments) => updateNoteMutation.mutateAsync({ noteId, content, attachments }),
         deleteNote: (note) => deleteNoteMutation.mutateAsync(note),
-        pinNote: (noteId) => pinNoteMutation.mutateAsync(noteId),
-        unpinNote: (noteId) => unpinNoteMutation.mutateAsync(noteId),
+        // Pin an activity or session note to its next time (or undo it).
+        setCarryForward: (noteId, on) => carryForwardMutation.mutateAsync({ noteId, on }),
     };
 }

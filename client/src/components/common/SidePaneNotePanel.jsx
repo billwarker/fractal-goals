@@ -13,8 +13,6 @@ function SidePaneNotePanel({
     onSubmit,
     onEdit,
     onDelete,
-    onPin,
-    onUnpin,
     hasMore = false,
     onLoadMore,
     placeholder = 'Add a note...',
@@ -133,8 +131,6 @@ function SidePaneNotePanel({
                         notes={notes}
                         onEdit={onEdit}
                         onDelete={onDelete}
-                        onPin={onPin}
-                        onUnpin={onUnpin}
                         hasMore={hasMore}
                         onLoadMore={onLoadMore}
                         groupByDate={false}

@@ -6,9 +6,12 @@ import uuid
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
-from models import ActivityDefinition, ActivityInstance, CircuitRound, CircuitRun, Goal, Note, Program, Session, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, Goal, Note, Session, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations, validate_root_goal
 from services.events import Event, Events, event_bus
+from services.goal_review_content import normalize_review_data, review_content
 from services.goal_review_rules import restart_review_cadence
+from services.note_carry_forward import CarryForwardError, carried_notes_for_session, set_carry_forward
+from services.note_contexts import validate_note_context
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.quota_service import QuotaService
@@ -60,10 +63,20 @@ class NoteService:
         ).options(
             *goal_note_load_options(),
         ).order_by(
-            Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).all()
         return [serialize_note_display(note) for note in notes], None, 200
+
+    def get_carried_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
+        """Notes pinned to the next instance of this session's activities, and those it consumed."""
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+        pending, delivered = carried_notes_for_session(self.db_session, root_id, session_id)
+        return {
+            'pending': [serialize_note_display(note) for note in pending],
+            'delivered': [serialize_note_display(note) for note in delivered],
+        }, None, 200
 
     def get_activity_instance_notes(self, root_id, instance_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -77,7 +90,6 @@ class NoteService:
         ).options(
             *goal_note_load_options(),
         ).order_by(
-            Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).all()
         return [serialize_note_display(note) for note in notes], None, 200
@@ -150,7 +162,6 @@ class NoteService:
             query = query.filter(Note.session_id != exclude_session_id)
 
         notes = query.order_by(
-            Note.pinned_at.desc().nullslast(),
             Note.created_at.desc(),
         ).limit(limit).all()
         results = []
@@ -192,7 +203,6 @@ class NoteService:
             ).options(
                 *goal_note_load_options(),
             ).order_by(
-                Note.pinned_at.desc().nullslast(),
                 Note.created_at.desc(),
             ).all()
 
@@ -205,128 +215,6 @@ class NoteService:
             results.append(serialize_activity_history_entry(instance, instance_notes))
 
         return results, None, 200
-
-    def _validate_note_context(
-        self,
-        *,
-        root_id,
-        context_type,
-        context_id,
-        session_id,
-        activity_instance_id,
-        activity_definition_id,
-        goal_id,
-    ) -> tuple[JsonDict | None, tuple[str, int] | None]:
-        activity = None
-        if activity_definition_id:
-            activity = self.db_session.query(ActivityDefinition).filter(
-                ActivityDefinition.id == activity_definition_id,
-                ActivityDefinition.root_id == root_id,
-                ActivityDefinition.deleted_at.is_(None),
-            ).first()
-            if not activity:
-                return None, ("Activity definition not found in this fractal", 400)
-
-        if context_type == 'root':
-            if context_id != root_id:
-                return None, ("root notes must use the fractal root id as context_id", 400)
-            if session_id or activity_instance_id or goal_id or activity_definition_id:
-                return None, ("root notes cannot be linked to a goal, session, or activity", 400)
-            return {'activity_definition': activity}, None
-
-        if context_type == 'goal':
-            if not goal_id or context_id != goal_id:
-                return None, ("goal notes require matching context_id and goal_id", 400)
-            linked_goal = self.db_session.query(Goal).filter(
-                Goal.id == goal_id,
-                Goal.root_id == root_id,
-                Goal.deleted_at.is_(None),
-            ).first()
-            if not linked_goal:
-                return None, ("Goal not found in this fractal", 400)
-            if session_id or activity_instance_id:
-                return None, ("goal notes cannot be linked directly to a session or activity instance", 400)
-            return {'goal': linked_goal, 'activity_definition': activity}, None
-
-        if context_type == 'session':
-            if not session_id or context_id != session_id:
-                return None, ("session notes require matching context_id and session_id", 400)
-            session_obj = self.db_session.query(Session).filter(
-                Session.id == session_id,
-                Session.root_id == root_id,
-                Session.deleted_at.is_(None),
-            ).first()
-            if not session_obj:
-                return None, ("Session not found in this fractal", 400)
-            if activity_instance_id:
-                return None, ("session notes cannot include activity_instance_id", 400)
-            return {'session': session_obj, 'activity_definition': activity}, None
-
-        if context_type == 'program':
-            if not context_id:
-                return None, ("program notes require a context_id", 400)
-            program = self.db_session.query(Program).filter(
-                Program.id == context_id,
-                Program.root_id == root_id,
-            ).first()
-            if not program:
-                return None, ("Program not found in this fractal", 400)
-            if session_id or activity_instance_id or goal_id or activity_definition_id:
-                return None, ("program notes cannot be linked to a goal, session, or activity", 400)
-            return {'program': program}, None
-
-        if context_type == 'activity_instance':
-            if not activity_instance_id or context_id != activity_instance_id:
-                return None, ("activity instance notes require matching context_id and activity_instance_id", 400)
-            instance = self.db_session.query(ActivityInstance).filter(
-                ActivityInstance.id == activity_instance_id,
-                ActivityInstance.root_id == root_id,
-                ActivityInstance.deleted_at.is_(None),
-            ).first()
-            if not instance:
-                return None, ("Activity instance not found in this fractal", 400)
-            if session_id and instance.session_id != session_id:
-                return None, ("Activity instance does not belong to the provided session", 400)
-            if activity and instance.activity_definition_id and instance.activity_definition_id != activity.id:
-                return None, ("activity_definition_id does not match the activity instance", 400)
-            return {'session': None, 'activity_definition': activity, 'activity_instance': instance}, None
-
-        if context_type == 'activity_definition':
-            if not activity_definition_id or context_id != activity_definition_id:
-                return None, ("activity definition notes require matching context_id and activity_definition_id", 400)
-            if session_id or activity_instance_id or goal_id:
-                return None, ("activity definition notes cannot also target a session, instance, or goal", 400)
-            return {'activity_definition': activity}, None
-
-        if context_type == 'circuit_run':
-            if not session_id or not context_id:
-                return None, ("circuit run notes require a context_id and session_id", 400)
-            if activity_instance_id or activity_definition_id or goal_id:
-                return None, ("circuit run notes cannot also target an activity or goal", 400)
-            circuit_run = self.db_session.query(CircuitRun).filter(
-                CircuitRun.id == context_id,
-                CircuitRun.root_id == root_id,
-                CircuitRun.session_id == session_id,
-            ).first()
-            if not circuit_run:
-                return None, ("Circuit run not found in the provided session", 400)
-            return {'circuit_run': circuit_run}, None
-
-        if context_type == 'circuit_round':
-            if not session_id or not context_id:
-                return None, ("circuit round notes require a context_id and session_id", 400)
-            if activity_instance_id or activity_definition_id or goal_id:
-                return None, ("circuit round notes cannot also target an activity or goal", 400)
-            circuit_round = self.db_session.query(CircuitRound).join(CircuitRun).filter(
-                CircuitRound.id == context_id,
-                CircuitRun.root_id == root_id,
-                CircuitRun.session_id == session_id,
-            ).first()
-            if not circuit_round:
-                return None, ("Circuit round not found in the provided session", 400)
-            return {'circuit_round': circuit_round}, None
-
-        return None, ("Unsupported note context_type", 400)
 
     def get_goal_notes(
         self,
@@ -429,7 +317,6 @@ class NoteService:
             ).options(
                 *goal_note_load_options(),
             ).order_by(
-                Note.pinned_at.desc().nullslast(),
                 Note.created_at.desc(),
             ).all()
         return [serialize_note_display(note) for note in notes], None, 200
@@ -506,45 +393,6 @@ class NoteService:
             self.db_session.rollback()
             return None, str(exc), 404 if exc.code == 'filter_not_found' else 400
 
-    def pin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        note = self.db_session.query(Note).filter(
-            Note.id == note_id,
-            Note.root_id == root_id,
-            Note.deleted_at.is_(None),
-        ).first()
-        if not note:
-            return None, "Note not found", 404
-
-        if derive_note_type(note.context_type, activity_set_id=note.activity_set_id) == 'activity_set_note':
-            return None, "Activity set notes cannot be pinned", 400
-
-        note.pinned_at = datetime.now(timezone.utc)
-        self.db_session.commit()
-        logger.info("Pinned note %s", note_id)
-        return serialize_note_display(note), None, 200
-
-    def unpin_note(self, root_id, note_id, current_user_id) -> ServiceResult[JsonDict]:
-        _, error = self._validate_owned_root(root_id, current_user_id)
-        if error:
-            return None, *error
-
-        note = self.db_session.query(Note).filter(
-            Note.id == note_id,
-            Note.root_id == root_id,
-            Note.deleted_at.is_(None),
-        ).first()
-        if not note:
-            return None, "Note not found", 404
-
-        note.pinned_at = None
-        self.db_session.commit()
-        logger.info("Unpinned note %s", note_id)
-        return serialize_note_display(note), None, 200
-
     def create_note(
         self,
         root_id,
@@ -556,6 +404,14 @@ class NoteService:
         agent_grant_id=None,
         agent_run_id=None,
     ) -> ServiceResult[JsonDict]:
+        review_data = None
+        if data.get('review_data') is not None:
+            if data.get('note_kind') != 'goal_review':
+                return None, "review_data is only valid on goal_review notes", 400
+            review_data, review_error = normalize_review_data(data['review_data'])
+            if review_data is None:
+                return None, review_error or "Invalid review", 400
+            data = {**data, 'content': review_content(review_data)}
         data = normalize_note_payload(data)
         if 'nano_goal_id' in data:
             return None, "nano_goal_id is no longer supported", 400
@@ -585,7 +441,8 @@ class NoteService:
         if data.get('activity_set_id') and context_type != 'activity_instance':
             return None, "activity_set_id is only valid for activity instance notes", 400
 
-        context_payload, context_error = self._validate_note_context(
+        context_payload, context_error = validate_note_context(
+            self.db_session,
             root_id=root_id,
             context_type=context_type,
             context_id=context_id,
@@ -593,9 +450,11 @@ class NoteService:
             activity_instance_id=activity_instance_id,
             activity_definition_id=activity_definition_id,
             goal_id=goal_id,
+            calendar_date=data.get('calendar_date'),
         )
         if context_error:
             return None, *context_error
+        program = (context_payload or {}).get('program')
 
         if not content:
             return None, "content is required", 400
@@ -649,6 +508,9 @@ class NoteService:
                 activity_set_id=activity_set_id,
                 content=content,
                 note_kind=note_kind,
+                review_data=review_data,
+                program_id=program.id if program else None,
+                calendar_date=(context_payload or {}).get('calendar_date'),
                 agent_grant_id=agent_grant_id,
                 agent_run_id=agent_run_id,
             )
@@ -695,6 +557,15 @@ class NoteService:
         if not note:
             return None, "Note not found", 404
 
+        if data.get('review_data') is not None:
+            if note.note_kind != 'goal_review':
+                return None, "review_data is only valid on goal_review notes", 400
+            review_data, review_error = normalize_review_data(data['review_data'])
+            if review_data is None:
+                return None, review_error or "Invalid review", 400
+            note.review_data = review_data
+            data = {**data, 'content': review_content(review_data)}
+
         attachments = data.get('attachments')
         if attachments is not None:
             try:
@@ -714,11 +585,12 @@ class NoteService:
                 return None, storage_error, storage_status
             note.content = data['content']
 
-        if 'pin' in data:
-            if data['pin']:
-                note.pinned_at = datetime.now(timezone.utc)
-            else:
-                note.pinned_at = None
+        if data.get('carry_forward') is not None:
+            try:
+                set_carry_forward(note, data['carry_forward'])
+            except CarryForwardError as exc:
+                self.db_session.rollback()
+                return None, str(exc), exc.status
 
         if attachments is not None:
             MediaService(self.db_session).replace_attachments(note, attachments)

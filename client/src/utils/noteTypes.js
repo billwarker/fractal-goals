@@ -7,6 +7,7 @@ export const NOTE_TYPE_LABELS = {
     goal_review_note: 'Goal Review Note',
     session_note: 'Session Note',
     program_note: 'Program Note',
+    program_date_note: 'Program Date Note',
     activity_instance_note: 'Activity Instance Note',
     activity_set_note: 'Activity Set Note',
     activity_definition_note: 'Activity Definition Note',
@@ -32,7 +33,7 @@ export const NOTE_CATEGORIES = [
     { value: 'general', label: 'General', contextTypes: ['root', 'activity_definition'] },
     { value: 'goals', label: 'Goals', contextTypes: ['goal'] },
     { value: 'sessions', label: 'Sessions', contextTypes: ['session', 'activity_instance', 'circuit_run', 'circuit_round'] },
-    { value: 'programs', label: 'Programs', contextTypes: ['program'] },
+    { value: 'programs', label: 'Programs', contextTypes: ['program', 'program_date'] },
 ];
 
 const CATEGORY_BY_CONTEXT = Object.fromEntries(NOTE_CATEGORIES.flatMap(

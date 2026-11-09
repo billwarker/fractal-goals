@@ -1,6 +1,6 @@
 """Ordered candidates and scope projection for bulk goal-note reads."""
 
-from sqlalchemy.orm import joinedload, noload
+from sqlalchemy.orm import joinedload, selectinload, noload
 from models import Note, Session
 
 
@@ -20,7 +20,7 @@ def load_root_goal_notes(db_session, root_id, *, include_attachments=True):
             joinedload(Note.activity_definition),
             joinedload(Note.activity_instance),
         )
-        .order_by(Note.pinned_at.desc().nullslast(), Note.created_at.desc())
+        .order_by(Note.created_at.desc())
         .all()
     )
 
@@ -65,4 +65,6 @@ def goal_note_load_options():
         joinedload(Note.session).joinedload(Session.template),
         joinedload(Note.goal),
         joinedload(Note.activity_definition),
+        # serialize_note reads the noted set's position; batch it rather than one load per set note.
+        selectinload(Note.activity_set),
     )

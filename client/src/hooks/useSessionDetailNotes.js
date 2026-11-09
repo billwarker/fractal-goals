@@ -3,9 +3,8 @@ import useSessionNotes from './useSessionNotes';
 export function useSessionDetailNotes({
     rootId,
     sessionId,
-    selectedActivity,
 }) {
-    const sessionNotesHook = useSessionNotes(rootId, sessionId, selectedActivity?.activity_definition_id);
+    const sessionNotesHook = useSessionNotes(rootId, sessionId);
 
     return {
         ...sessionNotesHook,

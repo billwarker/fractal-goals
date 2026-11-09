@@ -90,3 +90,32 @@ def test_populated_pre_conditions_database_upgrades_to_head(historical_database)
     alembic('downgrade', '-1')
     alembic('upgrade', 'head')
     alembic('check')
+
+
+@pytest.mark.integration
+def test_notes_upgrade_backfills_program_ids_and_refuses_unknown_context_types(historical_database):
+    engine, alembic = historical_database
+    alembic('upgrade', 'a7c9e1f3b5d7')
+    with engine.begin() as connection:
+        connection.execute(text("""
+            INSERT INTO goals (id, root_id, name, created_at, completed, row_version,
+                               inherit_parent_activities, track_activities, paused)
+            VALUES ('notes-root', 'notes-root', 'Notes upgrade', '2026-01-01', false, 1, false, true, false);
+            INSERT INTO programs (id, root_id, name, start_date, end_date, weekly_schedule)
+            VALUES ('notes-program', 'notes-root', 'Block', '2026-01-01', '2026-02-01', '[]');
+            INSERT INTO notes (id, root_id, context_type, context_id, content, created_at)
+            VALUES ('program-note', 'notes-root', 'program', 'notes-program', 'Keep it', '2026-01-02'),
+                   ('stray-note', 'notes-root', 'nano_goal', 'gone', 'Old', '2026-01-02');
+        """))
+    with pytest.raises(AssertionError, match='unknown context types: nano_goal'):
+        alembic('upgrade', 'head')
+    with engine.begin() as connection:
+        connection.execute(text("DELETE FROM notes WHERE id = 'stray-note'"))
+    alembic('upgrade', 'head')
+    with engine.connect() as connection:
+        assert connection.execute(text(
+            "SELECT program_id FROM notes WHERE id = 'program-note'"
+        )).scalar_one() == 'notes-program'
+    alembic('downgrade', '-1')
+    alembic('upgrade', 'head')
+    alembic('check')

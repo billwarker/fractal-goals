@@ -1,0 +1,88 @@
+.context {
+    display: grid;
+    gap: 6px;
+    margin: 2px 0 6px;
+}
+
+.line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+    font-size: 12px;
+}
+
+.muted {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.values {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+.action {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.action:hover {
+    color: var(--color-brand-primary);
+}
+
+.action:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
+}
+
+.instance {
+    /* Sized to its values, not the row: a few sets shouldn't open a page-wide box. */
+    display: grid;
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    gap: 6px;
+    font-size: 12px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card-alt);
+}
+
+.sets {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sets li {
+    display: flex;
+    gap: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--color-text-secondary);
+}
+
+.sets li[aria-current="true"] {
+    background: var(--color-brand-primary-soft);
+    color: var(--color-text-primary);
+    font-weight: 600;
+}
+
+.setLabel {
+    min-width: 44px;
+    color: var(--color-text-muted);
+}

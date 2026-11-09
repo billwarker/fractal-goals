@@ -1,8 +1,8 @@
 /**
  * useSessionNotes - Hook for managing session notes
  * 
- * Provides CRUD operations for notes attached to a session or its activities.
- * Fetches both current session notes and previous notes for activity definitions.
+ * Provides CRUD and pin operations for notes attached to a session or its activities, plus the
+ * notes pinned to the next instance of this session's activities (`carriedNotes`).
  */
 
 import { useMemo } from 'react';
@@ -10,23 +10,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOutbox } from '../offline/OutboxContext';
 import { SESSION_OP } from '../offline/opKinds';
 import { fractalApi } from '../utils/api';
+import { fractalNotesApi } from '../utils/api/fractalNotesApi';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
-/**
- * @param {string} rootId - ID of the fractal
- * @param {string} sessionId - ID of the current session
- * @param {string|null} activityDefinitionId - Optional activity definition ID for fetching previous notes
- */
 // Quick bars pass attachments in the serialized shape (for optimistic notes); the API takes ids and descriptions.
+const EMPTY_CARRIED = { pending: [], delivered: [] };
+
 const noteRequest = ({ attachments = [], ...data }) => (
     attachments.length
         ? { ...data, attachments: attachments.map((item) => ({ asset_id: item.asset_id || item.id, alt_text: item.alt_text || '' })) }
         : data
 );
 
-export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) {
+/**
+ * @param {string} rootId - ID of the fractal
+ * @param {string} sessionId - ID of the current session
+ */
+export function useSessionNotes(rootId, sessionId) {
     const queryClient = useQueryClient();
     const outbox = useOutbox();
     const sessionNotesKey = queryKeys.sessionNotes(rootId, sessionId);
@@ -70,6 +72,15 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
                 );
                 return { data: { id: noteId, content } };
             },
+            // `patch` is the cached note's change; the body is what the server takes.
+            updatePins: async (noteId, body, patch) => {
+                await enqueue(
+                    SESSION_OP.NOTE_UPDATE,
+                    { method: 'put', url: `/${rootId}/notes/${noteId}`, body },
+                    { noteId, patch },
+                    { entityIds: [noteId], coalesceKey: `note:${noteId}:${Object.keys(body)[0]}` },
+                );
+            },
             deleteNote: async (noteId) => {
                 await enqueue(
                     SESSION_OP.NOTE_DELETE,
@@ -111,20 +122,11 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         staleTime: 60000, // 1 minute
     });
 
-    // Query for previous notes for the selected activity definition
-    const {
-        data: previousNotes = [],
-    } = useQuery({
-        queryKey: queryKeys.activityDefinitionNotes(rootId, activityDefinitionId),
-        queryFn: async () => {
-            const res = await fractalApi.getActivityDefinitionNotes(
-                rootId,
-                activityDefinitionId,
-                { limit: 10, excludeSession: sessionId }
-            );
-            return res.data || [];
-        },
-        enabled: !!rootId && !!activityDefinitionId,
+    // Notes pinned to the next instance of this session's activities, and those it already used.
+    const { data: carriedNotes = EMPTY_CARRIED } = useQuery({
+        queryKey: queryKeys.sessionCarriedNotes(rootId, sessionId),
+        queryFn: async () => (await fractalNotesApi.getCarriedNotes(rootId, sessionId)).data || EMPTY_CARRIED,
+        enabled: !!rootId && !!sessionId,
         staleTime: 60000,
     });
 
@@ -160,6 +162,23 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         },
     });
 
+    const pinsMutation = useMutation({
+        mutationFn: ({ noteId, body }) => fractalApi.updateNote(rootId, noteId, body),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionNotesKey }),
+        onError: (error) => {
+            notify.error(`Failed to update the pin: ${formatError(error)}`);
+        },
+    });
+    const updatePins = (noteId, body, patch) => {
+        // A carried note belongs to an earlier session: dismissing it only changes this session's strip.
+        queryClient.setQueryData(queryKeys.sessionCarriedNotes(rootId, sessionId), (old) => (old && patch.carry_forward === null
+            ? { ...old, pending: old.pending.filter((note) => note.id !== noteId) }
+            : old));
+        return offlineNotes
+            ? offlineNotes.updatePins(noteId, body, patch)
+            : pinsMutation.mutateAsync({ noteId, body });
+    };
+
     const deleteNoteMutation = useMutation({
         mutationFn: (noteId) => fractalApi.deleteNote(rootId, noteId),
         onSuccess: (_, noteId) => {
@@ -176,7 +195,7 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
 
     return {
         notes,
-        previousNotes,
+        carriedNotes,
         previousSessionNotes,
         loading: notesLoading || prevSessionLoading,
         error: notesError,
@@ -190,6 +209,9 @@ export function useSessionNotes(rootId, sessionId, activityDefinitionId = null) 
         ),
         // NoteCard hands over the whole note, as it does for the Notes page and goal notes.
         deleteNote: (note) => (offlineNotes ? offlineNotes.deleteNote(note.id) : deleteNoteMutation.mutateAsync(note.id)),
+        setCarryForward: (noteId, on) => updatePins(
+            noteId, { carry_forward: on }, { carry_forward: on ? 'pending' : null },
+        ),
         refreshNotes
     };
 }

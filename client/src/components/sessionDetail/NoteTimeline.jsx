@@ -10,8 +10,7 @@ function NoteTimeline({
     notes,
     onUpdate,
     onDelete,
-    onPin,
-    onUnpin,
+    onCarryForward,
     compact = false,
     minimal = true,
     showContext = false,
@@ -26,8 +25,7 @@ function NoteTimeline({
             notes={notes}
             onEdit={onUpdate ? (noteId, content) => onUpdate(noteId, content) : undefined}
             onDelete={onDelete}
-            onPin={onPin}
-            onUnpin={onUnpin}
+            onCarryForward={onCarryForward}
             compact={compact}
             selectedNoteId={selectedNoteId}
             onNoteSelect={(note) => onNoteSelect && onNoteSelect(note.id)}

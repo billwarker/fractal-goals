@@ -41,6 +41,70 @@ describe('NoteTimeline timeline presentation', () => {
         });
     });
 
+    it('marks sessions, activities and lone goal notes with directory icons on their lines', () => {
+        const { container } = render(
+            <NoteTimeline
+                notes={[
+                    note('a', { root_id: 'root', session_id: 's1', session_name: 'Guitar', created_at: '2026-07-04T18:21:00Z' }),
+                    note('b', { root_id: 'root', session_id: 's1', session_name: 'Guitar', context_type: 'session', activity_instance_id: null, note_type: 'session_note', created_at: '2026-07-04T18:20:00Z' }),
+                    note('g', { context_type: 'goal', goal_id: 'goal', goal_type: 'LongTermGoal', activity_instance_id: null, note_type: 'goal_note', created_at: '2026-07-04T18:00:00Z' }),
+                ]}
+                showContext
+                presentation="timeline"
+                noteTypeVariant="metadata"
+                groupByDate
+            />,
+        );
+        expect(container.querySelectorAll('[class*="sessionNode"]')).toHaveLength(1);
+        // Only the activity note branches off the session; the session note is a plain leaf.
+        expect(container.querySelectorAll('[class*="activityNode"]')).toHaveLength(1);
+        // Every note's first line says something: the session note is headed, not blank.
+        expect(screen.getByText('Session note')).toBeInTheDocument();
+        expect(container.querySelectorAll('[class*="goalNode"]')).toHaveLength(1);
+    });
+
+    it('groups notes on the same activity instance under one activity header', () => {
+        const shared = {
+            root_id: 'root', session_id: 's1', session_name: 'Guitar', activity_instance_id: 'inst', context_id: 'inst',
+            activity_definition_name: 'Figuring out Songs by Ear',
+            instance_sets: [{ id: 'set-a', metrics: [{ value: 5, name: 'takes' }] }],
+        };
+        render(
+            <NoteTimeline
+                notes={[
+                    note('a', { ...shared, created_at: '2026-07-04T18:21:00Z' }),
+                    note('b', { ...shared, created_at: '2026-07-04T18:14:00Z', note_type: 'activity_set_note', set_index: 1 }),
+                    note('c', { ...shared, created_at: '2026-07-04T18:09:00Z' }),
+                    note('d', { root_id: 'root', session_id: 's1', session_name: 'Guitar', created_at: '2026-07-04T18:00:00Z' }),
+                ]}
+                showContext
+                presentation="timeline"
+                noteTypeVariant="metadata"
+                groupByDate
+            />,
+        );
+
+        const group = screen.getByRole('region', { name: 'Figuring out Songs by Ear notes' });
+        expect(within(group).getByText('3 notes')).toBeInTheDocument();
+        expect(within(group).getAllByText('Figuring out Songs by Ear')).toHaveLength(1);
+        expect(within(group).getAllByRole('list', { name: 'Figuring out Songs by Ear sets' })).toHaveLength(1);
+        expect(within(group).queryByRole('link', { name: 'Open session' })).not.toBeInTheDocument();
+        const session = screen.getByRole('region', { name: 'Guitar session notes' });
+        expect(within(session).getAllByRole('link', { name: 'Open session' })).toHaveLength(1);
+        expect(within(session).getByRole('link', { name: 'Open session' })).toHaveAttribute('href', '/root/session/s1');
+        expect(within(group).getByText('Set #2')).toBeInTheDocument();
+        // Every note shows its time once, on the line directly above its text.
+        const noteA = within(group).getByText('Content a').closest('[class*="noteCard"]');
+        expect(within(noteA).getAllByText(/\d:\d\d/)).toHaveLength(1);
+        const timeLine = noteA.querySelector('[class*="timeLine"]');
+        expect(timeLine.textContent).toMatch(/\d:\d\d/);
+        expect(timeLine.nextElementSibling).toHaveTextContent('Content a');
+        ['Content a', 'Content b', 'Content c'].forEach((text) => expect(within(group).getByText(text)).toBeInTheDocument());
+        // A single note on another instance keeps its own header and links.
+        expect(within(group).queryByText('Content d')).not.toBeInTheDocument();
+        expect(screen.getByText('Activity d')).toBeInTheDocument();
+    });
+
     it('groups consecutive notes from the same session under one shared badge', () => {
         render(
             <NoteTimeline
@@ -107,7 +171,7 @@ describe('NoteTimeline timeline presentation', () => {
 
         const group = screen.getByRole('region', { name: 'Upper Body - Heavy session notes' });
         expect(group.style.getPropertyValue('--session-color')).toBe('');
-        expect(within(group).queryByText('Session note')).not.toBeInTheDocument();
+        expect(within(group).getAllByText('Session note')).toHaveLength(1);  // A heading, not the session's name again.
         expect(within(group).queryByText('Session')).not.toBeInTheDocument();
         expect(within(group).queryByText('Activity Instance')).not.toBeInTheDocument();
         expect(within(group).getByText('Bench Press')).toBeInTheDocument();

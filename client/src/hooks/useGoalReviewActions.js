@@ -9,7 +9,7 @@ import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
 /**
- * Goal review actions: write a review (a goal_review note, which restarts the cadence), or turn
+ * Goal review actions: write a guided review (a goal_review note with `review_data`, which restarts the cadence), or turn
  * reviews back on. Each refreshes the goal trees,
  * whose `review` field carries the schedule.
  */
@@ -37,8 +37,9 @@ export default function useGoalReviewActions(rootId, goalId) {
 
     return {
         isSaving,
-        writeReview: (content, attachments = []) => run(() => fractalNotesApi.createNote(rootId, {
-            content, context_type: 'goal', context_id: goalId, goal_id: goalId, note_kind: 'goal_review',
+        // The server derives the note's text from the answers.
+        writeReview: (reviewData, attachments = []) => run(() => fractalNotesApi.createNote(rootId, {
+            review_data: reviewData, context_type: 'goal', context_id: goalId, goal_id: goalId, note_kind: 'goal_review',
             ...(attachments.length ? { attachments } : {}),
         }), 'Couldn’t save the review', 'Review saved'),
         setReviewsOn: (on) => run(

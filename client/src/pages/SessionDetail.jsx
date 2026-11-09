@@ -77,6 +77,7 @@ function SessionDetailContent() {
         addNote,
         updateNote,
         deleteNote,
+        notePins,
         refreshNotes,
         sidePaneModel,
         handleActivityFocus,
@@ -258,6 +259,7 @@ function SessionDetailContent() {
                             onAddNote={addNote}
                             onUpdateNote={updateNote}
                             onDeleteNote={deleteNote}
+                            notePins={notePins}
                             onOpenGoals={handleOpenGoals}
                             activityGoalScope={activityGoalScope}
                         />

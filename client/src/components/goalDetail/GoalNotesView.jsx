@@ -24,8 +24,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
         createNote,
         updateNote,
         deleteNote,
-        pinNote,
-        unpinNote,
+        setCarryForward,
     } = useGoalNotes(rootId, goalId, {
         includeDescendants,
         includeGoalNotes,
@@ -106,7 +105,6 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                         onSubmit={handleCompose}
                         onCancel={() => setComposing(false)}
                         prelinkedGoalId={goalId}
-                        prelinkedGoalName={null}
                     />
                 </div>
             )}
@@ -120,8 +118,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                         notes={notes}
                         onEdit={isReadOnly ? undefined : updateNote}
                         onDelete={isReadOnly ? undefined : deleteNote}
-                        onPin={isReadOnly ? undefined : pinNote}
-                        onUnpin={isReadOnly ? undefined : unpinNote}
+                        onCarryForward={isReadOnly ? undefined : setCarryForward}
                         groupByDate={true}
                         showContext={includeDescendants}
                         showTypePill={false}

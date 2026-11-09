@@ -11,11 +11,11 @@ const csv = (value) => (value ? value.split(',').map((part) => part.trim()).filt
 // URL parameter for each filter field. Saved filter ids and the selected heatmap day are part
 // of the view, so back/forward and shared links restore exactly what was on screen.
 const PARAMS = {
-    text: 'q', categories: 'cat', goalIds: 'goals', activityIds: 'act', pinnedOnly: 'pinned', savedFilterIds: 'saved', day: 'day',
+    text: 'q', categories: 'cat', goalIds: 'goals', activityIds: 'act', savedFilterIds: 'saved', day: 'day',
 };
 
 export const EMPTY_NOTES_FILTERS = {
-    text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false, savedFilterIds: [], day: null,
+    text: '', categories: [], goalIds: [], activityIds: [], savedFilterIds: [], day: null,
 };
 
 /** Notes page filter state, kept in the URL. */
@@ -27,7 +27,6 @@ export function useNotesPageFilters(timezone) {
         categories: csv(searchParams.get(PARAMS.categories)).filter((value) => CATEGORY_VALUES.has(value)),
         goalIds: csv(searchParams.get(PARAMS.goalIds)),
         activityIds: csv(searchParams.get(PARAMS.activityIds)),
-        pinnedOnly: searchParams.get(PARAMS.pinnedOnly) === '1',
         savedFilterIds: csv(searchParams.get(PARAMS.savedFilterIds)),
         day: DAY.test(searchParams.get(PARAMS.day) || '') ? searchParams.get(PARAMS.day) : null,
     }), [searchParams]);
@@ -38,9 +37,7 @@ export function useNotesPageFilters(timezone) {
             Object.entries(updates).forEach(([field, value]) => {
                 const key = PARAMS[field];
                 if (!key) return;
-                const serialized = Array.isArray(value) ? value.join(',')
-                    : typeof value === 'boolean' ? (value ? '1' : '')
-                        : (value || '');
+                const serialized = Array.isArray(value) ? value.join(',') : (value || '');
                 if (serialized) next.set(key, serialized);
                 else next.delete(key);
             });
@@ -54,7 +51,6 @@ export function useNotesPageFilters(timezone) {
         categories: filters.categories.length ? filters.categories : undefined,
         goal_ids: filters.goalIds.length ? filters.goalIds : undefined,
         activity_definition_ids: filters.activityIds.length ? filters.activityIds : undefined,
-        pinned_only: filters.pinnedOnly || undefined,
     }), [filters]);
 
     const apiFilters = useMemo(() => ({
@@ -69,7 +65,7 @@ export function useNotesPageFilters(timezone) {
 
     // One URL update: consecutive setSearchParams calls in a handler would overwrite each other.
     const clearAdHoc = useCallback((alsoUpdate = {}) => updateFilters({
-        text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false,
+        text: '', categories: [], goalIds: [], activityIds: [],
         ...alsoUpdate,
     }), [updateFilters]);
     const clearAll = useCallback(() => updateFilters(EMPTY_NOTES_FILTERS), [updateFilters]);

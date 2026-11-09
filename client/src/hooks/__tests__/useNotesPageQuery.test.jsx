@@ -61,7 +61,6 @@ function createWrapper(queryClient) {
 describe('useNotesPageQuery', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        createNote.mockResolvedValue({ data: {} });
         updateNote.mockResolvedValue({ data: {} });
         deleteNote.mockResolvedValue({ data: {} });
         pinNote.mockResolvedValue({ data: {} });

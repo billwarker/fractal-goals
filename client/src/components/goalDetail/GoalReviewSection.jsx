@@ -6,7 +6,7 @@ import { getISOYMDInTimezone } from '../../utils/dateUtils';
 import { getGoalReview, isReviewDue } from '../../utils/goalReview';
 import Button from '../atoms/Button';
 import GoalReviewBanner from './GoalReviewBanner';
-import GoalReviewView from './GoalReviewView';
+import GoalReviewForm from './GoalReviewForm';
 import styles from './GoalReviewBanner.module.css';
 
 /**
@@ -38,14 +38,14 @@ export function GoalReviewPrompt({ rootId, goal, goalId, onReview }) {
 export function GoalReviewComposer({ rootId, goal, goalId, onDone }) {
     const { isSaving, writeReview } = useGoalReviewActions(rootId, goalId);
     return (
-        <GoalReviewView
+        <GoalReviewForm
             rootId={rootId}
             goal={goal}
             goalId={goalId}
             isSaving={isSaving}
             onCancel={onDone}
-            onSubmit={async (content, attachments) => {
-                const saved = await writeReview(content, attachments);
+            onSubmit={async (reviewData, attachments) => {
+                const saved = await writeReview(reviewData, attachments);
                 if (saved) onDone();
                 return saved;
             }}

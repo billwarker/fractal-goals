@@ -129,11 +129,12 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
 
     const {
         notes: sessionNotes,
-        previousNotes,
+        carriedNotes,
         previousSessionNotes,
         addNote,
         updateNote,
         deleteNote,
+        setCarryForward,
         refreshNotes,
     } = useSessionDetailNotes({
         rootId,
@@ -188,11 +189,12 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         onGoalClick: setSelectedGoal,
         onGoalCreated: handleGoalHierarchyChanged,
         notes: sessionNotes,
-        previousNotes,
         previousSessionNotes,
         addNote,
         updateNote,
         deleteNote,
+        carriedNotes,
+        setCarryForward,
         onOptions: () => setShowOptionsModal(true),
         mode: sidePaneMode,
         onModeChange: setSidePaneModeUi,
@@ -230,8 +232,9 @@ export function useSessionDetailController({ rootId, sessionId, navigate, isMobi
         setIsMobilePaneOpen,
         allAvailableGoals,
         sessionNotes,
-        previousNotes,
         previousSessionNotes,
+        // Next-time pins and the notes carried to this session's activity cards.
+        notePins: { carried: carriedNotes, setCarryForward },
         sidePaneModel,
         addNote,
         updateNote,

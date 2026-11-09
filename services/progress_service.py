@@ -266,7 +266,7 @@ class ProgressService(
             for note in self.db.query(Note).filter(
                 Note.activity_instance_id.in_(instance_ids),
                 Note.deleted_at.is_(None),
-            ).order_by(Note.pinned_at.desc().nullslast(), Note.created_at.desc()).all():
+            ).order_by(Note.created_at.desc()).all():
                 notes_by_instance.setdefault(note.activity_instance_id, []).append(note)
         items = []
         for row in instances:

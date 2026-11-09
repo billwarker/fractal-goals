@@ -5,15 +5,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import useSessionNotes from '../useSessionNotes';
 
-const mocks = vi.hoisted(() => ({ outbox: { current: null }, createNote: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getCarriedNotes: vi.fn(), outbox: { current: null }, createNote: vi.fn(), updateNote: vi.fn() }));
 vi.mock('../../offline/OutboxContext', () => ({ useOutbox: () => mocks.outbox.current }));
 vi.mock('../../utils/notify', () => ({ default: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('../../utils/api/fractalNotesApi', () => ({
+    fractalNotesApi: { getCarriedNotes: (...args) => mocks.getCarriedNotes(...args) },
+}));
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         getSessionNotes: () => Promise.resolve({ data: [] }),
         getPreviousSessionNotes: () => Promise.resolve({ data: [] }),
-        getActivityDefinitionNotes: () => Promise.resolve({ data: [] }),
         createNote: (...args) => mocks.createNote(...args),
+        updateNote: (...args) => mocks.updateNote(...args),
     },
 }));
 
@@ -27,6 +30,7 @@ function setup() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.getCarriedNotes.mockResolvedValue({ data: { pending: [], delivered: [] } });
     mocks.outbox.current = null;
 });
 
@@ -64,5 +68,31 @@ describe('useSessionNotes attachments', () => {
         expect(mocks.createNote).toHaveBeenCalledWith('root', {
             session_id: 'session', content: 'Run', attachments: [{ asset_id: 'asset', alt_text: 'Run' }],
         });
+    });
+});
+
+describe('useSessionNotes pins', () => {
+    it('queues pin-to-next through the outbox with the cached note\'s new state', async () => {
+        const submit = vi.fn().mockResolvedValue(undefined);
+        mocks.outbox.current = { submit };
+        const { result } = setup();
+        await act(() => result.current.setCarryForward('note-1', true));
+        expect(submit.mock.calls[0][0]).toMatchObject({
+            method: 'put',
+            url: '/root/notes/note-1',
+            body: { carry_forward: true },
+            meta: { noteId: 'note-1', patch: { carry_forward: 'pending' } },
+            coalesceKey: 'note:note-1:carry_forward',
+        });
+    });
+
+    it('saves online and drops a dismissed note from this session\'s carried notes', async () => {
+        mocks.getCarriedNotes.mockResolvedValueOnce({ data: { pending: [{ id: 'old', activity_definition_id: 'bench' }], delivered: [] } });
+        mocks.updateNote.mockResolvedValue({ data: {} });
+        const { result } = setup();
+        await vi.waitFor(() => expect(result.current.carriedNotes.pending).toHaveLength(1));
+        await act(() => result.current.setCarryForward('old', false));
+        expect(mocks.updateNote).toHaveBeenCalledWith('root', 'old', { carry_forward: false });
+        await vi.waitFor(() => expect(result.current.carriedNotes.pending).toEqual([]));
     });
 });

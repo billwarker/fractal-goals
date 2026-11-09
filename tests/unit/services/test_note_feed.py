@@ -52,10 +52,11 @@ def test_spec_normalization_and_limits():
         'text': 'scapula', 'categories': ['goals']}
     assert normalize_spec({'text': 'youtube', 'text_mode': 'keyword'}) == {'text': 'youtube'}  # Earlier saved filters.
     assert normalize_spec({'goal_id': 'g1', 'goal_ids': ['g2']}) == {'goal_ids': ['g1', 'g2']}
+    assert normalize_spec({'text': 'x', 'pinned_only': True}) == {'text': 'x'}  # Pin to top was retired.
     assert normalize_spec({'conditions': [{'op': 'equals', 'value': ' elbow '}], 'match': 'any'}) == {
         'conditions': [{'op': 'equals', 'value': 'elbow'}]}  # "match" only matters with two or more conditions.
     for bad in ({'unknown': 1}, {'text': 'x' * 201}, {'text_mode': 'regex'}, {'categories': ['activities']},
-                {'pinned_only': 'yes'}, {'activity_definition_ids': ['a'] * 51}, {'match': 'some'},
+                {'activity_definition_ids': ['a'] * 51}, {'match': 'some'},
                 {'conditions': [{'op': 'regex', 'value': 'x'}]}, {'conditions': [{'op': 'contains', 'value': '  '}]},
                 {'conditions': [{'op': 'contains', 'value': 'x'}] * 11}):
         with pytest.raises(NoteFilterError):

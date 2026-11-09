@@ -34,6 +34,7 @@ const SessionSection = ({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
+    notePins,
     onOpenGoals,
     activityGoalScope = null,
 }) => {
@@ -377,6 +378,7 @@ const SessionSection = ({
                                 onAddNote={onAddNote}
                                 onUpdateNote={onUpdateNote}
                                 onDeleteNote={onDeleteNote}
+                                notePins={notePins}
                                 onOpenGoals={onOpenGoals}
                                 isDragging={isDragging}
                                 activityDefinition={definition}

@@ -1,16 +1,15 @@
 /**
  * Notes Page — /:rootId/notes
  *
- * - Left: saved filters (combine with AND) above the reverse-chronological timeline.
- * - Right: heatmap, search (keyword or regex), category, goal, activity and pinned filters.
- *   While composing, the right pane links the note to a goal or activity instead.
+ * - Left: the reverse-chronological timeline. Notes are written where they belong (sessions,
+ *   goals, program days); this page reads, edits, pins to next time and deletes them.
+ * - Right: heatmap, search, saved filters (combine with AND), category, goal, activity and pinned filters.
  * Filters live in the URL (useNotesPageFilters). Mobile moves the right pane into a sheet.
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { NoteTimeline, NoteComposer } from '../components/notes';
-import ComposeLinkPanel from '../components/notes/ComposeLinkPanel';
+import { NoteTimeline } from '../components/notes';
 import { useActivities, useActivityGroups } from '../hooks/useActivityQueries';
 import { useNotesPageQuery } from '../hooks/useNotesPageQuery';
 import { useNotesPageFilters } from '../hooks/useNotesPageFilters';
@@ -54,8 +53,6 @@ function Notes() {
         const stored = window.localStorage.getItem(`notes-filter-pane-open:${rootId || 'default'}`);
         return getIsMobileViewport() ? false : (stored === null ? true : stored === 'true');
     });
-    const [composing, setComposing] = useState(false);
-    const [editingNote, setEditingNote] = useState(null); // note object being edited
     const [goalPickerOpen, setGoalPickerOpen] = useState(false);
     const [activityPickerOpen, setActivityPickerOpen] = useState(false);
     const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
@@ -73,12 +70,6 @@ function Notes() {
     }, [isMobile, rootId]);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    // Compose link state
-    const [composeGoalId, setComposeGoalId] = useState(null);
-    const [composeGoalName, setComposeGoalName] = useState(null);
-    const [composeActivityId, setComposeActivityId] = useState(null);
-    const [composeActivityName, setComposeActivityName] = useState(null);
-
     // Ignore saved-filter ids in the URL that no longer exist (deleted elsewhere).
     const activeSavedIds = savedFiltersLoading
         ? filters.savedFilterIds
@@ -87,7 +78,7 @@ function Notes() {
 
     const {
         notes, total, hasMore, isLoading,
-        loadNextPage, createNote, updateNote, deleteNote, pinNote, unpinNote,
+        loadNextPage, updateNote, deleteNote, setCarryForward,
     } = useNotesPageQuery(rootId, feedFilters);
 
     useEffect(() => { if (!rootId) navigate('/'); }, [rootId, navigate]);
@@ -105,50 +96,11 @@ function Notes() {
         updateFilters({ savedFilterIds: activeSavedIds.filter((id) => id !== filter.id) });
     };
 
-    const resetComposeLinks = () => {
-        setComposeGoalId(null);
-        setComposeGoalName(null);
-        setComposeActivityId(null);
-        setComposeActivityName(null);
-    };
-
-    const handleCompose = async (content, goalId, activityDefinitionId, attachments = []) => {
-        if (editingNote) {
-            await updateNote(editingNote.id, content, attachments);
-            setEditingNote(null);
-        } else {
-            const contextType = goalId ? 'goal' : activityDefinitionId ? 'activity_definition' : 'root';
-            const contextId = goalId || activityDefinitionId || rootId;
-            await createNote({
-                content,
-                attachments,
-                context_type: contextType,
-                context_id: contextId,
-                goal_id: goalId || undefined,
-                activity_definition_id: activityDefinitionId || undefined,
-            });
-        }
-        setComposing(false);
-        setMobilePanelOpen(false);
-        resetComposeLinks();
-    };
-
-    const handleEditRequest = (note) => {
-        setEditingNote(note);
-        setComposing(true);
-        setIsFiltersPaneOpen(true);
-        if (isMobile) {
-            setMobilePanelOpen(true);
-        }
-    };
-
     const goalNames = Object.fromEntries(goalOptions.map((goal) => [goal.id, goal.name]));
     const activityNames = Object.fromEntries(activities.map((activity) => [activity.id, activity.name]));
     const summarize = (ids, names) => (ids.length > 2 ? `${ids.length} selected` : ids.map((id) => names[id] || '…').join(', '));
     const conditionLabels = filterConditionLabels({ filters, savedFilters, activeSavedIds, goalNames, activityNames });
-    const mobilePanelLabel = composing
-        ? (mobilePanelOpen ? 'Hide Associator' : 'Show Associator')
-        : (mobilePanelOpen ? 'Hide Filters' : 'Show Filters');
+    const mobilePanelLabel = mobilePanelOpen ? 'Hide Filters' : 'Show Filters';
 
     /* ─── Left column ─── */
     const leftColumn = (
@@ -161,24 +113,11 @@ function Notes() {
                         <FilterConditions labels={conditionLabels} />
                     </>
                 )}
-                actions={(
-                    <>
-                        <HeaderButton
-                            variant="primary"
-                            onClick={() => { setComposing(true); setIsFiltersPaneOpen(true); }}
-                            disabled={composing}
-                        >
-                            + Write Note
-                        </HeaderButton>
-                        {!isMobile ? (
-                            <HeaderButton variant="secondary" onClick={() => setIsFiltersPaneOpen(v => !v)}>
-                                {isFiltersPaneOpen
-                                    ? (composing ? 'Hide Associator' : 'Hide Filters')
-                                    : (composing ? 'Show Associator' : 'Show Filters')}
-                            </HeaderButton>
-                        ) : null}
-                    </>
-                )}
+                actions={!isMobile ? (
+                    <HeaderButton variant="secondary" onClick={() => setIsFiltersPaneOpen(v => !v)}>
+                        {isFiltersPaneOpen ? 'Hide Filters' : 'Show Filters'}
+                    </HeaderButton>
+                ) : null}
             />
 
             {onboarding?.enabled && onboarding.state?.status === 'active' && !onboarding.state?.steps?.first_session && (
@@ -186,45 +125,21 @@ function Notes() {
             )}
 
             <div className={styles.timelineArea}>
-                {composing ? (
-                    <NoteComposer
-                        key={editingNote?.id || 'new'}
-                        rootId={rootId}
-                        onSubmit={handleCompose}
-                        onCancel={() => {
-                            setComposing(false);
-                            setEditingNote(null);
-                            setMobilePanelOpen(false);
-                            resetComposeLinks();
-                        }}
-                        initialContent={editingNote?.content}
-                        initialAttachments={editingNote?.attachments || []}
-                        selectedGoalId={composeGoalId}
-                        selectedGoalName={composeGoalName}
-                        selectedActivityId={composeActivityId}
-                        selectedActivityName={composeActivityName}
-                        onGoalSelect={(id, name) => { setComposeGoalId(id); setComposeGoalName(name); }}
-                        onActivitySelect={(id, name) => { setComposeActivityId(id); setComposeActivityName(name); }}
-                        hideLinkPanel={true}
-                        bare={!isMobile}
-                        submitLabel={editingNote ? 'Save changes' : 'Save note'}
-                    />
-                ) : (
-                    <NoteTimeline
-                        notes={notes}
-                        onEditRequest={handleEditRequest}
-                        onDelete={deleteNote}
-                        onPin={pinNote}
-                        onUnpin={unpinNote}
-                        showContext={true}
-                        noteTypeVariant="metadata"
-                        presentation="timeline"
-                        groupByDate={true}
-                        hasMore={hasMore}
-                        onLoadMore={loadNextPage}
-                        emptyMessage={hasActiveFilters ? 'No notes match the current filters.' : 'No notes yet. Write your first note!'}
-                    />
-                )}
+                <NoteTimeline
+                    notes={notes}
+                    onEdit={updateNote}
+                    onDelete={deleteNote}
+                    onCarryForward={setCarryForward}
+                    showContext={true}
+                    noteTypeVariant="metadata"
+                    presentation="timeline"
+                    groupByDate={true}
+                    hasMore={hasMore}
+                    onLoadMore={loadNextPage}
+                    emptyMessage={hasActiveFilters
+                        ? 'No notes match the current filters.'
+                        : 'No notes yet. Write them on sessions, goals and program days.'}
+                />
             </div>
         </div>
     );
@@ -281,28 +196,9 @@ function Notes() {
         </div>
     );
 
-    const composeLinkPanelBody = (
-        <div className={styles.composeLinkCardBody}>
-            <ComposeLinkPanel
-                rootId={rootId}
-                selectedGoalId={composeGoalId}
-                selectedActivityId={composeActivityId}
-                onGoalSelect={(id, name) => { setComposeGoalId(id); setComposeGoalName(name); }}
-                onActivitySelect={(id, name) => { setComposeActivityId(id); setComposeActivityName(name); }}
-            />
-        </div>
-    );
-
-    const composeLinkPanel = (
-        <div className={styles.composeLinkCard}>
-            <SidePaneHeader title="Link Note" subtitle="Goal or Activity" />
-            {composeLinkPanelBody}
-        </div>
-    );
-
     const rightColumn = isFiltersPaneOpen && !isMobile && (
         <div className={styles.rightColumn}>
-            {composing ? composeLinkPanel : filterPanel}
+            {filterPanel}
         </div>
     );
 
@@ -339,13 +235,12 @@ function Notes() {
 
             <NotesMobileSheet
                 open={isMobile && mobilePanelOpen}
-                composing={composing}
                 total={total}
                 hasActiveFilters={hasActiveFilters}
                 onReset={clearAll}
                 onClose={() => setMobilePanelOpen(false)}
             >
-                {composing ? composeLinkPanelBody : filterPanelBody}
+                {filterPanelBody}
             </NotesMobileSheet>
         </div>
     );

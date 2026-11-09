@@ -17,7 +17,9 @@
 .timelineArea {
     flex: 1;
     overflow-y: auto;
-    padding: 12px 14px;
+    /* The feed starts on a background grid line (the page's left edge is the grid's origin), so the
+       timeline's rail and brackets land on grid lines too (NoteTimeline.module.css). */
+    padding: 12px 14px 12px var(--grid-unit);
 }
 
 /* ─── Right column ─── */
@@ -47,35 +49,15 @@
     padding: 0 16px 24px;
 }
 
-/* ─── Compose link panel card (right column during compose) ─── */
-.composeLinkCard {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: transparent;
-    overflow: hidden;
-}
-
-.composeLinkCardBody {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
 /* ─── Mobile ─── */
 @media (max-width: 768px) {
     .timelineArea {
+        padding-left: 0;
         padding-bottom: calc(12px + var(--mobile-page-footer-height));
     }
 
     .rightColumn {
         display: none;
-    }
-
-    .composeLinkCardBody {
-        overflow-y: auto;
     }
 }
 .onboardingEmptyState { margin: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card-alt); }

@@ -15,16 +15,16 @@ describe('useNotesPageFilters', () => {
         const { result } = setup();
         act(() => result.current.state.updateFilters({
             text: 'elbow scapula', categories: ['goals', 'sessions'], goalIds: ['g1', 'g2'],
-            activityIds: ['a1'], pinnedOnly: true, savedFilterIds: ['f1', 'f2'], day: '2026-10-23',
+            activityIds: ['a1'], savedFilterIds: ['f1', 'f2'], day: '2026-10-23',
         }));
         const params = new URLSearchParams(result.current.location.search);
         expect(Object.fromEntries(params)).toEqual({
             q: 'elbow scapula', cat: 'goals,sessions', goals: 'g1,g2',
-            act: 'a1', pinned: '1', saved: 'f1,f2', day: '2026-10-23',
+            act: 'a1', saved: 'f1,f2', day: '2026-10-23',
         });
         expect(result.current.state.apiFilters).toEqual({
             text: 'elbow scapula', categories: ['goals', 'sessions'], goal_ids: ['g1', 'g2'],
-            activity_definition_ids: ['a1'], pinned_only: true,
+            activity_definition_ids: ['a1'],
             saved_filter_ids: ['f1', 'f2'], day: '2026-10-23', timezone: 'America/New_York',
         });
         expect(result.current.state.hasAdHocFilters).toBe(true);

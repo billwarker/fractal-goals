@@ -6,14 +6,12 @@
 import React from 'react';
 import NoteCard from '../notes/NoteCard';
 
-function NoteItem({ note, onUpdate, onDelete, onPin, onUnpin, compact = false, isSelected, onSelect }) {
+function NoteItem({ note, onUpdate, onDelete, compact = false, isSelected, onSelect }) {
     return (
         <NoteCard
             note={note}
             onEdit={onUpdate ? (noteId, content) => onUpdate(noteId, content) : undefined}
             onDelete={onDelete}
-            onPin={onPin}
-            onUnpin={onUnpin}
             compact={compact}
             isSelected={isSelected}
             onSelect={onSelect}

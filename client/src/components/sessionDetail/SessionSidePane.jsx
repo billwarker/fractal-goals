@@ -135,8 +135,8 @@ function SessionSidePane({
                                 addNote={details?.addNote}
                                 updateNote={details?.updateNote}
                                 deleteNote={details?.deleteNote}
-                                pinNote={details?.pinNote}
-                                unpinNote={details?.unpinNote}
+                                carriedNotes={details?.carriedNotes}
+                                setCarryForward={details?.setCarryForward}
                                 className={styles.detailsSessionNotes}
                             />
                         )}

@@ -97,10 +97,6 @@ export default function NotesFilterControls({
                 <button type="button" className={styles.pickRow} onClick={onPickActivities}>
                     <span>Activities</span><strong>{activitySummary || 'Any'}</strong>›
                 </button>
-                <label className={styles.check}>
-                    <input type="checkbox" checked={filters.pinnedOnly} onChange={(event) => updateFilters({ pinnedOnly: event.target.checked })} />
-                    Pinned notes only
-                </label>
             </section>
 
             {editing && (

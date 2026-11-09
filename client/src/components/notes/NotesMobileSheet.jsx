@@ -6,13 +6,9 @@ import BodyPortal from '../layout/BodyPortal';
 import SheetHandle from '../layout/SheetHandle';
 import styles from './NotesMobileSheet.module.css';
 
-/**
- * Mobile bottom sheet for the Notes page: filters while browsing, the
- * associator while composing.
- */
+/** Mobile bottom sheet holding the Notes page filters. */
 export default function NotesMobileSheet({
     open,
-    composing,
     total,
     hasActiveFilters,
     onReset,
@@ -26,17 +22,13 @@ export default function NotesMobileSheet({
                     <SheetHandle onDismiss={onClose} />
                     <div className={styles.header}>
                         <div className={styles.headerCopy}>
-                            <div className={styles.title}>{composing ? 'Associator' : 'Filters'}</div>
-                            <div className={styles.subtitle}>
-                                {composing ? 'Link this note to a goal or activity.' : `${total} note${total !== 1 ? 's' : ''} shown`}
-                            </div>
+                            <div className={styles.title}>Filters</div>
+                            <div className={styles.subtitle}>{`${total} note${total !== 1 ? 's' : ''} shown`}</div>
                         </div>
                         <div className={styles.actions}>
-                            {!composing ? (
-                                <Button variant="secondary" size="sm" className={styles.actionButton} onClick={onReset} disabled={!hasActiveFilters}>
-                                    Reset
-                                </Button>
-                            ) : null}
+                            <Button variant="secondary" size="sm" className={styles.actionButton} onClick={onReset} disabled={!hasActiveFilters}>
+                                Reset
+                            </Button>
                             <Button variant="secondary" size="sm" className={styles.actionButton} onClick={onClose}>
                                 Hide
                             </Button>

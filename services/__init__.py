@@ -23,6 +23,8 @@ from services.events import event_bus, Event, Events, EventBus
 from services.completion_handlers import init_completion_handlers
 from services.event_logger import setup_event_logging
 from services.analytics_query_cache import setup_analytics_query_cache_invalidation
+# Registers the flush hook that consumes next-instance note pins on any instance completion.
+import services.note_carry_forward  # noqa: F401,E402
 
 _services_initialized = False
 

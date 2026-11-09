@@ -24,12 +24,14 @@ from services.program_rollups import block_weeks
 from services.program_metrics_service import MAX_WINDOW_DAYS, ProgramMetricsService
 from services.program_scope import resolve_program_scope
 from services.programs import ProgramService
+from services.note_program_dates import load_date_notes
+from services.serializers import serialize_note
 from services.session_filters import resolve_timezone, session_duration_seconds_from_row
 from services.session_runtime import get_session_template_color, get_session_template_name, get_template_color
 
 
 class ProgramDayReadModelService:
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
     CHAIN_LOOKBACK_DAYS = MAX_WINDOW_DAYS
     # A hard safety bound for one local date; the summary covers every loaded
     # session while the session list itself is cursor-paged.
@@ -345,6 +347,7 @@ class ProgramDayReadModelService:
             "completed_template_count": fact["completed_template_count"] if fact else 0,
             "requirements": date_evaluation,
             "occurrences": occurrences,
+            "notes": [serialize_note(note) for note in load_date_notes(self.db_session, program.id, detail_date)],
             "can_edit_credits": can_edit_credits,
             "sessions": [
                 self._serialize_day_session(

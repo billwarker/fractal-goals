@@ -61,6 +61,7 @@ function SessionActivityItem({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
+    notePins = null,
     isDragging,
     activityDefinition: activityDefinitionProp = null,
     activityNotes: activityNotesProp = null,
@@ -723,6 +724,7 @@ function SessionActivityItem({
             activityNotes={activityNotes}
             onUpdateNote={onUpdateNote}
             onDeleteNote={onDeleteNote}
+            notePins={notePins}
             handleAddNote={handleAddNote}
         />
     );

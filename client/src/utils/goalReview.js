@@ -97,27 +97,39 @@ export function describeNextReview({ cadence, review, startedAt, createdAt, paus
     return `Next review ${formatDueDate(nextReviewOn, today)} · ${reason}`;
 }
 
+/** A guided review's status choices, in display order. Mirrors STATUS_LABELS in services/goal_review_content.py. */
+export const REVIEW_STATUSES = [
+    { value: 'on_track', label: 'On track' },
+    { value: 'at_risk', label: 'At risk' },
+    { value: 'off_track', label: 'Off track' },
+];
+
+/** The guided review's questions, keyed by their `review_data` field. */
+export const REVIEW_PROMPTS = [
+    { key: 'went_well', label: 'What went well?', heading: 'What went well' },
+    { key: 'change', label: 'What would you change?', heading: 'What to change' },
+    { key: 'next_focus', label: 'What will you focus on until the next review?', heading: 'Focus until the next review' },
+];
+
 /**
- * A goal_review note's starting text: the goal's description, progress since the last review, and due status.
- * @param {{ name: string, description?: string, lastReviewOn?: string | null, childrenTotal?: number,
- *   childrenCompleted?: number, dueLabel?: string | null, today: string }} input
+ * The read-only context a review is written against: what changed since the last review (or the start).
+ * @param {{ description?: string, lastReviewOn?: string | null, children?: any[], activityDays?: Array<{ date: string, activities: number }>,
+ *   dueLabel?: string | null, today: string }} input
+ * @returns {{ since: string, description: string, facts: string[] }}
  */
-export function buildReviewTemplate({ name, description, lastReviewOn, childrenTotal = 0, childrenCompleted = 0, dueLabel, today }) {
-    const since = lastReviewOn ? `since the last review (${formatDueDate(lastReviewOn, today)})` : 'so far';
-    return [
-        `## Review: ${name}`,
-        '',
-        '**The goal**',
-        description?.trim() ? description.trim() : '_No description yet._',
-        '',
-        `**Progress ${since}**`,
-        childrenTotal > 0 ? `- ${childrenCompleted} of ${childrenTotal} child goals complete` : '- ',
-        dueLabel ? `- ${dueLabel}` : '- No due date',
-        '',
-        '**What went well**',
-        '- ',
-        '',
-        '**What to change**',
-        '- ',
-    ].join('\n');
+export function reviewContext({ description, lastReviewOn, children = [], activityDays = [], dueLabel, today }) {
+    const after = (/** @type {unknown} */ value) => {
+        const day = toIsoDate(value);
+        return Boolean(day && (!lastReviewOn || day > lastReviewOn.slice(0, 10)));
+    };
+    const childrenDone = children.filter((child) => child.completed && (!lastReviewOn || after(child.completed_at))).length;
+    const activeDays = activityDays.filter((day) => day.activities > 0 && after(day.date)).length;
+    const facts = [`Active on ${plural(activeDays, 'day')}`];
+    if (children.length) facts.push(`${childrenDone} of ${plural(children.length, 'child goal')} completed`);
+    facts.push(dueLabel || 'No due date');
+    return {
+        since: lastReviewOn ? `Since the last review (${formatDueDate(lastReviewOn.slice(0, 10), today)})` : 'So far',
+        description: description?.trim() || '',
+        facts,
+    };
 }

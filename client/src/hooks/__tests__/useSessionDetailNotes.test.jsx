@@ -35,7 +35,7 @@ describe('useSessionDetailNotes', () => {
                     content: 'A note',
                 },
             ],
-            previousNotes: [],
+            carriedNotes: { pending: [], delivered: [] },
             previousSessionNotes: [],
             addNote: vi.fn(),
             updateNote: vi.fn(),

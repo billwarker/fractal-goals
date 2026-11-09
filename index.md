@@ -112,7 +112,8 @@ schedules the next review one cadence after the latest `goal_review` note (or th
 `review_disabled` and `review_deferred_until`, and `is_reviewed` makes R depend on it: a due review
 takes R away until one is written. Goals on those levels serialize a `review` object, with review dates
 batch-loaded by `load_fractal_goals_for_serialization`. Notes carry an explicit
-`note_kind` (`goal_completion | goal_review`, CHECK-constrained). New goals start their due date at the
+`note_kind` (`goal_completion | goal_review`, CHECK-constrained); guided reviews keep their answers in
+`review_data`. New goals start their due date at the
 level's default horizon.
 
 Goals are created from the Program calendar, Days and Session Detail hierarchies by scoping a goal
@@ -412,7 +413,22 @@ Saved filters (`note_filters`, `services/note_filter_service.py`) are full specs
 AND-ed with the ad-hoc spec. Filter state lives in the URL (`hooks/useNotesPageFilters.js`); the side pane
 holds the heatmap, search (whose right-edge button opens `FilterModal` to create or edit a filter), compact
 saved-filter toggles and the remaining controls; active conditions show as badges beside the note count.
-Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables. Analytics uses
+Goal and activity pickers are shared with the Sessions page through `components/common/FilterPickerModals.jsx`. `NoteTimeline` draws one rail whose node geometry comes from shared CSS variables.
+The Notes page doesn't write notes. Feed pages are enriched in a fixed number of queries
+(`services/note_display_context.py`: an activity note's recorded sets and plan note, goal paths,
+program names), so cards never fetch per note.
+
+`notes.context_type` is CHECK-constrained. Program-date notes (`program_date`: `program_id` plus
+`calendar_date`, `services/note_program_dates.py`) belong to a date in a program, not a program day;
+the day read model returns them as `detail.notes`. Notes are never pinned to the top (`pinned_at` is retired and
+unread). An activity note can be pinned to the activity's next instance, a session note to the next
+session (`carry_forward_at`). `services/note_carry_forward.py` owns that: a `before_flush` hook uses up
+the pin (`carried_into_instance_id` / `carried_into_session_id`) when an instance of the activity, or a
+session, completes in another non-quick session, in the same transaction, whichever path wrote it. `GET …/sessions/<id>/carried-notes` feeds Session Detail's `ActivityPinnedStrip`, which
+also shows the plan's activity note. Guided goal reviews store `review_data`; the server derives the
+note's text (`services/goal_review_content.py`). See
+[Notes update](planning/notes-update-2026-11.md) and
+[UI behaviour contracts](planning/ui-contracts-reference.md#notes-pins-carried-notes-and-program-dates). Analytics uses
 a tenant-governed semantic catalog with structured queries and a flag-gated raw SQL path whose
 parse-based relation/function allowlist, read-only savepoint, and optional least-privilege role are
 described in [Analytics SQL boundary](docs/architecture/ANALYTICS_SQL_BOUNDARY.md) (default-deny

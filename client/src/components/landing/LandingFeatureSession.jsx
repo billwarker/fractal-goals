@@ -201,8 +201,6 @@ function LandingSessionScreenWithModel({
         addNote: async () => null,
         updateNote: async () => null,
         deleteNote: async () => null,
-        pinNote: async () => null,
-        unpinNote: async () => null,
         onOptions: () => {},
         mode: sidePaneMode,
         onModeChange: setSidePaneMode,

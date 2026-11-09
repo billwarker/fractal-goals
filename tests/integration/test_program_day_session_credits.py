@@ -154,7 +154,7 @@ class TestProgramDayReviewSummary:
         off_plan = sessions[credit_world["sessions"]["off_plan"].id]
         other = sessions[credit_world["sessions"]["other"].id]
 
-        assert payload["schema_version"] == 8
+        assert payload["schema_version"] == 9
         assert detail["state"] == "scheduled_partial"
         assert detail["can_edit_credits"] is True
         assert (matched["relation"], matched["credit"]["source"]) == ("credited", "template_match")

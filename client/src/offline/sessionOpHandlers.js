@@ -215,7 +215,7 @@ const OPTIMISTIC = {
     },
     [SESSION_OP.NOTE_UPDATE]: (queryClient, op) => {
         queryClient.setQueryData(keysFor(op.meta).notes, mapList((list) => list.map((note) => (
-            note.id === op.meta.noteId ? { ...note, ...op.body, ...(op.meta.attachments ? { attachments: op.meta.attachments } : {}) } : note
+            note.id === op.meta.noteId ? { ...note, ...op.body, ...op.meta.patch, ...(op.meta.attachments ? { attachments: op.meta.attachments } : {}) } : note
         ))));
     },
     [SESSION_OP.NOTE_DELETE]: (queryClient, op) => {
