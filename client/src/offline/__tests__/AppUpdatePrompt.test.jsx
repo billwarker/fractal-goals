@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AppUpdatePrompt from '../AppUpdatePrompt';
@@ -27,5 +27,17 @@ describe('AppUpdatePrompt', () => {
         status.current = { pendingCount: 0, rejected: [{ opId: 'r' }] };
         render(<AppUpdatePrompt />);
         expect(screen.getByText('A new version of Fractal Goals is ready.')).toBeInTheDocument();
+    });
+
+    it('reloads into the update, or hides until the app next opens', async () => {
+        const { applyAppUpdate } = await import('../serviceWorker');
+        const { unmount } = render(<AppUpdatePrompt />);
+        fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+        expect(applyAppUpdate).toHaveBeenCalledOnce();
+        unmount();
+
+        render(<AppUpdatePrompt />);
+        fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+        expect(screen.queryByText(/new version/)).toBeNull();
     });
 });
