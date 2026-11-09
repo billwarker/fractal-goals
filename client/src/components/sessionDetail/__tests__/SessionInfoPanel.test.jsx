@@ -117,6 +117,11 @@ describe('SessionInfoPanel', () => {
         expect(screen.getByRole('link', { name: 'Q4 2026' }).className).toContain('programValue');
         expect(screen.getByText('Month 1').className).toContain('blockValue');
         expect(screen.getByText('Day 1 — Sunday Practice').className).toContain('blockValue');
+        // The whole context pans as one line instead of each part truncating separately.
+        const viewport = screen.getByTestId('program-context').parentElement;
+        expect(viewport).toHaveAttribute('title', 'Q4 2026 · Month 1 · Day 1 — Sunday Practice');
+        // It pans only on hover, so it doesn't distract during a session.
+        expect(viewport.className).toContain('panOnHover');
     });
 
     describe('live activity duration', () => {

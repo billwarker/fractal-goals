@@ -29,7 +29,7 @@ describe('GoalHeaderTitle', () => {
         act(() => resize());
         expect(viewport).toHaveAttribute('data-overflow', 'true');
         expect(viewport).toHaveAttribute('tabindex', '0');
-        expect(viewport.style.getPropertyValue('--goal-title-pan-distance')).toBe('-150px');
+        expect(viewport.style.getPropertyValue('--pan-distance')).toBe('-150px');
         expect(viewport).toHaveAttribute('title', 'Learn a long piece');
 
         availableWidth = 400;

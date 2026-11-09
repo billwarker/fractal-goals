@@ -14,6 +14,7 @@ import DisclosureButton from '../atoms/DisclosureButton';
 import EditIcon from '../atoms/EditIcon';
 import { Heading } from '../atoms/Typography';
 import Input from '../atoms/Input';
+import PanningText from '../atoms/PanningText';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { getTemplateColor } from '../../utils/sessionRuntime';
@@ -46,6 +47,9 @@ function SessionInfoPanel() {
         programDayNumberLabel,
         programInfo?.day_name && programInfo.day_name !== programDayNumberLabel ? programInfo.day_name : null,
     ].filter(Boolean).join(' — ');
+    const programContextTitle = [programInfo?.program_name, programInfo?.block_name, programDayLabel]
+        .filter(Boolean)
+        .join(' · ');
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -143,10 +147,13 @@ function SessionInfoPanel() {
                     </div>
                 )}
                 {programInfo ? (
-                    <div className={styles.sessionInfoRow}>
+                    <div className={`${styles.sessionInfoRow} ${styles.programContextRow}`}>
                         <span className={styles.label}>Program:</span>
-                        <span
-                            className={styles.programContextValue}
+                        <PanningText
+                            className={styles.programContextViewport}
+                            title={programContextTitle}
+                            restartKey={programContextTitle}
+                            panOnHover
                             data-testid="program-context"
                             style={{
                                 '--session-program-color': programInfo.program_color || 'var(--color-brand-primary)',
@@ -169,7 +176,7 @@ function SessionInfoPanel() {
                             {programDayLabel ? (
                                 <>{programInfo.program_name || programInfo.block_name ? <span className={styles.contextSeparator}>·</span> : null}<span className={styles.blockValue}>{programDayLabel}</span></>
                             ) : null}
-                        </span>
+                        </PanningText>
                     </div>
                 ) : null}
             </div>

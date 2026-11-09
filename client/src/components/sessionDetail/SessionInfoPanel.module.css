@@ -105,25 +105,19 @@
     color: var(--session-block-color, var(--color-brand-primary));
 }
 
-.programContextValue {
-    display: inline-flex;
-    align-items: baseline;
-    justify-content: flex-end;
-    gap: 6px;
-    min-width: 0;
-    overflow: hidden;
-    white-space: nowrap;
+.programContextRow {
+    gap: 8px;
 }
 
-.programContextValue > span,
-.programContextValue > a {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Fitting context sits right-aligned; overflowing context pans from its start. */
+.programContextViewport {
+    flex: 1 1 auto;
+    text-align: right;
 }
 
+/* Separators carry their own spacing so it doesn't depend on the panning text's display. */
 .contextSeparator {
-    flex: 0 0 auto;
+    margin-inline: 6px;
     color: var(--color-text-muted);
 }
 
