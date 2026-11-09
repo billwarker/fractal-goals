@@ -74,5 +74,31 @@ describe('ProgramBlocksPanel', () => {
 
         expect(screen.queryByRole('button', { name: 'Delete Base' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Edit Base' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Collapse Base' })).toBeInTheDocument();
+    });
+
+    it('collapses completed and upcoming blocks to their name and dates, and toggles them', () => {
+        const blocks = [
+            { ...block, id: 'past', name: 'Past', start_date: '2026-02-01', end_date: '2026-02-28' },
+            { ...block, id: 'now', name: 'Now', start_date: '2026-03-01', end_date: '2026-03-31' },
+            { ...block, id: 'next', name: 'Next', start_date: '2026-04-01', end_date: '2026-04-30' },
+        ];
+        renderWithProviders(
+            <ProgramBlocksPanel cards={buildBlockCards({ blocks, metrics: { blocks: [] }, today: '2026-03-04' })} />,
+            { withTimezone: false },
+        );
+
+        const statsOf = (name) => document.getElementById(`side-block-stats-${name.toLowerCase()}`);
+        expect(statsOf('Now')).toBeVisible();
+        expect(statsOf('Past')).not.toBeVisible();
+        expect(statsOf('Next')).not.toBeVisible();
+        expect(within(screen.getByRole('article', { name: 'Past' })).getByText(/Feb 1 – Feb 28/)).toBeVisible();
+
+        const expand = screen.getByRole('button', { name: 'Expand Past' });
+        expect(expand).toHaveAttribute('aria-expanded', 'false');
+        fireEvent.click(expand);
+        expect(statsOf('Past')).toBeVisible();
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse Past' }));
+        expect(statsOf('Past')).not.toBeVisible();
     });
 });
