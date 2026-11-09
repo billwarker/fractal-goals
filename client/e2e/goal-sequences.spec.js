@@ -28,6 +28,14 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     const first = await create(`First step ${suffix}`);
     // Long enough to wrap in the Goals pane, so the step number and branch alignment are exercised.
     const second = await create(`Second step, a longer goal name that wraps ${suffix}`);
+    // Mobile toasts land over the dialog footer and pause while hovered, so a click there can wait on one forever.
+    // Wait for each to appear first, or the hidden check passes before it renders.
+    const waitOutToast = async (text) => {
+        const toast = page.getByRole('status').filter({ hasText: text });
+        await page.mouse.move(0, 0);
+        await expect(toast).toBeVisible();
+        await expect(toast).toBeHidden({ timeout: 10_000 });
+    };
     const isPaused = async (goal) => (await (await page.request.get(`/api/${root}/goals/${goal.id}`, { headers })).json()).paused;
 
     await page.goto(`/${root}/programs`);
@@ -46,6 +54,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     await dialog.getByRole('button', { name: /^Sequence/ }).click();
     await dialog.getByRole('button', { name: `Add ${second.name}` }).click();
     await dialog.getByRole('button', { name: 'Create sequence' }).click();
+    await waitOutToast('Sequence created');
     await expect(dialog.getByRole('button', { name: 'Options', exact: true })).toBeVisible();
     await expect.poll(() => isPaused(second)).toBe(true);
     await dialog.getByRole('button', { name: /^Close/ }).first().click();
@@ -64,12 +73,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     await expect(dialog.getByRole('checkbox', { name: new RegExp(`Begin next goal in sequence: ${second.name}`) })).toBeChecked();
     await dialog.getByRole('button', { name: 'Complete Goal' }).click();
     await expect.poll(() => isPaused(second)).toBe(false);
-    // The completion toast lands over the mobile dialog footer and pauses while hovered; let it clear.
-    // Wait for it to appear first, or the hidden check passes before it renders.
-    const completedToast = page.getByRole('status').filter({ hasText: `Completed: ${first.name}` });
-    await page.mouse.move(0, 0);
-    await expect(completedToast).toBeVisible();
-    await expect(completedToast).toBeHidden({ timeout: 10_000 });
+    await waitOutToast(`Completed: ${first.name}`);
 
     // …and un-completing it pauses the second again.
     await dialog.getByRole('button', { name: 'Mark Incomplete' }).click();
