@@ -5,9 +5,10 @@ import styles from './ActionToast.module.css';
 
 /**
  * A toast with a message, optional detail lines, and one action (e.g. Undo). The action runs
- * once and dismisses the toast.
+ * once and dismisses the toast. Outside react-hot-toast, pass `onDismiss` to handle dismissal.
  */
-export function ActionToast({ toastId, visible = true, message, details = [], actionLabel, onAction, tone = 'info' }) {
+export function ActionToast({ toastId, visible = true, message, details = [], actionLabel, onAction, onDismiss, tone = 'info' }) {
+    const dismiss = onDismiss || (() => toast.dismiss(toastId));
     return (
         <div className={`${styles.toast} ${styles[tone] || ''} ${visible ? '' : styles.leaving}`} role="status" aria-live="polite">
             <div className={styles.body}>
@@ -23,14 +24,14 @@ export function ActionToast({ toastId, visible = true, message, details = [], ac
                     type="button"
                     className={styles.action}
                     onClick={() => {
-                        toast.dismiss(toastId);
+                        dismiss();
                         onAction();
                     }}
                 >
                     {actionLabel}
                 </button>
             ) : null}
-            <button type="button" className={styles.close} aria-label="Dismiss" onClick={() => toast.dismiss(toastId)}>×</button>
+            <button type="button" className={styles.close} aria-label="Dismiss" onClick={dismiss}>×</button>
         </div>
     );
 }

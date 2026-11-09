@@ -234,9 +234,9 @@ test('offline tag edits sync, and an activity added then deleted offline never r
     await page.getByRole('group', { name: 'Activity tags' }).getByRole('button', { name: 'Add tag' }).click();
     await page.getByRole('dialog', { name: 'Choose activity tags' }).getByText('Heavy day', { exact: true }).click();
     await page.getByRole('button', { name: 'Close tag picker' }).click();
-    // Chips collapse into a titled "1 tag" summary when they don't fit, which depends on font metrics.
+    // The chip or, when tags don't fit, the "1 tag" summary: both carry the name as their title.
     const activityTags = page.getByRole('group', { name: 'Activity tags' });
-    await expect(activityTags.getByRole('checkbox', { name: 'Heavy day', checked: true }).or(activityTags.getByTitle('Heavy day'))).toBeVisible();
+    await expect(activityTags.getByTitle('Heavy day')).toBeVisible();
 
     // Add an activity, then change your mind.
     await page.getByText('+ Add Activity').first().click();
@@ -280,6 +280,7 @@ test('a change the server keeps failing is set aside, and later changes still sy
     const fineInstance = instances.find((instance) => instance.name === 'Fine finish');
     await page.route(`**/activity-instances/${brokenInstance.id}/start`, (route) => route.fulfill({ status: 500, json: { error: 'boom' } }));
 
+    await page.clock.install();
     await page.goto(`/${root}/session/${session.id}`);
     await expect(page.getByText('Fine finish').first()).toBeVisible();
     await context.setOffline(true);
@@ -287,11 +288,13 @@ test('a change the server keeps failing is set aside, and later changes still sy
     await page.getByTitle('Instant complete (0s duration)').last().click();
     await context.setOffline(false);
 
-    // The later change waits behind the failing one, then syncs once that is set aside.
+    // The later change waits behind the failing one, then syncs once that is set aside. Giving up
+    // takes 30 minutes, so the page's clock jumps ahead through its retries.
     await expect.poll(async () => {
+        await page.clock.fastForward('10:00');
         const rows = await (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
         return rows.find((row) => row.id === fineInstance.id)?.completed;
-    }, { timeout: 200_000, intervals: [5_000] }).toBe(true);
+    }, { timeout: 120_000, intervals: [2_000] }).toBe(true);
     const status = page.getByRole('status').filter({ hasText: "couldn't sync" });
     await expect(status).toBeVisible();
     await status.getByRole('button', { name: 'Review' }).click();

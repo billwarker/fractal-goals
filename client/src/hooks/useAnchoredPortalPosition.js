@@ -15,6 +15,8 @@ export default function useAnchoredPortalPosition({
     margin = 8,
     maxWidth = 280,
     estimatedHeight = 190,
+    // Size to the content, up to maxWidth, instead of always taking maxWidth.
+    fitContent = false,
 }) {
     useLayoutEffect(() => {
         if (!open) return undefined;
@@ -37,8 +39,15 @@ export default function useAnchoredPortalPosition({
                 || window.innerHeight;
             const viewportRight = viewportLeft + viewportWidth;
             const viewportBottom = viewportTop + viewportHeight;
-            const width = Math.min(maxWidth, Math.max(0, viewportWidth - (margin * 2)));
-            const preferredLeft = align === 'left' ? rect.left : rect.right - width;
+            if (fitContent) {
+                overlay.style.setProperty('width', 'max-content');
+                overlay.style.setProperty('min-width', '0');
+            }
+            const widestAllowed = fitContent ? Math.min(maxWidth, overlay.getBoundingClientRect().width) : maxWidth;
+            const width = Math.min(widestAllowed, Math.max(0, viewportWidth - (margin * 2)));
+            const preferredLeft = align === 'left'
+                ? rect.left
+                : align === 'center' ? rect.left + ((rect.width - width) / 2) : rect.right - width;
             const left = Math.max(
                 viewportLeft + margin,
                 Math.min(preferredLeft, viewportRight - width - margin),
@@ -77,5 +86,5 @@ export default function useAnchoredPortalPosition({
             window.visualViewport?.removeEventListener('resize', positionOverlay);
             window.visualViewport?.removeEventListener('scroll', positionOverlay);
         };
-    }, [align, anchorRef, anchorSelector, estimatedHeight, gap, margin, maxWidth, open, overlayRef]);
+    }, [align, anchorRef, anchorSelector, estimatedHeight, fitContent, gap, margin, maxWidth, open, overlayRef]);
 }

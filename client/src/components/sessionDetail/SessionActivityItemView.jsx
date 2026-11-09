@@ -30,7 +30,7 @@ import {
     SessionItemTimerMeta,
 } from './SessionItemCardPrimitives';
 import styles from './SessionActivityItem.module.css';
-import InstanceLinkedGoalIcons from './InstanceLinkedGoalIcons';
+import InstanceGoalIcons, { useInstanceLowestGoals } from './InstanceGoalIcons';
 
 function SessionActivityItemView({
     rootId,
@@ -108,7 +108,7 @@ function SessionActivityItemView({
     onDeleteNote,
     handleAddNote,
 }) {
-    const linkedGoalIds = exercise?.associated_goal_ids || [];
+    const lowestGoals = useInstanceLowestGoals(rootId, exercise?.session_id, exercise);
     const [isOptionsOpen, setIsOptionsOpen] = useState(false);
     const [timerConflictExtras, setTimerConflictExtras] = useState(null);
     const [timeInputErrors, setTimeInputErrors] = useState({ start: '', stop: '' });
@@ -218,7 +218,7 @@ function SessionActivityItemView({
                             if (onFocus) onFocus(exercise, null);
                         }}
                         className={styles.activityNameContainer}
-                    >
+                     data-tag-width-boundary>
                             <div className={styles.activityIdentityText}>
                                 <div className={`${styles.activityName} ${styles.activityNameFlex}`}>
                                     <span className={styles.activityNameFlex}>
@@ -309,12 +309,13 @@ function SessionActivityItemView({
                                                     tags={exercise.tags || []}
                                                     editable={isSelected}
                                                     triggerFirst
+                                                    maxTagRows={2}
                                                 />
                                             )}
                                         </div>
                                     )}
                                 </div>
-                                {(groupLabel || averageDuration || linkedGoalIds.length > 0) && (
+                                {(groupLabel || averageDuration || lowestGoals.length > 0) && (
                                     <div className={styles.activityMetaLine}>
                                         {groupLabel && (
                                             <span className={styles.activityGroupLabel}>{groupLabel}</span>
@@ -330,10 +331,10 @@ function SessionActivityItemView({
                                                 Avg {averageDuration.label}
                                             </span>
                                         )}
-                                        {linkedGoalIds.length > 0 && (groupLabel || averageDuration) && (
+                                        {lowestGoals.length > 0 && (groupLabel || averageDuration) && (
                                             <span className={styles.activityMetaSeparator}>•</span>
                                         )}
-                                        <InstanceLinkedGoalIcons rootId={rootId} goalIds={linkedGoalIds} />
+                                        <InstanceGoalIcons goals={lowestGoals} directGoalIds={exercise?.associated_goal_ids} />
                                     </div>
                                 )}
                                 {def.description && (

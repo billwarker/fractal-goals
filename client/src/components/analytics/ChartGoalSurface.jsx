@@ -38,6 +38,12 @@ function swallowNextClick() {
     setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), GHOST_CLICK_MS);
 }
 
+/** A chart built outside the visualization registry, taking what the surface adds from its context. */
+export function PresetSurfaceChart({ context }) {
+    const { Chart, props } = context.presetChart;
+    return <Chart {...props} chartRef={context.chartRef} goalLines={context.goalConditionLines} onOpenGoal={context.onOpenGoal} />;
+}
+
 /**
  * Analytics charts as a goal-setting surface.
  *
@@ -50,7 +56,7 @@ function swallowNextClick() {
  * under its name and shown first, then opens here. Existing goals on the activity are
  * passed to the chart, which marks them at their thresholds; clicking one opens it here.
  */
-export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {}, chartToSave = null, canSetGoal = true }) {
+export default function ChartGoalSurface({ Chart, context, rootId, annotating = false, onAnnotatingChange = () => {}, chartToSave = null, canSetGoal = true, currentGoalId = null }) {
     const queryClient = useQueryClient();
     const visualizationId = context.visualization?.id;
     const supported = GOAL_CHART_IDS.has(visualizationId);
@@ -108,9 +114,13 @@ export default function ChartGoalSurface({ Chart, context, rootId, annotating = 
     }, [chartRef]);
 
     const { controls: extendControls, extend, shrink, futureShare } = useAxisExtension({ chartRef, annotating, placement });
+    // The goal already open behind this chart (goal details) has nothing more to open.
+    const openGoalFromChart = useCallback((goalId) => {
+        if (String(goalId) !== String(currentGoalId)) setOpenGoalId(goalId);
+    }, [currentGoalId]);
     const chartContext = useMemo(() => ({
-        ...context, goalConditionLines: lines, onOpenGoal: setOpenGoalId, axisFutureShare: futureShare,
-    }), [context, futureShare, lines]);
+        ...context, goalConditionLines: lines, onOpenGoal: openGoalFromChart, axisFutureShare: futureShare,
+    }), [context, futureShare, lines, openGoalFromChart]);
 
     const stopAnnotating = useCallback(() => {
         onAnnotatingChange(false);

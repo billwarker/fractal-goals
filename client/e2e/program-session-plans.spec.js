@@ -29,7 +29,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     // Comparing two dates is a side-pane toggle (a sheet on phones).
     if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     await page.getByRole('button', { name: 'Compare two days' }).click();
-    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     await selectTodayAndNextWeek(page, today);
     // Today is the latest program day; next week's sits beside it.
     const cards = page.getByRole('article', { name: /^Bench Day plan/ });

@@ -309,4 +309,47 @@ describe('ProgramDayPane', () => {
         expect(screen.queryByRole('button', { name: 'Schedule Reusable' })).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'New program day' })).not.toBeInTheDocument();
     });
+
+    describe('goals due on the date', () => {
+        const goal = { id: 'goal-9', name: 'Tuck Planche', type: 'ImmediateGoal', deadline: '2026-09-02' };
+        const due = {
+            goal,
+            icon: { shape: 'circle', color: '#3399cc', secondaryColor: '#111111', isSmart: false },
+            completed: false,
+        };
+
+        it('leaves the date to the pane header and opens the goal', () => {
+            const onGoalClick = vi.fn();
+            renderPane({ dueGoals: [due], onGoalClick });
+            const card = screen.getByRole('region', { name: 'Goals due on this date' });
+            expect(within(card).getByText('Tuck Planche')).toBeInTheDocument();
+            expect(within(card).queryByText('Wed, Sep 2, 2026')).not.toBeInTheDocument();
+            fireEvent.click(within(card).getByRole('button', { name: /Tuck Planche/ }));
+            expect(onGoalClick).toHaveBeenCalledWith(goal);
+        });
+
+        it('sits beneath the program day card', () => {
+            renderPane({ dueGoals: [due] });
+            const card = screen.getByRole('region', { name: 'Goals due on this date' });
+            const lastCard = screen.getAllByRole('heading', { level: 3 }).at(-1);
+            expect(card).toContainElement(lastCard);
+            expect(screen.getAllByRole('heading', { level: 3 }).length).toBeGreaterThan(1);
+        });
+
+        it('says when a goal is already completed', () => {
+            renderPane({ dueGoals: [{ ...due, completed: true }] });
+            expect(screen.getByText('Completed')).toBeInTheDocument();
+        });
+
+        it('still shows on a date with no program schedule', () => {
+            renderPane({ dueGoals: [due], query: { data: { detail: null } } });
+            expect(screen.getByRole('region', { name: 'Goals due on this date' })).toBeInTheDocument();
+            expect(screen.getByText(/No program schedule/)).toBeInTheDocument();
+        });
+
+        it('stays out of the way with nothing due', () => {
+            renderPane({ dueGoals: [] });
+            expect(screen.queryByRole('region', { name: 'Goals due on this date' })).not.toBeInTheDocument();
+        });
+    });
 });

@@ -169,7 +169,7 @@ class TestPhase1TimerConfidence:
         assert resume_resp.status_code == 200
         assert resume_resp.get_json()["is_paused"] is False
 
-    def test_pause_session_when_already_paused_returns_400(self, authed_client, sample_practice_session):
+    def test_pause_session_when_already_paused_is_a_no_op(self, authed_client, sample_practice_session):
         root_id = sample_practice_session.root_id
         session_id = sample_practice_session.id
 
@@ -177,13 +177,15 @@ class TestPhase1TimerConfidence:
         assert first.status_code == 200
 
         second = authed_client.post(f"/api/{root_id}/timers/session/{session_id}/pause")
-        assert second.status_code == 400
+        assert second.status_code == 200
+        assert second.get_json()["is_paused"] is True
 
-    def test_resume_session_when_not_paused_returns_400(self, authed_client, sample_practice_session):
+    def test_resume_session_when_not_paused_is_a_no_op(self, authed_client, sample_practice_session):
         response = authed_client.post(
             f"/api/{sample_practice_session.root_id}/timers/session/{sample_practice_session.id}/resume"
         )
-        assert response.status_code == 400
+        assert response.status_code == 200
+        assert response.get_json()["is_paused"] is False
 
     def test_pause_missing_session_returns_404(self, authed_client, sample_ultimate_goal):
         response = authed_client.post(

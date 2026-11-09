@@ -270,10 +270,17 @@ background/border styling and expose their association through the ring and acce
 `useActivityInstanceGoalAssociation` owns
 cache updates and evidence invalidation. Duplication starts with no one-off links.
 
-Every one-off link is also shown, read-only, on the card's meta line after "Group • Avg": a 12px
-goal icon per linked goal (`InstanceLinkedGoalIcons`, goals resolved from the cached fractal tree),
-whatever the selection or scope, with a "Linked to <goal> (this instance only)" tooltip and `+N` past
-four. Circuit members match instance cards: their name carries the scoped link button and the tag control
+The card's meta line after "Group • Avg" always shows, read-only, a 12px icon for the lowest goal on each
+branch the instance counts toward (`InstanceGoalIcons`: definition and group goals plus one-off links,
+without paused goals, resolved like the Goal Hierarchy pane), whatever the selection or scope. One-off links
+read "Linked to <goal> (this instance only)", others just the goal's name, with `+N` past four. Adding an
+activity from the scoped picker that is offered only through one-off links ("One-off link" chip) links the new
+instance to the scoped goal; catalog activities and circuits are not auto-linked.
+
+Instance, whole-circuit and circuit member tags sit beside the name and wrap beneath it, left-aligned, showing each tag's
+name (cut off at 180px, full name in `title`). They collapse to "N tags" only when they need more than two
+rows of the identity column (`tagsFitInRows`), so a card's buttons or name length never hide a tag. Set rows and
+circuit round editors stay on one row, using the row's spare width. Circuit members match instance cards: their name carries the scoped link button and the tag control
 (sets included) beside it, and
 the meta line under it shows the activity group breadcrumb, then the linked goal icons. While a goal is scoped, the add-activity
 picker also offers definitions whose instances were linked to that goal or a descendant, from any

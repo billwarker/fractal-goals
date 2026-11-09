@@ -1,4 +1,53 @@
+import { buildPreviousProgramDays } from '../createSessionProgramDay';
 import { buildTodayProgramDayView, partitionTemplatesByProgram, programSessionToTemplate } from '../createSessionProgramDay';
+
+describe('buildPreviousProgramDays', () => {
+    const program = {
+        id: 'p', name: 'Q4', color: '#f80', goal_ids: ['g'],
+        days: [
+            { id: 'legs', name: 'Legs', day_number: 1, templates: [{ id: 't1' }] },
+            { id: 'gone', name: 'Old', day_number: 2, templates: [{ id: 'deleted' }] },
+        ],
+    };
+    const templates = [{ id: 't1', name: 'Legs A', template_data: { sections: [] } }];
+    const occurrencesByDay = new Map([
+        ['legs', [
+            { date: '2026-11-05', program_day_completed: true },
+            { date: '2026-11-07', manual_status: null },
+            { date: '2026-11-08' },
+        ]],
+        ['gone', [{ date: '2026-11-06', manual_status: 'rest' }]],
+    ]);
+    const build = (overrides = {}) => buildPreviousProgramDays({
+        program, occurrencesByDay, templates, todayISO: '2026-11-08', ...overrides,
+    });
+
+    it('lists each day type once, most recently occurred first, without today or a block', () => {
+        const rows = build();
+        expect(rows.map((row) => [row.day_id, row.last_date, row.last_status_label])).toEqual([
+            ['legs', '2026-11-07', 'Not done'],
+            ['gone', '2026-11-06', 'Rest'],
+        ]);
+        expect(rows[0].is_previous).toBe(true);
+        expect(rows[0].block_id).toBeUndefined();
+    });
+
+    it('leaves out days scheduled today and days that have not occurred yet', () => {
+        expect(build({ scheduledToday: [{ day_id: 'legs' }] }).map((row) => row.day_id)).toEqual(['gone']);
+        expect(build({ todayISO: '2026-11-01' })).toEqual([]);
+    });
+
+    it('takes template data from the loaded templates and leaves a deleted one with no sessions', () => {
+        const rows = build();
+        expect(rows[0].sessions[0]).toMatchObject({ template_id: 't1', template_data: { sections: [] } });
+        expect(rows[1].sessions).toEqual([]);
+    });
+
+    it('has nothing without a program or occurrences', () => {
+        expect(build({ program: null })).toEqual([]);
+        expect(build({ occurrencesByDay: undefined })).toEqual([]);
+    });
+});
 
 describe('createSessionProgramDay', () => {
     it('preserves the configured template color when adapting a program session', () => {

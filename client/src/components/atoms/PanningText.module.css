@@ -1,0 +1,51 @@
+.viewport {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.text {
+    display: inline-block;
+    vertical-align: top;
+}
+
+.viewport[data-overflow='true'] .text {
+    animation: textPan var(--pan-duration) linear infinite;
+}
+
+.viewport:hover .text,
+.viewport:focus-within .text {
+    animation-play-state: paused;
+}
+
+.panOnHover[data-overflow='true'] .text {
+    animation: none;
+}
+
+.panOnHover[data-overflow='true']:hover .text,
+.panOnHover[data-overflow='true']:focus-within .text {
+    animation: textPan var(--pan-duration) linear infinite;
+    animation-play-state: running;
+}
+
+@keyframes textPan {
+    0%, 15%, 100% { transform: translateX(0); }
+    50%, 65% { transform: translateX(var(--pan-distance)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .viewport {
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .viewport::-webkit-scrollbar {
+        display: none;
+    }
+
+    .viewport[data-overflow='true'] .text,
+    .panOnHover[data-overflow='true']:hover .text,
+    .panOnHover[data-overflow='true']:focus-within .text {
+        animation: none;
+    }
+}

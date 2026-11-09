@@ -8,5 +8,6 @@ from flask_limiter.util import get_remote_address
 # Initialize Limiter with no app yet (will be initialized in app.py)
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["2000 per day", "500 per hour"]
+    # Per route and client. A live session refetches its reads after every synced burst.
+    default_limits=["20000 per day", "3000 per hour"]
 )

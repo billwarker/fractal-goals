@@ -4,16 +4,15 @@
 import notify from '../utils/notify';
 import { API_BASE, axios } from '../utils/api/core';
 import { trackEvent } from '../utils/telemetry';
-import { getClockOffsetMs, isOnline } from './connectivity';
+import { getClockOffsetMs, getOfflineReason, isOnline, subscribeConnectivity } from './connectivity';
 import { createIndexedDbStore } from './indexedDbStore';
 import { createOutbox } from './outbox';
 
 export { registerSessionOpHandlers } from './sessionOpHandlers';
 export { restoreQueryCache, startQueryPersistence } from './queryPersistence';
 
-// Dead connections should be noticed quickly; the op stays queued, so a short
-// timeout costs nothing but a retry.
-const OUTBOX_REQUEST_TIMEOUT_MS = 8000;
+// Dead connections should be noticed quickly, but a busy server must not read as one.
+const OUTBOX_REQUEST_TIMEOUT_MS = 15000;
 
 /** Shift a queued action time by this device's measured clock error, so the server sees true time. */
 export function correctActionTime(body, offsetMs = getClockOffsetMs()) {
@@ -26,9 +25,16 @@ export function sendOutboxOp(op) {
     return axios.request({
         method: op.method,
         url: `${API_BASE}${op.url}`,
-        data: correctActionTime(op.body) ?? undefined,
+        data: op.body ?? undefined,
         headers: { 'Idempotency-Key': op.idempotencyKey },
         timeout: OUTBOX_REQUEST_TIMEOUT_MS,
+    });
+}
+
+/** Records why the app went offline, so false alarms show up in sync health. Returns a cleanup function. */
+export function trackOfflineTransitions() {
+    return subscribeConnectivity((online) => {
+        if (!online) trackEvent('offline_detected', { props: { reason: getOfflineReason() } });
     });
 }
 
@@ -43,6 +49,8 @@ export function createUserOutbox(userId) {
     return createOutbox({
         store: createIndexedDbStore(userId),
         send: sendOutboxOp,
+        // Once per op: the server compares a retry's body with the first attempt's.
+        prepareBody: (body) => correctActionTime(body),
         isOnline,
         channel,
         onEvent: (type, props) => {

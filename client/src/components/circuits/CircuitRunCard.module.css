@@ -54,8 +54,10 @@
     min-width: 0;
 }
 
+/* Takes the row's spare width: round tags measure against it, so a shrink-wrapped box would never fit them. */
 .roundActions {
     display: flex;
+    flex: 1 1 auto;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
@@ -138,6 +140,7 @@
 
 .memberTags {
     display: inline-flex;
+    flex-wrap: wrap;
     flex: 0 1 auto;
     min-width: 0;
     font-size: initial;
@@ -253,8 +256,10 @@
         align-items: center;
     }
 
+    /* The column sizes to its content, so round tags need a definite width to measure against. */
     .roundActions {
         flex-wrap: nowrap;
+        width: 60cqi;
     }
 
     .memberHeader {

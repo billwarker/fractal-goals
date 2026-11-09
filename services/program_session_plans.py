@@ -46,7 +46,8 @@ from validators.core import validate_section_items
 
 # Occurrence statuses come from the day read model, so share its window cap.
 MAX_OCCURRENCE_WINDOW_DAYS = MAX_WINDOW_DAYS
-CANDIDATE_LOOKBACK_DAYS = 14
+CANDIDATE_LOOKBACK_DAYS = 60
+MAX_PREVIOUS_CANDIDATES = 30
 MAX_PLAN_SECTIONS = 50
 MAX_PLAN_ITEMS = 200
 SEED_SCAN_LIMIT = 30
@@ -654,8 +655,9 @@ class ProgramSessionPlanService:
     def plan_candidates(self, root_id, owner_id, template_id, raw_date):
         """Plans a new session of ``template_id`` can execute on ``raw_date``.
 
-        Today's occurrences come first (stored or virtual), then stored plans from the
-        previous ``CANDIDATE_LOOKBACK_DAYS`` days that no session has executed yet.
+        Today's occurrences come first (stored or virtual), then the newest stored plans from
+        the previous ``CANDIDATE_LOOKBACK_DAYS`` days, up to ``MAX_PREVIOUS_CANDIDATES``. A plan
+        already executed can be run again and says so.
         """
         if not validate_root_goal(self.db_session, root_id, owner_id=owner_id):
             return None, "Fractal not found or access denied", 404
@@ -701,7 +703,8 @@ class ProgramSessionPlanService:
                 ProgramSessionPlan.date < target_date,
                 ProgramSessionPlan.deleted_at.is_(None),
             )
-            .order_by(ProgramSessionPlan.date.desc())
+            .order_by(ProgramSessionPlan.date.desc(), ProgramSessionPlan.id)
+            .limit(MAX_PREVIOUS_CANDIDATES)
             .all()
         )
         stored_ids = [plan.id for _, _, plan in today if plan] + [plan.id for plan in earlier]
@@ -714,9 +717,9 @@ class ProgramSessionPlanService:
         for plan in earlier:
             day = plan.program_day
             plan_date = date_part(plan.date)
-            if executed.get(plan.id) or not program_day_scheduled_on(day, day.program, plan_date):
+            if not program_day_scheduled_on(day, day.program, plan_date):
                 continue
-            candidates.append(self._candidate(day, plan_date, plan, is_today=False, executed=False))
+            candidates.append(self._candidate(day, plan_date, plan, is_today=False, executed=bool(executed.get(plan.id))))
         return {'template_id': template_id, 'date': target_date.isoformat(), 'candidates': candidates}, None, 200
 
     @staticmethod

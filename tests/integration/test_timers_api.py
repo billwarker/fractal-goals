@@ -87,6 +87,22 @@ class TestTimerStartStop:
         assert data['time_start'] is not None
         assert data['time_stop'] is None
 
+    def test_repeating_a_pause_or_resume_succeeds_without_changing_the_session(
+        self, authed_client, db_session, sample_activity_instance,
+    ):
+        session = db_session.get(Session, sample_activity_instance.session_id)
+        url = f'/api/{session.root_id}/timers/session/{session.id}'
+
+        not_paused = authed_client.post(f'{url}/resume')
+        assert not_paused.status_code == 200
+        assert not_paused.get_json()['is_paused'] is False
+
+        first = authed_client.post(f'{url}/pause')
+        again = authed_client.post(f'{url}/pause')
+        assert first.status_code == again.status_code == 200
+        assert again.get_json()['is_paused'] is True
+        assert again.get_json()['last_paused_at'] == first.get_json()['last_paused_at']
+
     def test_pause_resume_keeps_the_logical_timer_visible(
         self,
         authed_client,

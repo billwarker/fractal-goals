@@ -54,6 +54,12 @@
     max-width: 100%;
 }
 
+.wrappingEditor {
+    flex: 0 1 auto;
+    width: auto;
+    justify-content: flex-start;
+}
+
 .measure {
     position: absolute;
     display: inline-flex;
@@ -68,7 +74,19 @@
     content: attr(data-tag-label);
 }
 
+.wrappingRow {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    width: auto;
+}
+
 .choice {
+    /* One long name can't take over the row; the full name is in its title. */
+    display: inline-block;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     padding: 2px 7px;
     border: 1px solid var(--tag-color, var(--color-border));
     border-radius: 999px;
@@ -89,8 +107,15 @@
     color: var(--color-text-primary);
 }
 
-.summary {
+/* A Badge, sized like the tag chips it stands in for and centred despite .choice's inline-block. */
+.choice.summary {
+    display: inline-flex;
+    align-items: center;
+    min-height: 0;
     min-width: 0;
+    padding: 2px 7px;
+    font-size: 11px;
+    line-height: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

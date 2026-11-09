@@ -63,6 +63,19 @@ export function buildGoalDeadlineCalendarEvent({
     };
 }
 
+/**
+ * What the calendar badges on `date` (a due date, or a completed goal's completion date). `goal` is
+ * the goal record itself: an event's props overwrite its level `type`, so they can't stand in for it.
+ */
+export function goalsBadgedOnDate(events = [], date, goals = []) {
+    return events.flatMap((event) => {
+        const props = event.extendedProps;
+        if (event.start !== date || props?.type !== 'goal' || props.badgeLabel) return [];
+        const goal = goals.find((candidate) => String(candidate.id) === String(props.goalId));
+        return goal ? [{ goal, icon: props.goalIcon, completed: Boolean(props.goalCompleted) }] : [];
+    });
+}
+
 const readGoal = (goal, key) => goal?.[key] ?? goal?.attributes?.[key];
 
 /**

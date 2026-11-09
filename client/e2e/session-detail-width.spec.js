@@ -203,6 +203,8 @@ test('session hierarchy shares mobile edges and metric inputs retain usable widt
     const note = workspace.getByPlaceholder(/Add a note/).last();
     await note.fill('Full-width selection keeps controls usable.');
     await note.press('Enter');
+    // The note shows as soon as it's queued; wait for the composer to clear so the text is the note's alone.
+    await expect(note).toHaveValue('');
     await expect(workspace.getByText('Full-width selection keeps controls usable.', { exact: true })).toBeVisible();
     await page.reload();
     await expect(workspace.getByLabel('Pike Push Ups on the Floor metrics', { exact: true }).first().locator('input')).toHaveValue('32.00');

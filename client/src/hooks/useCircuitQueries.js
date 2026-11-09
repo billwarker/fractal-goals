@@ -13,6 +13,9 @@ import { fractalApi } from '../utils/api';
 import { queryKeys } from './queryKeys';
 import { refreshCircuitSessionConsumers, updateCircuitRunCache } from './circuitQueryCache';
 
+// Long enough for a normal queue; a dropped connection or sign-in must not hang the add.
+const DRAIN_WAIT_MS = 30000;
+
 
 export function useCircuits(rootId, { includeArchived = false } = {}) {
     return useQuery({
@@ -289,7 +292,11 @@ export function useCreateCircuitRun(rootId, sessionId) {
         const definition = outbox && cachedCircuitDefinition(queryClient, rootId, variables.circuitDefinitionId);
         if (!definition) {
             if (outbox && !isOnline()) throw new Error('This circuit needs a connection to add');
-            if (outbox) await outbox.whenDrained(sessionId);
+            if (outbox) {
+                await outbox.whenDrained(sessionId, { timeoutMs: DRAIN_WAIT_MS }).catch(() => {
+                    throw new Error('Earlier changes are still syncing. Try adding this circuit again in a moment.');
+                });
+            }
             return direct.mutateAsync(variables);
         }
         const { buildPlaceholderRun, placeholderCircuitInstances } = await loadCircuitOps();

@@ -424,6 +424,43 @@ def test_inherited_run_scope_rejects_archived_tag_and_rolls_back_round(
     assert len(after.rounds) == rounds_before, "rejected round must be rolled back"
 
 
+def test_circuit_and_round_tags_stay_editable_after_the_session_completes(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    session.completed = True
+    db_session.commit()
+
+    tags_url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}"
+    added = authed_client.patch(f"{tags_url}/tags", json={"name": "Hypertrophy", "assigned": True})
+    assert added.status_code == 200, added.get_json()
+    assert [tag["name"] for tag in added.get_json()["tags"]] == ["Hypertrophy"]
+
+    round_id = run["rounds"][0]["id"]
+    round_added = authed_client.patch(f"{tags_url}/rounds/{round_id}/tags", json={"name": "Heavy", "assigned": True})
+    assert round_added.status_code == 200, round_added.get_json()
+    assert [tag["name"] for tag in round_added.get_json()["rounds"][0]["tags"]] == ["Heavy"]
+
+    removed = authed_client.patch(f"{tags_url}/tags", json={"name": "Hypertrophy", "assigned": False})
+    assert removed.status_code == 200, removed.get_json()
+    assert removed.get_json()["tags"] == []
+
+
 def test_circuit_scope_tags_validate_ownership_archives_and_round_membership(
     authed_client,
     db_session,
@@ -1599,6 +1636,43 @@ def test_circuit_member_metrics_persist_to_each_round_result(
     )
     assert cleared.status_code == 200, cleared.get_json()
     assert cleared.get_json()["rounds"][0]["members"][0]["metrics"] == []
+
+
+def test_circuit_member_results_stay_editable_after_the_session_completes(
+    authed_client,
+    db_session,
+    test_user,
+    sample_ultimate_goal,
+    sample_activity_definition,
+):
+    session = _session(db_session, sample_ultimate_goal, test_user)
+    non_set = _non_set_activity(db_session, sample_ultimate_goal)
+    definition = _create_definition(
+        authed_client,
+        sample_ultimate_goal,
+        sample_activity_definition,
+        non_set,
+    )
+    run = authed_client.post(
+        f"/api/{sample_ultimate_goal.id}/sessions/{session.id}/circuit-runs",
+        json={"circuit_definition_id": definition["id"], "section_index": 0},
+    ).get_json()
+    run = authed_client.post(f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/rounds").get_json()
+    session.completed = True
+    db_session.commit()
+
+    metric = sample_activity_definition.metric_definitions[0]
+    members = [circuit_round["members"][0] for circuit_round in run["rounds"]]
+    member_url = f"/api/{sample_ultimate_goal.id}/circuit-runs/{run['id']}/members/{members[0]['id']}/metrics"
+    saved = authed_client.patch(member_url, json={"metrics": [{"metric_id": metric.id, "value": 135}]})
+    assert saved.status_code == 200, saved.get_json()
+
+    cascaded = authed_client.post(f"{member_url}/cascade", json={"metric_id": metric.id})
+    assert cascaded.status_code == 200, cascaded.get_json()
+    assert [
+        next(value["value"] for value in circuit_round["members"][0]["metrics"] if value["metric_id"] == metric.id)
+        for circuit_round in cascaded.get_json()["rounds"]
+    ] == [135, 135]
 
 
 def test_circuit_member_metric_cascade_fills_only_later_empty_rounds(

@@ -24,6 +24,8 @@
  * @property {number} [rejectedAt]
  * @property {object | null} [error] Why the server rejected the op (shown for review).
  * @property {object | null} [lastError] The latest transient failure while retrying.
+ * @property {number} [sendingUntil] While in the future, the op is being sent, so nothing may coalesce or cancel it.
+ * @property {boolean} [bodyPrepared] `body` is final: retries must send exactly this.
  */
 
 /**
@@ -40,6 +42,8 @@
  * @property {(op: OutboxOp) => Promise<unknown>} [send] Delivers one op to the server.
  * @property {() => boolean} [isOnline]
  * @property {(callback: () => Promise<unknown>) => Promise<unknown>} [lock]
+ * @property {(callback: () => Promise<unknown>, options?: { steal?: boolean }) => Promise<unknown>} [drainLock]
+ * @property {(body: unknown) => unknown} [prepareBody]
  * @property {BroadcastChannel | null} [channel]
  * @property {() => number} [now]
  * @property {() => number} [random]

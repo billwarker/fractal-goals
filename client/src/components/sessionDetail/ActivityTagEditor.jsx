@@ -36,6 +36,7 @@ function ActivityTagEditor({
     // unless the caller shows them itself (`showSelected={false}`).
     leading = null,
     showSelected = true,
+    maxTagRows = 1, // Above one, tags wrap under the name and read "N tags" only past this many rows.
 }) {
     const isStacked = leading != null;
     const isSetScope = Boolean(setId) || setScope;
@@ -86,7 +87,7 @@ function ActivityTagEditor({
     const selectedTags = selectedIds.map((id) => tagsById.get(id)).filter((tag) => tag && !inheritedIds.has(tag.id));
     const nameMatch = findTagByName(pickerCatalog.tags, name);
     const toggle = (tag) => toggleTagSelection(selectedIds, tag, families);
-    const tagOverflow = useTagCountOverflow(selectedTags, editable);
+    const tagOverflow = useTagCountOverflow(selectedTags, editable, { maxRows: maxTagRows });
 
     useAnchoredPortalPosition({
         open: editable && isPickerOpen,
@@ -296,7 +297,7 @@ function ActivityTagEditor({
     ) : null;
 
     const tagChoice = (tag) => (
-        <label key={tag.id} className={`${styles.choice} ${selectedIds.includes(tag.id) ? styles.selected : ''}`} style={tag.color ? { '--tag-color': tag.color } : undefined}>
+        <label key={tag.id} className={`${styles.choice} ${selectedIds.includes(tag.id) ? styles.selected : ''}`} title={tag.name} style={tag.color ? { '--tag-color': tag.color } : undefined}>
             <input
                 type="checkbox"
                 checked={selectedIds.includes(tag.id)}
@@ -309,7 +310,7 @@ function ActivityTagEditor({
 
     return (
         <div
-            className={`${styles.editor} ${isStacked ? styles.stackedEditor : isSetScope ? styles.setEditor : styles.instanceEditor} ${className}`}
+            className={`${styles.editor} ${isStacked ? styles.stackedEditor : isSetScope ? styles.setEditor : styles.instanceEditor} ${maxTagRows > 1 ? styles.wrappingEditor : ''} ${className}`}
             ref={editorRef}
             role="group"
             aria-label={groupLabel}
@@ -319,7 +320,7 @@ function ActivityTagEditor({
                 <div className={styles.stackedHead}>{leading}{addTagTrigger}</div>
                 {showSelected && selectedTags.length ? <div className={styles.stackedList}>{selectedTags.map(tagChoice)}</div> : null}
             </>) : (
-            <div className={styles.tags} ref={tagOverflow.containerRef}>
+            <div className={`${styles.tags} ${maxTagRows > 1 ? styles.wrappingRow : ''}`} ref={tagOverflow.containerRef}>
                 {triggerFirst ? addTagTrigger : null}
                 <span className={styles.measure} ref={tagOverflow.measureRef} aria-hidden="true">
                     {selectedTags.map((tag) => (

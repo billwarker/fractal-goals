@@ -877,7 +877,7 @@ function ProgramCalendarPage() {
                     dueDragEnabled={dueDateDrop.dueDragEnabled}
                     rootId={rootId}
                     scope={selectedTimeframeDates.length ? 'range' : calendarScope}
-                    contextDate={contextDate}
+                    contextDate={contextDate} goalCalendarEvents={goalDeadlineEvents}
                     selectedRange={selectedCalendarRange}
                     selectionLabel={selectedTimeframeLabel}
                     dayDetailQuery={dayDetailQuery}

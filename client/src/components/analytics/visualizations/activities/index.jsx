@@ -46,6 +46,7 @@ function ActivityScatterPlotChart({ context }) {
                 onOpenGoal={context.onOpenGoal}
                 selectedMetricX={context.visualizationState.metricX}
                 selectedMetricY={context.visualizationState.metricY}
+                hideTitle={context.hideChartTitle}
                 groupBy={groupBy}
                 lookups={lookups}
             />
@@ -91,6 +92,7 @@ function MetricTrendsVisualizationChart({ context }) {
                 chartRef={context.chartRef}
                 goalLines={context.goalConditionLines}
                 onOpenGoal={context.onOpenGoal}
+                hideTitle={context.hideChartTitle}
                 metrics={context.visualizationState.metrics || []}
                 setsHandling={context.visualizationState.setsHandling || 'top'}
                 selectedSplit={context.visualizationState.selectedSplit || 'all'}

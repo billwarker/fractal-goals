@@ -32,7 +32,7 @@ test('single and bulk program-day statuses persist in the calendar', async ({ pa
     await statusTrigger.click();
     await expect(page.getByText('Manual complete')).toBeVisible();
 
-    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     await page.getByRole('button', { name: /Select Multiple Days|Select Days/ }).click();
     const selectedMetricsResponse = page.waitForResponse((response) => {
         const url = new URL(response.url());
@@ -40,14 +40,14 @@ test('single and bulk program-day statuses persist in the calendar', async ({ pa
             && url.searchParams.get('dates') === `${today},${later}`;
     });
     await page.locator(`.fc-daygrid-day[data-date="${today}"]`).click();
-    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     await page.locator(`.fc-daygrid-day[data-date="${later}"]`).click();
     const selectedMetrics = await (await selectedMetricsResponse).json();
     expect(selectedMetrics.window.dates).toEqual([today, later]);
     expect(selectedMetrics.window.total_days).toBe(2);
     await expect(page.getByText('Selected timeframe', { exact: true }).first().locator('..'))
         .toContainText('2 selected days');
-    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     if (device === 'desktop') {
         const overview = page.getByLabel('Selected timeframe program overview');
         await expect(overview).toBeVisible();

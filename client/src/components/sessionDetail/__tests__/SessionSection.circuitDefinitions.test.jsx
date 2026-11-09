@@ -54,6 +54,7 @@ vi.mock('../../../contexts/ActiveSessionContext', () => ({
     }),
 }));
 
+vi.mock('../../../hooks/useActivityInstanceGoalAssociation', async (original) => ({ ...(await original()), useAddActivityFromPicker: () => async () => {} }));
 vi.mock('../../../hooks/useIsMobile', () => ({ default: () => false }));
 
 vi.mock('../../../hooks/useCircuitQueries', () => ({

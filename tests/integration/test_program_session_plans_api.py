@@ -337,10 +337,18 @@ def test_session_rejects_plan_of_another_template(authed_client, db_session, pla
     assert response.status_code == 400
 
 
-def test_candidates_offer_today_then_unexecuted_plans_within_lookback(authed_client, db_session, plan_world):
-    template = plan_world['template']
+def _candidates(authed_client, plan_world, today):
+    response = authed_client.get(
+        f"/api/{plan_world['root'].id}/session-plans/candidates"
+        f"?template_id={plan_world['template'].id}&date={today.isoformat()}"
+    )
+    return response.get_json()['candidates']
+
+
+def test_candidates_offer_today_then_previous_plans_within_lookback(authed_client, db_session, plan_world, monkeypatch):
+    monkeypatch.setattr('services.program_session_plans.CANDIDATE_LOOKBACK_DAYS', 14)
     today = plan_world['mondays'][3]
-    inside = today - timedelta(days=CANDIDATE_LOOKBACK_DAYS)  # a Monday: boundary is inclusive
+    inside = today - timedelta(days=14)  # a Monday: boundary is inclusive
     outside = inside - timedelta(days=1)  # the Sunday before, scheduled explicitly
     db_session.add(ProgramDayOccurrenceSchedule(program_day_id=plan_world['day'].id, date=outside))
     db_session.commit()
@@ -349,15 +357,57 @@ def test_candidates_offer_today_then_unexecuted_plans_within_lookback(authed_cli
         assert _save(authed_client, plan_world, plan_date, sections).status_code == 200
     assert db_session.query(ProgramSessionPlan).count() == 2
 
-    response = authed_client.get(
-        f"/api/{plan_world['root'].id}/session-plans/candidates?template_id={template.id}&date={today.isoformat()}"
-    )
-
-    candidates = response.get_json()['candidates']
-    assert [(row['date'], row['is_today'], row['plan_id'] is None) for row in candidates] == [
+    assert [(row['date'], row['is_today'], row['plan_id'] is None) for row in _candidates(authed_client, plan_world, today)] == [
         (today.isoformat(), True, True),
         (inside.isoformat(), False, False),
     ]
+
+
+def test_candidates_include_previous_plans_already_run_and_say_so(authed_client, db_session, test_user, plan_world):
+    week1, week2, _, today = plan_world['mondays']
+    sections = _day_plans(authed_client, plan_world, week1)['sections']
+    run = _save(authed_client, plan_world, week1, sections).get_json()
+    _save(authed_client, plan_world, week2, sections)
+    db_session.add(Session(owner_id=test_user.id, root_id=plan_world['root'].id, name='Bench',
+                           template_id=plan_world['template'].id, program_session_plan_id=run['plan_id']))
+    db_session.commit()
+
+    assert [(row['date'], row['executed']) for row in _candidates(authed_client, plan_world, today)] == [
+        (today.isoformat(), False),
+        (week2.isoformat(), False),
+        (week1.isoformat(), True),
+    ]
+
+
+def test_candidates_cap_previous_plans_at_the_newest(authed_client, plan_world, monkeypatch):
+    monkeypatch.setattr('services.program_session_plans.MAX_PREVIOUS_CANDIDATES', 1)
+    week1, week2, _, today = plan_world['mondays']
+    sections = _day_plans(authed_client, plan_world, week1)['sections']
+    _save(authed_client, plan_world, week1, sections)
+    _save(authed_client, plan_world, week2, sections)
+
+    assert [row['date'] for row in _candidates(authed_client, plan_world, today)] == [today.isoformat(), week2.isoformat()]
+
+
+def test_a_session_started_from_a_previous_day_leaves_that_date_uncredited(authed_client, plan_world):
+    past = plan_world['past_mondays'][1]
+    response = authed_client.post(f"/api/{plan_world['root'].id}/sessions", json={
+        'name': 'Bench',
+        'template_id': plan_world['template'].id,
+        'session_start': datetime.now(timezone.utc).isoformat(),
+        'session_data': {
+            'template_id': plan_world['template'].id,
+            'session_type': 'normal',
+            'program_context': {'day_id': plan_world['day'].id},
+            'sections': [],
+        },
+    })
+    assert response.status_code == 201
+    assert response.get_json()['program_day_id'] == plan_world['day'].id
+
+    row = next(row for row in _occurrences(authed_client, plan_world) if row['date'] == past.isoformat())
+    assert row.get('sessions', []) == []
+    assert row.get('program_day_completed') is not True
 
 
 def test_pull_template_changes_keeps_planned_values_and_plan_added_items(authed_client, db_session, plan_world):

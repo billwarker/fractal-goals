@@ -67,7 +67,7 @@ test('summarizes a block in the calendar pane and adds a program day with option
 
     // Program days belong to the program: they are created from the Days tab's side pane and
     // take optional goals from the program's goals.
-    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse' }).click();
+    if (device === 'mobile') await page.getByRole('button', { name: 'Collapse', exact: true }).click();
     await page.getByRole('tab', { name: 'Days' }).click();
     if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();
     await expectSidebarHeader();

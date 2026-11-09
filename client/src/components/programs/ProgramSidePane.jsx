@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 import Button from '../atoms/Button';
 import SidePaneHeader from '../common/SidePaneHeader';
@@ -7,6 +7,7 @@ import ViewToggleTabs from '../common/ViewToggleTabs';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { blockWeekLabel } from '../../utils/programBlockWeeks';
 import { formatProgramCalendarRange } from '../../utils/programCalendarContext';
+import { goalsBadgedOnDate } from '../../utils/programCalendarGoalEvents';
 import { blockForDate } from '../../utils/programViewModel';
 import ProgramSidebar from './ProgramSidebar';
 import ProgramDayPane from './ProgramDayPane';
@@ -31,6 +32,7 @@ export default function ProgramSidePane({
     rootId,
     scope = 'program',
     contextDate,
+    goalCalendarEvents = [],
     selectedRange,
     selectionLabel = null,
     dayDetailQuery,
@@ -58,6 +60,10 @@ export default function ProgramSidePane({
     view = 'details',
     onViewChange = () => {},
 }) {
+    const dueGoals = useMemo(
+        () => (scope === 'day' ? goalsBadgedOnDate(goalCalendarEvents, contextDate, goals) : []),
+        [contextDate, goalCalendarEvents, goals, scope],
+    );
     const getGoalDetails = (goalId) => goals.find((goal) => String(goal.id) === String(goalId)) || null;
     // "Month 1 · Week 3" under a scoped date: the block covering it, and its week when tracked.
     const dayBlockLabel = scope === 'day' && contextDate
@@ -134,6 +140,7 @@ export default function ProgramSidePane({
                     rootId={rootId}
                     date={contextDate}
                     today={today}
+                    dueGoals={dueGoals}
                     query={dayDetailQuery}
                     program={program}
                     onScheduleDay={onScheduleDay}

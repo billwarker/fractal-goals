@@ -59,10 +59,14 @@ export function OutboxProvider({ children }) {
         const unsubscribe = subscribeConnectivity((online) => {
             if (online) void outbox.flush();
         });
+        const stopTrackingOffline = engine.trackOfflineTransitions();
         const handleRefreshed = () => outbox.resumeAfterAuth();
         const handleVisible = () => {
             if (document.visibilityState !== 'visible') return;
             checkConnectivity();
+            // A sign-in elsewhere may have fixed a pause; if not, the next send pauses again.
+            outbox.resumeAfterAuth();
+            void outbox.reclaimStalledDrain();
             void outbox.flush();
         };
         window.addEventListener('auth:token_refreshed', handleRefreshed);
@@ -71,6 +75,7 @@ export function OutboxProvider({ children }) {
         return () => {
             unregisterHandlers();
             unsubscribe();
+            stopTrackingOffline();
             window.removeEventListener('auth:token_refreshed', handleRefreshed);
             document.removeEventListener('visibilitychange', handleVisible);
         };

@@ -84,6 +84,15 @@
 .goalList { display: grid; gap: 4px; }
 .goalList button { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 5px 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; text-align: left; }
 .goalList button:hover { background: var(--color-bg-card-hover); }
+.dueGoalList { display: grid; gap: 4px; }
+.dueGoal { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; font: inherit; text-align: left; }
+.dueGoal > svg { flex: 0 0 auto; margin-top: 2px; }
+.dueGoal:hover { background: var(--color-bg-card-hover); }
+.dueGoal:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.dueGoalText { display: grid; flex: 1 1 auto; gap: 3px; min-width: 0; }
+.dueGoalName { overflow-wrap: anywhere; font-size: 14px; font-weight: 500; line-height: 1.35; }
+.dueGoalMeta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; color: var(--color-text-muted); font-size: 12px; line-height: 1.35; }
+.dueGoalCompleted { color: var(--color-brand-success); }
 .offPlanGroup { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--color-border) 62%, transparent); }
 .offPlanGroup h4 { margin: 0; color: var(--color-text-primary); font-size: 13px; font-weight: 700; }
 .creditMenuTrigger:disabled { cursor: wait; opacity: .6; }

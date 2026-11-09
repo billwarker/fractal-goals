@@ -162,7 +162,7 @@ export default function CircuitRunCard({
                         canMoveDown={canMoveDown}
                         sessionIndex={itemNumber}
                     />
-                    <div className={activityStyles.activityNameContainer}>
+                    <div className={activityStyles.activityNameContainer} data-tag-width-boundary>
                         <div className={`${activityStyles.activityName} ${activityStyles.activityNameFlex}`}>
                             <span>{run.name}</span>
                             {(isRunSelected || (run.tags || []).length > 0) && (
@@ -232,7 +232,6 @@ export default function CircuitRunCard({
                                         className={`${activityStyles.headerScopeControl} ${styles.runScopeControl}`}
                                         run={run}
                                         availableTags={derived.circuitAvailableTags}
-                                        disabled={disabled}
                                         editable={isRunSelected}
                                         onPerform={perform}
                                     />
@@ -289,7 +288,6 @@ export default function CircuitRunCard({
                                     <CircuitRoundTagControl
                                         round={round}
                                         availableTags={derived.circuitAvailableTags}
-                                        disabled={disabled}
                                         editable={isRoundSelected}
                                         onPerform={perform}
                                     />
@@ -367,7 +365,6 @@ export default function CircuitRunCard({
                                                     rootId={rootId}
                                                     definition={definition}
                                                     metrics={metrics}
-                                                    disabled={disabled}
                                                     saving={action.isPending}
                                                     progress={{ comparison: instance?.progress_comparison, setIndex, planned: derived.plannedMemberValues(round, slot) }}
                                                     onSave={(nextMetrics) => action.saveMemberMetrics

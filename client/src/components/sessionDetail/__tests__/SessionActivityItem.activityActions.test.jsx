@@ -348,9 +348,12 @@ describe('SessionActivityItem one-off goal links', () => {
         const { QueryClient } = await import('@tanstack/react-query');
         const { queryKeys } = await import('../../../hooks/queryKeys');
         const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-        queryClient.setQueryData(queryKeys.fractalTree('root-1'), {
-            id: 'root-1', name: 'Guitar', type: 'UltimateGoal',
-            children: [{ id: 'song', name: 'Head Over Heels', type: 'ImmediateGoal', children: [] }],
+        queryClient.setQueryData(queryKeys.sessionGoalsView('root-1', 'session-1'), {
+            goal_tree: {
+                id: 'root-1', name: 'Guitar', type: 'UltimateGoal',
+                children: [{ id: 'song', name: 'Head Over Heels', type: 'ImmediateGoal', children: [] }],
+            },
+            activity_goal_ids_by_activity: { 'activity-1': ['root-1'] },
         });
         renderWithProviders(
             <SessionActivityItem
@@ -370,7 +373,9 @@ describe('SessionActivityItem one-off goal links', () => {
             />,
             { queryClient, withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
         );
-        expect(screen.getByRole('list', { name: 'Linked goals' })).toBeInTheDocument();
+        expect(screen.getByRole('list', { name: 'Goals' })).toBeInTheDocument();
+        // The definition's goal is the one-off goal's ancestor: only the lowest on the branch shows.
+        expect(screen.getAllByRole('listitem')).toHaveLength(1);
         expect(screen.getByRole('listitem', { name: 'Linked to Head Over Heels (this instance only)' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: /Associate with|instance association/ })).not.toBeInTheDocument();
     });

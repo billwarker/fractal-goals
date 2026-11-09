@@ -24,6 +24,7 @@ function CircuitScopeTagEditor({
     disabled = false,
     editable = true,
     triggerFirst = false,
+    maxTagRows = 1, // Above one, tags wrap under the name and read "N tags" only past this many rows.
     onChange,
 }) {
     const editorRef = useRef(null);
@@ -47,7 +48,7 @@ function CircuitScopeTagEditor({
     ), [availableTags, catalogTags, search, selectedIds]);
     const assignableCount = catalogTags.filter((tag) => !tag.archived).length;
     const nameMatch = findTagByName(catalogTags, name);
-    const tagOverflow = useTagCountOverflow(tags, editable);
+    const tagOverflow = useTagCountOverflow(tags, editable, { maxRows: maxTagRows });
 
     useAnchoredPortalPosition({
         open: editable && isOpen,
@@ -135,12 +136,12 @@ function CircuitScopeTagEditor({
     return (
         <div
             ref={editorRef}
-            className={`${styles.editor} ${styles.instanceEditor} ${styles.scopeEditor} ${className}`}
+            className={`${styles.editor} ${styles.instanceEditor} ${styles.scopeEditor} ${maxTagRows > 1 ? styles.wrappingEditor : ''} ${className}`}
             role="group"
             aria-label={scopeLabel}
             onClick={(event) => event.stopPropagation()}
         >
-            <div className={styles.tags} ref={tagOverflow.containerRef}>
+            <div className={`${styles.tags} ${maxTagRows > 1 ? styles.wrappingRow : ''}`} ref={tagOverflow.containerRef}>
                 {triggerFirst ? addTagTrigger : null}
                 <span className={styles.measure} ref={tagOverflow.measureRef} aria-hidden="true">
                     {tags.map((tag) => (

@@ -12,6 +12,7 @@ export function CircuitRunTagControl({ className = '', run, availableTags, disab
             disabled={disabled}
             editable={editable}
             triggerFirst
+            maxTagRows={2}
             onChange={(value) => onPerform({ action: 'updateRunTag', value, inlineError: true })}
         />
     );
@@ -67,6 +68,7 @@ export function CircuitMemberTagEditor({
             tags={activitySet ? activitySet.tags || [] : instance.tags || []}
             inheritedTags={inheritedTags}
             editable={editable}
+            maxTagRows={activitySet ? 1 : 2}
         />
     );
 }

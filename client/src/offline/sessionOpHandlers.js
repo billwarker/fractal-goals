@@ -20,6 +20,10 @@ export { SESSION_OP };
 export { findSessionForActivity } from './sessionCache';
 
 
+// Saving a set often means another save seconds later: refresh once the session goes quiet.
+const POST_SYNC_QUIET_MS = 1500;
+const REJECTION_TOAST_DELAY_MS = 300;
+
 const SESSION_QUERY_PREFIXES = new Set(['session', 'session-activities', 'session-notes', 'circuit-runs']);
 
 const keysFor = ({ rootId, sessionId }) => ({
@@ -242,20 +246,52 @@ export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
         queryKeys.sessionGoalsView(rootId, sessionId),
         queryKeys.sessionNotes(rootId, sessionId),
         queryKeys.sessionProgressSummary(sessionId),
+        queryKeys.progressRoot(),
+        ['activity-progress-timeline', rootId],
+    ]);
+    // Other pages' read models only go stale here; they refetch when next opened.
+    const staleOnly = { refetchType: 'none' };
+    invalidateQueryKeys(queryClient, [
         queryKeys.sessionsEvidenceGoalsRoot(rootId),
         queryKeys.sessionsFlowtreeMetricsRoot(rootId),
         queryKeys.programDayReadModelRoot(rootId),
         queryKeys.activityHistoryRoot(rootId),
-        queryKeys.progressRoot(),
-        ['activity-progress-timeline', rootId],
-    ]);
-    invalidateSessionLists(queryClient, rootId, queryKeys);
+    ], staleOnly);
+    invalidateSessionLists(queryClient, rootId, queryKeys, staleOnly);
 }
 
 /** Wire session op kinds to the query cache. Returns a cleanup function. */
 export function registerSessionOpHandlers(outbox, queryClient) {
     const scopeRoots = new Map();
     let pendingScopes = new Set();
+    const refreshTimers = new Map();
+    let rejections = [];
+    let rejectionTimer = null;
+
+    const cancelRefresh = (scope) => {
+        clearTimeout(refreshTimers.get(scope));
+        refreshTimers.delete(scope);
+    };
+    const scheduleRefresh = (scope, rootId) => {
+        cancelRefresh(scope);
+        refreshTimers.set(scope, setTimeout(() => {
+            refreshTimers.delete(scope);
+            invalidateSessionAfterSync(queryClient, rootId, scope);
+        }, POST_SYNC_QUIET_MS));
+    };
+    // One toast per burst: a rejected add also rejects everything that depended on it.
+    const reportRejection = (error) => {
+        rejections.push(error);
+        if (rejectionTimer) return;
+        rejectionTimer = setTimeout(() => {
+            const [first] = rejections;
+            notify.error(rejections.length === 1
+                ? `A change couldn't be saved: ${first?.message || 'the server rejected it'}`
+                : `${rejections.length} changes couldn't be saved. Review them in the sync status.`);
+            rejections = [];
+            rejectionTimer = null;
+        }, REJECTION_TOAST_DELAY_MS);
+    };
 
     const ack = (op, response) => {
         const data = response?.data;
@@ -351,8 +387,8 @@ export function registerSessionOpHandlers(outbox, queryClient) {
     };
 
     const reject = (op, error) => {
-        notify.error(`A change couldn't be saved: ${error?.message || 'the server rejected it'}`);
-        if (!outbox.hasPending(op.scope)) invalidateSessionAfterSync(queryClient, op.meta.rootId, op.meta.sessionId);
+        reportRejection(error);
+        if (!outbox.hasPending(op.scope)) scheduleRefresh(op.meta.sessionId, op.meta.rootId);
     };
 
     const unregister = Object.values(SESSION_OP).map((kind) => outbox.registerHandler(kind, {
@@ -379,12 +415,13 @@ export function registerSessionOpHandlers(outbox, queryClient) {
         outbox.pendingOps().forEach((op) => {
             if (!op.scope) return;
             next.add(op.scope);
+            cancelRefresh(op.scope);
             if (op.meta?.rootId) scopeRoots.set(op.scope, op.meta.rootId);
         });
         pendingScopes.forEach((scope) => {
             if (next.has(scope)) return;
             const rootId = scopeRoots.get(scope);
-            if (rootId) invalidateSessionAfterSync(queryClient, rootId, scope);
+            if (rootId) scheduleRefresh(scope, rootId);
         });
         pendingScopes = next;
     });
@@ -397,5 +434,7 @@ export function registerSessionOpHandlers(outbox, queryClient) {
         unregister.forEach((off) => off());
         unsubscribeCache();
         unsubscribeOutbox();
+        refreshTimers.forEach((timer) => clearTimeout(timer));
+        clearTimeout(rejectionTimer);
     };
 }
