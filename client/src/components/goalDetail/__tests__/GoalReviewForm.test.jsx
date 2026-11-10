@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import GoalReviewForm from '../GoalReviewForm';
@@ -52,6 +52,42 @@ describe('GoalReviewForm', () => {
 
         await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
             { schema: 1, status: 'on_track', went_well: 'Played a gig', change: '', next_focus: '' }, [],
+        ));
+    });
+
+    it('hands Save to the host footer and saves from there', async () => {
+        const onSubmit = vi.fn().mockResolvedValue(true);
+        const registerFooterAction = vi.fn();
+        const { unmount } = render(
+            <GoalReviewForm rootId="r" goal={goal} goalId="g" onSubmit={onSubmit} onCancel={vi.fn()} registerFooterAction={registerFooterAction} />,
+        );
+        expect(screen.queryByRole('button', { name: 'Save review' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+        expect(registerFooterAction).toHaveBeenLastCalledWith(expect.objectContaining({ label: 'Save review', disabled: true }));
+
+        fireEvent.change(screen.getByLabelText('What went well?'), { target: { value: 'Played a gig' } });
+        const action = registerFooterAction.mock.lastCall[0];
+        expect(action.disabled).toBe(false);
+        await act(async () => action.onClick());
+        expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ went_well: 'Played a gig' }), []);
+
+        unmount();
+        expect(registerFooterAction).toHaveBeenLastCalledWith(null);
+    });
+
+    it('edits an existing review: answers filled in, that review not shown as the last one', async () => {
+        const onSubmit = vi.fn().mockResolvedValue(true);
+        render(<GoalReviewForm rootId="r" goal={goal} goalId="g" onSubmit={onSubmit} editingNote={data.notes[1]} />);
+        expect(screen.getByRole('button', { name: 'At risk' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByLabelText('What went well?')).toHaveValue('Wrote two songs');
+        expect(screen.queryByRole('button', { name: 'Attach pictures, video or audio' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByText('Last review'));
+        expect(screen.getByText('Older')).toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('What would you change?'), { target: { value: 'Rehearse' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(
+            { schema: 1, status: 'at_risk', went_well: 'Wrote two songs', change: 'Rehearse', next_focus: '' }, [],
         ));
     });
 

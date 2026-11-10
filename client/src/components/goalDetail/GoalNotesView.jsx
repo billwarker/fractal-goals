@@ -11,7 +11,7 @@ import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
 import styles from './GoalNotesView.module.css';
 
-function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null }) {
+function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null, onEditReview }) {
     const [includeDescendants, setIncludeDescendants] = useState(false);
     const [includeGoalNotes, setIncludeGoalNotes] = useState(true);
     const [includeActivityInstanceNotes, setIncludeActivityInstanceNotes] = useState(true);
@@ -117,6 +117,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                     <NoteTimeline
                         notes={notes}
                         onEdit={isReadOnly ? undefined : updateNote}
+                        onEditReview={isReadOnly ? undefined : onEditReview}
                         onDelete={isReadOnly ? undefined : deleteNote}
                         onCarryForward={isReadOnly ? undefined : setCarryForward}
                         groupByDate={true}

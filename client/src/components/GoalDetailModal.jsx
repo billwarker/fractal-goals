@@ -62,6 +62,7 @@ function GoalDetailModal({
     initialActivities = [], initialActivityGroups = [], // Create-mode associations
     initialCompletion = null, // Create-mode { completionCondition, conditionDraft, name?, deadline? } seed
     initialView = 'goal', initialViewKey = 0,
+    initialReviewNote = null, // With initialView 'goal-review': the review to edit; the modal closes when it's done
 }) {
     const {
         getGoalColor = () => '#4caf50',
@@ -120,6 +121,8 @@ function GoalDetailModal({
     const [activityBuilderTemplate, setActivityBuilderTemplate] = useState(null);
     const [isActivityBuilderOpen, setIsActivityBuilderOpen] = useState(false);
     const [conditionErrors, setConditionErrors] = useState({});
+    // The review the Review view edits; null writes a new one.
+    const [reviewNote, setReviewNote] = useState(initialReviewNote);
     const updateConditionDraft = React.useCallback((draft) => {
         setConditionDraft(draft);
         setConditionErrors({});
@@ -650,6 +653,9 @@ function GoalDetailModal({
             readOnlyAssociatedActivities={readOnlyAssociatedActivities}
             readOnlyAssociatedActivityGroups={readOnlyAssociatedActivityGroups}
             readOnlyNotes={readOnlyNotes}
+            reviewNote={reviewNote}
+            setReviewNote={setReviewNote}
+            closeAfterReview={initialView === 'goal-review' && Boolean(initialReviewNote) && reviewNote === initialReviewNote}
             readOnlyTimelineEntries={readOnlyTimelineEntries}
             refreshAssociations={refreshAssociations}
             registerActivitiesAssociateAction={registerActivitiesAssociateAction}

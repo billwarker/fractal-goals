@@ -6,12 +6,13 @@ import uuid
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import selectinload
 
-from models import ActivityDefinition, ActivityInstance, Goal, Note, Session, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations, validate_root_goal
+from models import ActivityDefinition, ActivityInstance, Goal, Note, Program, Session, activity_goal_associations, activity_instance_goal_associations, goal_activity_group_associations, validate_root_goal
 from services.events import Event, Events, event_bus
 from services.goal_review_content import normalize_review_data, review_content
 from services.goal_review_rules import restart_review_cadence
 from services.note_carry_forward import CarryForwardError, carried_notes_for_session, set_carry_forward
 from services.note_contexts import validate_note_context
+from services.note_ownership import count_owned_notes
 from services.owned_entity_queries import get_owned_activity_instance, get_owned_session
 from services.payload_normalizers import normalize_note_payload
 from services.quota_service import QuotaService
@@ -50,6 +51,40 @@ class NoteService:
         if not root:
             return None, ("Fractal not found or access denied", 404)
         return root, None
+
+    def count_owned_notes(self, root_id, current_user_id, *, session_id=None, goal_id=None,
+                          activity_instance_id=None, program_id=None) -> ServiceResult[JsonDict]:
+        """How many notes deleting one session, goal (with its subtree), activity instance or program would take."""
+        _, error = self._validate_owned_root(root_id, current_user_id)
+        if error:
+            return None, *error
+        if sum(bool(value) for value in (session_id, goal_id, activity_instance_id, program_id)) != 1:
+            return None, "Give one of session_id, goal_id, activity_instance_id or program_id", 400
+        if session_id:
+            session = get_owned_session(self.db_session, root_id, session_id)
+            if not session:
+                return None, "Session not found", 404
+            targets = {
+                'session_ids': [session.id],
+                'instance_ids': [instance.id for instance in (session.activity_instances or [])],
+            }
+        elif activity_instance_id:
+            if not get_owned_activity_instance(self.db_session, root_id, activity_instance_id):
+                return None, "Activity instance not found", 404
+            targets = {'instance_ids': [activity_instance_id]}
+        elif program_id:
+            if not self.db_session.query(Program.id).filter(Program.id == program_id, Program.root_id == root_id).first():
+                return None, "Program not found", 404
+            targets = {'program_ids': [program_id]}
+        else:
+            from services.goal_service import GoalService  # Goal services import notes; resolve lazily.
+            goal = self.db_session.query(Goal).filter(
+                Goal.id == goal_id, Goal.root_id == root_id, Goal.deleted_at.is_(None),
+            ).first()
+            if not goal:
+                return None, "Goal not found", 404
+            targets = {'goal_ids': GoalService(self.db_session).goal_subtree_ids(goal)}
+        return {'count': count_owned_notes(self.db_session, root_id, **targets)}, None, 200
 
     def get_session_notes(self, root_id, session_id, current_user_id) -> ServiceResult[JsonList]:
         _, error = self._validate_owned_root(root_id, current_user_id)

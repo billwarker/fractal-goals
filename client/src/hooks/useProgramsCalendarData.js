@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { flattenGoals } from '../utils/goalHelpers';
 import { buildProgramSummaryLabels } from '../utils/programViewModel';
 import { fractalApi } from '../utils/api';
+import { invalidateNotesAfterDelete } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 
@@ -46,6 +47,11 @@ export function useProgramsCalendarData(rootId, { timezone } = {}) {
         refetchProgramList(),
         queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
     ]), [queryClient, refetchProgramList, rootId]);
+    // A deleted program takes its notes and date notes with it.
+    const refreshAfterProgramDeleted = useCallback(() => {
+        invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
+        return refetchPrograms();
+    }, [queryClient, refetchPrograms, rootId]);
 
     return {
         programs: sortedPrograms,
@@ -54,6 +60,7 @@ export function useProgramsCalendarData(rootId, { timezone } = {}) {
         loading: programsQuery.isLoading || goalsQuery.isLoading,
         treeData: goalsQuery.data || null,
         refetchPrograms,
+        refreshAfterProgramDeleted,
         refetchGoals: goalsQuery.refetch,
     };
 }

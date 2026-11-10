@@ -38,7 +38,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     /* The time line follows directly; the heading and the time read as one block. */
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .noteCard.timeline .metaStack,
@@ -51,6 +51,18 @@
 .noteCard.timeline .headerActions {
     min-width: 0;
     padding-top: 1px;
+}
+
+/* The heading's line is one rail node tall, so its name centres on the node beside it (NoteTimeline's --tree-node). */
+.noteCard.timeline .contextSummary {
+    display: flex;
+    align-items: center;
+    min-height: var(--tree-node, 18px);
+    line-height: var(--tree-node, 18px);
+}
+
+.noteCard.timeline .reviewHeading [data-status] {
+    line-height: calc(var(--tree-node, 18px) - 2px);
 }
 
 /* A note without a heading of its own (e.g. in an activity group) starts at its time line. */
@@ -178,6 +190,37 @@
 
 .contextSummary {
     min-width: 0;
+}
+
+.reviewHeading {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* A goal note's name opens its goal; a program note's leads to its program. */
+.goalLink {
+    padding: 0;
+    text-decoration: none;
+    border: 0;
+    background: none;
+    font-family: inherit;
+    line-height: inherit;
+    text-align: left;
+    cursor: pointer;
+    text-underline-offset: 3px;
+}
+
+.goalLink:hover,
+.goalLink:focus-visible {
+    text-decoration: underline;
+}
+
+.goalLink:focus-visible {
+    outline: none;
 }
 
 .goalContext {

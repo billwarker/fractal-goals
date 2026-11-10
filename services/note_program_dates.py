@@ -34,6 +34,19 @@ def validate_program_date_note(db_session, root_id, program_id, calendar_date) -
     return {'program': program, 'calendar_date': target_date}, None
 
 
+def load_range_date_notes(db_session, program_ids, start: date, end: date) -> list[Note]:
+    """Live notes on any date from start to end of these programs, oldest first within a date."""
+    if not program_ids:
+        return []
+    return db_session.query(Note).filter(
+        Note.program_id.in_(program_ids),
+        Note.context_type == 'program_date',
+        Note.calendar_date >= start,
+        Note.calendar_date <= end,
+        Note.deleted_at.is_(None),
+    ).order_by(Note.calendar_date, Note.created_at, Note.id).all()
+
+
 def load_date_notes(db_session, program_id, calendar_date: date) -> list[Note]:
     """Live notes on one date of a program, newest first."""
     return db_session.query(Note).filter(

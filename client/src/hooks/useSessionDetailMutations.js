@@ -8,7 +8,9 @@ import { formatError } from '../utils/mutationNotify';
 import { applyOptimisticQueryUpdate } from '../utils/optimisticQuery';
 import { fractalApi } from '../utils/api';
 import { applyCreatedGoal } from '../utils/goalTreeCache';
-import { invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
+import {
+    invalidateNotesAfterDelete, invalidateOnboardingProgress, invalidateQueryKeys, invalidateSessionLists,
+} from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 import { useSessionCompletion } from './useSessionCompletion';
 import {
@@ -115,6 +117,8 @@ export function useSessionDetailMutations({
                 if (!Array.isArray(previous)) return previous;
                 return previous.filter((instance) => instance.id !== instanceId);
             });
+            // Its notes went with it.
+            invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
             setSessionDataDraft((previous) => {
                 if (!previous?.sections) return previous;
                 return {
@@ -154,6 +158,7 @@ export function useSessionDetailMutations({
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
             // A deleted session no longer executes its plan.
             queryClient.invalidateQueries({ queryKey: queryKeys.programSessionPlansRoot(rootId) });
+            invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
             notify.success('Session deleted successfully');
         },
         onError: () => {

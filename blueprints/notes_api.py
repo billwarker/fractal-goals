@@ -59,6 +59,31 @@ def get_session_notes(current_user, root_id, session_id):
         db_session.close()
 
 
+@notes_bp.route('/<root_id>/notes/owned-count', methods=['GET'])
+@token_required
+def get_owned_note_count(current_user, root_id):
+    """How many notes deleting a session, goal, activity instance or program would take, for its confirmation."""
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.count_owned_notes(
+            root_id,
+            current_user.id,
+            session_id=request.args.get('session_id') or None,
+            goal_id=request.args.get('goal_id') or None,
+            activity_instance_id=request.args.get('activity_instance_id') or None,
+            program_id=request.args.get('program_id') or None,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error counting owned notes")
+        return internal_error(logger, "Error counting owned notes")
+    finally:
+        db_session.close()
+
+
 @notes_bp.route('/<root_id>/sessions/<session_id>/carried-notes', methods=['GET'])
 @token_required
 def get_carried_notes(current_user, root_id, session_id):

@@ -121,6 +121,70 @@ describe('NoteCard structured reviews', () => {
         expect(screen.queryByRole('menuitem', { name: 'Edit' })).not.toBeInTheDocument();
         expect(screen.getByRole('menuitem', { name: 'Attach pictures, video or audio' })).toBeInTheDocument();
     });
+
+    it('heads a feed review with its goal and status, the goal name opening the goal', () => {
+        const review = {
+            ...note, note_kind: 'goal_review', note_type: 'goal_review_note', attachments: [], goal_name: 'Handstand push ups', goal_type: 'ShortTermGoal',
+            goal_path: ['Become an Elite Calisthenics Athlete'],
+            review_data: { schema: 1, status: 'on_track', went_well: 'Decent', change: '', next_focus: '' },
+        };
+        const onOpenGoal = vi.fn();
+        renderWithProviders(
+            <NoteCard note={review} onDelete={vi.fn()} onOpenGoal={onOpenGoal} showContext />,
+            { withAuth: false, withGoalLevels: false },
+        );
+        expect(screen.queryByText('Become an Elite Calisthenics Athlete')).not.toBeInTheDocument();
+        expect(screen.getAllByText('On track')).toHaveLength(1);
+        expect(screen.queryByRole('link', { name: 'Open goal' })).not.toBeInTheDocument();
+        const name = screen.getByRole('button', { name: 'Handstand push ups' });
+        // "Goal Review: [icon] [name]", then the status.
+        expect(name.parentElement).toHaveTextContent(/^Goal Review:Handstand push ups$/);
+        expect(within(name.parentElement.parentElement).getByText('On track')).toBeInTheDocument();
+        fireEvent.click(name);
+        expect(onOpenGoal).toHaveBeenCalledWith(review);
+    });
+
+    it('opens a plain goal note\'s goal from its name, with no separate link', () => {
+        const goalNote = { ...note, note_type: 'goal_note', goal_type: 'ShortTermGoal', goal_name: 'Handstand', attachments: [] };
+        const onOpenGoal = vi.fn();
+        renderWithProviders(
+            <NoteCard note={goalNote} onDelete={vi.fn()} onOpenGoal={onOpenGoal} showContext />,
+            { withAuth: false, withGoalLevels: false },
+        );
+        expect(screen.queryByRole('link', { name: 'Open goal' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Handstand' }));
+        expect(onOpenGoal).toHaveBeenCalledWith(goalNote);
+    });
+
+    it.each(['program', 'program_date'])('links a %s note\'s name to its program, with no separate link', (contextType) => {
+        const programNote = {
+            ...note, context_type: contextType, context_id: 'prog', program_id: 'prog', program_name: 'End 2026 Strong',
+            goal_id: null, note_type: `${contextType}_note`, calendar_date: '2026-11-10', attachments: [],
+        };
+        renderWithProviders(<NoteCard note={programNote} onDelete={vi.fn()} showContext />, { withAuth: false, withGoalLevels: false });
+        expect(screen.queryByRole('link', { name: 'Open program' })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /^End 2026 Strong/ })).toHaveAttribute('href', '/root/programs/prog');
+    });
+
+    it('colours a date note\'s program name by its program and its date by its block', () => {
+        const dateNote = {
+            ...note, context_type: 'program_date', context_id: 'prog', program_id: 'prog', program_name: 'End 2026 Strong',
+            program_color: 'rgb(249, 115, 22)', block_color: 'rgb(34, 197, 94)', goal_id: null,
+            note_type: 'program_date_note', calendar_date: '2026-11-10', attachments: [],
+        };
+        renderWithProviders(<NoteCard note={dateNote} onDelete={vi.fn()} showContext />, { withAuth: false, withGoalLevels: false });
+        expect(screen.getByText('End 2026 Strong')).toHaveStyle({ color: 'rgb(249, 115, 22)' });
+        expect(screen.getByText('Nov 10, 2026')).toHaveStyle({ color: 'rgb(34, 197, 94)' });
+    });
+
+    it('edits a review in its review form when the host offers one', () => {
+        const review = { ...note, note_kind: 'goal_review', attachments: [], review_data: { schema: 1, status: 'on_track' } };
+        const onEditReview = vi.fn();
+        render({ note: review, onEditReview });
+        fireEvent.click(screen.getByRole('button', { name: 'Note options' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+        expect(onEditReview).toHaveBeenCalledWith(review);
+    });
 });
 
 describe('NoteOptionsMenu placement', () => {

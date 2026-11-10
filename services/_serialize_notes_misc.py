@@ -165,10 +165,13 @@ def serialize_note_display(note):
             result["session_template_color"] = template_color
 
     display_goal = note.goal
-    if display_goal:
+    # A note that only linked a goal survives the goal's deletion; it no longer names it.
+    if display_goal and display_goal.deleted_at is None:
         result["goal_name"] = display_goal.name
         result["goal_type"] = get_canonical_goal_type(display_goal)
         result["goal_is_smart"] = bool(all(calculate_smart_status(display_goal).values()))
+        # Feeds colour a completed goal's notes with the completed goal colour.
+        result["goal_completed"] = bool(display_goal.completed)
 
     if note.activity_definition:
         result["activity_definition_name"] = note.activity_definition.name

@@ -24,6 +24,7 @@ const pastProgram = {
     end_date: '2025-02-01',
 };
 
+vi.mock('../../hooks/useOwnedNoteCount', () => ({ useOwnedNoteCount: () => null }));
 vi.mock('../../contexts/GoalsContext', () => ({
     useGoals: () => ({ setActiveRootId: vi.fn() }),
 }));

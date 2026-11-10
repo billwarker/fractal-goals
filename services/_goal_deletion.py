@@ -9,6 +9,7 @@ from typing import Any
 from models import Goal, get_goal_by_id
 from services._completion_context import _emit_pending_events
 from services.goal_sequence_service import leave_track
+from services.note_ownership import soft_delete_owned_notes
 from services.events import event_bus, Event, Events
 from services.service_types import ServiceResult
 
@@ -32,7 +33,9 @@ class _GoalDeletionMixin:
         # Deleting the active step of a sequence begins the next one unless the user declines.
         pending_events = []
         leave_track(self.db_session, goal, pending_events, begin_next=begin_next)
-        self._soft_delete_goal_subtree(goal, deleted_at)
+        subtree = self._soft_delete_goal_subtree(goal, deleted_at)
+        # The goals' own notes, reviews and completion notes go with them.
+        soft_delete_owned_notes(self.db_session, root_id, deleted_at, goal_ids=[item.id for item in subtree])
         self.db_session.commit()
         _emit_pending_events(pending_events)
         if emit_event:

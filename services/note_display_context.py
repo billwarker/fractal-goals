@@ -1,12 +1,14 @@
 """Batch program display context onto serialized notes without changing canonical note ownership."""
 from sqlalchemy.orm import joinedload
 
-from models import ActivityInstance, Goal, MetricValue, Program
+from models import ActivityInstance, Goal, MetricValue, Program, ProgramBlock
 from services._serialize_activities import serialize_metric_value
 
 
 def attach_program_names(db_session, notes_payload):
-    """Program and program-date notes get `program_name`."""
+    """Program and program-date notes get `program_name` and `program_color` (the program's colour, else its
+    first coloured block's, as the calendar draws it); a date note also gets `block_color`, the colour of
+    the program block covering its date (None outside any block)."""
     notes = notes_payload if isinstance(notes_payload, list) else [notes_payload]
     program_ids = {
         note.get('program_id') or note.get('context_id')
@@ -16,10 +18,32 @@ def attach_program_names(db_session, notes_payload):
     if not program_ids:
         return notes_payload
 
-    names = dict(db_session.query(Program.id, Program.name).filter(Program.id.in_(program_ids)).all())
+    programs = {
+        program_id: (name, color)
+        for program_id, name, color in db_session.query(Program.id, Program.name, Program.color)
+        .filter(Program.id.in_(program_ids)).all()
+    }
+    blocks = {}
+    for block in db_session.query(ProgramBlock).filter(
+        ProgramBlock.program_id.in_(program_ids),
+    ).order_by(ProgramBlock.start_date, ProgramBlock.id).all():
+        blocks.setdefault(block.program_id, []).append(block)
     for note in notes:
-        if note.get('context_type') in ('program', 'program_date'):
-            note['program_name'] = names.get(note.get('program_id') or note.get('context_id'))
+        if note.get('context_type') not in ('program', 'program_date'):
+            continue
+        program_id = note.get('program_id') or note.get('context_id')
+        name, color = programs.get(program_id, (None, None))
+        note['program_name'] = name
+        program_blocks = blocks.get(program_id, [])
+        note['program_color'] = color or next((block.color for block in program_blocks if block.color), None)
+        if note.get('context_type') == 'program_date':
+            on_date = note.get('calendar_date')
+            block = next((
+                item for item in program_blocks
+                if on_date and item.start_date and item.end_date
+                and item.start_date.isoformat() <= on_date <= item.end_date.isoformat()
+            ), None)
+            note['block_color'] = block.color if block else None
     return notes_payload
 
 

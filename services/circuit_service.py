@@ -13,7 +13,6 @@ from models import (
     CircuitRunSlot,
     CircuitSlot,
     MetricValue,
-    Note,
     Session,
     session_goals,
     validate_root_goal,
@@ -26,6 +25,7 @@ from services.circuit_run_timing_operations import CircuitRunTimingOperations
 from services.circuit_tag_operations import CircuitTagOperations
 from services.circuit_session_items import append_circuit_run_item, remove_circuit_run_item
 from services.events import Event, Events, event_bus
+from services.note_ownership import release_pins_into, soft_delete_owned_notes
 from services.owned_entity_queries import get_owned_activity_definition, get_owned_session
 from services.prescriptions import circuit_prescription_tag_ids
 from services.quota_service import QuotaService
@@ -458,14 +458,11 @@ class CircuitService:
         )
         now = utc_now_naive()
         round_ids = [circuit_round.id for circuit_round in run.rounds]
-        self.db_session.query(Note).filter(
-            Note.root_id == root_id,
-            Note.deleted_at.is_(None),
-            (
-                ((Note.context_type == "circuit_run") & (Note.context_id == run.id))
-                | ((Note.context_type == "circuit_round") & (Note.context_id.in_(round_ids)))
-            ),
-        ).update({Note.deleted_at: now}, synchronize_session=False)
+        soft_delete_owned_notes(
+            self.db_session, root_id, now,
+            circuit_run_ids=[run.id], circuit_round_ids=round_ids, instance_ids=instance_ids,
+        )
+        release_pins_into(self.db_session, root_id, instance_ids=instance_ids)
         if instance_ids:
             for instance in self.db_session.query(ActivityInstance).filter(
                 ActivityInstance.id.in_(instance_ids),

@@ -25,6 +25,7 @@ import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
 import NotesMobileSheet from '../components/notes/NotesMobileSheet';
+import NoteGoalModal from '../components/goalDetail/NoteGoalModal';
 import NotesFilterControls from '../components/notes/page/NotesFilterControls';
 import FilterConditions, { filterConditionLabels } from '../components/notes/page/FilterConditions';
 import { useOptionalOnboarding } from '../contexts/OnboardingContext';
@@ -56,6 +57,8 @@ function Notes() {
     const [goalPickerOpen, setGoalPickerOpen] = useState(false);
     const [activityPickerOpen, setActivityPickerOpen] = useState(false);
     const [mobilePanelOpen, setMobilePanelOpen] = useState(false);
+    // The goal open over the feed: { goalId, reviewNote? } — a review's goal opens on its form.
+    const [openGoal, setOpenGoal] = useState(null);
 
     /* eslint-disable react-hooks/set-state-in-effect -- Responsive navigation collapses desktop-only panes on entry to mobile. */
     useEffect(() => {
@@ -128,6 +131,8 @@ function Notes() {
                 <NoteTimeline
                     notes={notes}
                     onEdit={updateNote}
+                    onEditReview={(note) => setOpenGoal({ goalId: note.goal_id, reviewNote: note })}
+                    onOpenGoal={(note) => setOpenGoal({ goalId: note.goal_id })}
                     onDelete={deleteNote}
                     onCarryForward={setCarryForward}
                     showContext={true}
@@ -232,6 +237,16 @@ function Notes() {
                     onConfirm={(activityIds) => updateFilters({ activityIds })}
                 />
             )}
+
+            {openGoal ? (
+                <NoteGoalModal
+                    key={`${openGoal.goalId}-${openGoal.reviewNote?.id || ''}`}
+                    rootId={rootId}
+                    goalId={openGoal.goalId}
+                    reviewNote={openGoal.reviewNote}
+                    onClose={() => setOpenGoal(null)}
+                />
+            ) : null}
 
             <NotesMobileSheet
                 open={isMobile && mobilePanelOpen}

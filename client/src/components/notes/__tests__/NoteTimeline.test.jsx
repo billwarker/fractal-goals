@@ -5,7 +5,7 @@ import NoteTimeline from '../NoteTimeline';
 
 vi.mock('../../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
-        getGoalColor: () => '#22d3ee',
+        getGoalColor: (level) => (level === 'Completed' ? '#16a34a' : '#22d3ee'),
         getGoalSecondaryColor: () => '#0f172a',
         getGoalIcon: () => 'circle',
     }),
@@ -88,10 +88,12 @@ describe('NoteTimeline timeline presentation', () => {
         expect(within(group).getByText('3 notes')).toBeInTheDocument();
         expect(within(group).getAllByText('Figuring out Songs by Ear')).toHaveLength(1);
         expect(within(group).getAllByRole('list', { name: 'Figuring out Songs by Ear sets' })).toHaveLength(1);
-        expect(within(group).queryByRole('link', { name: 'Open session' })).not.toBeInTheDocument();
+        expect(within(group).queryByRole('link', { name: /^Open session/ })).not.toBeInTheDocument();
         const session = screen.getByRole('region', { name: 'Guitar session notes' });
-        expect(within(session).getAllByRole('link', { name: 'Open session' })).toHaveLength(1);
-        expect(within(session).getByRole('link', { name: 'Open session' })).toHaveAttribute('href', '/root/session/s1');
+        // The session's badge is its one link.
+        expect(within(session).getAllByRole('link', { name: /^Open session/ })).toHaveLength(1);
+        expect(within(session).getByRole('link', { name: 'Open session Guitar' })).toHaveAttribute('href', '/root/session/s1');
+        expect(within(session).queryByText('Open session')).not.toBeInTheDocument();
         expect(within(group).getByText('Set #2')).toBeInTheDocument();
         // Every note shows its time once, on the line directly above its text.
         const noteA = within(group).getByText('Content a').closest('[class*="noteCard"]');
@@ -183,5 +185,47 @@ describe('NoteTimeline timeline presentation', () => {
             <NoteTimeline presentation="timeline" notes={[note('one', { session_id: 's', session_template_name: 'Heavy', session_template_color: '#ef4444' })]} />,
         );
         expect(screen.getByRole('region', { name: 'Heavy session notes' }).style.getPropertyValue('--session-color')).toBe('#ef4444');
+    });
+});
+
+describe('NoteTimeline goal notes', () => {
+    const goalNote = (id, overrides) => note(id, {
+        context_type: 'goal', context_id: 'g', goal_id: 'g', goal_type: 'ShortTermGoal', goal_name: `Goal ${id}`,
+        activity_instance_id: null, activity_definition_name: null, note_type: 'goal_note', ...overrides,
+    });
+
+    it.each([
+        ['an open goal', {}, '#22d3ee'],
+        ['a completed goal', { goal_completed: true }, '#16a34a'],
+        ['a completion note', { note_kind: 'goal_completion', note_type: 'goal_completion_note' }, '#16a34a'],
+    ])('puts the goal icon on the rail only, coloured for %s', (_label, overrides, color) => {
+        const { container } = render(
+            <NoteTimeline notes={[goalNote('a', overrides)]} showContext presentation="timeline" noteTypeVariant="metadata" groupByDate />,
+        );
+        const nodes = container.querySelectorAll('[class*="goalNode"]');
+        expect(nodes).toHaveLength(1);
+        expect(nodes[0].style.getPropertyValue('--node-color')).toBe(color);
+        // The rail carries the icon, so the heading has none.
+        expect(container.querySelectorAll('[class*="noteCard"] svg')).toHaveLength(0);
+    });
+});
+
+describe('NoteTimeline program notes', () => {
+    it.each(['program', 'program_date'])('hangs a %s note off the rail on a calendar node', (contextType) => {
+        const { container } = render(
+            <NoteTimeline
+                notes={[note('p', {
+                    context_type: contextType, context_id: 'prog', program_id: 'prog', program_name: 'Q4', program_color: '#f97316',
+                    activity_instance_id: null, activity_definition_name: null, note_type: `${contextType}_note`,
+                })]}
+                showContext
+                presentation="timeline"
+                noteTypeVariant="metadata"
+                groupByDate
+            />,
+        );
+        const node = container.querySelector('[class*="goalNode"]');
+        expect(node.querySelectorAll('svg')).toHaveLength(1);
+        expect(node.style.getPropertyValue('--node-color')).toBe('#f97316');
     });
 });

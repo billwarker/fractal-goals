@@ -3,7 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import GoalDeleteConfirmSubView from '../GoalDeleteConfirmSubView';
 
-const { sequence } = vi.hoisted(() => ({ sequence: { data: null, enabled: null } }));
+const { sequence, notes } = vi.hoisted(() => ({ sequence: { data: null, enabled: null }, notes: { count: null, target: null } }));
+vi.mock('../../../hooks/useOwnedNoteCount', () => ({
+    useOwnedNoteCount: (_rootId, target) => {
+        notes.target = target;
+        return notes.count;
+    },
+}));
 vi.mock('../../../hooks/useGoalSequenceQueries', () => ({
     useGoalSequence: (_rootId, _goalId, { enabled }) => {
         sequence.enabled = enabled;
@@ -14,6 +20,14 @@ vi.mock('../../../hooks/useGoalSequenceQueries', () => ({
 describe('GoalDeleteConfirmSubView', () => {
     beforeEach(() => {
         sequence.data = null;
+        notes.count = null;
+    });
+
+    it('says how many notes go with the goal and the goals under it', () => {
+        notes.count = 3;
+        render(<GoalDeleteConfirmSubView rootId="r" goal={{ name: 'Leaf' }} goalId="g" onBack={vi.fn()} onConfirm={vi.fn()} />);
+        expect(notes.target).toEqual({ goal_id: 'g' });
+        expect(screen.getByText('“Leaf” will be deleted. Its 3 notes will be deleted too.')).toBeInTheDocument();
     });
 
     it('confirms a childless goal in one step', () => {

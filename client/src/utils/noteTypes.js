@@ -22,6 +22,11 @@ export const NOTE_KIND_LABELS = {
     goal_review: 'Goal Review',
 };
 
+/** "1 note" / "4 notes", for delete confirmations. */
+export function notesPhrase(count) {
+    return `${count} ${count === 1 ? 'note' : 'notes'}`;
+}
+
 /** Note types attached to a goal itself. */
 export const GOAL_NOTE_TYPES = new Set(['goal_note', 'goal_completion_note', 'goal_review_note']);
 
@@ -30,7 +35,6 @@ export const GOAL_NOTE_TYPES = new Set(['goal_note', 'goal_completion_note', 'go
  * services/note_filter_spec.py; both are checked against tests/fixtures/note_categories.json.
  */
 export const NOTE_CATEGORIES = [
-    { value: 'general', label: 'General', contextTypes: ['root', 'activity_definition'] },
     { value: 'goals', label: 'Goals', contextTypes: ['goal'] },
     { value: 'sessions', label: 'Sessions', contextTypes: ['session', 'activity_instance', 'circuit_run', 'circuit_round'] },
     { value: 'programs', label: 'Programs', contextTypes: ['program', 'program_date'] },
@@ -42,5 +46,5 @@ const CATEGORY_BY_CONTEXT = Object.fromEntries(NOTE_CATEGORIES.flatMap(
 
 /** Mirrors derive_note_category in services/note_filter_spec.py. */
 export function deriveNoteCategory(contextType) {
-    return CATEGORY_BY_CONTEXT[contextType] || 'general';
+    return CATEGORY_BY_CONTEXT[contextType] || null;
 }

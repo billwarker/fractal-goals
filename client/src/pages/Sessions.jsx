@@ -34,6 +34,9 @@ import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
+import { useOwnedNoteCount } from '../hooks/useOwnedNoteCount';
+import { notesPhrase } from '../utils/noteTypes';
+import { invalidateNotesAfterDelete } from '../utils/queryInvalidation';
 const QuickSessionWorkspace = lazyWithRetry(() => import('../components/sessionDetail/QuickSessionWorkspace'), 'components/sessionDetail/QuickSessionWorkspace');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 function Sessions() {
@@ -253,6 +256,8 @@ function Sessions() {
         return result;
     }, [deleteGoal, queryClient, rootId]);
 
+    const deleteNoteCount = useOwnedNoteCount(rootId, { session_id: sessionToDelete?.id }, { enabled: Boolean(sessionToDelete) });
+
     const handleCloseDeleteModal = useCallback(() => {
         setSessionToDelete(null);
     }, []);
@@ -276,6 +281,7 @@ function Sessions() {
             queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
+            invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
 
             notify.success('Session deleted');
         } catch (err) {
@@ -423,7 +429,7 @@ function Sessions() {
                 onConfirm={handleConfirmDeleteSession}
                 title="Delete Session"
                 message={sessionToDelete
-                    ? `Are you sure you want to delete "${sessionToDelete.name}"?`
+                    ? `Are you sure you want to delete "${sessionToDelete.name}"${deleteNoteCount ? ` and its ${notesPhrase(deleteNoteCount)}` : ''}?`
                     : 'Are you sure you want to delete this session?'}
                 confirmText="Delete Session"
             />

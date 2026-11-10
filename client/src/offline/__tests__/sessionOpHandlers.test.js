@@ -53,6 +53,18 @@ describe('session op handlers', () => {
         env.queryClient.clear();
     });
 
+    it('hides a removed activity\'s notes while the removal is queued', async () => {
+        const { queryClient, outbox } = env;
+        const notesKey = queryKeys.sessionNotes(rootId, sessionId);
+        queryClient.setQueryData(notesKey, [
+            { id: 'n1', activity_instance_id: 'i1' },
+            { id: 'n2', activity_instance_id: null },
+        ]);
+        await enqueue(outbox, queryClient, { kind: SESSION_OP.ACTIVITY_REMOVE, method: 'delete', meta: { instanceId: 'i1' } });
+        expect(queryClient.getQueryData(activitiesKey)).toEqual([]);
+        expect(queryClient.getQueryData(notesKey).map((note) => note.id)).toEqual(['n2']);
+    });
+
     it('keeps unsynced edits visible when stale server data lands', async () => {
         const { queryClient, outbox } = env;
         await enqueue(outbox, queryClient, {

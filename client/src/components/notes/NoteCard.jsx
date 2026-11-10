@@ -12,9 +12,10 @@ import NoteOptionsMenu from './NoteOptionsMenu';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import NoteContextLine from './NoteContextLine';
 import PinBadge from './PinBadge';
-import ReviewNoteBody from './ReviewNoteBody';
+import ReviewNoteBody, { ReviewStatusBadge } from './ReviewNoteBody';
 import styles from './NoteCard.module.css';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import { noteContextLink } from '../../utils/noteContext';
 import { GOAL_NOTE_TYPES, NOTE_KIND_LABELS, NOTE_TYPE_LABELS } from '../../utils/noteTypes';
 function buildPlainTextPreview(content) {
     if (!content) return '';
@@ -72,6 +73,8 @@ function NoteCard({
     note,
     onEdit,
     onEditRequest,   // if provided, called instead of opening inline editor
+    onEditReview,    // (note): edit a guided review's answers in its goal's review form
+    onOpenGoal,      // (note): open a goal note's goal; its name becomes the way in
     onDelete,
     onCarryForward,  // (noteId, on): pin to the next instance of the note's activity, or the next session
     showContext = false,
@@ -201,6 +204,17 @@ function NoteCard({
     const canWrite = (!!onEdit || !!onEditRequest) && !note.isPast && !note.isCarried;
     // A guided review's text is derived from its answers; it is not edited as text.
     const canEdit = canWrite && !note.review_data;
+    const canEditReview = !!onEditReview && !note.isPast && Boolean(note.review_data);
+    // A guided review's header carries its goal and its status; the body only the answers.
+    const isReviewHeader = Boolean(note.review_data) && !minimal;
+    // On the timeline the goal's icon sits on the rail beside the note, so the heading leaves it out.
+    const showHeaderGoalIcon = variant !== 'timeline';
+    const opensGoal = Boolean(onOpenGoal && note.goal_id && note.context_type === 'goal');
+    // In a feed, a program note's name leads to its program instead of a separate link.
+    const programLink = showContext && !minimal && note.root_id
+        && (resolvedNoteType === 'program_note' || resolvedNoteType === 'program_date_note')
+        ? noteContextLink(note, note.root_id)
+        : null;
     const canCarry = !!onCarryForward && !note.isPast && note.carry_forward !== 'delivered'
         && Boolean(note.activity_definition_id || note.context_type === 'session');
     const canDelete = !!onDelete && !note.isPast && !note.isCarried;
@@ -209,6 +223,7 @@ function NoteCard({
     const carryLabel = carryForwardLabel(note);
     const menuItems = [
         canEdit && { label: 'Edit', onSelect: handleEditClick },
+        canEditReview && { label: 'Edit', onSelect: (event) => { event.stopPropagation(); onEditReview(note); } },
         canManageMedia && { label: note.attachments?.length ? 'Manage attachments' : 'Attach pictures, video or audio', onSelect: () => setManagingMedia(true) },
         canCarry && {
             label: note.carry_forward === 'pending' ? `Unpin from next ${nextTarget}` : `Pin to next ${nextTarget}`,
@@ -313,6 +328,32 @@ function NoteCard({
         }
     }
 
+    // A program note's name in its program's colour; a date note's date in its block's, when one covers it.
+    const programDate = resolvedNoteType === 'program_date_note' && note.calendar_date
+        ? formatLiteralDate(note.calendar_date)
+        : null;
+    const programHeading = (
+        <>
+            <span style={note.program_color ? { color: note.program_color } : undefined}>{note.program_name || 'Program'}</span>
+            {programDate ? (
+                <>
+                    {' · '}
+                    <span style={note.block_color ? { color: note.block_color } : undefined}>{programDate}</span>
+                </>
+            ) : null}
+        </>
+    );
+
+    const goalName = opensGoal ? (
+        <button
+            type="button"
+            className={`${styles.contextPrimary} ${styles.goalLink}`}
+            onClick={(event) => { event.stopPropagation(); onOpenGoal(note); }}
+        >
+            {primaryContextLabel}
+        </button>
+    ) : <span className={styles.contextPrimary}>{primaryContextLabel}</span>;
+
     if (isDeleting) {
         return <div className={`${styles.noteCard} ${styles.noteCardDeleting}`}>Deleting…</div>;
     }
@@ -343,23 +384,11 @@ function NoteCard({
                         <div className={styles.metaStack}>
                             <div className={styles.metaRow}>
                                 <div className={styles.contextSummary}>
-                                    {(resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
-                                        <span className={styles.goalContext}>
-                                            {isGoalCompletionNote ? (
-                                                <>
-                                                    <span className={styles.noteKindPrefix}>{noteKindLabel}:</span>
-                                                    <GoalIcon
-                                                        shape={getGoalIcon(note.goal_type)}
-                                                        color={getGoalColor('Completed')}
-                                                        secondaryColor={getGoalSecondaryColor('Completed')}
-                                                        isSmart={Boolean(note.goal_is_smart)}
-                                                        size={12}
-                                                    />
-                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
+                                    {isReviewHeader ? (
+                                        <span className={styles.reviewHeading}>
+                                            <span className={styles.goalContext}>
+                                                <span className={styles.noteKindPrefix}>{NOTE_KIND_LABELS.goal_review}:</span>
+                                                {showHeaderGoalIcon && note.goal_type ? (
                                                     <GoalIcon
                                                         shape={getGoalIcon(note.goal_type)}
                                                         color={getGoalColor(note.goal_type)}
@@ -367,6 +396,39 @@ function NoteCard({
                                                         isSmart={Boolean(note.goal_is_smart)}
                                                         size={12}
                                                     />
+                                                ) : null}
+                                                {goalName}
+                                            </span>
+                                            <ReviewStatusBadge status={note.review_data.status} />
+                                        </span>
+                                    ) : (resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
+                                        <span className={styles.goalContext}>
+                                            {isGoalCompletionNote ? (
+                                                <>
+                                                    <span className={styles.noteKindPrefix}>{noteKindLabel}:</span>
+                                                    {showHeaderGoalIcon ? (
+                                                        <GoalIcon
+                                                            shape={getGoalIcon(note.goal_type)}
+                                                            color={getGoalColor('Completed')}
+                                                            secondaryColor={getGoalSecondaryColor('Completed')}
+                                                            isSmart={Boolean(note.goal_is_smart)}
+                                                            size={12}
+                                                        />
+                                                    ) : null}
+                                                    {goalName}
+                                                </>
+                                            ) : (
+                                                <>
+                                                    {goalName}
+                                                    {showHeaderGoalIcon ? (
+                                                        <GoalIcon
+                                                            shape={getGoalIcon(note.goal_type)}
+                                                            color={getGoalColor(note.goal_type)}
+                                                            secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                                                            isSmart={Boolean(note.goal_is_smart)}
+                                                            size={12}
+                                                        />
+                                                    ) : null}
                                                 </>
                                             )}
                                         </span>
@@ -378,6 +440,14 @@ function NoteCard({
                                         <span className={styles.contextPrimary}>Session note</span>
                                     ) : resolvedNoteType === 'session_note' ? (
                                         renderSessionTemplateBadge()
+                                    ) : programLink ? (
+                                        <Link
+                                            className={`${styles.contextPrimary} ${styles.goalLink}`}
+                                            to={programLink.to}
+                                            onClick={(event) => event.stopPropagation()}
+                                        >
+                                            {programHeading}
+                                        </Link>
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                     )}
@@ -430,7 +500,9 @@ function NoteCard({
                         {pinBadge}
                     </div>
                 </div>
-                {showContext && !minimal && <NoteContextLine note={note} grouped={suppressActivityContext} hideLink={suppressSessionContext} />}
+                {showContext && !minimal && !isReviewHeader && (
+                    <NoteContextLine note={note} grouped={suppressActivityContext} hideLink={suppressSessionContext || opensGoal || Boolean(programLink)} />
+                )}
                 {/* One place for when: the time (and any pin) sits directly above the text, on every note. */}
                 <div className={styles.timeLine}>{timestamp}</div>
                 {/* Content */}
@@ -460,7 +532,7 @@ function NoteCard({
                 ) : (
                     <div className={`${styles.content} ${note.isCarried ? styles.carriedContent : ''}`}>
                         {note.review_data ? (
-                            <ReviewNoteBody review={note.review_data} />
+                            <ReviewNoteBody review={note.review_data} showStatus={!isReviewHeader} />
                         ) : shouldShowRichContent ? (
                             <MarkdownNoteContent
                                 content={note.content}

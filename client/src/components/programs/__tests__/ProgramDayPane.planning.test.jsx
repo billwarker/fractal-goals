@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import ProgramDayPane from '../ProgramDayPane';
 
 // Date notes are covered by ProgramDateNotes.test.jsx; they need a query client.
-vi.mock('../ProgramDateNotes', () => ({ default: () => null }));
+vi.mock('../ProgramDateNotes', () => ({ default: () => null, ProgramDateNoteComposer: () => null }));
 
 const occurrence = {
     occurrence_key: 'day-1:2026-09-05',

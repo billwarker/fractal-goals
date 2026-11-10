@@ -8,6 +8,7 @@ import models
 from models import ActivityInstance, CircuitRun, Session, validate_root_goal
 from services import Event, Events, event_bus
 from services.circuit_completion import circuit_completion_event_data, finalize_circuit_run
+from services.note_ownership import release_pins_into, soft_delete_owned_notes
 from services.occurred_at import resolve_occurred_at
 from services.payload_normalizers import normalize_session_payload
 from services.serializers import serialize_session
@@ -332,7 +333,13 @@ class _SessionUpdatesMixin:
             for instance in (session.activity_instances or [])
             if instance.activity_definition_id
         ]
+        instance_ids = [instance.id for instance in (session.activity_instances or [])]
         session.deleted_at = datetime.now(timezone.utc)
+        # The notes written in the session go with it; pins it used up wait for the next session.
+        soft_delete_owned_notes(
+            self.db_session, root_id, session.deleted_at, session_ids=[session.id], instance_ids=instance_ids,
+        )
+        release_pins_into(self.db_session, root_id, session_ids=[session.id], instance_ids=instance_ids)
         self.db_session.commit()
         stats_service = SessionTemplateStatsService(self.db_session)
         if template_id:

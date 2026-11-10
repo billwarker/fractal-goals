@@ -380,3 +380,51 @@ describe('SessionActivityItem one-off goal links', () => {
         expect(screen.queryByRole('button', { name: /Associate with|instance association/ })).not.toBeInTheDocument();
     });
 });
+
+describe('removing an activity that has notes', () => {
+    const renderItem = (allNotes) => renderWithProviders(
+        <SessionActivityItem
+            exercise={{
+                id: 'instance-noted', session_id: 'session-1', activity_definition_id: 'activity-1',
+                sets: [], metrics: [], time_start: null, time_stop: null, duration_seconds: 0,
+            }}
+            onFocus={vi.fn()}
+            isSelected={false}
+            onReorder={vi.fn()}
+            canMoveUp={false}
+            canMoveDown={false}
+            sessionIndex={1}
+            allNotes={allNotes}
+            onAddNote={vi.fn()}
+            onUpdateNote={vi.fn()}
+            onDeleteNote={vi.fn()}
+            isDragging={false}
+            activityDefinition={{
+                id: 'activity-1', name: 'Pull Up', metric_definitions: [], split_definitions: [],
+                has_sets: false, has_splits: false,
+            }}
+        />,
+        { withTimezone: false, withAuth: false, withGoalLevels: false, withTheme: false },
+    );
+
+    beforeEach(() => removeActivity.mockClear());
+
+    it('removes at once when the activity has no notes', () => {
+        renderItem([]);
+        fireEvent.click(screen.getByRole('button', { name: 'Delete activity' }));
+        expect(removeActivity).toHaveBeenCalledWith('instance-noted');
+    });
+
+    it('says how many notes go before removing', () => {
+        renderItem([
+            { id: 'n1', activity_instance_id: 'instance-noted', content: 'Grip slipped' },
+            { id: 'n2', activity_instance_id: 'instance-noted', content: 'Better' },
+            { id: 'n3', activity_instance_id: 'someone-else', content: 'Not this one' },
+        ]);
+        fireEvent.click(screen.getByRole('button', { name: 'Delete activity' }));
+        expect(removeActivity).not.toHaveBeenCalled();
+        expect(screen.getByText("Remove Pull Up and its 2 notes? This can't be undone.")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+        expect(removeActivity).toHaveBeenCalledWith('instance-noted');
+    });
+});

@@ -167,6 +167,8 @@ export const queryKeys = {
     allNotesRoot: (rootId) => ['all-notes', rootId],
     // Under the all-notes root so every note mutation refreshes the heatmap too.
     notesHeatmap: (rootId, filters = {}) => ['all-notes', rootId, 'heatmap', filters],
+    // How many notes deleting a session, goal or activity would take; refreshed by every note mutation.
+    ownedNoteCount: (rootId, target = {}) => ['all-notes', rootId, 'owned-count', target],
     noteFilters: (rootId) => ['note-filters', rootId],
     goalAttachments: (rootId, goalId) => ['goal-attachments', rootId, goalId],
     instagramOembed: (permalink) => ['instagram-oembed', permalink],

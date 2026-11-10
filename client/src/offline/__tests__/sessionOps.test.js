@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     activeWorkConflictError,
+    applySessionCompletion,
     applySessionPause,
     applySessionResume,
     applyTimerAction,
@@ -98,5 +99,28 @@ describe('session pause and resume patches', () => {
         const resumed = applySessionResume(paused.session, paused.instances, T2);
         expect(resumed.session).toMatchObject({ is_paused: false, total_paused_seconds: 180 });
         expect(resumed.instances[0]).toMatchObject({ is_paused: false, total_paused_seconds: 180 });
+    });
+});
+
+describe('session completion patch', () => {
+    it('ends at the completion time and excludes paused time from the duration', () => {
+        const session = { id: 's', session_start: T0, total_paused_seconds: 60, attributes: { session_start: T0 } };
+        const completed = applySessionCompletion(session, true, T2);
+        expect(completed).toMatchObject({ completed: true, session_end: T2, total_duration_seconds: 420 });
+        expect(completed.attributes).toMatchObject({ completed: true, total_duration_seconds: 420 });
+    });
+
+    it('ends a paused session at its pause', () => {
+        const session = { id: 's', session_start: T0, is_paused: true, last_paused_at: T1, total_paused_seconds: 0 };
+        expect(applySessionCompletion(session, true, T2)).toMatchObject({
+            session_end: T1, total_duration_seconds: 300, is_paused: false, last_paused_at: null,
+        });
+    });
+
+    it('gives quick sessions no end and clears timing when reopened', () => {
+        const session = { id: 's', session_start: T0 };
+        expect(applySessionCompletion(session, true, T2, { quick: true })).not.toHaveProperty('session_end');
+        expect(applySessionCompletion({ ...session, session_end: T2, total_duration_seconds: 480 }, false, T2))
+            .toMatchObject({ completed: false, completed_at: null, session_end: null, total_duration_seconds: null });
     });
 });

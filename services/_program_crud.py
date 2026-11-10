@@ -9,7 +9,7 @@ import logging
 from typing import List, Dict, Optional
 
 
-from models import Program, ProgramBlock
+from models import Note, Program, ProgramBlock
 from services import event_bus, Event, Events
 from services.owned_entity_queries import get_owned_program
 from services.quota_service import QuotaService
@@ -319,6 +319,10 @@ class _ProgramCrudMixin(_ProgramMixinBase):
         affected_sessions_count = cls._count_program_day_sessions(program)
         
         program_name = program.name
+        # Programs are deleted outright, and so are the notes written on them and their dates. Done here so it
+        # never depends on the database enforcing notes.program_id's ON DELETE CASCADE.
+        for note in session.query(Note).filter(Note.root_id == root_id, Note.program_id == program.id).all():
+            session.delete(note)
         session.delete(program)
         cls._commit(session)
         

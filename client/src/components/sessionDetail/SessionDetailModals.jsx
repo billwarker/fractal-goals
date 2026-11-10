@@ -1,6 +1,8 @@
 import React, { Suspense } from 'react';
 
 import ConfirmationModal from '../ConfirmationModal';
+import { useOwnedNoteCount } from '../../hooks/useOwnedNoteCount';
+import { notesPhrase } from '../../utils/noteTypes';
 import SessionOptionsModal from './SessionOptionsModal';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
@@ -10,6 +12,7 @@ const ActivityAssociationModal = lazyWithRetry(() => import('./ActivityAssociati
 
 function SessionDetailModals({
     rootId,
+    sessionId = null,
     activities,
     activityGroups = [],
     showDeleteConfirm,
@@ -44,6 +47,8 @@ function SessionDetailModals({
     isSavingTemplate,
     isDuplicatingSession,
 }) {
+    // Deleting the session takes its notes; the count is asked for only while the dialog is open.
+    const noteCount = useOwnedNoteCount(rootId, { session_id: sessionId }, { enabled: Boolean(showDeleteConfirm) });
     return (
         <>
             <ConfirmationModal
@@ -51,7 +56,9 @@ function SessionDetailModals({
                 onClose={onCloseDeleteConfirm}
                 onConfirm={onConfirmDelete}
                 title="Delete Session"
-                message="Are you sure you want to delete this session? This action cannot be undone."
+                message={noteCount
+                    ? `Delete this session and its ${notesPhrase(noteCount)}? This can't be undone.`
+                    : 'Are you sure you want to delete this session? This action cannot be undone.'}
                 confirmText="Delete"
             />
 

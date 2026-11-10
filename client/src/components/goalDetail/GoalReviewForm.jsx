@@ -1,4 +1,4 @@
-import React, { useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
@@ -16,6 +16,9 @@ import styles from './GoalReviewForm.module.css';
 
 const read = (goal, key) => goal?.[key] ?? goal?.attributes?.[key];
 const EMPTY_ANSWERS = { status: null, went_well: '', change: '', next_focus: '' };
+const pickAnswers = (reviewData) => Object.fromEntries(Object.keys(EMPTY_ANSWERS)
+    .filter((key) => reviewData?.[key] != null)
+    .map((key) => [key, reviewData[key]]));
 
 function LastReview({ note }) {
     if (!note) return null;
@@ -32,19 +35,24 @@ function LastReview({ note }) {
 /**
  * Writing a goal review: what changed since the last review, read-only, above a few plain
  * questions. The answers are saved as `review_data`; saving restarts the review cadence.
+ * With `registerFooterAction`, Save and Cancel live in the host's footer instead of the form.
+ * With `editingNote`, the form edits that review's answers; its attachments stay managed from its note card.
  */
-export default function GoalReviewForm({ rootId, goal, goalId, onSubmit, onCancel, isSaving = false }) {
+export default function GoalReviewForm({
+    rootId, goal, goalId, onSubmit, onCancel, isSaving = false, registerFooterAction, editingNote = null,
+}) {
     const { timezone } = useTimezone();
     const today = getISOYMDInTimezone(new Date(), timezone || 'UTC');
     const formId = useId();
-    const [answers, setAnswers] = useState(EMPTY_ANSWERS);
+    const formRef = useRef(null);
+    const [answers, setAnswers] = useState(() => ({ ...EMPTY_ANSWERS, ...pickAnswers(editingNote?.review_data) }));
     const [error, setError] = useState('');
     const draft = useAttachmentDraft(rootId);
     const { data: heatmap } = useGoalActivityHeatmap(rootId, goalId, { timezone: timezone || 'UTC' });
     const { notes } = useGoalNotes(rootId, goalId, { includeActivityInstanceNotes: false });
     const lastReviewNote = useMemo(() => notes
-        .filter((note) => note.note_kind === 'goal_review')
-        .reduce((latest, note) => (!latest || note.created_at > latest.created_at ? note : latest), null), [notes]);
+        .filter((note) => note.note_kind === 'goal_review' && note.id !== editingNote?.id)
+        .reduce((latest, note) => (!latest || note.created_at > latest.created_at ? note : latest), null), [editingNote?.id, notes]);
 
     const context = reviewContext({
         description: read(goal, 'description'),
@@ -59,6 +67,20 @@ export default function GoalReviewForm({ rootId, goal, goalId, onSubmit, onCance
     const hasAnswer = Boolean(answers.status || REVIEW_PROMPTS.some((prompt) => answers[prompt.key].trim()));
     const busy = isSaving || draft.isBusy;
 
+    const saveLabel = isSaving ? 'Saving…' : (editingNote ? 'Save changes' : 'Save review');
+    const saveDisabled = !hasAnswer || busy;
+    useEffect(() => {
+        if (!registerFooterAction) return undefined;
+        registerFooterAction({
+            label: saveLabel,
+            disabled: saveDisabled,
+            title: draft.busyReason || undefined,
+            onClick: () => formRef.current?.requestSubmit(),
+        });
+        return undefined;
+    }, [draft.busyReason, registerFooterAction, saveDisabled, saveLabel]);
+    useEffect(() => () => registerFooterAction?.(null), [registerFooterAction]);
+
     const submit = async (event) => {
         event.preventDefault();
         if (!hasAnswer || busy) return;
@@ -68,7 +90,7 @@ export default function GoalReviewForm({ rootId, goal, goalId, onSubmit, onCance
     };
 
     return (
-        <form className={styles.form} onSubmit={submit} aria-label={`Review ${read(goal, 'name') || 'goal'}`} {...draft.dropProps}>
+        <form ref={formRef} className={styles.form} onSubmit={submit} aria-label={`Review ${read(goal, 'name') || 'goal'}`} {...draft.dropProps}>
             <section className={styles.context} aria-label="Review context">
                 <h3>{context.since}</h3>
                 <p className={context.description ? styles.description : styles.muted}>
@@ -118,11 +140,15 @@ export default function GoalReviewForm({ rootId, goal, goalId, onSubmit, onCance
             {error ? <p role="alert" className={styles.error}>{error}</p> : null}
 
             <div className={styles.actions}>
-                <Button type="submit" variant="primary" disabled={!hasAnswer || busy} title={draft.busyReason || undefined}>
-                    {isSaving ? 'Saving…' : 'Save review'}
-                </Button>
-                <AttachMenuButton draft={draft} disabled={isSaving} placement="up" />
-                {onCancel ? <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button> : null}
+                {!registerFooterAction ? (
+                    <Button type="submit" variant="primary" disabled={saveDisabled} title={draft.busyReason || undefined}>
+                        {saveLabel}
+                    </Button>
+                ) : null}
+                {!editingNote ? <AttachMenuButton draft={draft} disabled={isSaving} placement="up" /> : null}
+                {onCancel && !registerFooterAction
+                    ? <Button type="button" variant="secondary" onClick={onCancel}>Cancel</Button>
+                    : null}
             </div>
         </form>
     );

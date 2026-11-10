@@ -34,9 +34,9 @@ export function GoalReviewPrompt({ rootId, goal, goalId, onReview }) {
     );
 }
 
-/** Writing a review; returns to the goal once saved. */
-export function GoalReviewComposer({ rootId, goal, goalId, onDone }) {
-    const { isSaving, writeReview } = useGoalReviewActions(rootId, goalId);
+/** Writing a review, or editing `editingNote`'s answers; calls `onDone` once saved. */
+export function GoalReviewComposer({ rootId, goal, goalId, onDone, registerFooterAction, editingNote = null }) {
+    const { isSaving, writeReview, editReview } = useGoalReviewActions(rootId, goalId);
     return (
         <GoalReviewForm
             rootId={rootId}
@@ -44,8 +44,12 @@ export function GoalReviewComposer({ rootId, goal, goalId, onDone }) {
             goalId={goalId}
             isSaving={isSaving}
             onCancel={onDone}
+            registerFooterAction={registerFooterAction}
+            editingNote={editingNote}
             onSubmit={async (reviewData, attachments) => {
-                const saved = await writeReview(reviewData, attachments);
+                const saved = editingNote
+                    ? await editReview(editingNote.id, reviewData)
+                    : await writeReview(reviewData, attachments);
                 if (saved) onDone();
                 return saved;
             }}

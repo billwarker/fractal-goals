@@ -139,6 +139,15 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
         );
     }
 
+    if (type === 'date_note') {
+        return (
+            <div className={`${styles.eventPill} ${styles.eventPillDateNote}`} title={title}>
+                <span className={styles.dayStatusAssistive}>Note: </span>
+                <span className={styles.eventPillText}>{title}</span>
+            </div>
+        );
+    }
+
     if (type === 'completed_session') {
         return renderCompletedSession(title, eventInfo.event.extendedProps);
     }

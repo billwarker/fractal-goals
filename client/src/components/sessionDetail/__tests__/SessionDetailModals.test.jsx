@@ -4,7 +4,14 @@ import { render, screen } from '@testing-library/react';
 import SessionDetailModals from '../SessionDetailModals';
 
 const goalDetailModalSpy = vi.fn();
+const notes = vi.hoisted(() => ({ count: null, calls: [] }));
 
+vi.mock('../../../hooks/useOwnedNoteCount', () => ({
+    useOwnedNoteCount: (...args) => {
+        notes.calls.push(args);
+        return notes.count;
+    },
+}));
 vi.mock('../ConfirmationModal', () => ({
     default: () => <div data-testid="confirmation-modal" />,
 }));
@@ -27,6 +34,27 @@ vi.mock('../ActivityAssociationModal', () => ({
 describe('SessionDetailModals', () => {
     beforeEach(() => {
         goalDetailModalSpy.mockClear();
+        notes.count = null;
+        notes.calls = [];
+    });
+
+    it('says how many notes go with the session, asking only while the dialog is open', () => {
+        notes.count = 4;
+        render(
+            <SessionDetailModals
+                rootId="root-1"
+                sessionId="session-1"
+                activities={[]}
+                showDeleteConfirm
+                onCloseDeleteConfirm={vi.fn()}
+                onConfirmDelete={vi.fn()}
+                showBuilder={false}
+                selectedGoal={null}
+                showAssociationModal={false}
+            />
+        );
+        expect(notes.calls.at(-1)).toEqual(['root-1', { session_id: 'session-1' }, { enabled: true }]);
+        expect(screen.getByText("Delete this session and its 4 notes? This can't be undone.")).toBeInTheDocument();
     });
 
     it('passes the goal completion handler to the session detail goal modal', async () => {

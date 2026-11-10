@@ -6,6 +6,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CalendarIcon } from '../atoms/AppIcons';
 import GoalIcon from '../atoms/GoalIcon';
 import { LightningIcon, TimerIcon } from '../analytics/AnalyticsIcons';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
@@ -144,6 +145,8 @@ function NoteTimeline({
     notes = [],
     onEdit,
     onEditRequest,
+    onEditReview,
+    onOpenGoal,
     onDelete,
     onCarryForward,
     showContext = false,
@@ -173,6 +176,8 @@ function NoteTimeline({
             note={note}
             onEdit={onEdit}
             onEditRequest={onEditRequest}
+            onEditReview={onEditReview}
+            onOpenGoal={onOpenGoal}
             onDelete={onDelete}
             onCarryForward={onCarryForward}
             showContext={showContext}
@@ -206,18 +211,28 @@ function NoteTimeline({
     // A note outside any session hangs off the rail on its kind's icon: its goal's, or an activity's.
     const standaloneNode = (note) => {
         if (note.goal_type && note.context_type === 'goal') {
+            // A completion note, or any note on a goal that is now completed, takes the completed colour.
+            const colorKey = note.goal_completed || note.note_kind === 'goal_completion' ? 'Completed' : note.goal_type;
             return (
-                <TreeNode kind="goal" color={getGoalColor(note.goal_type)}>
+                <TreeNode kind="goal" color={getGoalColor(colorKey)}>
                     <GoalIcon
                         shape={getGoalIcon(note.goal_type)}
-                        color={getGoalColor(note.goal_type)}
-                        secondaryColor={getGoalSecondaryColor(note.goal_type)}
+                        color={getGoalColor(colorKey)}
+                        secondaryColor={getGoalSecondaryColor(colorKey)}
                         size={12}
                     />
                 </TreeNode>
             );
         }
         if (note.activity_definition_id) return <TreeNode kind="goal"><LightningIcon size={12} /></TreeNode>;
+        if (note.context_type === 'program' || note.context_type === 'program_date') {
+            const color = note.program_color || undefined;
+            return (
+                <TreeNode kind="goal" color={color}>
+                    <CalendarIcon size={12} style={color ? { color } : undefined} />
+                </TreeNode>
+            );
+        }
         return null;
     };
 
@@ -234,18 +249,29 @@ function NoteTimeline({
                 >
                     <div className={styles.sessionHeader}>
                         <TreeNode kind="session"><TimerIcon size={12} /></TreeNode>
-                        <SessionTemplateNameBadge
-                            name={sessionGroup.sessionName}
-                            color={sessionGroup.sessionColor}
-                            size="feed"
-                            wrap
-                            className={styles.sessionBadge}
-                        />
+                        {/* The badge is the way into its session. */}
                         {sessionGroup.rootId ? (
-                            <Link className={styles.sessionLink} to={`/${sessionGroup.rootId}/session/${sessionGroup.sessionId}`}>
-                                Open session
+                            <Link
+                                className={styles.sessionBadgeLink}
+                                to={`/${sessionGroup.rootId}/session/${sessionGroup.sessionId}`}
+                                aria-label={`Open session ${sessionGroup.sessionName}`}
+                            >
+                                <SessionTemplateNameBadge
+                                    name={sessionGroup.sessionName}
+                                    color={sessionGroup.sessionColor}
+                                    size="feed"
+                                    wrap
+                                />
                             </Link>
-                        ) : null}
+                        ) : (
+                            <SessionTemplateNameBadge
+                                name={sessionGroup.sessionName}
+                                color={sessionGroup.sessionColor}
+                                size="feed"
+                                wrap
+                                className={styles.sessionBadge}
+                            />
+                        )}
                         <span className={styles.sessionCount}>
                             {sessionGroup.notes.length} {sessionGroup.notes.length === 1 ? 'note' : 'notes'}
                         </span>

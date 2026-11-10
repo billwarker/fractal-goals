@@ -150,18 +150,27 @@
     max-width: min(100%, 420px);
 }
 
-.sessionLink {
-    flex-shrink: 0;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    font-weight: 600;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-    white-space: nowrap;
+.sessionBadgeLink {
+    display: inline-flex;
+    min-width: 0;
+    max-width: min(100%, 420px);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: filter 0.15s;
 }
 
-.sessionLink:hover {
-    color: var(--color-brand-primary);
+.sessionBadgeLink > * {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.sessionBadgeLink:hover {
+    filter: brightness(1.2);
+}
+
+.sessionBadgeLink:focus-visible {
+    outline: 2px solid var(--color-brand-primary);
+    outline-offset: 2px;
 }
 
 .sessionCount {
@@ -268,7 +277,8 @@
         flex-wrap: wrap;
     }
 
-    .sessionBadge {
+    .sessionBadge,
+    .sessionBadgeLink {
         max-width: calc(100% - 64px);
     }
 }

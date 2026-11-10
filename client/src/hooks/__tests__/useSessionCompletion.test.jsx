@@ -86,3 +86,24 @@ it('lets the server choose the end time and reports a paused completion', async 
         expect.stringMatching(/^Session completed — ended at \d{1,2}:53 (AM|PM) when paused$/),
     );
 });
+
+it('stops listing the completed session as active', async () => {
+    const queryClient = new QueryClient();
+    const activeKey = queryKeys.activeSession('user-1', 'root-1');
+    queryClient.setQueryData(activeKey, { id: 'session-1' });
+    const wrapper = ({ children }) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useSessionCompletion({
+        rootId: 'root-1',
+        sessionId: 'session-1',
+        session: { id: 'session-1', completed: false },
+        sessionActivitiesKey: queryKeys.sessionActivities('root-1', 'session-1'),
+        queryClient,
+        updateSession: vi.fn().mockResolvedValue({ data: { completed: true } }),
+    }), { wrapper });
+
+    await act(async () => result.current());
+
+    expect(queryClient.getQueryData(activeKey)).toBeNull();
+});

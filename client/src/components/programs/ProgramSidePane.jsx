@@ -11,6 +11,7 @@ import { goalsBadgedOnDate } from '../../utils/programCalendarGoalEvents';
 import { blockForDate } from '../../utils/programViewModel';
 import ProgramSidebar from './ProgramSidebar';
 import ProgramDayPane from './ProgramDayPane';
+import { ProgramDateNoteComposer } from './ProgramDateNotes';
 import ProgramOverview from './ProgramOverview';
 import { ProgramPlusIcon } from './ProgramSvgIcons';
 import styles from './ProgramSidePane.module.css';
@@ -162,6 +163,9 @@ export default function ProgramSidePane({
                     onEditPlan={onEditPlan}
                     sessionCreditUpdating={sessionCreditUpdating}
                 />
+            ) : null}
+            {program && scope === 'day' ? (
+                <ProgramDateNoteComposer rootId={rootId} programId={program.id} date={contextDate} />
             ) : null}
 
             {program && scope !== 'day' && activeView === 'details' ? (

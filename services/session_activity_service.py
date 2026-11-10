@@ -9,6 +9,7 @@ import models
 from models import ActivityDefinition, ActivityInstance, ActivitySet, Goal, MetricDefinition, MetricValue, SessionWorkInterval, session_goals, validate_root_goal
 from services import Event, Events, event_bus
 from services.goal_type_utils import get_canonical_goal_type
+from services.note_ownership import release_pins_into, soft_delete_owned_notes
 from services.owned_entity_queries import (
     get_owned_activity_definition,
     get_owned_activity_instance,
@@ -425,6 +426,9 @@ class SessionActivityService:
         if open_interval and open_interval.activity_instance_id == instance_id:
             interval_service.close(open_interval, ended_at=utc_now_naive())
         instance.deleted_at = models.utc_now()
+        # The activity's notes go with it; pins it used up wait for the next instance.
+        soft_delete_owned_notes(self.db_session, root_id, instance.deleted_at, instance_ids=[instance_id])
+        release_pins_into(self.db_session, root_id, instance_ids=[instance_id])
         self._remove_instance_from_session_sections(session, instance_id)
         self.db_session.commit()
         event_bus.emit(Event(

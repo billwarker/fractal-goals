@@ -4,7 +4,7 @@ import { fractalApi } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
-import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
+import { invalidateNotesAfterDelete, invalidateOnboardingProgress } from '../utils/queryInvalidation';
 import { applyCreatedGoal } from '../utils/goalTreeCache';
 
 const GoalsContext = createContext();
@@ -100,7 +100,8 @@ export function GoalsProvider({ children }) {
             queryClient.invalidateQueries({ queryKey: queryKeys.goalConditionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionActivitiesRoot(variables.rootId) });
-            queryClient.invalidateQueries({ queryKey: queryKeys.sessionNotesRoot(variables.rootId) });
+            // The goals' notes went with them.
+            invalidateNotesAfterDelete(queryClient, variables.rootId, queryKeys);
             await invalidateOnboardingProgress(queryClient, queryKeys);
             queryClient.invalidateQueries({ queryKey: queryKeys.sessionGoalsViewRoot(variables.rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.goalSequenceRoot(variables.rootId) });

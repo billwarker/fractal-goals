@@ -10,7 +10,18 @@ export const EMPTY_CALENDAR_FEED = Object.freeze({
     programDays: [],
     completedSessionDays: [],
     periods: [],
+    dateNotes: [],
 });
+
+/** A note preview as one line of plain text: markdown links keep their words, images and marks go. */
+function plainNoteText(text = '') {
+    return text
+        .replace(/!\[[^\]]*\]\([^)]*\)?/g, '')
+        .replace(/\[([^\]]+)\]\([^)]*\)?/g, '$1')
+        .replace(/[`*_>#~]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
 
 function uniqueById(items) {
     return [...new Map(items.map((item) => [String(item.id), item])).values()];
@@ -30,6 +41,7 @@ export function mergeCalendarFeedChunks(chunks = []) {
         programDays: loaded.flatMap((chunk) => chunk.program_days || []),
         completedSessionDays: loaded.flatMap((chunk) => chunk.completed_session_days || []),
         periods: uniqueById(loaded.flatMap((chunk) => chunk.periods || [])),
+        dateNotes: loaded.flatMap((chunk) => chunk.date_notes || []),
     };
 }
 
@@ -140,6 +152,29 @@ export function buildCalendarFeedEvents({ feed = EMPTY_CALENDAR_FEED, programs =
                     sortOrder: 0,
                 },
             });
+        });
+    });
+
+    // A note on a date sits under the day's other entries; clicking it opens the day, where it reads in full.
+    (feed.dateNotes || []).forEach((note, index) => {
+        const text = plainNoteText(note.preview);
+        if (!text) return;
+        events.push({
+            id: `date-note-${note.id}`,
+            title: text,
+            start: note.date,
+            allDay: true,
+            backgroundColor: 'transparent',
+            borderColor: 'transparent',
+            textColor: 'inherit',
+            classNames: ['program-date-note-event'],
+            extendedProps: {
+                type: 'date_note',
+                programId: note.program_id,
+                program: programById.get(String(note.program_id)),
+                noteId: note.id,
+                sortOrder: 10 + index / 1000,
+            },
         });
     });
 

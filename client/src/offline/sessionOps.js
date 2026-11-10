@@ -269,6 +269,39 @@ export function applySessionPause(session, instances, at) {
     };
 }
 
+/**
+ * Mirror of the server's completion boundary: a paused session ends at its pause,
+ * otherwise at its recorded end or the completion time, and its duration excludes
+ * paused time. Quick sessions carry no end or duration.
+ */
+export function applySessionCompletion(session, completed, at, { quick = false } = {}) {
+    if (!session) return session;
+    const attrs = session.attributes || {};
+    const timing = {};
+    if (!completed) {
+        Object.assign(timing, { session_end: null, total_duration_seconds: null, is_paused: false, last_paused_at: null });
+    } else if (!quick) {
+        const start = session.session_start ?? attrs.session_start ?? null;
+        const lastPausedAt = session.last_paused_at ?? attrs.last_paused_at ?? null;
+        const isPaused = Boolean(session.is_paused ?? attrs.is_paused) && lastPausedAt;
+        let end = session.session_end ?? attrs.session_end ?? at;
+        if (isPaused) end = start && Date.parse(start) > Date.parse(lastPausedAt) ? start : lastPausedAt;
+        const pausedSeconds = session.total_paused_seconds ?? attrs.total_paused_seconds ?? 0;
+        Object.assign(timing, {
+            session_end: end,
+            total_duration_seconds: start ? Math.max(0, secondsBetween(start, end) - pausedSeconds) : null,
+            is_paused: false,
+            last_paused_at: null,
+        });
+    }
+    const completion = { completed, completed_at: completed ? at : null, ...timing };
+    return {
+        ...session,
+        ...completion,
+        ...(session.attributes ? { attributes: { ...attrs, ...completion } } : {}),
+    };
+}
+
 export function applySessionResume(session, instances, at) {
     const pausedFor = session?.last_paused_at ? secondsBetween(session.last_paused_at, at) : 0;
     return {

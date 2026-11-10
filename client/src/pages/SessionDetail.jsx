@@ -183,6 +183,7 @@ function SessionDetailContent() {
 
                 <SessionDetailModals
                     rootId={rootId}
+                    sessionId={sessionId}
                     activities={activities}
                     activityGroups={activityGroups}
                     showDeleteConfirm={showDeleteConfirm}
@@ -290,6 +291,7 @@ function SessionDetailContent() {
 
             <SessionDetailModals
                 rootId={rootId}
+                sessionId={sessionId}
                 activities={activities}
                 activityGroups={activityGroups}
                 showDeleteConfirm={showDeleteConfirm}

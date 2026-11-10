@@ -19,6 +19,8 @@ export function useProgramDateNotes(rootId, programId) {
     const invalidate = () => Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.programDayReadModelRoot(rootId, programId) }),
         queryClient.invalidateQueries({ queryKey: queryKeys.allNotesRoot(rootId) }),
+        // Calendar cells show the date's notes.
+        queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
     ]);
 
     const createMutation = useMutation({

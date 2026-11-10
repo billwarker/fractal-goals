@@ -39,6 +39,9 @@ export const fractalNotesApi = {
     createNote: (rootId, data) => axios.post(`${API_BASE}/${rootId}/notes`, data),
     updateNote: (rootId, noteId, data) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
     deleteNote: (rootId, noteId) => axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),
+    // target: { session_id } | { goal_id } | { activity_instance_id }
+    getOwnedNoteCount: (rootId, target) =>
+        axios.get(`${API_BASE}/${rootId}/notes/owned-count`, { params: target }),
     getGoalNotes: (rootId, goalId, options = {}) =>
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/notes${buildQueryString(options, {
             includeDescendants: 'include_descendants',

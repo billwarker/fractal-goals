@@ -560,6 +560,24 @@
 }
 
 /* Time off spans its dates as a hatched, neutral bar above program ribbons. */
+/* A date note: one quiet line, cut off with an ellipsis by .eventPillText. */
+.eventPillDateNote {
+    min-width: 0;
+    border-left: 2px solid color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+    border-radius: 0 3px 3px 0;
+    background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+    color: var(--color-text-secondary);
+}
+
+.eventPillDateNote .eventPillText {
+    min-width: 0;
+    font-style: italic;
+}
+
+.eventPillDateNote:hover {
+    color: var(--color-text-primary);
+}
+
 .eventPillCalendarPeriod {
     min-height: 18px;
     border: 1px dashed color-mix(in srgb, var(--color-text-muted) 55%, transparent);

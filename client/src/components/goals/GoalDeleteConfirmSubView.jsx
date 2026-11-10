@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 
 import { useGoalSequence } from '../../hooks/useGoalSequenceQueries';
+import { useOwnedNoteCount } from '../../hooks/useOwnedNoteCount';
+import { notesPhrase } from '../../utils/noteTypes';
 import Button from '../atoms/Button';
 import styles from '../GoalDetailModal.module.css';
 
@@ -18,6 +20,9 @@ export default function GoalDeleteConfirmSubView({ rootId, goal, goalId, childCo
     const [typed, setTyped] = useState('');
     const needsTyping = childCount > 0;
     const name = goal?.name ?? goal?.attributes?.name ?? 'this goal';
+    // Its notes, reviews and completion notes (and those of the goals under it) go too.
+    const noteCount = useOwnedNoteCount(rootId, { goal_id: goalId });
+    const withNotes = noteCount ? ` Its ${notesPhrase(noteCount)} will be deleted too.` : '';
 
     return (
         <div className={styles.optionsSubView}>
@@ -25,8 +30,8 @@ export default function GoalDeleteConfirmSubView({ rootId, goal, goalId, childCo
             <div className={styles.optionsSectionHeader}>Delete goal?</div>
             <div className={styles.optionsSectionHint}>
                 {needsTyping
-                    ? `“${name}” and its ${childCount} child ${childCount === 1 ? 'goal' : 'goals'} (and their descendants) will be deleted.`
-                    : `“${name}” will be deleted.`}
+                    ? `“${name}” and its ${childCount} child ${childCount === 1 ? 'goal' : 'goals'} (and their descendants) will be deleted.${withNotes}`
+                    : `“${name}” will be deleted.${withNotes}`}
             </div>
             {nextStep ? (
                 <label className={styles.sequenceCheckbox}>

@@ -32,6 +32,11 @@ export function useSessionCompletion({
         try {
             const response = await updateSession({ completed: nextCompleted });
             if (nextCompleted) {
+                // A queued completion syncs later; the nav must stop showing it as in progress now.
+                queryClient.setQueriesData(
+                    { queryKey: queryKeys.activeSessionRoot() },
+                    (active) => (active?.id === sessionId ? null : active),
+                );
                 queryClient.setQueryData(sessionActivitiesKey, (previous = []) => (
                     Array.isArray(previous)
                         ? previous.map((instance) => ({

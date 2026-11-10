@@ -88,3 +88,22 @@ describe('programCalendarFeed', () => {
         expect(colour(first)).toBeTruthy();
     });
 });
+
+describe('date notes in calendar cells', () => {
+    it('merges chunk notes and draws each as one plain line on its date, after the day', () => {
+        const feed = mergeCalendarFeedChunks([
+            { ...august, date_notes: [{ id: 'n1', program_id: 'p1', date: '2026-08-31', preview: 'Slept **badly**, see [log](https://x.y)' }] },
+            { ...september, date_notes: [{ id: 'n2', program_id: 'p1', date: '2026-09-01', preview: '![img](a.png)' }] },
+        ]);
+        expect(feed.dateNotes.map((note) => note.id)).toEqual(['n1', 'n2']);
+
+        const events = buildCalendarFeedEvents({ feed, programs: [program] });
+        const notes = events.filter((event) => event.extendedProps.type === 'date_note');
+        // An image-only preview has no words to show.
+        expect(notes).toHaveLength(1);
+        expect(notes[0]).toMatchObject({ start: '2026-08-31', title: 'Slept badly, see log', allDay: true });
+        expect(notes[0].extendedProps).toMatchObject({ programId: 'p1', noteId: 'n1' });
+        const dayEvent = events.find((event) => event.extendedProps.type === 'program_day');
+        expect(notes[0].extendedProps.sortOrder).toBeGreaterThan(dayEvent.extendedProps.sortOrder);
+    });
+});

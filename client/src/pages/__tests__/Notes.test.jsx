@@ -117,12 +117,12 @@ describe('Notes page', () => {
         expect(timelineProps.onEdit).toBe(useNotesPageQueryMock.mock.results.at(-1).value.updateNote);
     });
 
-    it('offers four compact categories and passes the selection to the notes query', async () => {
+    it('offers three compact categories and passes the selection to the notes query', async () => {
         render(<MemoryRouter><Notes /></MemoryRouter>);
 
         const categories = screen.getByRole('group', { name: 'Categories' });
         expect(Array.from(categories.querySelectorAll('button')).map((button) => button.textContent))
-            .toEqual(['General', 'Goals', 'Sessions', 'Programs']);
+            .toEqual(['Goals', 'Sessions', 'Programs']);
         expect(screen.queryByRole('button', { name: 'Activity Set Notes' })).not.toBeInTheDocument();
 
         await act(async () => {

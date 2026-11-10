@@ -299,7 +299,7 @@ export default function ProgramDayPane({
                 </Button>
             ) : null}
             {dueGoalsCard}
-            <ProgramDateNotes rootId={rootId} programId={program.id} date={date} notes={detail.notes} />
+            <ProgramDateNotes rootId={rootId} programId={program.id} notes={detail.notes} />
         </div>
     );
 }

@@ -778,7 +778,8 @@ def test_remove_session_activity_mutation_query_budget(
     assert_mutation_budget(
         response, status_code=200, max_bytes=20_000, max_ms=500, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 13
+    # Two of these are fixed-cost bulk UPDATEs: the activity's notes go with it, its delivered pins wait again.
+    assert query_counter["total"] <= 15
 
 
 @pytest.mark.integration

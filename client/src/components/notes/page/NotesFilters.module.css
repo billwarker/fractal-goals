@@ -387,6 +387,13 @@ fieldset.field legend {
 }
 
 /* Categories: independent checkbox-style options (multi-select), not a joined segmented control. */
+.categoryIcon {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    margin-left: 1px;
+}
+
 .categoryOptions {
     display: flex;
     flex-wrap: wrap;
