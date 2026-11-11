@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 import time
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 
@@ -64,7 +64,9 @@ def main():
             try:
                 with urlopen(origin, timeout=1):
                     break
-            except (URLError, TimeoutError):
+            except OSError:
+                # Docker's port proxy can accept and then reset the connection while nginx starts;
+                # URLError, timeouts and resets are all OSErrors.
                 time.sleep(0.1)
         else:
             raise RuntimeError('nginx container did not start')
