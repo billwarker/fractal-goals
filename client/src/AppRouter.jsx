@@ -37,6 +37,7 @@ const AgentChatPopover = lazyWithRetry(() => import('./components/agent/AgentCha
 const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
 const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
+import LoadingState from './components/common/LoadingState';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { usePageViewTelemetry } from './hooks/usePageViewTelemetry';
@@ -50,10 +51,13 @@ import { useIsOnline } from './offline/useIsOnline';
 
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from './utils/marketingHost';
 
-function RequireAdmin({ children }) {
-    const { user } = useAuth();
+export function RequireAdmin({ children }) {
+    const { user, loading } = useAuth();
     const { rootId } = useParams();
 
+    // A reload or deep link renders before the current user resolves; redirecting then
+    // would send admins away from admin-only pages.
+    if (loading) return <LoadingState label="Loading..." />;
     if (!user?.is_admin) {
         return <Navigate to={rootId ? `/${rootId}/goals` : '/'} replace />;
     }

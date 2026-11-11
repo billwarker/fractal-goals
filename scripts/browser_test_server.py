@@ -21,6 +21,7 @@ os.environ["AGENT_EMBEDDED_PRIVACY_APPROVED"] = "true"
 
 from config import config
 from sqlalchemy import create_engine, text
+from scripts.browser_showcase_seed import seed_showcase
 from sqlalchemy.engine import make_url
 
 
@@ -457,6 +458,8 @@ def main():
             db.commit()
             for suffix in ("desktop", "mobile"):
                 _seed_embedded_proposal(db, suffix, user)
+            db.commit()
+            seed_showcase(db, now, config)
             db.commit()
         from app import app
         from extensions import limiter
