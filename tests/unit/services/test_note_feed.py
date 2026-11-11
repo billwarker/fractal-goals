@@ -52,10 +52,13 @@ def test_spec_normalization_and_limits():
         'text': 'scapula', 'categories': ['goals']}
     assert normalize_spec({'text': 'youtube', 'text_mode': 'keyword'}) == {'text': 'youtube'}  # Earlier saved filters.
     assert normalize_spec({'goal_id': 'g1', 'goal_ids': ['g2']}) == {'goal_ids': ['g1', 'g2']}
+    assert normalize_spec({'text': 'x', 'pinned_only': True}) == {'text': 'x'}  # Pin to top was retired.
+    assert normalize_spec({'categories': ['general', 'goals']}) == {'categories': ['goals']}  # General was retired.
+    assert normalize_spec({'categories': 'general'}) == {}
     assert normalize_spec({'conditions': [{'op': 'equals', 'value': ' elbow '}], 'match': 'any'}) == {
         'conditions': [{'op': 'equals', 'value': 'elbow'}]}  # "match" only matters with two or more conditions.
     for bad in ({'unknown': 1}, {'text': 'x' * 201}, {'text_mode': 'regex'}, {'categories': ['activities']},
-                {'pinned_only': 'yes'}, {'activity_definition_ids': ['a'] * 51}, {'match': 'some'},
+                {'activity_definition_ids': ['a'] * 51}, {'match': 'some'},
                 {'conditions': [{'op': 'regex', 'value': 'x'}]}, {'conditions': [{'op': 'contains', 'value': '  '}]},
                 {'conditions': [{'op': 'contains', 'value': 'x'}] * 11}):
         with pytest.raises(NoteFilterError):
@@ -64,12 +67,14 @@ def test_spec_normalization_and_limits():
 
 
 def test_categories_map_where_notes_were_written(feed):
-    assert contents(feed, categories=['general']) == ['Handstand cue: stack scapula', 'Morning: elbow pain 100% gone']
     assert contents(feed, categories=['goals']) == ['Review: scapula control improving']
     assert contents(feed, categories=['sessions']) == ['Elbow lockout felt strong', 'Late workout, abort']
     assert contents(feed, categories=['programs']) == []
     payload, _, _ = feed.service.get_all_notes(feed.root.id, feed.user.id, filters={})
-    assert {note['note_category'] for note in payload['notes']} == {'general', 'goals', 'sessions'}
+    # Leftover fractal-wide and activity-definition notes belong to no category, but still show unfiltered.
+    assert {note['note_category'] for note in payload['notes']} == {None, 'goals', 'sessions'}
+    assert contents(feed, categories=['goals', 'sessions', 'programs']) == [
+        'Elbow lockout felt strong', 'Late workout, abort', 'Review: scapula control improving']
 
 
 def test_keyword_search_escapes_wildcards_and_ands_terms(feed):
@@ -123,10 +128,10 @@ def test_category_filter_pages_in_sql(feed):
     listener = lambda *args: statements.append(args[2])
     event.listen(feed.db.get_bind(), 'before_cursor_execute', listener)
     try:
-        payload, _, _ = feed.service.get_all_notes(feed.root.id, feed.user.id, filters={'categories': ['general', 'sessions']}, page_size=2)
+        payload, _, _ = feed.service.get_all_notes(feed.root.id, feed.user.id, filters={'categories': ['goals', 'sessions']}, page_size=2)
     finally:
         event.remove(feed.db.get_bind(), 'before_cursor_execute', listener)
-    assert payload['total'] == 4 and len(payload['notes']) == 2 and payload['has_more']
+    assert payload['total'] == 3 and len(payload['notes']) == 2 and payload['has_more']
     assert any('LIMIT' in statement.upper() for statement in statements if 'FROM notes' in statement)
 
 

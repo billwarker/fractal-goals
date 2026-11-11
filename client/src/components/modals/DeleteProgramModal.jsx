@@ -6,9 +6,13 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import { Text } from '../atoms/Typography';
 import { AlertTriangleIcon } from '../atoms/AppIcons';
+import { useOwnedNoteCount } from '../../hooks/useOwnedNoteCount';
+import { notesPhrase } from '../../utils/noteTypes';
 import styles from './DeleteProgramModal.module.css';
 
-const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCount, requireMatchingText }) => {
+const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCount, rootId, programId, requireMatchingText }) => {
+    // Its program and date notes go with it (services/note_ownership.py).
+    const noteCount = useOwnedNoteCount(rootId, { program_id: programId }, { enabled: Boolean(isOpen && programId) }) || 0;
     const [confirmText, setConfirmText] = useState('');
     const handleClose = () => {
         setConfirmText('');
@@ -35,6 +39,11 @@ const DeleteProgramModal = ({ isOpen, onClose, onConfirm, programName, sessionCo
                     <p className={styles.text}>
                         Are you sure you want to delete <strong>"{programName}"</strong>?
                     </p>
+                    {noteCount > 0 ? (
+                        <p className={styles.text}>
+                            Its <strong>{notesPhrase(noteCount)}</strong>, on the program and its dates, will be deleted too.
+                        </p>
+                    ) : null}
 
                     {sessionCount > 0 && (
                         <div className={styles.warningBox}>

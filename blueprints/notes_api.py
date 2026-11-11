@@ -59,6 +59,48 @@ def get_session_notes(current_user, root_id, session_id):
         db_session.close()
 
 
+@notes_bp.route('/<root_id>/notes/owned-count', methods=['GET'])
+@token_required
+def get_owned_note_count(current_user, root_id):
+    """How many notes deleting a session, goal, activity instance or program would take, for its confirmation."""
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.count_owned_notes(
+            root_id,
+            current_user.id,
+            session_id=request.args.get('session_id') or None,
+            goal_id=request.args.get('goal_id') or None,
+            activity_instance_id=request.args.get('activity_instance_id') or None,
+            program_id=request.args.get('program_id') or None,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error counting owned notes")
+        return internal_error(logger, "Error counting owned notes")
+    finally:
+        db_session.close()
+
+
+@notes_bp.route('/<root_id>/sessions/<session_id>/carried-notes', methods=['GET'])
+@token_required
+def get_carried_notes(current_user, root_id, session_id):
+    db_session, note_service = _with_note_service()
+    try:
+        payload, error, status = note_service.get_carried_notes(root_id, session_id, current_user.id)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching carried notes")
+        return internal_error(logger, "Error fetching carried notes")
+    finally:
+        db_session.close()
+
+
 @notes_bp.route('/<root_id>/activity-instances/<instance_id>/notes', methods=['GET'])
 @token_required
 def get_activity_instance_notes(current_user, root_id, instance_id):
@@ -249,7 +291,6 @@ def _feed_filters():
         'goal_ids': _csv('goal_ids') or ([request.args['goal_id']] if request.args.get('goal_id') else []),
         'activity_definition_ids': request.args.getlist('activity_definition_ids[]') or _csv('activity_definition_ids'),
         'activity_group_ids': request.args.getlist('activity_group_ids[]') or _csv('activity_group_ids'),
-        'pinned_only': request.args.get('pinned_only', 'false').lower() == 'true',
         'saved_filter_ids': _csv('filters'),
         'day': request.args.get('day') or None,
         'timezone': request.args.get('timezone') or None,
@@ -289,41 +330,5 @@ def get_notes_heatmap(current_user, root_id):
         db_session.rollback()
         logger.exception("Error fetching notes heatmap")
         return internal_error(logger, "Error fetching notes heatmap")
-    finally:
-        db_session.close()
-
-
-@notes_bp.route('/<root_id>/notes/<note_id>/pin', methods=['PUT'])
-@token_required
-@idempotent
-def pin_note(current_user, root_id, note_id):
-    db_session, note_service = _with_note_service()
-    try:
-        payload, error, status = note_service.pin_note(root_id, note_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error pinning note")
-        return internal_error(logger, "Error pinning note")
-    finally:
-        db_session.close()
-
-
-@notes_bp.route('/<root_id>/notes/<note_id>/unpin', methods=['PUT'])
-@token_required
-@idempotent
-def unpin_note(current_user, root_id, note_id):
-    db_session, note_service = _with_note_service()
-    try:
-        payload, error, status = note_service.unpin_note(root_id, note_id, current_user.id)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(payload), status
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error unpinning note")
-        return internal_error(logger, "Error unpinning note")
     finally:
         db_session.close()

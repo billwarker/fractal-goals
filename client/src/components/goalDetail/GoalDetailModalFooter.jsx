@@ -191,6 +191,7 @@ function GoalDetailModalFooter({
                         type="button"
                         onClick={optionsFooterAction.onClick}
                         disabled={optionsFooterAction.disabled}
+                        title={optionsFooterAction.title}
                         className={`${styles.completionFooterButton} ${styles.activitiesFooterConfirmButton}`}
                         style={{
                             '--completion-accent': displayGoalColor,

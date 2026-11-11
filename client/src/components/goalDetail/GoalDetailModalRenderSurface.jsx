@@ -122,6 +122,9 @@ function GoalDetailModalRenderSurface({
     readOnlyAssociatedActivityGroups,
     readOnlyNotes,
     readOnlyTimelineEntries,
+    reviewNote = null,
+    setReviewNote = () => {},
+    closeAfterReview = false,
     refreshAssociations,
     registerActivitiesAssociateAction,
     registerActivitiesAssociateCancelAction,
@@ -158,8 +161,18 @@ function GoalDetailModalRenderSurface({
     // Intentionally refresh the preview timestamp when entering a new modal subview.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const completionPreviewDate = useMemo(() => new Date(), [viewState]);
+    const openReview = (note) => {
+        setReviewNote(note);
+        setViewState('goal-review');
+    };
+    // An edit opened from outside the goal returns there, one from the Notes tab to the notes; a new review to the goal.
+    const finishReview = () => {
+        if (closeAfterReview) handleClose();
+        else setViewState(reviewNote ? 'goal-notes' : 'goal');
+    };
     // An Options sub-view (e.g. Sequence) may put its primary action in the footer beside Cancel.
-    const [optionsFooterAction, setOptionsFooterAction] = useState(null);
+    // The Options and Review sub-views put their primary action in the modal footer.
+    const [subViewFooterAction, setSubViewFooterAction] = useState(null);
     const programsAffectedByCompletion = useMemo(() => (
         getProgramsAffectedByGoalCompletion({
             programs,
@@ -308,7 +321,7 @@ function GoalDetailModalRenderSurface({
                     <>
                     {!readOnly && mode !== 'create' && goalId && levelConfig?.uses_reviews ? (
                         <Suspense fallback={null}>
-                            <GoalReviewPrompt rootId={rootId} goal={goal} goalId={goalId} onReview={() => setViewState('goal-review')} />
+                            <GoalReviewPrompt rootId={rootId} goal={goal} goalId={goalId} onReview={() => openReview(null)} />
                         </Suspense>
                     ) : null}
                     <GoalViewMode
@@ -498,7 +511,7 @@ function GoalDetailModalRenderSurface({
                     displayMode={displayMode}
                     onSequencingChange={onSequencingChange}
                     programScope={programScope}
-                    registerFooterAction={setOptionsFooterAction}
+                    registerFooterAction={setSubViewFooterAction}
                 />
             </Suspense>
         );
@@ -510,13 +523,22 @@ function GoalDetailModalRenderSurface({
                     goalId={goalId}
                     hideComposer
                     readOnlyNotes={readOnlyNotes}
+                    onEditReview={readOnly ? undefined : openReview}
                 />
             </Suspense>
         );
     } else if (viewState === 'goal-review') {
         content = (
             <Suspense fallback={null}>
-                <GoalReviewComposer rootId={rootId} goal={goal} goalId={goalId} onDone={() => setViewState('goal')} />
+                <GoalReviewComposer
+                    key={reviewNote?.id || 'new'}
+                    rootId={rootId}
+                    goal={goal}
+                    goalId={goalId}
+                    editingNote={reviewNote}
+                    onDone={finishReview}
+                    registerFooterAction={readOnly ? undefined : setSubViewFooterAction}
+                />
             </Suspense>
         );
     } else if (viewState === 'goal-timeline') {
@@ -614,7 +636,7 @@ function GoalDetailModalRenderSurface({
     const showCompletionConfirmFooter = (viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && mode !== 'create'
         && !readOnly;
-    const showOptionsFooter = viewState === 'goal-options'
+    const showOptionsFooter = (viewState === 'goal-options' || viewState === 'goal-review')
         && mode !== 'create'
         && !readOnly;
     const completionConfirmAccentColor = viewState === 'uncomplete-confirm' ? completedColor : goalColor;
@@ -647,8 +669,8 @@ function GoalDetailModalRenderSurface({
             handleCancelActivitiesFlow={handleCancelActivitiesFlow}
             activitiesAssociateAction={activitiesAssociateAction}
             showOptionsFooter={showOptionsFooter}
-            onCancelOptions={() => handleGoalViewNavigation('goal')}
-            optionsFooterAction={viewState === 'goal-options' ? optionsFooterAction : null}
+            onCancelOptions={viewState === 'goal-review' ? finishReview : () => handleGoalViewNavigation('goal')}
+            optionsFooterAction={['goal-options', 'goal-review'].includes(viewState) ? subViewFooterAction : null}
             showDetailFooter={showDetailFooter}
             handleEditDetails={handleEditDetails}
             handleGoalViewNavigation={handleGoalViewNavigation}

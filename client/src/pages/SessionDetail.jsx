@@ -77,6 +77,7 @@ function SessionDetailContent() {
         addNote,
         updateNote,
         deleteNote,
+        notePins,
         refreshNotes,
         sidePaneModel,
         handleActivityFocus,
@@ -182,6 +183,7 @@ function SessionDetailContent() {
 
                 <SessionDetailModals
                     rootId={rootId}
+                    sessionId={sessionId}
                     activities={activities}
                     activityGroups={activityGroups}
                     showDeleteConfirm={showDeleteConfirm}
@@ -258,6 +260,7 @@ function SessionDetailContent() {
                             onAddNote={addNote}
                             onUpdateNote={updateNote}
                             onDeleteNote={deleteNote}
+                            notePins={notePins}
                             onOpenGoals={handleOpenGoals}
                             activityGoalScope={activityGoalScope}
                         />
@@ -288,6 +291,7 @@ function SessionDetailContent() {
 
             <SessionDetailModals
                 rootId={rootId}
+                sessionId={sessionId}
                 activities={activities}
                 activityGroups={activityGroups}
                 showDeleteConfirm={showDeleteConfirm}

@@ -101,3 +101,65 @@ test('saved keyword filters combine, the heatmap narrows to a day, and the URL r
         expect(await noHorizontalScroll(page)).toBe(true);
     }
 });
+
+test('the notes timeline puts its rail, brackets and indents on the background grid', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    // A seeded, completed session with one activity instance (scripts/browser_test_server.py).
+    const sessionId = `browser-heatmap-session-${suffix}-0`;
+    const instanceId = `browser-heatmap-instance-${suffix}-0`;
+    const marker = `gq${Date.now().toString(36)}${suffix[0]}`;
+    const token = await logIn(page);
+    const headers = { Authorization: `Bearer ${token}` };
+    const created = [];
+    const note = async (content, data) => {
+        const response = await page.request.post(`/api/${root}/notes`, { headers, data: { content: `${marker} ${content}`, ...data } });
+        expect(response.ok()).toBeTruthy();
+        created.push((await response.json()).id);
+    };
+    try {
+        // Newest first on the page: the activity group, then the session note, all in one session group.
+        await note('session note', { context_type: 'session', context_id: sessionId, session_id: sessionId });
+        await note('grouped one', { context_type: 'activity_instance', context_id: instanceId, activity_instance_id: instanceId });
+        await note('grouped two', { context_type: 'activity_instance', context_id: instanceId, activity_instance_id: instanceId });
+
+        await page.goto(`/${root}/notes?q=${marker}`);
+        await expect(page.getByText(`${marker} grouped two`)).toBeVisible();
+        const offsets = await page.evaluate((text) => {
+            const origin = document.querySelector('.content-container').getBoundingClientRect().left;
+            const x = (element) => element.getBoundingClientRect().left - origin;
+            const line = (element) => x(element) + 1;  // centre of a 2px bracket
+            const centre = (element) => x(element) + element.getBoundingClientRect().width / 2;
+            const textOf = (content) => [...document.querySelectorAll('[class*="markdownContent"]')]
+                .find((node) => node.textContent.includes(content));
+            const rail = document.querySelector('[class*="_rail_"]');
+            return {
+                rail: x(rail) + parseFloat(getComputedStyle(rail, '::before').left) + 0.5,
+                sessionBadge: x(document.querySelector('[class*="sessionHeader"]')),
+                sessionBracket: line(document.querySelector('[class*="sessionNotes"]')),
+                sessionNote: x(textOf(`${text} session note`)),
+                activityHeader: x(document.querySelector('[class*="activityHeader"]')),
+                activityBracket: line(document.querySelector('[class*="activityNotes"]')),
+                groupedNote: x(textOf(`${text} grouped two`)),
+                // Directory nodes centre on their parent's line: a session on the rail, an activity on its session's.
+                sessionNode: centre(document.querySelector('[class*="sessionNode"]')),
+                activityNode: centre(document.querySelector('[class*="activityNode"]')),
+            };
+        }, marker);
+        const grid = 20;
+        for (const [name, value] of Object.entries(offsets)) {
+            const off = ((value % grid) + grid) % grid;
+            expect(Math.min(off, grid - off), `${name} at ${value}px is off the ${grid}px grid`).toBeLessThanOrEqual(1);
+        }
+        // One grid step per level, and every note in a session group starts at the same indent.
+        expect(Math.abs(offsets.sessionBracket - offsets.sessionBadge)).toBeLessThanOrEqual(1);
+        expect(offsets.sessionNote - offsets.sessionBadge).toBeCloseTo(grid, 0);
+        expect(offsets.activityHeader).toBeCloseTo(offsets.sessionNote, 0);
+        expect(offsets.groupedNote - offsets.activityHeader).toBeCloseTo(grid, 0);
+        expect(Math.abs(offsets.sessionNode - offsets.rail)).toBeLessThanOrEqual(1);
+        expect(Math.abs(offsets.activityNode - offsets.sessionBracket)).toBeLessThanOrEqual(1);
+        await page.screenshot({ path: testInfo.outputPath(`notes-grid-${suffix}.png`) });
+    } finally {
+        for (const id of created) await page.request.delete(`/api/${root}/notes/${id}`, { headers });
+    }
+});

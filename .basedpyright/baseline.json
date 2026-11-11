@@ -1154,14 +1154,6 @@
                     "endColumn": 44,
                     "lineCount": 1
                 }
-            },
-            {
-                "code": "reportAttributeAccessIssue",
-                "range": {
-                    "startColumn": 13,
-                    "endColumn": 38,
-                    "lineCount": 1
-                }
             }
         ],
         "./services/_goal_fractals.py": [

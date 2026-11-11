@@ -24,6 +24,7 @@ from services.analytics_engine import AnalyticsEngineService
 from services.analytics_query_cache import clear_cache
 from services.feature_flag_service import FeatureFlagService
 from tests.conftest import session_headers_for
+from scripts.analytics_sql_role_grants import grant_statements
 
 
 CORPUS_PATH = Path(__file__).resolve().parents[1] / "fixtures" / "analytics_sql_corpus.json"
@@ -368,9 +369,9 @@ def test_read_only_scope_blocks_writes_and_restores_the_request_transaction(db_s
 def test_least_privilege_role_runs_catalog_sql_and_denies_account_tables(db_session, test_user, monkeypatch):
     role = f"analytics_probe_{uuid.uuid4().hex[:12]}"
     db_session.execute(text(f'CREATE ROLE "{role}" NOLOGIN'))
-    # Exactly the documented allowlist: proves the catalog needs nothing more.
-    for table in sorted(catalog_source_tables()):
-        db_session.execute(text(f'GRANT SELECT ON "{table}" TO "{role}"'))
+    # Exactly the documented grants (scripts/analytics_sql_role_grants.py): proves the catalog needs nothing more.
+    for statement in grant_statements(role):
+        db_session.execute(text(statement))
     db_session.commit()
     try:
         root = _root(db_session, test_user, "Role Root")

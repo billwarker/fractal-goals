@@ -8,13 +8,14 @@ import NotesFilterControls from '../NotesFilterControls';
 
 const heatmap = vi.hoisted(() => ({ value: { data: null, isLoading: false } }));
 vi.mock('../../../../hooks/useNotesPageQuery', () => ({ useNotesHeatmap: () => heatmap.value }));
+vi.mock('../../../../contexts/GoalLevelsContext', () => ({ useGoalLevels: () => ({ getGoalIcon: () => 'circle' }) }));
 
 const base = { text: '', categories: [], goalIds: [], activityIds: [], pinnedOnly: false, savedFilterIds: [], day: null };
 const saved = (overrides = {}) => ({ savedFilters: [], activeIds: [], onToggle: vi.fn(), onCreate: vi.fn(), onUpdate: vi.fn(), onDelete: vi.fn(), ...overrides });
 const renderControls = (filters = {}, extra = {}) => {
     const updateFilters = vi.fn();
     render(<NotesFilterControls rootId="root" filters={{ ...base, ...filters }} apiFilters={{}} updateFilters={updateFilters}
-        goalSummary="" activitySummary="" onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
+        onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
     return updateFilters;
 };
 
@@ -29,20 +30,23 @@ describe('NotesFilterControls', () => {
         categories.forEach(({ value, context_types: contextTypes }) => {
             contextTypes.forEach((contextType) => expect(deriveNoteCategory(contextType)).toBe(value));
         });
-        expect(deriveNoteCategory('unknown_context')).toBe('general');
+        // General was retired: notes from elsewhere belong to no category.
+        expect(deriveNoteCategory('root')).toBeNull();
     });
 
     it('orders sections heatmap, search, saved filters with Sessions-style headers and no search mode toggle', () => {
         renderControls();
         expect(screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent))
-            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Categories', 'Goal & Activity']);
+            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Categories', 'Activities', 'Goals']);
         expect(screen.queryByRole('radiogroup', { name: 'Search mode' })).not.toBeInTheDocument();
     });
 
     it('presents categories as a multi-select with no "All" option', () => {
         const update = renderControls({ categories: ['goals'] });
         const group = screen.getByRole('group', { name: 'Categories' });
-        expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['General', '✓Goals', 'Sessions', 'Programs']);  // ✓ marks the selected option.
+        expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['✓Goals', 'Sessions', 'Programs']);  // ✓ marks the selected option.
+        // Each option carries its category's icon beside the label.
+        within(group).getAllByRole('button').forEach((button) => expect(button.querySelector('svg')).not.toBeNull());
         expect(within(group).queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
         fireEvent.click(within(group).getByRole('button', { name: 'Sessions' }));
         expect(update).toHaveBeenLastCalledWith({ categories: ['goals', 'sessions'] });

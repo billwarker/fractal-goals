@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import FilterModal, { keywordTerms } from '../FilterModal';
 
+vi.mock('../../../../contexts/GoalLevelsContext', () => ({ useGoalLevels: () => ({ getGoalIcon: () => 'circle' }) }));
+
 const current = { categories: [], pinnedOnly: false, goalIds: [], activityIds: [] };
 
 describe('FilterModal', () => {

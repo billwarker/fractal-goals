@@ -11,7 +11,6 @@ function noteFeedQuery(params) {
     list('goal_ids', params.goal_ids);
     list('activity_definition_ids', params.activity_definition_ids);
     list('activity_group_ids', params.activity_group_ids);
-    if (params.pinned_only) query.set('pinned_only', 'true');
     list('filters', params.saved_filter_ids);
     if (params.day) query.set('day', params.day);
     if (params.timezone) query.set('timezone', params.timezone);
@@ -40,6 +39,9 @@ export const fractalNotesApi = {
     createNote: (rootId, data) => axios.post(`${API_BASE}/${rootId}/notes`, data),
     updateNote: (rootId, noteId, data) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, data),
     deleteNote: (rootId, noteId) => axios.delete(`${API_BASE}/${rootId}/notes/${noteId}`),
+    // target: { session_id } | { goal_id } | { activity_instance_id }
+    getOwnedNoteCount: (rootId, target) =>
+        axios.get(`${API_BASE}/${rootId}/notes/owned-count`, { params: target }),
     getGoalNotes: (rootId, goalId, options = {}) =>
         axios.get(`${API_BASE}/${rootId}/goals/${goalId}/notes${buildQueryString(options, {
             includeDescendants: 'include_descendants',
@@ -52,6 +54,6 @@ export const fractalNotesApi = {
     createNoteFilter: (rootId, data) => axios.post(`${API_BASE}/${rootId}/note-filters`, data),
     updateNoteFilter: (rootId, filterId, data) => axios.put(`${API_BASE}/${rootId}/note-filters/${filterId}`, data),
     deleteNoteFilter: (rootId, filterId) => axios.delete(`${API_BASE}/${rootId}/note-filters/${filterId}`),
-    pinNote: (rootId, noteId) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}/pin`),
-    unpinNote: (rootId, noteId) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}/unpin`),
+    setCarryForward: (rootId, noteId, on) => axios.put(`${API_BASE}/${rootId}/notes/${noteId}`, { carry_forward: on }),
+    getCarriedNotes: (rootId, sessionId) => axios.get(`${API_BASE}/${rootId}/sessions/${sessionId}/carried-notes`),
 };

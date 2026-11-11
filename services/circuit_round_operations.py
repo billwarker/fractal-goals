@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from sqlalchemy import or_
-
-from models import ActivityInstance, ActivitySet, CircuitRound, Note
+from models import ActivityInstance, ActivitySet, CircuitRound
 from services.circuit_rules import (
     ESTIMATED_CIRCUIT_RESULT_BYTES,
     MAX_CIRCUIT_ROUNDS,
     validate_circuit_shape,
 )
 from services.events import Event, Events, event_bus
+from services.note_ownership import release_pins_into, soft_delete_owned_notes
 from services.quota_service import QuotaService
 from services.serializers import serialize_circuit_run
 from services.work_interval_service import utc_now_naive
@@ -101,18 +100,11 @@ class CircuitRoundOperations:
                 result_instance_ids.append(member.activity_instance_id)
                 result_rows.append(self.db_session.get(ActivityInstance, member.activity_instance_id))
 
-        note_conditions = [
-            (Note.context_type == "circuit_round") & (Note.context_id == circuit_round.id),
-        ]
-        if result_set_ids:
-            note_conditions.append(Note.activity_set_id.in_(result_set_ids))
-        if result_instance_ids:
-            note_conditions.append(Note.activity_instance_id.in_(result_instance_ids))
-        self.db_session.query(Note).filter(
-            Note.root_id == root_id,
-            Note.deleted_at.is_(None),
-            or_(*note_conditions),
-        ).update({Note.deleted_at: utc_now_naive()}, synchronize_session=False)
+        soft_delete_owned_notes(
+            self.db_session, root_id, utc_now_naive(),
+            circuit_round_ids=[circuit_round.id], set_ids=result_set_ids, instance_ids=result_instance_ids,
+        )
+        release_pins_into(self.db_session, root_id, instance_ids=result_instance_ids)
 
         self.db_session.delete(circuit_round)
         self.db_session.flush()

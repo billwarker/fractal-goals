@@ -1,16 +1,14 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 import Notes from '../Notes';
 
 const {
-    createNote,
     navigate,
     noteTimelineMock,
     useNotesPageQueryMock,
 } = vi.hoisted(() => ({
-    createNote: vi.fn(),
     navigate: vi.fn(),
     noteTimelineMock: vi.fn(),
     useNotesPageQueryMock: vi.fn(),
@@ -46,15 +44,6 @@ vi.mock('../../components/notes', () => ({
         noteTimelineMock(props);
         return <div>Timeline</div>;
     },
-    NoteComposer: ({ onSubmit }) => (
-        <button onClick={() => onSubmit('Root note', null, null)} type="button">
-            Submit mocked note
-        </button>
-    ),
-}));
-
-vi.mock('../../components/notes/ComposeLinkPanel', () => ({
-    default: () => <div>Compose links</div>,
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -105,7 +94,6 @@ describe('Notes page', () => {
             isLoading: false,
             isFetching: false,
             loadNextPage: vi.fn(),
-            createNote,
             updateNote: vi.fn(),
             deleteNote: vi.fn(),
             pinNote: vi.fn(),
@@ -120,41 +108,21 @@ describe('Notes page', () => {
         });
     });
 
-    it('creates a root-context note when no goal or activity is linked', async () => {
-        createNote.mockResolvedValue({});
-
+    it('has no write action and edits notes inline', () => {
         render(<MemoryRouter><Notes /></MemoryRouter>);
 
-        await act(async () => {
-            fireEvent.click(screen.getByText('+ Write Note'));
-        });
-
-        await waitFor(() => {
-            expect(screen.getByText('Submit mocked note')).toBeInTheDocument();
-        });
-
-        await act(async () => {
-            fireEvent.click(screen.getByText('Submit mocked note'));
-        });
-
-        await waitFor(() => {
-            expect(createNote).toHaveBeenCalledWith({
-                content: 'Root note',
-                attachments: [],
-                context_type: 'root',
-                context_id: 'root-1',
-                goal_id: undefined,
-                activity_definition_id: undefined,
-            });
-        });
+        expect(screen.queryByText(/Write Note/)).not.toBeInTheDocument();
+        const timelineProps = noteTimelineMock.mock.calls.at(-1)[0];
+        expect(timelineProps.onEditRequest).toBeUndefined();
+        expect(timelineProps.onEdit).toBe(useNotesPageQueryMock.mock.results.at(-1).value.updateNote);
     });
 
-    it('offers four compact categories and passes the selection to the notes query', async () => {
+    it('offers three compact categories and passes the selection to the notes query', async () => {
         render(<MemoryRouter><Notes /></MemoryRouter>);
 
         const categories = screen.getByRole('group', { name: 'Categories' });
         expect(Array.from(categories.querySelectorAll('button')).map((button) => button.textContent))
-            .toEqual(['General', 'Goals', 'Sessions', 'Programs']);
+            .toEqual(['Goals', 'Sessions', 'Programs']);
         expect(screen.queryByRole('button', { name: 'Activity Set Notes' })).not.toBeInTheDocument();
 
         await act(async () => {

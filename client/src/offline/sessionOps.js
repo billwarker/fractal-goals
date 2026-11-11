@@ -119,6 +119,7 @@ function deriveNoteType(contextType, { setIndex = null, activitySetId = null, no
         goal: 'goal_note',
         session: 'session_note',
         program: 'program_note',
+        program_date: 'program_date_note',
         activity_definition: 'activity_definition_note',
         circuit_run: 'circuit_run_note',
         circuit_round: 'circuit_round_note',
@@ -149,9 +150,13 @@ export function buildPlaceholderNote({ id, data, session = null, setIndex = null
         note_type: noteType,
         note_type_label: NOTE_TYPE_LABELS[noteType] || 'Note',
         note_category: deriveNoteCategory(data.context_type),
+        program_id: null,
+        calendar_date: null,
+        carry_forward: null,
+        carried_into_instance_id: null,
+        carried_into_session_id: null,
+        review_data: null,
         set_index: setIndex,
-        is_pinned: false,
-        pinned_at: null,
         created_at: at,
         updated_at: at,
         session_name: session?.name ?? null,
@@ -261,6 +266,39 @@ export function applySessionPause(session, instances, at) {
                 ? { ...instance, is_paused: true, last_paused_at: at }
                 : instance))
             : instances,
+    };
+}
+
+/**
+ * Mirror of the server's completion boundary: a paused session ends at its pause,
+ * otherwise at its recorded end or the completion time, and its duration excludes
+ * paused time. Quick sessions carry no end or duration.
+ */
+export function applySessionCompletion(session, completed, at, { quick = false } = {}) {
+    if (!session) return session;
+    const attrs = session.attributes || {};
+    const timing = {};
+    if (!completed) {
+        Object.assign(timing, { session_end: null, total_duration_seconds: null, is_paused: false, last_paused_at: null });
+    } else if (!quick) {
+        const start = session.session_start ?? attrs.session_start ?? null;
+        const lastPausedAt = session.last_paused_at ?? attrs.last_paused_at ?? null;
+        const isPaused = Boolean(session.is_paused ?? attrs.is_paused) && lastPausedAt;
+        let end = session.session_end ?? attrs.session_end ?? at;
+        if (isPaused) end = start && Date.parse(start) > Date.parse(lastPausedAt) ? start : lastPausedAt;
+        const pausedSeconds = session.total_paused_seconds ?? attrs.total_paused_seconds ?? 0;
+        Object.assign(timing, {
+            session_end: end,
+            total_duration_seconds: start ? Math.max(0, secondsBetween(start, end) - pausedSeconds) : null,
+            is_paused: false,
+            last_paused_at: null,
+        });
+    }
+    const completion = { completed, completed_at: completed ? at : null, ...timing };
+    return {
+        ...session,
+        ...completion,
+        ...(session.attributes ? { attributes: { ...attrs, ...completion } } : {}),
     };
 }
 

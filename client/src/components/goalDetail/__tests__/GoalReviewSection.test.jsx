@@ -1,10 +1,13 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
-import { GoalReviewPrompt } from '../GoalReviewSection';
+import { GoalReviewComposer, GoalReviewPrompt } from '../GoalReviewSection';
 
 const { actions } = vi.hoisted(() => ({
-    actions: { isSaving: false, setReviewsOn: vi.fn(), writeReview: vi.fn() },
+    actions: { isSaving: false, setReviewsOn: vi.fn(), writeReview: vi.fn(), editReview: vi.fn() },
+}));
+vi.mock('../GoalReviewForm', () => ({
+    default: ({ onSubmit }) => <button type="button" onClick={() => onSubmit({ schema: 1, status: 'on_track' }, [])}>Submit</button>,
 }));
 vi.mock('../../../hooks/useGoalReviewActions', () => ({ default: () => actions }));
 vi.mock('../../../contexts/TimezoneContext', () => ({ useTimezone: () => ({ timezone: 'UTC' }) }));
@@ -38,5 +41,17 @@ describe('GoalReviewPrompt', () => {
 
         rerender(<GoalReviewPrompt rootId="r" goalId="g" goal={goalWith({ status: 'upcoming', next_review_on: '2026-11-01' })} />);
         expect(container).toBeEmptyDOMElement();
+    });
+});
+
+describe('GoalReviewComposer', () => {
+    it('updates the review it edits instead of writing a new one', async () => {
+        actions.editReview.mockResolvedValue(true);
+        const onDone = vi.fn();
+        render(<GoalReviewComposer rootId="r" goalId="g" goal={goalWith(null)} editingNote={{ id: 'n1' }} onDone={onDone} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Submit' }));
+        await vi.waitFor(() => expect(onDone).toHaveBeenCalled());
+        expect(actions.editReview).toHaveBeenCalledWith('n1', { schema: 1, status: 'on_track' });
+        expect(actions.writeReview).not.toHaveBeenCalled();
     });
 });

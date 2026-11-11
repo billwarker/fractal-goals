@@ -66,6 +66,10 @@
 }
 
 .timelineArea {
+    /* No background grid in the modal: the rail's widest node (an 18px icon) starts on the content
+       padding line, like the filters above, and labels follow one grid unit to the right of the rail. */
+    --timeline-rail-x: 9px;
+    --timeline-rail-gap: calc(var(--timeline-rail-x) + var(--grid-unit, 20px));
     min-height: 80px;
 }
 

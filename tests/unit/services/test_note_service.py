@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import date, timedelta
 
-from models import ActivitySet, Goal, Note, Program
+from models import ActivitySet, Goal, Note, Program, ProgramBlock
 from services.serializers import derive_note_type
 from services.events import Events
 from services.note_service import NoteService
@@ -183,8 +183,30 @@ def test_get_goal_notes_returns_display_context(db_session, sample_goal_hierarch
     assert error is None
     assert status == 200
     assert payload[0]['goal_name'] == goal.name
+    assert payload[0]['goal_completed'] is False
     assert 'image_data' not in payload[0]
     assert 'has_image' not in payload[0]
+
+
+def test_goal_notes_say_when_their_goal_is_completed(db_session, sample_goal_hierarchy, test_user):
+    goal = sample_goal_hierarchy['short_term']
+    goal.completed = True
+    db_session.add(Note(
+        id=str(uuid.uuid4()),
+        root_id=sample_goal_hierarchy['ultimate'].id,
+        context_type='goal',
+        context_id=goal.id,
+        goal_id=goal.id,
+        content='After finishing',
+    ))
+    db_session.commit()
+
+    payload, error, _ = NoteService(db_session).get_goal_notes(
+        sample_goal_hierarchy['ultimate'].id, goal.id, test_user.id,
+    )
+
+    assert error is None
+    assert payload[0]['goal_completed'] is True
 
 
 def test_derive_note_type_distinguishes_activity_set_notes():
@@ -253,6 +275,39 @@ def test_create_program_note(db_session, sample_goal_hierarchy, test_user):
     assert notes['notes'][0]['program_name'] == 'Program with notes'
 
 
+def test_program_date_notes_carry_program_and_block_colours(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+    start = date.today()
+    program = Program(
+        id=str(uuid.uuid4()), root_id=root.id, name='Coloured', color='#f97316',
+        start_date=start, end_date=start + timedelta(days=20), weekly_schedule=[],
+    )
+    db_session.add(program)
+    db_session.flush()
+    db_session.add(ProgramBlock(program_id=program.id, name='Build', color='#22c55e',
+                                start_date=start, end_date=start + timedelta(days=6)))
+    db_session.commit()
+
+    service = NoteService(db_session)
+    for offset in (2, 10):
+        _, error, _ = service.create_note(root.id, test_user.id, {
+            'content': f'Day {offset}', 'context_type': 'program_date', 'context_id': program.id,
+            'calendar_date': (start + timedelta(days=offset)).isoformat(),
+        })
+        assert error is None
+    _, error, _ = service.create_note(root.id, test_user.id, {
+        'content': 'Whole program', 'context_type': 'program', 'context_id': program.id,
+    })
+    assert error is None
+
+    payload, error, _ = service.get_all_notes(root.id, test_user.id, filters={})
+    by_content = {note['content']: note for note in payload['notes']}
+    assert {note['program_color'] for note in by_content.values()} == {'#f97316'}
+    assert by_content['Day 2']['block_color'] == '#22c55e'
+    assert by_content['Day 10']['block_color'] is None  # No block covers that date.
+    assert 'block_color' not in by_content['Whole program']
+
+
 def test_get_all_notes_scopes_program_notes_to_selected_program(db_session, sample_goal_hierarchy, test_user):
     root = sample_goal_hierarchy['ultimate']
     first_program = Program(
@@ -299,31 +354,6 @@ def test_get_all_notes_scopes_program_notes_to_selected_program(db_session, samp
     assert notes['total'] == 1
     assert notes['notes'][0]['content'] == 'Past cycle reflection'
     assert notes['notes'][0]['program_name'] == 'Previous Program'
-
-
-def test_pin_note_rejects_activity_set_notes(db_session, sample_goal_hierarchy, sample_activity_instance, test_user):
-    activity_set = ActivitySet(activity_instance_id=sample_activity_instance.id, sort_order=0)
-    db_session.add(activity_set)
-    db_session.flush()
-    note = Note(
-        id=str(uuid.uuid4()),
-        root_id=sample_goal_hierarchy['ultimate'].id,
-        context_type='activity_instance',
-        context_id=sample_activity_instance.id,
-        activity_instance_id=sample_activity_instance.id,
-        activity_definition_id=sample_activity_instance.activity_definition_id,
-        activity_set_id=activity_set.id,
-        content='Set-specific note',
-    )
-    db_session.add(note)
-    db_session.commit()
-
-    service = NoteService(db_session)
-    payload, error, status = service.pin_note(sample_goal_hierarchy['ultimate'].id, note.id, test_user.id)
-
-    assert payload is None
-    assert status == 400
-    assert error == 'Activity set notes cannot be pinned'
 
 
 def test_get_session_notes_includes_session_template_name(
@@ -462,3 +492,26 @@ def test_get_all_notes_filters_regular_goal_notes_by_goal_id(
     assert status == 200
     assert payload['total'] == 1
     assert payload['notes'][0]['id'] == goal_note.id
+
+
+def test_program_notes_fall_back_to_a_block_colour_like_the_calendar(db_session, sample_goal_hierarchy, test_user):
+    root = sample_goal_hierarchy['ultimate']
+    start = date.today()
+    program = Program(
+        id=str(uuid.uuid4()), root_id=root.id, name='Uncoloured',
+        start_date=start, end_date=start + timedelta(days=20), weekly_schedule=[],
+    )
+    db_session.add(program)
+    db_session.flush()
+    db_session.add(ProgramBlock(program_id=program.id, name='Build', color='#22c55e',
+                                start_date=start + timedelta(days=10), end_date=start + timedelta(days=20)))
+    db_session.commit()
+
+    payload, error, _ = NoteService(db_session).create_note(root.id, test_user.id, {
+        'content': 'Early days', 'context_type': 'program_date', 'context_id': program.id,
+        'calendar_date': start.isoformat(),
+    })
+
+    assert error is None
+    assert payload['program_color'] == '#22c55e'
+    assert payload['block_color'] is None  # The block starts later.

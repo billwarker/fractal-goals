@@ -4,11 +4,12 @@ Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from models import Goal, get_goal_by_id
 from services._completion_context import _emit_pending_events
 from services.goal_sequence_service import leave_track
+from services.note_ownership import soft_delete_owned_notes
 from services.events import event_bus, Event, Events
 from services.service_types import ServiceResult
 
@@ -16,6 +17,10 @@ from services.service_types import ServiceResult
 
 class _GoalDeletionMixin:
     db_session: Any  # provided by the composed GoalService
+
+    if TYPE_CHECKING:
+        # Provided by _GoalHelpersMixin in the composed GoalService.
+        def _soft_delete_goal_subtree(self, goal: Goal, deleted_at: datetime) -> list[Goal]: ...
 
     def delete_fractal_goal(self, root_id, goal_id, current_user_id, *, emit_event=True, begin_next=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)
@@ -32,7 +37,9 @@ class _GoalDeletionMixin:
         # Deleting the active step of a sequence begins the next one unless the user declines.
         pending_events = []
         leave_track(self.db_session, goal, pending_events, begin_next=begin_next)
-        self._soft_delete_goal_subtree(goal, deleted_at)
+        subtree = self._soft_delete_goal_subtree(goal, deleted_at)
+        # The goals' own notes, reviews and completion notes go with them.
+        soft_delete_owned_notes(self.db_session, root_id, deleted_at, goal_ids=[item.id for item in subtree])
         self.db_session.commit()
         _emit_pending_events(pending_events)
         if emit_event:

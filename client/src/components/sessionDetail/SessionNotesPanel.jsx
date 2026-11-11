@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 
+import { carriedNotesForSession } from '../../utils/carriedNotes';
 import NoteQuickAdd from './NoteQuickAdd';
 import NoteTimeline from './NoteTimeline';
 import styles from './ProgressPanel.module.css';
@@ -14,8 +15,8 @@ function SessionNotesPanel({
     addNote,
     updateNote,
     deleteNote,
-    pinNote,
-    unpinNote,
+    carriedNotes = null,
+    setCarryForward,
     className = '',
 }) {
     const [selectedNoteId, setSelectedNoteId] = useState(null);
@@ -36,13 +37,10 @@ function SessionNotesPanel({
             });
         }
 
-        return allNotes.sort((a, b) => {
-            if (a.is_pinned !== b.is_pinned) {
-                return a.is_pinned ? -1 : 1;
-            }
-            return new Date(b.created_at) - new Date(a.created_at);
-        });
-    }, [notes, previousSessionNotes]);
+        allNotes.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        // Notes pinned to this session from an earlier one come first.
+        return [...carriedNotesForSession(carriedNotes, sessionId), ...allNotes];
+    }, [notes, previousSessionNotes, carriedNotes, sessionId]);
 
     const handleAddNote = async (content, attachments = []) => {
         if (!addNote) return;
@@ -74,8 +72,7 @@ function SessionNotesPanel({
                             notes={combinedNotes}
                             onUpdate={updateNote}
                             onDelete={deleteNote}
-                            onPin={pinNote}
-                            onUnpin={unpinNote}
+                            onCarryForward={setCarryForward}
                             compact={false}
                             selectedNoteId={selectedNoteId}
                             onNoteSelect={setSelectedNoteId}

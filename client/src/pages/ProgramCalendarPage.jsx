@@ -952,13 +952,11 @@ function ProgramCalendarPage() {
 
             <DeleteProgramModal
                 isOpen={Boolean(programToDelete)}
-                onClose={() => {
-                    setProgramToDelete(null);
-                    setDeleteSessionCount(0);
-                }}
+                onClose={() => { setProgramToDelete(null); setDeleteSessionCount(0); }}
                 onConfirm={confirmDeleteProgram}
                 programName={programToDelete?.name || ''}
                 sessionCount={deleteSessionCount}
+                rootId={rootId} programId={programToDelete?.id}
                 requireMatchingText="delete"
             />
 

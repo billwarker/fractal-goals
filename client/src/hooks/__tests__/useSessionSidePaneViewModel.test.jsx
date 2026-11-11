@@ -65,7 +65,6 @@ describe('useSessionSidePaneViewModel', () => {
             onGoalClick,
             onGoalCreated,
             notes: [{ id: 'note-1' }],
-            previousNotes: [{ id: 'prev-note-1' }],
             previousSessionNotes: [{ id: 'prev-session-1' }],
             addNote,
             updateNote,
@@ -88,8 +87,8 @@ describe('useSessionSidePaneViewModel', () => {
             addNote,
             updateNote,
             deleteNote,
-            pinNote: undefined,
-            unpinNote: undefined,
+            carriedNotes: null,
+            setCarryForward: undefined,
         });
         expect(result.current.goals).toMatchObject({
             selectedActivity,

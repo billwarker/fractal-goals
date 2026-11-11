@@ -9,8 +9,8 @@ import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
 
 /**
- * Goal review actions: write a review (a goal_review note, which restarts the cadence), or turn
- * reviews back on. Each refreshes the goal trees,
+ * Goal review actions: write a guided review (a goal_review note with `review_data`, which restarts the cadence), edit
+ * one's answers (which keeps its date, so the cadence stands), or turn reviews back on. Each refreshes the goal trees,
  * whose `review` field carries the schedule.
  */
 export default function useGoalReviewActions(rootId, goalId) {
@@ -24,6 +24,7 @@ export default function useGoalReviewActions(rootId, goalId) {
             await Promise.all([
                 refreshGoalReadModels(queryClient, queryKeys, rootId),
                 queryClient.invalidateQueries({ queryKey: queryKeys.allNotesRoot(rootId) }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.goalNotesRoot(rootId) }),
             ]);
             if (success) notify.success(success);
             return true;
@@ -37,10 +38,16 @@ export default function useGoalReviewActions(rootId, goalId) {
 
     return {
         isSaving,
-        writeReview: (content, attachments = []) => run(() => fractalNotesApi.createNote(rootId, {
-            content, context_type: 'goal', context_id: goalId, goal_id: goalId, note_kind: 'goal_review',
+        // The server derives the note's text from the answers.
+        writeReview: (reviewData, attachments = []) => run(() => fractalNotesApi.createNote(rootId, {
+            review_data: reviewData, context_type: 'goal', context_id: goalId, goal_id: goalId, note_kind: 'goal_review',
             ...(attachments.length ? { attachments } : {}),
         }), 'Couldn’t save the review', 'Review saved'),
+        editReview: (noteId, reviewData) => run(
+            () => fractalNotesApi.updateNote(rootId, noteId, { review_data: reviewData }),
+            'Couldn’t update the review',
+            'Review updated',
+        ),
         setReviewsOn: (on) => run(
             () => fractalApi.updateGoal(rootId, goalId, { review_disabled: !on }),
             'Couldn’t change reviews',

@@ -9,6 +9,8 @@ import { playCompletionSound } from '../../utils/playCompletionSound';
 import styles from './SessionActivityItem.module.css';
 import { SummaryDelta } from './SessionActivityProgressSummary';
 import SessionActivityItemView from './SessionActivityItemView';
+import ConfirmationModal from '../ConfirmationModal';
+import { notesPhrase } from '../../utils/noteTypes';
 import MetricValueEditor from './MetricValueEditor';
 import useMetricDrafts from './useMetricDrafts';
 import usePlannedValues from './usePlannedValues';
@@ -61,6 +63,7 @@ function SessionActivityItem({
     onAddNote,
     onUpdateNote,
     onDeleteNote,
+    notePins = null,
     isDragging,
     activityDefinition: activityDefinitionProp = null,
     activityNotes: activityNotesProp = null,
@@ -88,7 +91,9 @@ function SessionActivityItem({
     const averageDuration = getAverageDurationStat(
         session?.stats?.activity_durations?.[exercise.activity_definition_id]
     );
-    const onDelete = () => removeActivity(exercise.id);
+    // Removing an activity takes its notes; say so first when it has any.
+    const [confirmingRemoval, setConfirmingRemoval] = useState(false);
+    const onDelete = () => (activityNotes.length ? setConfirmingRemoval(true) : removeActivity(exercise.id));
     const onUpdate = useCallback((key, value, extraData = {}) => {
         if (key === 'timer_action') {
             return Promise.resolve(updateTimer(exercise.id, value, extraData)).catch((error) => {
@@ -647,6 +652,7 @@ function SessionActivityItem({
     };
 
     return (
+        <>
         <SessionActivityItemView
             goalAssociationControl={goalAssociationControl}
             rootId={rootId}
@@ -723,8 +729,18 @@ function SessionActivityItem({
             activityNotes={activityNotes}
             onUpdateNote={onUpdateNote}
             onDeleteNote={onDeleteNote}
+            notePins={notePins}
             handleAddNote={handleAddNote}
         />
+        <ConfirmationModal
+            isOpen={confirmingRemoval}
+            onClose={() => setConfirmingRemoval(false)}
+            onConfirm={() => removeActivity(exercise.id)}
+            title="Remove activity"
+            message={`Remove ${def.name || 'this activity'} and its ${notesPhrase(activityNotes.length)}? This can't be undone.`}
+            confirmText="Remove"
+        />
+        </>
     );
 }
 

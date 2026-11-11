@@ -167,8 +167,13 @@ checked, "every [n] [unit]" follows on the same line, marked "(level default)" u
 the level's cadence again clears the override.
 
 When a review is due, a "Review due" banner at the top of the goal's details offers one action,
-**Review**: a `goal_review` note starting from the goal's description, progress since the last review,
-child goals complete and the due status. Saving it restarts the cadence (and clears any deferral set
+**Review**: a guided form (`GoalReviewForm`). A read-only panel shows what changed since the last
+review (or so far): the description, active days, child goals completed, the due status and the last
+review (collapsed). Below it are an On track / At risk / Off track choice and three plain questions
+("What went well?", "What would you change?", "What will you focus on until the next review?"), plus
+attachments. No markdown is shown. The answers are saved as the note's `review_data`, and the server
+derives its text; cards render the status and answers (`ReviewNoteBody`) and offer no text editing.
+Older markdown reviews still render as markdown. Saving restarts the cadence (and clears any deferral set
 through the API). Reviews are turned off in edit mode; when they're off, the top of the details offers
 "Turn on". The Notes page filters Goal Reviews and Goal Completions, and cards badge both kinds. The
 Program calendar shows "Review: [icon] [name]" badges on the next review of goals in the displayed
@@ -414,3 +419,33 @@ catalog, rather than waiting for the panel to be configured. Goal charts keep th
 SQL read/loading state. If a continuation fails, the chart shows an error with Retry; that action
 resumes the missing page while preserving loaded history. The page-level history notice offers the
 same retry, and keeps its loading wording steady between requests.
+
+## Notes: pins, carried notes and program dates
+
+**Pin to next time.** Notes are never pinned to the top of a list (that was retired; lists are newest
+first). A note's "···" menu offers "Pin to next <Activity>" on activity notes (sets included) and "Pin to
+next session" on session notes. A next-time pin badges the card "Pinned to next <Activity>" / "Pinned to next session", then
+"Carried to next …" once used. A used pin can't be changed. Pending pins show only in open sessions.
+
+**Carried notes.** On Session Detail, `ActivityPinnedStrip` sits at the top of each activity card. It
+shows the plan's activity note ("From plan") and notes pinned to next from other sessions ("From Nov 2",
+which links to that session, plus "· Set #2" for set notes). A pending carried note has a Dismiss (×)
+control that unpins it. Set-level plan notes stay under their sets. The pin is used up when an instance of
+that activity completes in another non-quick session, or when such a session completes (first instance
+wins). A completed session keeps showing what it used. Session notes pinned to next show the same way at
+the top of the next open session's notes ("Pinned for this session"), and are used up when that session
+completes.
+
+**Program dates.** The program day sidebar ends with a **Notes** card for the selected calendar date: the
+date's notes and a quick-add ("Add a note for Nov 12…"). These notes are about the date in the program,
+not a program day, so moving or unscheduling a day leaves them on their date. They list under Programs on
+the Notes page.
+
+**Notes page.** The page reads, edits (inline), pins to next time and deletes notes; it doesn't write them. When a
+note's activity instance has recorded values, its card always shows them: each set's values with the
+noted set highlighted (or the values of a set-free activity) and the plan's note. Goal notes show their
+ancestor path. Cards link to their goal or program; session-group headers carry "Open session" for their
+notes.
+Within a session group, consecutive notes on the same activity instance share one activity header (name,
+note count, the instance's values); the notes beneath show only their time, set ("Set #2"), that set's
+values and text. A lone note on an instance keeps its own header and links.

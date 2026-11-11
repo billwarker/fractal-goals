@@ -312,38 +312,4 @@
     overflow: hidden;
 }
 
-/* Bottom sheet backdrop — mobile only, rendered via JSX */
-.sheetBackdrop {
-    display: none;
-}
-
-@media (max-width: 768px) {
-    .sheetBackdrop {
-        display: block;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 499;
-    }
-
-    /* Bottom sheet pattern — filters slide up over content rather than pushing it down */
-    .rightPanel {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        width: 100%;
-        height: var(--mobile-sidebar-height);
-        max-height: var(--mobile-sidebar-height);
-        box-sizing: border-box;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-        border-left: none;
-        border-top: none;
-        border-radius: 16px 16px 0 0;
-        background: var(--color-bg-sidebar);
-        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
-        z-index: 500;
-        overflow: hidden;
-    }
-
-}
+/* On mobile the pane is ResponsiveSidePane's bottom sheet, styled there. */

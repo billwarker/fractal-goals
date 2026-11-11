@@ -49,26 +49,6 @@ function pasteImage(locator) {
     });
 }
 
-test('notes explain unavailable cloud storage and preserve the draft', async ({ page }, testInfo) => {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    await page.goto(`/browser-root-${testInfo.project.name}/notes`);
-    await page.getByRole('button', { name: /Write Note/ }).click();
-    const textarea = page.getByPlaceholder('Write a note…', { exact: false });
-    await textarea.fill('Keep this draft while choosing evidence.');
-    await page.getByRole('button', { name: 'Choose from cloud storage', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Choose from cloud storage' });
-    await expect(dialog.getByText(/Cloud storage isn't available yet/)).toBeVisible();
-    await expect(dialog.getByRole('button', { name: /^Connect / })).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(textarea).toHaveValue('Keep this draft while choosing evidence.');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
-});
-
 test('the goal quick note bar attaches media from beside the add-note button', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     await openGoalNotes(page, suffix);
@@ -96,7 +76,11 @@ test('the goal quick note bar attaches media from beside the add-note button', a
     await expect(textbox).toHaveValue('Keep this text');
     await attach.click();
     await page.getByRole('menuitem', { name: 'From cloud storage' }).click();
-    await expect(page.getByRole('dialog', { name: 'Choose from cloud storage' }).getByText(/Cloud storage isn't available yet/)).toBeVisible();
+    const dialog = page.getByRole('dialog', { name: 'Choose from cloud storage' });
+    await expect(dialog.getByText(/Cloud storage isn't available yet/)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /^Connect / })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(textbox).toHaveValue('Keep this text');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)).toBe(false);
 });
 
@@ -194,7 +178,7 @@ test('a note’s options menu closes on an outside click without crashing the pa
     const card = page.locator('[class*="noteCard_"]').filter({ has: text });
     await card.getByRole('button', { name: 'Note options' }).click();
     await expect(page.getByRole('menu', { name: 'Note options' }).getByRole('menuitem'))
-        .toContainText(['Edit', 'Attach pictures, video or audio', 'Pin note', 'Delete']);
+        .toContainText(['Edit', 'Attach pictures, video or audio', 'Delete']);
     // A real press on the note text used to crash Chrome's renderer while the menu was open.
     // Press its left edge: on narrow screens the right-aligned menu covers the middle.
     await text.click({ position: { x: 4, y: 4 } });
@@ -266,4 +250,37 @@ test('goal details view mode shows the pictures attached to the description', as
     await expect(image).toBeVisible();
     await expect(page.getByRole('link', { name: /Form Reference\.png · Google Drive/ })).toHaveAttribute('target', '_blank');
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);  // View mode, not the editor.
+});
+
+test('the goal notes timeline starts its rail on the modal\'s content padding', async ({ page }, testInfo) => {
+    const suffix = testInfo.project.name;
+    const root = `browser-root-${suffix}`;
+    let created;
+    await openGoalNotes(page, suffix, {
+        beforeOpen: async (token) => {
+            const content = `rail ${Date.now()}`;
+            const response = await page.request.post(`/api/${root}/notes`, {
+                headers: { Authorization: `Bearer ${token}` },
+                data: { content, context_type: 'goal', context_id: root, goal_id: root },
+            });
+            created = { id: (await response.json()).id, token, content };
+        },
+    });
+    try {
+        await expect(page.getByText(created.content)).toBeVisible();
+        const { rail, filters } = await page.evaluate(() => {
+            const railElement = document.querySelector('[class*="_rail_"]');
+            const filterRow = document.querySelector('[class*="optionsRow"]');
+            return {
+                rail: railElement.getBoundingClientRect().left + parseFloat(getComputedStyle(railElement, '::before').left),
+                filters: filterRow.getBoundingClientRect().left,
+            };
+        });
+        // The rail sits half an icon in from the content edge, so the widest node starts on it.
+        expect(rail - filters).toBeGreaterThanOrEqual(8);
+        expect(rail - filters).toBeLessThanOrEqual(10);
+        await page.screenshot({ path: testInfo.outputPath(`goal-notes-rail-${suffix}.png`) });
+    } finally {
+        await page.request.delete(`/api/${root}/notes/${created.id}`, { headers: { Authorization: `Bearer ${created.token}` } });
+    }
 });

@@ -6,7 +6,7 @@ import { getISOYMDInTimezone } from '../../utils/dateUtils';
 import { getGoalReview, isReviewDue } from '../../utils/goalReview';
 import Button from '../atoms/Button';
 import GoalReviewBanner from './GoalReviewBanner';
-import GoalReviewView from './GoalReviewView';
+import GoalReviewForm from './GoalReviewForm';
 import styles from './GoalReviewBanner.module.css';
 
 /**
@@ -34,18 +34,22 @@ export function GoalReviewPrompt({ rootId, goal, goalId, onReview }) {
     );
 }
 
-/** Writing a review; returns to the goal once saved. */
-export function GoalReviewComposer({ rootId, goal, goalId, onDone }) {
-    const { isSaving, writeReview } = useGoalReviewActions(rootId, goalId);
+/** Writing a review, or editing `editingNote`'s answers; calls `onDone` once saved. */
+export function GoalReviewComposer({ rootId, goal, goalId, onDone, registerFooterAction, editingNote = null }) {
+    const { isSaving, writeReview, editReview } = useGoalReviewActions(rootId, goalId);
     return (
-        <GoalReviewView
+        <GoalReviewForm
             rootId={rootId}
             goal={goal}
             goalId={goalId}
             isSaving={isSaving}
             onCancel={onDone}
-            onSubmit={async (content, attachments) => {
-                const saved = await writeReview(content, attachments);
+            registerFooterAction={registerFooterAction}
+            editingNote={editingNote}
+            onSubmit={async (reviewData, attachments) => {
+                const saved = editingNote
+                    ? await editReview(editingNote.id, reviewData)
+                    : await writeReview(reviewData, attachments);
                 if (saved) onDone();
                 return saved;
             }}

@@ -1,0 +1,39 @@
+.review {
+    display: grid;
+    gap: 8px;
+}
+
+.status {
+    justify-self: start;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--review-status-color) 14%, transparent);
+    color: var(--review-status-color);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.status[data-status="on_track"] { --review-status-color: var(--color-brand-success); }
+.status[data-status="at_risk"] { --review-status-color: var(--color-brand-warning); }
+.status[data-status="off_track"] { --review-status-color: var(--color-brand-danger); }
+
+.answers {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+}
+
+.answers dt {
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.answers dd {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}

@@ -559,6 +559,24 @@
     z-index: 2;
 }
 
+/* A date note: one quiet italic line, its text shrinking to an ellipsis. */
+.dateNoteEvent {
+    min-width: 0;
+    border-left: 2px solid color-mix(in srgb, var(--color-text-muted) 70%, transparent);
+    border-radius: 0 3px 3px 0;
+    background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+    color: var(--color-text-secondary);
+    font-style: italic;
+}
+
+.dateNoteEvent > :last-child {
+    min-width: 0;
+}
+
+.dateNoteEvent:hover {
+    color: var(--color-text-primary);
+}
+
 /* Time off spans its dates as a hatched, neutral bar above program ribbons. */
 .eventPillCalendarPeriod {
     min-height: 18px;

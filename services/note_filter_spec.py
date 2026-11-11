@@ -8,12 +8,12 @@ from sqlalchemy import and_, exists, or_
 
 from models import ActivityDefinition, MediaAsset, Note, NoteAttachment
 
-# Four reader-facing categories, by where a note was written.
+# Reader-facing categories, by where a note was written. Fractal-wide and activity-definition notes
+# ("General") are no longer written; any left over belong to no category and show only unfiltered.
 CATEGORY_CONTEXT_TYPES = {
-    'general': ('root', 'activity_definition'),
     'goals': ('goal',),
     'sessions': ('session', 'activity_instance', 'circuit_run', 'circuit_round'),
-    'programs': ('program',),
+    'programs': ('program', 'program_date'),
 }
 CONTEXT_CATEGORY = {context: category for category, contexts in CATEGORY_CONTEXT_TYPES.items() for context in contexts}
 MAX_TEXT = 200
@@ -22,7 +22,7 @@ MAX_CONDITIONS = 10
 # contains: the value appears anywhere (LIKE). equals: the value appears as a whole word or phrase.
 CONDITION_OPS = ('contains', 'equals')
 MATCH_MODES = ('all', 'any')
-SPEC_KEYS = {'text', 'conditions', 'match', 'categories', 'goal_ids', 'activity_definition_ids', 'activity_group_ids', 'pinned_only'}
+SPEC_KEYS = {'text', 'conditions', 'match', 'categories', 'goal_ids', 'activity_definition_ids', 'activity_group_ids'}
 
 
 class NoteFilterError(ValueError):
@@ -32,7 +32,7 @@ class NoteFilterError(ValueError):
 
 
 def derive_note_category(context_type):
-    return CONTEXT_CATEGORY.get(context_type, 'general')
+    return CONTEXT_CATEGORY.get(context_type)
 
 
 def _id_list(value, field):
@@ -54,6 +54,9 @@ def normalize_spec(raw):
     if raw.get('text_mode') in (None, 'keyword'):
         # Filters saved before regex search was removed carry text_mode='keyword'.
         raw = {key: value for key, value in raw.items() if key != 'text_mode'}
+    if 'pinned_only' in raw:
+        # Pinning notes to the top was retired; filters saved with "pinned only" now match every note.
+        raw = {key: value for key, value in raw.items() if key != 'pinned_only'}
     if 'goal_id' in raw:
         # Earlier specs held one goal; goals are now a list like the Sessions filter.
         raw = {**{key: value for key, value in raw.items() if key != 'goal_id'},
@@ -71,11 +74,11 @@ def normalize_spec(raw):
     categories = raw.get('categories') or []
     if isinstance(categories, str):
         categories = [part for part in categories.split(',') if part]
+    if isinstance(categories, list) and 'general' in categories:
+        # The General category was retired; filters saved with it keep their other categories.
+        categories = [category for category in categories if category != 'general']
     if not isinstance(categories, list) or any(category not in CATEGORY_CONTEXT_TYPES for category in categories):
         raise NoteFilterError(f'Categories must be from: {", ".join(CATEGORY_CONTEXT_TYPES)}')
-    pinned = raw.get('pinned_only') or False
-    if not isinstance(pinned, bool):
-        raise NoteFilterError('pinned_only must be true or false')
     spec = {
         'text': text_value.strip(),
         'conditions': conditions,
@@ -84,7 +87,6 @@ def normalize_spec(raw):
         'goal_ids': _id_list(raw.get('goal_ids'), 'goal_ids'),
         'activity_definition_ids': _id_list(raw.get('activity_definition_ids'), 'activity_definition_ids'),
         'activity_group_ids': _id_list(raw.get('activity_group_ids'), 'activity_group_ids'),
-        'pinned_only': pinned,
     }
     return {key: value for key, value in spec.items() if value not in ('', [], None, False)}
 
@@ -157,8 +159,6 @@ def apply_spec(query, spec, db):
                 )
             ))
         query = query.filter(or_(*conditions))
-    if spec.get('pinned_only'):
-        query = query.filter(Note.pinned_at.isnot(None))
     # Quick search: every word or "quoted phrase" must appear.
     for term in keyword_terms(spec.get('text', '')):
         query = query.filter(_matches({'op': 'contains', 'value': term}))

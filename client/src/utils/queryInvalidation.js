@@ -39,6 +39,18 @@ export function invalidateAfterSessionCreated(queryClient, rootId, queryKeys) {
     ]);
 }
 
+/**
+ * Deleting a session, activity, goal or program takes the notes written on it (services/note_ownership.py):
+ * every notes read model drops them. Session notes caches refetch with their sessions.
+ */
+export function invalidateNotesAfterDelete(queryClient, rootId, queryKeys) {
+    invalidateQueryKeys(queryClient, [
+        queryKeys.allNotesRoot(rootId),
+        queryKeys.goalNotesRoot(rootId),
+        queryKeys.sessionNotesRoot(rootId),
+    ]);
+}
+
 export function invalidateOnboardingProgress(queryClient, queryKeys) {
     return queryClient.invalidateQueries({
         queryKey: queryKeys.onboardingRoot(),

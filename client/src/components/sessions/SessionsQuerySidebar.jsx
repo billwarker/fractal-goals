@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import SidePaneHeader from '../common/SidePaneHeader';
 import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
+import FilterPickerField from '../common/FilterPickerField';
 import { ActivityFilterPicker, GoalFilterModal } from '../common/FilterPickerModals';
+import { describeSessionRange } from '../../hooks/useSessionsPageFilters';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
 import './SessionsQuerySidebar.css';
 
@@ -14,6 +16,13 @@ const RANGE_PRESET_OPTIONS = [
     { value: 'all', label: 'All' },
     { value: 'custom', label: 'Custom' },
 ];
+
+/** "10 of 75 sessions" while the list is still paging in, "75 sessions" once it all shows. */
+function sessionCountLabel(visible, total) {
+    const noun = (count) => (count === 1 ? 'session' : 'sessions');
+    if (!total || visible >= total) return `${visible} ${noun(visible)}`;
+    return `${visible} of ${total} ${noun(total)}`;
+}
 
 function SessionsQuerySidebar({
     filters,
@@ -51,7 +60,7 @@ function SessionsQuerySidebar({
         <div className="sessions-query-sidebar">
             <SidePaneHeader
                 title="Filters"
-                subtitle={`${visibleSessionsCount} shown${totalSessionsCount ? ` of ${totalSessionsCount}` : ''}`}
+                subtitle={`${sessionCountLabel(visibleSessionsCount, totalSessionsCount)} · ${describeSessionRange(filters)}`}
                 actions={(
                     <>
                     <SidePaneHeaderButton
@@ -64,7 +73,7 @@ function SessionsQuerySidebar({
                     {onToggleCollapse && (
                         <SidePaneHeaderButton
                             onClick={onToggleCollapse}
-                            aria-label="Collapse filters panel"
+                            aria-label={isMobile ? 'Hide filters panel' : 'Collapse filters panel'}
                         >
                             {isMobile ? 'Hide' : 'Collapse'}
                         </SidePaneHeaderButton>
@@ -206,70 +215,25 @@ function SessionsQuerySidebar({
                 </section>
 
                 <section className="sessions-query-sidebar-section">
-                    <div className="sessions-query-sidebar-section-header">
-                        <h4>Activities</h4>
-                        <span>{filters.activityIds.length} selected</span>
-                    </div>
-                    <button
-                        type="button"
-                        className="sessions-query-picker-button"
-                        onClick={() => setIsActivityModalOpen(true)}
+                    <FilterPickerField
+                        title="Activities"
+                        chooseLabel="Choose Activities"
+                        count={filters.activityIds.length}
+                        selectedNames={selectedActivityNames}
+                        onChoose={() => setIsActivityModalOpen(true)}
                         disabled={isActivityFilterLoading || activities.length === 0}
-                    >
-                        {filters.activityIds.length > 0
-                            ? `Choose Activities (${filters.activityIds.length})`
-                            : 'Choose Activities'}
-                    </button>
-                    <div className="sessions-query-selection-preview">
-                        {selectedActivityNames.length > 0
-                            ? selectedActivityNames.join(', ')
-                            : 'All activities'}
-                    </div>
+                    />
                 </section>
 
                 <section className="sessions-query-sidebar-section">
-                    <div className="sessions-query-sidebar-section-header">
-                        <h4>Goals Via Activity</h4>
-                        <span>{filters.goalIds.length} selected</span>
-                    </div>
-                    <button
-                        type="button"
-                        className="sessions-query-picker-button"
-                        onClick={() => setIsGoalModalOpen(true)}
+                    <FilterPickerField
+                        title="Goals Via Activity"
+                        chooseLabel="Choose Goals"
+                        count={filters.goalIds.length}
+                        selectedNames={selectedGoalNames}
+                        onChoose={() => setIsGoalModalOpen(true)}
                         disabled={isGoalFilterLoading || goalOptions.length === 0}
-                    >
-                        {filters.goalIds.length > 0
-                            ? `Choose Goals (${filters.goalIds.length})`
-                            : 'Choose Goals'}
-                    </button>
-                    <div className="sessions-query-selection-preview">
-                        {selectedGoalNames.length > 0
-                            ? selectedGoalNames.join(', ')
-                            : 'All activity-linked goals'}
-                    </div>
-                </section>
-
-                <section className="sessions-query-sidebar-section">
-                    <div className="sessions-query-sidebar-section-header">
-                        <h4>Summary</h4>
-                    </div>
-                    <div className="sessions-query-summary">
-                        <div>
-                            Range: {filters.rangePreset === 'custom'
-                                ? `${filters.rangeStart || '-'} to ${filters.rangeEnd || '-'}`
-                                : RANGE_PRESET_OPTIONS.find((option) => option.value === filters.rangePreset)?.label || '90D'}
-                        </div>
-                        <div>
-                            Heat: {filters.heatmapMode === 'duration' ? 'Session duration' : 'Session count'}
-                        </div>
-                    <div>
-                        Duration: {filters.durationMinutes
-                            ? `${filters.durationOperator === 'gt' ? '>' : '<'} ${filters.durationMinutes} min`
-                            : 'Any'}
-                        </div>
-                        <div>Activities: {selectedActivityNames.length ? selectedActivityNames.join(', ') : 'All'}</div>
-                        <div>Goals: {selectedGoalNames.length ? selectedGoalNames.join(', ') : 'All'}</div>
-                    </div>
+                    />
                 </section>
             </div>
 

@@ -1,7 +1,8 @@
 import sqlalchemy as sa
-from sqlalchemy import Boolean, Column, String, DateTime, Integer, ForeignKey, Text
+from sqlalchemy import Boolean, Column, Date, String, DateTime, Integer, ForeignKey, Text
 from sqlalchemy.orm import relationship
 import uuid
+from sqlalchemy.dialects.postgresql import JSONB
 from .base import Base, utc_now, JSON_TYPE
 
 class Note(Base):
@@ -21,6 +22,33 @@ class Note(Base):
         sa.CheckConstraint(
             "note_kind IS NULL OR note_kind IN ('goal_completion', 'goal_review')", name='ck_notes_note_kind',
         ),
+        sa.CheckConstraint(
+            "context_type IN ('root', 'goal', 'session', 'program', 'program_date', 'activity_instance',"
+            " 'activity_definition', 'circuit_run', 'circuit_round')",
+            name='ck_notes_context_type',
+        ),
+        # A program-date note belongs to one calendar date of a program.
+        sa.CheckConstraint(
+            "context_type <> 'program_date' OR (program_id IS NOT NULL AND calendar_date IS NOT NULL)",
+            name='ck_notes_program_date_shape',
+        ),
+        # Only a next-time pin can be consumed (services/note_carry_forward.py).
+        sa.CheckConstraint(
+            'carry_forward_at IS NOT NULL OR (carried_into_instance_id IS NULL AND carried_into_session_id IS NULL)',
+            name='ck_notes_carry_forward_shape',
+        ),
+        sa.CheckConstraint("review_data IS NULL OR note_kind = 'goal_review'", name='ck_notes_review_data'),
+        sa.Index(
+            'ix_notes_program_calendar_date', 'program_id', 'calendar_date',
+            postgresql_where=sa.text('deleted_at IS NULL AND calendar_date IS NOT NULL'),
+        ),
+        sa.Index(
+            'ix_notes_pending_carry', 'root_id', 'activity_definition_id',
+            postgresql_where=sa.text(
+                'carry_forward_at IS NOT NULL AND carried_into_instance_id IS NULL AND deleted_at IS NULL'
+                ' AND carried_into_session_id IS NULL'
+            ),
+        ),
     )
     
     session_id = Column(String, ForeignKey('sessions.id', ondelete='CASCADE'), nullable=True, index=True)
@@ -35,16 +63,30 @@ class Note(Base):
     agent_grant_id = Column(String, ForeignKey('agent_grants.id', ondelete='SET NULL'), nullable=True, index=True)
     agent_run_id = Column(String, ForeignKey('agent_runs.id', ondelete='SET NULL'), nullable=True, index=True)
     pinned_at = Column(DateTime, nullable=True)
+    # Program-date notes: one calendar date of a program. `program_id` is also set on program notes.
+    program_id = Column(String, ForeignKey('programs.id', ondelete='CASCADE'), nullable=True, index=True)
+    calendar_date = Column(Date, nullable=True)
+    # "Pin to next": set while pending, kept once consumed: an activity note by the next instance of its
+    # activity (`carried_into_instance_id`), a session note by the next session (`carried_into_session_id`).
+    carry_forward_at = Column(DateTime, nullable=True)
+    carried_into_instance_id = Column(
+        String, ForeignKey('activity_instances.id', ondelete='SET NULL'), nullable=True, index=True,
+    )
+    carried_into_session_id = Column(String, ForeignKey('sessions.id', ondelete='SET NULL'), nullable=True, index=True)
+    # Structured goal review answers; `content` is derived from them (services/goal_review_content.py).
+    # none_as_null: a note without answers stores SQL NULL, not JSON null (ck_notes_review_data).
+    review_data = Column(JSONB(none_as_null=True), nullable=True)
 
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     deleted_at = Column(DateTime, nullable=True)
 
-    session = relationship("Session", backref="notes_list")
-    activity_instance = relationship("ActivityInstance", backref="notes_list")
+    session = relationship("Session", backref="notes_list", foreign_keys=[session_id])
+    activity_instance = relationship("ActivityInstance", backref="notes_list", foreign_keys=[activity_instance_id])
     activity_set = relationship("ActivitySet")
     activity_definition = relationship("ActivityDefinition", backref="notes_list")
     goal = relationship("Goal", foreign_keys=[goal_id])
+    program = relationship("Program")
     attachments = relationship("NoteAttachment", order_by="NoteAttachment.position", lazy="selectin", passive_deletes=True)
 
 class NoteFilter(Base):

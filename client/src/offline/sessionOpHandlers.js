@@ -1,8 +1,10 @@
 import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
+import { isQuickSession } from '../utils/sessionRuntime';
 import { SESSION_OP } from './opKinds';
 import {
+    applySessionCompletion,
     applySessionPause,
     applySessionResume,
     applyTimerAction,
@@ -75,6 +77,10 @@ const OPTIMISTIC = {
         queryClient.setQueryData(keysFor(op.meta).activities, mapList((list) => (
             list.filter((instance) => instance.id !== op.meta.instanceId)
         )));
+        // Its notes go with it (services/note_ownership.py).
+        queryClient.setQueryData(keysFor(op.meta).notes, mapList((list) => (
+            list.filter((note) => note.activity_instance_id !== op.meta.instanceId)
+        )));
     },
     [SESSION_OP.TIMER]: (queryClient, op) => {
         const { instanceId, action, sessionPaused, extraData } = op.meta;
@@ -114,12 +120,8 @@ const OPTIMISTIC = {
             if (body.session_data) {
                 next.attributes = { ...(previous.attributes || {}), session_data: body.session_data };
             }
-            if (body.completed !== undefined) {
-                next.completed = body.completed;
-                next.completed_at = body.completed ? op.meta.occurredAt : null;
-                if (next.attributes) next.attributes = { ...next.attributes, completed: body.completed };
-            }
-            return next;
+            if (body.completed === undefined) return next;
+            return applySessionCompletion(next, body.completed, op.meta.occurredAt, { quick: isQuickSession(next) });
         });
     },
     [SESSION_OP.CIRCUIT_RUN]: (queryClient, op) => {
@@ -215,7 +217,7 @@ const OPTIMISTIC = {
     },
     [SESSION_OP.NOTE_UPDATE]: (queryClient, op) => {
         queryClient.setQueryData(keysFor(op.meta).notes, mapList((list) => list.map((note) => (
-            note.id === op.meta.noteId ? { ...note, ...op.body, ...(op.meta.attachments ? { attachments: op.meta.attachments } : {}) } : note
+            note.id === op.meta.noteId ? { ...note, ...op.body, ...op.meta.patch, ...(op.meta.attachments ? { attachments: op.meta.attachments } : {}) } : note
         ))));
     },
     [SESSION_OP.NOTE_DELETE]: (queryClient, op) => {
@@ -248,6 +250,8 @@ export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
         queryKeys.sessionProgressSummary(sessionId),
         queryKeys.progressRoot(),
         ['activity-progress-timeline', rootId],
+        // The nav's session action is always mounted and follows completion.
+        queryKeys.activeSessionRoot(),
     ]);
     // Other pages' read models only go stale here; they refetch when next opened.
     const staleOnly = { refetchType: 'none' };

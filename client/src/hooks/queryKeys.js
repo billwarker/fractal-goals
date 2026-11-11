@@ -148,7 +148,8 @@ export const queryKeys = {
     sessionNotesRoot: (rootId) => ['session-notes', rootId],
     sessionTemplates: (rootId) => ['session-templates', rootId],
     previousSessionNotes: (rootId, sessionId) => ['previous-session-notes', rootId, sessionId],
-    activityDefinitionNotes: (rootId, activityDefinitionId) => ['activity-definition-notes', rootId, activityDefinitionId],
+    // Under the session's notes key, so post-sync refreshes of session notes include it.
+    sessionCarriedNotes: (rootId, sessionId) => ['session-notes', rootId, sessionId, 'carried'],
     sessions: (rootId) => ['sessions', rootId],
     activeSessionRoot: () => ['sessions', 'active'],
     activeSession: (userId, rootId) => ['sessions', 'active', userId, rootId],
@@ -166,6 +167,8 @@ export const queryKeys = {
     allNotesRoot: (rootId) => ['all-notes', rootId],
     // Under the all-notes root so every note mutation refreshes the heatmap too.
     notesHeatmap: (rootId, filters = {}) => ['all-notes', rootId, 'heatmap', filters],
+    // How many notes deleting a session, goal or activity would take; refreshed by every note mutation.
+    ownedNoteCount: (rootId, target = {}) => ['all-notes', rootId, 'owned-count', target],
     noteFilters: (rootId) => ['note-filters', rootId],
     goalAttachments: (rootId, goalId) => ['goal-attachments', rootId, goalId],
     instagramOembed: (permalink) => ['instagram-oembed', permalink],

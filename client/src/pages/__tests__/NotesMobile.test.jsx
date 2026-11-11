@@ -1,11 +1,10 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import Notes from '../Notes';
 
 const navigate = vi.fn();
-const createNote = vi.fn();
 
 vi.mock('react-router-dom', async (importOriginal) => {
     const actual = await importOriginal();
@@ -24,7 +23,6 @@ vi.mock('../../hooks/useNotesPageQuery', () => ({
         isLoading: false,
         isFetching: false,
         loadNextPage: vi.fn(),
-        createNote,
         updateNote: vi.fn(),
         deleteNote: vi.fn(),
         pinNote: vi.fn(),
@@ -46,16 +44,6 @@ vi.mock('../../hooks/useActivityQueries', () => ({
 
 vi.mock('../../components/notes', () => ({
     NoteTimeline: () => <div>Timeline</div>,
-    NoteComposer: ({ onCancel }) => (
-        <div>
-            <div>Composer</div>
-            <button type="button" onClick={onCancel}>Cancel composer</button>
-        </div>
-    ),
-}));
-
-vi.mock('../../components/notes/ComposeLinkPanel', () => ({
-    default: () => <div>Associator panel</div>,
 }));
 
 vi.mock('../../hooks/useGoalQueries', () => ({
@@ -79,7 +67,7 @@ vi.mock('../../hooks/useIsMobile', () => ({
     getIsMobileViewport: () => true,
 }));
 
-describe('Notes mobile compose shell', () => {
+describe('Notes mobile shell', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         Object.defineProperty(window, 'localStorage', {
@@ -105,30 +93,16 @@ describe('Notes mobile compose shell', () => {
         expect(document.querySelector('.mobile-sheet-enter [data-sheet-handle]')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
         expect(button).toHaveAttribute('aria-expanded', 'true');
-        fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));
+        // The same header as Sessions: Reset Filters and Hide.
+        expect(screen.getByRole('button', { name: 'Reset Filters' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide filters panel' }));
         expect(screen.queryByText('Filters')).not.toBeInTheDocument();
         expect(button).toHaveAttribute('aria-expanded', 'false');
     });
 
-    it('switches the mobile footer action to the associator toggle during compose mode', async () => {
+    it('offers no write action on mobile', () => {
         render(<MemoryRouter><Notes /></MemoryRouter>);
-
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: '+ Write Note' }));
-        });
-
-        const footer = screen.getByRole('contentinfo', { name: 'Note filter controls' });
-        expect(within(footer).getByRole('button', { name: 'Show Associator' })).toBeInTheDocument();
-
-        await act(async () => {
-            fireEvent.click(screen.getByRole('button', { name: 'Show Associator' }));
-        });
-
-        expect(screen.getByText('Associator')).toBeInTheDocument();
-        expect(screen.getByText('Associator panel')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Hide Associator' })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel composer' }));
-        expect(within(footer).getByRole('button', { name: 'Show Filters' })).toBeInTheDocument();
+        expect(screen.queryByText(/Write Note/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Associator/)).not.toBeInTheDocument();
     });
 });

@@ -1,19 +1,14 @@
 /**
- * NoteComposer — shared compose UI for creating notes.
- * Used on /notes page and inside GoalNotesView (goal detail modal).
- *
- * When prelinkedGoalId is provided, the goal is pre-linked and locked.
- * The right-side panel has tabs for Goal tree browser and Activity picker.
+ * NoteComposer — full markdown compose UI for goal notes (GoalNotesView).
+ * The note is written for `prelinkedGoalId`; quick bars elsewhere use NoteQuickAdd.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import CloseIcon from '../atoms/CloseIcon';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import NoteAttachmentsEditor from './NoteAttachmentsEditor';
 import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
 import { parseVideoUrl } from '../../utils/videoEmbeds';
-import ComposeLinkPanel from './ComposeLinkPanel';
 import styles from './NoteComposer.module.css';
 
 function NoteComposer({
@@ -23,35 +18,16 @@ function NoteComposer({
     initialAttachments = [],
     initialContent = '',      // pre-populate for edit mode
     submitLabel,              // override submit button label
-    prelinkedGoalId = null,   // when set, goal is pre-filled and locked (goal modal context)
-    prelinkedGoalName = null,
+    prelinkedGoalId = null,   // the goal the note is written for
     isSubmitting: externalSubmitting = false,
-    // Controlled link state (used by /notes page to hoist link panel to right column)
-    selectedGoalId: controlledGoalId,
-    selectedGoalName: controlledGoalName,
-    selectedActivityId: controlledActivityId,
-    selectedActivityName: controlledActivityName,
-    onGoalSelect: controlledGoalSelect,
-    onActivitySelect: controlledActivitySelect,
-    hideLinkPanel = false,
-    bare = false,
 }) {
     const [content, setContent] = useState(initialContent);
     const draft = useAttachmentDraft(rootId, initialAttachments);
     const [previewMode, setPreviewMode] = useState(false);
-    const [internalGoalId, setInternalGoalId] = useState(prelinkedGoalId);
-    const [internalGoalName, setInternalGoalName] = useState(prelinkedGoalName);
-    const [internalActivityId, setInternalActivityId] = useState(null);
-    const [internalActivityName, setInternalActivityName] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState('');
     const textareaRef = useRef(null);
 
-    // Use controlled or internal state
-    const selectedGoalId = controlledGoalId !== undefined ? controlledGoalId : internalGoalId;
-    const selectedGoalName = controlledGoalName !== undefined ? controlledGoalName : internalGoalName;
-    const selectedActivityId = controlledActivityId !== undefined ? controlledActivityId : internalActivityId;
-    const selectedActivityName = controlledActivityName !== undefined ? controlledActivityName : internalActivityName;
     // All note surfaces support markdown + inline video embeds, so the
     // Write/Preview toggle is always available regardless of goal/activity links.
 
@@ -68,31 +44,15 @@ function NoteComposer({
         }
     }, []);
 
-    const clearGoal = () => {
-        if (controlledGoalSelect) controlledGoalSelect(null, null);
-        else { setInternalGoalId(null); setInternalGoalName(null); }
-    };
-
-    const clearActivity = () => {
-        if (controlledActivitySelect) controlledActivitySelect(null, null);
-        else { setInternalActivityId(null); setInternalActivityName(null); }
-    };
-
     const handleSubmit = async () => {
         if (!content.trim() || isSubmitting || externalSubmitting || draft.isBusy) return;
         setSubmitError('');
         setIsSubmitting(true);
         try {
-            const saved = await onSubmit(content.trim(), selectedGoalId, selectedActivityId, draft.payload());
+            const saved = await onSubmit(content.trim(), prelinkedGoalId, null, draft.payload());
             if (saved === false) throw new Error('The note could not be saved. Your draft is still here.');
             draft.reset();
             setContent('');
-            setInternalGoalId(prelinkedGoalId);
-            setInternalGoalName(prelinkedGoalName);
-            setInternalActivityId(null);
-            setInternalActivityName(null);
-            if (controlledGoalSelect && !prelinkedGoalId) controlledGoalSelect(null, null);
-            if (controlledActivitySelect) controlledActivitySelect(null, null);
             setPreviewMode(false);
         } catch (error) {
             setSubmitError(error?.response?.data?.error || error?.message || 'The note could not be saved. Try again.');
@@ -137,7 +97,7 @@ function NoteComposer({
     };
 
     return (
-        <div className={[styles.composer, bare ? styles.bare : ''].filter(Boolean).join(' ')}>
+        <div className={styles.composer}>
             {submitError && <p role="alert">{submitError}</p>}
             <div className={styles.composerBody}>
                 {/* Left: write/preview area */}
@@ -184,28 +144,6 @@ function NoteComposer({
 
                     <NoteAttachmentsEditor draft={draft} disabled={isSubmitting || externalSubmitting} />
 
-                    {/* Selected links */}
-                    <div className={styles.linkedChips}>
-                        {selectedGoalId && (
-                            <span className={styles.chip}>
-                                Goal: {selectedGoalName || selectedGoalId}
-                                {!prelinkedGoalId && (
-                                    <button className={styles.chipRemove} onClick={clearGoal} type="button">
-                                        <CloseIcon size={12} />
-                                    </button>
-                                )}
-                            </span>
-                        )}
-                        {selectedActivityId && (
-                            <span className={styles.chip}>
-                                Activity: {selectedActivityName || selectedActivityId}
-                                <button className={styles.chipRemove} onClick={clearActivity} type="button">
-                                    <CloseIcon size={12} />
-                                </button>
-                            </span>
-                        )}
-                    </div>
-
                     <div className={styles.submitRow}>
                         <button
                             className={styles.submitBtn}
@@ -231,17 +169,6 @@ function NoteComposer({
                     </div>
                 </div>
 
-                {!prelinkedGoalId && !hideLinkPanel && <ComposeLinkPanel
-                    rootId={rootId} selectedGoalId={selectedGoalId} selectedActivityId={selectedActivityId}
-                    onGoalSelect={(id, name) => {
-                        if (controlledGoalSelect) controlledGoalSelect(id, name);
-                        else { setInternalGoalId(id); setInternalGoalName(name); }
-                    }}
-                    onActivitySelect={(id, name) => {
-                        if (controlledActivitySelect) controlledActivitySelect(id, name);
-                        else { setInternalActivityId(id); setInternalActivityName(name); }
-                    }}
-                />}
             </div>
         </div>
     );

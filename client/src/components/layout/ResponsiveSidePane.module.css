@@ -1,3 +1,33 @@
+/*
+ * The mobile bottom sheet, over whatever the page's panel class sets for desktop
+ * (doubled class so it wins regardless of stylesheet order).
+ */
+.sheet.sheet {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--mobile-sidebar-height);
+    max-height: var(--mobile-sidebar-height);
+    min-height: 0;
+    box-sizing: border-box;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border: none;
+    border-radius: 16px 16px 0 0;
+    background: var(--color-bg-sidebar);
+    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
+    z-index: 500;
+    overflow: hidden;
+}
+
+.backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 499;
+}
+
 /* The handle keeps its height; the pane's content fills the rest of the sheet. */
 .sheet {
     display: flex;

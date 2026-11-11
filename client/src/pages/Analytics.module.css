@@ -57,10 +57,6 @@
     overflow: hidden;
 }
 
-.sheetBackdrop {
-    display: none;
-}
-
 @media (max-width: 768px) {
     .leftPanelWithMobileFooter {
         padding-bottom: var(--mobile-page-footer-height);
@@ -68,31 +64,6 @@
 
     .workspace {
         padding: var(--grid-unit);
-    }
-
-    .sheetBackdrop {
-        display: block;
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 499;
-    }
-
-    .rightPanel {
-        position: fixed;
-        right: 0;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: var(--mobile-sidebar-height);
-        max-height: var(--mobile-sidebar-height);
-        min-height: 0;
-        box-sizing: border-box;
-        padding-bottom: env(safe-area-inset-bottom, 0px);
-        border-left: none;
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
-        z-index: 500;
     }
 }
 .onboardingEmptyState { margin: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card-alt); }

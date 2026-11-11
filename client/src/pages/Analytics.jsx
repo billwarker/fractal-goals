@@ -441,7 +441,6 @@ function Analytics() {
             isMobile={isMobile}
             onClose={() => setIsFiltersPaneOpen(false)}
             panelClassName={styles.rightPanel}
-            backdropClassName={styles.sheetBackdrop}
         >
             <Suspense fallback={<AnalyticsLoading />}><AnalyticsFiltersSidebar
                 rootId={rootId} sessions={sessions} windowStates={windowStates} shownGrains={shownGrains}

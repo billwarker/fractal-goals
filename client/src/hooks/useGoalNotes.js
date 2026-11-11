@@ -1,6 +1,6 @@
 /**
  * useGoalNotes — hook for notes directly attached to a goal.
- * Provides CRUD + pin/unpin mutations, invalidating both goalNotes and allNotes caches.
+ * Provides CRUD + next-time pin mutations, invalidating both goalNotes and allNotes caches.
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,16 +68,10 @@ export function useGoalNotes(
         onError: () => notify.error('Failed to remove completion note'),
     });
 
-    const pinNoteMutation = useMutation({
-        mutationFn: (noteId) => fractalNotesApi.pinNote(rootId, noteId),
+    const carryForwardMutation = useMutation({
+        mutationFn: ({ noteId, on }) => fractalNotesApi.setCarryForward(rootId, noteId, on),
         onSuccess: () => { invalidate(); },
-        onError: () => notify.error('Failed to pin note'),
-    });
-
-    const unpinNoteMutation = useMutation({
-        mutationFn: (noteId) => fractalNotesApi.unpinNote(rootId, noteId),
-        onSuccess: () => { invalidate(); },
-        onError: () => notify.error('Failed to unpin note'),
+        onError: () => notify.error('Failed to change the pin'),
     });
 
     return {
@@ -88,7 +82,7 @@ export function useGoalNotes(
         updateNote: (noteId, content) => updateNoteMutation.mutateAsync({ noteId, content }),
         deleteNote: (note) => deleteNoteMutation.mutateAsync(note),
         deleteGoalCompletionNotes: () => deleteGoalCompletionNotesMutation.mutateAsync(),
-        pinNote: (noteId) => pinNoteMutation.mutateAsync(noteId),
-        unpinNote: (noteId) => unpinNoteMutation.mutateAsync(noteId),
+        // Pin an activity or session note to its next time (or undo it).
+        setCarryForward: (noteId, on) => carryForwardMutation.mutateAsync({ noteId, on }),
     };
 }

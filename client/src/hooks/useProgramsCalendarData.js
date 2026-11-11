@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { flattenGoals } from '../utils/goalHelpers';
 import { buildProgramSummaryLabels } from '../utils/programViewModel';
 import { fractalApi } from '../utils/api';
+import { invalidateNotesAfterDelete } from '../utils/queryInvalidation';
 import { queryKeys } from './queryKeys';
 import { useFractalTree } from './useGoalQueries';
 
@@ -42,10 +43,14 @@ export function useProgramsCalendarData(rootId, { timezone } = {}) {
     const programLabels = useMemo(() => buildProgramSummaryLabels(sortedPrograms), [sortedPrograms]);
 
     const { refetch: refetchProgramList } = programsQuery;
-    const refetchPrograms = useCallback(() => Promise.all([
-        refetchProgramList(),
-        queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
-    ]), [queryClient, refetchProgramList, rootId]);
+    // Notes show their program's name and colour, and a deleted program takes its notes with it.
+    const refetchPrograms = useCallback(() => {
+        invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
+        return Promise.all([
+            refetchProgramList(),
+            queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
+        ]);
+    }, [queryClient, refetchProgramList, rootId]);
 
     return {
         programs: sortedPrograms,

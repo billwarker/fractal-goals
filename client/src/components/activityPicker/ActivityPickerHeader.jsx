@@ -39,12 +39,7 @@ export default function ActivityPickerHeader({
                     </Button>
                 )}
                 {showCloseButton && onClose && (
-                    <CloseButton
-                        className={styles.closeButton}
-                        onClick={onClose}
-                        aria-label="Close activity picker"
-                        size={14}
-                    />
+                    <CloseButton onClick={onClose} aria-label="Close activity picker" />
                 )}
             </div>
         </div>

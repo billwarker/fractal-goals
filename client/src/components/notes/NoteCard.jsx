@@ -1,8 +1,7 @@
 /** Shared note card for note feeds, goal details, and session details. */
 import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
-import { PinIcon } from '../atoms/AppIcons';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
@@ -10,7 +9,13 @@ import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import NoteMedia from './NoteMedia';
 import NoteOptionsMenu from './NoteOptionsMenu';
 import MarkdownNoteContent from './MarkdownNoteContent';
+import NoteContextLine from './NoteContextLine';
+import PinBadge from './PinBadge';
+import ReviewNoteBody from './ReviewNoteBody';
+import { GoalNoteHeading, ProgramNoteHeading, noteContextLabel } from './NoteCardHeadings';
 import styles from './NoteCard.module.css';
+import { formatLiteralDate } from '../../utils/dateUtils';
+import { noteContextLink } from '../../utils/noteContext';
 import { GOAL_NOTE_TYPES, NOTE_KIND_LABELS, NOTE_TYPE_LABELS } from '../../utils/noteTypes';
 function buildPlainTextPreview(content) {
     if (!content) return '';
@@ -30,6 +35,7 @@ function deriveNoteType(note) {
     if (note.context_type === 'goal') return 'goal_note';
     if (note.context_type === 'session') return 'session_note';
     if (note.context_type === 'program') return 'program_note';
+    if (note.context_type === 'program_date') return 'program_date_note';
     if (note.context_type === 'activity_definition') return 'activity_definition_note';
     if (note.context_type === 'activity_instance') {
         return note.set_index !== null && note.set_index !== undefined
@@ -47,6 +53,18 @@ function deriveNoteTypeLabel(note) {
     return NOTE_TYPE_LABELS[deriveNoteType(note)] || 'Note';
 }
 
+/** What a note's next-time pin waits for: the next session, or the next instance of its activity. */
+function carryForwardTarget(note) {
+    return note.context_type === 'session' ? 'session' : note.activity_definition_name || 'activity';
+}
+
+/** "Pinned to next Bench Press" / "Pinned to next session" while a next-time pin waits; "Carried to next …" once used. */
+export function carryForwardLabel(note) {
+    if (note.carry_forward === 'pending') return `Pinned to next ${carryForwardTarget(note)}`;
+    if (note.carry_forward === 'delivered') return `Carried to next ${carryForwardTarget(note)}`;
+    return null;
+}
+
 function formatMetadataNoteTypeLabel(label) {
     return label.replace(/\s+Note$/i, '');
 }
@@ -55,15 +73,17 @@ function NoteCard({
     note,
     onEdit,
     onEditRequest,   // if provided, called instead of opening inline editor
+    onEditReview,    // (note): edit a guided review's answers in its goal's review form
+    onOpenGoal,      // (note): open a goal note's goal; its name becomes the way in
     onDelete,
-    onPin,
-    onUnpin,
+    onCarryForward,  // (noteId, on): pin to the next instance of the note's activity, or the next session
     showContext = false,
     compact = false,
     minimal = false,
     variant = 'card',
     compactMedia = false,
     suppressSessionContext = false,
+    suppressActivityContext = false,  // inside an activity group, whose header names the activity
     timestampDisplay = 'dateTime',
     showTypePill = true,
     noteTypeVariant = 'pill',
@@ -77,7 +97,6 @@ function NoteCard({
     const textareaRef = useRef(null);
     const cardRef = useRef(null);
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
     const isGoalCompletionNote = resolvedNoteType === 'goal_completion_note';
@@ -171,15 +190,6 @@ function NoteCard({
         }
     };
 
-    const handlePinToggle = (e) => {
-        e.stopPropagation();
-        if (note.is_pinned) {
-            onUnpin && onUnpin(note.id);
-        } else {
-            onPin && onPin(note.id);
-        }
-    };
-
     const handleEditClick = (e) => {
         e.stopPropagation();
         if (onEditRequest) {
@@ -189,22 +199,54 @@ function NoteCard({
         }
     };
 
-    const canEdit = (!!onEdit || !!onEditRequest) && !note.isPast;
-    const canPin = (!!onPin || !!onUnpin) && !note.isPast && resolvedNoteType !== 'activity_set_note';
-    const canDelete = !!onDelete && !note.isPast;
-    const canManageMedia = canEdit && Boolean(note.root_id);
+    // A carried note belongs to an earlier session: here it can only be unpinned.
+    const canWrite = (!!onEdit || !!onEditRequest) && !note.isPast && !note.isCarried;
+    // A guided review's text is derived from its answers; it is not edited as text.
+    const canEdit = canWrite && !note.review_data;
+    const canEditReview = !!onEditReview && !note.isPast && Boolean(note.review_data);
+    // A guided review's header carries its goal and its status; the body only the answers.
+    const isReviewHeader = Boolean(note.review_data) && !minimal;
+    // On the timeline the goal's icon sits on the rail beside the note, so the heading leaves it out.
+    const showHeaderGoalIcon = variant !== 'timeline';
+    const opensGoal = Boolean(onOpenGoal && note.goal_id && note.context_type === 'goal');
+    // In a feed, a program note's name leads to its program instead of a separate link.
+    const programLink = showContext && !minimal && note.root_id
+        && (resolvedNoteType === 'program_note' || resolvedNoteType === 'program_date_note')
+        ? noteContextLink(note, note.root_id)
+        : null;
+    const canCarry = !!onCarryForward && !note.isPast && note.carry_forward !== 'delivered'
+        && Boolean(note.activity_definition_id || note.context_type === 'session');
+    const canDelete = !!onDelete && !note.isPast && !note.isCarried;
+    const canManageMedia = canWrite && Boolean(note.root_id);
+    const nextTarget = carryForwardTarget(note);
+    const carryLabel = carryForwardLabel(note);
     const menuItems = [
         canEdit && { label: 'Edit', onSelect: handleEditClick },
+        canEditReview && { label: 'Edit', onSelect: (event) => { event.stopPropagation(); onEditReview(note); } },
         canManageMedia && { label: note.attachments?.length ? 'Manage attachments' : 'Attach pictures, video or audio', onSelect: () => setManagingMedia(true) },
-        canPin && { label: note.is_pinned ? 'Unpin' : 'Pin note', onSelect: handlePinToggle },
+        canCarry && {
+            label: note.carry_forward === 'pending' ? `Unpin from next ${nextTarget}` : `Pin to next ${nextTarget}`,
+            onSelect: (event) => { event.stopPropagation(); onCarryForward(note.id, note.carry_forward !== 'pending'); },
+        },
         canDelete && { label: 'Delete', onSelect: handleDelete, danger: true },
     ].filter(Boolean);
-    const shouldDeferRichContent = !note.is_pinned && !isSelected && !minimal && !compact;
+    const shouldDeferRichContent = !isSelected && !minimal && !compact;
     const [shouldRenderRichContent, setShouldRenderRichContent] = useState(
         typeof window === 'undefined' || typeof window.IntersectionObserver === 'undefined' || !shouldDeferRichContent
     );
     const shouldShowRichContent = !shouldDeferRichContent || shouldRenderRichContent || managingMedia;
     const previewContent = supportsMarkdown ? buildPlainTextPreview(note.content) : note.content;
+    // A pinned note says so beside its menu, with the same pin mark everywhere; a note carried in from an
+    // earlier session links back to it. The time always sits on its own line above the text.
+    const carriedFrom = formatLiteralDate(note.session_date || note.created_at, { year: undefined }) || 'last time';
+    const pinBadge = note.isCarried ? (
+        <PinBadge>
+            {note.carry_forward === 'delivered' ? 'Carried' : 'Pinned'} from{' '}
+            {note.root_id && note.session_id ? (
+                <Link to={`/${note.root_id}/session/${note.session_id}`}>{carriedFrom}</Link>
+            ) : carriedFrom}
+        </PinBadge>
+    ) : carryLabel ? <PinBadge>{carryLabel}</PinBadge> : null;
     const timestamp = (
         <span className={styles.timestamp}>
             {formatDate(note.created_at)}
@@ -237,32 +279,7 @@ function NoteCard({
         return () => observer.disconnect();
     }, [shouldDeferRichContent, shouldShowRichContent]);
 
-    const primaryContextLabel = note.context_display_name || (() => {
-        switch (resolvedNoteType) {
-            case 'fractal_note':
-                return 'Fractal';
-            case 'goal_note':
-                return note.goal_name || note.content || 'Goal';
-            case 'goal_completion_note':
-            case 'goal_review_note':
-                return note.goal_name || note.content || 'Goal';
-            case 'session_note':
-                return suppressSessionContext
-                    ? 'Session note'
-                    : note.session_template_name || note.session_name || 'Session';
-            case 'program_note':
-                return note.program_name || 'Program';
-            case 'activity_set_note':
-                return `${note.activity_definition_name || 'Activity'} · Set ${(note.set_index ?? 0) + 1}`;
-            case 'activity_instance_note':
-            case 'activity_definition_note':
-                return note.activity_definition_name || 'Activity';
-            case 'circuit_run_note': return 'Activity circuit';
-            case 'circuit_round_note': return 'Circuit round';
-            default:
-                return 'Note';
-        }
-    })();
+    const primaryContextLabel = noteContextLabel(note, resolvedNoteType, { suppressSessionContext });
     const secondaryContextBadges = [];
     if (showContext && resolvedNoteType !== 'fractal_note') {
         if (!GOAL_NOTE_TYPES.has(resolvedNoteType) && note.goal_name) {
@@ -298,20 +315,12 @@ function NoteCard({
                     compact ? styles.compact : '',
                     isSelected ? styles.selected : '',
                     note.isPast ? styles.pastNote : '',
-                    note.is_pinned ? styles.pinned : '',
                 ].filter(Boolean).join(' ')}
                 onClick={(e) => {
                     e.stopPropagation();
                     onSelect && onSelect();
                 }}
             >
-                {/* Pin indicator */}
-                {note.is_pinned && (
-                    <span className={styles.pinnedIndicator} title="Pinned">
-                        <PinIcon size={14} />
-                    </span>
-                )}
-
                 {/* Options button — pinned to the card's top-right corner */}
                 {menuItems.length > 0 && <NoteOptionsMenu items={menuItems} />}
 
@@ -321,37 +330,24 @@ function NoteCard({
                         <div className={styles.metaStack}>
                             <div className={styles.metaRow}>
                                 <div className={styles.contextSummary}>
-                                    {(resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
-                                        <span className={styles.goalContext}>
-                                            {isGoalCompletionNote ? (
-                                                <>
-                                                    <span className={styles.noteKindPrefix}>{noteKindLabel}:</span>
-                                                    <GoalIcon
-                                                        shape={getGoalIcon(note.goal_type)}
-                                                        color={getGoalColor('Completed')}
-                                                        secondaryColor={getGoalSecondaryColor('Completed')}
-                                                        isSmart={Boolean(note.goal_is_smart)}
-                                                        size={12}
-                                                    />
-                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className={styles.contextPrimary}>{primaryContextLabel}</span>
-                                                    <GoalIcon
-                                                        shape={getGoalIcon(note.goal_type)}
-                                                        color={getGoalColor(note.goal_type)}
-                                                        secondaryColor={getGoalSecondaryColor(note.goal_type)}
-                                                        isSmart={Boolean(note.goal_is_smart)}
-                                                        size={12}
-                                                    />
-                                                </>
-                                            )}
-                                        </span>
+                                    {isReviewHeader || ((resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type) ? (
+                                        <GoalNoteHeading
+                                            note={note}
+                                            label={primaryContextLabel}
+                                            kind={isReviewHeader ? 'review' : isGoalCompletionNote ? 'completion' : 'goal'}
+                                            showIcon={showHeaderGoalIcon}
+                                            onOpenGoal={opensGoal ? onOpenGoal : null}
+                                        />
+                                    ) : suppressActivityContext ? (
+                                        // The group's header names the activity: only a set needs a heading here.
+                                        setLabel ? <span className={styles.contextPrimary}>{setLabel}</span> : null
                                     ) : resolvedNoteType === 'session_note' && suppressSessionContext ? (
-                                        null  // The session group's header already names the session.
+                                        // The group's header names the session; this says what kind of note it is.
+                                        <span className={styles.contextPrimary}>Session note</span>
                                     ) : resolvedNoteType === 'session_note' ? (
                                         renderSessionTemplateBadge()
+                                    ) : programLink ? (
+                                        <ProgramNoteHeading note={note} to={programLink.to} />
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                     )}
@@ -381,12 +377,8 @@ function NoteCard({
                         {!minimal && noteTypeVariant === 'metadata' && (
                             <>
                                 {showTypePill && !noteKindLabel && !suppressSessionContext && (
-                                    <>
-                                        <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
-                                        <span className={styles.metaSep} aria-hidden="true">·</span>
-                                    </>
+                                    <span className={styles.noteTypeText}>{displayNoteTypeLabel}</span>
                                 )}
-                                {timestamp}
                             </>
                         )}
                         {!minimal && noteTypeVariant !== 'metadata' && (
@@ -396,7 +388,6 @@ function NoteCard({
                                         {displayNoteTypeLabel}
                                     </span>
                                 )}
-                                {timestamp}
                             </>
                         )}
                         {minimal && (
@@ -404,11 +395,16 @@ function NoteCard({
                                 {setLabel && (
                                     <span className={styles.setLabel}>{setLabel}</span>
                                 )}
-                                {timestamp}
                             </>
                         )}
+                        {pinBadge}
                     </div>
                 </div>
+                {showContext && !minimal && !isReviewHeader && (
+                    <NoteContextLine note={note} grouped={suppressActivityContext} hideLink={suppressSessionContext || opensGoal || Boolean(programLink)} />
+                )}
+                {/* One place for when: the time (and any pin) sits directly above the text, on every note. */}
+                <div className={styles.timeLine}>{timestamp}</div>
                 {/* Content */}
                 {isEditing ? (
                     <div className={styles.editArea}>
@@ -434,8 +430,10 @@ function NoteCard({
                         </div>
                     </div>
                 ) : (
-                    <div className={styles.content}>
-                        {shouldShowRichContent ? (
+                    <div className={`${styles.content} ${note.isCarried ? styles.carriedContent : ''}`}>
+                        {note.review_data ? (
+                            <ReviewNoteBody review={note.review_data} showStatus={!isReviewHeader} />
+                        ) : shouldShowRichContent ? (
                             <MarkdownNoteContent
                                 content={note.content}
                                 className={styles.markdownContent}

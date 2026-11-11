@@ -8,6 +8,7 @@ const activityActions = {
     setActivityGroupGoals: vi.fn(),
 };
 
+vi.mock('../../../hooks/useOwnedNoteCount', () => ({ useOwnedNoteCount: () => null }));
 vi.mock('../../../contexts/ActivitiesContext', () => ({
     useActivities: () => activityActions,
     useOptionalActivities: () => activityActions,

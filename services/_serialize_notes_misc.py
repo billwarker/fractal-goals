@@ -83,10 +83,22 @@ def serialize_note(note):
         "goal_id": note.goal_id,
         "agent_grant_id": getattr(note, "agent_grant_id", None),
         "agent_run_id": getattr(note, "agent_run_id", None),
-        "pinned_at": format_utc(note.pinned_at) if note.pinned_at else None,
-        "is_pinned": note.pinned_at is not None,
+        "program_id": getattr(note, "program_id", None),
+        "calendar_date": note.calendar_date.isoformat() if getattr(note, "calendar_date", None) else None,
+        "carry_forward": carry_forward_state(note),
+        "carried_into_instance_id": getattr(note, "carried_into_instance_id", None),
+        "carried_into_session_id": getattr(note, "carried_into_session_id", None),
+        "review_data": getattr(note, "review_data", None),
     }
     return result
+
+
+def carry_forward_state(note):
+    """'pending' while a next-time pin waits for its next instance or session, 'delivered' once used."""
+    if getattr(note, "carry_forward_at", None) is None:
+        return None
+    used = getattr(note, "carried_into_instance_id", None) or getattr(note, "carried_into_session_id", None)
+    return "delivered" if used else "pending"
 
 
 def derive_note_type(context_type, set_index=None, note_kind=None, activity_set_id=None):
@@ -103,6 +115,8 @@ def derive_note_type(context_type, set_index=None, note_kind=None, activity_set_
         return "session_note"
     if context_type == "program":
         return "program_note"
+    if context_type == "program_date":
+        return "program_date_note"
     if context_type == "activity_definition":
         return "activity_definition_note"
     if context_type == "activity_instance":
@@ -120,6 +134,7 @@ def note_type_label(note_type):
         "goal_note": "Goal Note",
         "session_note": "Session Note",
         "program_note": "Program Note",
+        "program_date_note": "Program Date Note",
         "activity_instance_note": "Activity Instance Note",
         "activity_set_note": "Activity Set Note",
         "activity_definition_note": "Activity Definition Note",
@@ -150,10 +165,13 @@ def serialize_note_display(note):
             result["session_template_color"] = template_color
 
     display_goal = note.goal
-    if display_goal:
+    # A note that only linked a goal survives the goal's deletion; it no longer names it.
+    if display_goal and display_goal.deleted_at is None:
         result["goal_name"] = display_goal.name
         result["goal_type"] = get_canonical_goal_type(display_goal)
         result["goal_is_smart"] = bool(all(calculate_smart_status(display_goal).values()))
+        # Feeds colour a completed goal's notes with the completed goal colour.
+        result["goal_completed"] = bool(display_goal.completed)
 
     if note.activity_definition:
         result["activity_definition_name"] = note.activity_definition.name

@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from 'vitest';
 
 import NoteComposer from '../NoteComposer';
 
-vi.mock('../ComposeLinkPanel', () => ({ default: () => null }));
 vi.mock('../../../hooks/useStorageConnections', () => ({ useStorageConnections: () => ({ providers: [], limits: null }) }));
 
 const attachment = { id: 'asset', name: 'Practice.mp4', alt_text: 'Practice' };

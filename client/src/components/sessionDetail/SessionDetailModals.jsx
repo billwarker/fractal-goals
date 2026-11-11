@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 
-import ConfirmationModal from '../ConfirmationModal';
+import DeleteSessionModal from '../sessions/DeleteSessionModal';
 import SessionOptionsModal from './SessionOptionsModal';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 
@@ -10,6 +10,7 @@ const ActivityAssociationModal = lazyWithRetry(() => import('./ActivityAssociati
 
 function SessionDetailModals({
     rootId,
+    sessionId = null,
     activities,
     activityGroups = [],
     showDeleteConfirm,
@@ -46,12 +47,15 @@ function SessionDetailModals({
 }) {
     return (
         <>
-            <ConfirmationModal
+            <DeleteSessionModal
+                rootId={rootId}
+                session={sessionId ? { id: sessionId } : null}
                 isOpen={showDeleteConfirm}
                 onClose={onCloseDeleteConfirm}
-                onConfirm={onConfirmDelete}
-                title="Delete Session"
-                message="Are you sure you want to delete this session? This action cannot be undone."
+                onConfirm={() => {
+                    onCloseDeleteConfirm();
+                    onConfirmDelete();
+                }}
                 confirmText="Delete"
             />
 

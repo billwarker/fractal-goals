@@ -1,0 +1,137 @@
+.form {
+    display: grid;
+    gap: 14px;
+}
+
+.context {
+    display: grid;
+    gap: 6px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md, 8px);
+    background: var(--color-bg-card-alt);
+}
+
+.context h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.description,
+.muted {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.description { color: var(--color-text-primary); }
+.muted { color: var(--color-text-muted); }
+
+.facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    color: var(--color-text-secondary);
+    font-size: 12px;
+}
+
+.lastReview summary {
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.lastReview[open] summary {
+    margin-bottom: 6px;
+}
+
+.status {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.status legend,
+.prompt span {
+    padding: 0;
+    margin-bottom: 6px;
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.statusOptions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.statusOptions button {
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.statusOptions button:hover { border-color: var(--color-border-hover); }
+.statusOptions button:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
+.statusOptions button[data-status="on_track"] { --review-status-color: var(--color-brand-success); }
+.statusOptions button[data-status="at_risk"] { --review-status-color: var(--color-brand-warning); }
+.statusOptions button[data-status="off_track"] { --review-status-color: var(--color-brand-danger); }
+
+.statusOptions button[aria-pressed="true"] {
+    border-color: var(--review-status-color);
+    background: color-mix(in srgb, var(--review-status-color) 14%, transparent);
+    font-weight: 600;
+}
+
+.prompt {
+    display: grid;
+}
+
+.prompt textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 64px;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: 13px;
+    line-height: 1.45;
+    resize: vertical;
+}
+
+.prompt textarea:focus {
+    border-color: var(--color-brand-primary);
+    outline: none;
+}
+
+.error {
+    margin: 0;
+    color: var(--color-brand-danger);
+    font-size: 12px;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}

@@ -6,7 +6,7 @@ from sqlalchemy import func
 
 from models import Note, NoteFilter
 from services.goal_note_read_model import goal_note_load_options
-from services.note_display_context import attach_program_names
+from services.note_display_context import attach_instance_context, attach_program_names
 from services.note_filter_spec import SPEC_KEYS, NoteFilterError, apply_spec, normalize_spec
 from services.serializers import serialize_note_display
 
@@ -62,10 +62,11 @@ def notes_page(db, root_id, filters, page=0, page_size=25):
 
     total = query.order_by(None).count()
     notes = query.options(*goal_note_load_options()).order_by(
-        Note.pinned_at.desc().nullslast(), Note.created_at.desc(), Note.id.desc(),
+        Note.created_at.desc(), Note.id.desc(),
     ).limit(page_size).offset(page * page_size).all()
     results = [serialize_note_display(note) for note in notes]
     attach_program_names(db, results)
+    attach_instance_context(db, results)
     return {'notes': results, 'total': total, 'page': page, 'page_size': page_size,
             'has_more': (page + 1) * page_size < total}
 

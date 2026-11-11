@@ -5,6 +5,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import pytest
 
 from models import (
+    Note,
     Program,
     ProgramBlock,
     ProgramDay,
@@ -172,6 +173,31 @@ class TestProgramCalendarFeed:
         assert payload["programs"] == []
         assert payload["program_days"] == []
         assert [s["name"] for d in payload["completed_session_days"] for s in d["completed_sessions"]] == ["Solo"]
+
+    def test_date_notes_appear_as_one_line_previews_on_their_dates(self, authed_client, db_session, feed_world):
+        start = feed_world["next_month"]
+        noted = start + timedelta(days=3)
+        root_id = feed_world["root"].id
+        program_id = feed_world["second"].id
+
+        def note(content, **fields):
+            row = Note(id=str(uuid.uuid4()), root_id=root_id, context_type="program_date", context_id=program_id,
+                       program_id=program_id, calendar_date=fields.pop("calendar_date", noted), content=content, **fields)
+            db_session.add(row)
+            return row
+
+        kept = note("Slept badly,\n kept it light " + "x" * 300)
+        note("Removed", deleted_at=datetime.now(timezone.utc))
+        note("Next month", calendar_date=_month_end(start) + timedelta(days=1))
+        db_session.commit()
+
+        payload = _feed(authed_client, root_id, start, _month_end(start)).get_json()
+        (preview,) = payload["date_notes"]
+        assert preview["id"] == kept.id
+        assert preview["program_id"] == program_id
+        assert preview["date"] == noted.isoformat()
+        assert preview["preview"].startswith("Slept badly, kept it light x")
+        assert len(preview["preview"]) == 120
 
     def test_unchanged_chunk_revalidates_with_304(self, authed_client, client, auth_headers, feed_world):
         start = feed_world["next_month"]

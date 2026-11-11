@@ -38,7 +38,6 @@ export default function FilterModal({ filter = null, searchText = '', current, o
     const [rows, setRows] = useState(() => initialRows(spec, searchText));
     const [match, setMatch] = useState(spec.match || 'all');
     const [categories, setCategories] = useState(filter ? spec.categories || [] : current.categories);
-    const [pinnedOnly, setPinnedOnly] = useState(filter ? Boolean(spec.pinned_only) : current.pinnedOnly);
     const links = filter
         ? {
             goalIds: spec.goal_ids || (spec.goal_id ? [spec.goal_id] : []),
@@ -57,7 +56,6 @@ export default function FilterModal({ filter = null, searchText = '', current, o
         conditions: conditions.length ? conditions : undefined,
         match: conditions.length > 1 ? match : undefined,
         categories: categories.length ? categories : undefined,
-        pinned_only: pinnedOnly || undefined,
         ...(includeLinks ? {
             goal_ids: links.goalIds.length ? links.goalIds : undefined,
             activity_definition_ids: links.activityIds.length ? links.activityIds : undefined,
@@ -132,10 +130,6 @@ export default function FilterModal({ filter = null, searchText = '', current, o
                         <span id="filter-categories">Categories <span className={styles.headerNote}>(none selected means any)</span></span>
                         <CategoryPicker value={categories} onChange={setCategories} labelledBy="filter-categories" />
                     </div>
-                    <label className={styles.check}>
-                        <input type="checkbox" checked={pinnedOnly} onChange={(event) => setPinnedOnly(event.target.checked)} />
-                        Pinned notes only
-                    </label>
                     {hasLinks && (
                         <label className={styles.check}>
                             <input type="checkbox" checked={includeLinks} onChange={(event) => setIncludeLinks(event.target.checked)} />

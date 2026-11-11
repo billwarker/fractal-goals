@@ -29,7 +29,9 @@
 .emptySidePaneButton { min-height: 38px; padding: 0 18px; border: 1px solid var(--color-border); border-radius: var(--border-radius-sm); background: var(--color-bg-input); color: var(--color-text-primary); font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s ease, border-color .2s ease, color .2s ease, transform .2s ease; }
 .emptySidePaneButton:hover { border-color: var(--color-border-hover); background: var(--color-bg-card-hover); transform: translateY(-1px); }
 
-.scopedContent { display: grid; align-content: start; gap: 16px; padding: 18px 16px 28px; overflow: auto; scrollbar-gutter: stable; }
+.scopedContent { min-height: 0; display: grid; align-content: start; gap: 16px; padding: 18px 16px 28px; overflow: auto; scrollbar-gutter: stable; }
+/* A day's quick note sits in the pane's footer, below however much the day shows. */
+.dayNotesFooter { margin-top: auto; }
 .state { padding: 32px 20px; color: var(--color-text-secondary); font-size: 13px; line-height: 1.5; }
 .state button { margin-left: 6px; border: 0; background: transparent; color: var(--color-brand-primary); font: inherit; font-weight: 700; cursor: pointer; }
 .cardHeading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

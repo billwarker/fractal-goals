@@ -13,7 +13,6 @@ export { default as SessionGoalHierarchyPanel } from './SessionGoalHierarchyPane
 export { default as NoteQuickAdd } from './NoteQuickAdd';
 export { default as NoteTimeline } from './NoteTimeline';
 export { default as NoteItem } from './NoteItem';
-export { default as PreviousNotesSection } from './PreviousNotesSection';
 export { default as ProgressPanel } from './ProgressPanel';
 export { default as QuickSessionWorkspace } from './QuickSessionWorkspace';
 export { default as SessionOptionsModal } from './SessionOptionsModal';

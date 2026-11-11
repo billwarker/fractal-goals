@@ -1,7 +1,7 @@
 import React from 'react';
 import { act, renderHook } from '@testing-library/react';
 import { MemoryRouter, useSearchParams } from 'react-router-dom';
-import useSessionsPageFilters from '../useSessionsPageFilters';
+import useSessionsPageFilters, { describeSessionRange } from '../useSessionsPageFilters';
 
 function Wrapper({ children }) {
     return (
@@ -38,5 +38,21 @@ describe('useSessionsPageFilters', () => {
         expect(result.current.apiFilters.sort_order).toBe('asc');
         act(() => result.current.resetFilters());
         expect(result.current.hasActiveFilters).toBe(false);
+    });
+});
+
+describe('describeSessionRange', () => {
+    it.each([
+        [{ rangePreset: '7d' }, 'last 7 days'],
+        [{ rangePreset: '90d' }, 'last 90 days'],
+        [{ rangePreset: '6m' }, 'last 6 months'],
+        [{ rangePreset: '1y' }, 'last year'],
+        [{ rangePreset: 'all' }, 'all time'],
+        [{ rangePreset: 'custom', rangeStart: '2026-08-13', rangeEnd: '2026-11-10' }, 'Aug 13, 2026 – Nov 10, 2026'],
+        [{ rangePreset: 'custom', rangeStart: '2026-08-13' }, 'since Aug 13, 2026'],
+        [{ rangePreset: 'custom', rangeEnd: '2026-11-10' }, 'until Nov 10, 2026'],
+        [{ rangePreset: 'custom' }, 'all time'],
+    ])('%j reads %s', (filters, expected) => {
+        expect(describeSessionRange(filters)).toBe(expected);
     });
 });

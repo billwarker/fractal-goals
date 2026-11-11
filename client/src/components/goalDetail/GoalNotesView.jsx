@@ -11,7 +11,7 @@ import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
 import styles from './GoalNotesView.module.css';
 
-function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null }) {
+function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null, onEditReview }) {
     const [includeDescendants, setIncludeDescendants] = useState(false);
     const [includeGoalNotes, setIncludeGoalNotes] = useState(true);
     const [includeActivityInstanceNotes, setIncludeActivityInstanceNotes] = useState(true);
@@ -24,8 +24,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
         createNote,
         updateNote,
         deleteNote,
-        pinNote,
-        unpinNote,
+        setCarryForward,
     } = useGoalNotes(rootId, goalId, {
         includeDescendants,
         includeGoalNotes,
@@ -106,7 +105,6 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                         onSubmit={handleCompose}
                         onCancel={() => setComposing(false)}
                         prelinkedGoalId={goalId}
-                        prelinkedGoalName={null}
                     />
                 </div>
             )}
@@ -119,9 +117,9 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
                     <NoteTimeline
                         notes={notes}
                         onEdit={isReadOnly ? undefined : updateNote}
+                        onEditReview={isReadOnly ? undefined : onEditReview}
                         onDelete={isReadOnly ? undefined : deleteNote}
-                        onPin={isReadOnly ? undefined : pinNote}
-                        onUnpin={isReadOnly ? undefined : unpinNote}
+                        onCarryForward={isReadOnly ? undefined : setCarryForward}
                         groupByDate={true}
                         showContext={includeDescendants}
                         showTypePill={false}

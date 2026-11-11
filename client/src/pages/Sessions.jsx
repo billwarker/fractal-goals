@@ -18,7 +18,7 @@ import ModalBackdrop from '../components/atoms/ModalBackdrop';
 import Spinner from '../components/atoms/Spinner';
 import EmptyState from '../components/common/EmptyState';
 import LoadingState from '../components/common/LoadingState';
-import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import DeleteSessionModal from '../components/sessions/DeleteSessionModal';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
@@ -34,6 +34,7 @@ import '../App.css';
 import styles from './Sessions.module.css';
 import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
+import { invalidateNotesAfterDelete } from '../utils/queryInvalidation';
 const QuickSessionWorkspace = lazyWithRetry(() => import('../components/sessionDetail/QuickSessionWorkspace'), 'components/sessionDetail/QuickSessionWorkspace');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 function Sessions() {
@@ -276,6 +277,7 @@ function Sessions() {
             queryClient.invalidateQueries({ queryKey: queryKeys.sessions(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.activityHistoryRoot(rootId) });
             queryClient.invalidateQueries({ queryKey: queryKeys.progressRoot() });
+            invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
 
             notify.success('Session deleted');
         } catch (err) {
@@ -290,7 +292,6 @@ function Sessions() {
             isMobile={isMobile}
             onClose={() => setIsFiltersPaneOpen(false)}
             panelClassName={styles.rightPanel}
-            backdropClassName={styles.sheetBackdrop}
         >
             <SessionsQuerySidebar
                 filters={filters}
@@ -417,15 +418,12 @@ function Sessions() {
 
             {filtersPane}
 
-            <DeleteConfirmModal
+            <DeleteSessionModal
+                rootId={rootId}
+                session={sessionToDelete}
                 isOpen={Boolean(sessionToDelete)}
                 onClose={handleCloseDeleteModal}
                 onConfirm={handleConfirmDeleteSession}
-                title="Delete Session"
-                message={sessionToDelete
-                    ? `Are you sure you want to delete "${sessionToDelete.name}"?`
-                    : 'Are you sure you want to delete this session?'}
-                confirmText="Delete Session"
             />
 
             {!!selectedGoal && (

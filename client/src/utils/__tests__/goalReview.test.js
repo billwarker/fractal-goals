@@ -1,5 +1,5 @@
 import cases from '../../../../tests/fixtures/goal_review_cases.json';
-import { buildReviewTemplate, describeCadence, describeNextReview, isReviewDue, nextReviewDate } from '../goalReview';
+import { describeCadence, describeNextReview, isReviewDue, nextReviewDate, reviewContext } from '../goalReview';
 
 const TODAY = '2026-10-19';
 const review = (fields) => ({ cadence: { value: 3, unit: 'months', source: 'level' }, status: 'upcoming', next_review_on: '2026-11-12', ...fields });
@@ -47,15 +47,34 @@ describe('goal review wording', () => {
         expect(describeNextReview({ cadence: null, today: TODAY })).toBeNull();
     });
 
-    it('starts a review from the description, progress and due status', () => {
-        const text = buildReviewTemplate({
-            name: 'Play in a band', description: 'Gig monthly', lastReviewOn: '2026-07-19',
-            childrenTotal: 4, childrenCompleted: 1, dueLabel: 'Due Dec 31, 2026 (in 73 days)', today: TODAY,
+    it('summarizes what changed since the last review', () => {
+        const context = reviewContext({
+            description: ' Gig monthly ', lastReviewOn: '2026-07-19', today: TODAY,
+            children: [
+                { completed: true, completed_at: '2026-08-02T10:00:00Z' },
+                { completed: true, completed_at: '2026-07-19T10:00:00Z' },
+                { completed: false }, { completed: false },
+            ],
+            activityDays: [
+                { date: '2026-07-19', activities: 2 }, { date: '2026-07-20', activities: 1 },
+                { date: '2026-08-01', activities: 0 }, { date: '2026-08-02', activities: 3 },
+            ],
+            dueLabel: 'Due Dec 31, 2026 (in 73 days)',
         });
-        expect(text).toContain('## Review: Play in a band');
-        expect(text).toContain('**The goal**\nGig monthly');
-        expect(text).toContain('**Progress since the last review (Jul 19)**');
-        expect(text).toContain('- 1 of 4 child goals complete');
-        expect(text).toContain('- Due Dec 31, 2026 (in 73 days)');
+        expect(context).toEqual({
+            since: 'Since the last review (Jul 19)',
+            description: 'Gig monthly',
+            facts: ['Active on 2 days', '1 of 4 child goals completed', 'Due Dec 31, 2026 (in 73 days)'],
+        });
+    });
+
+    it('counts from the start before a first review', () => {
+        const context = reviewContext({
+            today: TODAY, children: [{ completed: true, completed_at: null }],
+            activityDays: [{ date: '2026-01-02', activities: 1 }],
+        });
+        expect(context).toEqual({
+            since: 'So far', description: '', facts: ['Active on 1 day', '1 of 1 child goal completed', 'No due date'],
+        });
     });
 });

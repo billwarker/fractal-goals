@@ -318,6 +318,55 @@
       "title": "CreateTemplateOperation",
       "type": "object"
     },
+    "GoalReviewDataSchema": {
+      "additionalProperties": false,
+      "description": "A guided goal review's answers. The note's content is derived from them on the server.",
+      "properties": {
+        "change": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Change",
+          "type": "string"
+        },
+        "next_focus": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Next Focus",
+          "type": "string"
+        },
+        "schema": {
+          "const": 1,
+          "default": 1,
+          "title": "Schema",
+          "type": "integer"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "enum": [
+                "on_track",
+                "at_risk",
+                "off_track"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Status"
+        },
+        "went_well": {
+          "default": "",
+          "maxLength": 2000,
+          "title": "Went Well",
+          "type": "string"
+        }
+      },
+      "title": "GoalReviewDataSchema",
+      "type": "object"
+    },
     "NoteAttachmentSchema": {
       "additionalProperties": false,
       "properties": {
@@ -388,11 +437,32 @@
           "title": "Attachments",
           "type": "array"
         },
+        "calendar_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calendar Date"
+        },
         "content": {
-          "maxLength": 5000,
-          "minLength": 1,
-          "title": "Content",
-          "type": "string"
+          "anyOf": [
+            {
+              "maxLength": 5000,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content"
         },
         "context_id": {
           "minLength": 1,
@@ -400,7 +470,7 @@
           "type": "string"
         },
         "context_type": {
-          "pattern": "^(root|goal|session|program|activity_instance|activity_definition|circuit_run|circuit_round)$",
+          "pattern": "^(root|goal|session|program|program_date|activity_instance|activity_definition|circuit_run|circuit_round)$",
           "title": "Context Type",
           "type": "string"
         },
@@ -429,6 +499,17 @@
           "default": null,
           "title": "Note Kind"
         },
+        "review_data": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GoalReviewDataSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "session_id": {
           "anyOf": [
             {
@@ -443,7 +524,6 @@
         }
       },
       "required": [
-        "content",
         "context_type",
         "context_id"
       ],

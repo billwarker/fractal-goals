@@ -7,6 +7,7 @@ import GoalDueText from '../goals/GoalDueText';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { sortProgramDays } from '../../utils/programViewModel';
+import ProgramDateNotes from './ProgramDateNotes';
 import ProgramDayScheduleActions from './ProgramDayScheduleActions';
 import ProgramDayPeriodBanner from './ProgramDayPeriodBanner';
 import ProgramDayStatusMark from './ProgramDayStatusMark';
@@ -298,6 +299,7 @@ export default function ProgramDayPane({
                 </Button>
             ) : null}
             {dueGoalsCard}
+            <ProgramDateNotes rootId={rootId} programId={program.id} notes={detail.notes} />
         </div>
     );
 }

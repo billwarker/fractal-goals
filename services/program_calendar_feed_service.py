@@ -3,8 +3,8 @@
 The calendar loads this feed in month chunks for the rows in view. One response
 carries everything the calendar draws for the range across every program: program
 and block spans, canonical per-program date facts with light occurrence ribbons,
-completed sessions (once, with their credits unioned across programs), and
-calendar periods. Full program detail is never needed to render the calendar.
+completed sessions (once, with their credits unioned across programs), calendar
+periods, and short previews of the notes written on dates. Full program detail is never needed to render the calendar.
 """
 
 from datetime import date, datetime, timedelta
@@ -15,6 +15,7 @@ from models import Program, ProgramDay, ProgramDayTemplate, validate_root_goal
 from models.program import get_program_day_template_rules
 from services._serialize_common import format_utc
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
+from services.note_program_dates import load_range_date_notes
 from services.program_calendar_sessions import load_completed_sessions_by_date
 from services.program_day_occurrences import date_part
 from services.program_day_read_model_service import ProgramDayReadModelService
@@ -22,6 +23,8 @@ from services.session_filters import resolve_timezone
 from services.session_runtime import get_template_color
 
 MAX_CALENDAR_FEED_DAYS = 62
+# A calendar cell shows one line of a date note; the side pane has the whole note.
+DATE_NOTE_PREVIEW_CHARS = 120
 
 
 def _parse_date(value):
@@ -133,7 +136,21 @@ class ProgramCalendarFeedService:
                 serialize_calendar_period(period) for period in periods
                 if period.start_date <= end and period.end_date >= start
             ],
+            "date_notes": [
+                self._serialize_date_note(note)
+                for note in load_range_date_notes(self.db_session, [program.id for program in programs], start, end)
+            ],
         }, None, 200
+
+    @staticmethod
+    def _serialize_date_note(note):
+        text = ' '.join((note.content or '').split())
+        return {
+            "id": note.id,
+            "program_id": note.program_id,
+            "date": note.calendar_date.isoformat(),
+            "preview": text[:DATE_NOTE_PREVIEW_CHARS],
+        }
 
     @staticmethod
     def _serialize_program(program):

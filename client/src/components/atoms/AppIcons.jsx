@@ -38,6 +38,14 @@ export function InfoIcon(props) {
     );
 }
 
+export function FilterIcon(props) {
+    return (
+        <SvgIcon {...props}>
+            <path d="M3 5h18l-7 8.5V19l-4 2v-7.5L3 5Z" />
+        </SvgIcon>
+    );
+}
+
 export function FilterPlusIcon(props) {
     return (
         <SvgIcon {...props}>
