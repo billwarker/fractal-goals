@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openOrigin } from './support/session.js';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -7,12 +8,7 @@ test('AI connection settings are keyboard accessible and revoke delegated grants
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText(`Browser Practice ${suffix}`).first()).toBeVisible();
+    await openOrigin(page);
     await page.goto(`/browser-root-${suffix}/goals`);
 
     const settingsButton = page.getByRole('button', { name: 'SETTINGS', exact: true });
@@ -21,10 +17,22 @@ test('AI connection settings are keyboard accessible and revoke delegated grants
     const dialog = page.getByRole('dialog', { name: 'Settings' });
     await expect(dialog).toBeVisible();
 
-    const connectionsButton = dialog.getByRole('button', { name: 'AI Connections', exact: true });
-    await connectionsButton.focus();
-    await connectionsButton.press('Enter');
-    await expect(connectionsButton).toHaveAttribute('aria-pressed', 'true');
+    if (testInfo.project.name === 'mobile') {
+        // Phones list the sections; opening one shows it alone.
+        const connectionsItem = dialog.getByRole('button', { name: /^AI Connections/ });
+        await connectionsItem.focus();
+        await connectionsItem.press('Enter');
+    } else {
+        // Desktop sections are a tablist: arrow keys move between tabs and select them.
+        const generalTab = dialog.getByRole('tab', { name: 'General', exact: true });
+        const connectionsTab = dialog.getByRole('tab', { name: 'AI Connections', exact: true });
+        await generalTab.focus();
+        for (let step = 0; step < 6 && await connectionsTab.getAttribute('aria-selected') !== 'true'; step += 1) {
+            await page.keyboard.press('ArrowDown');
+        }
+        await expect(connectionsTab).toHaveAttribute('aria-selected', 'true');
+        await expect(connectionsTab).toBeFocused();
+    }
     await expect(dialog.getByRole('heading', { name: 'Connected services' })).toBeVisible();
     // Exact name: "…desktop" must not also match the desktop-late seed's "…desktop-late".
     const connection = dialog.locator('article').filter({
@@ -54,12 +62,7 @@ test('Ask AI reviews a proposal by keyboard, the worker applies it, and the tree
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
 
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText(`Browser Practice ${suffix}`).first()).toBeVisible();
+    await openOrigin(page);
     await page.goto(`/${rootId}/goals`);
     await expect(page.getByText(goalName, { exact: true })).toHaveCount(0);
 

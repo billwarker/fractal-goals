@@ -1,3 +1,4 @@
+// @vitest-environment node
 import axisExtension, { canShrink, extendableEnds, extendedLimits, growEnd, headroomExtension, shrinkEnd } from '../axisExtension';
 
 describe('axisExtension', () => {

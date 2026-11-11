@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { lineMask } from '../useTimelineLineGaps';
 
 describe('lineMask', () => {

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Contract: client helpers must work with the slim goal payload, where the
  * server no longer duplicates top-level fields inside `attributes` and no

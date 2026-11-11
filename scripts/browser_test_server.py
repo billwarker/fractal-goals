@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import os
-import signal
 import subprocess
 import sys
 import uuid
@@ -12,10 +11,10 @@ os.environ["ENV"] = "testing"
 os.environ["FLASK_DEBUG"] = "false"
 os.environ["SENTRY_DSN"] = ""
 os.environ["RATELIMIT_ENABLED"] = "false"
-# One process serves every parallel browser (the visual sweep runs four at once, each page
-# firing a burst of requests), so it needs a larger pool than a production instance.
-os.environ.setdefault("DB_POOL_SIZE", "20")
-os.environ.setdefault("DB_MAX_OVERFLOW", "20")
+# Gunicorn serves the parallel browsers from BROWSER_SERVER_WORKERS processes (see serve());
+# each gets its own pool, sized so all of them stay well under PostgreSQL's 100 connections.
+os.environ.setdefault("DB_POOL_SIZE", "8")
+os.environ.setdefault("DB_MAX_OVERFLOW", "8")
 os.environ["AGENT_MCP_RESOURCE_URI"] = "https://mcp.browser.invalid/mcp"
 os.environ["AGENT_OAUTH_ISSUER"] = "https://issuer.browser.invalid"
 os.environ["AGENT_ADAPTER_ID"] = "browser-test-adapter"
@@ -215,7 +214,55 @@ def _seed_performance_fractal(db, suffix, user, ultimate_level, now):
         total_duration_seconds=1800, attributes={'private_notes': 'large body ' * 4000}) for index in range(120)])
 
 
+def serve(app):
+    """Serve the seeded app with several Gunicorn worker processes.
+
+    Parallel test browsers (two workflow workers, four sweep workers) each fire bursts of
+    requests; one threaded dev-server process serialises them on the GIL and stalls first
+    loads. The app is preloaded, so the setup above (seeded database, limiter off) is inherited
+    by every worker; each drops the inherited database connections after forking.
+    """
+    from gunicorn.app.base import BaseApplication
+
+    import models
+    import models.base
+
+    # Fork with no open sessions or pooled connections: a connection (or a transaction left
+    # open by the seeding session) shared across processes hangs requests.
+    models.remove_session()
+    if models.base._cached_engine is not None:
+        models.base._cached_engine.dispose()
+
+    def post_fork(_server, _worker):
+        if models.base._cached_engine is not None:
+            models.base._cached_engine.dispose(close=False)
+
+    class BrowserFixtureServer(BaseApplication):
+        def load_config(self):
+            for key, value in {
+                "bind": "127.0.0.1:8012",
+                "workers": int(os.environ.get("BROWSER_SERVER_WORKERS", "3")),
+                "threads": 4,
+                "preload_app": True,
+                "timeout": 120,
+                "graceful_timeout": 5,
+                # Longer than a test's pause between API calls, so a reused connection isn't
+                # closed under it (the 2 s default caused ECONNRESET in Playwright requests).
+                "keepalive": 75,
+                "post_fork": post_fork,
+                "accesslog": None,
+                "loglevel": "warning",
+            }.items():
+                self.cfg.set(key, value)
+
+        def load(self):
+            return app
+
+    BrowserFixtureServer().run()
+
+
 def main():
+    owner_pid = os.getpid()
     source = make_url(config.get_database_url())
     if source.host not in ("localhost", "127.0.0.1", "::1"):
         raise SystemExit("Browser fixtures require a local PostgreSQL server")
@@ -481,10 +528,13 @@ def main():
             stderr=subprocess.DEVNULL,
         )
 
-        signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
         try:
-            app.run(host="127.0.0.1", port=8012, use_reloader=False)
+            serve(app)
         finally:
+            # A Gunicorn worker that exits unwinds this stack too (it was forked from here);
+            # only the process that set everything up may tear it down.
+            if os.getpid() != owner_pid:
+                os._exit(0)
             worker.terminate()
             try:
                 worker.wait(timeout=10)
@@ -492,6 +542,8 @@ def main():
                 worker.kill()
                 worker.wait(timeout=5)
     finally:
+        if os.getpid() != owner_pid:
+            os._exit(0)
         if engine is not None:
             models.remove_session()
             engine.dispose()

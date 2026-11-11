@@ -1,4 +1,5 @@
 import { expect, test } from './support/clock.js';
+import { openOrigin } from './support/session.js';
 
 function nextMonthTitle(title) {
     const date = new Date(`1 ${title} UTC`);
@@ -24,12 +25,7 @@ test('the program calendar can scroll weeks continuously and remembers the choic
         if (url.includes('/day-read-model')) readModelRequests.push(url);
     });
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
     await page.goto(`/browser-root-${suffix}/programs`);
 
     const toggle = page.getByRole('checkbox', { name: 'Continuous' });

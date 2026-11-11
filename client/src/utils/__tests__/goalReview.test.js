@@ -1,3 +1,4 @@
+// @vitest-environment node
 import cases from '../../../../tests/fixtures/goal_review_cases.json';
 import { describeCadence, describeNextReview, isReviewDue, nextReviewDate, reviewContext } from '../goalReview';
 

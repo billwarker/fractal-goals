@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 // Shared with tests/unit/services/test_program_rollups.py so client and server weeks never drift.

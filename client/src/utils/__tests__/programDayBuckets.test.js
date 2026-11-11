@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { bucketScope, buildDayBuckets, pickBucketDate } from '../programDayBuckets';
 
 // 2026-09-01 is a Tuesday.

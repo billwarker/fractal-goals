@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { SLOW_REQUEST_MS, isServerSlow, resetServerWarmthForTests, settleRequest, trackRequest } from '../serverWarmth';
 
 describe('serverWarmth', () => {

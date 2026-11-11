@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openOrigin } from './support/session.js';
 
 test('large session lists keep real cards available during fast scrolling and defer offscreen rendering', async ({ page }, testInfo) => {
     const root = `browser-performance-${testInfo.project.name}`;
@@ -12,12 +13,7 @@ test('large session lists keep real cards available during fast scrolling and de
         window.performanceLongTasks = [];
         new PerformanceObserver((list) => window.performanceLongTasks.push(...list.getEntries().map(({ startTime, duration }) => ({ startTime, duration })))).observe({ type: 'longtask', buffered: true });
     });
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
     const firstPage = page.waitForResponse((response) => response.url().includes(`/api/${root}/sessions?`));
     await page.goto(`/${root}/sessions`);
     const response = await firstPage;

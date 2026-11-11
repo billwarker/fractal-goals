@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getGoalLineageScope } from '../../components/flowTree/flowTreeTreeUtils';
 import {
     collectProgramGoalIds,

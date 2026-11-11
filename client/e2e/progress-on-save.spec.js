@@ -1,18 +1,14 @@
 import { expect, test } from '@playwright/test';
 
+import { apiToken, openOrigin } from './support/session.js';
+
 test('a saved value moves the Progress chart and its comparison from the one save response', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'desktop', 'The pane stays open beside the session on desktop.');
     test.setTimeout(60_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
 
     const root = 'browser-offline-root-desktop';
     const headers = { Authorization: `Bearer ${token}` };

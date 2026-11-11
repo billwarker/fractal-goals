@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import fixture from '../../../../tests/fixtures/circuit_id_vectors.json';

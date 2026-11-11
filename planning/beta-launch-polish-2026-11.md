@@ -367,3 +367,11 @@ Phase 2 (loading) was skipped by mistake (I read "proceed to phase 3" as a skip)
 - Empty-while-loading fixed: Notes shows a skeleton until its first page arrives; Session Detail's goals panel waits for `sessionGoalsViewLoading` before saying "No goals associated"; Program Day Picker shows loading instead of "No program days".
 - Gate: the maintainability audit fails on a `div`, `p`, `span`, `li` or `section` that just says "Loading…", and on `.loading-spinner`.
 - Verified with a simulated cold start (5 s bundle, 7 s API): boot loader, then the waking hint, then the Notes skeleton.
+
+### Test speed (2026-11-11)
+
+Measured first (full Vitest run, summed across workers): about 270 s building jsdom per file, about 340 s importing modules, and about 170 s of actual tests. The browser suite took about 15 minutes, with every test signing in through the form against one dev-server process. The machine was also at load 13–33, mostly from other apps.
+- Vitest: 125 logic-only files run in the `node` environment (docblock); the setup lazy-loads the DOM helpers. Related runs (the pre-commit hook) use the full worker count, and the wall-clock limit is now 8 minutes; the 180 s limit cut off two commits today.
+- Browser suite: one sign-in per run (a `setup` project and saved storage state, plus the API token for seeding specs). Gunicorn serves it with 3 workers and a 75 s keep-alive. Assertions wait 10 s instead of 5 s. `test:browser:smoke` covers 9 key journeys on desktop.
+- Server fixes found along the way: workers must not inherit the parent's DB connections (requests hung), and only the owning process may drop the test database (a worker exiting through the inherited `finally` dropped it mid-run).
+- Product finding: `GET /api/fractals` takes about 0.8 s even idle for a user with many fractals (Selection page). Profile it as a performance follow-up.

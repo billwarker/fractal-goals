@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getSessionTrendRows, sessionTrendMeasure } from '../visualizations/sessions/SessionTrends';
 
 describe('SessionTrends aggregation', () => {

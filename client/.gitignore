@@ -25,3 +25,4 @@ dist-ssr
 
 # Visual sweep output (npm run sweep)
 sweep-results
+e2e/.auth

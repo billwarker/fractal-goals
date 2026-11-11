@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+// This journey starts on the public landing page and signs in through the form.
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test('production landing, authenticated goals and session survive navigation and reload', async ({ page }, testInfo) => {
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));

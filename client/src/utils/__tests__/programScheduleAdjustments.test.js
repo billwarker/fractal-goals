@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import { getProgramDayScheduledDates } from '../programViewModel';
 import { findDraftDayConflicts, occupiedProgramDates, takenWeekdays } from '../programCalendarConflicts';

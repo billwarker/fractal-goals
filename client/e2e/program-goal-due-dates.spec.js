@@ -1,5 +1,6 @@
 import { deviceOf, expect, test } from './support/clock.js';
 import { dragBetween } from './support/pointer.js';
+import { openOrigin } from './support/session.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root, with no due date.
 test('sets a goal due date by dragging it onto a calendar day, with undo, on desktop only', async ({ page }, testInfo) => {
@@ -10,12 +11,7 @@ test('sets a goal due date by dragging it onto a calendar day, with undo, on des
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     await page.goto(`/${rootId}/programs`);
     if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();

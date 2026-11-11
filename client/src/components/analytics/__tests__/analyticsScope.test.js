@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildAnalyticsLink, parseAnalyticsLink } from '../../../utils/analyticsDeepLink';
 import { instanceMatchesScope, normalizeGlobalFilters, sessionMatchesScope } from '../analyticsGlobalFilters';
 import { analyticsStateFromLink } from '../useAnalyticsDeepLink';

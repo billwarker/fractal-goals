@@ -18,6 +18,7 @@
     "test:related": "node scripts/run-vitest-with-timeout.mjs --related",
     "test:coverage": "node scripts/run-vitest-with-timeout.mjs --coverage",
     "test:browser": "playwright test",
+    "test:browser:smoke": "playwright test --project=setup --project=desktop e2e/production.spec.js e2e/offline-session.spec.js e2e/quick-session-completion.spec.js e2e/progress-on-save.spec.js e2e/notes-page.spec.js e2e/goal-reviews.spec.js e2e/program-session-plans.spec.js e2e/settings-storage.spec.js e2e/agent-connections.spec.js",
     "sweep": "node scripts/run-sweep.mjs",
     "sweep:report": "node scripts/sweep-report.mjs",
     "check:contrast": "node scripts/check-theme-contrast.mjs"

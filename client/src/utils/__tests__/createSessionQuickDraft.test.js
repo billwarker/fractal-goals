@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildQueuedQuickSession, sanitizeMetrics, sanitizeSets } from '../createSessionQuickDraft';
 
 describe('createSessionQuickDraft', () => {

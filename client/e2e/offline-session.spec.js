@@ -1,22 +1,19 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    return token;
+import { apiToken, openOrigin } from './support/session.js';
+
+// Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
+// the API token for seeding.
+async function openSignedIn(page) {
+    await openOrigin(page);
+    return apiToken();
 }
 
 test('an open session keeps working with no signal, survives a reload, and syncs on reconnect', async ({ page, context }, testInfo) => {
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = `browser-offline-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
 
@@ -75,7 +72,7 @@ test('a quick session completed with no signal is kept on the device and syncs o
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = `browser-offline-quick-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
     const activity = await (await page.request.post(`/api/${root}/activities`, {
@@ -113,7 +110,7 @@ test('a circuit and an extra round added with no signal sync with the ids the ph
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = `browser-offline-circuit-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
     const post = async (path, data) => {
@@ -178,7 +175,9 @@ test('a circuit and an extra round added with no signal sync with the ids the ph
 test('signed out with no signal, the app says so and recovers when the connection returns', async ({ page, context }) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await logIn(page);
+    await openSignedIn(page);
+    // The service worker registers from the app itself.
+    await page.goto('/');
     await page.evaluate(() => navigator.serviceWorker.ready);
     await page.reload();
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
@@ -201,7 +200,7 @@ test('offline tag edits sync, and an activity added then deleted offline never r
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = `browser-offline-edits-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
     const post = async (path, data) => {
@@ -262,7 +261,7 @@ test('a change the server keeps failing is set aside, and later changes still sy
     // Real backoff: eight failed attempts take roughly 60-125 s, so run once, on desktop.
     test.skip(testInfo.project.name !== 'desktop', 'Timing-bound; one project is enough');
     test.setTimeout(240_000);
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = `browser-offline-ceiling-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
     const post = async (path, data) => (await page.request.post(`/api/${root}/${path}`, { headers, data })).json();
@@ -303,7 +302,9 @@ test('a change the server keeps failing is set aside, and later changes still sy
 });
 
 test('the offline kill switch removes the service worker on the next load', async ({ page }) => {
-    await logIn(page);
+    await openSignedIn(page);
+    // The service worker registers from the app itself.
+    await page.goto('/');
     await page.evaluate(() => navigator.serviceWorker.ready);
     expect(await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length)).toBeGreaterThan(0);
 

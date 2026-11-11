@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test';
 
+import { apiToken, openOrigin } from './support/session.js';
+
 test("scoped creation joins the goal's group; one-off links show on cards and in the picker", async ({ page }, testInfo) => {
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
     const suffix = testInfo.project.name;
     const root = `browser-scoped-groups-root-${suffix}`;
     const goalName = `Browser Scoped Groups ${suffix}`;

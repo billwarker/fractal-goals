@@ -1,3 +1,4 @@
+// @vitest-environment node
 import {
     LIGHT_THEME_CARD,
     LIGHT_THEME_MIN_CONTRAST,

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildPlanGoalsView, planGoalsViewHasGoal, planSectionActivityIds } from '../planGoalsView';
 
 const tree = {

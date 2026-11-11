@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { goalFromActivityTotal, goalFromMetricProgress, goalFromMetricTrend, goalFromScatterPoint } from '../chartGoalPrefill';
 import { goalChartMarkers, goalLineAnnotations, goalMarkers, isMarkedThreshold } from '../goalConditionLines';
 

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import { AUTH_STATE, THEMES, VIEWPORTS } from './e2e/sweep/manifest.js';
+import { BROWSER_USER_STATE } from './e2e/support/session.js';
 
 // `npm run sweep` (SWEEP=1) runs only the visual sweep: every surface in
 // e2e/sweep/manifest.js at each viewport × theme. Workflow specs never run it.
@@ -19,14 +20,27 @@ const sweepProjects = [
     }))),
 ];
 
+// Every workflow project starts signed in (e2e/auth.setup.js signs in once per run).
+const signedIn = { dependencies: ['setup'], testIgnore: [/sweep\//, /auth\.setup\.js/] };
 const workflowProjects = [
-    { name: 'desktop', testIgnore: /sweep\//, use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', testIgnore: /sweep\//, use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    { name: 'setup', testMatch: /e2e\/auth\.setup\.js/, use: { ...devices['Desktop Chrome'] } },
+    { name: 'desktop', ...signedIn, use: { ...devices['Desktop Chrome'], storageState: BROWSER_USER_STATE } },
+    {
+        name: 'mobile',
+        ...signedIn,
+        use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium', storageState: BROWSER_USER_STATE },
+    },
     // Program calendars at 22:00 New York time, when the local day is behind UTC.
     {
         name: 'desktop-late',
+        ...signedIn,
         testMatch: /program-.*\.spec\.js/,
-        use: { ...devices['Desktop Chrome'], timezoneId: 'America/New_York', lateEveningClock: true },
+        use: {
+            ...devices['Desktop Chrome'],
+            storageState: BROWSER_USER_STATE,
+            timezoneId: 'America/New_York',
+            lateEveningClock: true,
+        },
     },
 ];
 
@@ -39,6 +53,9 @@ export default defineConfig({
     retries: 0,
     workers: sweeping ? 4 : 2,
     timeout: sweeping ? 60_000 : 30_000,
+    // Assertions wait up to 10 s: first loads after a fresh server and parallel browsers can
+    // run past the 5 s default on a busy machine without anything being wrong.
+    expect: { timeout: 10_000 },
     reporter: [['list'], ['html', { open: 'never' }]],
     use: { baseURL: 'http://127.0.0.1:8012', trace: 'retain-on-failure' },
     projects: sweeping ? sweepProjects : workflowProjects,

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { createAutoSaveQueue } from '../autoSaveQueue';
 
 describe('createAutoSaveQueue', () => {

@@ -1,14 +1,10 @@
 import { expect, test } from '@playwright/test';
 
+import { apiToken, openOrigin } from './support/session.js';
+
 test('circuit and round tags use activity chips and the shared catalog', async ({ page }, testInfo) => {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
     const root = `browser-circuit-tags-root-${testInfo.project.name}`;
     const { session, tag } = await page.evaluate(async ({ root, token }) => {
         const post = async (path, body) => {
@@ -70,14 +66,8 @@ test('circuit and round tags use activity chips and the shared catalog', async (
 });
 
 test('circuit tags show by name beside a long name, and a many-tag badge lines up with the chips', async ({ page }, testInfo) => {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
     const root = `browser-circuit-tag-width-root-${testInfo.project.name}`;
     const names = ['ear-training', 'left-hand-focus', 'slow-tempo', 'metronome-on', 'fretboard-recall', 'sight-reading', 'improvisation', 'chord-melody', 'alternate-picking', 'hybrid-picking', 'string-skipping', 'position-shifts'];
     const session = await page.evaluate(async ({ root, token, names, stamp }) => {

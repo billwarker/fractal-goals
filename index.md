@@ -652,6 +652,15 @@ overflow, touch-target (24px minimum, 40px recommended) and axe findings per cap
 `client/sweep-results/index.html` contact sheet; `SWEEP_ENFORCE=1` turns the findings into failures.
 Add a manifest entry for every new page, modal or sheet.
 
+Test speed: logic-only Vitest files start with `// @vitest-environment node` (no jsdom; `src/test/setup.js`
+loads the DOM helpers only where a window exists), so new pure-logic tests should too. The browser
+workflow suite signs `browser_user` in once (`e2e/auth.setup.js` → `e2e/.auth/`, read with
+`apiToken()` from `e2e/support/session.js`); specs start signed in, and one that tests the sign-in
+itself opts out with an empty `storageState`. `scripts/browser_test_server.py` serves through
+Gunicorn (`BROWSER_SERVER_WORKERS`, default 3), forking only after releasing its database connections
+and tearing down only in the owning process. `npm run test:browser:smoke` runs one journey per area on
+desktop for quick local checks; CI runs the full suite.
+
 Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with
 `vi.mock(path, () => import(helper))`.

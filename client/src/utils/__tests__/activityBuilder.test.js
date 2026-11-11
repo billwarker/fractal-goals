@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildActivityPayload, prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../activityBuilder';
 import { getInitialActivityBuilderState } from '../../components/activityBuilder/activityBuilderUtils';
 

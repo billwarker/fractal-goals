@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { blockWeeks } from '../programBlockWeeks';
 import { blockStatus, buildBlockCards } from '../programBlocksViewModel';
 

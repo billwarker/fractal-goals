@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildGraphPresentation } from '../flowTreeGraphUtils';
 import { applySequenceDraft, getSequencingScope } from '../flowTreeTreeUtils';
 

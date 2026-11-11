@@ -1,15 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    return token;
+import { apiToken, openOrigin } from './support/session.js';
+
+// Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
+// the API token for seeding.
+async function openSignedIn(page) {
+    await openOrigin(page);
+    return apiToken();
 }
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root.
@@ -19,7 +16,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const create = async (name) => {
         const response = await page.request.post(`/api/${root}/goals`, { headers, data: { name, type: 'LongTermGoal', parent_id: root } });
         expect(response.ok(), await response.text()).toBeTruthy();

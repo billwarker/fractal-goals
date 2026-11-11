@@ -1,3 +1,4 @@
+// @vitest-environment node
 import cases from '../../../../tests/fixtures/program_goal_window_cases.json';
 import { isGoalInProgramWindow } from '../programGoalWindow';
 

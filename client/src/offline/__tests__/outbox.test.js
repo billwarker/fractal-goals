@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OP_STATE, classifyFailure, createMemoryStore, createOutbox } from '../outbox';

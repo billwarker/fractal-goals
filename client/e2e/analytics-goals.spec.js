@@ -1,15 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    return token;
+import { apiToken, openOrigin } from './support/session.js';
+
+// Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
+// the API token for seeding.
+async function openSignedIn(page) {
+    await openOrigin(page);
+    return apiToken();
 }
 
 // The "browser-root" fractal has four completed "Guitar practice" sessions.
@@ -19,7 +16,7 @@ test('right-clicking an Activity Totals bar sets a goal from that point', async 
     const root = `browser-root-${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
 
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: /^Activities/ }).first().click();
@@ -65,7 +62,7 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
     const suffix = testInfo.project.name;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     // Its own seeded fractal: sessions can't be created on a root with one in progress.
     const { root, activityId, formId, viewName } = await page.evaluate(async ({ token, suffix }) => {
         const call = async (path, body, method = 'POST') => {
@@ -211,7 +208,7 @@ test('Set goal mode extends the axes for a goal beyond the data, and leaves no t
 
 test('a saved view can be closed, back to an empty view', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
-    await logIn(page);
+    await openSignedIn(page);
 
     await page.goto(`/browser-root-${suffix}/analytics`);
     await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
@@ -236,7 +233,7 @@ test('a saved view can be closed, back to an empty view', async ({ page }, testI
 test('a goal from an unsaved chart gets that chart, saved under its name and shown first', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const root = `browser-root-${suffix}`;
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
 
     await page.goto(`/${root}/analytics`);
     await page.getByRole('button', { name: /^Activities/ }).first().click();
@@ -284,7 +281,7 @@ test('a saved view of the removed Goal Detail View goes back to choosing a chart
     const root = `browser-root-${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const name = `Old goal detail ${suffix}`;
     const created = await page.request.post(`/api/roots/${root}/dashboards`, { headers, data: {
         name, kind: 'view', layout: {
@@ -308,7 +305,7 @@ test('Metric Trends offers Set goal with one metric showing, and not with two', 
     test.setTimeout(60_000);
     const suffix = testInfo.project.name;
     const root = `browser-trend-goals-root-${suffix}`;
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const seed = await page.evaluate(async ({ token, root }) => {
         const call = async (path, body, method = 'POST') => {
             const response = await fetch(`/api/${path}`, {
@@ -404,7 +401,7 @@ test('stacked Metric Trends and Progress panels for one activity line up their x
     const root = 'browser-aligned-sessions-root-desktop';
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const dashboardName = await page.evaluate(async ({ token, root }) => {
         const call = async (path, body, method = 'POST') => {
             const response = await fetch(`/api/${path}`, {
@@ -506,7 +503,7 @@ test('stacked time-bucket charts share their x axis, and side-by-side panels of 
     const root = 'browser-aligned-boards-root-desktop';
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     await page.evaluate(async ({ token, root }) => {
         const call = async (path, body, method = 'POST') => {
             const response = await fetch(`/api/${path}`, {
@@ -589,7 +586,7 @@ test('a goal can be set from an expanded Progress chart on a session', async ({ 
     test.skip(testInfo.project.name !== 'desktop', 'The pane stays open beside the session on desktop.');
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = 'browser-progress-goals-root-desktop';
     const headers = { Authorization: `Bearer ${token}` };
     const api = async (method, path, data) => {
@@ -660,7 +657,7 @@ test('a goal’s progress chart marks the goal and sets new ones', async ({ page
     test.skip(testInfo.project.name !== 'desktop', 'The pane stays open beside the session on desktop.');
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const root = 'browser-progress-goal-chart-root-desktop';
     const headers = { Authorization: `Bearer ${token}` };
     const api = async (method, path, data) => {
