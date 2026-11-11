@@ -11,6 +11,7 @@ export const fractalMetaApi = {
     setAnalyticsViewGoals: (rootId, dashboardId, goalIds) =>
         axios.put(`${API_BASE}/roots/${rootId}/dashboards/${dashboardId}/goals`, { goal_ids: goalIds }),
     getLogs: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/logs${buildQueryString(options)}`),
+    getLogActivity: (rootId, options = {}) => axios.get(`${API_BASE}/${rootId}/logs/activity${buildQueryString(options)}`),
     clearLogs: (rootId) => axios.delete(`${API_BASE}/${rootId}/logs/clear`),
 
     getPageSurfaces: (rootId, page = 'goals') => axios.get(`${API_BASE}/roots/${rootId}/page-surfaces${buildQueryString({ page })}`),

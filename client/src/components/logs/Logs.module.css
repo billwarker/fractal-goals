@@ -1,0 +1,360 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    background-color: var(--color-bg-app);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+    color: var(--color-text-primary);
+}
+
+.body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: var(--spacing-lg) 40px 48px;
+}
+
+/* Filters: one row above the chart and the table, which both follow them. */
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+}
+
+.dates {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.field input,
+.field select {
+    box-sizing: border-box;
+    min-height: 32px;
+    padding: 0 var(--spacing-sm);
+    border: 1px solid var(--color-border-input);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+    border-color: var(--color-brand-primary);
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.typeField {
+    margin-left: auto;
+}
+
+.typeField select {
+    min-width: 220px;
+}
+
+.panel {
+    margin-bottom: var(--spacing-md);
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card);
+}
+
+.chart {
+    position: relative;
+    height: 200px;
+    padding: var(--spacing-sm) var(--spacing-md) var(--spacing-xs);
+}
+
+.chartNote {
+    display: grid;
+    min-height: 120px;
+    margin: 0;
+    padding: var(--spacing-md);
+    place-items: center;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    text-align: center;
+}
+
+.chartLoading {
+    min-height: 200px;
+}
+
+/* Events: four columns on wide screens. */
+.list {
+    min-width: 0;
+}
+
+.listHeader,
+.row {
+    display: grid;
+    grid-template-columns: 170px minmax(150px, 220px) minmax(0, 1fr) minmax(140px, 240px);
+    gap: var(--spacing-md);
+    padding: 10px var(--spacing-md);
+}
+
+.listHeader {
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-header);
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.row {
+    align-items: start;
+    font-size: var(--font-size-sm);
+}
+
+.row + .row {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.row:hover {
+    background: var(--color-bg-hover);
+}
+
+.when {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.relative {
+    color: var(--color-text-primary);
+}
+
+.exact {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.event {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    min-width: 0;
+}
+
+.domainDot {
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+}
+
+.eventType {
+    overflow: hidden;
+    color: var(--color-text-primary);
+    font-family: var(--font-family-mono, ui-monospace, monospace);
+    font-size: var(--font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.deleted {
+    color: var(--color-brand-danger);
+}
+
+.description {
+    min-width: 0;
+    color: var(--color-text-primary);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+/* The entity ID, then the payload, each on its own line under the description. */
+.meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    margin-top: 4px;
+}
+
+.entity {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--color-text-muted);
+    font-family: var(--font-family-mono, ui-monospace, monospace);
+    font-size: var(--font-size-2xs, 11px);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.payload summary {
+    color: var(--color-brand-primary);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+}
+
+.payload {
+    width: 100%;
+}
+
+.payload pre {
+    max-width: 640px;
+    max-height: 240px;
+    margin: var(--spacing-xs) 0 0;
+    padding: var(--spacing-sm);
+    overflow: auto;
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    white-space: pre-wrap;
+}
+
+.source {
+    min-width: 0;
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-mono, ui-monospace, monospace);
+    font-size: var(--font-size-xs);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+}
+
+.pageInfo {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1024px) {
+    .listHeader,
+    .row {
+        grid-template-columns: 140px minmax(130px, 180px) minmax(0, 1fr);
+    }
+
+    .listHeader span:last-child {
+        display: none;
+    }
+
+    /* The source moves under its description. */
+    .source {
+        grid-column: 3;
+        margin-top: -8px;
+    }
+}
+
+/* Phones: each event is a card (event and time on top, the description under them). */
+@media (max-width: 768px) {
+    .body {
+        padding: var(--spacing-md) var(--spacing-md) 96px;
+    }
+
+    .filters {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filters > [role='radiogroup'] {
+        width: 100%;
+    }
+
+    .dates {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .typeField {
+        margin-left: 0;
+    }
+
+    .field input,
+    .field select {
+        min-height: 44px;
+        font-size: 16px;
+    }
+
+    .typeField select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .chart {
+        height: 180px;
+        padding-inline: var(--spacing-sm);
+    }
+
+    .listHeader {
+        display: none;
+    }
+
+    .row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            'event when'
+            'description description'
+            'source source';
+        gap: 6px var(--spacing-sm);
+        padding: var(--spacing-md);
+    }
+
+    .event {
+        grid-area: event;
+    }
+
+    .when {
+        grid-area: when;
+        align-items: flex-end;
+    }
+
+    .exact {
+        display: none;
+    }
+
+    .description {
+        grid-area: description;
+    }
+
+    .source {
+        grid-area: source;
+        margin-top: 0;
+    }
+
+    .payload summary {
+        display: inline-block;
+        padding: 10px 0;
+    }
+}

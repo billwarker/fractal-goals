@@ -110,7 +110,7 @@ export const queryKeys = {
     goalsForSelection: (rootId) => ['goalsForSelection', rootId],
     goalsTree: (rootId) => ['goals-tree', rootId],
     logsRoot: (rootId) => ['logs', rootId],
-    logs: (rootId, page = 1, pageSize = 50, eventType = 'all', startDate = '', endDate = '') => [
+    logs: (rootId, page = 1, pageSize = 50, eventType = 'all', startDate = '', endDate = '', timezone = '') => [
         'logs',
         rootId,
         page,
@@ -118,8 +118,13 @@ export const queryKeys = {
         eventType,
         startDate,
         endDate,
+        timezone,
     ],
     landingExamples: () => ['public', 'landing-examples'],
+    // Under logsRoot, so clearing the logs refreshes the activity chart too.
+    logsActivity: (rootId, { startDate = '', endDate = '', timezone = '', eventType = 'all' } = {}) => [
+        'logs', rootId, 'activity', startDate, endDate, timezone, eventType,
+    ],
     logsInfinite: (rootId, pageSize = 50) => ['logs', rootId, 'infinite', pageSize],
     program: (rootId, programId, timezone = null) => timezone
         ? ['program', rootId, programId, { timezone }]

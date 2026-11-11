@@ -182,8 +182,9 @@ const checks = [
     ],
   },
   {
-    file: 'src/pages/Logs.css',
-    patterns: [/\.logs-grid-header/, /\.log-item/, /@media\s*\(max-width:\s*768px\)/],
+    file: 'src/components/logs/Logs.module.css',
+    // Events become cards on phones, and the filters stack.
+    patterns: [/\.listHeader/, /grid-template-areas:/, /@media\s*\(max-width:\s*768px\)/],
   },
   {
     file: 'src/pages/ProgramCalendarPage.module.css',

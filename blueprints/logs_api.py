@@ -31,6 +31,7 @@ def get_logs(current_user, root_id):
     event_type = request.args.get('event_type')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    tz = request.args.get('tz')
     include_event_types = _parse_boolean_arg(request.args.get('include_event_types'), default=True)
 
     db_session = get_db_session()
@@ -44,6 +45,7 @@ def get_logs(current_user, root_id):
             event_type=event_type,
             start_date=start_date,
             end_date=end_date,
+            tz=tz,
             include_event_types=include_event_types,
         )
         if error:
@@ -53,6 +55,32 @@ def get_logs(current_user, root_id):
         db_session.rollback()
         logger.exception("Error fetching logs for root %s", root_id)
         return internal_error(logger, "Error fetching logs")
+    finally:
+        db_session.close()
+
+@logs_api.route('/api/<root_id>/logs/activity', methods=['GET'])
+@token_required
+def get_log_activity(current_user, root_id):
+    """Event counts per local day or hour, split by domain (the Logs activity chart)."""
+    db_session = get_db_session()
+    service = LogService(db_session)
+    try:
+        payload, error, status = service.get_activity_series(
+            root_id,
+            current_user.id,
+            start_date=request.args.get('start_date'),
+            end_date=request.args.get('end_date'),
+            tz=request.args.get('tz', 'UTC'),
+            bucket=request.args.get('bucket', 'day'),
+            event_type=request.args.get('event_type'),
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error fetching log activity for root %s", root_id)
+        return internal_error(logger, "Error fetching log activity")
     finally:
         db_session.close()
 

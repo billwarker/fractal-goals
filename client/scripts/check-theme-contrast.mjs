@@ -86,6 +86,7 @@ const CHECKS = [
     ...pairs(BOTH, '--color-focus-ring', ['--color-bg-card', '--color-bg-app'], 3, 'focus ring'),
     // The light theme's filled buttons carry white text (dark ones use their own text tokens).
     ...pairs(['light'], '--color-text-inverse', ['--color-brand-primary', '--color-brand-success', '--color-brand-danger', '--color-accent'], 4.5, 'text on filled buttons'),
+    ...pairs(['dark'], '--color-text-inverse', ['--color-brand-danger'], 4.5, 'text on danger buttons'),
     ...pairs(['light'], '--color-brand-primary', ['--color-bg-card', '--color-bg-elevated'], 4.5, 'link text'),
     ...pairs(['light'], '--color-brand-danger', ['--color-bg-card'], 4.5, 'error text'),
     ...pairs(['light'], '--color-brand-success', ['--color-bg-card'], 4.5, 'success text'),
