@@ -53,6 +53,40 @@ function divisions(scale, cell) {
     return { segments: Math.max((scale.ticks?.length || 0) - 1, 0), unit: cell };
 }
 
+/** How far the layout boxes' outer labels reach past the plot on each side (Chart.js's `getPadding`). */
+export function labelOverhang(chart) {
+    const overhang = { top: 0, right: 0, bottom: 0, left: 0 };
+    (chart.boxes || []).forEach((box) => {
+        const padding = box.getPadding?.();
+        if (!padding) return;
+        SIDES.forEach((side) => { overhang[side] = Math.max(overhang[side], padding[side] || 0); });
+    });
+    return overhang;
+}
+
+/**
+ * What insets the plot on each side besides padding: the axes (and title, legend) laid out there, and the
+ * labels' overhang. The axes' size is what the inset leaves after the padding when the padding wins; when
+ * the overhang wins it can't be read that way, so it's the boxes on that side.
+ */
+function sideInsets(chart, area, padding) {
+    const overhang = labelOverhang(chart);
+    const measured = {
+        left: area.left,
+        top: area.top,
+        right: chart.width - area.right,
+        bottom: chart.height - area.bottom,
+    };
+    const boxSize = (side) => (chart.boxes || [])
+        .filter((box) => box.position === side)
+        .reduce((sum, box) => sum + ((side === 'left' || side === 'right' ? box.width : box.height) || 0), 0);
+    return Object.fromEntries(SIDES.map((side) => {
+        const paddingWins = measured[side] > overhang[side] + 0.5;
+        const boxes = paddingWins ? Math.max(0, measured[side] - padding[side]) : boxSize(side);
+        return [side, { boxes, overhang: overhang[side] }];
+    }));
+}
+
 function gridFor(canvas) {
     // A page that draws its own grid (Analytics' workspace) marks it with data-page-grid.
     const container = canvas?.closest?.('[data-page-grid], .content-container');
@@ -85,11 +119,19 @@ const pageGridSnap = {
         const base = chart.$pageGridBase || { top: 0, right: 0, bottom: 0, left: 0 };
         const current = chart.$pageGridPad || base;
         const area = chart.chartArea;
+        // Chart.js insets the plot on each side by the larger of the padding plus that side's axes and the
+        // overhang of the outer tick labels, so padding below the overhang moves nothing. Room and padding
+        // are worked out with that in mind; the inset each side needs besides padding is read from the
+        // layout as it stands.
+        const inset = sideInsets(chart, area, current);
+        const room = {
+            left: grid.x + Math.max(base.left + inset.left.boxes, inset.left.overhang),
+            top: grid.y + Math.max(base.top + inset.top.boxes, inset.top.overhang),
+            right: grid.x + chart.width - Math.max(base.right + inset.right.boxes, inset.right.overhang),
+            bottom: grid.y + chart.height - Math.max(base.bottom + inset.bottom.boxes, inset.bottom.overhang),
+        };
         // The space before this plugin's adjustments, in page-grid coordinates.
-        const left = grid.x + area.left - (current.left - base.left);
-        const top = grid.y + area.top - (current.top - base.top);
-        const right = grid.x + area.right + (current.right - base.right);
-        const bottom = grid.y + area.bottom + (current.bottom - base.bottom);
+        const { left, top, right, bottom } = room;
         const shared = chart.$alignedEdges?.report(chart, { left, right }) || { left, right };
         const rows = chart.$alignedRows?.report(chart, { left: top, right: bottom }) || { left: top, right: bottom };
 
@@ -107,11 +149,12 @@ const pageGridSnap = {
         const leadY = Math.floor(slackY / 2 / cell) * cell;
         const plotLeft = shared.left + shiftLeft + leadX;
         const plotTop = rows.left + shiftTop + leadY;
+        // The padding that puts each plot edge there: it is never below the overhang, so it takes effect.
         const next = {
-            left: base.left + (plotLeft - left),
-            top: base.top + (plotTop - top),
-            right: base.right + (right - (plotLeft + width)),
-            bottom: base.bottom + (bottom - (plotTop + height)),
+            left: plotLeft - grid.x - inset.left.boxes,
+            top: plotTop - grid.y - inset.top.boxes,
+            right: chart.width - (plotLeft + width - grid.x) - inset.right.boxes,
+            bottom: chart.height - (plotTop + height - grid.y) - inset.bottom.boxes,
         };
         const changed = SIDES.some((side) => Math.abs(next[side] - current[side]) >= 0.5);
         if (!changed) {

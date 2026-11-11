@@ -47,12 +47,15 @@ test('a due review shows a Review banner and can be written from goal details', 
         return;
     }
 
+    // The guided form: what changed since the last review above a few questions; Save sits in the footer.
     await details.getByRole('button', { name: 'Review', exact: true }).click();
-    const composer = page.getByRole('textbox').filter({ hasText: '## Review: Browser Planning desktop' });
-    await expect(composer).toBeVisible();
-    await expect(composer).toContainText('Plan sessions that build toward a recital.');
+    await expect(page.getByRole('region', { name: 'Review context' })).toContainText('Plan sessions that build toward a recital.');
+    const save = page.getByRole('button', { name: 'Save review' });
+    await expect(save).toBeDisabled();
+    await page.getByRole('button', { name: 'On track' }).click();
+    await page.getByLabel('What went well?').fill('Played through the set');
     const saved = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/notes`) && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Save review' }).click();
+    await save.click();
     expect((await saved).ok()).toBeTruthy();
 
     await expect(page.getByRole('region', { name: 'Review due' })).toHaveCount(0);
@@ -60,6 +63,24 @@ test('a due review shows a Review banner and can be written from goal details', 
     expect(goal.review.status).toBe('upcoming');
     expect(await smart()).toBe(true);
     const notes = await (await page.request.get(`/api/${root}/goals/${root}/notes`, { headers })).json();
-    expect(notes.some((note) => note.note_type === 'goal_review_note')).toBe(true);
+    const review = notes.find((note) => note.note_type === 'goal_review_note');
+    expect(review.review_data).toMatchObject({ status: 'on_track', went_well: 'Played through the set' });
+
+    // Editing it later from the Notes page brings back the form, filled in; the review keeps its date.
+    await page.goto(`/${root}/notes`);
+    const card = page.getByText('Played through the set').locator('xpath=ancestor::*[.//button[@aria-label="Note options"]][1]');
+    await card.getByRole('button', { name: 'Note options' }).click();
+    await page.getByRole('menuitem', { name: 'Edit' }).click();
+    await expect(page.getByLabel('What went well?')).toHaveValue('Played through the set');
+    await expect(page.getByRole('button', { name: 'On track' })).toHaveAttribute('aria-pressed', 'true');
+    await page.getByLabel('What would you change?').fill('Rehearse the ending');
+    const updated = page.waitForResponse((response) => response.url().endsWith(`/api/${root}/notes/${review.id}`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    expect((await updated).ok()).toBeTruthy();
+    await expect(page.getByText('Rehearse the ending')).toBeVisible();
+    const edited = (await (await page.request.get(`/api/${root}/goals/${root}/notes`, { headers })).json())
+        .find((note) => note.id === review.id);
+    expect(edited.review_data.change).toBe('Rehearse the ending');
+    expect(edited.created_at).toBe(review.created_at);
     expect(errors).toEqual([]);
 });

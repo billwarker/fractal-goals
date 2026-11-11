@@ -35,7 +35,8 @@ account's password hash. These layers now hold the boundary; each one must stay.
    oversized value never reaches the application. Structured results are checked
    against the same total after their bounded fetch.
 7. **Optional least-privilege role.** When `ANALYTICS_SQL_ROLE` is set, the query also
-   runs under `SET LOCAL ROLE`. The role is an allowlist: SELECT on exactly the tables
+   runs under `SET LOCAL ROLE`. The role is an allowlist: use of the `public` schema (granted
+   outright, since a database can withhold it from PUBLIC) and SELECT on exactly the tables
    the catalog CTEs read, generated from the catalog so a later table (credentials,
    tokens, provider state) is never readable until it joins the catalog:
 

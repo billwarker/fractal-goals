@@ -60,7 +60,8 @@ export default function CloudMediaDialog({ rootId, onAdd, onClose }) {
     }
 
     return (
-        <Modal isOpen={!picking} title="Choose from cloud storage" onClose={onClose} size="md">
+        // Always opened from something else (a note composer, the goal modal's footer), so it sits on top.
+        <Modal isOpen={!picking} title="Choose from cloud storage" onClose={onClose} size="md" layer="top">
             <p>Files stay in your cloud storage. Private files keep their sharing settings.</p>
             {isLoading && <p role="status">Loading storage…</p>}
             {isError && <p role="alert">Storage could not load. <Button onClick={() => refetch()}>Retry</Button></p>}
