@@ -37,6 +37,7 @@ const AgentChatPopover = lazyWithRetry(() => import('./components/agent/AgentCha
 const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals/ForcePasswordChangeModal'), 'components/modals/ForcePasswordChangeModal');
 const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
+import RouteFallback from './components/common/RouteFallback';
 import LoadingState from './components/common/LoadingState';
 
 import { usePageTitle } from './hooks/usePageTitle';
@@ -57,7 +58,7 @@ export function RequireAdmin({ children }) {
 
     // A reload or deep link renders before the current user resolves; redirecting then
     // would send admins away from admin-only pages.
-    if (loading) return <LoadingState label="Loading..." />;
+    if (loading) return <LoadingState variant="page" label="Loading…" />;
     if (!user?.is_admin) {
         return <Navigate to={rootId ? `/${rootId}/goals` : '/'} replace />;
     }
@@ -257,10 +258,10 @@ function App() {
                     ) : redirectDeprecatedLandingRoute ? (
                         <Navigate to="/" replace />
                     ) : showLandingPage ? (
-                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}><Landing /></Suspense>
+                        <Suspense fallback={<RouteFallback />}><Landing /></Suspense>
                     ) : showLegalPage ? (
                         <ComponentErrorBoundary>
-                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                            <Suspense fallback={<RouteFallback />}>
                                 <Legal />
                             </Suspense>
                         </ComponentErrorBoundary>
@@ -268,19 +269,19 @@ function App() {
                         <Selection />
                     ) : location.pathname === '/admin' ? (
                         <ComponentErrorBoundary>
-                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                            <Suspense fallback={<RouteFallback />}>
                                 <Admin />
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : location.pathname === '/reset-password' ? (
                         <ComponentErrorBoundary>
-                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                            <Suspense fallback={<RouteFallback />}>
                                 <ResetPassword />
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : location.pathname === STORAGE_CONNECTED_PATH ? (
                         <ComponentErrorBoundary>
-                            <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                            <Suspense fallback={<RouteFallback />}>
                                 <StorageConnected />
                             </Suspense>
                         </ComponentErrorBoundary>
@@ -290,7 +291,7 @@ function App() {
                                 path="/:rootId/goals"
                                 element={
                                     <ComponentErrorBoundary>
-                                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Suspense fallback={<RouteFallback />}>
                                             <FractalGoals />
                                         </Suspense>
                                     </ComponentErrorBoundary>
@@ -298,42 +299,42 @@ function App() {
                             />
                             <Route path="/:rootId/programs" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                             <ProgramCalendarPage />
                                         </Suspense>
                                     </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/programs/:programId" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <ProgramCalendarPage />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/programs/:programId/blocks" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <ProgramCalendarPage />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/sessions" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <Sessions />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/analytics" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <Analytics />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/notes" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <Notes />
                                     </Suspense>
                                 </ComponentErrorBoundary>
@@ -341,7 +342,7 @@ function App() {
                             <Route path="/:rootId/logs" element={
                                 <RequireAdmin>
                                     <ComponentErrorBoundary>
-                                        <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                        <Suspense fallback={<RouteFallback />}>
                                             <Logs />
                                         </Suspense>
                                     </ComponentErrorBoundary>
@@ -349,28 +350,28 @@ function App() {
                             } />
                             <Route path="/:rootId/session/:sessionId" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <SessionDetail />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/create-session" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <CreateSession />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/manage-session-templates" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <CreateSessionTemplate />
                                     </Suspense>
                                 </ComponentErrorBoundary>
                             } />
                             <Route path="/:rootId/manage-activities" element={
                                 <ComponentErrorBoundary>
-                                    <Suspense fallback={<div className="loading-spinner">Loading...</div>}>
+                                    <Suspense fallback={<RouteFallback />}>
                                         <ManageActivities />
                                     </Suspense>
                                 </ComponentErrorBoundary>

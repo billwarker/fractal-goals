@@ -18,6 +18,7 @@ import GoalEditForm from '../goals/GoalEditForm';
 import GoalHeader from '../goals/GoalHeader';
 import GoalUncompletionModal from '../goals/GoalUncompletionModal';
 import GoalViewMode from '../goals/GoalViewMode';
+import LoadingState from '../common/LoadingState';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GoalDetailModalPortal from './GoalDetailModalPortal';
 import styles from '../GoalDetailModal.module.css';
@@ -543,7 +544,7 @@ function GoalDetailModalRenderSurface({
         );
     } else if (viewState === 'goal-timeline') {
         content = (
-            <Suspense fallback={<p role="status">Loading timeline...</p>}>
+            <Suspense fallback={<LoadingState label="Loading timeline…" />}>
                 <GoalActivityHeatmap
                     key={goalId}
                     rootId={rootId}

@@ -50,6 +50,7 @@ import { createProgramCalendarContext, formatProgramCalendarSelection, getProgra
 import { buildProgramBlockLabels, getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
 import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
+import LoadingState from '../components/common/LoadingState';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -766,7 +767,7 @@ function ProgramCalendarPage() {
                         viewMode === 'days' ? styles.daysModePanel : '',
                     ].filter(Boolean).join(' ')}>
                         {loading || (viewMode !== 'calendar' && detailLoading) ? (
-                            <div className={styles.loading}>Loading programs...</div>
+                            <LoadingState label="Loading programs…" />
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
                                 calendarEvents={calendarEventsWithSessions}
@@ -821,7 +822,7 @@ function ProgramCalendarPage() {
                             />
                         ) : viewMode === 'days' && displayProgram ? (
                             <div className={styles.blocksPanel}>
-                                <Suspense fallback={<div className={styles.loading}>Loading days...</div>}>
+                                <Suspense fallback={<LoadingState label="Loading days…" />}>
                                     <ProgramDaysView
                                         rootId={rootId}
                                         program={displayProgram}

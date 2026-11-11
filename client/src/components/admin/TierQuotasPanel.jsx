@@ -9,6 +9,7 @@ import {
 import { adminApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import LoadingState from '../common/LoadingState';
 import styles from '../../pages/Admin.module.css';
 
 const ADMIN_USERS_KEY = ['admin', 'users'];
@@ -92,7 +93,7 @@ export default function TierQuotasPanel({ tierQuotasQuery }) {
     };
 
     if (tierQuotasQuery.isLoading) {
-        return <div className={styles.status}>Loading tier quotas...</div>;
+        return <LoadingState label="Loading tier quotas…" />;
     }
 
     if (tierQuotasQuery.isError) {

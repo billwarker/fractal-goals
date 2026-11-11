@@ -24,10 +24,10 @@ describe('chart states', () => {
         expect(onClearFilters).toHaveBeenCalled();
     });
 
-    it('announces loading and offers a retry on errors', () => {
+    it('announces loading and offers a retry on errors', async () => {
         const onRetry = vi.fn();
         render(<><ChartLoading label="Loading full history…" /><ChartError onRetry={onRetry} /></>);
-        expect(screen.getByRole('status')).toHaveTextContent('Loading full history…');
+        expect(await screen.findByRole('status')).toHaveTextContent('Loading full history…');
         fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
         expect(onRetry).toHaveBeenCalled();
     });

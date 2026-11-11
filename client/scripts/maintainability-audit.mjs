@@ -216,6 +216,25 @@ const countRawColorLiterals = (file, content) => {
   const pattern = file.endsWith('.css') ? /#[0-9a-fA-F]{3,8}\b|rgba?\(/g : /['"`]#[0-9a-fA-F]{3,8}['"`]|['"`]rgba?\(/g;
   return (code.match(pattern) ?? []).length;
 };
+// Loading states go through components/common/LoadingState (delay, escalation, retry). A div,
+// p or span that just says "Loading…", or the never-styled .loading-spinner class, is an
+// ad-hoc loader. (A button's own busy text, like "Loading more…", is fine.)
+const LOADING_STATE_OWNERS = new Set([
+  'src/components/common/LoadingState.jsx',
+  'src/components/common/RouteFallback.jsx',
+]);
+const AD_HOC_LOADING = /<(?:div|p|span|li|section)\b[^>]*>\s*Loading\b|className=["'][^"']*\bloading-spinner\b/;
+const auditLoadingStates = (file, content) => {
+  if (!file.endsWith('.jsx') || isTestFile(file) || LOADING_STATE_OWNERS.has(file)) return;
+  const match = content.match(AD_HOC_LOADING);
+  if (match) {
+    console.error(
+      `[maintainability-audit] ${file} has an ad-hoc loading state (${match[0].trim().slice(0, 60)}). ` +
+      'Use <LoadingState label="Loading …" /> (or <RouteFallback /> for Suspense routes).'
+    );
+    hasFailure = true;
+  }
+};
 const inlineStyleBudgets = new Map([
   ['src/components/GoalDetailModal.jsx', 18],
   ['src/components/goalDetail/GoalTimelineView.jsx', 1],
@@ -435,6 +454,7 @@ for (const file of sourceFiles) {
   const relativePath = relative(resolve(''), file);
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
+  auditLoadingStates(relativePath, content);
   inlineStyleCount += auditInlineStyles(relativePath, content);
   rawCloseGlyphCount += countRawCloseGlyphs(content);
   rawButtonClassDriftCount += countRawButtonClassDrift(content);

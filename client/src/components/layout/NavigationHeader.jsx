@@ -14,6 +14,7 @@ import { globalApi } from '../../utils/api';
 import { getFractalDisplay, getFractalSwitchPath } from '../../utils/fractalNavigation';
 import { dismissGoalDetailsForNavigation } from '../../utils/navigationEvents';
 import GoalIcon from '../atoms/GoalIcon';
+import LoadingState from '../common/LoadingState';
 import NavigationSessionAction from './NavigationSessionAction';
 import styles from '../../AppRouter.module.css';
 
@@ -156,7 +157,7 @@ function FractalSwitcher({
                     style={menuPosition}
                 >
                     {fractalsQuery.isLoading && (
-                        <div className={styles.fractalSwitcherStatus}>Loading fractals...</div>
+                        <LoadingState variant="inline" className={styles.fractalSwitcherStatus} label="Loading fractals…" />
                     )}
                     {!fractalsQuery.isLoading && switchableFractals.length === 0 && (
                         <div className={styles.fractalSwitcherStatus}>No other fractals available</div>

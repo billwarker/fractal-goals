@@ -6,6 +6,7 @@ import { formatLiteralDate } from '../../../utils/dateUtils';
 import { occurrenceStatus, planCardElementId } from '../../../utils/programDaysView';
 import EmptyState from '../../common/EmptyState';
 import ProgramDayStatusMark from '../ProgramDayStatusMark';
+import LoadingState from '../../common/LoadingState';
 import CompletedSessionCard from './CompletedSessionCard';
 import OptionalTemplateSelector from './OptionalTemplateSelector';
 import SessionPlanCard from './SessionPlanCard';
@@ -127,7 +128,7 @@ export default function PlanDateColumn({
                     />
                 </article>
             ) : null}
-            {plansQuery.isLoading ? <p className={styles.state} aria-busy="true">Loading plans…</p> : null}
+            {plansQuery.isLoading ? <LoadingState label="Loading plans…" /> : null}
             {plansQuery.error ? (
                 <p className={styles.state} role="alert">
                     Plans could not be loaded. <button type="button" onClick={() => plansQuery.refetch()}>Retry</button>

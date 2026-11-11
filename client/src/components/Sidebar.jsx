@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 const GoalDetailModal = lazyWithRetry(() => import('./ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 import './Sidebar.css';
+import LoadingState from './common/LoadingState';
 
 /**
  * Sidebar Component
@@ -59,7 +60,7 @@ const Sidebar = ({
 
     // Goal View - Use GoalDetailModal in Panel Mode
     return (
-        <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
+        <Suspense fallback={<LoadingState label="Loading goal details…" />}>
             <GoalDetailModal
                 isOpen={true}
                 onClose={onClose}

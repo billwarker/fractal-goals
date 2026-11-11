@@ -14,6 +14,7 @@ import GroupBuilderModal from '../components/modals/GroupBuilderModal';
 import { InboxIcon } from '../components/atoms/AppIcons';
 import Linkify from '../components/atoms/Linkify';
 import PageHeader from '../components/layout/PageHeader';
+import LoadingState from '../components/common/LoadingState';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import HeaderButton from '../components/layout/HeaderButton';
 import { prepareActivityDefinitionCopy } from '../utils/activityBuilder';
@@ -286,7 +287,7 @@ function ManageActivities() {
     };
 
     if (activitiesLoading || activityGroupsLoading || circuitsLoading) {
-        return <div className={styles.loadingState}>Loading activities...</div>;
+        return <LoadingState variant="page" skeleton="cards" label="Loading activities…" />;
     }
 
     // Recursive Group Renderer

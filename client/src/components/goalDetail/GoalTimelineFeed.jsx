@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Button from '../atoms/Button';
 import { useGoalTimelinePages } from '../../hooks/useGoalTimelinePages';
+import LoadingState from '../common/LoadingState';
 import { GoalTimelineEntries, timelineEntryDay } from './GoalTimelineEntries';
 import styles from './GoalTimelineEntries.module.css';
 import sectionStyles from './GoalActivityHeatmap.module.css';
@@ -44,7 +45,7 @@ export default function GoalTimelineFeed({ rootId, goalId, goal, timezone, metri
                 {date && <Button variant="secondary" size="sm" data-readonly-allow onClick={onClearDate}>Close day</Button>}
             </div>
             {isSnapshot && <p className={sectionStyles.help}>Published timeline snapshot; recent evidence may be incomplete.</p>}
-            {!isSnapshot && query.isLoading ? <p role="status">Loading timeline...</p> : null}
+            {!isSnapshot && query.isLoading ? <LoadingState label="Loading timeline…" /> : null}
             {!isSnapshot && query.isError && !pages.length && <p role="alert">Timeline could not be loaded. <Button variant="secondary" size="sm" onClick={() => query.refetch()}>Retry</Button></p>}
             {!isSnapshot && query.isFetchNextPageError && <p role="alert">More entries could not be loaded. The entries above are still available.</p>}
             <div className={styles.timeline} onPointerOver={highlightFrom} onPointerLeave={() => onHighlightDay?.(null)} onFocus={highlightFrom} onBlur={clearHighlight}>

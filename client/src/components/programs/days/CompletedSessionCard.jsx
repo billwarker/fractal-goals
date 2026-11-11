@@ -15,6 +15,7 @@ import { planAlignmentKeys } from '../../../utils/programDaysView';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick } from '../../prescriptions/usePlanRowSelection';
+import LoadingState from '../../common/LoadingState';
 import CompletedSessionHeader from './CompletedSessionHeader';
 import styles from './ProgramDaysView.module.css';
 
@@ -109,7 +110,7 @@ export default function CompletedSessionCard({
         });
     }, [date, isActive, onReport, query.data, reportKey, sessionId, template.id, template.name]);
 
-    if (query.isLoading) return <p className={styles.state} aria-busy="true">Loading session…</p>;
+    if (query.isLoading) return <LoadingState label="Loading session…" />;
     if (query.error || !query.data) {
         return (
             <p className={styles.state} role="alert">

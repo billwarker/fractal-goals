@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 
 import SessionCard from '../../sessions/SessionCard';
 import { useSessions } from '../../../hooks/useSessionQueries';
+import LoadingState from '../../common/LoadingState';
 
 function getSessionTimestamp(session) {
     const data = session.attributes?.session_data || session.session_data || {};
@@ -23,7 +24,7 @@ export default function LastSessionWidget({ sharedData }) {
     }, [sessions]);
 
     if (isLoading) {
-        return <div className="surface-widget-empty">Loading session…</div>;
+        return <LoadingState label="Loading session…" />;
     }
     if (!latest) {
         return <div className="surface-widget-empty">No sessions yet.</div>;

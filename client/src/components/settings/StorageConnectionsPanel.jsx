@@ -4,6 +4,7 @@ import { useStorageConnections } from '../../hooks/useStorageConnections';
 import { STORAGE_PROVIDERS, providerLabel } from '../../utils/storageConnectionCopy';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
+import LoadingState from '../common/LoadingState';
 import SettingsSection from './SettingsSection';
 import styles from './StorageConnectionsPanel.module.css';
 
@@ -142,7 +143,7 @@ export default function StorageConnectionsPanel() {
                 {error && <p className={styles.error} role="alert">{error}</p>}
 
                 <div className={styles.section}>
-                    {isLoading && <p className={styles.muted} role="status">Loading storage accounts…</p>}
+                    {isLoading && <LoadingState variant="inline" label="Loading storage accounts…" />}
                     {isError && (
                         <p className={styles.error} role="alert">
                             Storage accounts couldn’t load. <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button>

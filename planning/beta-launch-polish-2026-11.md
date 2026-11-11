@@ -330,7 +330,7 @@ Found for later phases:
 
 ### Phase 3 — Settings and Logs (2026-11-11)
 
-Phase 2 (loading) was deferred at your request; its found items above still stand.
+Phase 2 (loading) was skipped by mistake (I read "proceed to phase 3" as a skip); it runs next, before Phase 4.
 
 **Settings**
 - `SettingsModal.jsx` is now a shell over `components/settings/` sections: `GeneralSettings` (Regional, Appearance, This fractal), `AppearanceSettings`, `AccountSettings`, plus the existing goal characteristics, AI, storage and onboarding panels.
@@ -357,3 +357,13 @@ Phase 2 (loading) was deferred at your request; its found items above still stan
 - Account: the plan is one row; usage is a two-column list with meters only for real limits (red at 90%), and the scope options are compact chips. Fixed a double usage fetch on open: loading fractals always produced a new scope array.
 - The dialog keeps a fixed height across tabs.
 - Test server: the browser fixture server's DB pool is 20 + 20, because four parallel sweep browsers exhausted the default 5 + 10.
+
+### Phase 2 — One loading system (2026-11-11)
+
+- `LoadingState` is the single loading component: a 200 ms anti-flash delay, then a spinner or a content-shaped skeleton (`list`, `cards`, `chart`, `detail`, `tree`). After 4 s it adds "Still loading…", or a "server may be waking up" line when API reads are slow. With `error` it shows a retry. `useLoadEscalation` drives the stages.
+- Cold starts: `offline/serverWarmth.js` counts GET requests waiting over 2.5 s. When a request times out, the reachability probe now waits 30 s instead of 5 s, so a cold start no longer flips the app to Offline. Cloud Run config is untouched.
+- App-host boot loader: `index.html` shows the same look before the bundle loads, with the waking hint after 4 s, and hands off when React shows something (with a 1.5 s fallback so it can never stick).
+- Migrated: 17 route fallbacks (to `RouteFallback`), around 50 ad-hoc loaders across pages, panels, admin and modals, and `ChartLoading` / `AnalyticsLoading`, which now delegate. Fixed the `Sessions` quick-session `message=` prop bug (it showed a generic "Loading…").
+- Empty-while-loading fixed: Notes shows a skeleton until its first page arrives; Session Detail's goals panel waits for `sessionGoalsViewLoading` before saying "No goals associated"; Program Day Picker shows loading instead of "No program days".
+- Gate: the maintainability audit fails on a `div`, `p`, `span`, `li` or `section` that just says "Loading…", and on `.loading-spinner`.
+- Verified with a simulated cold start (5 s bundle, 7 s API): boot loader, then the waking hint, then the Notes skeleton.

@@ -58,6 +58,16 @@ literals. The preference (System / Light / Dark / Scheduled) resolves through `u
 mirrored before first paint by `public/boot/shell.js` (shared fixture `tests/fixtures/theme_schedule_cases.json`),
 lives per device in `theme-preference` and syncs to `user.preferences.appearance`. User-chosen goal colours
 are stored once and adapted for the light theme by `utils/themeColors.js` inside `GoalLevelsContext`.
+
+Loading: every loading state is `components/common/LoadingState` (variants `page` / `section` / `inline`,
+optional `skeleton` shapes, `error` + `onRetry`). It stays invisible for 200 ms, then shows; after 4 s it
+says "Still loading…", or that the server may be waking up while `offline/serverWarmth.js` sees reads
+waiting over 2.5 s (a Cloud Run cold start or a slow network). Suspense routes use `RouteFallback`. On
+the app host, `index.html` paints a matching boot loader before the bundle (with a waking hint after
+4 s from `public/boot/shell.js`) and `utils/appBootHandoff.js` removes it once React shows a loading
+state or content. A timed-out request's reachability probe waits 30 s
+(`COLD_START_PROBE_TIMEOUT_MS`), so a waking server isn't reported offline. The maintainability audit
+rejects ad-hoc "Loading…" elements and the old `.loading-spinner` class.
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context

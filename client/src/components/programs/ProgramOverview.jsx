@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 import { formatLiteralDate } from '../../utils/dateUtils';
+import LoadingState from '../common/LoadingState';
 import styles from './ProgramOverview.module.css';
 
 const SHORT_DATE = { year: undefined, month: 'short', day: 'numeric' };
@@ -12,7 +13,7 @@ const formatPercent = (value) => value == null ? '—' : `${Math.round(value * 1
  * program's blocks. The goal hierarchy has its own Goals view in the side pane.
  */
 export default function ProgramOverview({ metrics, loading = false, error = null, onEditPeriod = null, blocks = null }) {
-    if (loading) return <div className={styles.state} aria-busy="true">Loading program overview…</div>;
+    if (loading) return <LoadingState label="Loading program overview…" />;
     if (error) return <div className={styles.state} role="alert">Program overview could not be loaded. Try again shortly.</div>;
     if (!metrics) return <div className={styles.state}>Program overview is not available yet.</div>;
 

@@ -7,6 +7,7 @@ import SavedViewChart from '../analytics/SavedViewChart';
 import ConditionProgressChart from '../goalDetail/ConditionProgressChart';
 import { useGoalConditionEvidence } from '../../hooks/useGoalConditionQueries';
 import { buildAnalyticsLink } from '../../utils/analyticsDeepLink';
+import LoadingState from '../common/LoadingState';
 import styles from './GoalCharts.module.css';
 
 /** The threshold chart, from the goal's evidence in its active period. */
@@ -33,7 +34,7 @@ function GoalConditionChart({ rootId, goalId, density, goalSurface = null }) {
             }) : null,
         });
     }, [activity, goalChart, onChartInfo, rootId]);
-    if (query.isLoading) return <div className={styles.status} role="status">Loading chart…</div>;
+    if (query.isLoading) return <LoadingState label="Loading chart…" />;
     if (query.error) {
         return (
             <div className={styles.status} role="alert">

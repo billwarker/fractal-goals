@@ -10,6 +10,7 @@ import {
     isOnline,
     recordClockSample,
     reportRequestFailed,
+    COLD_START_PROBE_TIMEOUT_MS,
     reportRequestSucceeded,
     resetConnectivityForTests,
     subscribeConnectivity,
@@ -40,6 +41,14 @@ describe('connectivity', () => {
         expect(probeHealth).toHaveBeenCalledTimes(1);
         expect(isOnline()).toBe(true);
         expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('gives a timed-out request\'s probe long enough to cover a cold start', async () => {
+        probeHealth.mockResolvedValue({});
+        reportRequestFailed(Object.assign(new Error('timeout'), { code: 'ECONNABORTED' }));
+        await Promise.resolve();
+        expect(probeHealth).toHaveBeenCalledWith({ timeout: COLD_START_PROBE_TIMEOUT_MS });
+        expect(COLD_START_PROBE_TIMEOUT_MS).toBeGreaterThanOrEqual(20000);
     });
 
     it('goes offline when a timed-out request is followed by an unanswered probe', async () => {

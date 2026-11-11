@@ -4,6 +4,7 @@ import AttachMenuButton from '../notes/AttachMenuButton';
 import { AttachmentDraftList, AttachmentDraftNotice } from '../notes/NoteAttachmentsEditor';
 import { useAttachmentDraft } from '../../hooks/useAttachmentDraft';
 import CreateNoteIcon from '../atoms/CreateNoteIcon';
+import LoadingState from './LoadingState';
 import styles from './SidePaneNotePanel.module.css';
 
 function SidePaneNotePanel({
@@ -117,9 +118,7 @@ function SidePaneNotePanel({
 
             <div className={styles.notesList}>
                 {isLoading ? (
-                    <div className={styles.status}>
-                        <p>Loading notes…</p>
-                    </div>
+                    <LoadingState label="Loading notes…" />
                 ) : error ? (
                     <div className={styles.status}>
                         <p>Notes could not be loaded.</p>

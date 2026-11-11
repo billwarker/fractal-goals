@@ -36,7 +36,7 @@ describe('standardization atoms', () => {
         expect(badge.className).not.toContain('pill');
     });
 
-    it('uses the shared spinner in loading states', () => {
+    it('uses the shared spinner in loading states', async () => {
         render(
             <>
                 <Spinner label="Fetching" />
@@ -45,8 +45,7 @@ describe('standardization atoms', () => {
         );
 
         expect(screen.getByRole('status', { name: 'Fetching' })).toBeInTheDocument();
-        expect(screen.getByRole('status', { name: 'Loading session data...' })).toBeInTheDocument();
-        expect(screen.getByText('Loading session data...')).toBeInTheDocument();
+        expect(await screen.findByText('Loading session data...')).toBeInTheDocument();
     });
 
     it('renders a labeled radio control', () => {

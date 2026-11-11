@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { agentApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import SettingsSection from '../settings/SettingsSection';
+import LoadingState from '../common/LoadingState';
 import styles from './AgentConnectionsPanel.module.css';
 
 const endpoint = import.meta.env.VITE_AGENT_MCP_RESOURCE_URI || '';
@@ -118,7 +119,7 @@ function AgentConnectionsPanel({ enabled = true }) {
 
             <SettingsSection title="Connected services">
                 <div className={styles.section}>
-                    {connectionsQuery.isLoading && <p className={styles.muted}>Loading connections…</p>}
+                    {connectionsQuery.isLoading && <LoadingState variant="inline" label="Loading connections…" />}
                     {connectionsQuery.isError && (
                         <p className={styles.error} role="alert">
                             Connections are unavailable: {connectionsQuery.error?.response?.data?.error || connectionsQuery.error?.message || 'Please try again.'}

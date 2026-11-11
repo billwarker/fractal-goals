@@ -8,6 +8,7 @@ import { chooseGoogleDriveFile } from '../../utils/googleDrivePicker';
 import { providerLabel } from '../../utils/storageConnectionCopy';
 import Button from '../atoms/Button';
 import Modal from '../atoms/Modal';
+import LoadingState from '../common/LoadingState';
 import styles from './MediaAttachment.module.css';
 
 const errorText = (error) => error?.response?.data?.error || error?.message || 'The file could not be attached. Try again.';
@@ -63,7 +64,7 @@ export default function CloudMediaDialog({ rootId, onAdd, onClose }) {
         // Always opened from something else (a note composer, the goal modal's footer), so it sits on top.
         <Modal isOpen={!picking} title="Choose from cloud storage" onClose={onClose} size="md" layer="top">
             <p>Files stay in your cloud storage. Private files keep their sharing settings.</p>
-            {isLoading && <p role="status">Loading storage…</p>}
+            {isLoading && <LoadingState label="Loading storage…" />}
             {isError && <p role="alert">Storage could not load. <Button onClick={() => refetch()}>Retry</Button></p>}
             {!isLoading && !isError && !providers.some((item) => item.configured) && (
                 <p>Cloud storage isn&apos;t available yet. You can still paste shared links into your note.</p>

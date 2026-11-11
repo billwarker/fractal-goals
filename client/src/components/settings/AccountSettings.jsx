@@ -4,6 +4,7 @@ import { useGoals } from '../../contexts/GoalsContext';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import Button from '../atoms/Button';
 import Input from '../atoms/Input';
+import LoadingState from '../common/LoadingState';
 import SettingsSection, { SettingsRow } from './SettingsSection';
 import styles from './AccountSettings.module.css';
 
@@ -53,7 +54,7 @@ function MembershipSection({ account }) {
 
             <SettingsSection title="Usage" description="What counts toward your plan’s limits.">
                 {/* A failed request is reported by a toast (useAccountSettings). */}
-                {!accountUsage && <p className={styles.loading}>Loading usage…</p>}
+                {!accountUsage && <LoadingState variant="inline" label="Loading usage…" />}
                 {accountUsage && (
                     <>
                         <fieldset className={styles.scope}>
@@ -79,7 +80,7 @@ function MembershipSection({ account }) {
                                         <span>{fractal.name}{fractal.id === activeRootId ? ' (current)' : ''}</span>
                                     </label>
                                 ))}
-                                {fractalsLoading && <span className={styles.loading}>Loading fractals…</span>}
+                                {fractalsLoading && <LoadingState variant="inline" label="Loading fractals…" />}
                             </div>
                         </fieldset>
 

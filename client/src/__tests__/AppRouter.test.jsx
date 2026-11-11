@@ -337,7 +337,8 @@ describe('RequireAdmin', () => {
         mockUser.loading = true;
         renderGuarded();
         expect(screen.queryByTestId('location-path')).toBeNull();
-        expect(screen.getAllByText('Loading...').length).toBeGreaterThan(0);
+        // The loader announces itself from the first frame, before its anti-flash delay ends.
+        expect(screen.getAllByLabelText('Loading…').length).toBeGreaterThan(0);
     });
 
     it('renders admin pages for admins once the user resolves', () => {

@@ -16,6 +16,7 @@ import notify from '../utils/notify';
 import controls from './settings/SettingsControls.module.css';
 import styles from './GoalCharacteristicsSettings.module.css';
 import { logError } from '../utils/logger';
+import LoadingState from './common/LoadingState';
 
 const parseCount = (value) => (value ? parseInt(value, 10) : null);
 
@@ -241,7 +242,7 @@ const GoalCharacteristicsSettings = () => {
     const [edits, setEdits] = useState({});
 
     if (!goalLevels || goalLevels.length === 0) {
-        return <p className={styles.intro}>Loading goal levels…</p>;
+        return <LoadingState label="Loading goal levels…" />;
     }
 
     const editableGoalLevels = goalLevels.filter((level) => level?.name !== 'Completed');

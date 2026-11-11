@@ -11,6 +11,7 @@ import {
     getGoalNodeType,
 } from '../../utils/goalNodeModel';
 import notify from '../../utils/notify';
+import LoadingState from '../common/LoadingState';
 import GoalDeleteConfirmSubView from './GoalDeleteConfirmSubView';
 import GoalHierarchyList from './GoalHierarchyList';
 import GoalSequenceSubView, { sequenceCandidates } from './GoalSequenceSubView';
@@ -402,7 +403,7 @@ function GoalMoveSubView({
             />
 
             {isLoading ? (
-                <div className={styles.optionsEmptyState}>Loading eligible parents...</div>
+                <LoadingState label="Loading eligible parents…" />
             ) : eligible.length === 0 && !isLoading ? (
                 <div className={styles.optionsEmptyState}>No eligible parents found.</div>
             ) : (

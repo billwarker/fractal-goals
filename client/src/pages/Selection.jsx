@@ -11,6 +11,7 @@ import GoalIcon from '../components/atoms/GoalIcon';
 import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { queryKeys } from '../hooks/queryKeys';
+import LoadingState from '../components/common/LoadingState';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -232,7 +233,7 @@ function Selection() {
     const HeaderIcon = animatedIcons && isHeaderSmart ? AnimatedGoalIcon : GoalIcon;
 
     if (authLoading || fractalsQuery.isLoading) {
-        return <div className={styles.loadingContainer}>Loading fractals...</div>;
+        return <LoadingState variant="page" skeleton="cards" label="Loading fractals…" />;
     }
 
     return (

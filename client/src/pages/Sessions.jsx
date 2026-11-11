@@ -464,7 +464,7 @@ function Sessions() {
                             title="Close"
                         />
                         <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSession.id}>
-                            <Suspense fallback={<LoadingState message="Loading session…" />}><QuickSessionWorkspace /></Suspense>
+                            <Suspense fallback={<LoadingState label="Loading session…" />}><QuickSessionWorkspace /></Suspense>
                         </ActiveSessionProvider>
                     </div>
                 </ModalBackdrop>,

@@ -141,7 +141,8 @@ function MobileSettings({ sections, openId, onOpen }) {
                     <ChevronIcon direction="left" aria-hidden="true" />
                     All settings
                 </button>
-                <h3 className={styles.mobileSectionTitle}>{open.label}</h3>
+                {/* A breadcrumb, not a heading: the section's own header follows. */}
+                <span className={styles.mobileSectionTitle}>{open.label}</span>
             </div>
             <div className={styles.content}>
                 <SectionContent id={open.id} />

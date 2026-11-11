@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import LoadingState from '../common/LoadingState';
 import SessionActivityItem from './SessionActivityItem';
 import styles from './SessionSection.module.css';
 import { Heading } from '../atoms/Typography';
@@ -390,9 +391,7 @@ const SessionSection = ({
                 })}
 
                 {instancesLoading && orderedItems.length === 0 && (
-                    <div className={styles.dropZoneIndicator}>
-                        Loading activity items...
-                    </div>
+                    <LoadingState skeleton="list" label="Loading activities…" />
                 )}
 
                 {isDragOver && draggedItem && (

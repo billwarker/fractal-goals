@@ -1,9 +1,10 @@
 import React from 'react';
 import CalendarHeatmap from '../common/CalendarHeatmap';
+import LoadingState from '../common/LoadingState';
 import './SessionCalendarHeatmap.css';
 
 function SessionCalendarHeatmap({ heatmap = null, isLoading = false }) {
-    if (isLoading) return <div className="session-heatmap-empty">Loading heatmap...</div>;
+    if (isLoading) return <LoadingState variant="inline" label="Loading heatmap…" />;
     if (!heatmap?.days?.length) return <div className="session-heatmap-empty">No sessions in this range.</div>;
     const duration = heatmap.metric === 'duration';
     const maximum = heatmap.max_value ?? heatmap.max_count;

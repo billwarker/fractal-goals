@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react';
 
+import LoadingState from '../common/LoadingState';
 import GridLayout, {
     GRID_UNIT,
     GRID_COLUMNS,
@@ -18,30 +19,9 @@ import {
     getTreePanelId,
     sanitizeSurfaceConfig,
 } from './surfaceState';
+import { DEFAULT_DETAIL_PCT, clampDetailCells, detailCellsFromHint } from './surfaceDetailCells';
 
 const SurfaceWidget = lazyWithRetry(() => import('./SurfaceWidget'), 'components/surface/SurfaceWidget');
-const DEFAULT_DETAIL_PCT = 34;
-const MIN_DETAIL_PCT = 20;
-const MAX_DETAIL_PCT = 70;
-
-function clampDetailCells(cells, totalColumns) {
-    const cols = Math.max(1, totalColumns || GRID_COLUMNS);
-    const minCells = Math.max(1, Math.round((MIN_DETAIL_PCT / 100) * cols));
-    const maxCells = Math.max(minCells, Math.round((MAX_DETAIL_PCT / 100) * cols));
-    return Math.min(maxCells, Math.max(minCells, Math.round(cells)));
-}
-
-function detailCellsFromHint(hint, totalColumns) {
-    const cols = Math.max(1, totalColumns || GRID_COLUMNS);
-    if (hint && typeof hint === 'object') {
-        const savedCols = hint.cols || cols;
-        if (hint.w && savedCols) {
-            return clampDetailCells(Math.round((hint.w / savedCols) * cols), cols);
-        }
-    }
-    return clampDetailCells(Math.round((DEFAULT_DETAIL_PCT / 100) * cols), cols);
-}
-
 const PANEL_CLICK_BLOCKER_SELECTOR = [
     'button',
     'a',
@@ -539,7 +519,7 @@ export default function PageSurface({
                 style={{ width: '100%', height: '100%' }}
                 onMouseDown={onSelect}
             >
-                <Suspense fallback={<div role="status">Loading widget…</div>}>
+                <Suspense fallback={<LoadingState label="Loading widget…" />}>
                     <SurfaceWidget
                         widgetType={content?.widgetType}
                         state={content?.state}

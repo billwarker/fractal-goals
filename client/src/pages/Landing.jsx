@@ -22,6 +22,7 @@ import { buildLandingGoalDemos } from '../utils/landingGoalDemos';
 import { collectSnapshotLevels, findFirstGoalByType, getGoalIconProps } from '../utils/landingPageModel';
 import { resolveNestedWheelIntent } from '../utils/landingScrollNavigation';
 import { normalizeLandingTreeViewSettings } from '../utils/landingTreeViewSettings';
+import LoadingState from '../components/common/LoadingState';
 import styles from './Landing.module.css';
 // Reuse the real goals-page styles for the view-options widget and the docked
 // side-in detail panel (.flowtree-options-pane, .details-window.sidebar.docked).
@@ -584,12 +585,11 @@ function Landing() {
                         {isExamplesLoading && !selectedExample ? (
                             <div
                                 className={styles.heroExamplesPlaceholder}
+                                role="status"
                                 aria-label="Loading example goals"
                                 aria-busy="true"
                                 data-testid="example-picker-skeleton"
-                            >
-                                <span className={styles.visuallyHidden}>Loading example goals</span>
-                            </div>
+                            />
                         ) : (
                             <div className={styles.exampleToggle} role="tablist" aria-label="Example goal trees">
                                 {publishedExamples.map((example) => {
@@ -730,7 +730,7 @@ function Landing() {
                                             </div>
                                         )}
                                         {shouldRenderGoalExplorer && !isExplorerTakeoverOpen ? (
-                                            <Suspense fallback={<div className={styles.flowTreeLoading}>Loading preview...</div>}>
+                                            <Suspense fallback={<LoadingState className={styles.flowTreeLoading} label="Loading preview…" />}>
                                                 <FlowTree
                                                     ref={flowTreeRef}
                                                     key={selectedExample.id}
@@ -766,7 +766,7 @@ function Landing() {
                                     {selectedGoal && isDesktopLanding && (
                                         <div className="details-window sidebar docked landing-goal-dock">
                                             <div className="window-content landing-goal-dock-content">
-                                                <Suspense fallback={<div className={styles.flowTreeLoading}>Loading details...</div>}>
+                                                <Suspense fallback={<LoadingState className={styles.flowTreeLoading} label="Loading details…" />}>
                                                     <GoalLevelsProvider seedLevels={snapshotLevels}>
                                                         <GoalDetailModal
                                                             isOpen

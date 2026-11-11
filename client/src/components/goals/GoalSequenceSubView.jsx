@@ -9,6 +9,7 @@ import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
 import DeleteButton from '../atoms/DeleteButton';
 import GoalIcon from '../atoms/GoalIcon';
+import LoadingState from '../common/LoadingState';
 import styles from '../GoalDetailModal.module.css';
 
 const toId = (value) => (value == null ? null : String(value));
@@ -154,7 +155,7 @@ export default function GoalSequenceSubView({ rootId, goal, goalId, treeData, on
     useEffect(() => () => registerFooterAction?.(null), [registerFooterAction]);
 
     if (trackId && sequenceQuery.isLoading) {
-        return <div className={styles.optionsSubView}><div className={styles.optionsEmptyState}>Loading sequence…</div></div>;
+        return <div className={styles.optionsSubView}><LoadingState label="Loading sequence…" /></div>;
     }
 
     return (

@@ -26,6 +26,7 @@ import {
     LANDING_TREE_VIEW_SETTING_OPTIONS,
     normalizeLandingTreeViewSettings,
 } from '../utils/landingTreeViewSettings';
+import LoadingState from '../components/common/LoadingState';
 import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
@@ -175,7 +176,7 @@ function LandingExampleShowcaseEditor({
             </button>
             {expanded && (
                 optionsQuery.isLoading ? (
-                    <div className={styles.status}>Loading showcase options...</div>
+                    <LoadingState label="Loading showcase options…" />
                 ) : optionsQuery.isError ? (
                     <div className={styles.status}>Failed to load showcase options.</div>
                 ) : (
@@ -447,7 +448,7 @@ function LandingExamplesPanel() {
     const canSave = draftIssues.length === 0;
     const canPublish = sortedDraftExamples.length > 0 && publishIssues.length === 0;
     if (landingExamplesQuery.isLoading) {
-        return <div className={styles.status}>Loading landing examples...</div>;
+        return <LoadingState label="Loading landing examples…" />;
     }
     if (landingExamplesQuery.isError) {
         return <div className={styles.status}>Failed to load landing examples.</div>;
@@ -583,7 +584,7 @@ function FeatureFlagsPanel() {
         onError: (error) => notify.error(`Failed to update feature flag: ${formatError(error)}`),
     });
     if (featureFlagsQuery.isLoading) {
-        return <div className={styles.status}>Loading feature flags...</div>;
+        return <LoadingState label="Loading feature flags…" />;
     }
     if (featureFlagsQuery.isError) {
         return <div className={styles.status}>Failed to load feature flags.</div>;
@@ -1106,7 +1107,7 @@ function Admin() {
             ['Invite Keys', summary.invite_keys?.available || 0],
         ];
     }, [summaryQuery.data]);
-    if (loading) return <div className={styles.status}>Loading...</div>;
+    if (loading) return <LoadingState variant="page" label="Loading admin overview…" />;
     if (!user?.is_admin) return <Navigate to="/" replace />;
     return (
         <div className={styles.container}>

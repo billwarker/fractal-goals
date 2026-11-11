@@ -35,6 +35,38 @@
   <meta name="twitter:description" content="Break big goals into trackable trees, build your own programs, and log every session in one composable platform. Built for people training across many disciplines." />
   <meta name="twitter:image" content="https://fractalgoals.com/og-cover.png" />
   <style>
+    /* App-host boot loader: the look of LoadingState variant="page" before any app CSS loads.
+       Colours mirror --color-bg-app / --color-text-* in src/design-tokens.css. */
+    .app-boot-shell { display: none; }
+    [data-entry-surface="app"] .app-boot-shell {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 24px;
+      background: #121419;
+      color: #bcc9d8;
+      font: 13px/1.45 "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      text-align: center;
+    }
+    [data-theme="light"][data-entry-surface="app"] .app-boot-shell { background: #ededec; color: #3a3a3a; }
+    .app-boot-spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 999px;
+      animation: app-boot-spin 0.8s linear infinite;
+    }
+    .app-boot-hint { display: none; max-width: 34ch; color: #8ea0b7; font-size: 12px; }
+    [data-theme="light"] .app-boot-hint { color: #5b5b5b; }
+    [data-boot-slow="true"] .app-boot-hint { display: block; }
+    @keyframes app-boot-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .app-boot-spinner { animation-duration: 2.4s; } }
     .landing-boot-shell { display: none; }
     [data-entry-surface="landing"] .landing-boot-shell {
       position: fixed;
@@ -365,6 +397,11 @@
 </head>
 
 <body>
+  <div id="app-boot-shell" class="app-boot-shell" role="status" aria-live="polite" aria-busy="true">
+    <span class="app-boot-spinner" aria-hidden="true"></span>
+    <span>Loading Fractal Goals…</span>
+    <span class="app-boot-hint">The server may be waking up after a quiet spell. This can take up to 20 seconds.</span>
+  </div>
   <main id="landing-boot-shell" class="landing-boot-shell" aria-label="Loading Fractal Goals" aria-busy="true">
       <header class="landing-boot-header">
         <span class="landing-boot-bar">

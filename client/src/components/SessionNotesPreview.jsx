@@ -12,6 +12,7 @@ import { formatDateInTimezone } from '../utils/dateUtils';
 import { useTimezone } from '../contexts/TimezoneContext';
 import MarkdownNoteContent from './notes/MarkdownNoteContent';
 import './SessionNotesPreview.css';
+import LoadingState from './common/LoadingState';
 
 function SessionNotesPreview({ rootId, sessionId }) {
     const { notes: rawNotes, isLoading: isNotesLoading, error: notesError } = useSessionNotes(rootId, sessionId);
@@ -66,7 +67,7 @@ function SessionNotesPreview({ rootId, sessionId }) {
     if (loading) {
         return (
             <div className="session-notes-preview">
-                <div className="notes-loading">Loading notes...</div>
+                <LoadingState variant="inline" label="Loading notes…" />
             </div>
         );
     }

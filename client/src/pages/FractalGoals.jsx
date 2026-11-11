@@ -46,6 +46,7 @@ import {
     seedMobileFromDesktop,
     updateSurfaceModeConfig,
 } from '../components/surface/surfaceState';
+import LoadingState from '../components/common/LoadingState';
 import '../App.css';
 import './FractalGoals.css';
 import '../components/surface/PageSurface.css';
@@ -760,9 +761,7 @@ function FractalGoals() {
 
     if (loading || !fractalData) {
         return (
-            <div className="loading-container">
-                <p className="loading-text">Loading fractal data...</p>
-            </div>
+            <LoadingState variant="page" skeleton="tree" label="Loading your goals…" />
         );
     }
 
@@ -944,7 +943,7 @@ function FractalGoals() {
                             <div className="surface-detail-window">
                                 <div className="surface-detail-window-content">
                                     {showGoalModal ? (
-                                        <Suspense fallback={<div style={{ padding: '20px' }}>Loading Goal Details...</div>}>
+                                        <Suspense fallback={<LoadingState label="Loading goal details…" />}>
                                             <GoalDetailModal
                                                 isOpen={true}
                                                 onClose={() => setShowGoalModal(false)}
@@ -974,7 +973,7 @@ function FractalGoals() {
             </div>
 
             {shouldShowMobileGoalModal && (
-                <Suspense fallback={<div className="loading-spinner">Loading Goal Details...</div>}>
+                <Suspense fallback={<LoadingState label="Loading goal details…" />}>
                     {showGoalModal ? (
                         <GoalDetailModal
                             isOpen={true}

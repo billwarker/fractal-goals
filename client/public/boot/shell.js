@@ -56,7 +56,11 @@
   var isLocalPreviewPath = path === '/landing-preview' && isLocalDevHost;
   var isLandingEntry = isLocalPreviewPath || (path === '/' && isMarketingHost);
   document.documentElement.setAttribute('data-entry-surface', isLandingEntry ? 'landing' : 'app');
-  if (!isLandingEntry) return;
+  if (!isLandingEntry) {
+    // The app boot loader (index.html) explains a long wait; src/utils/appBootHandoff.js removes it.
+    setTimeout(function () { document.documentElement.setAttribute('data-boot-slow', 'true'); }, 4000);
+    return;
+  }
   // index.html carries the build-time URL in a meta tag Vite fills in.
   var staticUrlMeta = document.querySelector('meta[name="fg-landing-examples-static-url"]');
   var staticUrl = staticUrlMeta ? staticUrlMeta.getAttribute('content') || '' : '';

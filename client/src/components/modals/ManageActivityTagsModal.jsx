@@ -11,6 +11,7 @@ import Button from '../atoms/Button';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
+import LoadingState from '../common/LoadingState';
 import styles from './ManageActivityTagsModal.module.css';
 
 const DEFAULT_COLOR = '#64748B';
@@ -239,7 +240,7 @@ export default function ManageActivityTagsModal({ isOpen, onClose, rootId, activ
                             <select aria-label="Filter by activity" value={activityFilter} onChange={(event) => setActivityFilter(event.target.value)}><option value="all">Used on any activity</option>{activities.map((activity) => <option key={activity.id} value={activity.id}>{activity.name}</option>)}</select>
                             <select aria-label="Filter by usage" value={usageFilter} onChange={(event) => setUsageFilter(event.target.value)}><option value="all">All usage</option><option value="used">Used</option><option value="unused">Unused</option></select>
                         </div>
-                        {isLoading ? <p className={styles.empty}>Loading tag catalog…</p> : (
+                        {isLoading ? <LoadingState variant="inline" label="Loading tag catalog…" /> : (
                             <div className={styles.groups}>
                                 {groups.map((group) => (
                                     <section key={group.key} className={styles.group} aria-label={group.label}>

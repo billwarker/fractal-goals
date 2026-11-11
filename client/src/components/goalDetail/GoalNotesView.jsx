@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { NoteTimeline, NoteComposer } from '../notes';
 import Button from '../atoms/Button';
 import { useGoalNotes } from '../../hooks/useGoalNotes';
+import LoadingState from '../common/LoadingState';
 import styles from './GoalNotesView.module.css';
 
 function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = null, onEditReview }) {
@@ -112,7 +113,7 @@ function GoalNotesView({ rootId, goalId, hideComposer = false, readOnlyNotes = n
             {/* Timeline */}
             <div className={styles.timelineArea}>
                 {isLoading ? (
-                    <div className={styles.loading}>Loading notes…</div>
+                    <LoadingState label="Loading notes…" />
                 ) : (
                     <NoteTimeline
                         notes={notes}
