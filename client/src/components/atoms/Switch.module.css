@@ -1,0 +1,59 @@
+.switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--color-border-btn);
+    border-radius: 999px;
+    background: var(--color-toggle-track);
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-text-secondary);
+    transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.switch[aria-checked='true'] {
+    border-color: var(--color-brand-primary);
+    background: var(--color-brand-primary);
+}
+
+.switch[aria-checked='true'] .thumb {
+    background: var(--color-text-inverse);
+    transform: translateX(16px);
+}
+
+.switch:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* A larger hit area on touch screens, without changing the drawn size. */
+@media (pointer: coarse) {
+    .switch::after {
+        content: '';
+        position: absolute;
+        inset: -12px -4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .switch,
+    .thumb {
+        transition: none;
+    }
+}

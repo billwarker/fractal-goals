@@ -549,9 +549,21 @@ Auth, quotas, admin tooling, feature flags, telemetry, email delivery, landing p
 data export, and account deletion form the account boundary. Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
-The Logs page reads owner-scoped event history; only admins can clear a fractal's complete
-log history, after explicit confirmation regardless of filters. `useLogsData` owns that mutation
-and invalidates paginated and infinite history through the shared `logsRoot` query key.
+The Logs page (admin-only route) reads owner-scoped event history; only admins can clear a fractal's
+complete log history, after explicit confirmation regardless of filters. `useLogsData` owns that
+mutation and invalidates paginated and infinite history and the activity chart through the shared
+`logsRoot` query key. `GET /api/<root>/logs/activity` (`LogService.get_activity_series`) returns event
+counts per local day or hour (`date_trunc` on the timestamp converted to the request's `tz`; ranges up
+to 366 days daily, 14 hourly; empty buckets filled; DST-aware), split into the domains in
+`ACTIVITY_DOMAINS` by event-type prefix. `GET /api/<root>/logs` accepts the same `tz`, so YYYY-MM-DD
+bounds are whole local days and the table matches a chart bucket; each log carries its `domain`.
+
+Settings (`components/modals/SettingsModal.jsx`) is a shell over one component per section in
+`components/settings/`, built from `SettingsSection`/`SettingsRow` (label and help left, control
+right, stacking on phones) and `atoms/Switch`. Desktop uses a vertical ARIA tablist (arrow keys,
+Home/End); phones get a list that drills into one section. `useVisibleSettingsSections` hides AI
+Connections unless an AI flag is on or the user still has a connection to revoke; a `?settings=`
+deep link to a hidden section falls back to General until it becomes visible.
 
 Session tokens carry the session audience, `users.session_version`, and the original login
 time. Password change/reset, admin resets, suspension, and "Sign out of all devices" increment

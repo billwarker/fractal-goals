@@ -1,19 +1,15 @@
+/* Type follows the other settings sections: 13px body, 12px detail. */
 .panel {
-    display: grid;
-    gap: 24px;
+    font-size: var(--font-size-sm);
 }
 
 .section {
     display: grid;
-    gap: 12px;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
 }
 
-.section h3 {
-    margin: 0;
-    color: var(--color-text-primary);
-}
-
-.section p {
+:where(.section p) {
     margin: 0;
     color: var(--color-text-secondary);
     line-height: 1.5;

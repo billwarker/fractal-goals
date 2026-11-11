@@ -1,0 +1,104 @@
+.section + .section {
+    margin-top: var(--spacing-xl);
+}
+
+.header {
+    margin-bottom: var(--spacing-xs);
+}
+
+/* The rule always sits right under the title; a description reads below it. */
+.title {
+    margin: 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
+}
+
+.description {
+    margin: 10px 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.danger {
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-brand-danger);
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-brand-danger) 5%, transparent);
+}
+
+.danger .title {
+    border-bottom-color: color-mix(in srgb, var(--color-brand-danger) 40%, transparent);
+}
+
+.danger .title {
+    color: var(--color-brand-danger);
+}
+
+.rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 260px);
+    align-items: center;
+    gap: var(--spacing-xs) var(--spacing-lg);
+    padding: var(--spacing-sm) 0;
+}
+
+.row + .row {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.stacked {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+}
+
+.text {
+    min-width: 0;
+}
+
+.label {
+    display: block;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-medium);
+}
+
+.help {
+    margin: 2px 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.45;
+}
+
+.control {
+    display: flex;
+    justify-content: flex-end;
+    min-width: 0;
+}
+
+.stacked .control {
+    justify-content: flex-start;
+}
+
+/* A control that sizes to fit (a switch) stays beside its label; anything wider moves under it. */
+@media (max-width: 768px) {
+    .row {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .row:has(.control > :not([role='switch'])) {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .row:has(.control > :not([role='switch'])) .control {
+        justify-content: flex-start;
+    }
+}

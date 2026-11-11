@@ -327,3 +327,33 @@ Found for later phases:
 - Light-mode goal colours now target 3:1 (WCAG 1.4.11 non-text) instead of 4.5:1, and yellows ease toward gold as they darken (`#ffd700` → `#bc8600` instead of olive `#887200`).
 - Segmented toggles (`ViewToggleTabs`) read their track and selected-segment edge from `--color-toggle-*` / `--shadow-toggle-thumb`; light mode gets a darker track and a lifted, outlined thumb. New `size="compact"` and `semantics="radio"`.
 - Theme setting uses the compact toggle; Settings section titles, tabs and option labels are smaller.
+
+### Phase 3 — Settings and Logs (2026-11-11)
+
+Phase 2 (loading) was deferred at your request; its found items above still stand.
+
+**Settings**
+- `SettingsModal.jsx` is now a shell over `components/settings/` sections: `GeneralSettings` (Regional, Appearance, This fractal), `AppearanceSettings`, `AccountSettings`, plus the existing goal characteristics, AI, storage and onboarding panels.
+- New primitives: `SettingsSection` / `SettingsRow` (label and help on the left, control in a fixed column on the right, stacking on phones), `atoms/Switch` (`role="switch"`), and shared field styles in `SettingsControls.module.css`.
+- Every field has a real label; Account forms use `atoms/Input` and `atoms/Button` with autocomplete hints.
+- Navigation: a vertical ARIA tablist with arrow keys and Home/End on desktop; on phones, a section list that drills into one section with an "All settings" back button. `?settings=` deep links open the section directly on both.
+- AI Connections is hidden unless `ai_agent_connectors` or `ai_agent_embedded` is on, or the user still has a connection (so it can be revoked).
+- Tests: `SettingsModal.test.jsx` (7: gating, deep links, keyboard, drill-in) and `Switch.test.jsx` (2).
+
+**Logs**
+- Backend: `GET /api/<root>/logs/activity` buckets events per local day or hour by domain (Goals, Sessions, Activities, Programs, Notes, Other). The list endpoint takes the same `tz`, so a chart day and the table agree, and each log carries its `domain`. Tests cover the local-day boundary, DST (23- and 24-bucket days), the event-type filter, validation and tenant isolation (29 pass).
+- Client: `components/logs/` (`LogsActivityChart`, `LogsList`, `logsRange`, `Logs.module.css`); `pages/Logs.css` is deleted. The page uses the shared `PageHeader`; the red Clear logs uses a new `HeaderButton` `danger` variant.
+- One filter row drives both chart and table: 7 / 30 / 90 days / Custom, plus event type. Clicking a chart day narrows the table to that day.
+- The chart is a stacked bar per domain, with fixed colours from the validated chart series, a legend, a tooltip with totals, and a note in place of an empty chart.
+- The table shows relative time over exact time, a domain marker, and the event type. Entity ID and an expandable payload sit under the description. The source wraps after its dots. Below 1024px the source moves under the description; on phones each event is a card.
+- The contrast gate now also checks text on dark-mode danger buttons (64 pairs).
+
+#### Checkpoint 3, round 2 (2026-11-11)
+
+- Logs: the shared `PageHeader`, a red `HeaderButton` `danger` Clear logs, the full source wrapping after its dots (under the description below 1024px), and the ID and payload stacked under the description.
+- Settings: every tab's sections use `SettingsSection`. The rule sits right under the title, and a description sits 10px below it (measured on every tab). The storage and AI panels' paragraph resets use zero-specificity `:where()` so they can't override that spacing.
+- Cloud Storage: one type scale (13px body, 12px detail) and small buttons.
+- Goal Characteristics: one collapsible panel per level, grouped into Appearance, Rules (switches), Deadlines, Children and Reviews. Save and Restore sit at the foot, and "Unsaved changes" shows in the header. Completed goals come last.
+- Account: the plan is one row; usage is a two-column list with meters only for real limits (red at 90%), and the scope options are compact chips. Fixed a double usage fetch on open: loading fractals always produced a new scope array.
+- The dialog keeps a fixed height across tabs.
+- Test server: the browser fixture server's DB pool is 20 + 20, because four parallel sweep browsers exhausted the default 5 + 10.

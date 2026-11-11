@@ -1,451 +1,211 @@
 .modalShell {
     width: min(800px, calc(100vw - 32px));
-    height: min(600px, calc(var(--app-viewport-height, 100vh) - 32px));
+    height: min(620px, calc(var(--app-viewport-height, 100vh) - 32px));
+}
+
+/* The dialog keeps one height as sections change, so it doesn't jump. */
+.modalShell > * {
+    flex: 1;
 }
 
 .body {
     display: flex;
     flex: 1;
+    min-height: 0;
     overflow: hidden;
 }
 
-.bodyMobile {
-    flex-direction: column;
-}
-
-.bodyDesktop {
-    flex-direction: row;
-}
-
+/* Desktop: the section tablist on the left, the open section beside it. */
 .sidebar {
-    background-color: var(--color-bg-sidebar);
     display: flex;
+    flex: 0 0 196px;
+    flex-direction: column;
     justify-content: space-between;
-}
-
-.sidebarMobile {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-    padding: 8px 0;
-    flex-direction: row;
-    overflow-x: auto;
-}
-
-.sidebarDesktop {
-    width: 200px;
+    padding: var(--spacing-md) 0 var(--spacing-sm);
     border-right: 1px solid var(--color-border);
-    border-bottom: none;
-    padding: 16px 0;
-    flex-direction: column;
-    overflow-x: visible;
+    background: var(--color-bg-sidebar);
 }
 
-.tabMenu {
+.tabs {
     display: flex;
-}
-
-.tabMenuMobile {
-    flex-direction: row;
-    min-width: max-content;
-}
-
-.tabMenuDesktop {
     flex-direction: column;
-    min-width: auto;
 }
 
 .tab {
-    appearance: none;
-    background: transparent;
+    padding: 8px 20px;
     border: 0;
-    color: inherit;
+    border-left: 3px solid transparent;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
     font: inherit;
     font-size: var(--font-size-md);
-    cursor: pointer;
     text-align: left;
     white-space: nowrap;
 }
 
+.tab:hover {
+    background: var(--color-bg-hover);
+    color: var(--color-text-primary);
+}
+
+.tab[aria-selected='true'] {
+    border-left-color: var(--color-brand-primary);
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
+}
+
 .tab:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: -2px;
 }
 
-.tabMobile {
-    padding: 10px 14px;
-    border-left: none;
+.content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+    padding: var(--spacing-lg) var(--spacing-xl) var(--spacing-xl);
 }
 
-.tabDesktop {
-    padding: 9px 20px;
-    border-bottom: none;
+.content:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
 }
 
-.tabActive {
-    background-color: var(--color-bg-card-alt);
-    color: var(--color-text-primary);
-    font-weight: bold;
+.legal {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--spacing-sm) 20px 0;
 }
 
-.tabInactive {
-    background-color: transparent;
-    color: var(--color-text-secondary);
-    font-weight: normal;
-}
-
-.tabActiveMobile {
-    border-bottom: 3px solid var(--color-brand-primary);
-}
-
-.tabInactiveMobile {
-    border-bottom: 3px solid transparent;
-}
-
-.tabActiveDesktop {
-    border-left: 3px solid var(--color-brand-primary);
-}
-
-.tabInactiveDesktop {
-    border-left: 3px solid transparent;
-}
-
-.legalFooter {
-    padding: 16px;
-    border-top: 1px solid var(--color-border);
-}
-
-.legalLink {
-    display: block;
-    /* Vertical padding gives each link a comfortable hit area without
-       widening the sidebar footer. */
+.legal a {
     padding: 4px 0;
-    font-size: 12px;
     color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
     text-decoration: none;
 }
 
-.legalLink:hover {
+.legal a:hover,
+.legal a:focus-visible {
     color: var(--color-text-primary);
     text-decoration: underline;
 }
 
-.legalLink:focus-visible {
-    outline: 2px solid var(--color-primary);
-    outline-offset: 2px;
-    border-radius: 2px;
-}
-
-.legalLinkMargin {
-    margin-bottom: 8px;
-}
-
-.contentArea {
+/* Phones: a list that drills into one section at a time. */
+.mobileList {
     flex: 1;
     overflow-y: auto;
-    background-color: var(--color-bg-card);
+    padding: var(--spacing-sm) 0;
 }
 
-.contentAreaMobile {
-    padding: 16px;
+.mobileList ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
-.contentAreaDesktop {
-    padding: 24px;
+.mobileList li + li {
+    border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
 }
 
-.tabContent {
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-}
-
-.sectionTitle {
-    margin-top: 0;
-    margin-bottom: 12px;
-    color: var(--color-text-primary);
-    border-bottom: 1px solid var(--color-border);
-    padding-bottom: 6px;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-}
-
-.sectionContentStack {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.checkboxRow {
+.mobileItem {
     display: flex;
     align-items: center;
-    gap: 12px;
-}
-
-.checkboxInput {
-    width: 16px;
-    height: 16px;
-    cursor: pointer;
-}
-
-.checkboxLabel {
-    color: var(--color-text-primary);
-    font-size: var(--font-size-md);
-    cursor: pointer;
-}
-
-.checkboxDescription {
-    display: block;
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    margin-top: 4px;
-}
-
-.selectInput {
+    justify-content: space-between;
+    gap: var(--spacing-md);
     width: 100%;
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid var(--color-border-input);
-    background-color: var(--color-bg-input);
-    color: var(--color-text-primary);
-}
-
-.actionRow {
-    display: flex;
-    gap: 16px;
-}
-
-.actionRowMobile {
-    align-items: flex-start;
-    flex-direction: column;
-}
-
-.actionRowDesktop {
-    align-items: center;
-    flex-direction: row;
-}
-
-.actionRowText {
+    min-height: 56px;
+    padding: var(--spacing-sm) var(--spacing-lg);
+    border: 0;
+    background: transparent;
     color: var(--color-text-secondary);
-    font-size: 14px;
-}
-
-.secondaryButton {
-    padding: 8px 16px;
-    background-color: var(--color-bg-input);
-    border: 1px solid var(--color-border-btn);
-    border-radius: var(--border-radius-sm);
-    color: var(--color-text-primary);
     cursor: pointer;
-    font-size: 14px;
+    font: inherit;
+    text-align: left;
 }
 
-.membershipPanel {
+.mobileItem:active {
+    background: var(--color-bg-hover);
+}
+
+.mobileItem:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
+}
+
+.mobileItemLabel {
+    display: block;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-medium);
+}
+
+.mobileItemSummary {
+    display: block;
+    margin-top: 2px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}
+
+.mobileList .legal {
+    flex-direction: row;
+    gap: var(--spacing-lg);
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.mobileList .legal a {
+    padding: 12px 0;
+}
+
+.mobileSection {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.mobileSectionHeader {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 16px;
-    padding: 12px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-card-alt);
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    border-bottom: 1px solid var(--color-border);
 }
 
-.membershipTier {
-    color: var(--color-text-primary);
-    font-weight: 700;
-    font-size: 16px;
-}
-
-.membershipStatus {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    margin-top: 4px;
-    text-transform: capitalize;
-}
-
-.quotaFilterPanel {
-    margin-bottom: 16px;
-    padding: 12px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-secondary);
-}
-
-.quotaFilterHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 10px;
-}
-
-.quotaFilterTitle {
-    color: var(--color-text-primary);
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.quotaFilterSummary {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-}
-
-.quotaCheckboxList {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.quotaCheckboxItem {
+.back {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    max-width: 100%;
-    padding: 6px 8px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-card);
-    color: var(--color-text-primary);
+    gap: 2px;
+    min-height: 44px;
+    padding: 0 var(--spacing-sm);
+    border: 0;
+    background: transparent;
+    color: var(--color-brand-primary);
     cursor: pointer;
-    font-size: 12px;
+    font: inherit;
+    font-size: var(--font-size-md);
 }
 
-.quotaCheckboxItem span {
+.back:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
+}
+
+.mobileSectionTitle {
+    margin: 0 0 0 auto;
+    padding-right: var(--spacing-sm);
     overflow: hidden;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.quotaGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
+.mobileSection .content {
+    padding: var(--spacing-md) var(--spacing-lg) var(--spacing-xl);
 }
-
-.quotaRow {
-    padding: 10px;
-    border: 1px solid var(--color-border);
-    border-radius: 6px;
-    background: var(--color-bg-secondary);
-}
-
-.quotaHeader {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 8px;
-}
-
-.quotaLabel {
-    color: var(--color-text-primary);
-    font-size: 13px;
-    text-transform: capitalize;
-}
-
-.quotaValue {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.quotaBarTrack {
-    height: 6px;
-    overflow: hidden;
-    border-radius: 999px;
-    background: var(--color-bg-input);
-}
-
-.quotaBarFill {
-    height: 100%;
-    border-radius: inherit;
-    background: var(--color-brand-primary);
-    transition: width 0.2s ease;
-}
-
-.formContainer {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    max-width: 400px;
-}
-
-.textInput {
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid var(--color-border-input);
-    background: var(--color-bg-input);
-    color: var(--color-text-primary);
-}
-
-.textInputFlex {
-    flex: 1;
-}
-
-.primaryButton {
-    padding: 8px 16px;
-    background: var(--color-brand-primary);
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.dangerZone {
-    border: 1px solid var(--color-brand-danger);
-    padding: 16px;
-    border-radius: 8px;
-    background: rgba(239, 68, 68, 0.05);
-}
-
-.dangerTitle {
-    margin-top: 0;
-    margin-bottom: 8px;
-    color: var(--color-brand-danger);
-}
-
-.dangerText {
-    font-size: 14px;
-    color: var(--color-text-secondary);
-    margin-bottom: 16px;
-}
-
-.dangerInputRow {
-    display: flex;
-    gap: 8px;
-}
-
-.dangerInputRowMobile {
-    flex-direction: column;
-}
-
-.dangerInputRowDesktop {
-    flex-direction: row;
-}
-
-.dangerButton {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-}
-
-.dangerButtonActive {
-    background: var(--color-brand-danger);
-    color: white;
-    cursor: pointer;
-}
-
-.dangerButtonInactive {
-    background: var(--color-text-muted);
-    color: white;
-    cursor: not-allowed;
-}
-
-.mobileLegalFooter {
-    padding: 12px 0 16px;
-    margin-top: 12px;
-    border-top: 1px solid var(--color-border);
-}
-.labelSpacing { margin-bottom: 4px; }
-.descriptionSpacing { margin-top: 4px; }

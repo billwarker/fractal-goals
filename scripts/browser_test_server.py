@@ -12,6 +12,10 @@ os.environ["ENV"] = "testing"
 os.environ["FLASK_DEBUG"] = "false"
 os.environ["SENTRY_DSN"] = ""
 os.environ["RATELIMIT_ENABLED"] = "false"
+# One process serves every parallel browser (the visual sweep runs four at once, each page
+# firing a burst of requests), so it needs a larger pool than a production instance.
+os.environ.setdefault("DB_POOL_SIZE", "20")
+os.environ.setdefault("DB_MAX_OVERFLOW", "20")
 os.environ["AGENT_MCP_RESOURCE_URI"] = "https://mcp.browser.invalid/mcp"
 os.environ["AGENT_OAUTH_ISSUER"] = "https://issuer.browser.invalid"
 os.environ["AGENT_ADAPTER_ID"] = "browser-test-adapter"

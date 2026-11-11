@@ -1,0 +1,133 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    max-width: 360px;
+    padding-top: var(--spacing-sm);
+}
+
+.submit {
+    align-self: flex-start;
+}
+
+.loading {
+    margin: var(--spacing-sm) 0 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+}
+
+.scope {
+    margin: 0;
+    padding: var(--spacing-sm) 0;
+    border: 0;
+}
+
+.scopeTitle {
+    margin-bottom: 6px;
+    padding: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+}
+
+.scopeTitle span {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
+}
+
+.scopeOptions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.scopeOption {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    min-height: 28px;
+    padding: 0 10px 0 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font-size: var(--font-size-xs);
+}
+
+.scopeOption:has(input:checked) {
+    border-color: var(--color-brand-primary);
+    background: var(--color-bg-selected, var(--color-bg-card));
+}
+
+.scopeOption span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Usage: two columns of figures; only limited resources get a meter. */
+.usage {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--spacing-xl);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.usageItem {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 4px var(--spacing-sm);
+    padding: 7px 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+    font-size: var(--font-size-sm);
+}
+
+.usageLabel {
+    color: var(--color-text-primary);
+}
+
+.usageValue {
+    color: var(--color-text-primary);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-weight-medium);
+    text-align: right;
+}
+
+.usageLimit {
+    color: var(--color-text-secondary);
+    font-weight: var(--font-weight-normal);
+}
+
+.meter {
+    grid-column: 1 / -1;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--color-toggle-track);
+}
+
+.meter > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-brand-primary);
+}
+
+.meter[data-near-limit] > span {
+    background: var(--color-brand-danger);
+}
+
+@media (max-width: 768px) {
+    .usage {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .scopeOption {
+        min-height: 40px;
+    }
+}

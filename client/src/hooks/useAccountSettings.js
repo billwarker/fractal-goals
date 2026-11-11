@@ -63,7 +63,12 @@ export function useAccountSettings(activeTab) {
                     const fractals = Array.isArray(res.data) ? res.data : [];
                     setAvailableFractals(fractals);
                     const availableIds = new Set(fractals.map((fractal) => fractal.id));
-                    setSelectedQuotaRootIds((current) => current.filter((rootId) => availableIds.has(rootId)));
+                    // Keep the same array when nothing was dropped, so usage isn't fetched again.
+                    setSelectedQuotaRootIds((current) => (
+                        current.every((rootId) => availableIds.has(rootId))
+                            ? current
+                            : current.filter((rootId) => availableIds.has(rootId))
+                    ));
                 }
             })
             .catch((err) => {
