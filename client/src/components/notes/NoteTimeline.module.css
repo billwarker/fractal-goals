@@ -150,7 +150,7 @@
     max-width: min(100%, 420px);
 }
 
-.sessionBadgeLink {
+.sessionLink {
     display: inline-flex;
     min-width: 0;
     max-width: min(100%, 420px);
@@ -159,16 +159,16 @@
     transition: filter 0.15s;
 }
 
-.sessionBadgeLink > * {
+.sessionLink > * {
     min-width: 0;
     max-width: 100%;
 }
 
-.sessionBadgeLink:hover {
+.sessionLink:hover {
     filter: brightness(1.2);
 }
 
-.sessionBadgeLink:focus-visible {
+.sessionLink:focus-visible {
     outline: 2px solid var(--color-brand-primary);
     outline-offset: 2px;
 }
@@ -278,7 +278,7 @@
     }
 
     .sessionBadge,
-    .sessionBadgeLink {
+    .sessionLink {
         max-width: calc(100% - 64px);
     }
 }

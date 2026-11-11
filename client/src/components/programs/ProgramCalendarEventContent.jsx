@@ -141,7 +141,7 @@ export default function renderProgramCalendarEventContent(eventInfo, onGoalActiv
 
     if (type === 'date_note') {
         return (
-            <div className={`${styles.eventPill} ${styles.eventPillDateNote}`} title={title}>
+            <div className={`${styles.eventPill} ${styles.dateNoteEvent}`} title={title}>
                 <span className={styles.dayStatusAssistive}>Note: </span>
                 <span className={styles.eventPillText}>{title}</span>
             </div>

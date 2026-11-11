@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useTimezone } from '../../contexts/TimezoneContext';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import CheckIcon from '../atoms/CheckIcon';
 import CloseIcon from '../atoms/CloseIcon';
 import GoalIcon from '../atoms/GoalIcon';
@@ -12,7 +11,8 @@ import NoteOptionsMenu from './NoteOptionsMenu';
 import MarkdownNoteContent from './MarkdownNoteContent';
 import NoteContextLine from './NoteContextLine';
 import PinBadge from './PinBadge';
-import ReviewNoteBody, { ReviewStatusBadge } from './ReviewNoteBody';
+import ReviewNoteBody from './ReviewNoteBody';
+import { GoalNoteHeading, ProgramNoteHeading, noteContextLabel } from './NoteCardHeadings';
 import styles from './NoteCard.module.css';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { noteContextLink } from '../../utils/noteContext';
@@ -97,7 +97,6 @@ function NoteCard({
     const textareaRef = useRef(null);
     const cardRef = useRef(null);
     const { timezone } = useTimezone();
-    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
     const resolvedNoteType = deriveNoteType(note);
     const resolvedNoteTypeLabel = deriveNoteTypeLabel(note);
     const isGoalCompletionNote = resolvedNoteType === 'goal_completion_note';
@@ -280,34 +279,7 @@ function NoteCard({
         return () => observer.disconnect();
     }, [shouldDeferRichContent, shouldShowRichContent]);
 
-    const primaryContextLabel = note.context_display_name || (() => {
-        switch (resolvedNoteType) {
-            case 'fractal_note':
-                return 'Fractal';
-            case 'goal_note':
-                return note.goal_name || note.content || 'Goal';
-            case 'goal_completion_note':
-            case 'goal_review_note':
-                return note.goal_name || note.content || 'Goal';
-            case 'session_note':
-                return suppressSessionContext
-                    ? 'Session note'
-                    : note.session_template_name || note.session_name || 'Session';
-            case 'program_note':
-                return note.program_name || 'Program';
-            case 'program_date_note':
-                return [note.program_name || 'Program', note.calendar_date && formatLiteralDate(note.calendar_date)].filter(Boolean).join(' · ');
-            case 'activity_set_note':
-                return `${note.activity_definition_name || 'Activity'} · Set ${(note.set_index ?? 0) + 1}`;
-            case 'activity_instance_note':
-            case 'activity_definition_note':
-                return note.activity_definition_name || 'Activity';
-            case 'circuit_run_note': return 'Activity circuit';
-            case 'circuit_round_note': return 'Circuit round';
-            default:
-                return 'Note';
-        }
-    })();
+    const primaryContextLabel = noteContextLabel(note, resolvedNoteType, { suppressSessionContext });
     const secondaryContextBadges = [];
     if (showContext && resolvedNoteType !== 'fractal_note') {
         if (!GOAL_NOTE_TYPES.has(resolvedNoteType) && note.goal_name) {
@@ -327,32 +299,6 @@ function NoteCard({
             secondaryContextBadges.push({ type: 'text', label: 'Fractal' });
         }
     }
-
-    // A program note's name in its program's colour; a date note's date in its block's, when one covers it.
-    const programDate = resolvedNoteType === 'program_date_note' && note.calendar_date
-        ? formatLiteralDate(note.calendar_date)
-        : null;
-    const programHeading = (
-        <>
-            <span style={note.program_color ? { color: note.program_color } : undefined}>{note.program_name || 'Program'}</span>
-            {programDate ? (
-                <>
-                    {' · '}
-                    <span style={note.block_color ? { color: note.block_color } : undefined}>{programDate}</span>
-                </>
-            ) : null}
-        </>
-    );
-
-    const goalName = opensGoal ? (
-        <button
-            type="button"
-            className={`${styles.contextPrimary} ${styles.goalLink}`}
-            onClick={(event) => { event.stopPropagation(); onOpenGoal(note); }}
-        >
-            {primaryContextLabel}
-        </button>
-    ) : <span className={styles.contextPrimary}>{primaryContextLabel}</span>;
 
     if (isDeleting) {
         return <div className={`${styles.noteCard} ${styles.noteCardDeleting}`}>Deleting…</div>;
@@ -384,54 +330,14 @@ function NoteCard({
                         <div className={styles.metaStack}>
                             <div className={styles.metaRow}>
                                 <div className={styles.contextSummary}>
-                                    {isReviewHeader ? (
-                                        <span className={styles.reviewHeading}>
-                                            <span className={styles.goalContext}>
-                                                <span className={styles.noteKindPrefix}>{NOTE_KIND_LABELS.goal_review}:</span>
-                                                {showHeaderGoalIcon && note.goal_type ? (
-                                                    <GoalIcon
-                                                        shape={getGoalIcon(note.goal_type)}
-                                                        color={getGoalColor(note.goal_type)}
-                                                        secondaryColor={getGoalSecondaryColor(note.goal_type)}
-                                                        isSmart={Boolean(note.goal_is_smart)}
-                                                        size={12}
-                                                    />
-                                                ) : null}
-                                                {goalName}
-                                            </span>
-                                            <ReviewStatusBadge status={note.review_data.status} />
-                                        </span>
-                                    ) : (resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type ? (
-                                        <span className={styles.goalContext}>
-                                            {isGoalCompletionNote ? (
-                                                <>
-                                                    <span className={styles.noteKindPrefix}>{noteKindLabel}:</span>
-                                                    {showHeaderGoalIcon ? (
-                                                        <GoalIcon
-                                                            shape={getGoalIcon(note.goal_type)}
-                                                            color={getGoalColor('Completed')}
-                                                            secondaryColor={getGoalSecondaryColor('Completed')}
-                                                            isSmart={Boolean(note.goal_is_smart)}
-                                                            size={12}
-                                                        />
-                                                    ) : null}
-                                                    {goalName}
-                                                </>
-                                            ) : (
-                                                <>
-                                                    {goalName}
-                                                    {showHeaderGoalIcon ? (
-                                                        <GoalIcon
-                                                            shape={getGoalIcon(note.goal_type)}
-                                                            color={getGoalColor(note.goal_type)}
-                                                            secondaryColor={getGoalSecondaryColor(note.goal_type)}
-                                                            isSmart={Boolean(note.goal_is_smart)}
-                                                            size={12}
-                                                        />
-                                                    ) : null}
-                                                </>
-                                            )}
-                                        </span>
+                                    {isReviewHeader || ((resolvedNoteType === 'goal_note' || isGoalCompletionNote) && note.goal_type) ? (
+                                        <GoalNoteHeading
+                                            note={note}
+                                            label={primaryContextLabel}
+                                            kind={isReviewHeader ? 'review' : isGoalCompletionNote ? 'completion' : 'goal'}
+                                            showIcon={showHeaderGoalIcon}
+                                            onOpenGoal={opensGoal ? onOpenGoal : null}
+                                        />
                                     ) : suppressActivityContext ? (
                                         // The group's header names the activity: only a set needs a heading here.
                                         setLabel ? <span className={styles.contextPrimary}>{setLabel}</span> : null
@@ -441,13 +347,7 @@ function NoteCard({
                                     ) : resolvedNoteType === 'session_note' ? (
                                         renderSessionTemplateBadge()
                                     ) : programLink ? (
-                                        <Link
-                                            className={`${styles.contextPrimary} ${styles.goalLink}`}
-                                            to={programLink.to}
-                                            onClick={(event) => event.stopPropagation()}
-                                        >
-                                            {programHeading}
-                                        </Link>
+                                        <ProgramNoteHeading note={note} to={programLink.to} />
                                     ) : (
                                         <span className={styles.contextPrimary}>{primaryContextLabel}</span>
                                     )}

@@ -43,15 +43,14 @@ export function useProgramsCalendarData(rootId, { timezone } = {}) {
     const programLabels = useMemo(() => buildProgramSummaryLabels(sortedPrograms), [sortedPrograms]);
 
     const { refetch: refetchProgramList } = programsQuery;
-    const refetchPrograms = useCallback(() => Promise.all([
-        refetchProgramList(),
-        queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
-    ]), [queryClient, refetchProgramList, rootId]);
-    // A deleted program takes its notes and date notes with it.
-    const refreshAfterProgramDeleted = useCallback(() => {
+    // Notes show their program's name and colour, and a deleted program takes its notes with it.
+    const refetchPrograms = useCallback(() => {
         invalidateNotesAfterDelete(queryClient, rootId, queryKeys);
-        return refetchPrograms();
-    }, [queryClient, refetchPrograms, rootId]);
+        return Promise.all([
+            refetchProgramList(),
+            queryClient.invalidateQueries({ queryKey: queryKeys.programCalendarFeedRoot(rootId) }),
+        ]);
+    }, [queryClient, refetchProgramList, rootId]);
 
     return {
         programs: sortedPrograms,
@@ -60,7 +59,6 @@ export function useProgramsCalendarData(rootId, { timezone } = {}) {
         loading: programsQuery.isLoading || goalsQuery.isLoading,
         treeData: goalsQuery.data || null,
         refetchPrograms,
-        refreshAfterProgramDeleted,
         refetchGoals: goalsQuery.refetch,
     };
 }

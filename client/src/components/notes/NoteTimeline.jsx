@@ -252,7 +252,7 @@ function NoteTimeline({
                         {/* The badge is the way into its session. */}
                         {sessionGroup.rootId ? (
                             <Link
-                                className={styles.sessionBadgeLink}
+                                className={styles.sessionLink}
                                 to={`/${sessionGroup.rootId}/session/${sessionGroup.sessionId}`}
                                 aria-label={`Open session ${sessionGroup.sessionName}`}
                             >

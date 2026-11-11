@@ -1,6 +1,5 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { useOwnedNoteCount } from '../hooks/useOwnedNoteCount';
 
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
@@ -125,14 +124,12 @@ function ProgramCalendarPage() {
     const [builderState, setBuilderState] = useState({ open: false, mode: 'create', startDate: '', duplicateSource: null });
     const [programToDelete, setProgramToDelete] = useState(null);
     const [deleteSessionCount, setDeleteSessionCount] = useState(0);
-    const deleteNoteCount = useOwnedNoteCount(rootId, { program_id: programToDelete?.id }, { enabled: Boolean(programToDelete) });
     const {
         programs,
         goals,
         programLabels,
         loading,
         refetchPrograms,
-        refreshAfterProgramDeleted,
     } = useProgramsCalendarData(rootId, { timezone });
 
     const activeProgramId = useMemo(
@@ -679,7 +676,7 @@ function ProgramCalendarPage() {
                     programId: null,
                 });
             }
-            await refreshAfterProgramDeleted();
+            await refetchPrograms();
             await onboarding?.refresh();
         } catch (error) {
             notify.error(`Failed to delete program: ${error.response?.data?.error || error.message}`);
@@ -955,14 +952,11 @@ function ProgramCalendarPage() {
 
             <DeleteProgramModal
                 isOpen={Boolean(programToDelete)}
-                onClose={() => {
-                    setProgramToDelete(null);
-                    setDeleteSessionCount(0);
-                }}
+                onClose={() => { setProgramToDelete(null); setDeleteSessionCount(0); }}
                 onConfirm={confirmDeleteProgram}
                 programName={programToDelete?.name || ''}
                 sessionCount={deleteSessionCount}
-                noteCount={deleteNoteCount || 0}
+                rootId={rootId} programId={programToDelete?.id}
                 requireMatchingText="delete"
             />
 

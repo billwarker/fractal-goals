@@ -1,8 +1,8 @@
 import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
-import { SESSION_OP } from './opKinds';
 import { isQuickSession } from '../utils/sessionRuntime';
+import { SESSION_OP } from './opKinds';
 import {
     applySessionCompletion,
     applySessionPause,
