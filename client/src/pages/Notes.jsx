@@ -24,7 +24,7 @@ import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
-import NotesMobileSheet from '../components/notes/NotesMobileSheet';
+import ResponsiveSidePane from '../components/layout/ResponsiveSidePane';
 import NoteGoalModal from '../components/goalDetail/NoteGoalModal';
 import NotesFilterControls from '../components/notes/page/NotesFilterControls';
 import FilterConditions, { filterConditionLabels } from '../components/notes/page/FilterConditions';
@@ -101,7 +101,7 @@ function Notes() {
 
     const goalNames = Object.fromEntries(goalOptions.map((goal) => [goal.id, goal.name]));
     const activityNames = Object.fromEntries(activities.map((activity) => [activity.id, activity.name]));
-    const summarize = (ids, names) => (ids.length > 2 ? `${ids.length} selected` : ids.map((id) => names[id] || '…').join(', '));
+    const namesOf = (ids, names) => ids.map((id) => names[id]).filter(Boolean);
     const conditionLabels = filterConditionLabels({ filters, savedFilters, activeSavedIds, goalNames, activityNames });
     const mobilePanelLabel = mobilePanelOpen ? 'Hide Filters' : 'Show Filters';
 
@@ -156,8 +156,8 @@ function Notes() {
                 filters={filters}
                 apiFilters={feedFilters}
                 updateFilters={updateFilters}
-                goalSummary={summarize(filters.goalIds, goalNames)}
-                activitySummary={summarize(filters.activityIds, activityNames)}
+                selectedGoalNames={namesOf(filters.goalIds, goalNames)}
+                selectedActivityNames={namesOf(filters.activityIds, activityNames)}
                 onPickGoal={() => setGoalPickerOpen(true)}
                 onPickActivities={() => setActivityPickerOpen(true)}
                 saved={{
@@ -171,6 +171,8 @@ function Notes() {
             />
         </div>
     );
+
+    const closeFilters = () => (isMobile ? setMobilePanelOpen(false) : setIsFiltersPaneOpen(false));
 
     /* ─── Right column filter panel ─── */
     const filterPanel = (
@@ -188,10 +190,10 @@ function Notes() {
                         Reset Filters
                     </SidePaneHeaderButton>
                     <SidePaneHeaderButton
-                        onClick={() => setIsFiltersPaneOpen(false)}
-                        aria-label="Collapse filters panel"
+                        onClick={closeFilters}
+                        aria-label={isMobile ? 'Hide filters panel' : 'Collapse filters panel'}
                     >
-                        Collapse
+                        {isMobile ? 'Hide' : 'Collapse'}
                     </SidePaneHeaderButton>
                     </>
                 )}
@@ -201,10 +203,16 @@ function Notes() {
         </div>
     );
 
-    const rightColumn = isFiltersPaneOpen && !isMobile && (
-        <div className={styles.rightColumn}>
+    // One filter pane on every screen, as on Sessions: inline on desktop, a bottom sheet on mobile.
+    const rightColumn = (
+        <ResponsiveSidePane
+            open={isMobile ? mobilePanelOpen : isFiltersPaneOpen}
+            isMobile={isMobile}
+            onClose={closeFilters}
+            panelClassName={styles.rightColumn}
+        >
             {filterPanel}
-        </div>
+        </ResponsiveSidePane>
     );
 
     return (
@@ -247,16 +255,6 @@ function Notes() {
                     onClose={() => setOpenGoal(null)}
                 />
             ) : null}
-
-            <NotesMobileSheet
-                open={isMobile && mobilePanelOpen}
-                total={total}
-                hasActiveFilters={hasActiveFilters}
-                onReset={clearAll}
-                onClose={() => setMobilePanelOpen(false)}
-            >
-                {filterPanelBody}
-            </NotesMobileSheet>
         </div>
     );
 }

@@ -296,7 +296,6 @@ function Sessions() {
             isMobile={isMobile}
             onClose={() => setIsFiltersPaneOpen(false)}
             panelClassName={styles.rightPanel}
-            backdropClassName={styles.sheetBackdrop}
         >
             <SessionsQuerySidebar
                 filters={filters}

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { FilterPlusIcon } from '../../atoms/AppIcons';
+import FilterPickerField from '../../common/FilterPickerField';
 import { formatDay } from './FilterConditions';
 import CategoryPicker from './CategoryPicker';
 import FilterModal from './FilterModal';
@@ -43,7 +44,8 @@ function SearchField({ value, onChange, onCreateFilter }) {
 }
 
 export default function NotesFilterControls({
-    rootId, filters, apiFilters, updateFilters, goalSummary, activitySummary, onPickGoal, onPickActivities, saved,
+    rootId, filters, apiFilters, updateFilters, selectedGoalNames = [], selectedActivityNames = [],
+    onPickGoal, onPickActivities, saved,
 }) {
     const [editing, setEditing] = useState(null); // { filter } to edit, or { searchText } to create.
     return (
@@ -89,14 +91,24 @@ export default function NotesFilterControls({
                     onChange={(categories) => updateFilters({ categories })} />
             </section>
 
-            <section className={styles.section} aria-labelledby="notes-links-title">
-                <div className={styles.sectionHeader}><h4 id="notes-links-title">Goal &amp; Activity</h4></div>
-                <button type="button" className={styles.pickRow} onClick={onPickGoal}>
-                    <span>Goals</span><strong>{goalSummary || 'Any'}</strong>›
-                </button>
-                <button type="button" className={styles.pickRow} onClick={onPickActivities}>
-                    <span>Activities</span><strong>{activitySummary || 'Any'}</strong>›
-                </button>
+            {/* The same pickers, in the same order and form, as the Sessions filters. */}
+            <section className={styles.section}>
+                <FilterPickerField
+                    title="Activities"
+                    chooseLabel="Choose Activities"
+                    count={filters.activityIds.length}
+                    selectedNames={selectedActivityNames}
+                    onChoose={onPickActivities}
+                />
+            </section>
+            <section className={styles.section}>
+                <FilterPickerField
+                    title="Goals"
+                    chooseLabel="Choose Goals"
+                    count={filters.goalIds.length}
+                    selectedNames={selectedGoalNames}
+                    onChoose={onPickGoal}
+                />
             </section>
 
             {editing && (

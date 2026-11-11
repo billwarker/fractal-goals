@@ -15,6 +15,8 @@ function ActivityFilterModal({
     activityCounts = {},
     groupCounts = {},
     confirmLabel = 'Apply filters',
+    groupSelectionLabel,
+    groupSelectedLabel,
 }) {
     return (
         <ActivityPickerModal
@@ -31,6 +33,8 @@ function ActivityFilterModal({
                 groupsById: groupCounts,
             }}
             confirmLabel={confirmLabel}
+            {...(groupSelectionLabel ? { groupSelectionLabel } : {})}
+            {...(groupSelectedLabel ? { groupSelectedLabel } : {})}
             searchPlaceholder="Search activities..."
             onConfirm={({ activityIds, groupIds }) => {
                 onConfirm?.(activityIds, groupIds);

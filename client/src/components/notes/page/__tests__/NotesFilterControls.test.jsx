@@ -15,7 +15,7 @@ const saved = (overrides = {}) => ({ savedFilters: [], activeIds: [], onToggle: 
 const renderControls = (filters = {}, extra = {}) => {
     const updateFilters = vi.fn();
     render(<NotesFilterControls rootId="root" filters={{ ...base, ...filters }} apiFilters={{}} updateFilters={updateFilters}
-        goalSummary="" activitySummary="" onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
+        onPickGoal={vi.fn()} onPickActivities={vi.fn()} saved={saved()} {...extra} />);
     return updateFilters;
 };
 
@@ -37,7 +37,7 @@ describe('NotesFilterControls', () => {
     it('orders sections heatmap, search, saved filters with Sessions-style headers and no search mode toggle', () => {
         renderControls();
         expect(screen.getAllByRole('heading', { level: 4 }).map((heading) => heading.textContent))
-            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Categories', 'Goal & Activity']);
+            .toEqual(['Notes Heatmap', 'Search', 'Saved Filters', 'Categories', 'Activities', 'Goals']);
         expect(screen.queryByRole('radiogroup', { name: 'Search mode' })).not.toBeInTheDocument();
     });
 

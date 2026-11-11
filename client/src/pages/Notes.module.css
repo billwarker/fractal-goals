@@ -55,9 +55,5 @@
         padding-left: 0;
         padding-bottom: calc(12px + var(--mobile-page-footer-height));
     }
-
-    .rightColumn {
-        display: none;
-    }
 }
 .onboardingEmptyState { margin: var(--spacing-md); border: 1px solid var(--color-border); border-radius: var(--border-radius-lg); background: var(--color-bg-card-alt); }

@@ -264,16 +264,19 @@ test('dashboard sidebar keeps shared scope above independent chart tabs', async 
     await expect(global.getByRole('heading', { name: 'Time Range' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Time Range' })).toHaveCount(1);
     await expect(page.getByRole('list', { name: 'Active filters' })).toHaveCount(0);
+    // The filter mark, with the selection in its tooltip, shows only while the range is applied.
     const timeInfo = global.getByRole('button', { name: 'View time range filter selections' });
-    if (suffix === 'mobile') await timeInfo.click();
-    else await timeInfo.hover();
-    await expect(page.getByRole('tooltip')).toHaveText('All time');
-    await timeInfo.evaluate((element) => element.blur());
-    await page.mouse.move(0, 0);
+    await expect(timeInfo).toHaveCount(0);
     await global.getByRole('button', { name: '7D', exact: true }).click();
     await expect(global.getByRole('button', { name: 'Clear time range filter' })).toBeEnabled();
+    if (suffix === 'mobile') await timeInfo.click();
+    else await timeInfo.hover();
+    await expect(page.getByRole('tooltip')).toContainText('–');
+    await timeInfo.evaluate((element) => element.blur());
+    await page.mouse.move(0, 0);
     await global.getByRole('button', { name: 'Clear time range filter' }).click();
     await expect(global.getByRole('button', { name: 'Clear time range filter' })).toBeDisabled();
+    await expect(timeInfo).toHaveCount(0);
     await expect(addGlobal).toBeVisible();
     await first.getByRole('combobox', { name: 'Group by', exact: true }).selectOption('activity');
     await first.getByRole('list', { name: 'Additional filters' }).getByRole('button', { name: 'Tags', exact: true }).click();

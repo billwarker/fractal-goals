@@ -7,15 +7,17 @@ import styles from './ResponsiveSidePane.module.css';
 
 /**
  * A page's right-hand side pane: inline on desktop, and on mobile a bottom sheet
- * portalled to the body with a dismissing backdrop. The sheet entrance classes
- * only animate inside the mobile media query.
+ * portalled to the body with a dismissing backdrop. The sheet and backdrop styles
+ * are this component's own; `panelClassName` styles the desktop pane (and the
+ * sheet's contents), `backdropClassName` only adjusts the backdrop. The sheet
+ * entrance classes only animate inside the mobile media query.
  */
 export default function ResponsiveSidePane({
     open,
     isMobile,
     onClose,
     panelClassName,
-    backdropClassName,
+    backdropClassName = '',
     constrainToVisualViewport = true,
     children,
 }) {
@@ -24,7 +26,7 @@ export default function ResponsiveSidePane({
     return (
         <BodyPortal>
             <ModalBackdrop
-                className={`${backdropClassName} mobile-sheet-backdrop-enter`}
+                className={`${styles.backdrop} ${backdropClassName} mobile-sheet-backdrop-enter`}
                 constrainToVisualViewport={constrainToVisualViewport}
                 onClose={onClose}
                 aria-hidden="true"

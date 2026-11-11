@@ -93,7 +93,9 @@ describe('Notes mobile shell', () => {
         expect(document.querySelector('.mobile-sheet-enter [data-sheet-handle]')).toBeInTheDocument();
         expect(document.querySelector('.mobile-sheet-backdrop-enter')).toBeInTheDocument();
         expect(button).toHaveAttribute('aria-expanded', 'true');
-        fireEvent.click(screen.getByRole('button', { name: 'Hide', exact: true }));
+        // The same header as Sessions: Reset Filters and Hide.
+        expect(screen.getByRole('button', { name: 'Reset Filters' })).toBeDisabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Hide filters panel' }));
         expect(screen.queryByText('Filters')).not.toBeInTheDocument();
         expect(button).toHaveAttribute('aria-expanded', 'false');
     });

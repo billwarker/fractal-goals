@@ -1,16 +1,29 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getISOYMDInTimezone } from '../utils/dateUtils';
+import { formatLiteralDate, getISOYMDInTimezone } from '../utils/dateUtils';
 
 export const SESSION_RANGE_PRESETS = [
-    { value: '7d', label: '7D', days: 7 },
-    { value: '30d', label: '30D', days: 30 },
-    { value: '90d', label: '90D', days: 90 },
-    { value: '6m', label: '6M', months: 6 },
-    { value: '1y', label: '1Y', years: 1 },
-    { value: 'all', label: 'All' },
+    { value: '7d', label: '7D', days: 7, lookback: 'last 7 days' },
+    { value: '30d', label: '30D', days: 30, lookback: 'last 30 days' },
+    { value: '90d', label: '90D', days: 90, lookback: 'last 90 days' },
+    { value: '6m', label: '6M', months: 6, lookback: 'last 6 months' },
+    { value: '1y', label: '1Y', years: 1, lookback: 'last year' },
+    { value: 'all', label: 'All', lookback: 'all time' },
     { value: 'custom', label: 'Custom' },
 ];
+
+/** The sessions' time range in words: "last 90 days", "all time", or a custom "Aug 13 – Nov 10, 2026". */
+export function describeSessionRange({ rangePreset, rangeStart, rangeEnd } = {}) {
+    if (rangePreset === 'custom') {
+        const start = formatLiteralDate(rangeStart);
+        const end = formatLiteralDate(rangeEnd);
+        if (start && end) return `${start} – ${end}`;
+        if (start) return `since ${start}`;
+        if (end) return `until ${end}`;
+        return 'all time';
+    }
+    return SESSION_RANGE_PRESETS.find((item) => item.value === rangePreset)?.lookback || 'last 90 days';
+}
 
 const SESSION_HEATMAP_MODES = ['count', 'duration'];
 const SESSION_DURATION_OPERATORS = ['gt', 'lt'];
