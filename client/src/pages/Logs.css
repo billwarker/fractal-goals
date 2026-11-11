@@ -202,21 +202,21 @@
 }
 
 .log-event-tag.session {
-    background: rgba(76, 175, 80, 0.15);
+    background: color-mix(in srgb, var(--color-brand-success) 15%, transparent);
     color: var(--color-brand-success);
-    border: 1px solid rgba(76, 175, 80, 0.3);
+    border: 1px solid color-mix(in srgb, var(--color-brand-success) 30%, transparent);
 }
 
 .log-event-tag.goal {
-    background: rgba(33, 150, 243, 0.15);
+    background: color-mix(in srgb, var(--color-brand-primary) 15%, transparent);
     color: var(--color-brand-primary);
-    border: 1px solid rgba(33, 150, 243, 0.3);
+    border: 1px solid color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
 }
 
 .log-event-tag.target {
-    background: rgba(255, 152, 0, 0.15);
+    background: color-mix(in srgb, var(--color-brand-secondary) 15%, transparent);
     color: var(--color-mode-sets);
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    border: 1px solid color-mix(in srgb, var(--color-brand-secondary) 30%, transparent);
 }
 
 .log-event-tag.program {

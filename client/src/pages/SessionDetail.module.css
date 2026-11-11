@@ -200,7 +200,7 @@
 
 .sessionSectionDropZoneDragOver {
     border: 2px dashed var(--color-brand-success);
-    background: rgba(59, 197, 124, 0.08);
+    background: color-mix(in srgb, var(--color-brand-success) 8%, transparent);
 }
 
 .dragHint {
@@ -209,7 +209,7 @@
     color: var(--color-brand-success);
     font-size: 12px;
     font-style: italic;
-    background: rgba(59, 197, 124, 0.12);
+    background: color-mix(in srgb, var(--color-brand-success) 12%, transparent);
     border-radius: var(--border-radius-sm);
     margin-top: 8px;
 }

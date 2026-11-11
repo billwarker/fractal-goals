@@ -23,7 +23,7 @@
 .windowContainer.selected {
     border-color: var(--color-brand-primary);
     border-width: 2px;
-    box-shadow: 0 0 12px rgba(33, 150, 243, 0.3);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
 }
 
 /* On the page grid (Analytics): no fill, outline or shadow until selected, and a selected outline
@@ -38,7 +38,7 @@
 .windowContainer.onPageGrid.selected {
     border-width: 1px;
     border-color: var(--color-brand-primary);
-    box-shadow: 0 0 0 1px var(--color-brand-primary), 0 0 12px rgba(33, 150, 243, 0.3);
+    box-shadow: 0 0 0 1px var(--color-brand-primary), 0 0 12px color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
 }
 
 .onPageGrid .header {

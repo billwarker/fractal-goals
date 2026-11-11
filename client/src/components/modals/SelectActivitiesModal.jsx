@@ -176,8 +176,8 @@ function ActivitySelectionCard({ activity, isSelected, isAlreadyAssociated, onTo
         <div
             onClick={onToggle}
             style={{
-                background: isSelected ? '#2a4a2a' : '#1e1e1e',
-                border: `2px solid ${isSelected ? '#4caf50' : (isAlreadyAssociated ? '#333' : '#444')}`,
+                background: isSelected ? 'var(--color-brand-success-soft)' : 'var(--color-bg-card)',
+                border: `2px solid ${isSelected ? 'var(--color-brand-success)' : 'var(--color-border)'}`,
                 borderRadius: '6px',
                 padding: '10px 14px',
                 cursor: isAlreadyAssociated ? 'not-allowed' : 'pointer',
@@ -189,12 +189,12 @@ function ActivitySelectionCard({ activity, isSelected, isAlreadyAssociated, onTo
             }}
             onMouseEnter={(e) => {
                 if (!isAlreadyAssociated && !isSelected) {
-                    e.currentTarget.style.borderColor = '#4caf50';
+                    e.currentTarget.style.borderColor = 'var(--color-brand-success)';
                 }
             }}
             onMouseLeave={(e) => {
                 if (!isAlreadyAssociated && !isSelected) {
-                    e.currentTarget.style.borderColor = '#444';
+                    e.currentTarget.style.borderColor = 'var(--color-border)';
                 }
             }}
         >
@@ -202,12 +202,12 @@ function ActivitySelectionCard({ activity, isSelected, isAlreadyAssociated, onTo
                 width: '20px',
                 height: '20px',
                 borderRadius: '4px',
-                border: `2px solid ${isSelected ? '#4caf50' : '#666'}`,
-                background: isSelected ? '#4caf50' : 'transparent',
+                border: `2px solid ${isSelected ? 'var(--color-brand-success)' : 'var(--color-border-hover)'}`,
+                background: isSelected ? 'var(--color-brand-success)' : 'transparent',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#1a1a1a',
+                color: 'var(--color-text-inverse)',
                 fontSize: '14px',
                 fontWeight: 'bold',
                 flexShrink: 0
@@ -219,27 +219,27 @@ function ActivitySelectionCard({ activity, isSelected, isAlreadyAssociated, onTo
                 <div style={{
                     fontWeight: 'bold',
                     fontSize: '14px',
-                    color: isSelected || isAlreadyAssociated ? '#4caf50' : '#ccc',
+                    color: isSelected || isAlreadyAssociated ? 'var(--color-brand-success)' : 'var(--color-text-primary)',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px'
                 }}>
                     {activity.name}
                     {isAlreadyAssociated && (
-                        <span style={{ fontSize: '11px', color: '#666', fontWeight: 'normal' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 'normal' }}>
                             (Already associated)
                         </span>
                     )}
                 </div>
                 {activity.description && (
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '2px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
                         {activity.description}
                     </div>
                 )}
                 {hasMetrics && (
                     <div style={{
                         fontSize: '11px',
-                        color: '#555',
+                        color: 'var(--color-text-muted)',
                         marginTop: '4px',
                         display: 'flex',
                         gap: '8px',
@@ -247,7 +247,7 @@ function ActivitySelectionCard({ activity, isSelected, isAlreadyAssociated, onTo
                     }}>
                         {activity.metrics.map((m, idx) => (
                             <span key={idx} style={{
-                                background: '#2a2a2a',
+                                background: 'var(--color-bg-card-alt)',
                                 padding: '2px 6px',
                                 borderRadius: '3px'
                             }}>

@@ -51,6 +51,13 @@ The normal flow is:
 - `client/src/components/` owns reusable UI and feature views.
 - `client/src/hooks/` owns server-state orchestration and invalidation.
 - `client/src/contexts/` owns auth, theme, header, and lightweight UI coordination.
+
+Theme: `design-tokens.css` holds every colour with a dark (`:root`) and light (`[data-theme="light"]`,
+WinClassic-based) value; `npm run check:contrast` gates both and the maintainability audit caps raw colour
+literals. The preference (System / Light / Dark / Scheduled) resolves through `utils/themeSchedule.js`,
+mirrored before first paint by `public/boot/shell.js` (shared fixture `tests/fixtures/theme_schedule_cases.json`),
+lives per device in `theme-preference` and syncs to `user.preferences.appearance`. User-chosen goal colours
+are stored once and adapted for the light theme by `utils/themeColors.js` inside `GoalLevelsContext`.
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context
@@ -615,6 +622,13 @@ PostgreSQL database. It also builds the nginx container and verifies security he
 app shell, deep links, service-worker files and error responses through
 `scripts/check_frontend_headers.py`; shared nginx header includes preserve location-level
 cache policies without losing CSP or the other headers.
+
+`npm run sweep` (in `client/`) is the visual review loop: every surface in `client/e2e/sweep/manifest.js`
+(routes, plus modals opened by a step) is captured at 360/390/768/1440px in light and dark against the
+read-only showcase fractal and admin user (`scripts/browser_showcase_seed.py`), with horizontal
+overflow, touch-target (24px minimum, 40px recommended) and axe findings per capture. It writes the
+`client/sweep-results/index.html` contact sheet; `SWEEP_ENFORCE=1` turns the findings into failures.
+Add a manifest entry for every new page, modal or sheet.
 
 Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with

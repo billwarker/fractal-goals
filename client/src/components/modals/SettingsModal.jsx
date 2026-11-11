@@ -21,6 +21,7 @@ import styles from './SettingsModal.module.css';
 import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
 import OnboardingSettingsPanel from '../onboarding/OnboardingSettingsPanel';
 import AgentConnectionsPanel from '../agent/AgentConnectionsPanel';
+import AppearanceSettings from '../settings/AppearanceSettings';
 import StorageConnectionsPanel from '../settings/StorageConnectionsPanel';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
 
@@ -33,12 +34,7 @@ const SETTINGS_TABS = [
 ];
 
 const SettingsModalInner = ({ onClose, initialTab }) => {
-    const {
-        theme,
-        toggleTheme,
-        animatedIcons,
-        toggleAnimatedIcons
-    } = useTheme();
+    const { animatedIcons, toggleAnimatedIcons } = useTheme();
 
     const { preference, setPreference } = useTimezone();
 
@@ -178,22 +174,7 @@ const SettingsModalInner = ({ onClose, initialTab }) => {
                                     </div>
                                 </section>
 
-                                <section>
-                                    <h3 className={styles.sectionTitle}>
-                                        Interface Theme
-                                    </h3>
-                                    <div className={`${styles.actionRow} ${isMobile ? styles.actionRowMobile : styles.actionRowDesktop}`}>
-                                        <div className={styles.actionRowText}>
-                                            Current Mode: <strong>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</strong>
-                                        </div>
-                                        <button
-                                            onClick={toggleTheme}
-                                            className={styles.secondaryButton}
-                                        >
-                                            Toggle {theme === 'dark' ? 'Light' : 'Dark'} Mode
-                                        </button>
-                                    </div>
-                                </section>
+                                <AppearanceSettings titleClassName={styles.sectionTitle} />
 
                                 <section>
                                     <h3 className={styles.sectionTitle}>

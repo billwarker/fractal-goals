@@ -5,9 +5,9 @@
     min-width: 0;
     gap: 4px;
     padding: 3px;
-    border: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent);
+    border: 1px solid var(--color-toggle-track-border);
     border-radius: 6px;
-    background: color-mix(in srgb, var(--color-bg-secondary) 72%, var(--color-bg-app));
+    background: var(--color-toggle-track);
 }
 
 .tab {
@@ -34,7 +34,30 @@
 
 .tabActive {
     background: var(--view-toggle-panel-bg);
+    box-shadow: var(--shadow-toggle-thumb);
     color: var(--color-text-primary);
+}
+
+.tabActive:hover {
+    background: var(--view-toggle-panel-bg);
+}
+
+.tab:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+/* Compact toggle for settings rows: sized to its labels instead of filling the line. */
+.compact {
+    display: inline-flex;
+    width: auto;
+}
+
+.compact .tab {
+    flex: 0 0 auto;
+    min-height: 28px;
+    padding: 4px 14px;
+    font-size: 12px;
 }
 
 /* Fixed-footprint toggle for page headers, matching HeaderButton's height (32px desktop,
@@ -64,5 +87,21 @@
 
     .header .tab {
         min-height: 38px;
+    }
+}
+
+@media (max-width: 768px) {
+    .compact {
+        display: flex;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .compact .tab {
+        flex: 1 1 auto;
+        min-width: auto;
+        min-height: 40px;
+        padding-inline: 6px;
+        font-size: 13px;
     }
 }

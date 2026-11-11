@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Line } from 'react-chartjs-2';
-import { useGoalLevels } from '../../contexts/GoalLevelsContext';;
-import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity } from './ChartJSWrapper';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
+import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from './ChartJSWrapper';
 
 const GOAL_TYPES_HIERARCHY = [
     'UltimateGoal',
@@ -20,7 +20,9 @@ const GOAL_TYPES_HIERARCHY = [
  */
 function GoalCompletionTimeline({ goals, chartRef }) {
     const density = useChartDensity();
-    const { getGoalColor } = useGoalLevels();;
+    const { getGoalColor } = useGoalLevels();
+    // Canvas options can't read CSS variables; these are the theme's resolved colours.
+    const chartTheme = useChartThemeDefaults();
     // Goal types in hierarchy order from PARENT (bottom of stack) to CHILD (top of stack)
     // This ensures parent goals form the base of the stacked area chart
 
@@ -162,7 +164,7 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 display: true,
                 position: 'top',
                 labels: {
-                    color: '#ccc',
+                    color: chartTheme.textColor,
                     usePointStyle: true,
                     pointStyle: 'circle',
                     padding: 16,
@@ -172,9 +174,11 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 }
             },
             tooltip: {
-                backgroundColor: 'rgba(30, 30, 30, 0.95)',
-                titleColor: '#fff',
-                bodyColor: '#ccc',
+                backgroundColor: chartTheme.tooltipBg,
+                titleColor: chartTheme.tooltipText,
+                bodyColor: chartTheme.tooltipBody,
+                borderColor: chartTheme.tooltipBorder,
+                borderWidth: 1,
                 padding: 12,
                 displayColors: true,
                 callbacks: {
@@ -229,11 +233,11 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 title: {
                     display: true,
                     text: 'Completion Date',
-                    color: '#888',
+                    color: chartTheme.textColor,
                     font: { size: 12 }
                 },
-                ticks: { color: '#888' },
-                grid: { color: '#333' }
+                ticks: { color: chartTheme.textColor },
+                grid: { color: chartTheme.gridColor }
             },
             y: {
                 stacked: true,
@@ -241,17 +245,17 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 title: {
                     display: true,
                     text: 'Cumulative Goals Completed',
-                    color: '#888',
+                    color: chartTheme.textColor,
                     font: { size: 12 }
                 },
                 ticks: {
-                    color: '#888',
+                    color: chartTheme.textColor,
                     stepSize: 1
                 },
-                grid: { color: '#333' }
+                grid: { color: chartTheme.gridColor }
             }
         }
-    }), [chartData.goalsPerDate]);
+    }), [chartData.goalsPerDate, chartTheme]);
 
     // Empty state
     if (!chartData.datasets.length) {
@@ -262,14 +266,14 @@ function GoalCompletionTimeline({ goals, chartRef }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'column',
-                color: '#666',
+                color: 'var(--color-text-muted)',
                 padding: '40px'
             }}>
                 <div style={{ fontSize: '13px', marginBottom: '12px', opacity: 0.7 }}>No completions</div>
-                <h3 style={{ fontSize: '16px', fontWeight: 500, color: '#888', margin: 0 }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 500, color: 'var(--color-text-secondary)', margin: 0 }}>
                     No Completed Goals Yet
                 </h3>
-                <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', textAlign: 'center', maxWidth: '300px' }}>
+                <p style={{ fontSize: '13px', color: 'var(--color-text-muted)', marginTop: '8px', textAlign: 'center', maxWidth: '300px' }}>
                     Complete goals to see your cumulative progress visualized over time
                 </p>
             </div>

@@ -302,7 +302,7 @@ html {
 .details-modal ul {
     list-style: disc;
     padding-left: 20px;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--color-bg-card-alt);
     padding: 15px 15px 15px 35px;
     border-radius: 6px;
 }
@@ -364,7 +364,7 @@ html {
     list-style: none;
     padding: 0;
     margin: 10px 0;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--color-bg-card-alt);
     border-radius: 6px;
     padding: 12px;
 }
@@ -386,9 +386,9 @@ html {
 .completion-section {
     margin-top: 20px;
     padding: 15px;
-    background: rgba(55, 148, 255, 0.1);
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
     border-radius: 8px;
-    border: 1px solid rgba(55, 148, 255, 0.3);
+    border: 1px solid color-mix(in srgb, var(--color-brand-primary) 30%, transparent);
 }
 
 .completion-label {
@@ -609,7 +609,7 @@ html {
 .checkbox-list {
     max-height: 200px;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--color-bg-card-alt);
     padding: 12px;
     border-radius: 6px;
 }
@@ -625,7 +625,7 @@ html {
 }
 
 .checkbox-label:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--color-bg-hover);
 }
 
 .checkbox-label input[type="checkbox"] {
@@ -642,7 +642,7 @@ html {
 }
 
 .immediate-goal-item {
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--color-bg-card-alt);
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 12px;
@@ -695,5 +695,5 @@ html {
 }
 
 .add-goal-btn:hover {
-    background: rgba(55, 148, 255, 0.1);
+    background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
 }

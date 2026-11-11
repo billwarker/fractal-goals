@@ -24,8 +24,8 @@ class GlobalErrorBoundary extends React.Component {
             return (
                 <div style={{
                     padding: '2rem',
-                    backgroundColor: '#1e1e1e',
-                    color: '#e0e0e0',
+                    backgroundColor: 'var(--color-bg-app)',
+                    color: 'var(--color-text-primary)',
                     height: '100vh',
                     display: 'flex',
                     flexDirection: 'column',
@@ -33,12 +33,12 @@ class GlobalErrorBoundary extends React.Component {
                     justifyContent: 'center',
                     fontFamily: 'system-ui, sans-serif'
                 }}>
-                    <h1 style={{ color: '#ff5252' }}>Something went wrong.</h1>
+                    <h1 style={{ color: 'var(--color-brand-danger)' }}>Something went wrong.</h1>
                     <p>The application encountered an unexpected error.</p>
                     <div style={{
                         marginTop: '1rem',
                         padding: '1rem',
-                        backgroundColor: '#333',
+                        backgroundColor: 'var(--color-bg-card-alt)',
                         borderRadius: '4px',
                         maxWidth: '600px',
                         width: '100%',
@@ -54,7 +54,7 @@ class GlobalErrorBoundary extends React.Component {
                         style={{
                             marginTop: '2rem',
                             padding: '0.75rem 1.5rem',
-                            backgroundColor: '#4caf50',
+                            backgroundColor: 'var(--color-brand-success)',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',

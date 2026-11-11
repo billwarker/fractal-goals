@@ -16,17 +16,18 @@ export default function ApplicationProviders({ children }) {
     return (
         <TimezoneProvider>
             <AuthProvider>
-                <OutboxProvider>
-                    <OnboardingProvider>
-                        <GoalLevelsProvider>
-                            <GoalsProvider>
-                                <ThemeProvider>
+                {/* Above goal levels, whose colours adapt to the resolved theme. */}
+                <ThemeProvider>
+                    <OutboxProvider>
+                        <OnboardingProvider>
+                            <GoalLevelsProvider>
+                                <GoalsProvider>
                                     <ActivitiesProvider>{children}</ActivitiesProvider>
-                                </ThemeProvider>
-                            </GoalsProvider>
-                        </GoalLevelsProvider>
-                    </OnboardingProvider>
-                </OutboxProvider>
+                                </GoalsProvider>
+                            </GoalLevelsProvider>
+                        </OnboardingProvider>
+                    </OutboxProvider>
+                </ThemeProvider>
             </AuthProvider>
         </TimezoneProvider>
     );

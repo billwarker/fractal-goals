@@ -318,6 +318,7 @@ run_frontend_maintainability() {
     ensure_frontend_tools
     frontend_npm_script check:maintainability
     frontend_npm_script check:responsive
+    frontend_npm_script check:contrast
 }
 
 run_typecheck() {

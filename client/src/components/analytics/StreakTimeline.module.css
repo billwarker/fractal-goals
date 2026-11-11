@@ -201,8 +201,8 @@
 .motivation {
     margin-top: 20px;
     padding: 12px 16px;
-    background: linear-gradient(90deg, rgba(255, 152, 0, 0.1), rgba(255, 152, 0, 0.05));
-    border: 1px solid rgba(255, 152, 0, 0.2);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--color-brand-secondary) 10%, transparent), color-mix(in srgb, var(--color-brand-secondary) 5%, transparent));
+    border: 1px solid color-mix(in srgb, var(--color-brand-secondary) 20%, transparent);
     border-radius: 6px;
     font-size: 13px;
     color: var(--color-warning);

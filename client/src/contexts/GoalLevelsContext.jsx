@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { globalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
+import { adaptColorForTheme } from '../utils/themeColors';
 import { useAuth } from './AuthContext';
+import { useOptionalTheme } from './ThemeContext';
 
 const GoalLevelsContext = createContext();
 
@@ -189,7 +191,10 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         return goalLevels.find(l => l.name === name) || getFallbackLevelByName(name);
     };
 
-    const getGoalColor = (goal) => {
+    // Stored colours were picked for the dark theme; the light theme gets readable variants.
+    const resolvedTheme = useOptionalTheme()?.resolvedTheme ?? 'dark';
+
+    const getStoredGoalColor = (goal) => {
         if (!goal) return FALLBACK_COLOR;
 
         // If we already have the level object fully populated from a join:
@@ -219,11 +224,15 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         return FALLBACK_COLOR;
     };
 
+    const getGoalColor = (goal) => adaptColorForTheme(getStoredGoalColor(goal), resolvedTheme);
+
     // For when components know the name (e.g. from ThemeContext legacy calls)
     const getColorByName = (name) => {
-        if (name === 'Completed') return user?.preferences?.completed_primary_color || FALLBACK_COLOR;
+        if (name === 'Completed') {
+            return adaptColorForTheme(user?.preferences?.completed_primary_color || FALLBACK_COLOR, resolvedTheme);
+        }
         const lvl = getLevelByName(name);
-        return lvl?.color || FALLBACK_COLOR;
+        return adaptColorForTheme(lvl?.color || FALLBACK_COLOR, resolvedTheme);
     };
 
     const getGoalIcon = (goal) => {

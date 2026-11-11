@@ -61,6 +61,7 @@
     border: 0;
     color: inherit;
     font: inherit;
+    font-size: var(--font-size-md);
     cursor: pointer;
     text-align: left;
     white-space: nowrap;
@@ -77,7 +78,7 @@
 }
 
 .tabDesktop {
-    padding: 12px 24px;
+    padding: 9px 20px;
     border-bottom: none;
 }
 
@@ -161,10 +162,12 @@
 
 .sectionTitle {
     margin-top: 0;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     color: var(--color-text-primary);
     border-bottom: 1px solid var(--color-border);
-    padding-bottom: 8px;
+    padding-bottom: 6px;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-semibold);
 }
 
 .sectionContentStack {
@@ -187,6 +190,7 @@
 
 .checkboxLabel {
     color: var(--color-text-primary);
+    font-size: var(--font-size-md);
     cursor: pointer;
 }
 

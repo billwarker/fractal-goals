@@ -49,6 +49,9 @@ jobs:
       - name: Maintainability audit
         run: npm run check:maintainability
 
+      - name: Theme contrast check
+        run: npm run check:contrast
+
       - name: Build
         run: npm run build
 

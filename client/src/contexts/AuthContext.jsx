@@ -252,3 +252,6 @@ export const useAuth = () => {
     }
     return context;
 };
+
+/** For providers that work signed out too (e.g. the theme); null outside an AuthProvider. */
+export const useOptionalAuth = () => useContext(AuthContext);

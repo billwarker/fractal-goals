@@ -368,9 +368,29 @@ class AdminInviteKeyCreateSchema(BaseModel):
         return sanitize_string(v) if v else v
 
 
+class AppearancePreferenceSchema(BaseModel):
+    """Theme preference, mirrored by client/src/utils/themeSchedule.js.
+
+    Schedule times are device-local "HH:MM": dark from `darkFrom` until `lightFrom`.
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    mode: Literal['system', 'light', 'dark', 'schedule']
+    darkFrom: str = Field('20:00', pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
+    lightFrom: str = Field('07:00', pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
+
+
 class UserPreferencesUpdateSchema(BaseModel):
     """Schema for updating user preferences."""
     preferences: Dict[str, Any] = Field(...)
+
+    @field_validator('preferences')
+    @classmethod
+    def validate_appearance(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        # Other keys stay free-form; appearance is read before first paint, so it must be well formed.
+        if 'appearance' in v:
+            v = {**v, 'appearance': AppearancePreferenceSchema.model_validate(v['appearance']).model_dump()}
+        return v
 
 
 class OnboardingStateUpdateSchema(BaseModel):

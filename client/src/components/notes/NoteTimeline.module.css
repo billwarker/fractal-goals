@@ -42,7 +42,14 @@
     background: var(--rail-color);
 }
 
-/* Shared node look: filled dot with a page-coloured ring that cuts the rail. */
+/* Lines break around the nodes on them (useTimelineLineGaps sets --line-mask), so nodes are see-through. */
+.rail::before,
+.sessionNotes::before {
+    -webkit-mask-image: var(--line-mask, none);
+    mask-image: var(--line-mask, none);
+}
+
+/* Shared node look: a hollow dot in the gap its line leaves for it. */
 .continuousTimeline .dateHeader::before,
 .standaloneNote::before {
     content: '';
@@ -50,7 +57,6 @@
     z-index: 1;
     box-sizing: border-box;
     border-radius: 50%;
-    box-shadow: 0 0 0 3px var(--color-bg-primary, var(--color-bg-surface));
 }
 
 .continuousTimeline .dateHeader {
@@ -68,7 +74,7 @@
     width: var(--node);
     height: var(--node);
     border: 2px solid var(--color-text-muted);
-    background: var(--color-bg-primary, var(--color-bg-surface));
+    background: transparent;
 }
 
 .continuousTimeline .dateGroup:first-child .dateHeader {
@@ -93,7 +99,7 @@
 
 /*
  * Directory nodes: the Analytics category icons on the timeline's lines, each centred on its parent's
- * line with a page-coloured ring that cuts it. Sessions and lone goal or activity notes sit on the rail;
+ * line, which breaks around it. Sessions and lone goal or activity notes sit on the rail;
  * an activity sits on its session's bracket. Labels stay one grid unit to the right.
  */
 .treeNode {
@@ -107,8 +113,7 @@
     place-items: center;
     border: 1px solid color-mix(in srgb, var(--node-color) 55%, var(--color-border));
     border-radius: 5px;
-    background: var(--color-bg-primary, var(--color-bg-surface));
-    box-shadow: 0 0 0 3px var(--color-bg-primary, var(--color-bg-surface));
+    background: transparent;
     color: var(--node-color);
 }
 
@@ -183,10 +188,19 @@
 
 /* A light bracket in the session's colour, centred on the badge's grid line, groups its notes one unit in. */
 .sessionNotes {
+    position: relative;
     min-width: 0;
-    margin-left: -1px;
-    padding-left: calc(var(--grid, 20px) - 1px);
-    border-left: 2px solid color-mix(in srgb, var(--session-color) 45%, transparent);
+    padding-left: var(--grid, 20px);
+}
+
+.sessionNotes::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -1px;
+    width: 2px;
+    background: color-mix(in srgb, var(--session-color) 45%, transparent);
 }
 
 .activityGroup {
@@ -238,7 +252,7 @@
     width: var(--node-small);
     height: var(--node-small);
     border: 1.5px solid var(--color-text-muted);
-    background: var(--color-bg-primary, var(--color-bg-surface));
+    background: transparent;
 }
 
 .emptyState {

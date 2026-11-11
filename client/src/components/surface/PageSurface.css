@@ -74,7 +74,7 @@
 
 .surface-window-selected {
     border: 2px solid var(--color-brand-primary, var(--color-primary)) !important;
-    box-shadow: 0 0 12px rgba(33, 150, 243, 0.3) !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-brand-primary) 30%, transparent) !important;
 }
 
 .surface-panel-configurable {

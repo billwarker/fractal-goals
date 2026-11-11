@@ -118,8 +118,8 @@ function AnnotationLayer({
             top: Math.min(selectionStart.y, selectionEnd.y),
             width: Math.abs(selectionEnd.x - selectionStart.x),
             height: Math.abs(selectionEnd.y - selectionStart.y),
-            border: '2px dashed #2196f3',
-            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+            border: '2px dashed var(--color-brand-primary)',
+            backgroundColor: 'var(--color-brand-primary-soft)',
             pointerEvents: 'none',
             zIndex: 100
         };
@@ -150,7 +150,7 @@ function AnnotationLayer({
                     position: 'absolute',
                     left: Math.max(selectionStart?.x || 0, selectionEnd?.x || 0) + 8,
                     top: Math.min(selectionStart?.y || 0, selectionEnd?.y || 0),
-                    background: '#2196f3',
+                    background: 'var(--color-brand-primary)',
                     color: 'white',
                     padding: '4px 8px',
                     borderRadius: '4px',
@@ -171,10 +171,10 @@ function AnnotationLayer({
                     top: '8px',
                     right: '8px',
                     padding: '6px 12px',
-                    background: enabled ? '#2196f3' : 'rgba(50, 50, 50, 0.9)',
+                    background: enabled ? 'var(--color-brand-primary)' : 'var(--color-bg-tooltip)',
                     border: enabled ? '2px solid #1976d2' : '1px solid #555',
                     borderRadius: '4px',
-                    color: enabled ? 'white' : '#aaa',
+                    color: enabled ? 'var(--color-text-inverse)' : 'var(--color-text-muted)',
                     fontSize: '11px',
                     fontWeight: 500,
                     cursor: 'pointer',
@@ -208,7 +208,7 @@ function AnnotationLayer({
                                 width: '24px',
                                 height: '24px',
                                 borderRadius: '50%',
-                                background: '#ff9800',
+                                background: 'var(--color-brand-secondary)',
                                 border: '2px solid #f57c00',
                                 color: 'white',
                                 fontSize: '10px',
@@ -226,7 +226,7 @@ function AnnotationLayer({
                     {annotations.length > 3 && (
                         <span style={{
                             fontSize: '11px',
-                            color: '#888',
+                            color: 'var(--color-text-muted)',
                             display: 'flex',
                             alignItems: 'center'
                         }}>

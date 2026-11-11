@@ -28,12 +28,12 @@ class ComponentErrorBoundary extends React.Component {
                 <div style={{
                     padding: '16px',
                     margin: '8px 0',
-                    backgroundColor: 'rgba(255, 82, 82, 0.1)',
+                    backgroundColor: 'var(--color-brand-danger-soft)',
                     border: '1px solid #ff5252',
                     borderRadius: '8px',
-                    color: '#ffbaba'
+                    color: 'var(--color-text-primary)'
                 }}>
-                    <h4 style={{ margin: '0 0 8px 0', color: '#ff5252' }}>Something went wrong in this component</h4>
+                    <h4 style={{ margin: '0 0 8px 0', color: 'var(--color-brand-danger)' }}>Something went wrong in this component</h4>
                     <pre style={{
                         margin: 0,
                         fontSize: '12px',
@@ -54,7 +54,7 @@ class ComponentErrorBoundary extends React.Component {
                             marginTop: '12px',
                             background: 'transparent',
                             border: '1px solid #ff5252',
-                            color: '#ff5252',
+                            color: 'var(--color-brand-danger)',
                             padding: '4px 8px',
                             borderRadius: '4px',
                             cursor: 'pointer',

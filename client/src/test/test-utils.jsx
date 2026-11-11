@@ -40,11 +40,11 @@ export function renderWithProviders(
             </Routes>
         );
 
-        if (withTheme) {
-            wrappedUi = <ThemeProvider>{wrappedUi}</ThemeProvider>;
-        }
         if (withGoalLevels) {
             wrappedUi = <GoalLevelsProvider>{wrappedUi}</GoalLevelsProvider>;
+        }
+        if (withTheme) {
+            wrappedUi = <ThemeProvider>{wrappedUi}</ThemeProvider>;
         }
         if (withAuth) {
             wrappedUi = <AuthProvider>{wrappedUi}</AuthProvider>;

@@ -122,7 +122,7 @@
 
 .groupCardHasSelection {
     border-color: var(--color-brand-primary);
-    background: rgba(76, 175, 80, 0.05);
+    background: color-mix(in srgb, var(--color-brand-success) 5%, transparent);
 }
 
 .groupName {
@@ -142,7 +142,7 @@
     font-size: 0.75rem;
     font-weight: bold;
     color: var(--color-brand-primary);
-    background: rgba(76, 175, 80, 0.1);
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
     padding: 2px 8px;
     border-radius: 12px;
 }
@@ -177,7 +177,7 @@
 }
 
 .activityRowSelected {
-    background: rgba(76, 175, 80, 0.05);
+    background: color-mix(in srgb, var(--color-brand-success) 5%, transparent);
     border-color: var(--color-brand-primary);
 }
 

@@ -1,0 +1,44 @@
+.schedule {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-md);
+    margin-top: var(--spacing-sm);
+}
+
+.time {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.time input {
+    height: 30px;
+    padding: 0 var(--spacing-sm);
+    border: 1px solid var(--color-border-input);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+}
+
+.time input:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.status {
+    margin: var(--spacing-sm) 0 0;
+    font-size: var(--font-size-xs);
+    color: var(--color-text-muted);
+}
+
+/* Phones keep 44px targets; the inputs' 16px text stops iOS zooming in on focus. */
+@media (max-width: 768px) {
+    .time input {
+        height: 44px;
+        font-size: 16px;
+    }
+}

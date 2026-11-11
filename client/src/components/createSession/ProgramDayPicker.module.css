@@ -125,7 +125,7 @@
 }
 
 .sessionRowSelected {
-    background: rgba(76, 175, 80, 0.1);
+    background: color-mix(in srgb, var(--color-brand-success) 10%, transparent);
     border-color: var(--color-brand-success);
 }
 

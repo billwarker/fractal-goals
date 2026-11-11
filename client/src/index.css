@@ -149,13 +149,13 @@ svg {
   }
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: var(--color-text-primary);
-    background-color: var(--color-bg-app);
-  }
-
-  a:hover {
-    color: var(--color-brand-primary-hover);
+/* A scheduled theme switch (ThemeContext) eases colours instead of flashing. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: background-color 600ms var(--ease-standard), color 600ms var(--ease-standard),
+      border-color 600ms var(--ease-standard), fill 600ms var(--ease-standard), stroke 600ms var(--ease-standard) !important;
   }
 }
