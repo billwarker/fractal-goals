@@ -1,10 +1,17 @@
 """Batch program display context onto serialized notes without changing canonical note ownership."""
+from typing import overload
+
 from sqlalchemy.orm import joinedload
 
 from models import ActivityInstance, Goal, MetricValue, Program, ProgramBlock
 from services._serialize_activities import serialize_metric_value
+from services.service_types import JsonDict, JsonList
 
 
+@overload
+def attach_program_names(db_session, notes_payload: JsonDict) -> JsonDict: ...
+@overload
+def attach_program_names(db_session, notes_payload: JsonList) -> JsonList: ...
 def attach_program_names(db_session, notes_payload):
     """Program and program-date notes get `program_name` and `program_color` (the program's colour, else its
     first coloured block's, as the calendar draws it); a date note also gets `block_color`, the colour of

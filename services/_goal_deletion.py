@@ -4,7 +4,7 @@ Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from models import Goal, get_goal_by_id
 from services._completion_context import _emit_pending_events
@@ -17,6 +17,10 @@ from services.service_types import ServiceResult
 
 class _GoalDeletionMixin:
     db_session: Any  # provided by the composed GoalService
+
+    if TYPE_CHECKING:
+        # Provided by _GoalHelpersMixin in the composed GoalService.
+        def _soft_delete_goal_subtree(self, goal: Goal, deleted_at: datetime) -> list[Goal]: ...
 
     def delete_fractal_goal(self, root_id, goal_id, current_user_id, *, emit_event=True, begin_next=True) -> ServiceResult[Goal]:
         _, error = self._validate_owned_root(root_id, current_user_id)

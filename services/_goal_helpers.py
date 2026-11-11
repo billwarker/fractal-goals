@@ -139,7 +139,7 @@ class _GoalHelpersMixin:
 
     def goal_subtree_ids(self, goal: Goal) -> list[str]:
         """The goal and every live goal under it: what deleting it would delete."""
-        return [item.id for item in self._collect_goal_subtree(goal)]
+        return [str(item.id) for item in self._collect_goal_subtree(goal)]
 
     def _soft_delete_goal_subtree(self, goal: Goal, deleted_at: datetime) -> list[Goal]:
         subtree = self._collect_goal_subtree(goal)
