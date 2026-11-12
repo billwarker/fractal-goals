@@ -7,7 +7,7 @@ on:
 
 jobs:
   frontend:
-    timeout-minutes: 15
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,10 +37,10 @@ jobs:
         run: npm run typecheck
 
       - name: Frontend Tests and Coverage
-        # Coverage on hosted runners outlasts the 180s local default; the job
+        # Coverage takes ~2 min locally but close to 8 on hosted runners; the job
         # timeout still bounds a real hang.
         env:
-          VITEST_WALL_TIMEOUT_MS: "480000"
+          VITEST_WALL_TIMEOUT_MS: "720000"
         run: npm run test:coverage
 
       - name: Responsive audit
