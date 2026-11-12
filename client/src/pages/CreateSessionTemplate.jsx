@@ -12,6 +12,7 @@ import TemplateCard from '../components/TemplateCard';
 import TemplateBuilderModal from '../components/modals/TemplateBuilderModal';
 import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
 import PageHeader from '../components/layout/PageHeader';
+import LoadingState from '../components/common/LoadingState';
 import headerStyles from '../components/layout/PageHeader.module.css';
 import HeaderButton from '../components/layout/HeaderButton';
 import { getTemplateSortTimestamp } from '../utils/durationStats';
@@ -216,7 +217,7 @@ function CreateSessionTemplate() {
     }
 
     if (loading) {
-        return <div className="page-container" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-primary)' }}>Loading templates...</div>;
+        return <LoadingState variant="page" label="Loading templates…" />;
     }
 
     return (

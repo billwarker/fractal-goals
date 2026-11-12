@@ -149,13 +149,23 @@ svg {
   }
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: var(--color-text-primary);
-    background-color: var(--color-bg-app);
-  }
+/* Phones: text fields at 16px, because iOS Safari zooms the page into any smaller focused field.
+   The one global override of component type sizes, so it needs !important. */
+@media (max-width: 768px) {
+    input:not([type='checkbox'], [type='radio'], [type='range'], [type='color'], [type='file']),
+    select,
+    textarea {
+        font-size: max(16px, 1em) !important;
+    }
+}
 
-  a:hover {
-    color: var(--color-brand-primary-hover);
+/* A scheduled theme switch (ThemeContext) eases colours instead of flashing. */
+@media (prefers-reduced-motion: no-preference) {
+  html.theme-transitioning,
+  html.theme-transitioning *,
+  html.theme-transitioning *::before,
+  html.theme-transitioning *::after {
+    transition: background-color 600ms var(--ease-standard), color 600ms var(--ease-standard),
+      border-color 600ms var(--ease-standard), fill 600ms var(--ease-standard), stroke 600ms var(--ease-standard) !important;
   }
 }

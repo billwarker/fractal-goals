@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { attachFeedBlocks, buildCalendarFeedEvents, mergeCalendarFeedChunks } from '../programCalendarFeed';
 
 const program = { id: 'p1', name: 'Base', color: '#112233', start_date: '2026-08-20', end_date: '2026-10-05' };

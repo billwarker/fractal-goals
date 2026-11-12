@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { shownGrainNote } from '../visualizations/shared/GrainControl';
 
 describe('shownGrainNote', () => {

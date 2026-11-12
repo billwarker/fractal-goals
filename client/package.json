@@ -17,7 +17,12 @@
     "test:run": "node scripts/run-vitest-with-timeout.mjs",
     "test:related": "node scripts/run-vitest-with-timeout.mjs --related",
     "test:coverage": "node scripts/run-vitest-with-timeout.mjs --coverage",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:browser:smoke": "playwright test --project=setup --project=desktop e2e/production.spec.js e2e/offline-session.spec.js e2e/quick-session-completion.spec.js e2e/progress-on-save.spec.js e2e/notes-page.spec.js e2e/goal-reviews.spec.js e2e/program-session-plans.spec.js e2e/settings-storage.spec.js e2e/agent-connections.spec.js e2e/landing.spec.js e2e/demo.spec.js e2e/admin-live-demo.spec.js e2e/onboarding.spec.js",
+    "sweep": "node scripts/run-sweep.mjs",
+    "sweep:quick": "node scripts/run-sweep.mjs --project=sweep-setup --project=sweep-phone-light --project=sweep-phone-dark --project=sweep-desktop-light --project=sweep-desktop-dark",
+    "sweep:report": "node scripts/sweep-report.mjs",
+    "check:contrast": "node scripts/check-theme-contrast.mjs"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.1.1",
@@ -43,6 +48,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.63.0",
     "@resvg/resvg-js": "^2.6.2",

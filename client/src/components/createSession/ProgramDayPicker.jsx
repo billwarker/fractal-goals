@@ -4,6 +4,7 @@ import ProgramName from '../atoms/ProgramName';
 import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
+import LoadingState from '../common/LoadingState';
 import StepHeader from './StepHeader';
 import styles from './ProgramDayPicker.module.css';
 
@@ -76,11 +77,15 @@ function ProgramDayPicker({
         return (
             <StepContainer>
                 <StepHeader stepNumber={1} title="Select a Day from Your Program" />
-                <EmptyState
-                    description={previousDaysLoading ? 'Loading previous program days…' : 'No program days today, and none before today.'}
-                    actionLabel={hasTemplates ? 'Select Template Instead' : undefined}
-                    onAction={hasTemplates ? onSwitchToTemplate : undefined}
-                />
+                {previousDaysLoading ? (
+                    <LoadingState label="Loading previous program days…" />
+                ) : (
+                    <EmptyState
+                        description="No program days today, and none before today."
+                        actionLabel={hasTemplates ? 'Select Template Instead' : undefined}
+                        onAction={hasTemplates ? onSwitchToTemplate : undefined}
+                    />
+                )}
             </StepContainer>
         );
     }

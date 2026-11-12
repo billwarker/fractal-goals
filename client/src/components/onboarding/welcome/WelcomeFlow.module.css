@@ -1,0 +1,226 @@
+.page {
+    display: grid;
+    min-height: 100%;
+    padding: var(--spacing-xl) var(--spacing-lg);
+    place-items: center;
+    background-color: var(--color-bg-app);
+    background-image:
+        linear-gradient(var(--color-grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--color-grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+    width: min(560px, 100%);
+    padding: var(--spacing-xl);
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-lg, 12px);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-md);
+}
+
+.progress {
+    display: flex;
+    gap: 6px;
+}
+
+.progressDot,
+.progressDone {
+    width: 28px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-toggle-track);
+}
+
+.progressDone {
+    background: var(--color-brand-primary);
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: clamp(1.4rem, 4vw, 1.75rem);
+    line-height: 1.2;
+}
+
+.title:focus {
+    outline: none;
+}
+
+.lead {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-md);
+    line-height: 1.55;
+}
+
+.fields {
+    display: grid;
+    gap: var(--spacing-sm);
+}
+
+.field {
+    display: grid;
+    gap: 4px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
+}
+
+.field input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 40px;
+    padding: 0 var(--spacing-md);
+    border: 1px solid var(--color-border-input);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-normal);
+}
+
+.field input:focus-visible {
+    border-color: var(--color-brand-primary);
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.example {
+    min-height: 32px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-card-alt);
+    color: var(--color-text-primary);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-sm);
+}
+
+.example:hover {
+    border-color: var(--color-border-hover);
+}
+
+.example:focus-visible,
+.skip:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.illustration {
+    padding: var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
+}
+
+.preview {
+    display: grid;
+    gap: 8px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-md);
+}
+
+.previewRoot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: var(--font-weight-semibold);
+}
+
+.previewPlaceholder {
+    color: var(--color-text-muted);
+    font-weight: var(--font-weight-normal);
+}
+
+/* Children hang off the root on a line, as on the Goals page's hierarchy view. */
+.previewChildren {
+    display: grid;
+    gap: 8px;
+    margin: 0 0 0 10px;
+    padding: 0 0 0 20px;
+    border-left: 2px solid var(--color-connection-line);
+    list-style: none;
+}
+
+.previewChildren li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.previewChildren li::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    width: 16px;
+    border-top: 2px solid var(--color-connection-line);
+}
+
+.actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
+}
+
+.skip {
+    align-self: center;
+    min-height: 40px;
+    padding: 0 var(--spacing-sm);
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    text-decoration: underline;
+}
+
+/* Phones: the flow fills the screen, with the actions full width. */
+@media (max-width: 768px) {
+    .page {
+        padding: 0;
+        place-items: stretch;
+    }
+
+    .card {
+        width: 100%;
+        min-height: 100%;
+        padding: var(--spacing-lg);
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    .actions {
+        margin-top: auto;
+    }
+
+    .actions > * {
+        flex: 1;
+        min-height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .card > * {
+        animation: welcomeIn var(--duration-base, 200ms) var(--ease-out, ease-out);
+    }
+}
+
+@keyframes welcomeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+}

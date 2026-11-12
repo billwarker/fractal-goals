@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { familiesWithMembers, groupTagsForPicker, toggleTagSelection } from '../tagPickerOptions';
 
 const catalog = {

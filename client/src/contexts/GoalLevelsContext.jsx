@@ -3,7 +3,9 @@ import { useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { globalApi } from '../utils/api';
 import { queryKeys } from '../hooks/queryKeys';
+import { adaptColorForTheme } from '../utils/themeColors';
 import { useAuth } from './AuthContext';
+import { useOptionalTheme } from './ThemeContext';
 
 const GoalLevelsContext = createContext();
 
@@ -97,6 +99,12 @@ export function resolveGoalLevel(goalLevels, goalOrType) {
     return null;
 }
 
+const ROOT_PATH_PATTERN = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
+export function getRootIdFromPath(pathname) {
+    return pathname?.match(ROOT_PATH_PATTERN)?.[1] ?? null;
+}
+
 export function adjustBrightness(hex, percent) {
     hex = hex.replace('#', '');
     let r = parseInt(hex.substring(0, 2), 16);
@@ -120,22 +128,10 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
     // SMART) resolves from the published snapshot exactly like the authenticated app.
     const hasSeed = Array.isArray(seedLevels) && seedLevels.length > 0;
 
-    // Extract rootId from URL path (pattern: /:rootId/...)
-    // UUID pattern: 8-4-4-4-12 hex characters
-    const getRootIdFromUrl = () => {
-        const match = window.location.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-        return match ? match[1] : null;
-    };
-
-    const [currentRootId, setCurrentRootId] = React.useState(getRootIdFromUrl);
-
+    // The fractal's levels carry its own colours. Read the root from the router's path
+    // (/:rootId/...), not the window's, so it also resolves under the demo's /demo basename.
     const location = useLocation();
-
-    // Keep rootId in sync with URL changes efficiently
-    React.useEffect(() => {
-        const newRootId = getRootIdFromUrl();
-        setCurrentRootId(prev => prev !== newRootId ? newRootId : prev);
-    }, [location.pathname]);
+    const currentRootId = getRootIdFromPath(location.pathname);
 
     const {
         data: fetchedGoalLevels = [],
@@ -189,7 +185,10 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         return goalLevels.find(l => l.name === name) || getFallbackLevelByName(name);
     };
 
-    const getGoalColor = (goal) => {
+    // Stored colours were picked for the dark theme; the light theme gets readable variants.
+    const resolvedTheme = useOptionalTheme()?.resolvedTheme ?? 'dark';
+
+    const getStoredGoalColor = (goal) => {
         if (!goal) return FALLBACK_COLOR;
 
         // If we already have the level object fully populated from a join:
@@ -219,11 +218,15 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
         return FALLBACK_COLOR;
     };
 
+    const getGoalColor = (goal) => adaptColorForTheme(getStoredGoalColor(goal), resolvedTheme);
+
     // For when components know the name (e.g. from ThemeContext legacy calls)
     const getColorByName = (name) => {
-        if (name === 'Completed') return user?.preferences?.completed_primary_color || FALLBACK_COLOR;
+        if (name === 'Completed') {
+            return adaptColorForTheme(user?.preferences?.completed_primary_color || FALLBACK_COLOR, resolvedTheme);
+        }
         const lvl = getLevelByName(name);
-        return lvl?.color || FALLBACK_COLOR;
+        return adaptColorForTheme(lvl?.color || FALLBACK_COLOR, resolvedTheme);
     };
 
     const getGoalIcon = (goal) => {

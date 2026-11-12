@@ -1,52 +1,80 @@
-import React, { useState, useEffect } from 'react';
-import Linkify from '../components/atoms/Linkify';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDateInTimezone } from '../utils/dateUtils';
-import { useLogsData } from '../hooks/useLogsData';
-import useIsMobile from '../hooks/useIsMobile';
-import { useAuth } from '../contexts/AuthContext';
-import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+
 import Button from '../components/atoms/Button';
+import HeaderButton from '../components/layout/HeaderButton';
+import PageHeader from '../components/layout/PageHeader';
+import { useChartThemeDefaults } from '../components/analytics/ChartJSWrapper';
+import EmptyState from '../components/common/EmptyState';
+import LoadingState from '../components/common/LoadingState';
+import ViewToggleTabs from '../components/common/ViewToggleTabs';
+import LogsActivityChart, { domainColor } from '../components/logs/LogsActivityChart';
+import LogsList from '../components/logs/LogsList';
+import {
+    LOG_DOMAIN_KEYS,
+    LOG_RANGE_OPTIONS,
+    MAX_CHART_DAYS,
+    resolveLogRange,
+} from '../components/logs/logsRange';
+import styles from '../components/logs/Logs.module.css';
+import DeleteConfirmModal from '../components/modals/DeleteConfirmModal';
+import { useAuth } from '../contexts/AuthContext';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { useLogActivity, useLogsData } from '../hooks/useLogsData';
+import { getDurationDaysInclusive, getISOYMDInTimezone } from '../utils/dateUtils';
 import notify from '../utils/notify';
-import './Logs.css';
+
+const PAGE_SIZE = 50;
 
 /**
- * Application event history with admin-only retention controls.
+ * Application event history (admin-only): activity over time, then the events themselves.
  */
 function Logs() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const { timezone } = useTimezone();
-    const isMobile = useIsMobile();
     const { user } = useAuth();
+    const chartTheme = useChartThemeDefaults();
     const [showClearConfirm, setShowClearConfirm] = useState(false);
 
     const [page, setPage] = useState(1);
-    const pageSize = 50;
-
-    // Filter states
     const [eventType, setEventType] = useState('all');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const [range, setRange] = useState('30');
+    const [custom, setCustom] = useState({ startDate: '', endDate: '' });
 
     useEffect(() => {
-        if (!rootId) {
-            navigate('/');
-        }
+        if (!rootId) navigate('/');
     }, [rootId, navigate]);
 
-    const {
-        logs,
-        total,
-        eventTypes,
-        isLoading: loading,
-        refetch,
-        clearLogs,
-        isClearing,
-    } = useLogsData(rootId, { page, pageSize, eventType, startDate, endDate });
+    const today = getISOYMDInTimezone(new Date(), timezone);
+    const { startDate, endDate } = resolveLogRange(range, today, custom);
+    // The chart needs a bounded range; an open-ended custom range charts its last 30 days.
+    const chartDays = startDate && endDate ? getDurationDaysInclusive(startDate, endDate) : 0;
+    const chartTooLong = chartDays > MAX_CHART_DAYS;
 
-    const totalPages = Math.ceil(total / pageSize);
+    const {
+        logs, total, eventTypes, isLoading, isFetching, refetch, clearLogs, isClearing,
+    } = useLogsData(rootId, { page, pageSize: PAGE_SIZE, eventType, startDate, endDate, timezone });
+    const { activity, isLoading: activityLoading } = useLogActivity(rootId, {
+        startDate, endDate, timezone, eventType, enabled: !chartTooLong,
+    });
+
+    const domainColors = useMemo(
+        () => Object.fromEntries(LOG_DOMAIN_KEYS.map((key) => [key, domainColor(chartTheme, key)])),
+        [chartTheme],
+    );
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+    const changeFilters = (update) => {
+        update();
+        setPage(1);
+    };
+
+    const showDay = useCallback((day) => {
+        setRange('custom');
+        setCustom({ startDate: day, endDate: day });
+        setPage(1);
+    }, []);
 
     const handleClearLogs = async () => {
         if (isClearing || !user?.is_admin) return;
@@ -56,117 +84,114 @@ function Logs() {
             setPage(1);
             notify.success('Logs cleared');
         } catch (error) {
-            notify.error('Failed to clear logs: ' + (error.response?.data?.error || error.message));
+            notify.error(`Failed to clear logs: ${error.response?.data?.error || error.message}`);
         }
     };
 
     return (
-        <div className="logs-page-container">
-            <div className="logs-page-header">
-                <div className="header-main">
-                    {!isMobile ? <h1>Application Events</h1> : null}
-                    <div className="logs-filters">
-                        <div className="filter-group">
-                            <label>Type</label>
-                            <select value={eventType} onChange={(e) => { setEventType(e.target.value); setPage(1); }}>
-                                <option value="all">All</option>
-                                {eventTypes.map(t => (
-                                    <option key={t} value={t}>{t}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="filter-group">
-                            <label>From</label>
-                            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setPage(1); }} />
-                        </div>
-                        <div className="filter-group">
-                            <label>To</label>
-                            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1); }} />
-                        </div>
-                        <div className="logs-stats">
-                            {total} events
-                        </div>
-                    </div>
-                </div>
-                <div className="logs-header-actions">
-                    <Button unstyled className="refresh-logs-btn" disabled={isClearing} onClick={() => refetch()}>REFRESH</Button>
-                    {user?.is_admin && (
-                        <Button unstyled className="clear-logs-btn" disabled={isClearing} onClick={() => setShowClearConfirm(true)}>
-                            {isClearing ? 'CLEARING…' : 'CLEAR LOGS'}
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <div className="logs-page-body">
-                {loading && logs.length === 0 ? (
-                    <div className="logs-loading">Loading events...</div>
-                ) : logs.length === 0 ? (
-                    <div className="logs-empty">No events matching your filters.</div>
-                ) : (
-                    <div className="logs-list-container">
-                        <div className="logs-grid-header">
-                            <span className="col-timestamp">Datetime</span>
-                            <span className="col-event">Event</span>
-                            <span className="col-description">Description</span>
-                            <span className="col-source">Source</span>
-                        </div>
-                        <div className="logs-scroll-area">
-                            {logs.map(log => (
-                                <div key={log.id} className="log-item">
-                                    <span className="log-timestamp col-timestamp">
-                                        {formatDateInTimezone(log.timestamp, timezone, {
-                                            month: 'numeric',
-                                            day: 'numeric',
-                                            year: 'numeric',
-                                            hour: 'numeric',
-                                            minute: 'numeric',
-                                            second: 'numeric',
-                                            hour12: true
-                                        })}
-                                    </span>
-                                    <span className="col-event">
-                                        <span className={`log-event-tag ${(log.event_type || 'system').split('.')[0]} ${(log.event_type || '').endsWith('.deleted') ? 'deleted' : ''}`}>
-                                            {log.event_type}
-                                        </span>
-                                    </span>
-                                    <span className="log-description col-description">
-                                        <div className="description-text"><Linkify>{log.description}</Linkify></div>
-                                        {log.entity_id && (
-                                            <span className="log-entity-id" title={log.entity_id}>
-                                                ID: {log.entity_id}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <span className="log-source col-source">{log.source || 'system'}</span>
-                                </div>
-                            ))}
-                        </div>
-
-                        {totalPages > 1 && (
-                            <div className="logs-pagination">
-                                <button
-                                    disabled={page === 1}
-                                    onClick={() => setPage(p => p - 1)}
-                                    className="page-btn"
-                                >
-                                    Previous
-                                </button>
-                                <span className="page-info">
-                                    Page {page} of {totalPages}
-                                </span>
-                                <button
-                                    disabled={page === totalPages}
-                                    onClick={() => setPage(p => p + 1)}
-                                    className="page-btn"
-                                >
-                                    Next
-                                </button>
-                            </div>
+        <div className={styles.page}>
+            <PageHeader
+                title="Logs"
+                subtitle={isLoading ? 'Loading events…' : `${total.toLocaleString()} event${total === 1 ? '' : 's'}`}
+                actions={(
+                    <>
+                        <HeaderButton variant="secondary" disabled={isClearing || isFetching} onClick={() => refetch()}>
+                            {isFetching && !isLoading ? 'Refreshing…' : 'Refresh'}
+                        </HeaderButton>
+                        {user?.is_admin && (
+                            <HeaderButton variant="danger" disabled={isClearing} onClick={() => setShowClearConfirm(true)}>
+                                {isClearing ? 'Clearing…' : 'Clear logs'}
+                            </HeaderButton>
                         )}
+                    </>
+                )}
+            />
+
+            <div className={styles.body}>
+            <div className={styles.filters}>
+                <ViewToggleTabs
+                    items={LOG_RANGE_OPTIONS}
+                    value={range}
+                    onChange={(value) => changeFilters(() => {
+                        setRange(value);
+                        if (value === 'custom' && !custom.startDate && !custom.endDate) setCustom({ startDate, endDate });
+                    })}
+                    ariaLabel="Date range"
+                    size="compact"
+                    semantics="radio"
+                />
+                {range === 'custom' && (
+                    <div className={styles.dates}>
+                        <label className={styles.field}>
+                            <span>From</span>
+                            <input
+                                type="date"
+                                value={custom.startDate}
+                                max={custom.endDate || undefined}
+                                onChange={(event) => changeFilters(() => setCustom((current) => ({ ...current, startDate: event.target.value })))}
+                            />
+                        </label>
+                        <label className={styles.field}>
+                            <span>To</span>
+                            <input
+                                type="date"
+                                value={custom.endDate}
+                                min={custom.startDate || undefined}
+                                onChange={(event) => changeFilters(() => setCustom((current) => ({ ...current, endDate: event.target.value })))}
+                            />
+                        </label>
                     </div>
                 )}
+                <label className={`${styles.field} ${styles.typeField}`}>
+                    <span>Event</span>
+                    <select value={eventType} onChange={(event) => changeFilters(() => setEventType(event.target.value))}>
+                        <option value="all">All events</option>
+                        {eventTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                </label>
             </div>
+
+            <section className={styles.panel} aria-label="Activity over time">
+                {chartTooLong ? (
+                    <p className={styles.chartNote}>The chart covers up to a year. Shorten the range to see activity by day.</p>
+                ) : activityLoading && !activity ? (
+                    <LoadingState label="Loading activity…" className={styles.chartLoading} />
+                ) : activity && activity.total === 0 ? (
+                    <p className={styles.chartNote}>No events in this range.</p>
+                ) : activity ? (
+                    <LogsActivityChart activity={activity} onSelectDay={showDay} />
+                ) : null}
+            </section>
+
+            <section className={styles.panel} aria-label="Events">
+                {isLoading && logs.length === 0 ? (
+                    <LoadingState label="Loading events…" />
+                ) : logs.length === 0 ? (
+                    <EmptyState
+                        compact
+                        title="No events"
+                        description="Nothing matches these filters. Try a longer range or all events."
+                    />
+                ) : (
+                    <>
+                        <LogsList logs={logs} timezone={timezone} domainColors={domainColors} />
+                        {totalPages > 1 && (
+                            <nav className={styles.pagination} aria-label="Event pages">
+                                <Button variant="secondary" size="sm" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>
+                                    Previous
+                                </Button>
+                                <span className={styles.pageInfo}>Page {page} of {totalPages}</span>
+                                <Button variant="secondary" size="sm" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>
+                                    Next
+                                </Button>
+                            </nav>
+                        )}
+                    </>
+                )}
+            </section>
+
+            </div>
+
             <DeleteConfirmModal
                 isOpen={showClearConfirm}
                 onClose={() => setShowClearConfirm(false)}

@@ -11,6 +11,8 @@ import GoalIcon from '../components/atoms/GoalIcon';
 import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { queryKeys } from '../hooks/queryKeys';
+import WelcomeFlow from '../components/onboarding/welcome/WelcomeFlow';
+import LoadingState from '../components/common/LoadingState';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -87,6 +89,36 @@ function Selection() {
             notify.error(`Failed to create fractal: ${formatError(error)}`);
         },
     });
+
+    const quickstartMutation = useMutation({
+        mutationFn: async ({ data, idempotencyKey }) => (await globalApi.quickstartFractal(data, idempotencyKey)).data,
+        onSuccess: async (createdFractal) => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
+            if (createdFractal?.id) handleSelectRoot(createdFractal.id);
+        },
+        onError: (error) => {
+            notify.error(`Couldn’t create your goal: ${formatError(error)}`);
+        },
+    });
+
+    // Someone with no fractals gets the welcome flow, unless they chose to set up on their own.
+    const welcomeDismissedKey = userId ? `welcome-dismissed:${userId}` : null;
+    const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+        try {
+            return Boolean(welcomeDismissedKey && localStorage.getItem(welcomeDismissedKey));
+        } catch {
+            return false;
+        }
+    });
+    const dismissWelcome = () => {
+        try {
+            if (welcomeDismissedKey) localStorage.setItem(welcomeDismissedKey, '1');
+        } catch {
+            // Private mode: the choice lasts for this visit only.
+        }
+        setWelcomeDismissed(true);
+        setCreateModalOpen(true);
+    };
 
     const deleteFractalMutation = useMutation({
         mutationFn: async (rootId) => {
@@ -168,11 +200,6 @@ function Selection() {
         return fractal?.display_level || null;
     };
 
-    const getFractalTypeColor = (fractal) => {
-        const level = getFractalLevelConfig(fractal);
-        return level?.color || getGoalColor(fractal.type);
-    };
-
     const getHighestPriorityRoot = () => {
         if (!fractals || fractals.length === 0) return null;
         const recentMatch = recentRootId
@@ -232,7 +259,18 @@ function Selection() {
     const HeaderIcon = animatedIcons && isHeaderSmart ? AnimatedGoalIcon : GoalIcon;
 
     if (authLoading || fractalsQuery.isLoading) {
-        return <div className={styles.loadingContainer}>Loading fractals...</div>;
+        return <LoadingState variant="page" label="Loading fractals…" />;
+    }
+
+    // An invite or sign-in link opens the auth dialog here; the welcome flow waits until it's done.
+    if (isAuthenticated && fractalsQuery.isSuccess && fractals.length === 0 && !welcomeDismissed && !authModalRequested) {
+        return (
+            <WelcomeFlow
+                creating={quickstartMutation.isPending}
+                onCreate={(data, idempotencyKey) => quickstartMutation.mutate({ data, idempotencyKey })}
+                onSkip={dismissWelcome}
+            />
+        );
     }
 
     return (
@@ -309,25 +347,21 @@ function Selection() {
                         const fractalShape = level?.icon || getGoalIcon(fractal.type) || 'circle';
 
                         return (
-                            <div
-                                key={fractal.id}
-                                className={styles.card}
-                                onClick={() => handleSelectRoot(fractal.id)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                        event.preventDefault();
-                                        handleSelectRoot(fractal.id);
-                                    }
-                                }}
-                            >
+                            <div key={fractal.id} className={styles.card}>
                                 <div className={styles.cardContent}>
-                                    <h3 className={styles.cardTitle}>{fractal.name}</h3>
-                                    <div
-                                        className={styles.cardType}
-                                        style={{ color: getFractalTypeColor(fractal) }}
-                                    >
+                                    {/* The title is the card's one button; its hit area stretches over the card,
+                                        so the delete button can sit on top without nesting controls. */}
+                                    <h3 className={styles.cardTitle}>
+                                        <button
+                                            type="button"
+                                            className={styles.cardOpen}
+                                            onClick={() => handleSelectRoot(fractal.id)}
+                                        >
+                                            {fractal.name}
+                                        </button>
+                                    </h3>
+                                    {/* The icon below carries the level's colour; the label stays in text ink. */}
+                                    <div className={styles.cardType}>
                                         {getTypeDisplayName(fractal.type)}
                                     </div>
                                     <div className={styles.cardTypeIcon}>

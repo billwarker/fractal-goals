@@ -1,4 +1,5 @@
 import { deviceOf, expect, test } from './support/clock.js';
+import { openOrigin } from './support/session.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root.
 test('scopes a goal in the program Goals pane and creates a child under it', async ({ page }, testInfo) => {
@@ -10,12 +11,7 @@ test('scopes a goal in the program Goals pane and creates a child under it', asy
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     const openGoalsPane = async () => {
         if (device === 'mobile') await page.getByRole('button', { name: 'Show Sidebar' }).click();

@@ -18,7 +18,7 @@
 .chipActive {
     border-color: var(--color-brand-primary);
     color: var(--color-text-primary);
-    background: rgba(79, 156, 249, 0.16);
+    background: color-mix(in srgb, var(--color-brand-primary) 16%, transparent);
 }
 
 .dateGrid {

@@ -6,6 +6,7 @@ import EditIcon from '../atoms/EditIcon';
 import TrashIcon from '../atoms/TrashIcon';
 import DeleteConfirmModal from '../modals/DeleteConfirmModal';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import LoadingState from '../common/LoadingState';
 import BlockHeaderStats from './blocks/BlockHeaderStats';
 import ProgramStatusBadge from './ProgramStatusBadge';
 import styles from './ProgramBlocksPanel.module.css';
@@ -75,7 +76,7 @@ export default function ProgramBlocksPanel({
     const [blockToDelete, setBlockToDelete] = useState(null);
 
     if (error) return <p className={styles.state} role="alert">Block results could not be loaded. Try again shortly.</p>;
-    if (loading && !cards.length) return <p className={styles.state} aria-busy="true">Loading blocks…</p>;
+    if (loading && !cards.length) return <LoadingState label="Loading blocks…" />;
     if (!cards.length) return <p className={styles.state}>This program has no blocks yet. Use New block below, or select dates on the calendar.</p>;
 
     return (

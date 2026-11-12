@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 
 import ModalBackdrop from '../../atoms/ModalBackdrop';
 import CloseButton from '../../atoms/CloseButton';
+import LoadingState from '../../common/LoadingState';
 import { getGraphProfile } from './registry';
 import styles from './GraphProfileModal.module.css';
 
@@ -49,7 +50,7 @@ export default function GraphProfileModal({
 
                 <div className={styles.chartFrame}>
                     {isLoading ? (
-                        <div className={styles.state}>Loading graph...</div>
+                        <LoadingState label="Loading graph…" />
                     ) : isError ? (
                         <div className={styles.state}>Graph could not be loaded.</div>
                     ) : Chart ? (

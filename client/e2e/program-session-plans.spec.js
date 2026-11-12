@@ -1,4 +1,5 @@
 import { deviceOf, expect, test } from './support/clock.js';
+import { openOrigin } from './support/session.js';
 
 async function selectTodayAndNextWeek(page, today) {
     const rails = page.getByRole('list', { name: /^(Left|Right) column dates$/ });
@@ -17,12 +18,7 @@ test('program a dated plan, see it as next week\'s hints, and see it in the sess
     const rootId = `browser-plan-root-${suffix}`;
     const today = new Date().toISOString().slice(0, 10);
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     await page.goto(`/${rootId}/programs`);
     await page.getByRole('tab', { name: 'Days' }).click();

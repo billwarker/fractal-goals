@@ -680,7 +680,7 @@ function SessionActivityItem({
             showCopyPreviousValuesOption={showCopyPreviousValuesOption}
             copyPreviousValuesDisabled={showCopyPreviousValuesOption && !handleCopyPreviousValues}
             copyPreviousValuesLabel={historicalActivityHistoryLoading
-                ? 'Loading previous values...'
+                ? 'Loading previous values…'
                 : 'Copy values from previous instance'}
             localStartTime={localStartTime}
             setStartTimeDraft={setStartTimeDraft}

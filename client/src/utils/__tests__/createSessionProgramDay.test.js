@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildPreviousProgramDays } from '../createSessionProgramDay';
 import { buildTodayProgramDayView, partitionTemplatesByProgram, programSessionToTemplate } from '../createSessionProgramDay';
 

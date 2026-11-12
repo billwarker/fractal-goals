@@ -138,18 +138,25 @@
 .sessionConnectorEdge_selected {
     stroke: var(--color-brand-secondary, #ff9f1a);
     stroke-width: 2;
-    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) 48%, transparent));
+}
+
+/* Glows wrap each edge (see renderConnectorEdges) and scale with the theme's glow strength. */
+.sessionConnectorGlow_selected {
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--color-brand-secondary, #ff9f1a) calc(48% * var(--flowtree-glow-strength)), transparent));
+}
+
+.sessionConnectorGlow_completed {
+    filter:
+        drop-shadow(0 0 2px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) calc(55% * var(--flowtree-glow-strength)), transparent))
+        drop-shadow(0 0 7px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) calc(24% * var(--flowtree-glow-strength)), transparent));
 }
 
 .sessionConnectorEdge_dashed { stroke-dasharray: 5 5; }
 
 .sessionConnectorEdge_completed {
     stroke: var(--color-active-branch-line, #60a5fa);
-    stroke-width: 2.25;
-    opacity: 0.88;
-    filter:
-        drop-shadow(0 0 2px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 55%, transparent))
-        drop-shadow(0 0 7px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 24%, transparent));
+    stroke-width: var(--tree-highlight-width);
+    opacity: var(--tree-highlight-opacity);
 }
 
 .sessionConnectorEdgeFlow {
@@ -160,10 +167,7 @@
     vector-effect: non-scaling-stroke;
     stroke-linecap: round;
     stroke-linejoin: round;
-    opacity: 0.58;
-    filter:
-        drop-shadow(0 0 3px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 62%, transparent))
-        drop-shadow(0 0 8px color-mix(in srgb, var(--color-active-branch-line, #60a5fa) 28%, transparent));
+    opacity: calc(0.58 * var(--tree-highlight-opacity));
     animation: sessionLineageToRoot 1.25s linear infinite;
 }
 
@@ -212,16 +216,6 @@
     width: var(--icon-size);
     min-width: var(--icon-size);
     z-index: 1;
-}
-
-.sessionIconSlot::before {
-    content: '';
-    position: absolute;
-    inset: -2px;
-    border-radius: 999px;
-    background: var(--color-bg-elevated, var(--color-bg-card, #fff));
-    pointer-events: none;
-    z-index: 0;
 }
 
 .sessionIconSlot svg,

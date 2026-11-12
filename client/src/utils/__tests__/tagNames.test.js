@@ -1,3 +1,4 @@
+// @vitest-environment node
 import cases from '../../../../tests/fixtures/tag_name_normalization_cases.json';
 import { canonicalTagName, findTagByName, normalizeTagName } from '../tagNames';
 

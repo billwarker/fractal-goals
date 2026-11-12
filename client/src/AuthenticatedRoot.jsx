@@ -1,10 +1,10 @@
 import React, { Suspense, lazy } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
 import AppRouter from './AppRouter';
 import ApplicationProviders from './ApplicationProviders';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import AppToaster from './components/common/AppToaster';
 import { DebugProvider, useDebug } from './contexts/DebugContext';
 import { installConnectivity } from './offline/connectivity';
 
@@ -31,24 +31,7 @@ export default function AuthenticatedRoot({ queryClient }) {
                 <BrowserRouter>
                     <DebugProvider>
                         <QueryDevtools />
-                        <Toaster
-                            position="bottom-center"
-                            toastOptions={{
-                                style: {
-                                    background: 'var(--color-bg-card)',
-                                    color: 'var(--color-text-primary)',
-                                    border: '1px solid var(--color-border)',
-                                },
-                                success: {
-                                    duration: 3000,
-                                    iconTheme: { primary: 'var(--color-brand-success)', secondary: '#fff' },
-                                },
-                                error: {
-                                    duration: 5000,
-                                    iconTheme: { primary: 'var(--color-brand-danger)', secondary: '#fff' },
-                                },
-                            }}
-                        />
+                        <AppToaster />
                         <ApplicationProviders>
                             <AppRouter />
                         </ApplicationProviders>

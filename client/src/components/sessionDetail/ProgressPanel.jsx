@@ -8,6 +8,7 @@ import { useTimezone } from '../../contexts/TimezoneContext';
 import ActivityTimelineList from '../common/ActivityTimeline';
 import Button from '../atoms/Button';
 import TimelineShell from '../common/TimelineShell';
+import LoadingState from '../common/LoadingState';
 import ProgressChart from './ProgressChart';
 import ProgressCompareControls, { ProgressCompareBar, previewChoice, useCompareOpen } from './ProgressCompareControls';
 import styles from './ProgressPanel.module.css';
@@ -136,7 +137,7 @@ function ProgressPanel({ rootId, selectedActivity, sessionActivityDefs, sessionI
                 <div className={styles.timelineSectionHeader}>Past sessions</div>
                 <div className={`${styles.timelineContent} ${styles.historyList}`} {...historyHover}>
                     {!selectedActivityId ? <div className={styles.timelineEmpty}>Select an activity to view previous sessions</div>
-                        : query.isLoading ? <div className={styles.timelineLoading}>Loading timeline...</div>
+                        : query.isLoading ? <LoadingState label="Loading timeline…" />
                             : query.error ? <div className={styles.timelineError}>Error: {query.error.message}</div>
                                 : lastSession ? (
                                     <>

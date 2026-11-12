@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { chunkRange, monthChunksForRange, overscanChunks, shiftMonthKey } from '../calendarChunks';
 
 describe('calendarChunks', () => {

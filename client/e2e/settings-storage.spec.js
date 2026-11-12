@@ -1,18 +1,8 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-}
-
 const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
 
 test('deep link opens Cloud Storage settings for an unconfigured deployment', async ({ page }) => {
-    await logIn(page);
     await page.goto('/?settings=storage');
     const settings = page.getByRole('dialog', { name: 'Settings' });
     await expect(settings.getByRole('heading', { name: 'Cloud storage' })).toBeVisible();
@@ -33,7 +23,6 @@ test('connected and expired accounts lay out with their actions', async ({ page 
         ],
         limits: { max_file_bytes: 104857600, max_attachments: 8 },
     } }));
-    await logIn(page);
     await page.goto('/?settings=storage');
     const settings = page.getByRole('dialog', { name: 'Settings' });
     const drive = settings.getByRole('article', { name: 'Google Drive' });
@@ -66,12 +55,13 @@ test('with two accounts connected the user chooses where uploads are saved', asy
         destination = route.request().postDataJSON().provider;
         return route.fulfill({ json: { upload_destination: destination } });
     });
-    await logIn(page);
     await page.goto('/?settings=storage');
     const group = page.getByRole('radiogroup', { name: 'Save new uploads to' });
     await expect(group.getByRole('radio', { name: /Google Drive/ })).toBeChecked();
     await group.getByText('Dropbox', { exact: true }).click();
-    await expect(page.getByRole('status')).toHaveText('New uploads will be saved to Dropbox.');
+    // Scoped to the dialog: the page behind it may still be showing its own loading status.
+    const settings = page.getByRole('dialog', { name: 'Settings' });
+    await expect(settings.getByRole('status').filter({ hasText: 'New uploads' })).toHaveText('New uploads will be saved to Dropbox.');
     await expect(group.getByRole('radio', { name: /Dropbox/ })).toBeChecked();
     expect(destination).toBe('dropbox');
     expect(await noHorizontalScroll(page)).toBe(true);

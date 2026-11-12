@@ -3,6 +3,7 @@ import { onlineManager } from '@tanstack/react-query';
 import { axios } from '../utils/api/core';
 import { globalApi } from '../utils/api/globalApi';
 import { isNetworkError } from '../utils/networkErrors';
+import { settleRequest, trackRequest } from './serverWarmth';
 
 // Effective reachability of the API, not just the radio. `navigator.onLine`
 // stays true on captive or dead gym wifi, so request outcomes and a cheap probe
@@ -37,6 +38,9 @@ export function getClockOffsetMs() {
 }
 
 const TIMEOUT_CODES = new Set(['ECONNABORTED', 'ETIMEDOUT']);
+// After a request times out, the reachability probe waits this long before calling the API
+// unreachable: a Cloud Run cold start holds requests until an instance is ready.
+export const COLD_START_PROBE_TIMEOUT_MS = 30000;
 
 const listeners = new Set();
 let offlineReason = null;
@@ -100,7 +104,7 @@ async function verifyReachability() {
     if (verifyingReachability) return;
     verifyingReachability = true;
     try {
-        await globalApi.probeHealth();
+        await globalApi.probeHealth({ timeout: COLD_START_PROBE_TIMEOUT_MS });
     } catch {
         setOnline(false, 'timeout');
     } finally {
@@ -142,10 +146,12 @@ export function installConnectivity() {
 
     axios.interceptors.request.use((config) => {
         config._sentAt = Date.now();
+        trackRequest(config);
         return config;
     });
     axios.interceptors.response.use(
         (response) => {
+            settleRequest(response.config);
             reportRequestSucceeded();
             const serverDate = response.headers?.date;
             if (serverDate && response.config?._sentAt) {
@@ -154,6 +160,7 @@ export function installConnectivity() {
             return response;
         },
         (error) => {
+            settleRequest(error.config);
             reportRequestFailed(error);
             return Promise.reject(error);
         },

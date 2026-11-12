@@ -3,55 +3,267 @@ import { useGoalLevels } from '../contexts/GoalLevelsContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
 import GoalIcon from './atoms/GoalIcon';
+import Button from './atoms/Button';
+import ChevronIcon from './atoms/ChevronIcon';
+import Switch from './atoms/Switch';
 import GoalLevelReviewSettings from './GoalLevelReviewSettings';
 import AnimatedGoalIcon from './atoms/AnimatedGoalIcon';
+import { SettingsRow, rowDescriptionId } from './settings/SettingsSection';
 import { ICON_SHAPES, DEADLINE_UNITS } from '../utils/goalCharacteristics';
 import { authApi } from '../utils/api';
-import useIsMobile from '../hooks/useIsMobile';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
+import controls from './settings/SettingsControls.module.css';
 import styles from './GoalCharacteristicsSettings.module.css';
 import { logError } from '../utils/logger';
+import LoadingState from './common/LoadingState';
+
+const parseCount = (value) => (value ? parseInt(value, 10) : null);
+
+function LevelIcon({ shape, color, secondaryColor }) {
+    const { animatedIcons } = useTheme();
+    const Icon = animatedIcons ? AnimatedGoalIcon : GoalIcon;
+    return <Icon shape={shape} color={color} secondaryColor={secondaryColor} isSmart size={22} />;
+}
+
+/** A level's settings in a collapsible panel; unsaved edits are flagged in its header. */
+function LevelPanel({ title, icon, customized, dirty, onSave, onReset, defaultOpen = false, children }) {
+    return (
+        <details className={styles.level} open={defaultOpen || undefined}>
+            <summary className={styles.levelSummary}>
+                {icon}
+                <span className={styles.levelName}>{title}</span>
+                {customized && <span className={styles.badge}>Customized</span>}
+                {dirty && <span className={styles.unsaved}>Unsaved changes</span>}
+                <ChevronIcon className={styles.levelChevron} size={14} aria-hidden="true" />
+            </summary>
+            <div className={styles.levelBody}>
+                {children}
+                <div className={styles.levelActions}>
+                    {customized && (
+                        <Button variant="secondary" size="sm" onClick={onReset}>Restore default</Button>
+                    )}
+                    <Button size="sm" disabled={!dirty} onClick={onSave}>Save changes</Button>
+                </div>
+            </div>
+        </details>
+    );
+}
+
+function Group({ title, children }) {
+    return (
+        <div className={styles.group}>
+            <h5 className={styles.groupTitle}>{title}</h5>
+            {children}
+        </div>
+    );
+}
+
+function ColorPair({ idPrefix, primary, secondary, onPrimary, onSecondary }) {
+    return (
+        <span className={styles.colors}>
+            <label className={styles.color}>
+                <input id={`${idPrefix}-color`} type="color" value={primary} onChange={(event) => onPrimary(event.target.value)} />
+                <span>Main</span>
+            </label>
+            <label className={styles.color}>
+                <input type="color" value={secondary} onChange={(event) => onSecondary(event.target.value)} />
+                <span>Ring</span>
+            </label>
+        </span>
+    );
+}
+
+function AmountWithUnit({ id, describedBy, value, unit, placeholder, onValue, onUnit, unitLabel }) {
+    return (
+        <span className={styles.amount}>
+            <input
+                id={id}
+                aria-describedby={describedBy}
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder={placeholder}
+                value={value ?? ''}
+                onChange={(event) => onValue(parseCount(event.target.value))}
+                className={`${controls.input} ${controls.number}`}
+            />
+            <select
+                aria-label={unitLabel}
+                value={unit ?? 'days'}
+                onChange={(event) => onUnit(event.target.value)}
+                className={`${controls.select} ${styles.unit}`}
+            >
+                {DEADLINE_UNITS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+        </span>
+    );
+}
+
+function LevelSettings({ level, edits, onChange, onSave, onReset }) {
+    const current = { ...level, ...(edits || {}) };
+    const id = `level-${level.id}`;
+    const set = (field) => (value) => onChange(level.id, field, value);
+    const color = current.color || '#4f9cf9';
+
+    return (
+        <LevelPanel
+            title={current.name}
+            icon={<LevelIcon shape={current.icon || 'circle'} color={color} secondaryColor={current.secondary_color || undefined} />}
+            customized={level.owner_id !== null}
+            dirty={Boolean(edits && Object.keys(edits).length)}
+            onSave={() => onSave(level.id)}
+            onReset={() => onReset(level.id)}
+        >
+            <Group title="Appearance">
+                <SettingsRow label="Shape" stacked>
+                    <div className={styles.shapes} role="radiogroup" aria-label={`${current.name} shape`}>
+                        {ICON_SHAPES.map((shape) => {
+                            const selected = current.icon === shape.value;
+                            return (
+                                <button
+                                    key={shape.value}
+                                    type="button"
+                                    role="radio"
+                                    aria-checked={selected}
+                                    aria-label={shape.label}
+                                    title={shape.label}
+                                    className={styles.shape}
+                                    style={selected ? { '--shape-color': color } : undefined}
+                                    onClick={() => set('icon')(shape.value)}
+                                >
+                                    <GoalIcon shape={shape.value} color={selected ? color : 'var(--color-text-muted)'} size={18} />
+                                </button>
+                            );
+                        })}
+                    </div>
+                </SettingsRow>
+                <SettingsRow label="Colours" description="The icon, and the fill of its SMART ring." controlId={`${id}-color`}>
+                    <ColorPair
+                        idPrefix={id}
+                        primary={color}
+                        secondary={current.secondary_color || color}
+                        onPrimary={set('color')}
+                        onSecondary={set('secondary_color')}
+                    />
+                </SettingsRow>
+            </Group>
+
+            <Group title="Rules">
+                <SettingsRow label="Track activities" description="Sessions and activities can count toward these goals." controlId={`${id}-track`}>
+                    <Switch id={`${id}-track`} aria-describedby={rowDescriptionId(`${id}-track`)} checked={current.track_activities ?? true} onChange={set('track_activities')} />
+                </SettingsRow>
+                <SettingsRow label="Require SMART" description="Goals here must meet every SMART criterion." controlId={`${id}-smart`}>
+                    <Switch id={`${id}-smart`} aria-describedby={rowDescriptionId(`${id}-smart`)} checked={current.requires_smart ?? false} onChange={set('requires_smart')} />
+                </SettingsRow>
+                <SettingsRow label="Require a description" controlId={`${id}-description`}>
+                    <Switch id={`${id}-description`} checked={current.description_required ?? false} onChange={set('description_required')} />
+                </SettingsRow>
+            </Group>
+
+            <Group title="Deadlines">
+                <SettingsRow label="Allowed deadline" description="How far ahead a deadline can be. Leave blank for no limit." controlId={`${id}-deadline-min`} stacked>
+                    <span className={styles.range}>
+                        <AmountWithUnit
+                            id={`${id}-deadline-min`}
+                            describedBy={rowDescriptionId(`${id}-deadline-min`)}
+                            value={current.deadline_min_value}
+                            unit={current.deadline_min_unit}
+                            placeholder="Min"
+                            unitLabel="Shortest deadline unit"
+                            onValue={set('deadline_min_value')}
+                            onUnit={set('deadline_min_unit')}
+                        />
+                        <span className={styles.to}>to</span>
+                        <AmountWithUnit
+                            id={`${id}-deadline-max`}
+                            value={current.deadline_max_value}
+                            unit={current.deadline_max_unit}
+                            placeholder="Max"
+                            unitLabel="Longest deadline unit"
+                            onValue={set('deadline_max_value')}
+                            onUnit={set('deadline_max_unit')}
+                        />
+                    </span>
+                </SettingsRow>
+                <SettingsRow label="Default deadline" description="Filled in for new goals. Leave blank for none." controlId={`${id}-deadline-default`}>
+                    <AmountWithUnit
+                        id={`${id}-deadline-default`}
+                        describedBy={rowDescriptionId(`${id}-deadline-default`)}
+                        value={current.default_deadline_offset_value}
+                        unit={current.default_deadline_offset_unit}
+                        placeholder="—"
+                        unitLabel="Default deadline unit"
+                        onValue={set('default_deadline_offset_value')}
+                        onUnit={set('default_deadline_offset_unit')}
+                    />
+                </SettingsRow>
+            </Group>
+
+            <Group title="Children">
+                <SettingsRow label="Most children" description="Leave blank for no limit." controlId={`${id}-max-children`}>
+                    <input
+                        id={`${id}-max-children`}
+                        aria-describedby={rowDescriptionId(`${id}-max-children`)}
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        placeholder="No limit"
+                        value={current.max_children ?? ''}
+                        onChange={(event) => set('max_children')(parseCount(event.target.value))}
+                        className={`${controls.input} ${styles.wideNumber}`}
+                    />
+                </SettingsRow>
+                <SettingsRow label="Sort children by" controlId={`${id}-sort`}>
+                    <select
+                        id={`${id}-sort`}
+                        value={current.sort_children_by ?? ''}
+                        onChange={(event) => set('sort_children_by')(event.target.value || null)}
+                        className={controls.select}
+                    >
+                        <option value="">Manual</option>
+                        <option value="deadline">Deadline</option>
+                        <option value="created_at">Date created</option>
+                        <option value="completion_rate">Completion rate</option>
+                    </select>
+                </SettingsRow>
+            </Group>
+
+            <Group title="Reviews">
+                <GoalLevelReviewSettings idPrefix={id} current={current} onChange={(field, value) => onChange(level.id, field, value)} />
+            </Group>
+        </LevelPanel>
+    );
+}
 
 const GoalCharacteristicsSettings = () => {
     const { goalLevels, updateGoalLevel, resetGoalLevel } = useGoalLevels();
-    const { user, setUser } = useAuth();
-    const { animatedIcons } = useTheme();
-    const isMobile = useIsMobile();
-
-    // We maintain local state for active edits before saving to DB
+    // Unsaved edits per level, kept until saved.
     const [edits, setEdits] = useState({});
 
     if (!goalLevels || goalLevels.length === 0) {
-        return <div>Loading Goal Configuration...</div>;
+        return <LoadingState label="Loading goal levels…" />;
     }
 
     const editableGoalLevels = goalLevels.filter((level) => level?.name !== 'Completed');
 
     const handleChange = (levelId, field, value) => {
-        setEdits(prev => ({
-            ...prev,
-            [levelId]: {
-                ...(prev[levelId] || {}),
-                [field]: value
-            }
-        }));
+        setEdits((previous) => ({ ...previous, [levelId]: { ...(previous[levelId] || {}), [field]: value } }));
     };
+
+    const clearEdits = (levelId) => setEdits((previous) => {
+        const next = { ...previous };
+        delete next[levelId];
+        return next;
+    });
 
     const handleSave = async (levelId) => {
         const changes = edits[levelId];
         if (!changes) return;
-
         try {
             await updateGoalLevel({ id: levelId, updates: changes });
             notify.success('Settings saved.');
-
-            // Clear local edits for this level since they are now persisted
-            setEdits(prev => {
-                const next = { ...prev };
-                delete next[levelId];
-                return next;
-            });
+            clearEdits(levelId);
         } catch (error) {
             logError(error);
             notify.error(`Failed to save settings: ${formatError(error)}`);
@@ -59,15 +271,11 @@ const GoalCharacteristicsSettings = () => {
     };
 
     const handleReset = async (levelId) => {
-        if (!window.confirm("Restore this level to the system default characteristics?")) return;
+        if (!window.confirm('Restore this level to the system default characteristics?')) return;
         try {
             await resetGoalLevel(levelId);
             notify.success('Reset to defaults.');
-            setEdits(prev => {
-                const next = { ...prev };
-                delete next[levelId];
-                return next;
-            });
+            clearEdits(levelId);
         } catch (error) {
             notify.error(`Failed to reset level: ${formatError(error)}`);
         }
@@ -75,275 +283,28 @@ const GoalCharacteristicsSettings = () => {
 
     return (
         <div className={styles.container}>
-            <p className={styles.description}>
-                Customize the shape, colors, and behaviors of your goal hierarchy.
-                Any modifications you make here will be saved as personal overrides specifically for your account.
-            </p>
-
-            {/* Completed Goal Global Settings */}
-            <CompletedGoalSettingsCard user={user} setUser={setUser} animatedIcons={animatedIcons} isMobile={isMobile} />
-
-            {editableGoalLevels.map((level) => {
-                // Merge DB state with local unsaved edits
-                const current = { ...level, ...(edits[level.id] || {}) };
-                const hasUnsavedChanges = !!edits[level.id] && Object.keys(edits[level.id]).length > 0;
-                const isCustomized = level.owner_id !== null;
-
-                return (
-                    <div key={level.id} className={styles.levelCard}>
-                        {/* Header Row */}
-                        <div className={styles.levelHeaderRow}>
-                            <div className={styles.levelHeaderTitle}>
-                                {animatedIcons ? (
-                                    <AnimatedGoalIcon
-                                        shape={current.icon || 'circle'}
-                                        color={current.color || 'var(--color-brand-primary)'}
-                                        secondaryColor={current.secondary_color || undefined}
-                                        isSmart={true}
-                                        size={32}
-                                    />
-                                ) : (
-                                    <GoalIcon
-                                        shape={current.icon || 'circle'}
-                                        color={current.color || 'var(--color-brand-primary)'}
-                                        secondaryColor={current.secondary_color || undefined}
-                                        isSmart={true}
-                                        size={24}
-                                    />
-                                )}
-                                {current.name}
-
-                                {isCustomized && (
-                                    <span className={styles.customizedBadge}>
-                                        Customized
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className={styles.buttonGroup}>
-                                {isCustomized && (
-                                    <button
-                                        onClick={() => handleReset(level.id)}
-                                        className={styles.restoreButton}
-                                    >
-                                        Restore Default
-                                    </button>
-                                )}
-                                {hasUnsavedChanges && (
-                                    <button
-                                        onClick={() => handleSave(level.id)}
-                                        className={styles.saveButton}
-                                    >
-                                        Save Changes
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className={styles.settingsGroup}>
-                            {/* Icon Selection */}
-                            <div>
-                                <label className={styles.inputLabel}>
-                                    Shape
-                                </label>
-                                <div className={styles.shapeList}>
-                                    {ICON_SHAPES.map(s => {
-                                        const isSelected = current.icon === s.value;
-                                        return (
-                                            <button
-                                                key={s.value}
-                                                onClick={() => handleChange(level.id, 'icon', s.value)}
-                                                className={styles.shapeButton}
-                                                style={{
-                                                    borderColor: isSelected ? (current.color || 'var(--color-brand-primary)') : 'var(--color-border)',
-                                                    backgroundColor: isSelected ? 'rgba(0,0,0,0.1)' : 'transparent',
-                                                }}
-                                                title={s.label}
-                                            >
-                                                <GoalIcon
-                                                    shape={s.value}
-                                                    color={isSelected ? (current.color || 'var(--color-brand-primary)') : 'var(--color-text-muted)'}
-                                                    size={20}
-                                                />
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-
-                            {/* Color Selection */}
-                            <div className={styles.flexRowWrap}>
-                                <div>
-                                    <label className={styles.inputLabel}>
-                                        Primary Color
-                                    </label>
-                                    <input
-                                        type="color"
-                                        value={current.color || '#000000'}
-                                        onChange={(e) => handleChange(level.id, 'color', e.target.value)}
-                                        className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={styles.inputLabel}>
-                                        Secondary Color <span className={styles.subText}>(SMART ring fill)</span>
-                                    </label>
-                                    <input
-                                        type="color"
-                                        value={current.secondary_color || current.color || '#000000'}
-                                        onChange={(e) => handleChange(level.id, 'secondary_color', e.target.value)}
-                                        className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Behavior Toggles */}
-                            <div className={styles.behaviorControls}>
-
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.track_activities ?? true}
-                                        onChange={(e) => handleChange(level.id, 'track_activities', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Support Activity Tracking
-                                </label>
-
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.requires_smart ?? false}
-                                        onChange={(e) => handleChange(level.id, 'requires_smart', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Requires SMART Metrics
-                                </label>
-
-
-                                <label className={styles.checkboxLabel}>
-                                    <input
-                                        type="checkbox"
-                                        checked={current.description_required ?? false}
-                                        onChange={(e) => handleChange(level.id, 'description_required', e.target.checked)}
-                                        className={styles.pointer}
-                                    />
-                                    Description Required
-                                </label>
-                            </div>
-
-                            {/* Value + Unit Controls */}
-                            <div className={styles.valueUnitControls}>
-                                <div>
-                                        <label className={styles.inputLabelSecondary}>
-                                            Deadline Range
-                                        </label>
-                                        <div className={styles.flexAlignCenter}>
-                                            <input
-                                                type="number"
-                                                placeholder="Min"
-                                                min="0"
-                                                value={current.deadline_min_value ?? ''}
-                                                onChange={(e) => handleChange(level.id, 'deadline_min_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
-                                            />
-                                            <select
-                                                value={current.deadline_min_unit ?? 'days'}
-                                                onChange={(e) => handleChange(level.id, 'deadline_min_unit', e.target.value)}
-                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
-                                            >
-                                                {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                                            </select>
-                                            <span className={styles.inputLabelMuted} style={{ marginBottom: 0 }}>to</span>
-                                            <input
-                                                type="number"
-                                                placeholder="Max"
-                                                min="0"
-                                                value={current.deadline_max_value ?? ''}
-                                                onChange={(e) => handleChange(level.id, 'deadline_max_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
-                                            />
-                                            <select
-                                                value={current.deadline_max_unit ?? 'days'}
-                                                onChange={(e) => handleChange(level.id, 'deadline_max_unit', e.target.value)}
-                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
-                                            >
-                                                {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                <div>
-                                    <label className={styles.inputLabelSecondary}>
-                                        Max Children <span className={styles.subText}>(blank = unlimited)</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        placeholder="∞"
-                                        min="0"
-                                        value={current.max_children ?? ''}
-                                        onChange={(e) => handleChange(level.id, 'max_children', e.target.value ? parseInt(e.target.value) : null)}
-                                        className={`${styles.numberInput} ${styles.mediumNumberInput}`}
-                                    />
-                                </div>
-                                <div>
-                                        <label className={styles.inputLabelSecondary}>
-                                            Default Deadline Offset
-                                        </label>
-                                        <div className={styles.flexAlignCenter}>
-                                            <input
-                                                type="number"
-                                                placeholder="—"
-                                                min="0"
-                                                value={current.default_deadline_offset_value ?? ''}
-                                                onChange={(e) => handleChange(level.id, 'default_deadline_offset_value', e.target.value ? parseInt(e.target.value) : null)}
-                                                className={`${styles.numberInput} ${styles.smallNumberInput}`}
-                                            />
-                                            <select
-                                                value={current.default_deadline_offset_unit ?? 'days'}
-                                                onChange={(e) => handleChange(level.id, 'default_deadline_offset_unit', e.target.value)}
-                                                className={`${styles.selectInput} ${styles.selectInputSmall}`}
-                                            >
-                                                {DEADLINE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
-                                            </select>
-                                        </div>
-                                    </div>
-                                <GoalLevelReviewSettings
-                                    current={current}
-                                    onChange={(field, value) => handleChange(level.id, field, value)}
-                                />
-                                <div>
-                                    <label className={styles.inputLabelSecondary}>
-                                        Sort Children By
-                                    </label>
-                                    <select
-                                        value={current.sort_children_by ?? ''}
-                                        onChange={(e) => handleChange(level.id, 'sort_children_by', e.target.value || null)}
-                                        className={styles.selectInput}
-                                    >
-                                        <option value="">Manual (default)</option>
-                                        <option value="deadline">Deadline</option>
-                                        <option value="created_at">Created Date</option>
-                                        <option value="completion_rate">Completion Rate</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })}
+            {editableGoalLevels.map((level) => (
+                <LevelSettings
+                    key={level.id}
+                    level={level}
+                    edits={edits[level.id]}
+                    onChange={handleChange}
+                    onSave={handleSave}
+                    onReset={handleReset}
+                />
+            ))}
+            <CompletedGoalSettings />
         </div>
     );
 };
 
-const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) => {
+function CompletedGoalSettings() {
+    const { user, setUser } = useAuth();
     const prefs = user?.preferences || {};
     const [edits, setEdits] = useState({});
 
     const currentPrimary = edits.completed_primary_color ?? prefs.completed_primary_color ?? '#4caf50';
     const currentSecondary = edits.completed_secondary_color ?? prefs.completed_secondary_color ?? '#2e7d32';
-
-    const hasUnsavedChanges = Object.keys(edits).length > 0;
-    const isCustomized = prefs.completed_primary_color || prefs.completed_secondary_color;
 
     const handleSave = async () => {
         try {
@@ -358,11 +319,12 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
     };
 
     const handleReset = async () => {
-        if (!window.confirm("Restore completed goals to default green colors?")) return;
+        if (!window.confirm('Restore completed goals to default green colors?')) return;
         try {
-            // Nullifying them will make the app fall back to default
-            const changes = { completed_primary_color: null, completed_secondary_color: null };
-            const res = await authApi.updatePreferences({ preferences: changes });
+            // Clearing them makes the app fall back to the defaults.
+            const res = await authApi.updatePreferences({
+                preferences: { completed_primary_color: null, completed_secondary_color: null },
+            });
             setUser(res.data);
             notify.success('Reset to defaults.');
             setEdits({});
@@ -372,85 +334,31 @@ const CompletedGoalSettingsCard = ({ user, setUser, animatedIcons, isMobile }) =
     };
 
     return (
-        <div className={styles.levelCard}>
-            <div className={styles.levelHeaderRow}>
-                <div className={styles.levelHeaderTitle}>
-                    {animatedIcons ? (
-                        <AnimatedGoalIcon
-                            shape="check"
-                            color={currentPrimary}
-                            secondaryColor={currentSecondary}
-                            isSmart={true}
-                            size={32}
-                        />
-                    ) : (
-                        <GoalIcon
-                            shape="check"
-                            color={currentPrimary}
-                            secondaryColor={currentSecondary}
-                            isSmart={true}
-                            size={24}
-                        />
-                    )}
-                    Completed Goals
-                    {isCustomized && (
-                        <span className={styles.customizedBadge}>
-                            Customized
-                        </span>
-                    )}
-                </div>
-
-                <div className={styles.buttonGroup}>
-                    {isCustomized && (
-                        <button
-                            onClick={handleReset}
-                            className={styles.restoreButton}
-                        >
-                            Restore Default
-                        </button>
-                    )}
-                    {hasUnsavedChanges && (
-                        <button
-                            onClick={handleSave}
-                            className={styles.saveButton}
-                        >
-                            Save Changes
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            <div className={styles.settingsGroup}>
-                <p className={styles.inputLabelSecondary}>
-                    Select the colors used for all completed goals and their connections in the FlowTree.
-                </p>
-                <div className={styles.flexRowWrap}>
-                    <div>
-                        <label className={styles.inputLabel}>
-                            Primary Color
-                        </label>
-                        <input
-                            type="color"
-                            value={currentPrimary}
-                            onChange={(e) => setEdits(prev => ({ ...prev, completed_primary_color: e.target.value }))}
-                            className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
-                        />
-                    </div>
-                    <div>
-                        <label className={styles.inputLabel}>
-                            Secondary Color <span className={styles.subText}>(SMART ring fill)</span>
-                        </label>
-                        <input
-                            type="color"
-                            value={currentSecondary}
-                            onChange={(e) => setEdits(prev => ({ ...prev, completed_secondary_color: e.target.value }))}
-                            className={`${styles.colorInput} ${isMobile ? styles.colorInputMobile : styles.colorInputDesktop}`}
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
+        <LevelPanel
+            title="Completed goals"
+            icon={<LevelIcon shape="check" color={currentPrimary} secondaryColor={currentSecondary} />}
+            customized={Boolean(prefs.completed_primary_color || prefs.completed_secondary_color)}
+            dirty={Object.keys(edits).length > 0}
+            onSave={handleSave}
+            onReset={handleReset}
+        >
+            <Group title="Appearance">
+                <SettingsRow
+                    label="Colours"
+                    description="Used for every completed goal and its connections in the tree."
+                    controlId="level-completed-color"
+                >
+                    <ColorPair
+                        idPrefix="level-completed"
+                        primary={currentPrimary}
+                        secondary={currentSecondary}
+                        onPrimary={(value) => setEdits((previous) => ({ ...previous, completed_primary_color: value }))}
+                        onSecondary={(value) => setEdits((previous) => ({ ...previous, completed_secondary_color: value }))}
+                    />
+                </SettingsRow>
+            </Group>
+        </LevelPanel>
     );
-};
+}
 
 export default GoalCharacteristicsSettings;

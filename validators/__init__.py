@@ -34,7 +34,7 @@ from .auth import (
     AdminUserUpdateSchema,
     BetaSignupRequestSchema,
     LandingExampleSelectionSchema,
-    LandingExampleShowcaseSchema,
+    LandingExampleTourSchema,
     LegalAcceptanceSchema,
     PasswordForgotSchema,
     PasswordResetSchema,
@@ -51,6 +51,7 @@ from .auth import (
 )
 from .goals import (
     FractalCreateSchema,
+    FractalQuickstartSchema,
     GoalAssociationBatchSchema,
     GoalCompletionUpdateSchema,
     GoalConvertLevelSchema,
@@ -219,6 +220,7 @@ __all__ = [
     "DashboardCreateSchema",
     "DashboardUpdateSchema",
     "FractalCreateSchema",
+    "FractalQuickstartSchema",
     "FractalMetricCreateSchema",
     "FractalMetricUpdateSchema",
     "GoalAssociationBatchSchema",
@@ -238,7 +240,7 @@ __all__ = [
     "GroupReorderSchema",
     "HEX_COLOR_RE",
     "LandingExampleSelectionSchema",
-    "LandingExampleShowcaseSchema",
+    "LandingExampleTourSchema",
     "PasswordForgotSchema",
     "PasswordResetSchema",
     "MAX_DESCRIPTION_LENGTH",

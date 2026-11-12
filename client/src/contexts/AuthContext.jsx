@@ -1,8 +1,10 @@
-import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PRIVACY_VERSION, TERMS_VERSION } from '../content/legal/legalVersions';
-import { authApi, clearAccessToken, setAccessToken } from '../utils/api';
+import { authApi, clearAccessToken, publicApi, setAccessToken } from '../utils/api';
+import { setDemoReauthenticate } from '../utils/api/core';
+import { getLandingPageHref } from '../utils/marketingHost';
 import { isNetworkError } from '../utils/networkErrors';
 import { subscribeConnectivity } from '../offline/connectivity';
 import { clearPersistedQueryCache } from '../offline/queryPersistence';
@@ -245,6 +247,78 @@ export function AuthProvider({ children }) {
     );
 }
 
+// The live demo's visitor: a read-only guest on the published examples (src/demo/).
+export const DEMO_USER = Object.freeze({
+    id: 'demo',
+    username: 'Guest',
+    isDemo: true,
+    is_admin: false,
+    preferences: {},
+});
+
+async function mintDemoSession() {
+    const response = await publicApi.createDemoSession();
+    setAccessToken(response.data.token);
+    return response.data;
+}
+
+const mintDemoToken = async () => (await mintDemoSession()).token;
+
+export function DemoAuthProvider({ children }) {
+    const [state, setState] = useState({ loading: true, error: null });
+    const [appearance, setAppearance] = useState({});
+    // The guest sees each example coloured as its owner set it up (completed goals included).
+    const rootId = useLocation().pathname.split('/')[1] || null;
+    const rootPreferences = appearance[rootId];
+    const user = useMemo(
+        () => (rootPreferences ? { ...DEMO_USER, preferences: rootPreferences } : DEMO_USER),
+        [rootPreferences],
+    );
+
+    useEffect(() => {
+        let cancelled = false;
+        setDemoReauthenticate(mintDemoToken);
+        mintDemoSession().then(
+            (session) => {
+                if (cancelled) return;
+                setAppearance(session.appearance || {});
+                setState({ loading: false, error: null });
+            },
+            (error) => !cancelled && setState({ loading: false, error }),
+        );
+        return () => {
+            cancelled = true;
+            setDemoReauthenticate(null);
+            clearAccessToken();
+        };
+    }, []);
+
+    const leaveDemo = useCallback(async () => {
+        clearAccessToken();
+        window.location.assign(getLandingPageHref());
+    }, []);
+    const refuse = useCallback(async () => {
+        throw new Error('Not available in the demo');
+    }, []);
+
+    const value = {
+        user: state.loading || state.error ? null : user,
+        token: null,
+        loading: state.loading,
+        demoError: state.error,
+        login: refuse,
+        signup: refuse,
+        logout: leaveDemo,
+        signOutEverywhere: leaveDemo,
+        setUser: () => {},
+        isAuthenticated: !state.loading && !state.error,
+        isOfflineSession: false,
+        isDemo: true,
+    };
+
+    return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (!context) {
@@ -252,3 +326,6 @@ export const useAuth = () => {
     }
     return context;
 };
+
+/** For providers that work signed out too (e.g. the theme); null outside an AuthProvider. */
+export const useOptionalAuth = () => useContext(AuthContext);

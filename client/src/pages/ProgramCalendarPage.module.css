@@ -35,23 +35,6 @@
 }
 
 
-.headerTitleSegments {
-    display: inline-flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    column-gap: 10px;
-    row-gap: 2px;
-}
-
-.headerTitleSegment {
-    min-width: 0;
-}
-
-.headerTitleSeparator {
-    color: var(--color-text-muted);
-    font-weight: 600;
-}
-
 .headerMetaRow {
     display: inline-flex;
     align-items: center;

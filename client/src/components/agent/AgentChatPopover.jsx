@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { agentApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
+import LoadingState from '../common/LoadingState';
 import AgentProposalReview from './AgentProposalReview';
 import { getErrorMessage } from './agentChatFormatting';
 import styles from './AgentChatPopover.module.css';
@@ -115,7 +116,7 @@ function AgentChatPopover({ rootId, isOpen, onClose }) {
                 <div className={styles.messageList} aria-live="polite">
                     {messages.length === 0 && <article className={`${styles.message} ${styles.assistantMessage}`}><strong>Fractal AI</strong><p>Tell me what you want to change. I can inspect this fractal and prepare changes to review. Nothing is written until you approve a preview.</p><p>Embedded requests use the configured Fractal Goals provider account and its daily spend limits.</p></article>}
                     {messages.map((item) => <article className={`${styles.message} ${item.role === 'user' ? styles.userMessage : styles.assistantMessage}`} key={item.id}><strong>{item.role === 'user' ? 'You' : 'Fractal AI'}</strong><p>{item.content}</p></article>)}
-                    {conversationQuery.isLoading && <p className={styles.notice}>Loading conversation…</p>}
+                    {conversationQuery.isLoading && <LoadingState variant="inline" label="Loading conversation…" />}
                     {conversationQuery.isError && <p className={styles.error} role="alert">Could not load this conversation: {getErrorMessage(conversationQuery.error)}</p>}
                 </div>
                 {proposal && <section className={styles.section} aria-labelledby="agent-review-heading"><div className={styles.sectionHeading}><h3 id="agent-review-heading">Review proposed changes</h3><span className={styles.status}>{proposal.status.replaceAll('_', ' ')}</span></div><AgentProposalReview proposal={proposal} isPending={decide.isPending} onDecision={(decision) => decide.mutate({ item: proposal, decision })} error={decide.error} />{latestRun && ['queued', 'running'].includes(latestRun.status) && <button type="button" disabled={cancelRun.isPending} onClick={() => cancelRun.mutate(latestRun.id)}>Cancel assistant turn</button>}</section>}

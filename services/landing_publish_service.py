@@ -1,11 +1,11 @@
-"""Landing-example settings, snapshot building, and publish pipeline.
+"""The live demo's publish pipeline: snapshot the chosen fractals, publish a small manifest.
 
-Extracted from AdminService so the ~1k-line landing read-model builder lives
-in its own service boundary. AdminService and the admin blueprint compose this
-service; the public landing read path (`PublicService.get_landing_examples`)
-consumes the published cache via `LANDING_EXAMPLE_CACHE_KEY`.
+Publishing copies each draft example (an admin-owned source fractal) into the demo
+account with `DemoSnapshotService`. Snapshot ids derive from the source's, so demo links
+stay the same across publishes. The public manifest (`LANDING_EXAMPLE_CACHE_KEY`,
+also written to the static delivery) names the snapshots; `blueprints/demo_access.py`
+serves them read-only. Everything happens in one transaction under the publish lock.
 """
-from services.media_stream import omit_private_media
 
 import gzip
 import logging
@@ -16,17 +16,15 @@ from time import perf_counter
 from sqlalchemy import text
 
 from config import config
-from models import (
-    utc_now,
-)
-from services.goal_loading import load_fractal_goals_for_serialization
-from services.goal_history_read_model import GoalHistoryReadModel
+from models import Goal, GoalLevel, Program, Session, User, _safe_load_json, utc_now
+from services.demo_account_service import DemoAccountService
+from services.demo_snapshot_service import DemoSnapshotService, SnapshotResult, snapshot_root_id
 from services.ops_log import log_ops_event
-from services.serializers import (
-    format_utc,
-)
+from services.serializers import format_utc
+from services._serialize_common import calculate_smart_status
 from services.service_types import JsonDict, ServiceResult
 from services._landing_common import (
+    LANDING_EXAMPLE_APPEARANCE_KEYS,
     LANDING_EXAMPLE_CACHE_KEY,
     LANDING_EXAMPLE_DELIVERY_KEY,
     LANDING_EXAMPLE_PUBLISH_LOCK_KEY,
@@ -34,21 +32,16 @@ from services._landing_common import (
     LANDING_EXAMPLE_SETTINGS_KEY,
     _landing_publish_process_lock,
 )
-from services._landing_public_tree import _LandingPublicTreeMixin
 from services._landing_settings import _LandingSettingsMixin
-from services._landing_showcase import _LandingShowcaseMixin
 from services._landing_static_snapshot import _LandingStaticSnapshotMixin
-from services.landing_condition_analytics import build_landing_condition_analytics
 
 logger = logging.getLogger(__name__)
 
+# The tour opens the first goal worth opening: the most concrete level that has one.
+TOUR_GOAL_LEVELS = ("Short Term Goal", "Mid Term Goal", "Long Term Goal")
 
-class LandingPublishService(
-    _LandingSettingsMixin,
-    _LandingPublicTreeMixin,
-    _LandingShowcaseMixin,
-    _LandingStaticSnapshotMixin,
-):
+
+class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
     def __init__(self, db_session):
         self.db_session = db_session
 
@@ -79,32 +72,38 @@ class LandingPublishService(
         self, *, examples_override: list[JsonDict] | None = None,
     ) -> ServiceResult[JsonDict]:
         publish_started = perf_counter()
-        source_examples = examples_override
-        if source_examples is None:
-            source_examples = self._get_app_setting_value(
-                LANDING_EXAMPLE_SETTINGS_KEY, {"examples": []}
-            ).get("examples", [])
-        examples = self._normalize_landing_example_settings(source_examples)
-        _, error, status = self._validate_landing_example_roots(examples)
+        settings = self._get_landing_settings()
+        examples = self._normalize_landing_example_settings(
+            settings["examples"] if examples_override is None else examples_override
+        )
+        roots_by_id, error, status = self._validate_landing_example_roots(examples)
         if error:
             return None, error, status
 
+        account_id = str(DemoAccountService(self.db_session).ensure().id)
+        snapshot_service = DemoSnapshotService(self.db_session)
+        previous = settings["snapshots"]
+        taken_at = format_utc(utc_now())
+        snapshots: dict[str, JsonDict] = {}
         published_examples = []
-        showcase_warnings: list[str] = []
         for item in examples:
-            published, error = self._build_published_example(item, showcase_warnings)
-            if error:
-                message, status = error
-                return None, message, status
-            published_examples.append(published)
+            source = roots_by_id[item["root_id"]]
+            source_id = str(source.id)
+            target_root_id = snapshot_root_id(source_id)
+            snapshot_service.purge(target_root_id, account_id)
+            result = snapshot_service.snapshot(source_id, target_root_id, account_id)
+            snapshots[source_id] = {"root_id": target_root_id, "taken_at": taken_at, "counts": result.counts}
+            published_examples.append(self._build_published_example(item, source, result))
+        for source_root_id, snapshot in previous.items():
+            if source_root_id not in snapshots and snapshot.get("root_id"):
+                snapshot_service.purge(snapshot["root_id"], account_id)
 
         cache = {
-            "published_at": format_utc(utc_now()),
+            "published_at": taken_at,
             "revision": str(uuid.uuid4()),
             "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
             "examples": published_examples,
         }
-        cache = omit_private_media(cache)
         serialized_snapshot = self._serialized_landing_snapshot(cache)
         snapshot_bytes = len(serialized_snapshot.encode("utf-8"))
         compressed_snapshot = gzip.compress(
@@ -119,7 +118,7 @@ class LandingPublishService(
         delivery_started = perf_counter()
         static_snapshot, error = self._deliver_and_commit_landing_snapshot(
             cache,
-            examples,
+            {"examples": examples, "snapshots": snapshots},
             serialized_snapshot=serialized_snapshot,
             compressed_snapshot=compressed_snapshot,
             snapshot_bytes=snapshot_bytes,
@@ -128,15 +127,12 @@ class LandingPublishService(
         if error:
             message, status = error
             return None, message, status
-        committed_ms = round((perf_counter() - publish_started) * 1000)
         delivery_ms = round((perf_counter() - delivery_started) * 1000)
         total_ms = round((perf_counter() - publish_started) * 1000)
         logger.info(
-            "Landing publish completed examples=%s snapshot_bytes=%s committed_ms=%s "
-            "delivery_ms=%s total_ms=%s static_snapshot=%s",
+            "Demo publish completed examples=%s snapshot_bytes=%s delivery_ms=%s total_ms=%s static_snapshot=%s",
             len(published_examples),
             snapshot_bytes,
-            committed_ms,
             delivery_ms,
             total_ms,
             static_snapshot,
@@ -148,84 +144,85 @@ class LandingPublishService(
             snapshot_bytes=snapshot_bytes,
             compressed_bytes=compressed_bytes,
             static_snapshot=static_snapshot,
+            duration_ms=total_ms,
         )
+        payload, _, _ = self.get_landing_example_settings()
         return {
-            "published_at": cache["published_at"],
+            **(payload or {}),
             "revision": cache["revision"],
-            "published_example_count": len(published_examples),
-            "examples": examples,
-            "showcase_warnings": showcase_warnings,
             "static_snapshot": static_snapshot,
             "publish_duration_ms": total_ms,
             "snapshot_bytes": snapshot_bytes,
             "compressed_snapshot_bytes": compressed_bytes,
         }, None, 200
 
-    def _build_published_example(self, item, showcase_warnings):
-        """Build one example's public snapshot; resolved selections are written back to ``item``."""
-        example_started = perf_counter()
-        goals_by_id = load_fractal_goals_for_serialization(
-            self.db_session, item["root_id"], include_group_activities=True,
-            with_review_dates=False,  # public snapshots don't show reviews
-        )
-        root = goals_by_id.get(item["root_id"])
-        if not root:
-            return None, ("Landing example root not found", 404)
-        effective_levels_by_name = self._load_effective_landing_levels(root.owner_id, root.id)
-        history = GoalHistoryReadModel(self.db_session, root.id).preload(set(goals_by_id), goals_by_id=goals_by_id)
-        serialized_tree = self._serialize_public_goal_tree(root, effective_levels_by_name)
-        self._enrich_landing_tree_with_history(
-            serialized_tree, root, goals_by_id, effective_levels_by_name, history,
-        )
-        flowtree_data = self._build_landing_flowtree_data(root, serialized_tree, goals_by_id)
-        resolved_showcase, warnings = self._resolve_landing_showcase(root, item.get("showcase"))
-        showcase_warnings.extend(f"{item['label']}: {warning}" for warning in warnings)
-        resolved_content, content_warnings = self._resolve_landing_goal_content(
-            root, item.get("landing_content")
-        )
-        showcase_warnings.extend(f"{item['label']}: {warning}" for warning in content_warnings)
-        item["showcase"] = resolved_showcase
-        item["landing_content"] = resolved_content
-        showcase_data = self._build_landing_showcase_data(root, resolved_showcase)
-        condition_analytics = build_landing_condition_analytics(
-            self.db_session, root, goals_by_id, self._serialize_landing_activity_ref, history,
-        )
-        published = {
-            "root_id": root.id,
+    def _build_published_example(self, item: JsonDict, source: Goal, result: SnapshotResult) -> JsonDict:
+        """One manifest entry: what the landing draws and where the tour goes, on the snapshot."""
+        root_id = result.root_id
+        root = self.db_session.get(Goal, root_id)
+        owner = self.db_session.get(User, source.owner_id)
+        preferences = _safe_load_json(owner.preferences, {}) if owner else {}
+        if not isinstance(preferences, dict):
+            preferences = {}
+        return {
+            "root_id": root_id,
             "label": item["label"],
             "sort_order": item["sort_order"],
-            "root_name": root.name,
-            "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
-            "tree": serialized_tree,
-            "evidence_goal_ids": flowtree_data["evidence_goal_ids"],
-            "metrics_summary": flowtree_data["metrics_summary"],
-            "programs": flowtree_data["programs"],
-            "showcase": resolved_showcase,
-            "tree_view_settings": item["tree_view_settings"],
-            "landing_content": resolved_content,
-            "sessions": showcase_data["sessions"],
-            "activity_definitions": showcase_data["activity_definitions"],
-            "activity_groups": showcase_data["activity_groups"],
-            "activity_instantiation_summary": showcase_data["activity_instantiation_summary"],
-            "analytics_views": showcase_data["analytics_views"],
-            "analytics_activity_instances": showcase_data["analytics_activity_instances"],
-            "condition_analytics": condition_analytics,
-            "session_templates": showcase_data["session_templates"],
+            "root_name": source.name,
+            "icon": self._root_icon(root),
+            "tour": {
+                "goal_id": self._tour_goal_id(root_id),
+                "session_id": self._tour_session_id(root_id, result.id_map.get(item["tour"].get("session_id") or "")),
+                "program_id": self._tour_program_id(root_id, result.id_map.get(item["tour"].get("program_id") or "")),
+            },
+            "appearance": {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)},
         }
-        logger.info(
-            "Landing publish example built root_id=%s goals=%s duration_ms=%s",
-            root.id,
-            len(goals_by_id),
-            round((perf_counter() - example_started) * 1000),
-        )
-        return published, None
+
+    def _root_icon(self, root: Goal) -> JsonDict:
+        level = self.db_session.query(GoalLevel).filter(
+            GoalLevel.root_id == root.id,
+            GoalLevel.owner_id == root.owner_id,
+            GoalLevel.name == getattr(root.level, "name", None),
+            GoalLevel.deleted_at.is_(None),
+        ).first() or root.level
+        return {
+            "shape": getattr(level, "icon", None),
+            "color": getattr(level, "color", None),
+            "secondary_color": getattr(level, "secondary_color", None),
+            "smart": all(calculate_smart_status(root).values()),
+        }
+
+    def _tour_goal_id(self, root_id: str) -> str | None:
+        for level_name in TOUR_GOAL_LEVELS:
+            goal = self.db_session.query(Goal).join(GoalLevel, Goal.level_id == GoalLevel.id).filter(
+                Goal.root_id == root_id,
+                Goal.deleted_at.is_(None),
+                GoalLevel.name == level_name,
+            ).order_by(Goal.created_at.asc(), Goal.id.asc()).first()
+            if goal:
+                return goal.id
+        return None
+
+    def _tour_session_id(self, root_id: str, picked: str | None) -> str | None:
+        live = self.db_session.query(Session.id).filter(Session.root_id == root_id, Session.deleted_at.is_(None))
+        if picked and live.filter(Session.id == picked).first():
+            return picked
+        latest = live.order_by(Session.session_start.desc().nullslast(), Session.created_at.desc()).first()
+        return latest[0] if latest else None
+
+    def _tour_program_id(self, root_id: str, picked: str | None) -> str | None:
+        programs = self.db_session.query(Program.id).filter(Program.root_id == root_id)
+        if picked and programs.filter(Program.id == picked).first():
+            return picked
+        first = programs.order_by(Program.is_active.desc(), Program.created_at.asc()).first()
+        return first[0] if first else None
 
     def _landing_snapshot_size_error(self, snapshot_bytes, compressed_bytes) -> tuple[str, int] | None:
         """Reject snapshots over the expanded or transfer size limits, rolling back the draft."""
         if snapshot_bytes > config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:
             self.db_session.rollback()
             return (
-                "Landing snapshot is too large to publish "
+                "The demo manifest is too large to publish "
                 f"({snapshot_bytes:,} expanded bytes; "
                 f"limit {config.LANDING_EXAMPLES_MAX_UNCOMPRESSED_BYTES:,}; "
                 f"{compressed_bytes:,} transfer bytes; "
@@ -235,7 +232,7 @@ class LandingPublishService(
         if compressed_bytes > config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:
             self.db_session.rollback()
             return (
-                "Compressed landing snapshot is too large to publish "
+                "The compressed demo manifest is too large to publish "
                 f"({compressed_bytes:,} transfer bytes; "
                 f"limit {config.LANDING_EXAMPLES_MAX_COMPRESSED_BYTES:,}; "
                 f"{snapshot_bytes:,} expanded bytes; "
@@ -245,7 +242,7 @@ class LandingPublishService(
         return None
 
     def _deliver_and_commit_landing_snapshot(
-        self, cache, examples, *, serialized_snapshot, compressed_snapshot, snapshot_bytes, compressed_bytes,
+        self, cache, settings, *, serialized_snapshot, compressed_snapshot, snapshot_bytes, compressed_bytes,
     ):
         """Write the static snapshot, then commit the settings; restore the static copy if the commit fails."""
         previous_cache = self._get_app_setting_value(
@@ -273,9 +270,8 @@ class LandingPublishService(
                 "Retry publishing."
             ), 503)
 
-        # Reconcile stale references back into the editable draft so an
-        # unavailable hidden selection warns once instead of on every publish.
-        self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, {"examples": examples})
+        # The draft as published, with the private source → snapshot map.
+        self._set_app_setting_value(LANDING_EXAMPLE_SETTINGS_KEY, settings)
         self._set_app_setting_value(LANDING_EXAMPLE_CACHE_KEY, cache)
         delivery = {
             "revision": cache["revision"],

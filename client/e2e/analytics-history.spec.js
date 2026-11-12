@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { openOrigin } from './support/session.js';
 
 test('a deep link starts history immediately and holds its chart through pagination and retry', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const root = `browser-root-${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     let releaseActivities;
     let releaseContinuation;

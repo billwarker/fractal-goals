@@ -547,6 +547,26 @@ class TestPreferencesEndpoint:
         assert 'id' in data  # User object returned
         assert 'preferences' in data  # Preferences field exists
 
+    def test_appearance_preference_is_stored_with_defaults(self, authed_client):
+        response = authed_client.patch('/api/auth/preferences', json={
+            'preferences': {'appearance': {'mode': 'schedule', 'darkFrom': '21:30'}},
+        })
+        assert response.status_code == 200
+        assert response.get_json()['preferences']['appearance'] == {
+            'mode': 'schedule', 'darkFrom': '21:30', 'lightFrom': '07:00',
+        }
+
+    @pytest.mark.parametrize('appearance', [
+        {'mode': 'sepia'},
+        {'mode': 'schedule', 'darkFrom': '24:00'},
+        {'mode': 'schedule', 'lightFrom': '7:00'},
+        {'mode': 'light', 'extra': True},
+        'dark',
+    ])
+    def test_malformed_appearance_preference_is_rejected(self, authed_client, appearance):
+        response = authed_client.patch('/api/auth/preferences', json={'preferences': {'appearance': appearance}})
+        assert response.status_code in (400, 422)
+
     def test_onboarding_state_uses_optimistic_revision(self, authed_client):
         initial = authed_client.get('/api/auth/onboarding')
         assert initial.status_code == 200

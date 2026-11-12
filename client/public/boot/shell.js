@@ -3,12 +3,35 @@
 // forbid inline script (script-src 'self'). Served with Cache-Control: no-cache
 // because, unlike Vite assets, this path is not content-hashed.
 (function () {
-  // Resolve the theme before first paint.
+  // Resolve the theme before first paint. Mirrors resolveTheme in
+  // src/utils/themeSchedule.js; both are checked against
+  // tests/fixtures/theme_schedule_cases.json. A legacy 'theme' key is a fixed mode.
   try {
-    var saved = localStorage.getItem('theme');
-    var resolved = saved === 'light' || saved === 'dark'
-      ? saved
-      : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    var timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+    var minutesOf = function (value, fallback) {
+      var match = timePattern.exec(typeof value === 'string' ? value : '') || timePattern.exec(fallback);
+      return Number(match[1]) * 60 + Number(match[2]);
+    };
+    var preference = null;
+    try { preference = JSON.parse(localStorage.getItem('theme-preference')); } catch { preference = null; }
+    if (!preference || typeof preference !== 'object') {
+      var legacy = localStorage.getItem('theme');
+      preference = legacy === 'light' || legacy === 'dark' ? { mode: legacy } : { mode: 'system' };
+    }
+    var resolved;
+    if (preference.mode === 'light' || preference.mode === 'dark') {
+      resolved = preference.mode;
+    } else if (preference.mode === 'schedule') {
+      var now = new Date();
+      var minute = now.getHours() * 60 + now.getMinutes();
+      var darkFrom = minutesOf(preference.darkFrom, '20:00');
+      var lightFrom = minutesOf(preference.lightFrom, '07:00');
+      var dark = darkFrom === lightFrom
+        || (darkFrom < lightFrom ? minute >= darkFrom && minute < lightFrom : minute >= darkFrom || minute < lightFrom);
+      resolved = dark ? 'dark' : 'light';
+    } else {
+      resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    }
     document.documentElement.setAttribute('data-theme', resolved);
   } catch {
     document.documentElement.setAttribute('data-theme', 'dark');
@@ -33,7 +56,11 @@
   var isLocalPreviewPath = path === '/landing-preview' && isLocalDevHost;
   var isLandingEntry = isLocalPreviewPath || (path === '/' && isMarketingHost);
   document.documentElement.setAttribute('data-entry-surface', isLandingEntry ? 'landing' : 'app');
-  if (!isLandingEntry) return;
+  if (!isLandingEntry) {
+    // The app boot loader (index.html) explains a long wait; src/utils/appBootHandoff.js removes it.
+    setTimeout(function () { document.documentElement.setAttribute('data-boot-slow', 'true'); }, 4000);
+    return;
+  }
   // index.html carries the build-time URL in a meta tag Vite fills in.
   var staticUrlMeta = document.querySelector('meta[name="fg-landing-examples-static-url"]');
   var staticUrl = staticUrlMeta ? staticUrlMeta.getAttribute('content') || '' : '';

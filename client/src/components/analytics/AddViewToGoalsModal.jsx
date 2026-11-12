@@ -7,6 +7,7 @@ import { useAnalyticsViews } from '../../hooks/useDashboardQueries';
 import { MAX_CHARTS_PER_GOAL, useViewGoals } from '../../hooks/useGoalCharts';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import { flattenGoalTree } from '../../utils/goalNodeModel';
+import LoadingState from '../common/LoadingState';
 import styles from './SavedAnalyticsModal.module.css';
 
 /**
@@ -48,7 +49,7 @@ export default function AddViewToGoalsModal({ rootId, view, isOpen, onClose }) {
     const loading = treeQuery.isLoading || viewGoals.isLoading || savedQuery.isLoading;
     if (isOpen && (failed || loading)) return (
         <Modal isOpen onClose={onClose} title="Show on goals">
-            {failed ? <div role="alert">Couldn’t load goals and chart capacity. Close and try again.</div> : <p role="status">Loading goals and chart capacity…</p>}
+            {failed ? <div role="alert">Couldn’t load goals and chart capacity. Close and try again.</div> : <LoadingState label="Loading goals and chart capacity…" />}
             <Button variant="secondary" onClick={onClose}>Close</Button>
         </Modal>
     );

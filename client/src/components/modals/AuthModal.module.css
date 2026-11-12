@@ -136,3 +136,11 @@
     text-decoration: underline;
     text-underline-offset: 0.15em;
 }
+
+/* Touch screens: a taller tap area for the inline text buttons without moving their text. */
+@media (pointer: coarse) {
+    .toggleButton {
+        padding-block: 8px;
+        margin-block: -8px;
+    }
+}

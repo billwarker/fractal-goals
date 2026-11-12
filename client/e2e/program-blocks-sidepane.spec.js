@@ -1,4 +1,5 @@
 import { deviceOf, expect, test } from './support/clock.js';
+import { openOrigin } from './support/session.js';
 
 // Uses the "Browser Planning" fractal: its program's goal is the fractal root, and "Block 1"
 // runs from a week ago to three weeks ahead.
@@ -8,12 +9,7 @@ test('summarizes a block in the calendar pane and adds a program day with option
     const rootId = `browser-plan-root-${suffix}`;
     const rootName = `Browser Planning ${suffix}`;
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     await page.goto(`/${rootId}/programs`);
     // The Programs page has Calendar and Days only; blocks live in the calendar side pane.

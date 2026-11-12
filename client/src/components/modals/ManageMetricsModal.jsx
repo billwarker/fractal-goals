@@ -14,10 +14,10 @@ import Input from '../atoms/Input';
 import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import TextArea from '../atoms/TextArea';
+import LoadingState from '../common/LoadingState';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import MetricInputSettingsFields, { defaultPrecisionForType } from './MetricInputSettingsFields';
 import styles from './ManageMetricsModal.module.css';
-
 
 const EMPTY_FORM = {
     name: '',
@@ -288,7 +288,7 @@ function ManageMetricsModal({ isOpen, onClose, rootId }) {
                             <div className={styles.listSectionInner}>
                                 <div className={styles.sectionHeading}>Metrics</div>
                                 {isLoading ? (
-                                    <div className={styles.emptyState}>Loading...</div>
+                                    <LoadingState label="Loading metrics…" />
                                 ) : fractalMetrics.length === 0 ? (
                                     <div className={styles.emptyState}>No metrics yet. Create one to get started.</div>
                                 ) : (

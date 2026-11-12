@@ -205,6 +205,36 @@ const BESPOKE_BADGE_SELECTOR_BUDGET = 184;
 const GLOBAL_TOKEN_PREFIX = /^--(?:color|spacing|border-radius|shadow|font|line-height|duration|ease|z|panel|surface|sheet)-/;
 const BESPOKE_OVERLAY_FILE_BUDGET = 9;
 const RAW_MOTION_LITERAL_BUDGET = 664;
+// Raw hex/rgb() colours outside design-tokens.css (var() fallbacks excluded). Ratchet down only:
+// new colours belong in design-tokens.css with a value for each theme.
+const RAW_COLOR_LITERAL_BUDGET = 254;
+const VAR_COLOR_FALLBACK = /var\(--[\w-]+\s*,\s*(?:#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))\s*\)/g;
+const isTestFile = (file) => /(?:^|\/)(?:__tests__|test)\/|\.test\.[jt]sx?$/.test(file);
+const countRawColorLiterals = (file, content) => {
+  if (file.endsWith('design-tokens.css') || isTestFile(file)) return 0;
+  const code = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(VAR_COLOR_FALLBACK, '');
+  const pattern = file.endsWith('.css') ? /#[0-9a-fA-F]{3,8}\b|rgba?\(/g : /['"`]#[0-9a-fA-F]{3,8}['"`]|['"`]rgba?\(/g;
+  return (code.match(pattern) ?? []).length;
+};
+// Loading states go through components/common/LoadingState (delay, escalation, retry). A div,
+// p or span that just says "Loading…", or the never-styled .loading-spinner class, is an
+// ad-hoc loader. (A button's own busy text, like "Loading more…", is fine.)
+const LOADING_STATE_OWNERS = new Set([
+  'src/components/common/LoadingState.jsx',
+  'src/components/common/RouteFallback.jsx',
+]);
+const AD_HOC_LOADING = /<(?:div|p|span|li|section)\b[^>]*>\s*Loading\b|className=["'][^"']*\bloading-spinner\b/;
+const auditLoadingStates = (file, content) => {
+  if (!file.endsWith('.jsx') || isTestFile(file) || LOADING_STATE_OWNERS.has(file)) return;
+  const match = content.match(AD_HOC_LOADING);
+  if (match) {
+    console.error(
+      `[maintainability-audit] ${file} has an ad-hoc loading state (${match[0].trim().slice(0, 60)}). ` +
+      'Use <LoadingState label="Loading …" /> (or <RouteFallback /> for Suspense routes).'
+    );
+    hasFailure = true;
+  }
+};
 const inlineStyleBudgets = new Map([
   ['src/components/GoalDetailModal.jsx', 18],
   ['src/components/goalDetail/GoalTimelineView.jsx', 1],
@@ -407,6 +437,7 @@ let inlineStyleCount = 0;
 let rawCloseGlyphCount = 0;
 let rawButtonClassDriftCount = 0;
 let bespokeOverlayFileCount = 0;
+let rawColorLiteralCount = 0;
 for (const file of sourceFiles) {
   const content = readFileSync(file, 'utf8');
   if (!content) continue;
@@ -423,9 +454,11 @@ for (const file of sourceFiles) {
   const relativePath = relative(resolve(''), file);
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
+  auditLoadingStates(relativePath, content);
   inlineStyleCount += auditInlineStyles(relativePath, content);
   rawCloseGlyphCount += countRawCloseGlyphs(content);
   rawButtonClassDriftCount += countRawButtonClassDrift(content);
+  rawColorLiteralCount += countRawColorLiterals(relativePath, content);
   if (/styles\.(?:overlay|modalOverlay)|className=["'][^"']*modal-overlay/.test(content)) {
     bespokeOverlayFileCount += 1;
   }
@@ -442,6 +475,7 @@ for (const file of cssFiles) {
   bespokeBadgeSelectorCount += countBespokeBadgeSelectors(relativePath, content);
   for (const match of content.matchAll(/(--[\w-]+)\s*:/g)) definedCssTokens.add(match[1]);
   for (const match of content.matchAll(/var\((--[\w-]+)/g)) referencedCssTokens.add(match[1]);
+  rawColorLiteralCount += countRawColorLiterals(relativePath, content);
   rawMotionLiteralCount += (content.match(/\b[0-9.]+(?:ms|s)\b|cubic-bezier\([^)]*\)/g) ?? []).length;
 }
 
@@ -500,6 +534,14 @@ if (rawMotionLiteralCount > RAW_MOTION_LITERAL_BUDGET) {
   console.error(
     `[maintainability-audit] Found ${rawMotionLiteralCount} raw motion literals, exceeding the no-growth budget of ` +
     `${RAW_MOTION_LITERAL_BUDGET}. Use --duration-* and --ease-* tokens for new motion.`
+  );
+  hasFailure = true;
+}
+
+if (rawColorLiteralCount > RAW_COLOR_LITERAL_BUDGET) {
+  console.error(
+    `[maintainability-audit] Found ${rawColorLiteralCount} raw colour literals, exceeding the no-growth budget of ` +
+    `${RAW_COLOR_LITERAL_BUDGET}. Use design-tokens.css colours so both themes get a value.`
   );
   hasFailure = true;
 }

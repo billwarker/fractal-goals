@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openOrigin } from './support/session.js';
 
 test('goal heatmap shows lifetime evidence and accessible day inspection in both themes', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
@@ -8,12 +9,7 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
         localStorage.setItem('fractal_timezone_preference', 'UTC');
         localStorage.setItem('theme', 'dark');
     });
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
     await page.goto(`/browser-root-${suffix}/goals`);
     // The tree settles its layout as data arrives, so retry the click until the details open.
     await expect(async () => {
@@ -162,7 +158,16 @@ test('goal heatmap shows lifetime evidence and accessible day inspection in both
     await page.screenshot({ path: testInfo.outputPath('goal-heatmap-dark.png') });
     await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
     await expect(heatmap.getByRole('heading', { name: 'Timeline' })).toBeAttached();
-    await expect(heatmap.getByRole('heading', { name: 'Timeline', exact: true })).toHaveCSS('color', 'rgb(15, 31, 51)');
+    // The heading follows the light theme's primary text token (read live, so palette tuning can't break this).
+    const lightText = await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--color-text-primary)';
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+    });
+    await expect(heatmap.getByRole('heading', { name: 'Timeline', exact: true })).toHaveCSS('color', lightText);
     await expect(legendPeak).toHaveCSS('background-color', await legendPeak.evaluate((element) => {
         const probe = document.createElement('span');
         probe.style.color = getComputedStyle(element).getPropertyValue('--heatmap-accent');

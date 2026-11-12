@@ -576,3 +576,20 @@
 .cancelBtn:hover {
     background: var(--color-bg-hover);
 }
+
+/* Touch screens: a thumb-sized options button, and a taller tap area on the context link
+   (the negative margin keeps the text where it was). */
+@media (pointer: coarse) {
+    .optionsBtn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 36px;
+        min-height: 36px;
+    }
+
+    .goalLink {
+        padding-block: 6px;
+        margin-block: -6px;
+    }
+}

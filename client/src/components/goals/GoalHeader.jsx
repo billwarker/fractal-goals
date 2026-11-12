@@ -6,6 +6,7 @@ import GoalIcon from '../atoms/GoalIcon';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import { formatDateInTimezone, formatLiteralDate } from '../../utils/dateUtils';
 import { getAgeLabel } from '../../utils/goalTiming';
+import useReadableColor from '../../hooks/useReadableColor';
 import GoalHeaderTitle from './GoalHeaderTitle';
 import styles from './GoalHeader.module.css';
 
@@ -70,6 +71,7 @@ function GoalHeader({
     const completionReplacesDue = isCompleted && completedDateLabel;
     const terminalDateLabel = completionReplacesDue ? completedDateLabel : dueDateLabel;
     const terminalDateTitle = completionReplacesDue ? 'Completed' : 'Due';
+    const goalTextColor = useReadableColor(goalColor, 'text');
     const normalizedStatus = goalStatus === 'paused'
         ? 'paused'
         : goalStatus === 'inactive'
@@ -79,8 +81,9 @@ function GoalHeader({
         active: {
             label: 'Active',
             borderColor: 'color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border))',
-            background: 'color-mix(in srgb, var(--color-brand-success) 16%, transparent)',
-            color: 'var(--color-brand-success)',
+            background: 'color-mix(in srgb, var(--color-brand-success) 10%, transparent)',
+            // Green on a green tint falls below 4.5:1; the border and tint carry the state.
+            color: 'var(--color-text-primary)',
         },
         inactive: {
             label: 'Inactive',
@@ -90,9 +93,9 @@ function GoalHeader({
         },
         paused: {
             label: 'Paused',
-            borderColor: 'color-mix(in srgb, #60a5fa 62%, var(--color-border))',
-            background: 'color-mix(in srgb, #60a5fa 14%, transparent)',
-            color: '#93c5fd',
+            borderColor: 'color-mix(in srgb, var(--color-brand-primary) 62%, var(--color-border))',
+            background: 'color-mix(in srgb, var(--color-brand-primary) 14%, transparent)',
+            color: 'var(--color-brand-primary)',
         },
     }[normalizedStatus];
 
@@ -102,6 +105,7 @@ function GoalHeader({
             className={`${styles.header} ${headerTabs ? styles.headerWithTabs : ''}`}
             style={{
                 '--goal-header-color': goalColor,
+                '--goal-header-text': goalTextColor,
                 '--goal-status-border': statusConfig.borderColor,
                 '--goal-status-bg': statusConfig.background,
                 '--goal-status-color': statusConfig.color,
@@ -144,7 +148,8 @@ function GoalHeader({
             <div className={`${styles.metaPanel} ${isCompact ? styles.metaPanelCompact : ''}`}>
                 {/* Second Row: Badges, Status, and Dates */}
                 <div className={styles.metaRow}>
-                    <div className={`${styles.badgeRow} ${styles.metadataRail}`}>
+                    {/* Pans sideways on phones; focusable so keyboard users can scroll it too. */}
+                    <div className={`${styles.badgeRow} ${styles.metadataRail}`} tabIndex={0} role="group" aria-label="Goal status and dates">
                         {mode === 'create' && (
                             <span className={styles.createLabel}>
                                 + Create

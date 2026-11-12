@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
+import LoadingState from '../common/LoadingState';
 import styles from '../../pages/Admin.module.css';
 
 const ADMIN_BETA_SIGNUPS_KEY = ['admin', 'beta-signups'];
@@ -116,7 +117,7 @@ export default function BetaSignupsPanel({ enabled }) {
             </div>
 
             {betaSignupsQuery.isPending ? (
-                <p className={styles.status}>Loading beta signups...</p>
+                <LoadingState label="Loading beta signups…" />
             ) : requests.length === 0 ? (
                 <p className={styles.status}>No beta signups yet.</p>
             ) : (

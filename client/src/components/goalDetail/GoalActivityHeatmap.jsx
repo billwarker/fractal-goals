@@ -5,6 +5,7 @@ import { resolveGoalLevel, useGoalLevels } from '../../contexts/GoalLevelsContex
 import { useGoalActivityHeatmap } from '../../hooks/useGoalActivityHeatmap';
 import CalendarHeatmap from '../common/CalendarHeatmap';
 import { heatmapIntensity } from '../common/calendarHeatmapModel';
+import LoadingState from '../common/LoadingState';
 import GoalTimelineFeed from './GoalTimelineFeed';
 import styles from './GoalActivityHeatmap.module.css';
 import calendarStyles from '../common/CalendarHeatmap.module.css';
@@ -56,7 +57,7 @@ function GoalActivityCalendar({ rootId, goalId, goal, timezone, goalColor, snaps
                     </div>
                 </div>
                 <div>
-                    {!isSnapshot && (isLoading ? <p role="status">Loading timeline calendar...</p> : isError ? (
+                    {!isSnapshot && (isLoading ? <LoadingState label="Loading timeline calendar…" /> : isError ? (
                         <p role="alert">Timeline calendar could not be loaded. <Button variant="secondary" size="sm" onClick={() => refetch()}>Retry calendar</Button></p>
                     ) : data ? (
                         <>

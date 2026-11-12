@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../utils/api';
 import { presetToRange } from '../../utils/dateRange';
 import DateRangeFilter from '../common/DateRangeFilter';
+import LoadingState from '../common/LoadingState';
 import DauBarChart from './DauBarChart';
 import EventsBreakdownTable from './EventsBreakdownTable';
 import UsageStoragePanel from './UsageStoragePanel';
@@ -45,7 +46,7 @@ export default function UsagePanel({ enabled }) {
                 }}
             />
 
-            {usageQuery.isLoading && <p>Loading usage data...</p>}
+            {usageQuery.isLoading && <LoadingState label="Loading usage data…" />}
             {usageQuery.isError && <p>Failed to load usage data.</p>}
 
             {data && (

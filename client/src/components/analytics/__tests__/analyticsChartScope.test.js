@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import { instanceMatchesScope, sessionMatchesScope } from '../analyticsGlobalFilters';
 import { resolveAnalyticsChartScope } from '../analyticsChartScope';

@@ -1,14 +1,10 @@
 import { expect, test } from '@playwright/test';
 
+import { apiToken, openOrigin } from './support/session.js';
+
 async function openGoalNotes(page, suffix, { beforeOpen } = {}) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
     await beforeOpen?.(token);
     await page.goto(`/browser-root-${suffix}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
@@ -134,12 +130,7 @@ test('activity and session notes attach pictures from the same paperclip menu', 
     const suffix = testInfo.project.name;
     const uploads = [];
     await mockConnectedStorage(page, uploads);
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
     await page.goto(`/browser-root-${suffix}/session/browser-session-${suffix}`);
     await expect(page.getByText('Focused Practice').first()).toBeVisible();
 

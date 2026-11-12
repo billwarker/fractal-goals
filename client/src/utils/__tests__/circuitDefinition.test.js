@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../circuitDefinition';
 
 describe('prepareCircuitDefinitionDraft', () => {

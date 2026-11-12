@@ -12,8 +12,10 @@ function edgesAreEqual(currentEdges, nextEdges) {
             && currentEdge.state === edge.state
             && currentEdge.from.x === edge.from.x
             && currentEdge.from.y === edge.from.y
+            && currentEdge.from.r === edge.from.r
             && currentEdge.to.x === edge.to.x
-            && currentEdge.to.y === edge.to.y;
+            && currentEdge.to.y === edge.to.y
+            && currentEdge.to.r === edge.to.r;
     });
 }
 
@@ -43,6 +45,7 @@ export default function useGoalHierarchyConnectors({
                 const from = {
                     x: normalizeCoordinate(parentRect.left - listRect.left + (parentRect.width / 2)),
                     y: normalizeCoordinate(parentRect.top - listRect.top + (parentRect.height / 2)),
+                    r: normalizeCoordinate(Math.max(parentRect.width, parentRect.height) / 2),
                 };
 
                 node.children.forEach((child) => {
@@ -53,6 +56,7 @@ export default function useGoalHierarchyConnectors({
                     const to = {
                         x: normalizeCoordinate(childRect.left - listRect.left + (childRect.width / 2)),
                         y: normalizeCoordinate(childRect.top - listRect.top + (childRect.height / 2)),
+                        r: normalizeCoordinate(Math.max(childRect.width, childRect.height) / 2),
                     };
                     const childRow = rowById.get(String(child.id));
                     const active = getGoalConnectorEdgeHighlightState

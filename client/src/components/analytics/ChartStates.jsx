@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
 
 import EmptyState from '../common/EmptyState';
+import LoadingState from '../common/LoadingState';
 import styles from './ChartStates.module.css';
 
 /**
@@ -28,17 +29,9 @@ export function useReportShownGrain(grain) {
     }, [grain, onGrainShown]);
 }
 
+/** A chart's loading state: the shared spinner, filling the chart's space. */
 export function ChartLoading({ label = 'Loading analytics…' }) {
-    return (
-        <div className={styles.loading} role="status">
-            <div className={styles.skeleton} aria-hidden="true">
-                {[45, 70, 55, 85, 40, 65, 30].map((height, index) => (
-                    <span key={index} style={{ height: `${height}%` }} />
-                ))}
-            </div>
-            <span className={styles.label}>{label}</span>
-        </div>
-    );
+    return <LoadingState label={label} className={styles.loading} />;
 }
 
 export function ChartError({ message = 'Analytics could not be loaded.', onRetry = null }) {

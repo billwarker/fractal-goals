@@ -173,3 +173,10 @@
     text-decoration: line-through;
     opacity: 0.7;
 }
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .noteItemActions {
+        opacity: 1;
+    }
+}

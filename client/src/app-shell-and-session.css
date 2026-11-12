@@ -88,7 +88,7 @@
 .description-section {
     flex-grow: 1;
     overflow-y: auto;
-    background: rgba(0, 0, 0, 0.2);
+    background: var(--color-bg-card-alt);
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 20px;
@@ -186,7 +186,7 @@
 }
 
 .edit-form-sidebar textarea {
-    background: rgba(0, 0, 0, 0.3);
+    background: var(--color-bg-card-alt);
     border: 1px solid var(--color-border);
     color: white;
     border-radius: 6px;
@@ -509,7 +509,7 @@
     transform: translateY(-8px) scale(1.02);
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4);
     border-color: var(--color-brand-primary);
-    background: linear-gradient(145deg, rgba(40, 40, 40, 0.8), rgba(50, 50, 50, 0.6));
+    background: var(--color-bg-card-hover);
 }
 
 .fractal-card h3 {
@@ -676,4 +676,11 @@
     background: var(--color-brand-danger);
     color: white;
     border: 1px solid var(--color-brand-danger-hover);
+}
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .delete-btn {
+        opacity: 1;
+    }
 }

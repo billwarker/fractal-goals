@@ -13,6 +13,7 @@ import {
     pickCopyColumns,
     planCardElementId,
 } from '../../../utils/programDaysView';
+import LoadingState from '../../common/LoadingState';
 import PlanDateColumn from './PlanDateColumn';
 import PlanBucketRows from './PlanBucketRows';
 import PlanOccurrenceStrip from './PlanOccurrenceStrip';
@@ -111,7 +112,7 @@ export default function ProgramDaysView({
             </header>
             <p className={styles.visuallyHidden} aria-live="polite">{announcement}</p>
             <p className={styles.visuallyHidden} aria-live="polite">{planFocus?.announcement || ''}</p>
-            {occurrencesQuery.isLoading ? <p className={styles.state} aria-busy="true">Loading dates…</p> : null}
+            {occurrencesQuery.isLoading ? <LoadingState label="Loading dates…" /> : null}
             {occurrencesQuery.error ? (
                 <p className={styles.state} role="alert">
                     Dates could not be loaded. <button type="button" onClick={() => occurrencesQuery.refetch()}>Retry</button>

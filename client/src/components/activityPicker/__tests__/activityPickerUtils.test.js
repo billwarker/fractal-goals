@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getCreateFromSearchState, toggleGroupSelection } from '../activityPickerUtils';
 
 const allActivities = [

@@ -182,8 +182,9 @@ const checks = [
     ],
   },
   {
-    file: 'src/pages/Logs.css',
-    patterns: [/\.logs-grid-header/, /\.log-item/, /@media\s*\(max-width:\s*768px\)/],
+    file: 'src/components/logs/Logs.module.css',
+    // Events become cards on phones, and the filters stack.
+    patterns: [/\.listHeader/, /grid-template-areas:/, /@media\s*\(max-width:\s*768px\)/],
   },
   {
     file: 'src/pages/ProgramCalendarPage.module.css',
@@ -230,20 +231,15 @@ const checks = [
     patterns: [/@media\s*\(max-width:\s*768px\)\s*\{[^}]*\.button\s*\{[^}]*min-height:\s*44px;/s],
   },
   {
-    file: 'src/components/landing/LandingFeaturesSection.module.css',
-    patterns: [
-      /\.featureMain\s*\{[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/s,
-      /\.featureStage\s*\{[^}]*min-height:\s*0;[^}]*max-height:\s*100%;/s,
-      /\.programPagePreview,\s*\.analyticsPagePreview\s*\{[^}]*min-height:\s*0;/s,
-    ],
+    file: 'src/pages/Landing.module.css',
+    // One screen at every width: the hero fills the viewport and nothing scrolls sideways.
+    patterns: [/\.page\s*\{[^}]*min-height:\s*var\(--app-viewport-height\);/s],
+    forbiddenPatterns: [/\.page\s*\{[^}]*scroll-snap-type/s, /\.page\s*\{[^}]*overflow-x:\s*auto/s],
   },
   {
-    file: 'src/pages/Landing.module.css',
-    patterns: [
-      /\.page\s*\{[^}]*height:\s*var\(--app-viewport-height\);[^}]*overflow-x:\s*auto;[^}]*scrollbar-width:\s*none;/s,
-      /\.page::-webkit-scrollbar\s*\{[^}]*display:\s*none;/s,
-      /\.snapSection\s*\{[^}]*height:\s*100%;/s,
-    ],
+    file: 'src/demo/DemoGuide.module.css',
+    // On phones the guide clears the page footer and spans the screen.
+    patterns: [/@media\s*\(max-width:\s*720px\)\s*\{[^}]*\.guide\s*\{[^}]*bottom:\s*calc\(var\(--mobile-page-footer-height\)/s],
   },
   {
     file: 'src/index.css',

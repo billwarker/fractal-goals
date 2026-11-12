@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { viewAttachProblem } from '../useGoalCharts';
 
 const view = (profile, kind = 'view') => ({ kind, layout: { type: 'analytics_view', version: 1, profile, global_filters: {} } });

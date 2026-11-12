@@ -1,0 +1,21 @@
+{
+  "description": "Theme resolution shared by client/src/utils/themeSchedule.js and client/public/boot/shell.js. `now` is local wall-clock time HH:MM; `next` is the next switch as HH:MM (+1 when it is tomorrow), or null.",
+  "cases": [
+    { "name": "system dark", "preference": { "mode": "system" }, "now": "12:00", "systemPrefersLight": false, "theme": "dark", "next": null },
+    { "name": "system light", "preference": { "mode": "system" }, "now": "12:00", "systemPrefersLight": true, "theme": "light", "next": null },
+    { "name": "fixed light ignores system", "preference": { "mode": "light" }, "now": "23:00", "systemPrefersLight": false, "theme": "light", "next": null },
+    { "name": "fixed dark ignores system", "preference": { "mode": "dark" }, "now": "09:00", "systemPrefersLight": true, "theme": "dark", "next": null },
+    { "name": "missing preference follows system", "preference": null, "now": "09:00", "systemPrefersLight": true, "theme": "light", "next": null },
+    { "name": "unknown mode follows system", "preference": { "mode": "sepia" }, "now": "09:00", "systemPrefersLight": false, "theme": "dark", "next": null },
+    { "name": "overnight schedule, daytime", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "12:00", "systemPrefersLight": false, "theme": "light", "next": "20:00" },
+    { "name": "overnight schedule, evening", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "22:15", "systemPrefersLight": true, "theme": "dark", "next": "07:00+1" },
+    { "name": "overnight schedule, after midnight", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "03:00", "systemPrefersLight": true, "theme": "dark", "next": "07:00" },
+    { "name": "dark starts exactly at darkFrom", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "20:00", "systemPrefersLight": true, "theme": "dark", "next": "07:00+1" },
+    { "name": "light starts exactly at lightFrom", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "07:00", "systemPrefersLight": false, "theme": "light", "next": "20:00" },
+    { "name": "one minute before lightFrom", "preference": { "mode": "schedule", "darkFrom": "20:00", "lightFrom": "07:00" }, "now": "06:59", "systemPrefersLight": true, "theme": "dark", "next": "07:00" },
+    { "name": "same-day dark window, inside", "preference": { "mode": "schedule", "darkFrom": "13:00", "lightFrom": "15:00" }, "now": "14:00", "systemPrefersLight": true, "theme": "dark", "next": "15:00" },
+    { "name": "same-day dark window, outside", "preference": { "mode": "schedule", "darkFrom": "13:00", "lightFrom": "15:00" }, "now": "16:00", "systemPrefersLight": false, "theme": "light", "next": "13:00+1" },
+    { "name": "equal times never switch", "preference": { "mode": "schedule", "darkFrom": "08:00", "lightFrom": "08:00" }, "now": "12:00", "systemPrefersLight": true, "theme": "dark", "next": null },
+    { "name": "invalid times fall back to defaults", "preference": { "mode": "schedule", "darkFrom": "25:00", "lightFrom": "7am" }, "now": "21:00", "systemPrefersLight": true, "theme": "dark", "next": "07:00+1" }
+  ]
+}

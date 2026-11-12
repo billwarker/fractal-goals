@@ -1,15 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    return token;
+import { apiToken, openOrigin } from './support/session.js';
+
+// Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
+// the API token for seeding.
+async function openSignedIn(page) {
+    await openOrigin(page);
+    return apiToken();
 }
 
 async function saveView(page, headers, root, name, profile = { selectedCategory: 'activities', selectedVisualization: 'activityFrequency' }) {
@@ -42,7 +39,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     const viewName = `Guitar totals ${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const viewId = await saveView(page, headers, root, viewName);
 
     // Analytics: open the saved view and add it to the goal.
@@ -155,7 +152,7 @@ test('a saved session chart can be added from goal details', async ({ page }, te
     const viewName = `Session trends ${suffix}`;
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const viewId = await saveView(page, headers, root, viewName, { selectedCategory: 'sessions', selectedVisualization: 'sessionTrends' });
 
     await page.goto(`/${root}/goals`);
@@ -182,7 +179,7 @@ test('saved analytics searches goals, previews one chart, and manages copies and
     const name = `Saved browser ${suffix}`;
     const renamed = `${name} renamed`;
     const goalName = `First clean performance`;
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const viewId = await saveView(page, headers, root, name);
     const attached = await page.request.put(`/api/roots/${root}/dashboards/${viewId}/goals`, {
         headers, data: { goal_ids: [`browser-heatmap-milestone-${suffix}`] },
@@ -228,7 +225,7 @@ test('dashboard sidebar keeps shared scope above independent chart tabs', async 
     const suffix = testInfo.project.name;
     const root = `browser-root-${suffix}`;
     const name = `Sidebar tabs ${suffix}`;
-    const headers = { Authorization: `Bearer ${await logIn(page)}` };
+    const headers = { Authorization: `Bearer ${await openSignedIn(page)}` };
     const created = await page.request.post(`/api/roots/${root}/dashboards`, { headers, data: {
         name, kind: 'dashboard', layout: { version: 3, layout: { type: 'grid', panels: [
             { id: 'window-1', x: 0, y: 0, w: 48, h: 48 }, { id: 'window-2', x: 48, y: 0, w: 48, h: 48 },

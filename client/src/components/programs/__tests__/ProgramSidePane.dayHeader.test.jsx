@@ -47,7 +47,7 @@ describe('ProgramSidePane day heading', () => {
         expect(screen.queryByRole('button', { name: 'Next day' })).not.toBeInTheDocument();
     });
 
-    it('shows the selected timeframe and scoped overview for a multi-day range', () => {
+    it('shows the selected timeframe and scoped overview for a multi-day range', async () => {
         render(
             <MemoryRouter>
                 <ProgramSidePane
@@ -63,7 +63,7 @@ describe('ProgramSidePane day heading', () => {
 
         expect(screen.getByText('Selected timeframe')).toBeInTheDocument();
         expect(screen.getByText('Sep 2 – Sep 8, 2026')).toBeInTheDocument();
-        expect(screen.getByText('Loading program overview…')).toBeInTheDocument();
+        expect(await screen.findByText('Loading program overview…')).toBeInTheDocument();
         expect(screen.queryByRole('tablist', { name: 'Program side pane views' })).not.toBeInTheDocument();
     });
 });

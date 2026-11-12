@@ -2,6 +2,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, u
 import { useLocation, useParams } from 'react-router-dom';
 
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
+import ProgramPageTitle from '../components/programs/ProgramPageTitle';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlocksPanel from '../components/programs/ProgramBlocksPanel';
@@ -50,6 +51,7 @@ import { createProgramCalendarContext, formatProgramCalendarSelection, getProgra
 import { buildProgramBlockLabels, getProgramColor } from '../utils/programViewModel';
 import { getProgramStatus, isProgramActive } from '../utils/programGoalWindow';
 import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
+import LoadingState from '../components/common/LoadingState';
 import styles from './ProgramCalendarPage.module.css';
 
 const ProgramBlockModal = lazyWithRetry(() => import('../components/modals/ProgramBlockModal'), 'components/modals/ProgramBlockModal');
@@ -352,31 +354,12 @@ function ProgramCalendarPage() {
     const contextBlock = displayProgram
         ? sortedBlocks.find((block) => isProgramActive(block, contextDate))
         : null;
-    const contextBlockColor = contextBlock?.color || 'var(--color-brand-primary)';
-    const pageTitleParts = [
-        displayProgram?.name ? {
-            key: 'program',
-            label: displayProgram.name,
-            style: displayProgramColor ? { color: displayProgramColor } : undefined,
-        } : null,
-        contextBlock?.name ? {
-            key: 'block',
-            label: contextBlock.name,
-            style: { color: contextBlockColor },
-        } : null,
-        { key: 'date', label: selectedTimeframeLabel || selectedRangeText || selectedDateText },
-    ].filter(Boolean);
     const pageTitle = (
-        <span className={styles.headerTitleSegments}>
-            {pageTitleParts.map((part, index) => (
-                <React.Fragment key={part.key}>
-                    {index > 0 ? <span className={styles.headerTitleSeparator}>•</span> : null}
-                    <span className={styles.headerTitleSegment} style={part.style}>
-                        {part.label}
-                    </span>
-                </React.Fragment>
-            ))}
-        </span>
+        <ProgramPageTitle
+            program={displayProgram?.name ? { name: displayProgram.name, color: displayProgramColor } : null}
+            block={contextBlock?.name ? { name: contextBlock.name, color: contextBlock.color } : null}
+            dateLabel={selectedTimeframeLabel || selectedRangeText || selectedDateText}
+        />
     );
     // Keep the program's full date span and status beneath the contextual title.
     const programMeta = displayProgram ? (
@@ -750,7 +733,7 @@ function ProgramCalendarPage() {
     return (
         <div className={`${styles.container} ${isMobile ? styles.containerWithMobileDock : ''} page-reveal`}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
-                <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
+                <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`} data-tour="programs">
                     <PageHeader
                         className={styles.compactHeader}
                         title={pageTitle}
@@ -766,7 +749,7 @@ function ProgramCalendarPage() {
                         viewMode === 'days' ? styles.daysModePanel : '',
                     ].filter(Boolean).join(' ')}>
                         {loading || (viewMode !== 'calendar' && detailLoading) ? (
-                            <div className={styles.loading}>Loading programs...</div>
+                            <LoadingState label="Loading programs…" />
                         ) : viewMode === 'calendar' ? (
                             <ProgramCalendarView
                                 calendarEvents={calendarEventsWithSessions}
@@ -821,7 +804,7 @@ function ProgramCalendarPage() {
                             />
                         ) : viewMode === 'days' && displayProgram ? (
                             <div className={styles.blocksPanel}>
-                                <Suspense fallback={<div className={styles.loading}>Loading days...</div>}>
+                                <Suspense fallback={<LoadingState label="Loading days…" />}>
                                     <ProgramDaysView
                                         rootId={rootId}
                                         program={displayProgram}

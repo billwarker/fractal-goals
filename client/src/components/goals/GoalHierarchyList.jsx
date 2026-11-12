@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { getTypeDisplayName, getValidChildTypes } from '../../utils/goalHelpers';
 import { orderSequencedSiblings } from '../../utils/goalSequenceOrder';
 import { formatLiteralDate } from '../../utils/dateUtils';
@@ -6,6 +6,9 @@ import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchyIconAction from './GoalHierarchyIconAction';
 import useGoalHierarchyConnectors from './useGoalHierarchyConnectors';
 import styles from './GoalHierarchyList.module.css';
+
+// Space between a connector line's end and the icon it meets.
+const CONNECTOR_ICON_GAP = 2;
 function buildSessionHierarchyTree(nodes) {
     const nodeMap = new Map();
     const roots = [];
@@ -220,24 +223,46 @@ function GoalHierarchyList({
         }
     };
 
+    // Lines stop short of each icon (a masked gap) so icons sit on the page with no backing disc.
+    const connectorMaskId = `goal-hierarchy-connector-mask-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    const connectorCutouts = useMemo(() => {
+        const cutouts = new Map();
+        connectorEdges.forEach(({ from, to }) => {
+            [from, to].forEach((point) => cutouts.set(`${point.x},${point.y}`, point));
+        });
+        return [...cutouts.values()];
+    }, [connectorEdges]);
+
     const renderConnectorEdges = () => (
         <svg className={styles.sessionConnectorSvg} aria-hidden="true">
+            <defs>
+                <mask id={connectorMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+                    <rect x="0" y="0" width="100%" height="100%" fill="white" />
+                    {connectorCutouts.map(({ x, y, r }) => (
+                        <circle key={`${x},${y}`} cx={x} cy={y} r={r + CONNECTOR_ICON_GAP} fill="black" />
+                    ))}
+                </mask>
+            </defs>
             {connectorEdges.map(({ key, parentId, childId, from, to, active, state }) => {
                 const midpointY = to.y;
                 const path = `M ${from.x} ${from.y} V ${midpointY} H ${to.x}`;
+                const mask = `url(#${connectorMaskId})`;
 
+                // The glow sits on a wrapper so it is drawn from the already-masked line and
+                // stops where the line does, instead of leaving a glow-free disc round each icon.
                 return (
-                    <React.Fragment key={key}>
+                    <g key={key} className={styles[`sessionConnectorGlow_${state}`] || undefined}>
                         <path
                             d={path}
+                            mask={mask}
                             className={`${styles.sessionConnectorEdge} ${styles[`sessionConnectorEdge_${state}`] || ''}`}
                             data-connector-active={active ? 'true' : 'false'}
                             data-connector-state={state}
                             data-parent-goal-id={parentId}
                             data-child-goal-id={childId}
                         />
-                        {state === 'completed' && <path d={path} className={styles.sessionConnectorEdgeFlow} />}
-                    </React.Fragment>
+                        {state === 'completed' && <path d={path} mask={mask} className={styles.sessionConnectorEdgeFlow} />}
+                    </g>
                 );
             })}
         </svg>

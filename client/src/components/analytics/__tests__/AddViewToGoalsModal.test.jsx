@@ -58,10 +58,10 @@ describe('goal attachment picker', () => {
         expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
     });
 
-    it('waits for capacity and links, and blocks changes if either read fails', () => {
+    it('waits for capacity and links, and blocks changes if either read fails', async () => {
         state.links = { isLoading: true };
         const { rerender } = render(<AddViewToGoalsModal rootId="root" view={view} isOpen onClose={vi.fn()} />);
-        expect(screen.getByRole('status')).toHaveTextContent('Loading goals and chart capacity');
+        expect(await screen.findByRole('status')).toHaveTextContent('Loading goals and chart capacity');
         expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
         state.links = { isError: true };
         rerender(<AddViewToGoalsModal rootId="root" view={view} isOpen onClose={vi.fn()} />);

@@ -10,6 +10,12 @@ import {
     FLOWTREE_LAYOUT_NODE_DIMENSIONS,
     getSequenceBadgeBox,
 } from './components/flowTree/flowTreeGraphUtils';
+import {
+    fitViewportToDrawn,
+    getDrawnBounds,
+    getHierarchyViewport,
+    getTopOverlayInset,
+} from './components/flowTree/flowTreeViewport';
 import FlowTreeNode from './components/flowTree/FlowTreeNode';
 import { flowTreeEdgeTypes as edgeTypes } from './components/flowTree/flowTreeEdges';
 import { ACTIVE_GOAL_WINDOW_DAYS } from './hooks/useFlowTreeMetrics';
@@ -58,29 +64,6 @@ function getGraphBounds(nodes, dimensions) {
         y: bounds.minY,
         width: Math.max(bounds.maxX - bounds.minX, 1),
         height: Math.max(bounds.maxY - bounds.minY, 1),
-    };
-}
-
-function getHierarchyViewport(bounds, viewportWidth, viewportHeight, isMobile, sidebarOpen = false) {
-    if (!bounds || !viewportWidth || !viewportHeight) return null;
-
-    const leftInset = sidebarOpen && !isMobile
-        ? Math.min(420, viewportWidth * 0.32)
-        : 0;
-    const paddingX = isMobile ? 56 : 120;
-    const paddingY = isMobile ? 120 : 96;
-    const safeWidth = Math.max(viewportWidth - leftInset, 1);
-    const safeHeight = Math.max(viewportHeight, 1);
-    const zoomX = (safeWidth - paddingX) / Math.max(bounds.width, 1);
-    const zoomY = (safeHeight - paddingY) / Math.max(bounds.height, 1);
-    const zoom = Math.min(isMobile ? 1 : 1.08, Math.max(isMobile ? 0.22 : 0.28, Math.min(zoomX, zoomY)));
-    const centerX = leftInset + (safeWidth / 2);
-    const centerY = safeHeight / 2;
-
-    return {
-        x: centerX - ((bounds.x + (bounds.width / 2)) * zoom),
-        y: centerY - ((bounds.y + (bounds.height / 2)) * zoom),
-        zoom,
     };
 }
 
@@ -187,6 +170,20 @@ const FlowTree = React.forwardRef(({
 
         if (viewport) {
             rfInstance.setViewport?.(viewport, { duration });
+            if (isMobile) {
+                // The layout's node sizes don't match what phones draw (names wrap, labels are
+                // narrower than their boxes), so once drawn, fit the real tree below the options.
+                window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+                    const container = flowTreeContainerRef.current;
+                    const next = fitViewportToDrawn({
+                        drawn: getDrawnBounds(container),
+                        box: container?.getBoundingClientRect(),
+                        viewport: rfInstance.getViewport?.() || viewport,
+                        insets: { top: getTopOverlayInset(container) + 12, right: 16, bottom: 24, left: 16 },
+                    });
+                    if (next) rfInstance.setViewport?.(next, { duration: 0 });
+                }));
+            }
             return true;
         }
 
@@ -352,6 +349,8 @@ const FlowTree = React.forwardRef(({
                 minZoom={isMobile ? 0.06 : 0.1}
                 maxZoom={isMobile ? 1.6 : 2}
                 nodesConnectable={false}
+                // Edges have no action; keeping them out of the tab order and the tap targets.
+                edgesFocusable={false}
                 nodesDraggable={false}
                 panOnScroll={!interactionLocked && isMobile}
                 zoomOnScroll={!interactionLocked}

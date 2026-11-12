@@ -2,12 +2,13 @@ import React from 'react';
 
 import { useNotesHeatmap } from '../../../hooks/useNotesPageQuery';
 import CalendarHeatmap from '../../common/CalendarHeatmap';
+import LoadingState from '../../common/LoadingState';
 import styles from './NotesFilters.module.css';
 
 /** Notes written per day under the current filters. Clicking a day shows only that day. */
 export default function NotesHeatmap({ rootId, apiFilters, selectedDay, onSelectDay }) {
     const { data, isLoading, isError } = useNotesHeatmap(rootId, apiFilters);
-    if (isLoading) return <p className={styles.heatmapSummary} role="status">Loading heatmap…</p>;
+    if (isLoading) return <LoadingState variant="inline" label="Loading heatmap…" />;
     if (isError || !data) return <p className={styles.heatmapSummary}>The heatmap couldn’t load.</p>;
     const maximum = data.max_count || 0;
     return (

@@ -1,0 +1,69 @@
+.switch {
+    position: relative;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid var(--color-border-btn);
+    border-radius: 999px;
+    background: var(--color-toggle-track);
+    cursor: pointer;
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-text-secondary);
+    transition: transform 0.16s ease, background 0.16s ease;
+}
+
+.switch[aria-checked='true'] {
+    border-color: var(--color-brand-primary);
+    background: var(--color-brand-primary);
+}
+
+.switch[aria-checked='true'] .thumb {
+    background: var(--color-text-inverse);
+    transform: translateX(16px);
+}
+
+.switch:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.switch:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* Touch screens: a thumb-sized switch. */
+@media (pointer: coarse) {
+    .switch {
+        width: 48px;
+        height: 28px;
+    }
+
+    .thumb {
+        top: 3px;
+        left: 3px;
+        width: 20px;
+        height: 20px;
+    }
+
+    .switch[aria-checked='true'] .thumb {
+        transform: translateX(20px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .switch,
+    .thumb {
+        transition: none;
+    }
+}

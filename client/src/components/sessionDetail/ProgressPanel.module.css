@@ -398,7 +398,6 @@
     gap: 8px;
 }
 
-.timelineLoading,
 .timelineEmpty,
 .timelineError {
     text-align: center;

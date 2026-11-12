@@ -4,6 +4,8 @@ import { useStorageConnections } from '../../hooks/useStorageConnections';
 import { STORAGE_PROVIDERS, providerLabel } from '../../utils/storageConnectionCopy';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
+import LoadingState from '../common/LoadingState';
+import SettingsSection from './SettingsSection';
 import styles from './StorageConnectionsPanel.module.css';
 
 const STATUS_BADGES = {
@@ -57,13 +59,13 @@ function ProviderCard({ item, busy, onConnect, onDisconnect }) {
                                 Your files stay in {label}, and Fractal Goals’ access is revoked.
                             </p>
                             <div className={styles.actions}>
-                                <Button variant="secondary" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
-                                <Button variant="danger" isLoading={busy} onClick={() => onDisconnect(item.provider)}>Disconnect</Button>
+                                <Button variant="secondary" size="sm" disabled={busy} onClick={() => setConfirming(false)}>Cancel</Button>
+                                <Button variant="danger" size="sm" isLoading={busy} onClick={() => onDisconnect(item.provider)}>Disconnect</Button>
                             </div>
                         </div>
                     ) : (
                         <div className={styles.actions}>
-                            <Button variant="secondary" disabled={busy} onClick={() => setConfirming(true)}>Disconnect {label}</Button>
+                            <Button variant="secondary" size="sm" disabled={busy} onClick={() => setConfirming(true)}>Disconnect {label}</Button>
                         </div>
                     )}
                 </>
@@ -86,7 +88,7 @@ function ProviderCard({ item, busy, onConnect, onDisconnect }) {
                 <>
                     <p className={styles.muted}>{copy.scope}</p>
                     <div className={styles.actions}>
-                        <Button disabled={busy} onClick={() => onConnect(item.provider)}>
+                        <Button size="sm" disabled={busy} onClick={() => onConnect(item.provider)}>
                             {item.status === 'not_connected' ? `Connect ${label}` : `Reconnect ${label}`}
                         </Button>
                     </div>
@@ -133,39 +135,40 @@ export default function StorageConnectionsPanel() {
 
     return (
         <div className={styles.panel}>
-            <section className={styles.section} aria-labelledby="storage-settings-title">
-                <h3 id="storage-settings-title">Cloud storage</h3>
-                <p>Attach pictures, video and audio to notes from your own cloud storage. Originals stay in your account; Fractal Goals keeps only a reference to each file.</p>
-            </section>
+            <SettingsSection
+                title="Cloud storage"
+                description="Attach pictures, video and audio to notes from your own cloud storage. Originals stay in your account; Fractal Goals keeps only a reference to each file."
+            >
+                {status && <p className={status.ok ? styles.success : styles.error} role={status.ok ? 'status' : 'alert'}>{status.message}</p>}
+                {error && <p className={styles.error} role="alert">{error}</p>}
 
-            {status && <p className={status.ok ? styles.success : styles.error} role={status.ok ? 'status' : 'alert'}>{status.message}</p>}
-            {error && <p className={styles.error} role="alert">{error}</p>}
-
-            <section className={styles.section} aria-label="Storage accounts">
-                {isLoading && <p className={styles.muted} role="status">Loading storage accounts…</p>}
-                {isError && (
-                    <p className={styles.error} role="alert">
-                        Storage accounts couldn’t load. <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button>
-                    </p>
-                )}
-                {!isLoading && !isError && (
-                    <div className={styles.cards}>
-                        {providers.map((item) => (
-                            <ProviderCard key={item.provider} item={item} busy={isDisconnecting}
-                                onConnect={handleConnect} onDisconnect={handleDisconnect} />
-                        ))}
-                    </div>
-                )}
-                {!isLoading && !isError && providers.length > 0 && providers.every((item) => item.status === 'unavailable') && (
-                    <p className={styles.muted}>You can still paste shared links to pictures and video into any note.</p>
-                )}
-            </section>
+                <div className={styles.section}>
+                    {isLoading && <LoadingState variant="inline" label="Loading storage accounts…" />}
+                    {isError && (
+                        <p className={styles.error} role="alert">
+                            Storage accounts couldn’t load. <Button size="sm" variant="secondary" onClick={() => refetch()}>Retry</Button>
+                        </p>
+                    )}
+                    {!isLoading && !isError && (
+                        <div className={styles.cards}>
+                            {providers.map((item) => (
+                                <ProviderCard key={item.provider} item={item} busy={isDisconnecting}
+                                    onConnect={handleConnect} onDisconnect={handleDisconnect} />
+                            ))}
+                        </div>
+                    )}
+                    {!isLoading && !isError && providers.length > 0 && providers.every((item) => item.status === 'unavailable') && (
+                        <p className={styles.muted}>You can still paste shared links to pictures and video into any note.</p>
+                    )}
+                </div>
+            </SettingsSection>
 
             {connected.length > 1 && (
-                <section className={styles.section} aria-labelledby="storage-destination-title">
-                    <h3 id="storage-destination-title">Save new uploads to</h3>
-                    <p>Files you paste, drop or upload from this device go to this account.</p>
-                    <div className={styles.destinations} role="radiogroup" aria-labelledby="storage-destination-title">
+                <SettingsSection
+                    title="Save new uploads to"
+                    description="Files you paste, drop or upload from this device go to this account."
+                >
+                    <div className={styles.destinations} role="radiogroup" aria-label="Save new uploads to">
                         {connected.map((item) => (
                             <label key={item.provider} className={styles.destination}>
                                 <input type="radio" name="storage-upload-destination" value={item.provider}
@@ -178,11 +181,10 @@ export default function StorageConnectionsPanel() {
                             </label>
                         ))}
                     </div>
-                </section>
+                </SettingsSection>
             )}
 
-            <section className={styles.section} aria-labelledby="storage-limits-title">
-                <h3 id="storage-limits-title">Limits</h3>
+            <SettingsSection title="Limits">
                 <ul className={styles.limits}>
                     {limits?.max_file_bytes && <li>Up to {formatBytes(limits.max_file_bytes)} per file</li>}
                     {limits?.max_attachments && <li>Up to {limits.max_attachments} attachments per note</li>}
@@ -193,7 +195,7 @@ export default function StorageConnectionsPanel() {
                     Disconnecting or deleting a note never deletes files from your storage.{' '}
                     <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
                 </p>
-            </section>
+            </SettingsSection>
         </div>
     );
 }

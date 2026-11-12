@@ -1,15 +1,12 @@
 import { expect, test } from '@playwright/test';
 
-async function logIn(page) {
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const login = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await login).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
-    return token;
+import { apiToken, openOrigin } from './support/session.js';
+
+// Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
+// the API token for seeding.
+async function openSignedIn(page) {
+    await openOrigin(page);
+    return apiToken();
 }
 
 const noHorizontalScroll = (page) => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1);
@@ -27,7 +24,7 @@ test('saved keyword filters combine, the heatmap narrows to a day, and the URL r
     const suffix = testInfo.project.name;
     const root = `browser-root-${suffix}`;
     const marker = `zq${Date.now().toString(36)}${suffix[0]}`;
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     for (const [content, extra] of [
         [`${marker} elbow cue during handstands`, { context_type: 'goal', context_id: root, goal_id: root }],
         [`${marker} scapula cue for the press`, { context_type: 'goal', context_id: root, goal_id: root }],
@@ -109,7 +106,7 @@ test('the notes timeline puts its rail, brackets and indents on the background g
     const sessionId = `browser-heatmap-session-${suffix}-0`;
     const instanceId = `browser-heatmap-instance-${suffix}-0`;
     const marker = `gq${Date.now().toString(36)}${suffix[0]}`;
-    const token = await logIn(page);
+    const token = await openSignedIn(page);
     const headers = { Authorization: `Bearer ${token}` };
     const created = [];
     const note = async (content, data) => {

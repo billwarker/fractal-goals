@@ -18,6 +18,7 @@ import GoalEditForm from '../goals/GoalEditForm';
 import GoalHeader from '../goals/GoalHeader';
 import GoalUncompletionModal from '../goals/GoalUncompletionModal';
 import GoalViewMode from '../goals/GoalViewMode';
+import LoadingState from '../common/LoadingState';
 import GoalDetailModalFooter from './GoalDetailModalFooter';
 import GoalDetailModalPortal from './GoalDetailModalPortal';
 import styles from '../GoalDetailModal.module.css';
@@ -543,7 +544,7 @@ function GoalDetailModalRenderSurface({
         );
     } else if (viewState === 'goal-timeline') {
         content = (
-            <Suspense fallback={<p role="status">Loading timeline...</p>}>
+            <Suspense fallback={<LoadingState label="Loading timeline…" />}>
                 <GoalActivityHeatmap
                     key={goalId}
                     rootId={rootId}
@@ -714,7 +715,7 @@ function GoalDetailModalRenderSurface({
     if (displayMode === 'panel') {
         return (
             <>
-                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`}>
+                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`} data-tour="goal-detail">
                     <div className={styles.panelContent} ref={contentScrollRef}>
                         {content}
                     </div>
@@ -744,7 +745,7 @@ function GoalDetailModalRenderSurface({
                 className={`${styles.modalContent} ${pickingLevel ? styles.levelPickerContent : ''} ${readOnly ? styles.readOnlySurface : ''}`}
                 style={{ '--goal-detail-accent': displayGoalColor }}
             >
-                <div className={styles.modalScrollArea} ref={contentScrollRef}>
+                <div className={styles.modalScrollArea} ref={contentScrollRef} data-tour="goal-detail">
                     {content}
                 </div>
                 {footerContent && (

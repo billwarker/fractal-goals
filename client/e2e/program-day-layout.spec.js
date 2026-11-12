@@ -1,16 +1,12 @@
 import { deviceOf, expect, test } from './support/clock.js';
+import { openOrigin } from './support/session.js';
 
 test('program date header, view toggle, and session options fit the sidebar', async ({ page }, testInfo) => {
     const suffix = testInfo.project.name;
     const device = deviceOf(testInfo);
     const today = new Date().toISOString().slice(0, 10);
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
 
     // Exercise the real read model with a logged-session fixture, including a retired payload field.
     await page.route('**/day-read-model?*', async (route) => {

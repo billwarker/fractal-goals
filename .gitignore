@@ -40,8 +40,8 @@ goals.db
 *.log
 server.log
 client.log
-logs/
-!logs/README.md
+/logs/
+!/logs/README.md
 
 # Backup Files
 *.bak

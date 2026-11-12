@@ -6,6 +6,7 @@ import CloseButton from './CloseButton';
 import { Heading } from './Typography';
 import ModalBackdrop from './ModalBackdrop';
 import SheetHandle from '../layout/SheetHandle';
+import useIsMobile from '../../hooks/useIsMobile';
 
 const openModalLevels = new Map();
 
@@ -23,7 +24,10 @@ const Modal = ({
     title,
     children,
     size = 'md', // sm, md, lg, xl
-    sheetHandle = false, // A bottom sheet's bar above the header
+    sheetHandle, // A bottom sheet's drag bar above the header (defaults on for mobile sheets)
+    // On phones: 'card' (default) keeps the centred modal; 'sheet' docks to the bottom with a
+    // drag handle and 'fullscreen' fills the screen, for callers that opt in.
+    mobilePresentation = 'card',
     className = '',
     overlayClassName = '',
     bodyClassName = '',
@@ -35,6 +39,7 @@ const Modal = ({
     portalContainer = null,
 }) => {
     const dialogRef = useRef(null);
+    const isMobile = useIsMobile();
     const modalId = useId();
     const titleId = `${modalId}-title`;
     const onCloseRef = useRef(onClose);
@@ -102,9 +107,16 @@ const Modal = ({
 
     if (!isOpen) return null;
 
+    const presentation = isMobile ? mobilePresentation : 'card';
+    const showSheetHandle = sheetHandle ?? presentation === 'sheet';
+    const presentationClass = {
+        sheet: `${styles.sheet} mobile-sheet-enter`,
+        fullscreen: styles.fullscreen,
+    }[presentation] || '';
+
     const modalContent = (
         <ModalBackdrop
-            className={`${styles.overlay} ${overlayClassName}`}
+            className={`${styles.overlay} ${presentation !== 'card' ? styles[`${presentation}Overlay`] : ''} ${overlayClassName}`}
             style={overlayStyle}
             closeOnBackdrop={closeOnBackdrop}
             onClose={onClose}
@@ -115,11 +127,11 @@ const Modal = ({
             <div
                 ref={dialogRef}
                 tabIndex={-1}
-                className={`${styles.container} ${styles[size]} ${className}`}
+                className={`${styles.container} ${styles[size]} ${presentationClass} ${className}`}
                 onClick={e => e.stopPropagation()}
             >
                 <Card className={styles.content} padding="none">
-                    {sheetHandle ? <SheetHandle onDismiss={onClose} /> : null}
+                    {showSheetHandle ? <SheetHandle onDismiss={onClose} /> : null}
                     <div className={styles.header}>
                         {title && (
                             <Heading id={titleId} level={3} className={styles.title}>

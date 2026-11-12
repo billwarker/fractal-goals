@@ -1,41 +1,35 @@
+/* Type follows the other settings sections: 13px body, 12px detail. */
 .panel {
-    display: grid;
-    gap: 24px;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
 }
 
 .section {
     display: grid;
-    gap: 12px;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
 }
 
-.section h3 {
+/* Zero specificity, so the shared section header keeps its own spacing. */
+:where(.panel p) {
     margin: 0;
-    color: var(--color-text-primary);
-}
-
-.section p,
-.card p {
-    margin: 0;
-    line-height: 1.5;
-}
-
-.section > p {
-    color: var(--color-text-secondary);
 }
 
 .cards {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: var(--spacing-sm);
 }
 
 .card {
     display: grid;
     align-content: start;
-    gap: 12px;
-    padding: 14px;
+    gap: 10px;
+    padding: var(--spacing-md);
     border: 1px solid var(--color-border-card);
-    border-radius: 10px;
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
 }
 
 .card[data-status='reconnect_required'] {
@@ -47,25 +41,27 @@
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: var(--spacing-sm);
 }
 
 .cardHeader h4 {
     margin: 0;
     color: var(--color-text-primary);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
 }
-
 
 .details {
     display: grid;
-    gap: 6px;
+    gap: 4px;
     margin: 0;
+    font-size: var(--font-size-xs);
 }
 
 .details > div {
     display: grid;
-    grid-template-columns: minmax(80px, auto) 1fr;
-    gap: 8px;
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: var(--spacing-sm);
 }
 
 .details dt {
@@ -82,67 +78,70 @@
 .actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--spacing-sm);
 }
 
 .confirm {
     display: grid;
-    gap: 10px;
-    padding: 12px;
-    border-radius: 8px;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--border-radius-sm);
     background: var(--color-bg-elevated);
     color: var(--color-text-primary);
+    font-size: var(--font-size-xs);
 }
 
 .muted {
     color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
     overflow-wrap: anywhere;
 }
 
 .warning {
     color: var(--color-warning);
+    font-size: var(--font-size-xs);
 }
 
 .success {
-    color: var(--color-success, var(--color-text-primary));
+    color: var(--color-brand-success);
 }
 
 .error {
-    color: var(--color-danger);
+    color: var(--color-brand-danger);
 }
 
 .limits {
     display: grid;
-    gap: 6px;
-    margin: 0;
-    padding-left: 20px;
+    gap: 4px;
+    margin: var(--spacing-sm) 0;
+    padding-left: 18px;
     color: var(--color-text-secondary);
-    line-height: 1.5;
 }
 
-.section a {
-    color: var(--color-link, var(--color-text-primary));
-    font-weight: 600;
+.panel a {
+    color: var(--color-brand-primary);
+    font-weight: var(--font-weight-semibold);
 }
 
-.section a:focus-visible {
-    outline: 3px solid var(--color-focus-ring);
+.panel a:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
 }
 
 .destinations {
     display: grid;
-    gap: 8px;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-sm);
 }
 
 .destination {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--spacing-md);
     min-height: 44px;
-    padding: 10px 14px;
+    padding: var(--spacing-sm) var(--spacing-md);
     border: 1px solid var(--color-border-card);
-    border-radius: 10px;
+    border-radius: var(--border-radius-md);
     cursor: pointer;
 }
 
@@ -158,4 +157,5 @@
 
 .destination strong {
     color: var(--color-text-primary);
+    font-weight: var(--font-weight-semibold);
 }

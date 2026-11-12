@@ -1,9 +1,9 @@
 import { spawn } from 'node:child_process';
 
-// With 4 parallel workers the full suite runs ~45-85s depending on machine
-// load. 180s leaves headroom while still catching real hangs.
-// Override with VITEST_WALL_TIMEOUT_MS when needed.
-const DEFAULT_TIMEOUT_MS = 180_000;
+// With 4 parallel workers the full suite runs ~1.5-4 min depending on machine load (a busy
+// laptop is several times slower than an idle one). 8 min still catches a real hang without
+// failing a legitimate run; override with VITEST_WALL_TIMEOUT_MS when needed.
+const DEFAULT_TIMEOUT_MS = 480_000;
 const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) || DEFAULT_TIMEOUT_MS;
 
 // `--related <files...>` runs only tests importing the given source files
@@ -11,10 +11,9 @@ const timeoutMs = Number.parseInt(process.env.VITEST_WALL_TIMEOUT_MS || '', 10) 
 const cliArgs = process.argv.slice(2);
 const isRelatedRun = cliArgs[0] === '--related';
 const args = isRelatedRun
-    // Related runs normally cover only a few files, but broad staged diffs can
-    // fan out across much of the suite. Threads avoid repeated child-process
-    // startup while retaining per-file isolation for these frontend/jsdom tests.
-    ? ['vitest', 'related', '--run', '--pool=threads', '--maxWorkers=2', ...cliArgs.slice(1)]
+    // Related runs normally cover only a few files, but a change to a shared module (a context,
+    // a provider) fans out across most of the suite, so they use the full worker count.
+    ? ['vitest', 'related', '--run', ...cliArgs.slice(1)]
     : ['vitest', 'run', ...cliArgs];
 
 const childEnv = { ...process.env };

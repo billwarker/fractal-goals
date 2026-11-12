@@ -6,6 +6,7 @@ import DropdownMenu, { DropdownMenuItem } from '../atoms/DropdownMenu';
 import useAnchoredPortalPosition from '../../hooks/useAnchoredPortalPosition';
 import { useAnalyticsViews } from '../../hooks/useDashboardQueries';
 import { useGoalChartMutations, viewAttachProblem } from '../../hooks/useGoalCharts';
+import LoadingState from '../common/LoadingState';
 import { viewChartKey } from './goalChartItems';
 import styles from './GoalCharts.module.css';
 
@@ -49,7 +50,7 @@ export default function AddGoalChartMenu({ rootId, goalId, attachedIds, onAdded,
 
     const menu = isOpen ? createPortal(
         <DropdownMenu ref={menuRef} className={styles.menu} align="left" aria-label="Saved views">
-            {isLoading ? <p className={styles.menuNote} role="status">Loading saved views…</p> : null}
+            {isLoading ? <LoadingState variant="inline" label="Loading saved views…" /> : null}
             {!isLoading && candidates.length === 0 ? (
                 <p className={styles.menuNote}>No saved views to add. Save a view in Analytics first.</p>
             ) : null}

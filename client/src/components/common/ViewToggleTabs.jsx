@@ -1,6 +1,8 @@
 import React from 'react';
 import styles from './ViewToggleTabs.module.css';
 
+const SIZE_CLASSES = { header: styles.header, compact: styles.compact };
+
 function ViewToggleTabs({
     items,
     value,
@@ -8,13 +10,16 @@ function ViewToggleTabs({
     ariaLabel,
     className = '',
     size = 'fill',
+    semantics = 'tabs',
     style,
 }) {
+    // 'radio' is for a setting chosen from a few values, where no panel switches with it.
+    const radio = semantics === 'radio';
     return (
         <div
-            className={`${styles.tabs} ${size === 'header' ? styles.header : ''} ${className}`.replace(/\s+/g, ' ').trim()}
+            className={`${styles.tabs} ${SIZE_CLASSES[size] || ''} ${className}`.replace(/\s+/g, ' ').trim()}
             style={style}
-            role="tablist"
+            role={radio ? 'radiogroup' : 'tablist'}
             aria-label={ariaLabel}
         >
             {items.map((item) => {
@@ -23,8 +28,8 @@ function ViewToggleTabs({
                     <button
                         key={item.value}
                         type="button"
-                        role="tab"
-                        aria-selected={selected}
+                        role={radio ? 'radio' : 'tab'}
+                        {...(radio ? { 'aria-checked': selected } : { 'aria-selected': selected })}
                         className={`${styles.tab} ${selected ? styles.tabActive : ''}`}
                         onClick={() => onChange(item.value)}
                     >

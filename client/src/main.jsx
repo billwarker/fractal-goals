@@ -3,7 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient } from '@tanstack/react-query';
 import { isPublicLandingLocation } from './utils/marketingHost';
 import { dismissLandingBootShell } from './utils/landingBootHandoff';
+import { dismissAppBootShell, handoffAppBootShell } from './utils/appBootHandoff';
 import { maybePrefetchLandingExamples } from './utils/landingPrefetch';
+import { isDemoLocation } from './demo/demoMode';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -20,17 +22,27 @@ const queryClient = new QueryClient({
 });
 
 const isPublicLanding = isPublicLandingLocation();
+// The live demo: the real app, read-only, on the published examples (src/demo/).
+const isDemo = !isPublicLanding && isDemoLocation();
 
 // Preserve the HTML-parse snapshot head start while the route-specific React
 // bundle downloads. The query uses the same key in Landing, so it deduplicates.
 maybePrefetchLandingExamples(queryClient);
 
-const loadApplication = isPublicLanding
-    ? import('./PublicLandingRoot')
-    : import('./AuthenticatedRoot');
+// One import per branch, outside a ternary: as a ternary the minifier folded both
+// into a single preload carrying only AuthenticatedRoot's dependencies, so the
+// public landing never requested its own stylesheet.
+let loadApplication;
+if (isPublicLanding) loadApplication = import('./PublicLandingRoot');
+else if (isDemo) loadApplication = import('./demo/DemoRoot');
+else loadApplication = import('./AuthenticatedRoot');
 
 const rootElement = document.getElementById('root');
-if (!isPublicLanding) dismissLandingBootShell();
+if (isPublicLanding) dismissAppBootShell();
+else {
+    dismissLandingBootShell();
+    handoffAppBootShell(rootElement);
+}
 const root = createRoot(rootElement);
 
 loadApplication
@@ -44,6 +56,7 @@ loadApplication
     .catch((error) => {
         console.error('Application bootstrap failed:', error);
         dismissLandingBootShell();
+        dismissAppBootShell();
         rootElement.innerHTML = `
             <main class="boot-error" role="alert">
                 <h1>Unable to load Fractal Goals</h1>

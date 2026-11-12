@@ -338,7 +338,7 @@ function Sessions() {
                     )}
                 />
 
-                <div className={styles.sessionsList}>
+                <div className={styles.sessionsList} data-tour="sessions">
                     {sessionsLoading ? (
                         <LoadingState label="Loading session data..." className={styles.loadingContainer} />
                     ) : sessionsError ? (
@@ -354,8 +354,8 @@ function Sessions() {
                         <EmptyState
                             className={styles.emptyState}
                             description={hasActiveFilters
-                                ? 'No sessions match the current filters.'
-                                : 'No sessions found. Start by clicking "+ ADD SESSION" in the navigation.'}
+                                ? 'No sessions match the current filters. Clear a filter or widen the dates.'
+                                : 'Sessions are where you record practice against your goals. Start one with + Add Session at the top.'}
                         />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -464,7 +464,7 @@ function Sessions() {
                             title="Close"
                         />
                         <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSession.id}>
-                            <Suspense fallback={<LoadingState message="Loading session…" />}><QuickSessionWorkspace /></Suspense>
+                            <Suspense fallback={<LoadingState label="Loading session…" />}><QuickSessionWorkspace /></Suspense>
                         </ActiveSessionProvider>
                     </div>
                 </ModalBackdrop>,

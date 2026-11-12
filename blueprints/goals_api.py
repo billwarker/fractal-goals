@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, g, request, jsonify
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 from models import (
+    Goal,
     get_session,
 )
 from validators import (
@@ -15,8 +16,10 @@ from validators import (
     GoalPauseSchema,
     GoalMoveSchema,
     FractalCreateSchema,
+    FractalQuickstartSchema,
 )
 from blueprints.auth_api import token_required
+from blueprints.idempotency import idempotent
 from blueprints.goal_history_api import register_goal_history_routes
 from blueprints.goal_conditions_api import error_response, goal_response, register_goal_condition_routes
 from blueprints.goal_charts_api import register_goal_chart_routes
@@ -263,6 +266,20 @@ def get_all_fractals(current_user):
     db_session = get_db_session()
     try:
         service = GoalService(db_session)
+        if g.get('access_mode') == 'demo':
+            # Only the published examples, whichever admin owns each one.
+            demo_root_ids = g.demo_root_ids
+            owner_ids = {
+                owner_id for (owner_id,) in db_session.query(Goal.owner_id).filter(Goal.id.in_(demo_root_ids))
+            }
+            fractals = [
+                fractal
+                for owner_id in owner_ids
+                for fractal in service.list_fractals(owner_id)[0] or []
+                if fractal['id'] in demo_root_ids
+            ]
+            fractals.sort(key=lambda fractal: demo_root_ids.index(fractal['id']))
+            return jsonify(fractals)
         fractals, _, _ = service.list_fractals(current_user.id)
         return jsonify(fractals)
     finally:
@@ -286,6 +303,28 @@ def create_fractal(current_user, validated_data):
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error creating fractal")
+        return internal_error(logger, "Goals API request failed")
+    finally:
+        db_session.close()
+
+
+@goals_bp.route('/fractals/quickstart', methods=['POST'])
+@token_required
+@idempotent
+@validate_request(FractalQuickstartSchema)
+@limiter.limit("5 per minute")
+def quickstart_fractal(current_user, validated_data):
+    """Create a fractal and its first long-term goals in one transaction (the welcome flow)."""
+    db_session = get_db_session()
+    try:
+        service = GoalService(db_session)
+        new_fractal, error, status = service.quickstart_fractal(current_user.id, validated_data)
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(serialize_goal(new_fractal, include_children=False)), 201
+    except SQLAlchemyError:
+        db_session.rollback()
+        logger.exception("Error creating quickstart fractal")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

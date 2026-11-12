@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import cases from '../../../../tests/fixtures/goal_deadline_cases.json';

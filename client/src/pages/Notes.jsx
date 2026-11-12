@@ -21,6 +21,7 @@ import EmptyState from '../components/common/EmptyState';
 import SidePaneHeader from '../components/common/SidePaneHeader';
 import SidePaneHeaderButton from '../components/common/SidePaneHeaderButton';
 import useIsMobile, { getIsMobileViewport } from '../hooks/useIsMobile';
+import LoadingState from '../components/common/LoadingState';
 import PageHeader from '../components/layout/PageHeader';
 import HeaderButton from '../components/layout/HeaderButton';
 import MobilePageFooter from '../components/layout/MobilePageFooter';
@@ -128,23 +129,27 @@ function Notes() {
             )}
 
             <div className={styles.timelineArea}>
-                <NoteTimeline
-                    notes={notes}
-                    onEdit={updateNote}
-                    onEditReview={(note) => setOpenGoal({ goalId: note.goal_id, reviewNote: note })}
-                    onOpenGoal={(note) => setOpenGoal({ goalId: note.goal_id })}
-                    onDelete={deleteNote}
-                    onCarryForward={setCarryForward}
-                    showContext={true}
-                    noteTypeVariant="metadata"
-                    presentation="timeline"
-                    groupByDate={true}
-                    hasMore={hasMore}
-                    onLoadMore={loadNextPage}
-                    emptyMessage={hasActiveFilters
-                        ? 'No notes match the current filters.'
-                        : 'No notes yet. Write them on sessions, goals and program days.'}
-                />
+                {isLoading && notes.length === 0 ? (
+                    <LoadingState label="Loading notes…" />
+                ) : (
+                    <NoteTimeline
+                        notes={notes}
+                        onEdit={updateNote}
+                        onEditReview={(note) => setOpenGoal({ goalId: note.goal_id, reviewNote: note })}
+                        onOpenGoal={(note) => setOpenGoal({ goalId: note.goal_id })}
+                        onDelete={deleteNote}
+                        onCarryForward={setCarryForward}
+                        showContext={true}
+                        noteTypeVariant="metadata"
+                        presentation="timeline"
+                        groupByDate={true}
+                        hasMore={hasMore}
+                        onLoadMore={loadNextPage}
+                        emptyMessage={hasActiveFilters
+                            ? 'No notes match the current filters.'
+                            : 'No notes yet. Write them on sessions, goals and program days.'}
+                    />
+                )}
             </div>
         </div>
     );
@@ -216,7 +221,7 @@ function Notes() {
     );
 
     return (
-        <div className={`${styles.pageContainer} page-reveal`}>
+        <div className={`${styles.pageContainer} page-reveal`} data-tour="notes">
             {leftColumn}
             {rightColumn}
 

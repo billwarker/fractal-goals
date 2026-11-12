@@ -212,7 +212,7 @@ class TimerService:
         ).filter(
             ActivityInstance.session_id.in_(session_ids),
             ActivityInstance.deleted_at.is_(None),
-        )
+        ).order_by(ActivityInstance.created_at.asc(), ActivityInstance.id.asc())  # stable pages
         if limit is not None:
             query = query.offset(offset).limit(limit)
         instances = query.all()

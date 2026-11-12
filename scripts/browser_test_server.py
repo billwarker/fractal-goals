@@ -2,7 +2,6 @@
 
 from pathlib import Path
 import os
-import signal
 import subprocess
 import sys
 import uuid
@@ -12,6 +11,10 @@ os.environ["ENV"] = "testing"
 os.environ["FLASK_DEBUG"] = "false"
 os.environ["SENTRY_DSN"] = ""
 os.environ["RATELIMIT_ENABLED"] = "false"
+# Gunicorn serves the parallel browsers from BROWSER_SERVER_WORKERS processes (see serve());
+# each gets its own pool, sized so all of them stay well under PostgreSQL's 100 connections.
+os.environ.setdefault("DB_POOL_SIZE", "8")
+os.environ.setdefault("DB_MAX_OVERFLOW", "8")
 os.environ["AGENT_MCP_RESOURCE_URI"] = "https://mcp.browser.invalid/mcp"
 os.environ["AGENT_OAUTH_ISSUER"] = "https://issuer.browser.invalid"
 os.environ["AGENT_ADAPTER_ID"] = "browser-test-adapter"
@@ -21,6 +24,7 @@ os.environ["AGENT_EMBEDDED_PRIVACY_APPROVED"] = "true"
 
 from config import config
 from sqlalchemy import create_engine, text
+from scripts.browser_showcase_seed import seed_showcase
 from sqlalchemy.engine import make_url
 
 
@@ -94,6 +98,32 @@ def _seed_planning_fractal(db, suffix, user, level, today):
         program_day_id=f"browser-plan-day-{suffix}", session_template_id=f"browser-plan-template-{suffix}",
         is_required=True, order=0,
     ))
+
+
+def _publish_demo_examples(db, now):
+    """Publish the showcase plus a second, smaller example: the landing's live demo tours both."""
+    from models import Goal
+    from scripts.browser_showcase_seed import SHOWCASE_ROOT_ID
+    from services.landing_publish_service import LandingPublishService
+
+    second = "demo-spanish-root"
+    db.add(Goal(id=second, root_id=second, owner_id="sweep-admin", level_id="browser-ultimate-level",
+                name="Hold a conversation in Spanish", created_at=now))
+    db.flush()
+    for index, name in enumerate(("Learn the 1,000 most common words", "Speak for ten minutes a day")):
+        db.add(Goal(id=f"demo-spanish-goal-{index}", root_id=second, parent_id=second, owner_id="sweep-admin",
+                    name=name, sort_order=index, created_at=now))
+    db.flush()
+    service = LandingPublishService(db)
+    _, error, _ = service.update_landing_example_settings({"examples": [
+        {"root_id": SHOWCASE_ROOT_ID, "label": "Jazz guitar", "sort_order": 0},
+        {"root_id": second, "label": "Spanish", "sort_order": 1},
+    ]})
+    if error:
+        raise RuntimeError(f"Could not save the demo examples: {error}")
+    _, error, _ = service.publish_landing_examples()
+    if error:
+        raise RuntimeError(f"Could not publish the demo examples: {error}")
 
 
 def _seed_embedded_proposal(db, suffix, user):
@@ -210,7 +240,55 @@ def _seed_performance_fractal(db, suffix, user, ultimate_level, now):
         total_duration_seconds=1800, attributes={'private_notes': 'large body ' * 4000}) for index in range(120)])
 
 
+def serve(app):
+    """Serve the seeded app with several Gunicorn worker processes.
+
+    Parallel test browsers (two workflow workers, four sweep workers) each fire bursts of
+    requests; one threaded dev-server process serialises them on the GIL and stalls first
+    loads. The app is preloaded, so the setup above (seeded database, limiter off) is inherited
+    by every worker; each drops the inherited database connections after forking.
+    """
+    from gunicorn.app.base import BaseApplication
+
+    import models
+    import models.base
+
+    # Fork with no open sessions or pooled connections: a connection (or a transaction left
+    # open by the seeding session) shared across processes hangs requests.
+    models.remove_session()
+    if models.base._cached_engine is not None:
+        models.base._cached_engine.dispose()
+
+    def post_fork(_server, _worker):
+        if models.base._cached_engine is not None:
+            models.base._cached_engine.dispose(close=False)
+
+    class BrowserFixtureServer(BaseApplication):
+        def load_config(self):
+            for key, value in {
+                "bind": "127.0.0.1:8012",
+                "workers": int(os.environ.get("BROWSER_SERVER_WORKERS", "3")),
+                "threads": 4,
+                "preload_app": True,
+                "timeout": 120,
+                "graceful_timeout": 5,
+                # Longer than a test's pause between API calls, so a reused connection isn't
+                # closed under it (the 2 s default caused ECONNRESET in Playwright requests).
+                "keepalive": 75,
+                "post_fork": post_fork,
+                "accesslog": None,
+                "loglevel": "warning",
+            }.items():
+                self.cfg.set(key, value)
+
+        def load(self):
+            return app
+
+    BrowserFixtureServer().run()
+
+
 def main():
+    owner_pid = os.getpid()
     source = make_url(config.get_database_url())
     if source.host not in ("localhost", "127.0.0.1", "::1"):
         raise SystemExit("Browser fixtures require a local PostgreSQL server")
@@ -238,9 +316,11 @@ def main():
             ProgramDay,
             ProgramDayOccurrenceSchedule,
             Session,
+            SignupInviteKey,
             User,
         )
         from datetime import datetime, timedelta, timezone
+        from services._admin_common import hash_invite_key
 
         engine = models.get_engine()
         if engine.url.database != name:
@@ -259,6 +339,26 @@ def main():
             )
             user.set_password("BrowserTest123!")
             db.add(user)
+            # New accounts with no fractals, one per workflow project, for the welcome flow
+            # (e2e/onboarding.spec.js creates a fractal, so projects can't share one).
+            for project in ("desktop", "mobile"):
+                welcome_user = User(
+                    id=f"welcome-user-{project}",
+                    username=f"welcome_user_{project}",
+                    email=f"welcome-{project}@example.invalid",
+                    terms_accepted_version=config.TERMS_VERSION,
+                    terms_accepted_at=now,
+                    privacy_accepted_version=config.PRIVACY_VERSION,
+                    privacy_accepted_at=now,
+                )
+                welcome_user.set_password("WelcomeTest123!")
+                db.add(welcome_user)
+                # An emailed beta invite (e2e/landing.spec.js signs up through its link).
+                db.add(SignupInviteKey(
+                    key_hash=hash_invite_key(f"browser-invite-{project}"),
+                    label=f"Browser invite ({project})",
+                    assigned_email=f"invitee-{project}@example.invalid",
+                ))
             ultimate_level = GoalLevel(
                 id="browser-ultimate-level",
                 name="Ultimate Goal",
@@ -458,8 +558,17 @@ def main():
             for suffix in ("desktop", "mobile"):
                 _seed_embedded_proposal(db, suffix, user)
             db.commit()
+            seed_showcase(db, now, config)
+            db.commit()
+            _publish_demo_examples(db, now)
+            db.commit()
         from app import app
         from extensions import limiter
+
+        # The landing page previews at /landing-preview on local hosts (src/utils/marketingHost.js);
+        # production serves it only on the marketing host, so only this fixture server adds the route.
+        from blueprints.pages import render_react_app
+        app.add_url_rule('/landing-preview', 'landing_preview', render_react_app)
 
         # RATELIMIT_ENABLED is read from app config, not the environment; every spec logs in
         # through the UI from one address, so the login limit must be off here.
@@ -474,10 +583,13 @@ def main():
             stderr=subprocess.DEVNULL,
         )
 
-        signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
         try:
-            app.run(host="127.0.0.1", port=8012, use_reloader=False)
+            serve(app)
         finally:
+            # A Gunicorn worker that exits unwinds this stack too (it was forked from here);
+            # only the process that set everything up may tear it down.
+            if os.getpid() != owner_pid:
+                os._exit(0)
             worker.terminate()
             try:
                 worker.wait(timeout=10)
@@ -485,6 +597,8 @@ def main():
                 worker.kill()
                 worker.wait(timeout=5)
     finally:
+        if os.getpid() != owner_pid:
+            os._exit(0)
         if engine is not None:
             models.remove_session()
             engine.dispose()

@@ -7,6 +7,7 @@ import GoalDueText from '../goals/GoalDueText';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import { sortProgramDays } from '../../utils/programViewModel';
+import LoadingState from '../common/LoadingState';
 import ProgramDateNotes from './ProgramDateNotes';
 import ProgramDayScheduleActions from './ProgramDayScheduleActions';
 import ProgramDayPeriodBanner from './ProgramDayPeriodBanner';
@@ -119,7 +120,7 @@ export default function ProgramDayPane({
         ? <DueGoalsCard dueGoals={dueGoals} today={today} onGoalClick={onGoalClick} />
         : null;
     const withDueGoals = (content) => (dueGoalsCard ? <div className={styles.scopedContent}>{content}{dueGoalsCard}</div> : content);
-    if (query.isLoading && !detail) return withDueGoals(<div className={styles.state} aria-busy="true">Loading day details…</div>);
+    if (query.isLoading && !detail) return withDueGoals(<LoadingState label="Loading day details…" />);
     if (query.error) return withDueGoals(<div className={styles.state} role="alert">Day details could not be loaded. <button onClick={() => query.refetch()}>Retry</button></div>);
     if (!detail) return withDueGoals(<div className={styles.state}>No program schedule on {formatLiteralDate(date)}.</div>);
 

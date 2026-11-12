@@ -10,4 +10,6 @@ export const publicApi = {
         _skipAuth: true,
     }),
     createBetaSignup: (data) => axios.post(`${API_BASE}/public/beta-signups`, data),
+    // A short-lived read-only token for the live demo of the published examples.
+    createDemoSession: () => axios.post(`${API_BASE}/public/demo-session`, {}, { _skipAuth: true }),
 };

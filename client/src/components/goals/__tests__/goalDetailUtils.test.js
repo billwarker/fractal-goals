@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { buildLiveSmartGoal } from '../goalDetailUtils';
 import { calculateSMARTStatus, isSMART } from '../../../utils/smartHelpers';
 

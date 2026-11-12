@@ -51,6 +51,62 @@ The normal flow is:
 - `client/src/components/` owns reusable UI and feature views.
 - `client/src/hooks/` owns server-state orchestration and invalidation.
 - `client/src/contexts/` owns auth, theme, header, and lightweight UI coordination.
+
+Theme: `design-tokens.css` holds every colour with a dark (`:root`) and light (`[data-theme="light"]`,
+WinClassic-based) value; `npm run check:contrast` gates both and the maintainability audit caps raw colour
+literals. The preference (System / Light / Dark / Scheduled) resolves through `utils/themeSchedule.js`,
+mirrored before first paint by `public/boot/shell.js` (shared fixture `tests/fixtures/theme_schedule_cases.json`),
+lives per device in `theme-preference` and syncs to `user.preferences.appearance`. User-chosen goal colours
+are stored once and adapted for the light theme by `utils/themeColors.js` inside `GoalLevelsContext`.
+
+Loading: every loading state is `components/common/LoadingState`, always the spinner (variants `page` /
+`section` / `inline`, `error` + `onRetry`). It stays invisible for 200 ms, then shows; after 4 s it
+says "Still loading…", or that the server may be waking up while `offline/serverWarmth.js` sees reads
+waiting over 2.5 s (a Cloud Run cold start or a slow network). Suspense routes use `RouteFallback`. On
+the app host, `index.html` paints a matching boot loader before the bundle (with a waking hint after
+4 s from `public/boot/shell.js`) and `utils/appBootHandoff.js` removes it once React shows a loading
+state or content. A timed-out request's reachability probe waits 30 s
+(`COLD_START_PROBE_TIMEOUT_MS`), so a waking server isn't reported offline. The maintainability audit
+rejects ad-hoc "Loading…" elements and the old `.loading-spinner` class.
+
+First run: a signed-in user with no fractals sees `components/onboarding/welcome/WelcomeFlow` on
+Selection (welcome → big goal → up to three long-term goals, with a live tree preview; full screen on
+phones; skipping is remembered per user in `welcome-dismissed:<userId>` and opens the normal create
+modal). It creates everything with one `POST /api/fractals/quickstart` (`@idempotent`, one transaction
+in `GoalService.quickstart_fractal`, goals quota checked for the whole tree up front), then lands on the
+Goals page. The Getting Started checklist (`onboarding_v1` flag) orders its steps explore → activity →
+session → SMART → program, has "Show me" links, sits above the phone footer and celebrates once when
+complete. `client/e2e/onboarding.spec.js` drives the journey with the fixture's `welcome_user_<project>`
+accounts.
+
+Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
+demo. Each published demo (Admin → Live demo) is an icon linking to `/demo/<snapshot root>/goals?tour=1`;
+"or join the waitlist" opens `demo/DemoSignupModal`. `index.html`'s boot copy mirrors the hero (an
+architecture test ties its words to landing.md). `main.jsx` keeps its three root imports (public landing,
+demo, app) as separate statements, so each root preloads its own CSS.
+
+Live demo (`src/demo/`, plans `planning/landing-live-demo-2026-11.md` and
+`planning/demo-snapshots-2026-11.md`): the real app, read-only, on frozen copies. Publishing (Admin → Live
+demo, `services/landing_publish_service.py`) copies each chosen admin fractal into the demo account
+(`role='demo'`, nobody can sign in; `services/demo_account_service.py`) with
+`services/demo_snapshot_service.py`: a metadata-driven copy of every row the fractal reaches, ids derived
+from the source's (uuid5, so demo links survive a republish), references remapped (JSON included), the
+fractal's effective goal levels copied as its own, database insert-trigger effects undone, media and agent
+state left out. Every reachable table must be in `COPY_TABLES` or `EXCLUDED_TABLES`; adding a table that
+reaches a fractal fails `tests/integration/test_demo_snapshots.py` until it is classified there, and the
+same file checks every allow-listed page reads the same on the copy as on the source. The public manifest
+(`landing_example_cache`, schema 14) carries only label, root name, icon, the tour's deep links and the
+owner's completed-goal colours. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
+audience (`services/demo_access_service.py`); `token_required` hands demo tokens to
+`blueprints/demo_access.py`, which serves only GET endpoints in `DEMO_READ_ENDPOINTS` on roots that are
+still published, as the root's owner (the demo account), and never media, storage, account, agent, admin or log routes.
+`tests/integration/test_demo_access.py` walks every protected route in the URL map. Client: `DemoRoot`
+(BrowserRouter `basename="/demo"`, `DemoAuthProvider` guest, the shared `FractalRoutes` table) and
+`demoMode.js`, whose axios guard refuses writes before sending and opens `DemoWritePrompt`. In demo mode
+the outbox, persisted cache, service worker, theme sync, storage connections and attachments are off.
+`DemoGuide` is the tour (steps in `demoTour.js`, deep-linked via the manifest's `tour`; pages carry
+`data-tour` anchors for `Spotlight`). Invite holders are sent to the app host's invite link. Covered by
+`client/e2e/demo.spec.js`, `landing.spec.js` and `admin-live-demo.spec.js` (snapshot ids from `e2e/demoIds.js`).
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context
@@ -518,8 +574,7 @@ Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/no
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
 
 `services/goal_history_read_model.py` and `services/goal_note_read_model.py` are
-request-scoped bulk loaders. Landing publication reuses them while projecting each
-goal through the canonical timeline and note services. Analytics query caching is
+request-scoped bulk loaders. Analytics query caching is
 bounded in development/testing and bypassed in production-like multi-worker runtimes.
 
 ### Interaction contracts
@@ -542,9 +597,21 @@ Auth, quotas, admin tooling, feature flags, telemetry, email delivery, landing p
 data export, and account deletion form the account boundary. Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
-The Logs page reads owner-scoped event history; only admins can clear a fractal's complete
-log history, after explicit confirmation regardless of filters. `useLogsData` owns that mutation
-and invalidates paginated and infinite history through the shared `logsRoot` query key.
+The Logs page (admin-only route) reads owner-scoped event history; only admins can clear a fractal's
+complete log history, after explicit confirmation regardless of filters. `useLogsData` owns that
+mutation and invalidates paginated and infinite history and the activity chart through the shared
+`logsRoot` query key. `GET /api/<root>/logs/activity` (`LogService.get_activity_series`) returns event
+counts per local day or hour (`date_trunc` on the timestamp converted to the request's `tz`; ranges up
+to 366 days daily, 14 hourly; empty buckets filled; DST-aware), split into the domains in
+`ACTIVITY_DOMAINS` by event-type prefix. `GET /api/<root>/logs` accepts the same `tz`, so YYYY-MM-DD
+bounds are whole local days and the table matches a chart bucket; each log carries its `domain`.
+
+Settings (`components/modals/SettingsModal.jsx`) is a shell over one component per section in
+`components/settings/`, built from `SettingsSection`/`SettingsRow` (label and help left, control
+right, stacking on phones) and `atoms/Switch`. Desktop uses a vertical ARIA tablist (arrow keys,
+Home/End); phones get a list that drills into one section. `useVisibleSettingsSections` hides AI
+Connections unless an AI flag is on or the user still has a connection to revoke; a `?settings=`
+deep link to a hidden section falls back to General until it becomes visible.
 
 Session tokens carry the session audience, `users.session_version`, and the original login
 time. Password change/reset, admin resets, suspension, and "Sign out of all devices" increment
@@ -615,6 +682,25 @@ PostgreSQL database. It also builds the nginx container and verifies security he
 app shell, deep links, service-worker files and error responses through
 `scripts/check_frontend_headers.py`; shared nginx header includes preserve location-level
 cache policies without losing CSP or the other headers.
+
+`npm run sweep` (in `client/`) is the visual review loop: every surface in `client/e2e/sweep/manifest.js`
+(routes, plus modals opened by a step) is captured at 360/390/768/1440px in light and dark against the
+read-only showcase fractal and admin user (`scripts/browser_showcase_seed.py`), with horizontal
+overflow, touch-target (24px minimum, 40px recommended) and axe findings per capture. It writes the
+`client/sweep-results/index.html` contact sheet; `SWEEP_ENFORCE=1` turns the findings into failures.
+`npm run sweep:quick` covers phone and desktop in both themes (about half the captures) for fast local
+checks. `.github/workflows/visual-sweep.yml` enforces it beside Frontend CI: the quick set on pull
+requests that touch the client, every viewport nightly and on demand; captures retry once.
+Add a manifest entry for every new page, modal or sheet.
+
+Test speed: logic-only Vitest files start with `// @vitest-environment node` (no jsdom; `src/test/setup.js`
+loads the DOM helpers only where a window exists), so new pure-logic tests should too. The browser
+workflow suite signs `browser_user` in once (`e2e/auth.setup.js` → `e2e/.auth/`, read with
+`apiToken()` from `e2e/support/session.js`); specs start signed in, and one that tests the sign-in
+itself opts out with an empty `storageState`. `scripts/browser_test_server.py` serves through
+Gunicorn (`BROWSER_SERVER_WORKERS`, default 3), forking only after releasing its database connections
+and tearing down only in the owning process. `npm run test:browser:smoke` runs one journey per area on
+desktop for quick local checks; CI runs the full suite.
 
 Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with

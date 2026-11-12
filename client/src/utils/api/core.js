@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { isPublicLandingLocation } from '../marketingHost';
 import { isNetworkError } from '../networkErrors';
+import { DemoReadOnlyError, isDemoMode, reportBlockedDemoWrite, shouldBlockDemoRequest } from '../../demo/demoMode';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
@@ -12,6 +13,12 @@ let isRefreshing = false;
 let csrfFetchPromise = null;
 let failedQueue = [];
 let hasDispatchedSessionExpired = false;
+// The demo's replacement for /auth/refresh: mints a fresh read-only demo token.
+let demoReauthenticate = null;
+
+export function setDemoReauthenticate(handler) {
+    demoReauthenticate = handler;
+}
 const CSRF_COOKIE_NAME = 'fractal_csrf_token';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -105,12 +112,16 @@ const isCsrfAuthFailure = (error) => (
 );
 
 const dispatchSessionExpired = (detail = {}) => {
-    if (typeof window === 'undefined' || hasDispatchedSessionExpired || isPublicLandingLocation()) return;
+    if (typeof window === 'undefined' || hasDispatchedSessionExpired || isPublicLandingLocation() || isDemoMode()) return;
     hasDispatchedSessionExpired = true;
     window.dispatchEvent(new CustomEvent('auth:session_expired', { detail }));
 };
 
 axios.interceptors.request.use(async (config) => {
+    if (shouldBlockDemoRequest(config)) {
+        reportBlockedDemoWrite(config);
+        throw new DemoReadOnlyError();
+    }
     const isPublicRequest = String(config.url || '').includes('/public/');
     if (accessToken && !isPublicRequest && !config._skipAuth && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
@@ -170,6 +181,16 @@ axios.interceptors.response.use(
             }
             clearAccessToken();
             dispatchSessionExpired({ reason: 'csrf_expired' });
+        }
+
+        if (isDemoMode()) {
+            if (error.response?.status === 401 && originalRequest && !originalRequest._retry && demoReauthenticate) {
+                originalRequest._retry = true;
+                const token = await demoReauthenticate();
+                setHeader(originalRequest, 'Authorization', `Bearer ${token}`);
+                return axios(originalRequest);
+            }
+            return Promise.reject(error);
         }
 
         if (error.response?.status === 401 && !originalRequest?._retry) {

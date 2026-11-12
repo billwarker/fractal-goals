@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { NavigationHeader } from '../AppRouter';
+import { NavigationHeader, RequireAdmin } from '../AppRouter';
 
 const {
     getAllFractals,
@@ -23,7 +23,7 @@ const {
         type: 'UltimateGoal',
         is_smart: false,
     },
-    mockUser: { current: { id: 'user-1', is_admin: false } },
+    mockUser: { current: { id: 'user-1', is_admin: false }, loading: false },
 }));
 
 vi.mock('../utils/api', () => ({
@@ -47,6 +47,7 @@ vi.mock('../contexts/AuthContext', () => ({
     useAuth: () => ({
         user: mockUser.current,
         isAuthenticated: true,
+        loading: mockUser.loading,
     }),
 }));
 
@@ -311,5 +312,43 @@ describe('NavigationHeader', () => {
                 '/root-2/create-session',
             );
         });
+    });
+});
+
+describe('RequireAdmin', () => {
+    function renderGuarded() {
+        return render(
+            <MemoryRouter initialEntries={['/root-1/logs']}>
+                <Routes>
+                    <Route path="/:rootId/logs" element={<RequireAdmin><div>Admin logs</div></RequireAdmin>} />
+                    <Route path="/:rootId/goals" element={<LocationProbe />} />
+                </Routes>
+            </MemoryRouter>
+        );
+    }
+
+    afterEach(() => {
+        mockUser.current = { id: 'user-1', is_admin: false };
+        mockUser.loading = false;
+    });
+
+    it('waits for the current user instead of redirecting a deep link', () => {
+        mockUser.current = null;
+        mockUser.loading = true;
+        renderGuarded();
+        expect(screen.queryByTestId('location-path')).toBeNull();
+        // The loader announces itself from the first frame, before its anti-flash delay ends.
+        expect(screen.getAllByLabelText('Loading…').length).toBeGreaterThan(0);
+    });
+
+    it('renders admin pages for admins once the user resolves', () => {
+        mockUser.current = { id: 'user-1', is_admin: true };
+        renderGuarded();
+        expect(screen.getByText('Admin logs')).toBeInTheDocument();
+    });
+
+    it('redirects non-admins to the fractal goals page', () => {
+        renderGuarded();
+        expect(screen.getByTestId('location-path')).toHaveTextContent('/root-1/goals');
     });
 });

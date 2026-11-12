@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
 import { SESSION_TYPE_NORMAL, SESSION_TYPE_QUICK } from '../../../utils/sessionRuntime';

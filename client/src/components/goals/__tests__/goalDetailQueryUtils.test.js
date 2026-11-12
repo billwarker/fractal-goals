@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { QueryClient } from '@tanstack/react-query';
 
 import { invalidateGoalAssociationQueries, invalidateGoalSessionQueries } from '../goalDetailQueryUtils';

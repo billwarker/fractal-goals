@@ -1,203 +1,207 @@
 .container {
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-md);
 }
 
-.description {
-    font-size: 13px;
+.intro {
+    margin: 0 0 var(--spacing-xs);
     color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
 }
 
-.levelCard {
-    padding: 16px;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    background-color: var(--color-bg-card-alt);
+/* One collapsible panel per level. */
+.level {
+    border: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
 }
 
-.levelHeaderRow {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-    gap: 12px;
-}
-
-.levelHeaderTitle {
+.levelSummary {
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-weight: bold;
+    gap: var(--spacing-sm);
+    min-height: 44px;
+    padding: 0 var(--spacing-md);
+    border-radius: var(--border-radius-md);
+    cursor: pointer;
+    list-style: none;
+}
+
+.levelSummary::-webkit-details-marker {
+    display: none;
+}
+
+.levelSummary:hover {
+    background: var(--color-bg-hover);
+}
+
+.levelSummary:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: -2px;
+}
+
+.levelName {
     color: var(--color-text-primary);
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-semibold);
 }
 
-.customizedBadge {
-    font-size: 10px;
-    background: var(--color-bg-primary);
-    padding: 2px 6px;
-    border-radius: 4px;
-    color: var(--color-text-muted);
-    border: 1px solid var(--color-border);
+.badge,
+.unsaved {
+    padding: 1px 6px;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-size-2xs, 11px);
+    white-space: nowrap;
 }
 
-.buttonGroup {
-    display: flex;
-    gap: 8px;
-}
-
-.restoreButton {
-    font-size: 12px;
-    background: transparent;
+.badge {
     border: 1px solid var(--color-border);
     color: var(--color-text-secondary);
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: pointer;
 }
 
-.saveButton {
-    font-size: 12px;
-    background: var(--color-brand-primary);
-    border: none;
-    color: var(--color-text-inverse);
-    padding: 4px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
+.unsaved {
+    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent);
+    color: var(--color-brand-primary);
+    font-weight: var(--font-weight-semibold);
 }
 
-.settingsGroup {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.inputLabel {
-    display: block;
-    font-size: 12px;
-    margin-bottom: 8px;
+.levelChevron {
+    margin-left: auto;
     color: var(--color-text-secondary);
+    transition: transform 0.16s ease;
 }
 
-.inputLabelSecondary {
-    display: block;
-    font-size: 12px;
-    margin-bottom: 6px;
+.level[open] > .levelSummary .levelChevron {
+    transform: rotate(180deg);
+}
+
+.level[open] > .levelSummary {
+    border-bottom: 1px solid var(--color-border-card);
+    border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
+}
+
+.levelBody {
+    padding: var(--spacing-xs) var(--spacing-md) var(--spacing-md);
+}
+
+.levelActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    padding-top: var(--spacing-md);
+}
+
+.group {
+    padding-top: var(--spacing-md);
+}
+
+.groupTitle {
+    margin: 0;
     color: var(--color-text-secondary);
+    font-size: var(--font-size-2xs, 11px);
+    font-weight: var(--font-weight-semibold);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
-.inputLabelMuted {
-    display: block;
-    font-size: 12px;
-    margin-bottom: 6px;
-    color: var(--color-text-muted);
-}
-
-.subText {
-    font-size: 10px;
-    color: var(--color-text-muted);
-}
-
-.shapeList {
+.shapes {
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
+    gap: 6px;
 }
 
-.shapeButton {
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.flexRowWrap {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-}
-
-.colorInput {
-    height: 32px;
+.shape {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
     padding: 0;
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card);
     cursor: pointer;
 }
 
-.behaviorControls {
-    display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    margin-top: 8px;
+.shape:hover {
+    border-color: var(--color-border-hover);
 }
 
-.checkboxLabel {
-    display: flex;
+.shape[aria-checked='true'] {
+    border-color: var(--shape-color, var(--color-brand-primary));
+    box-shadow: inset 0 0 0 1px var(--shape-color, var(--color-brand-primary));
+}
+
+.shape:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.colors {
+    display: inline-flex;
+    gap: var(--spacing-md);
+}
+
+.color {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 13px;
-    color: var(--color-text-primary);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-xs);
     cursor: pointer;
 }
 
-.valueUnitControls {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-top: 12px;
+.color input {
+    width: 40px;
+    height: 28px;
+    padding: 2px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    cursor: pointer;
 }
 
-.flexAlignCenter {
-    display: flex;
+.amount {
+    display: inline-flex;
     align-items: center;
     gap: 6px;
 }
 
-.numberInput {
-    padding: 4px 8px;
-    font-size: 13px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
+.unit {
+    width: auto;
 }
 
-.smallNumberInput {
-    width: 55px;
+.range {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-sm);
 }
 
-.mediumNumberInput {
-    width: 70px;
+.to {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
 }
 
-.selectInput {
-    padding: 4px 8px;
-    font-size: 13px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    background: var(--color-bg-secondary);
-    color: var(--color-text-primary);
-    cursor: pointer;
+.wideNumber {
+    width: 96px;
 }
 
-.selectInputSmall {
-    padding: 4px 4px;
-    font-size: 12px;
+@media (max-width: 768px) {
+    .shape {
+        width: 44px;
+        height: 44px;
+    }
+
+    .color input {
+        width: 52px;
+        height: 44px;
+    }
 }
 
-.emptyDeadlineMeta {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    font-style: italic;
-    padding: 4px 0;
-}
-
-.pointer {
-    cursor: pointer;
+@media (prefers-reduced-motion: reduce) {
+    .levelChevron {
+        transition: none;
+    }
 }

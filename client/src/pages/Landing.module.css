@@ -1,12 +1,14 @@
+/* The landing is one screen: header, hero with the live-demo picker, footer. */
 .page {
-    --landing-page-x-padding: clamp(16px, 4vw, 56px);
-    --landing-section-max-width: 1560px;
-    --landing-readable-max-width: 1120px;
     --landing-css-ready: 1;
+    --landing-x: clamp(16px, 4vw, 48px);
 
-    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: var(--app-viewport-height);
+    box-sizing: border-box;
+    padding: 0 var(--landing-x);
     color: var(--color-text-primary);
-    padding: 20px var(--landing-page-x-padding) 56px;
     background-color: var(--color-bg-app);
     background-image:
         linear-gradient(var(--color-grid) 1px, transparent 1px),
@@ -14,1261 +16,274 @@
     background-size: 20px 20px;
 }
 
-.header,
-.hero,
-.treeSection,
-.betaSection {
-    max-width: var(--landing-section-max-width);
-    margin-left: auto;
-    margin-right: auto;
-}
-
 .header {
-    min-height: 48px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-}
-
-.brand,
-.nav {
-    display: flex;
-    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 1200px;
+    min-height: 60px;
+    margin: 0 auto;
+    padding-top: env(safe-area-inset-top, 0px);
 }
 
 .brand {
+    display: flex;
+    align-items: center;
     gap: 10px;
     color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0;
-    font-size: var(--font-size-sm);
 }
 
 .brand:hover {
     color: var(--color-text-primary);
 }
 
-.brandMark {
-    width: 38px;
-    height: 38px;
-    display: grid;
-    place-items: center;
-}
-
-.nav {
-    gap: 8px;
-}
-
-/* Brand + CTA row of the compact sticky header. Desktop flattens it away
-   with display: contents so the fixed centered header keeps its layout. */
-.headerBar {
+.headerTools {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 12px;
-    width: 100%;
 }
 
-/* Plain text like the nav items; the brand color + outbound arrow signal it
-   leaves the marketing site for the app. */
-.headerCta {
+.login {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
     min-height: 40px;
-    padding: 8px 4px;
-    color: var(--color-brand-primary);
-    font-size: var(--font-size-sm);
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.headerCta:hover,
-.headerCta:focus-visible {
-    color: var(--color-brand-primary-hover);
-}
-
-.headerCtaGlyph {
-    font-size: 0.9em;
-    line-height: 1;
-}
-
-.nav a,
-.nav button {
-    appearance: none;
-    font-family: inherit;
-    position: relative;
+    padding: 8px 6px;
     color: var(--color-text-secondary);
-    border: 1px solid transparent;
-    border-radius: var(--border-radius-sm);
-    min-height: 36px;
-    padding: 8px 12px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     font-size: var(--font-size-sm);
     font-weight: 700;
-    background: transparent;
-    cursor: pointer;
 }
 
-.nav a:hover,
-.nav button:hover,
-.navActive {
+.login:hover {
     color: var(--color-text-primary);
-    background: var(--color-bg-card-hover);
-    border-color: var(--color-border);
-}
-
-.nav button:focus-visible,
-.nav a:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
-    outline-offset: 2px;
-}
-
-.navActive::after {
-    content: "";
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 3px;
-    height: 2px;
-    border-radius: 999px;
-    background: var(--color-brand-primary);
 }
 
 .hero {
-    min-height: min(520px, calc(var(--app-viewport-height) - 88px));
-    display: block;
-    padding: 0 0 40px;
-}
-
-.heroCopy {
-    min-width: 0;
-    padding-top: 68px;
-}
-
-.heroBodyPanel {
-    margin-top: 32px;
-    max-width: min(1120px, 100%);
-    padding: clamp(20px, 3vw, 34px);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-lg);
-    background: color-mix(in srgb, var(--color-bg-card) 60%, transparent);
-}
-
-.heroExamplePicker {
-    margin-top: 40px;
-}
-
-/* Reserve the exact final picker footprint while the static example snapshot
-   is in flight. The intentionally empty surface avoids showing a fake example
-   that would be replaced as soon as GCS responds. */
-.heroExamplesPlaceholder {
-    width: min(1120px, 100%);
-    height: clamp(108px, 10vw, 152px);
-}
-
-.visuallyHidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-}
-
-.hero h1 {
-    margin: 0;
-    max-width: var(--landing-readable-max-width);
-    font-size: clamp(3.1rem, 8vw, 7.8rem);
-    line-height: 0.94;
-    letter-spacing: 0;
-}
-
-/* Compact-width hero extras; the desktop block hides them. */
-.heroKicker {
-    margin: 0 0 12px;
-    color: var(--color-brand-primary);
-    font-size: var(--font-size-xs);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-}
-
-.heroActions {
     display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-.heroActionPrimary,
-.heroActionSecondary {
-    display: inline-flex;
+    flex: 1;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    flex: 1 1 0;
-    min-height: 48px;
-    padding: 10px 16px;
-    font: inherit;
-    font-size: var(--font-size-base);
-    font-weight: 800;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
+    width: 100%;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: clamp(12px, 3vh, 48px) 0;
     text-align: center;
 }
 
-.heroActionPrimary {
-    color: white;
-    background: var(--color-brand-primary);
-    border: 1px solid var(--color-border-btn);
-}
-
-.heroActionPrimary:hover,
-.heroActionPrimary:focus-visible {
-    color: white;
-    background: var(--color-brand-primary-hover);
-}
-
-.heroActionSecondary {
-    color: var(--color-text-primary);
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-}
-
-.heroActionSecondary:hover,
-.heroActionSecondary:focus-visible {
-    background: var(--color-bg-card-hover);
-    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
-}
-
-.heroBodyPanel p {
+.kicker {
     margin: 0;
-    color: var(--color-text-secondary);
-    font-size: clamp(1.2rem, 2.5vw, 2rem);
-    line-height: var(--line-height-snug);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: 0;
-}
-
-.betaForm button {
-    min-height: 42px;
-    border-radius: var(--border-radius-sm);
-    border: 1px solid var(--color-border-btn);
-    background: var(--color-brand-primary);
-    color: white;
-    padding: 10px 16px;
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-xs);
     font-weight: 800;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
 }
 
-.betaForm button:hover:not(:disabled) {
-    color: white;
-    background: var(--color-brand-primary-hover);
-}
-
-.betaSection {
-    margin-top: 72px;
-}
-
-.treeSection {
-    margin-top: 28px;
-    max-width: var(--landing-section-max-width);
-}
-
-.deferredFeatureSection {
-    min-height: 520px;
-    max-width: var(--landing-section-max-width);
-    margin: 72px auto 0;
-    padding: 24px;
-}
-
-.featuresHost {
-    max-width: var(--landing-section-max-width);
-    margin: 0 auto;
-}
-
-.sectionHeader {
-    max-width: 820px;
-}
-
-.sectionHeader h2,
-.betaCopy h2 {
-    margin: 0;
-    font-size: clamp(2rem, 4vw, 3.4rem);
-    line-height: var(--line-height-tight);
-    letter-spacing: 0;
-}
-
-.sectionHeader p {
-    max-width: 820px;
-    margin: 16px 0 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-relaxed);
-}
-
-/* Compact header variant for full-viewport sections where the app window
-   (goal tree, feature stage) should get the vertical space instead. */
-.sectionHeaderCompact h2 {
-    font-size: clamp(1.5rem, 2.2vw, 2.2rem);
-}
-
-.sectionHeaderCompact p {
-    margin-top: 8px;
-    font-size: var(--font-size-md);
-}
-
-.audienceGrid {
-    margin-top: 24px;
+.title {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px;
-}
-
-.audienceCard {
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    box-shadow: var(--shadow-md);
-    padding: 18px;
-}
-
-.audienceCard h3 {
-    margin: 0;
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-snug);
+    place-items: center;
+    min-height: 2lh;
+    margin: clamp(6px, 1vh, 12px) 0 0;
+    /* Height-capped too, so the whole page fits one desktop screen. */
+    font-size: clamp(2.5rem, min(6.2vw, 8.5vh), 6.4rem);
+    line-height: 1;
     letter-spacing: 0;
 }
 
-.audienceCard p {
-    margin: 12px 0 0;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-md);
-    line-height: var(--line-height-base);
+.bodyPanel {
+    width: min(960px, 100%);
+    box-sizing: border-box;
+    margin-top: clamp(16px, 3vh, 36px);
+    padding: clamp(16px, min(2.2vw, 2.6vh), 28px);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-lg);
+    background: color-mix(in srgb, var(--color-bg-card) 60%, transparent);
+    text-align: left;
 }
 
-.exampleToggle {
-    margin-top: 0;
+.bodyPanel p {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: clamp(1.05rem, min(2vw, 2.4vh), 1.6rem);
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-snug);
+}
+
+.demo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: clamp(16px, 3.5vh, 44px);
+}
+
+.demoLabel {
+    margin: 0;
+    font-size: clamp(1.2rem, min(2.4vw, 3vh), 1.75rem);
+    font-weight: 800;
+    letter-spacing: 0;
+}
+
+.examples {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
-    gap: clamp(48px, 10vw, 140px);
-    align-items: center;
-}
-
-.exampleToggle button {
-    font: inherit;
-    position: relative;
-    width: clamp(108px, 10vw, 152px);
-    height: clamp(108px, 10vw, 152px);
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
+    gap: clamp(16px, 5vw, 72px);
+    margin: clamp(8px, 1.6vh, 20px) 0 0;
     padding: 0;
-    color: var(--color-text-primary);
-    background: transparent;
+    list-style: none;
+}
+
+.example {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    padding: 10px 14px;
     border: 1px solid transparent;
-    border-radius: var(--border-radius-sm);
-    cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
+    border-radius: var(--border-radius-lg);
+    color: var(--color-text-secondary);
+    transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
 }
 
-.exampleToggle button:hover,
-.exampleToggle button:focus-visible {
-    transform: translateY(-4px) scale(1.04);
-    outline: none;
-}
-
-.exampleToggle .toggleActive {
-    transform: scale(1.04);
-}
-
-.exampleToggleIcon {
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-}
-
-.exampleToggleLabel {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    clip-path: inset(50%);
-    white-space: nowrap;
-}
-
-.goalViewCards {
-    margin-top: 18px;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 10px;
-}
-
-.goalViewCard {
-    display: grid;
-    gap: 6px;
-    align-content: start;
-    padding: 14px 16px;
-    text-align: left;
+.example:hover,
+.example:focus-visible {
+    background: color-mix(in srgb, var(--color-bg-card) 70%, transparent);
+    border-color: var(--color-border);
     color: var(--color-text-primary);
-    background: color-mix(in srgb, var(--color-bg-card) 92%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-md);
-    font: inherit;
-    cursor: pointer;
-    transition: border-color 140ms ease, background-color 140ms ease;
+    transform: translateY(-4px);
 }
 
-.goalViewCard:hover {
-    background: var(--color-bg-card-hover);
-    border-color: color-mix(in srgb, var(--color-brand-primary) 55%, var(--color-border));
-}
-
-.goalViewCard:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
+.example:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
 }
 
-.goalViewCardActive {
-    border-color: var(--color-brand-primary);
-    box-shadow: inset 0 0 0 1px var(--color-brand-primary);
-}
-
-.goalViewCardTitle {
-    font-size: var(--font-size-base);
-    font-weight: 800;
-    line-height: var(--line-height-snug);
-}
-
-.goalViewCardBody {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-base);
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .goalViewCard {
-        transition: none;
-    }
-}
-
-.goalExplorer {
-    margin-top: 16px;
-    min-height: min(70vh, 720px);
-}
-
-.goalTreeCanvas {
-    position: relative;
-    display: flex;
-    width: 100%;
-    height: min(72vh, 720px);
-    min-height: 520px;
-    overflow: hidden;
-    border: 1px dashed transparent;
-    border-radius: var(--border-radius-sm);
-    transition: border-color var(--duration-base) var(--ease-standard), box-shadow var(--duration-base) var(--ease-standard);
-}
-
-.goalTreeCanvasLocked {
-    cursor: pointer;
-}
-
-.goalTreeCanvas:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
-    outline-offset: 2px;
-}
-
-/*
- * The FlowTree viewport is a flex sibling of the docked detail panel, so opening
- * the panel physically compresses this box. The FlowTree then re-fits/re-centers
- * into the smaller width on its container-resize effect — exactly like the
- * authenticated goals page (where the side pane is also an in-flow flex sibling).
- */
-.flowTreeViewport {
-    position: relative;
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-}
-
-.goalTreeUnlockHint {
-    position: absolute;
-    top: 34px;
-    left: 292px;
-    z-index: 39;
-    max-width: min(300px, calc(100% - 312px));
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    font-weight: 750;
-    line-height: var(--line-height-snug);
-    pointer-events: none;
-    text-shadow: 0 1px 12px var(--color-bg-app);
-    opacity: 0.92;
-}
-
-.goalTreeUnlockHintUnlocked {
-    color: var(--color-success);
-}
-
-.goalTreeCanvas:hover {
-    border-color: color-mix(in srgb, var(--color-brand-primary) 58%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 22%, transparent);
-}
-
-.flowTreeLoading {
-    height: 100%;
+.exampleIcon {
     display: grid;
     place-items: center;
-    color: var(--color-text-muted);
+}
+
+.exampleLabel {
     font-size: var(--font-size-sm);
     font-weight: 700;
 }
 
-/* Opens the full-screen explorer takeover; rendered only on compact widths
-   where the inline tree stays locked. */
-.exploreButton {
-    position: absolute;
-    right: 12px;
-    bottom: 12px;
-    z-index: 5;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 10px 16px;
+.demoPlaceholder {
+    width: min(480px, 100%);
+    height: 150px;
+    margin-top: 20px;
+}
+
+.demoHint {
+    margin: clamp(6px, 1vh, 12px) 0 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.waitlistLink {
+    min-height: 40px;
+    margin-top: 2px;
+    padding: 8px 12px;
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
     font: inherit;
     font-size: var(--font-size-sm);
-    font-weight: 800;
-    color: white;
-    background: var(--color-brand-primary);
-    border: 1px solid var(--color-border-btn);
-    border-radius: 999px;
-    box-shadow: var(--shadow-md);
+    text-decoration: underline;
     cursor: pointer;
 }
 
-.exploreButton:hover,
-.exploreButton:focus-visible {
-    color: white;
-    background: var(--color-brand-primary-hover);
+.waitlistLink:hover {
+    color: var(--color-text-primary);
 }
 
-.exploreButton:focus-visible {
-    outline: 2px solid var(--color-brand-primary);
+.waitlistButton {
+    min-height: 48px;
+    margin-top: 20px;
+    padding: 10px 28px;
+    border: 1px solid var(--color-border-btn);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-brand-primary);
+    color: var(--color-text-inverse);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.waitlistLink:focus-visible,
+.waitlistButton:focus-visible,
+.login:focus-visible,
+.brand:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
 }
 
-.exploreButtonGlyph {
-    font-size: 1.1em;
-    line-height: 1;
-}
-
-/*
- * The docked detail panel is an in-flow flex sibling of the FlowTree viewport
- * (NOT absolutely positioned), so its width compresses the tree viewport and the
- * FlowTree re-centers into the remaining space — matching the goals page. The
- * base surface + slideInRight animation come from the shared
- * .details-window.sidebar.docked styles in App.css.
- */
-:global(.landing-goal-dock.details-window.sidebar.docked) {
-    position: relative;
-    flex: 0 0 auto;
-    top: auto;
-    right: auto;
-    bottom: auto;
-    left: auto;
-    margin: 16px 16px 16px 8px;
-    z-index: 10;
-    width: 34%;
-    min-width: min(400px, calc(100% - 32px));
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    /* Keep the panel fully solid (the shared .details-window base is 0.95). */
-    opacity: 1;
-    background: var(--color-bg-sidebar);
-}
-
-:global(.landing-goal-dock .landing-goal-dock-content) {
-    flex: 1;
-    min-height: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-}
-
-.betaSection {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
-    gap: clamp(24px, 5vw, 72px);
-    align-items: center;
-    padding-bottom: 28px;
-}
-
-/* The footer lives inside #beta rather than beside it: a sibling of the snap
-   sections would become a fifth horizontal snap target on desktop. */
-.siteFooter {
-    grid-column: 1 / -1;
+.footer {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 12px 24px;
-    margin-top: 32px;
-    padding-top: 20px;
+    gap: 8px 24px;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--color-border);
-}
-
-.footerNote {
-    margin: 0;
     color: var(--color-text-muted);
     font-size: 13px;
 }
 
-.footerLinks {
+.footer p {
+    margin: 0;
+}
+
+.footer nav {
     display: flex;
-    flex-wrap: wrap;
     gap: 20px;
 }
 
-.footerLinks a {
+.footer a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
     color: var(--color-text-muted);
-    font-size: 13px;
-    text-decoration: none;
 }
 
-.footerLinks a:hover {
+.footer a:hover {
     color: var(--color-text-primary);
     text-decoration: underline;
 }
 
 @media (max-width: 620px) {
-    .siteFooter {
-        justify-content: flex-start;
-        margin-top: 24px;
-    }
-}
-
-.betaAudience {
-    min-width: 0;
-}
-
-.betaSignup {
-    min-width: 0;
-}
-
-.betaSignupPanel {
-    display: grid;
-    gap: 22px;
-    padding: clamp(20px, 2vw, 30px);
-    background: color-mix(in srgb, var(--color-bg-card) 88%, transparent);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-lg);
-}
-
-.betaCopy h2 {
-    font-size: clamp(2rem, 3vw, 3.5rem);
-}
-
-.betaCopy p {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-lg);
-    line-height: var(--line-height-relaxed);
-    margin: 16px 0 0;
-}
-
-.betaForm {
-    display: grid;
-    gap: 14px;
-    padding: 0;
-    background: transparent;
-    border: 0;
-    border-radius: 0;
-    box-shadow: none;
-}
-
-.betaForm label {
-    display: grid;
-    gap: 6px;
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-xs);
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0;
-}
-
-.betaForm input,
-.betaForm select,
-.betaForm textarea {
-    width: 100%;
-    color: var(--color-text-primary);
-    background: var(--color-bg-input);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius-sm);
-    padding: 11px 12px;
-    font-size: var(--font-size-base);
-    resize: vertical;
-}
-
-.betaForm input:focus,
-.betaForm select:focus,
-.betaForm textarea:focus {
-    border-color: var(--color-brand-primary);
-}
-
-.betaGoalInput {
-    min-height: 64px;
-    font-family: inherit;
-    line-height: 1.45;
-    text-transform: none;
-    font-weight: 400;
-}
-
-.betaForm button {
-    width: 100%;
-}
-
-.betaForm button:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-}
-
-.successMessage,
-.errorMessage {
-    margin: 0;
-    font-size: var(--font-size-sm);
-    line-height: var(--line-height-snug);
-}
-
-.successMessage {
-    color: var(--color-brand-success);
-}
-
-.errorMessage {
-    color: var(--color-brand-danger);
-}
-
-/*
- * Compact landing experience (mobile/tablet, <=980px): continuous vertical
- * scroll with a sticky brand bar + scroll-spy pill rail, a locked inline tree
- * preview with a full-screen takeover, and snap-scroll carousels for demo and
- * detail cards.
- */
-@media (max-width: 980px) {
-    /* Sections align their top under the sticky two-row header on jumps. */
-    .snapSection {
-        scroll-margin-top: 118px;
+    .brand span {
+        display: none;
     }
 
-    .header {
-        position: sticky;
-        top: 0;
-        z-index: 45;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-        margin: -20px calc(var(--landing-page-x-padding) * -1) 0;
-        padding: calc(10px + env(safe-area-inset-top, 0px)) var(--landing-page-x-padding) 10px;
-        background: color-mix(in srgb, var(--color-bg-app) 90%, transparent);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    .title {
+        min-height: 0;
+        font-size: clamp(2.3rem, 10.5vw, 3.2rem);
     }
 
-    /* Scroll-spy pill rail; mirrors the app's mobile horizontal nav rail. */
-    .nav {
-        flex-wrap: nowrap;
+    .bodyPanel p {
+        font-size: var(--font-size-base);
+    }
+
+    .examples {
         gap: 8px;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior-x: contain;
-        scrollbar-width: none;
-    }
-
-    .nav::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* Plain text items like desktop; the active item keeps the brand underline. */
-    .nav a,
-    .nav button {
-        flex: 0 0 auto;
-        min-height: 40px;
-        padding: 8px 12px;
-        border-color: transparent;
-        background: transparent;
-        white-space: nowrap;
-    }
-
-    .navActive {
-        color: var(--color-text-primary);
-        background: transparent;
-        border-color: transparent;
-    }
-
-    .hero {
-        min-height: auto;
-        padding-bottom: 28px;
-    }
-
-    .heroCopy {
-        display: flex;
-        flex-direction: column;
-        padding-top: 32px;
-    }
-
-    /* Visual order: kicker, headline, explainer, CTAs, example chips. */
-    .heroKicker {
-        order: 0;
-    }
-
-    .hero h1 {
-        order: 1;
-        font-size: clamp(2.5rem, 8.5vw, 4.2rem);
-        line-height: 1.02;
-    }
-
-    .heroBodyPanel {
-        order: 2;
-        margin-top: 22px;
-    }
-
-    .heroActions {
-        order: 3;
-    }
-
-    .goalTreeCanvas {
-        height: min(62svh, 560px);
-        min-height: 380px;
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius-md);
-        background: color-mix(in srgb, var(--color-bg-card) 40%, transparent);
-    }
-
-    .goalTreeCanvas:hover {
-        border-color: var(--color-border);
-        box-shadow: none;
-    }
-
-    /* Demo highlight cards become a swipeable snap row with edge peek. */
-    .goalViewCards {
-        display: flex;
-        gap: 10px;
-        margin-top: 14px;
-        overflow-x: auto;
-        scroll-snap-type: x proximity;
-        -webkit-overflow-scrolling: touch;
-        overscroll-behavior-x: contain;
-        scrollbar-width: none;
-        padding: 2px 2px 6px;
-    }
-
-    .goalViewCards::-webkit-scrollbar {
-        display: none;
-    }
-
-    .goalViewCard {
-        flex: 0 0 min(78vw, 320px);
-        scroll-snap-align: start;
-    }
-
-    .audienceGrid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    /* Signup panel (with its own heading) leads; audience cards follow. */
-    .betaSection {
-        display: flex;
-        flex-direction: column;
-        gap: 32px;
-    }
-
-    .betaSignup {
-        order: -1;
-    }
-
-    /* 16px inputs prevent iOS zoom-on-focus. */
-    .betaForm input,
-    .betaForm select,
-    .betaForm textarea {
-        font-size: max(var(--font-size-base), 16px);
-    }
-
-    .betaForm button {
-        min-height: 48px;
     }
 }
 
-@media (max-width: 620px) {
-    .page {
-        --landing-page-x-padding: 14px;
-
-        padding: 16px 14px 42px;
+@media (prefers-reduced-motion: reduce) {
+    .example {
+        transition: none;
     }
 
-    .snapSection {
-        scroll-margin-top: 112px;
-    }
-
-    .header {
-        margin-top: -16px;
-    }
-
-    .heroCopy {
-        padding-top: 26px;
-    }
-
-    .hero h1 {
-        font-size: clamp(2.4rem, 10vw, 3.1rem);
-    }
-
-    .heroBodyPanel p,
-    .betaCopy p {
-        font-size: var(--font-size-base);
-    }
-
-    .heroBodyPanel {
-        padding: 16px 18px;
-        margin-top: 18px;
-    }
-
-    .heroActions {
-        flex-direction: column;
-    }
-
-    .audienceGrid {
-        grid-template-columns: 1fr;
-    }
-
-    .audienceCard {
-        padding: 16px;
-    }
-
-    .audienceCard h3 {
-        font-size: var(--font-size-lg);
-    }
-
-    .betaSignupPanel {
-        padding: 18px;
-    }
-
-    .goalTreeCanvas {
-        height: min(58svh, 480px);
-        min-height: 360px;
-    }
-}
-
-/*
- * Segmented landing experience (desktop/tablet): the page itself becomes the
- * snap-scroll container (html/body are overflow hidden app-wide and .page
- * exactly fills the shared .content-container scroller), and each section is
- * one full-viewport snap panel. Below 981px the page keeps the continuous
- * scroll defined above.
- */
-@media (min-width: 981px) {
-    .page {
-        --landing-page-x-padding: clamp(12px, 1.2vw, 24px);
-        --landing-header-reserve: clamp(78px, 9vh, 104px);
-
-        height: var(--app-viewport-height);
-        overflow-x: auto;
-        overflow-y: hidden;
-        scrollbar-width: none;
-        display: flex;
-        align-items: stretch;
-        padding: 0;
-        scroll-snap-type: x mandatory;
-        scroll-behavior: smooth;
-        /* The container takes programmatic focus for keyboard paging. */
-        outline: none;
-    }
-
-    .page::-webkit-scrollbar {
-        display: none;
-    }
-
-    .snapSection {
-        flex: 0 0 100%;
-        box-sizing: border-box;
-        height: 100%;
-        scroll-snap-align: start;
-        scroll-snap-stop: always;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        margin-top: 0;
-        padding: var(--landing-header-reserve) var(--landing-page-x-padding) 24px;
-    }
-
-    .featuresHost {
-        width: 100%;
-        max-width: none;
-        margin: 0;
-    }
-
-    .deferredFeatureSection {
-        flex: 1;
-        width: 100%;
-        min-height: 0;
-        max-width: none;
-        margin: 0;
-        padding: 0;
-    }
-
-    .treeSection {
-        width: 100%;
-        max-width: none;
-        margin-left: 0;
-        margin-right: 0;
-        padding-left: var(--landing-page-x-padding);
-        padding-right: var(--landing-page-x-padding);
-    }
-
-    .hero,
-    .betaSection {
-        width: 100%;
-        max-width: none;
-        margin-left: 0;
-        margin-right: 0;
-    }
-
-    .hero {
-        min-height: 0;
-        padding-bottom: clamp(18px, 3vh, 34px);
-    }
-
-    .header {
-        position: fixed;
-        top: clamp(8px, 1.8vh, 18px);
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 40;
-        width: min(1120px, calc(100% - 48px));
-        justify-content: center;
-        gap: clamp(24px, 3vw, 44px);
-        min-height: 56px;
-        max-width: none;
-        margin: 0;
-    }
-
-    .brand {
-        font-size: var(--font-size-base);
-    }
-
-    .nav {
-        gap: clamp(12px, 1.6vw, 24px);
-    }
-
-    .nav a,
-    .nav button {
-        font-size: var(--font-size-base);
-    }
-
-    /* .headerBar flattens so the desktop header keeps its original flat flex
-       layout (brand + nav); compact-only elements are not rendered here. */
-    .headerBar {
-        display: contents;
-    }
-
-    .heroCopy {
-        flex: 1;
-        min-height: 0;
-        padding-top: clamp(20px, 5vh, 64px);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start;
-        text-align: center;
-    }
-
-    .hero h1 {
-        max-width: min(1120px, 100%);
-        font-size: clamp(3.6rem, 5.8vw, 6.8rem);
-        line-height: 0.98;
-        min-height: 2lh;
-        display: grid;
-        place-items: center;
-        transition: opacity 140ms ease;
-    }
-
-    .heroBodyPanel {
-        margin-top: clamp(22px, 4vh, 48px);
-        width: min(1120px, calc(100% - 120px));
-        text-align: left;
-    }
-
-    .heroExamplePicker {
-        flex: 0 0 auto;
-        margin-top: clamp(26px, 5vh, 52px);
-    }
-
-    /* Goals-view section: sidebar (header message + highlight cards) on the
-       left, the goal explorer panel filling the remaining viewport. */
-    .goalViewLayout {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        align-items: stretch;
-        gap: clamp(12px, 1.4vw, 22px);
-        margin-top: 0;
-    }
-
-    .goalViewSidebar {
-        flex: 0 0 clamp(220px, 18vw, 300px);
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        overflow-y: auto;
-        overscroll-behavior-y: contain;
-    }
-
-    /* The dock owns several nested Goal Details scrollers. Contain their native
-       overscroll while the page-level wheel guard handles boundary intent. */
-    :global(.landing-goal-dock) :global([class*="viewContainer"]),
-    :global(.landing-goal-dock) :global([class*="panelContent"]),
-    :global(.landing-goal-dock) :global([class*="modalScrollArea"]) {
-        overscroll-behavior-y: contain;
-    }
-
-    .goalViewCards {
-        grid-template-columns: 1fr;
-        gap: 12px;
-    }
-
-    .goalViewMain {
-        flex: 1;
-        min-width: 0;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .goalExplorer {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        margin-top: 0;
-    }
-
-    .goalTreeCanvas {
-        flex: 1;
-        height: auto;
-        min-height: 0;
-    }
-
-    .goalTreeUnlockHint {
-        top: 34px;
-        left: 292px;
-        max-width: min(300px, calc(100% - 312px));
-        font-size: var(--font-size-sm);
-    }
-
-    .betaSection {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(390px, 31vw);
-        align-items: center;
-        align-content: center;
-        gap: clamp(28px, 4vw, 76px);
-        padding-bottom: clamp(24px, 5vh, 64px);
-    }
-
-    .betaAudience {
-        align-self: center;
-    }
-
-    .betaAudience .sectionHeader h2 {
-        max-width: min(860px, 100%);
-        font-size: clamp(2.6rem, 3.9vw, 4.8rem);
-        line-height: 1;
-    }
-
-    .betaAudience .audienceGrid {
-        max-width: min(1060px, 100%);
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        margin-top: clamp(20px, 3.4vh, 40px);
-        gap: 14px;
-    }
-
-    .betaAudience .audienceCard {
-        min-height: 0;
-        padding: clamp(14px, 1.2vw, 18px);
-    }
-
-    .betaAudience .audienceCard h3 {
-        font-size: var(--font-size-lg);
-    }
-
-    .betaAudience .audienceCard p {
-        margin-top: 10px;
-        font-size: var(--font-size-sm);
-    }
-
-    .betaSignupPanel {
-        align-self: center;
-        max-width: 540px;
-        margin-left: auto;
-    }
-}
-
-/*
- * Short desktop viewports: sections may not fit one screen, so relax mandatory
- * snapping to proximity and let sections grow past the viewport.
- */
-@media (min-width: 981px) and (max-height: 720px) {
-    .page {
-        scroll-snap-type: x proximity;
-    }
-
-    .snapSection {
-        height: 100%;
-        min-height: 0;
-        overflow: hidden;
-    }
-}
-
-/* Tighten the hero so headline + example picker fit shorter screens. */
-@media (min-width: 981px) and (max-height: 820px) {
-    .heroCopy {
-        padding-top: clamp(28px, 6vh, 54px);
-    }
-
-    .hero h1 {
-        font-size: clamp(2.6rem, 6vw, 4.6rem);
-    }
-
-    .heroBodyPanel {
-        margin-top: clamp(18px, 4vh, 34px);
-        padding: 18px 22px;
-    }
-
-    .heroBodyPanel p {
-        font-size: clamp(1.05rem, 2vw, 1.4rem);
-    }
-
-    .exampleToggle button {
-        width: 108px;
-        height: 108px;
-    }
-
-    .heroExamplesPlaceholder {
-        height: 108px;
-    }
-
-    .exampleToggleIcon {
-        transform: scale(0.82);
+    .example:hover,
+    .example:focus-visible {
+        transform: none;
     }
 }

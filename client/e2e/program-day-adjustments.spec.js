@@ -1,4 +1,5 @@
 import { deviceOf, expect, test } from './support/clock.js';
+import { apiToken, openOrigin } from './support/session.js';
 
 // Create an isolated program so this workflow does not share scheduling state with other specs.
 test('move and remove recurring program days from the day sidebar', async ({ page }, testInfo) => {
@@ -8,14 +9,8 @@ test('move and remove recurring program days from the day sidebar', async ({ pag
     const later = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     const end = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
     await page.addInitScript(() => localStorage.setItem('fractal_timezone_preference', 'UTC'));
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    const loginResponse = page.waitForResponse((response) => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    const { token } = await (await loginResponse).json();
-    await expect(page.getByText('Browser Practice desktop').first()).toBeVisible();
+    await openOrigin(page);
+    const token = apiToken();
     const root = `browser-adjustments-root-${suffix}`;
     const created = await page.evaluate(async ({ root, today, end, token }) => {
         const response = await fetch(`/api/${root}/programs`, {

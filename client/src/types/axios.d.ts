@@ -11,5 +11,7 @@ declare module 'axios' {
         _retry?: boolean;
         /** Send time recorded by the connectivity probe (src/offline/connectivity.js). */
         _sentAt?: number;
+        /** Leave this request out of the server-warmth signal (src/offline/serverWarmth.js). */
+        _skipWarmth?: boolean;
     }
 }

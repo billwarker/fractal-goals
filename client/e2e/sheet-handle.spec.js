@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { openOrigin } from './support/session.js';
 
 const SHEETS = [
     { name: 'Sessions', path: 'browser-root-mobile/sessions', open: { name: 'Show Filters' } },
@@ -26,12 +27,7 @@ async function dragHandle(page, distance) {
 
 test('dragging the bar down closes each sidebar sheet; a short drag slides back', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'Bottom sheets are mobile only.');
-    await page.goto('/');
-    await page.getByText('LOG IN', { exact: true }).click();
-    await page.getByLabel('Username or Email').fill('browser_user');
-    await page.getByLabel('Password', { exact: true }).fill('BrowserTest123!');
-    await page.getByRole('button', { name: 'LOG IN', exact: true }).click();
-    await expect(page.getByText('Browser Practice mobile').first()).toBeVisible();
+    await openOrigin(page);
 
     for (const { name, path, open } of SHEETS) {
         await test.step(name, async () => {

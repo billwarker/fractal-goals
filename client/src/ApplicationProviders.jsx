@@ -12,22 +12,24 @@ import { OutboxProvider } from './offline/OutboxContext';
 // public landing experience. Keeping this composition in one place prevents
 // shared read-only components from losing a required context when entry points
 // are split for performance.
-export default function ApplicationProviders({ children }) {
+// `authProvider` swaps in the live demo's read-only guest (DemoAuthProvider).
+export default function ApplicationProviders({ children, authProvider = AuthProvider }) {
     return (
         <TimezoneProvider>
-            <AuthProvider>
-                <OutboxProvider>
-                    <OnboardingProvider>
-                        <GoalLevelsProvider>
-                            <GoalsProvider>
-                                <ThemeProvider>
+            {/* Theme sits above goal levels, whose colours adapt to the resolved theme. */}
+            {React.createElement(authProvider, null, (
+                <ThemeProvider>
+                    <OutboxProvider>
+                        <OnboardingProvider>
+                            <GoalLevelsProvider>
+                                <GoalsProvider>
                                     <ActivitiesProvider>{children}</ActivitiesProvider>
-                                </ThemeProvider>
-                            </GoalsProvider>
-                        </GoalLevelsProvider>
-                    </OnboardingProvider>
-                </OutboxProvider>
-            </AuthProvider>
+                                </GoalsProvider>
+                            </GoalLevelsProvider>
+                        </OnboardingProvider>
+                    </OutboxProvider>
+                </ThemeProvider>
+            ))}
         </TimezoneProvider>
     );
 }

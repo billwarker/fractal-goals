@@ -12,6 +12,7 @@ function HeaderButton({
         primary: styles.primary,
         secondary: styles.secondary,
         tertiary: styles.tertiary,
+        danger: styles.danger,
     }[variant] ?? styles.secondary;
 
     return (

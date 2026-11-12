@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { getChartNumbers, getChartTitle } from '../chartTitles';
 
 describe('chartTitles', () => {

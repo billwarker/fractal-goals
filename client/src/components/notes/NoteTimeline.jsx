@@ -4,7 +4,7 @@
  * Used on /notes page, goal detail modal, and session detail.
  */
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarIcon } from '../atoms/AppIcons';
 import GoalIcon from '../atoms/GoalIcon';
@@ -15,6 +15,7 @@ import NoteContextLine from './NoteContextLine';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { useTimezone } from '../../contexts/TimezoneContext';
 import styles from './NoteTimeline.module.css';
+import useTimelineLineGaps from './useTimelineLineGaps';
 
 function groupNotesByDate(notes, timezone) {
     const groups = [];
@@ -104,6 +105,7 @@ function TreeNode({ kind, children, color }) {
         <span
             className={`${styles.treeNode} ${styles[`${kind}Node`]}`}
             style={color ? { '--node-color': color } : undefined}
+            data-timeline-node=""
             aria-hidden="true"
         >
             {children}
@@ -165,6 +167,8 @@ function NoteTimeline({
 }) {
     const { timezone } = useTimezone();
     const { getGoalColor, getGoalIcon, getGoalSecondaryColor } = useGoalLevels();
+    const railRef = useRef(null);
+    useTimelineLineGaps(railRef, [notes, presentation, groupByDate, compact, minimal]);
 
     if (!notes.length) {
         return <div className={styles.emptyState}>{emptyMessage}</div>;
@@ -276,7 +280,7 @@ function NoteTimeline({
                             {sessionGroup.notes.length} {sessionGroup.notes.length === 1 ? 'note' : 'notes'}
                         </span>
                     </div>
-                    <div className={styles.sessionNotes}>
+                    <div className={styles.sessionNotes} data-timeline-line="">
                         {groupNotesByInstance(sessionGroup.notes).map((instanceGroup) => {
                             const [first] = instanceGroup.notes;
                             if (!instanceGroup.instanceId) return renderNote(first, true);
@@ -300,6 +304,7 @@ function NoteTimeline({
                 <div
                     key={`standalone-${sessionGroup.notes[0].id}`}
                     className={`${styles.standaloneNote} ${standaloneNode(sessionGroup.notes[0]) ? styles.withNode : ''}`}
+                    data-timeline-node={standaloneNode(sessionGroup.notes[0]) ? undefined : 'before'}
                 >
                     {standaloneNode(sessionGroup.notes[0])}
                     {renderNote(sessionGroup.notes[0])}
@@ -311,10 +316,14 @@ function NoteTimeline({
     return (
         <div className={`${styles.timeline} ${isTimeline ? styles.continuousTimeline : ''}`}>
             {/* Date-grouped notes; the timeline presentation draws one rail through them. */}
-            <div className={isTimeline ? styles.rail : undefined}>
+            <div
+                ref={isTimeline ? railRef : undefined}
+                className={isTimeline ? styles.rail : undefined}
+                data-timeline-line={isTimeline ? '' : undefined}
+            >
                 {groups.map(group => (
                     <div key={group.date} className={styles.dateGroup}>
-                        <div className={styles.dateHeader}>{group.date}</div>
+                        <div className={styles.dateHeader} data-timeline-node={isTimeline ? 'before' : undefined}>{group.date}</div>
                         <div className={isTimeline ? styles.dateNotes : undefined}>{renderDateNotes(group.notes)}</div>
                     </div>
                 ))}

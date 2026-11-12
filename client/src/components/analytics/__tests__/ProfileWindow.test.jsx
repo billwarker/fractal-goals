@@ -52,7 +52,7 @@ describe('ProfileWindow', () => {
             updateWindowState: vi.fn(),
         };
         const { rerender } = render(<ProfileWindow {...props} data={{ ...data, ...loadingState }} />);
-        expect(screen.getByRole('status')).toHaveTextContent('Loading');
+        expect(await screen.findByRole('status')).toHaveTextContent('Loading');
         expect(scatterPlot).not.toHaveBeenCalled();
         rerender(<ProfileWindow {...props} data={{ ...data, hasMoreEvidence: false }} />);
         await waitFor(() => expect(scatterPlot).toHaveBeenCalled());
@@ -73,7 +73,7 @@ describe('ProfileWindow', () => {
         expect(loadMoreEvidence).toHaveBeenCalledTimes(1);
     });
 
-    it('renders the selected activity scatter plot view', () => {
+    it('renders the selected activity scatter plot view', async () => {
         render(
             <ProfileWindow
                 data={{
@@ -109,7 +109,8 @@ describe('ProfileWindow', () => {
         );
 
         expect(screen.getByText('Metric Scatter Plot')).toBeInTheDocument();
-        expect(screen.getByText('Scatter Plot')).toBeInTheDocument();
+        // The chart is lazy-loaded.
+        expect(await screen.findByText('Scatter Plot')).toBeInTheDocument();
         expect(scatterPlot).toHaveBeenCalledWith(expect.objectContaining({
             selectedActivity: expect.objectContaining({ id: 'activity-1', name: 'Squat' }),
             selectedMetricX: expect.objectContaining({ id: 'reps' }),
@@ -325,7 +326,7 @@ describe('ProfileWindow', () => {
             canSplit
             onSplit={onSplit}
         />);
-        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split', exact: true }));
+        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split panel', exact: true }));
         const item = () => screen.queryByRole('button', { name: 'Split Vertical' });
 
         open();

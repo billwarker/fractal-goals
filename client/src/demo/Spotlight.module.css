@@ -1,0 +1,19 @@
+.ring {
+    position: fixed;
+    z-index: calc(var(--z-toast) - 11);
+    border: 2px solid var(--color-brand-primary);
+    border-radius: var(--border-radius-md);
+    box-shadow: 0 0 0 9999px color-mix(in srgb, var(--color-scrim) 45%, transparent);
+    pointer-events: none;
+    transition:
+        top var(--duration-slow) var(--ease-standard),
+        left var(--duration-slow) var(--ease-standard),
+        width var(--duration-slow) var(--ease-standard),
+        height var(--duration-slow) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ring {
+        transition: none;
+    }
+}

@@ -1,3 +1,4 @@
+// @vitest-environment node
 import * as model from '../prescriptionModel';
 import {
     MAX_PRESCRIPTION_SETS,

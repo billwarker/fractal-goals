@@ -3,17 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ACCOUNT_TIERS, DEFAULT_ACCOUNT_TIER } from '../constants/accountTiers';
 import BetaSignupsPanel from '../components/admin/BetaSignupsPanel';
-import LandingActivitySpotlightPicker from '../components/admin/LandingActivitySpotlightPicker';
-import LandingExampleOrderControls from '../components/admin/LandingExampleOrderControls';
-import { LandingPublicationSummary, LandingPublicDataNotice } from '../components/admin/LandingPublicationStatus';
+import LiveDemoPanel from '../components/admin/LiveDemoPanel';
 import TierQuotasPanel from '../components/admin/TierQuotasPanel';
 import UsagePanel from '../components/admin/UsagePanel';
-import LandingGoalsEditor, {
-    getLandingContentDraftIssues,
-    getLandingExamplePublishIssues,
-    LANDING_CONTENT_TABS,
-    normalizeLandingContent,
-} from '../components/admin/LandingGoalsEditor';
 import { useAuth } from '../contexts/AuthContext';
 import CloseButton from '../components/atoms/CloseButton';
 import ModalBackdrop from '../components/atoms/ModalBackdrop';
@@ -21,18 +13,13 @@ import { queryKeys } from '../hooks/queryKeys';
 import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
-import { getLandingPageHref } from '../utils/marketingHost';
-import {
-    LANDING_TREE_VIEW_SETTING_OPTIONS,
-    normalizeLandingTreeViewSettings,
-} from '../utils/landingTreeViewSettings';
+import LoadingState from '../components/common/LoadingState';
 import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
 const ADMIN_INVITES_KEY = ['admin', 'invite-keys'];
 const ADMIN_TIER_QUOTAS_KEY = ['admin', 'tier-quotas'];
 const ADMIN_FEATURE_FLAGS_KEY = ['admin', 'feature-flags'];
-const ADMIN_LANDING_EXAMPLES_KEY = ['admin', 'landing-examples'];
 const QUOTA_PLACEHOLDER = '{"goals": 100, "sessions": 500}';
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'Never';
 const formatLockStatus = (user) => user?.locked_until
@@ -119,454 +106,6 @@ function StorageEditor({ user }) {
         </div>
     );
 }
-const EMPTY_LANDING_SHOWCASE = {
-    session_id: null,
-    activity_ids: [],
-    program_id: null,
-    program_start_date: null,
-    program_end_date: null,
-    analytics_view_ids: [],
-};
-const LANDING_SHOWCASE_ANALYTICS_VIEW_CAP = 3;
-const normalizeShowcase = (showcase) => ({
-    ...EMPTY_LANDING_SHOWCASE,
-    ...(showcase || {}),
-    activity_ids: (showcase?.activity_ids || []).slice(0, 1),
-    analytics_view_ids: (showcase?.analytics_view_ids || []).slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP),
-});
-function LandingExampleShowcaseEditor({
-    example,
-    onShowcaseChange,
-    onTreeViewSettingsChange,
-    onContentChange,
-}) {
-    const [expanded, setExpanded] = useState(false);
-    const [activeTab, setActiveTab] = useState('goals');
-    const showcase = normalizeShowcase(example.showcase);
-    const publishIssueCount = getLandingExamplePublishIssues(example).length;
-    const optionsQuery = useQuery({
-        queryKey: ['admin', 'landing-example-options', example.root_id],
-        queryFn: async () => (await adminApi.getLandingExampleOptions(example.root_id)).data,
-        enabled: expanded,
-        staleTime: 60 * 1000,
-    });
-    const options = optionsQuery.data;
-    const update = (patch) => onShowcaseChange(example.root_id, { ...showcase, ...patch });
-    const toggleAnalyticsView = (viewId) => {
-        const next = showcase.analytics_view_ids.includes(viewId)
-            ? showcase.analytics_view_ids.filter((id) => id !== viewId)
-            : [...showcase.analytics_view_ids, viewId].slice(0, LANDING_SHOWCASE_ANALYTICS_VIEW_CAP);
-        update({ analytics_view_ids: next });
-    };
-    const selectedProgram = (options?.programs || []).find((program) => program.id === showcase.program_id) || null;
-    return (
-        <div className={styles.landingShowcaseEditor}>
-            <button
-                type="button"
-                className={styles.landingShowcaseToggle}
-                onClick={() => setExpanded((current) => !current)}
-                aria-expanded={expanded}
-            >
-                {expanded ? '▾' : '▸'} Landing page content
-                <span className={publishIssueCount === 0 ? styles.landingShowcaseReady : styles.landingShowcaseIssues}
-                    aria-live="polite">
-                    {publishIssueCount} {publishIssueCount === 1 ? 'issue' : 'issues'} blocking publish
-                </span>
-            </button>
-            {expanded && (
-                optionsQuery.isLoading ? (
-                    <div className={styles.status}>Loading showcase options...</div>
-                ) : optionsQuery.isError ? (
-                    <div className={styles.status}>Failed to load showcase options.</div>
-                ) : (
-                    <div className={styles.landingShowcaseFields}>
-                        <div className={styles.landingContentTabs} role="tablist" aria-label="Landing page sections">
-                            {LANDING_CONTENT_TABS.map((tab) => (
-                                <button
-                                    type="button"
-                                    role="tab"
-                                    aria-selected={activeTab === tab}
-                                    className={activeTab === tab ? styles.landingContentTabActive : ''}
-                                    onClick={() => setActiveTab(tab)}
-                                    key={tab}
-                                >
-                                    {tab[0].toUpperCase() + tab.slice(1)}
-                                </button>
-                            ))}
-                        </div>
-                        {activeTab === 'goals' && <>
-                            <fieldset>
-                                <legend>Goal tree viewer defaults</legend>
-                                <p className={styles.landingInteractionHint}>
-                                    Checked options start enabled whenever visitors select this example.
-                                </p>
-                                {LANDING_TREE_VIEW_SETTING_OPTIONS.map(({ key, label }) => (
-                                    <label className={styles.landingShowcaseCheck} key={key}>
-                                        <input
-                                            type="checkbox"
-                                            checked={example.tree_view_settings?.[key] === true}
-                                            onChange={(event) => onTreeViewSettingsChange(example.root_id, {
-                                                ...normalizeLandingTreeViewSettings(example.tree_view_settings),
-                                                [key]: event.target.checked,
-                                            })}
-                                        />
-                                        <span>{label}</span>
-                                    </label>
-                                ))}
-                            </fieldset>
-                            <LandingGoalsEditor content={example.landing_content}
-                                options={options} styles={styles}
-                                onChange={(value) => onContentChange(example.root_id, value)} />
-                        </>}
-                        {activeTab === 'sessions' && <label>
-                            <span>Featured session</span>
-                            <select
-                                value={showcase.session_id || ''}
-                                onChange={(event) => update({ session_id: event.target.value || null })}
-                            >
-                                <option value="">Auto (most recent)</option>
-                                {(options?.sessions || []).map((session) => (
-                                    <option
-                                        value={session.id}
-                                        key={session.id}
-                                        disabled={session.activity_instance_count === 0}
-                                    >
-                                        {session.name} — {session.session_start ? new Date(session.session_start).toLocaleDateString() : 'undated'}
-                                        {session.activity_instance_count === 0 ? ' — no activities' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>}
-                        {activeTab === 'activities' && (
-                            (options?.activities || []).length === 0
-                                ? <div className={styles.status}>No activities in this fractal.</div>
-                                : <LandingActivitySpotlightPicker
-                                    activities={options?.activities || []}
-                                    activityGroups={options?.activity_groups || []}
-                                    selectedActivityId={showcase.activity_ids[0] || null}
-                                    onChange={(activityId) => update({ activity_ids: activityId ? [activityId] : [] })}
-                                />
-                        )}
-                        {activeTab === 'programs' && <>
-                        <label>
-                            <span>Featured program</span>
-                            <select
-                                value={showcase.program_id || ''}
-                                onChange={(event) => {
-                                    const programId = event.target.value || null;
-                                    const program = (options?.programs || []).find((item) => item.id === programId);
-                                    update({
-                                        program_id: programId,
-                                        program_start_date: program?.start_date?.slice(0, 10) || null,
-                                        program_end_date: program?.end_date?.slice(0, 10) || null,
-                                    });
-                                }}
-                            >
-                                <option value="">Auto (first program)</option>
-                                {(options?.programs || []).map((program) => (
-                                    <option value={program.id} key={program.id}>{program.name}</option>
-                                ))}
-                            </select>
-                        </label>
-                        {showcase.program_id && (
-                            <div className={styles.landingShowcaseDates}>
-                                <label>
-                                    <span>Window start</span>
-                                    <input
-                                        type="date"
-                                        value={showcase.program_start_date || ''}
-                                        min={selectedProgram?.start_date?.slice(0, 10)}
-                                        max={showcase.program_end_date || selectedProgram?.end_date?.slice(0, 10)}
-                                        onChange={(event) => update({ program_start_date: event.target.value || null })}
-                                    />
-                                </label>
-                                <label>
-                                    <span>Window end</span>
-                                    <input
-                                        type="date"
-                                        value={showcase.program_end_date || ''}
-                                        min={showcase.program_start_date || selectedProgram?.start_date?.slice(0, 10)}
-                                        max={selectedProgram?.end_date?.slice(0, 10)}
-                                        onChange={(event) => update({ program_end_date: event.target.value || null })}
-                                    />
-                                </label>
-                            </div>
-                        )}
-                        </>}
-                        {activeTab === 'analytics' && <fieldset>
-                            <legend>Analytics views (max {LANDING_SHOWCASE_ANALYTICS_VIEW_CAP})</legend>
-                            {(options?.analytics_views || []).length === 0 && (
-                                <div className={styles.status}>No saved analytics views in this fractal.</div>
-                            )}
-                            {(options?.analytics_views || []).map((view) => {
-                                const checked = showcase.analytics_view_ids.includes(view.id);
-                                const capped = !checked
-                                    && showcase.analytics_view_ids.length >= LANDING_SHOWCASE_ANALYTICS_VIEW_CAP;
-                                return (
-                                    <label className={styles.landingShowcaseCheck} key={view.id}>
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            disabled={capped}
-                                            onChange={() => toggleAnalyticsView(view.id)}
-                                        />
-                                        <span>{view.name || 'Untitled analytics view'}</span>
-                                    </label>
-                                );
-                            })}
-                        </fieldset>}
-                    </div>
-                )
-            )}
-        </div>
-    );
-}
-function LandingExamplesPanel() {
-    const queryClient = useQueryClient();
-    const [draftExamples, setDraftExamples] = useState([]);
-    const landingExamplesQuery = useQuery({
-        queryKey: ADMIN_LANDING_EXAMPLES_KEY,
-        queryFn: async () => (await adminApi.getLandingExamples()).data,
-    });
-    React.useEffect(() => {
-        if (!landingExamplesQuery.data) return;
-        setDraftExamples((landingExamplesQuery.data.examples || []).map((example, index) => ({
-            root_id: example.root_id,
-            label: example.label,
-            sort_order: example.sort_order ?? index,
-            showcase: normalizeShowcase(example.showcase),
-            tree_view_settings: normalizeLandingTreeViewSettings(example.tree_view_settings),
-            landing_content: normalizeLandingContent(example.landing_content),
-        })));
-    }, [landingExamplesQuery.data]);
-    const eligibleFractals = landingExamplesQuery.data?.eligible_fractals || [];
-    const selectedRootIds = new Set(draftExamples.map((example) => example.root_id));
-    const sortedDraftExamples = [...draftExamples].sort((left, right) => (
-        (left.sort_order ?? 0) - (right.sort_order ?? 0)
-    ));
-    const normalizeDraft = (examples) => examples.map((example, index) => ({
-        root_id: example.root_id,
-        label: example.label,
-        sort_order: index,
-        showcase: normalizeShowcase(example.showcase),
-        tree_view_settings: normalizeLandingTreeViewSettings(example.tree_view_settings),
-        landing_content: normalizeLandingContent(example.landing_content),
-    }));
-    const updateMutation = useMutation({
-        mutationFn: (examples) => adminApi.updateLandingExamples({ examples: normalizeDraft(examples) }),
-        onSuccess: (res) => {
-            queryClient.setQueryData(ADMIN_LANDING_EXAMPLES_KEY, res.data);
-            notify.success('Landing examples saved');
-        },
-        onError: (error) => notify.error(`Failed to save landing examples: ${formatError(error)}`),
-    });
-    const publishMutation = useMutation({
-        mutationFn: () => adminApi.publishLandingExamples({ examples: normalizeDraft(sortedDraftExamples) }),
-        onSuccess: (res) => {
-            const resolvedExamples = normalizeDraft(res.data.examples || sortedDraftExamples);
-            setDraftExamples(resolvedExamples);
-            queryClient.setQueryData(ADMIN_LANDING_EXAMPLES_KEY, (current) => ({
-                ...(current || {}),
-                examples: resolvedExamples,
-                published_at: res.data.published_at,
-                published_example_count: res.data.published_example_count,
-                delivery: {
-                    revision: res.data.revision,
-                    status: res.data.static_snapshot === 'ok' ? 'delivered' : 'database_only',
-                    published_at: res.data.published_at,
-                    snapshot_bytes: res.data.snapshot_bytes,
-                    compressed_snapshot_bytes: res.data.compressed_snapshot_bytes,
-                },
-            }));
-            notify.success(
-                res.data.static_snapshot === 'ok'
-                    ? 'Landing examples published and delivered to the static site'
-                    : 'Landing examples published to the API cache',
-            );
-            (res.data.showcase_warnings || []).forEach((warning) => notify.warning(warning));
-        },
-        onError: (error) => notify.error(`Failed to publish landing examples: ${formatError(error)}`),
-    });
-    const updateShowcase = (rootId, showcase) => {
-        setDraftExamples((current) => current.map((example) => (
-            example.root_id === rootId ? { ...example, showcase: normalizeShowcase(showcase) } : example
-        )));
-    };
-    const updateLandingContent = (rootId, landingContentValue) => {
-        setDraftExamples((current) => current.map((example) => (
-            example.root_id === rootId
-                ? { ...example, landing_content: normalizeLandingContent(landingContentValue) }
-                : example
-        )));
-    };
-    const updateTreeViewSettings = (rootId, treeViewSettings) => {
-        setDraftExamples((current) => current.map((example) => (
-            example.root_id === rootId
-                ? { ...example, tree_view_settings: normalizeLandingTreeViewSettings(treeViewSettings) }
-                : example
-        )));
-    };
-    const addExample = (fractal) => {
-        setDraftExamples((current) => normalizeDraft([
-            ...current,
-            {
-                root_id: fractal.root_id,
-                label: fractal.name,
-                sort_order: current.length,
-                landing_content: normalizeLandingContent(),
-            },
-        ]));
-    };
-    const removeExample = (rootId) => {
-        setDraftExamples((current) => normalizeDraft(current.filter((example) => example.root_id !== rootId)));
-    };
-    const moveExample = (rootId, direction) => {
-        setDraftExamples((current) => {
-            const next = normalizeDraft([...current]);
-            const index = next.findIndex((example) => example.root_id === rootId);
-            const targetIndex = index + direction;
-            if (index < 0 || targetIndex < 0 || targetIndex >= next.length) return current;
-            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-            return normalizeDraft(next);
-        });
-    };
-    const updateLabel = (rootId, label) => {
-        setDraftExamples((current) => current.map((example) => (
-            example.root_id === rootId ? { ...example, label } : example
-        )));
-    };
-    const draftIssues = sortedDraftExamples.flatMap((example) => [
-        ...(!example.label.trim() ? ['Add a public label'] : []),
-        ...getLandingContentDraftIssues(example.landing_content),
-    ]);
-    const publishIssues = sortedDraftExamples.map((example) => ({
-        rootId: example.root_id,
-        label: example.label.trim() || eligibleFractals.find((item) => item.root_id === example.root_id)?.name || example.root_id,
-        issues: getLandingExamplePublishIssues(example),
-    })).filter((example) => example.issues.length > 0);
-    const canSave = draftIssues.length === 0;
-    const canPublish = sortedDraftExamples.length > 0 && publishIssues.length === 0;
-    if (landingExamplesQuery.isLoading) {
-        return <div className={styles.status}>Loading landing examples...</div>;
-    }
-    if (landingExamplesQuery.isError) {
-        return <div className={styles.status}>Failed to load landing examples.</div>;
-    }
-    return (
-        <section className={styles.section}>
-            <div className={styles.landingExamplesHeader}>
-                <div>
-                    <h2>Landing Examples</h2>
-                    <p>Choose admin-owned fractals to publish as read-only examples on the public landing page.</p>
-                    <a className={styles.landingExamplesPageLink} href={getLandingPageHref()} target="_blank" rel="noreferrer">
-                        View landing page
-                    </a>
-                </div>
-                <LandingPublicationSummary
-                    publishedAt={landingExamplesQuery.data?.published_at}
-                    publishedCount={landingExamplesQuery.data?.published_example_count}
-                    delivery={landingExamplesQuery.data?.delivery} />
-            </div>
-            <div className={styles.landingExamplesGrid}>
-                <div className={styles.landingExamplesPanel}>
-                    <div className={styles.landingExamplesPanelHeader}>
-                        <h3>Selected examples</h3>
-                        <span>{sortedDraftExamples.length} selected</span>
-                    </div>
-                    {sortedDraftExamples.length === 0 ? (
-                        <div className={styles.status}>No landing examples selected.</div>
-                    ) : (
-                        <div className={styles.landingExampleList}>
-                            {sortedDraftExamples.map((example, index) => {
-                                const fractal = eligibleFractals.find((item) => item.root_id === example.root_id);
-                                return (
-                                    <div className={styles.landingExampleItem} key={example.root_id}>
-                                        <LandingExampleOrderControls
-                                            example={example}
-                                            index={index}
-                                            total={sortedDraftExamples.length}
-                                            name={fractal?.name || 'Missing fractal'}
-                                            onMove={moveExample}
-                                            onRemove={removeExample}
-                                            styles={styles}
-                                        />
-                                        <label>
-                                            <span>Public label</span>
-                                            <input
-                                                value={example.label}
-                                                onChange={(event) => updateLabel(example.root_id, event.target.value)}
-                                            />
-                                        </label>
-                                        <LandingExampleShowcaseEditor
-                                            example={example}
-                                            onShowcaseChange={updateShowcase}
-                                            onTreeViewSettingsChange={updateTreeViewSettings}
-                                            onContentChange={updateLandingContent}
-                                        />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    <div className={styles.landingExamplesFooter}>
-                        <LandingPublicDataNotice />
-                        <div className={styles.landingPublishReadiness} role="status" aria-live="polite">
-                            {sortedDraftExamples.length === 0 ? (
-                                <span>Select at least one fractal before publishing.</span>
-                            ) : canPublish ? (
-                                <span className={styles.landingPublishReady}>Ready to publish {sortedDraftExamples.length} example{sortedDraftExamples.length === 1 ? '' : 's'}.</span>
-                            ) : (
-                                <>
-                                    <strong>Publishing needs {publishIssues.reduce((total, example) => total + example.issues.length, 0)} more selection{publishIssues.reduce((total, example) => total + example.issues.length, 0) === 1 ? '' : 's'}:</strong>
-                                    <ul>
-                                        {publishIssues.map((example) => (
-                                            <li key={example.rootId}><strong>{example.label}:</strong> {example.issues.join('; ')}</li>
-                                        ))}
-                                    </ul>
-                                </>
-                            )}
-                        </div>
-                        <button
-                            onClick={() => updateMutation.mutate(sortedDraftExamples)}
-                            disabled={updateMutation.isPending || !canSave}
-                        >
-                            {updateMutation.isPending ? 'Saving...' : 'Save Draft'}
-                        </button>
-                        <button
-                            onClick={() => publishMutation.mutate()}
-                            disabled={publishMutation.isPending || !canPublish}
-                            title={canPublish ? undefined : 'Complete the publishing requirements shown above'}
-                        >
-                            {publishMutation.isPending ? 'Publishing...' : 'Publish'}
-                        </button>
-                    </div>
-                </div>
-                <div className={styles.landingExamplesPanel}>
-                    <div className={styles.landingExamplesPanelHeader}>
-                        <h3>Eligible admin fractals</h3>
-                        <span>{eligibleFractals.length} available</span>
-                    </div>
-                    <div className={styles.landingExampleList}>
-                        {eligibleFractals.map((fractal) => (
-                            <div className={styles.landingFractalOption} key={fractal.root_id}>
-                                <div>
-                                    <strong>{fractal.name}</strong>
-                                    <span>Updated {formatDate(fractal.updated_at)}</span>
-                                </div>
-                                <button
-                                    onClick={() => addExample(fractal)}
-                                    disabled={selectedRootIds.has(fractal.root_id)}
-                                >
-                                    {selectedRootIds.has(fractal.root_id) ? 'Selected' : 'Add'}
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
-}
 function FeatureFlagsPanel() {
     const queryClient = useQueryClient();
     const featureFlagsQuery = useQuery({
@@ -583,7 +122,7 @@ function FeatureFlagsPanel() {
         onError: (error) => notify.error(`Failed to update feature flag: ${formatError(error)}`),
     });
     if (featureFlagsQuery.isLoading) {
-        return <div className={styles.status}>Loading feature flags...</div>;
+        return <LoadingState label="Loading feature flags…" />;
     }
     if (featureFlagsQuery.isError) {
         return <div className={styles.status}>Failed to load feature flags.</div>;
@@ -1106,7 +645,7 @@ function Admin() {
             ['Invite Keys', summary.invite_keys?.available || 0],
         ];
     }, [summaryQuery.data]);
-    if (loading) return <div className={styles.status}>Loading...</div>;
+    if (loading) return <LoadingState variant="page" label="Loading admin overview…" />;
     if (!user?.is_admin) return <Navigate to="/" replace />;
     return (
         <div className={styles.container}>
@@ -1118,7 +657,7 @@ function Admin() {
                 <Link to="/" className={styles.homeLink}>Home</Link>
             </header>
             <div className={styles.tabs}>
-                {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'landing', 'invite keys'].map((item) => (
+                {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'live demo', 'invite keys'].map((item) => (
                     <button
                         key={item}
                         className={tab === item ? styles.activeTab : ''}
@@ -1224,8 +763,8 @@ function Admin() {
             {tab === 'feature flags' && (
                 <FeatureFlagsPanel />
             )}
-            {tab === 'landing' && (
-                <LandingExamplesPanel />
+            {tab === 'live demo' && (
+                <LiveDemoPanel />
             )}
             {tab === 'invite keys' && (
                 <section className={styles.section}>

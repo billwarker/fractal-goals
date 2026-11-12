@@ -9,6 +9,7 @@ import useJustCreatedGoal from '../../hooks/useJustCreatedGoal';
 import { useSessionGoalsViewModel } from '../../hooks/useSessionGoalsViewModel';
 import { prefillConditionFromInstance } from '../../utils/goalConditions';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import LoadingState from '../common/LoadingState';
 import HierarchySection from './HierarchySection';
 import styles from './SessionGoalHierarchyPanel.module.css';
 import { logError } from '../../utils/logger';
@@ -40,6 +41,7 @@ function SessionGoalHierarchyPanel({
         activityGroups,
         conditionProgressByGoalId,
         sessionGoalsView,
+        sessionGoalsViewLoading,
     } = useActiveSessionData();
     const { createGoal, updateSession } = useActiveSessionActions();
     const queryClient = useQueryClient();
@@ -196,7 +198,10 @@ function SessionGoalHierarchyPanel({
                         scopedActivityName={scopedActivityName}
                         onAdjustScope={!readOnly && !selectedActivity ? () => setScopeModalOpen(true) : undefined}
                     />
-                    {displayHierarchy.length === 0 && (
+                    {displayHierarchy.length === 0 && sessionGoalsViewLoading && (
+                        <LoadingState label="Loading goals…" />
+                    )}
+                    {displayHierarchy.length === 0 && !sessionGoalsViewLoading && (
                         <div className={styles.emptyState}>
                             No goals associated with this session.
                             <br />
@@ -209,7 +214,7 @@ function SessionGoalHierarchyPanel({
             </div>
 
             {!readOnly && createSubGoalParent && createPortal(
-                <React.Suspense fallback={<div>Loading Details...</div>}>
+                <React.Suspense fallback={<LoadingState label="Loading goal details…" />}>
                     <GoalDetailModal
                         isOpen={Boolean(createSubGoalParent)}
                         onClose={() => setCreateSubGoalParent(null)}

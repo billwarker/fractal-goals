@@ -17,6 +17,7 @@ from services.serializers import serialize_user
 from services.admin_service import AdminService
 from services.quota_service import DEFAULT_STORAGE_LIMIT_BYTES, QuotaService
 from services.service_types import JsonDict, ServiceResult
+from services.demo_account_service import DEMO_ACCOUNT_ROLE
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
@@ -376,6 +377,11 @@ class AuthService:
         if not user:
             logger.warning("Failed login: unknown identifier=%s", data['username_or_email'])
             log_ops_event("auth.login_failed", level="warning", reason="unknown_user")
+            return None, "Invalid username or password", 401
+
+        if user.role == DEMO_ACCOUNT_ROLE:
+            # The demo account owns the live demo's snapshots; nobody signs in to it.
+            log_ops_event("auth.login_failed", level="warning", reason="demo_account")
             return None, "Invalid username or password", 401
 
         if not user.is_active:

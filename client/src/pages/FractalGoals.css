@@ -422,6 +422,22 @@
     outline: none;
 }
 
+/* Touch screens: 32px tap boxes for the tree's icon toggles (the toolbar's gap shrinks to match,
+   so the row keeps its width). */
+@media (pointer: coarse) {
+    .mobile-goals-view-toggle,
+    .mobile-goals-view-toolbar-integrated .mobile-goals-view-toggle,
+    .flowtree-options-minimize-btn {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+    }
+
+    .mobile-goals-view-toolbar-integrated {
+        gap: 8px;
+    }
+}
+
 .type-to-zoom-palette {
     position: absolute;
     top: 20px;
