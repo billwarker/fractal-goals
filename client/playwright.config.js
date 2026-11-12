@@ -50,7 +50,9 @@ export default defineConfig({
     testDir: './e2e',
     fullyParallel: true,
     forbidOnly: Boolean(process.env.CI),
-    retries: 0,
+    // A sweep capture is retried once: a real finding fails both attempts, a stalled page load
+    // on a busy runner doesn't fail the run. Workflow specs never retry.
+    retries: sweeping ? 1 : 0,
     workers: sweeping ? 4 : 2,
     timeout: sweeping ? 60_000 : 30_000,
     // Assertions wait up to 10 s: first loads after a fresh server and parallel browsers can

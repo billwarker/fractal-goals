@@ -2,6 +2,7 @@ import React, { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, u
 import { useLocation, useParams } from 'react-router-dom';
 
 import ViewToggleTabs from '../components/common/ViewToggleTabs';
+import ProgramPageTitle from '../components/programs/ProgramPageTitle';
 import DeleteProgramModal from '../components/modals/DeleteProgramModal';
 import ProgramBuilder from '../components/modals/ProgramBuilder';
 import ProgramBlocksPanel from '../components/programs/ProgramBlocksPanel';
@@ -353,31 +354,12 @@ function ProgramCalendarPage() {
     const contextBlock = displayProgram
         ? sortedBlocks.find((block) => isProgramActive(block, contextDate))
         : null;
-    const contextBlockColor = contextBlock?.color || 'var(--color-brand-primary)';
-    const pageTitleParts = [
-        displayProgram?.name ? {
-            key: 'program',
-            label: displayProgram.name,
-            style: displayProgramColor ? { color: displayProgramColor } : undefined,
-        } : null,
-        contextBlock?.name ? {
-            key: 'block',
-            label: contextBlock.name,
-            style: { color: contextBlockColor },
-        } : null,
-        { key: 'date', label: selectedTimeframeLabel || selectedRangeText || selectedDateText },
-    ].filter(Boolean);
     const pageTitle = (
-        <span className={styles.headerTitleSegments}>
-            {pageTitleParts.map((part, index) => (
-                <React.Fragment key={part.key}>
-                    {index > 0 ? <span className={styles.headerTitleSeparator}>•</span> : null}
-                    <span className={styles.headerTitleSegment} style={part.style}>
-                        {part.label}
-                    </span>
-                </React.Fragment>
-            ))}
-        </span>
+        <ProgramPageTitle
+            program={displayProgram?.name ? { name: displayProgram.name, color: displayProgramColor } : null}
+            block={contextBlock?.name ? { name: contextBlock.name, color: contextBlock.color } : null}
+            dateLabel={selectedTimeframeLabel || selectedRangeText || selectedDateText}
+        />
     );
     // Keep the program's full date span and status beneath the contextual title.
     const programMeta = displayProgram ? (

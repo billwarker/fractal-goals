@@ -48,7 +48,8 @@
 }
 
 .selectedState {
-    color: var(--color-brand-success);
+    /* Green pulled toward the ink so it reads on the selected card tint. */
+    color: color-mix(in srgb, var(--color-brand-success) 70%, var(--color-text-primary));
     font-size: 12px;
     font-weight: 700;
     white-space: nowrap;

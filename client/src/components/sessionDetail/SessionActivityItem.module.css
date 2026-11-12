@@ -1507,3 +1507,31 @@
         overflow-wrap: anywhere;
     }
 }
+
+/* Touch screens: the reorder arrows and set remover get thumb-sized boxes. */
+@media (pointer: coarse) {
+    .reorderButton {
+        width: 36px;
+        height: 30px;
+    }
+
+    .removeSetButton {
+        min-width: 40px;
+        min-height: 40px;
+    }
+}
+
+/* Phones: a full date-time at the 16px phone field size doesn't fit three across, so the
+   start, stop and duration fields stack, each full width. */
+@media (max-width: 480px) {
+    .timerMetaColumn,
+    :global([data-session-detail-content]) .timerMetaColumn {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        width: 100%;
+    }
+
+    .timerInput {
+        width: 100%;
+    }
+}

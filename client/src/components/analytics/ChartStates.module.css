@@ -1,17 +1,8 @@
 .loading {
     flex: 1;
-    align-items: stretch;
     height: 100%;
     min-height: 120px;
     padding: 16px;
-}
-
-/* The shared chart skeleton fills the chart's panel instead of its default height. */
-.loading > div[aria-hidden='true'] {
-    flex: 1;
-    max-width: none;
-    height: auto;
-    min-height: 60px;
 }
 
 .label,

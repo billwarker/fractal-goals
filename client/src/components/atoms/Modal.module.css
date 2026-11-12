@@ -159,3 +159,45 @@
         padding: 12px;
     }
 }
+
+/* Phones: a bottom sheet by default (mobilePresentation="sheet"), or full screen. */
+@media (max-width: 768px) {
+    .sheetOverlay {
+        align-items: flex-end;
+        padding-right: 0;
+        padding-bottom: 0;
+        padding-left: 0;
+    }
+
+    .sheet {
+        width: 100%;
+        max-width: none;
+        max-height: min(92dvh, var(--modal-available-height));
+    }
+
+    .sheet .content {
+        max-height: min(92dvh, var(--modal-available-height));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border-bottom-right-radius: 0;
+        border-bottom-left-radius: 0;
+    }
+
+    .fullscreenOverlay {
+        padding: 0;
+    }
+
+    .fullscreen {
+        width: 100%;
+        max-width: none;
+        height: var(--modal-viewport-height, var(--app-viewport-height, 100dvh));
+        max-height: none;
+    }
+
+    .fullscreen .content {
+        height: 100%;
+        max-height: none;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border-radius: 0;
+    }
+}

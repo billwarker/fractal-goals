@@ -14,16 +14,17 @@
     white-space: nowrap;
 }
 
+/* Coloured text on its own tint falls below 4.5:1; the border and tint carry the state. */
 .active {
     border-color: color-mix(in srgb, var(--color-brand-success) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-brand-success) 16%, transparent);
-    color: var(--color-brand-success);
+    background: color-mix(in srgb, var(--color-brand-success) 12%, transparent);
+    color: var(--color-text-primary);
 }
 
 .upcoming {
     border-color: color-mix(in srgb, var(--color-brand-primary) 62%, var(--color-border));
-    background: color-mix(in srgb, var(--color-brand-primary) 14%, transparent);
-    color: var(--color-brand-primary);
+    background: color-mix(in srgb, var(--color-brand-primary) 12%, transparent);
+    color: var(--color-text-primary);
 }
 
 .completed {

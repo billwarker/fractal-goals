@@ -1,5 +1,7 @@
 // @vitest-environment node
 import {
+    DARK_THEME_CARD,
+    LIGHT_THEME_CANVAS,
     LIGHT_THEME_CARD,
     LIGHT_THEME_MIN_CONTRAST,
     adaptColorForTheme,
@@ -25,8 +27,20 @@ describe('contrastRatio', () => {
 });
 
 describe('adaptColorForTheme', () => {
-    it('keeps stored colours in the dark theme', () => {
+    it('keeps colours that already read in the dark theme', () => {
         for (const color of DEFAULT_LEVEL_COLORS) expect(adaptColorForTheme(color, 'dark')).toBe(color);
+    });
+
+    it('lightens a colour too dark for the dark theme, keeping its hue', () => {
+        const navy = adaptColorForTheme('#1a237e', 'dark');
+        expect(contrastRatio(navy, DARK_THEME_CARD)).toBeGreaterThanOrEqual(LIGHT_THEME_MIN_CONTRAST);
+        const [r, , b] = parseHex(navy);
+        expect(b).toBeGreaterThan(r);
+    });
+
+    it('holds text colours to 4.5:1 on every surface', () => {
+        expect(contrastRatio(adaptColorForTheme('#f59f4d', 'light', 4.5), LIGHT_THEME_CANVAS)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(adaptColorForTheme('#2d3a8c', 'dark', 4.5), DARK_THEME_CARD)).toBeGreaterThanOrEqual(4.5);
     });
 
     it.each(DEFAULT_LEVEL_COLORS)('makes %s visible on light cards', (color) => {
@@ -58,7 +72,8 @@ describe('adaptColorForTheme', () => {
         expect(adaptColorForTheme(undefined, 'light')).toBeUndefined();
     });
 
-    it('falls back to black when nothing else reaches the target', () => {
-        expect(ensureContrast('#ffffff', '#000000', 22)).toBe('#000000');
+    it('falls back to black on light surfaces and white on dark ones when nothing else reaches the target', () => {
+        expect(ensureContrast('#777777', '#ffffff', 22)).toBe('#000000');
+        expect(ensureContrast('#777777', '#000000', 22)).toBe('#ffffff');
     });
 });

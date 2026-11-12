@@ -287,7 +287,7 @@ function ManageActivities() {
     };
 
     if (activitiesLoading || activityGroupsLoading || circuitsLoading) {
-        return <LoadingState variant="page" skeleton="cards" label="Loading activities…" />;
+        return <LoadingState variant="page" label="Loading activities…" />;
     }
 
     // Recursive Group Renderer

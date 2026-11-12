@@ -3,7 +3,6 @@ import React from 'react';
 import useLoadEscalation from '../../hooks/useLoadEscalation';
 import Button from '../atoms/Button';
 import Spinner from '../atoms/Spinner';
-import LoadingSkeleton from './LoadingSkeleton';
 import styles from './LoadingState.module.css';
 
 export const SLOW_LOADING_TEXT = 'Still loading…';
@@ -11,16 +10,14 @@ export const WAKING_SERVER_TEXT = 'The server may be waking up after a quiet spe
 
 /**
  * The one loading state. It stays invisible for `delayMs` so fast loads don't flash, then
- * shows a spinner (or a `skeleton` shaped like the content), and after a few seconds explains
- * the wait: still loading, or a server that may be waking up. With `error` it offers `onRetry`.
+ * shows the spinner, and after a few seconds explains the wait: still loading, or a server
+ * that may be waking up. With `error` it offers `onRetry`.
  *
  * variant: 'page' (fills the view), 'section' (a panel or list), 'inline' (beside other content).
- * skeleton: 'list' | 'cards' | 'chart' | 'detail' | 'tree'.
  */
 function LoadingState({
     label = 'Loading…',
     variant = 'section',
-    skeleton = null,
     delayMs,
     error = null,
     errorLabel = 'This couldn’t load.',
@@ -47,10 +44,8 @@ function LoadingState({
 
     return (
         <div className={classes} role="status" aria-live="polite" aria-busy="true">
-            {skeleton
-                ? <LoadingSkeleton kind={skeleton} />
-                : showSpinner && <Spinner size={variant === 'inline' ? 'sm' : 'md'} role="presentation" aria-hidden="true" aria-label={undefined} />}
-            <span className={skeleton ? styles.visuallyHidden : styles.label}>{label}</span>
+            {showSpinner && <Spinner size={variant === 'inline' ? 'sm' : 'md'} role="presentation" aria-hidden="true" aria-label={undefined} />}
+            <span className={styles.label}>{label}</span>
             {stage === 'slow' && (
                 <span className={styles.hint}>{serverSlow ? WAKING_SERVER_TEXT : SLOW_LOADING_TEXT}</span>
             )}

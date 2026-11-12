@@ -314,3 +314,11 @@
     background: var(--color-bg-hover);
     color: var(--color-text-primary);
 }
+
+/* Touch screens: a taller tap area on the session badge link without moving it. */
+@media (pointer: coarse) {
+    .sessionLink {
+        padding-block: 6px;
+        margin-block: -6px;
+    }
+}

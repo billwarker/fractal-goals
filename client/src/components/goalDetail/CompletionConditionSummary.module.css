@@ -19,7 +19,7 @@
 
 .source {
     font-size: var(--font-size-xs);
-    color: var(--condition-accent, var(--color-text-muted));
+    color: var(--condition-accent-text, var(--color-text-muted));
 }
 
 .headline {

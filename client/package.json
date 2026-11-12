@@ -20,6 +20,7 @@
     "test:browser": "playwright test",
     "test:browser:smoke": "playwright test --project=setup --project=desktop e2e/production.spec.js e2e/offline-session.spec.js e2e/quick-session-completion.spec.js e2e/progress-on-save.spec.js e2e/notes-page.spec.js e2e/goal-reviews.spec.js e2e/program-session-plans.spec.js e2e/settings-storage.spec.js e2e/agent-connections.spec.js",
     "sweep": "node scripts/run-sweep.mjs",
+    "sweep:quick": "node scripts/run-sweep.mjs --project=sweep-setup --project=sweep-phone-light --project=sweep-phone-dark --project=sweep-desktop-light --project=sweep-desktop-dark",
     "sweep:report": "node scripts/sweep-report.mjs",
     "check:contrast": "node scripts/check-theme-contrast.mjs"
   },

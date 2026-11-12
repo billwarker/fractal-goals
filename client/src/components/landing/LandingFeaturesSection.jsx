@@ -154,7 +154,8 @@ export default function LandingFeaturesSection({
     );
 
     const renderDetailCards = () => (
-        <div className={styles.featureDetailGrid}>
+        // A scroll container on narrow screens, so keyboard users can reach and scroll it too.
+        <div className={styles.featureDetailGrid} tabIndex={0} role="region" aria-label="Feature details">
             {activeDetailCards.map((card, index) => {
                 const activityView = getActivityViewForCard(index);
                 const isActivityCard = activeFeature === 'activity' && index < ACTIVITY_VIEW_ORDER.length;

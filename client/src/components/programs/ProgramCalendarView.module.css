@@ -88,8 +88,19 @@
     position: relative;
     z-index: 5;
     min-width: 24px;
+    color: var(--color-text-primary);
     font-weight: 400 !important;
     text-align: right;
+}
+
+/* Days from the neighbouring months: quieter, but still readable on a block tint (FullCalendar
+   fades their whole header to 0.3 opacity by default). */
+.calendarContainer :global(.fc-day-other .fc-daygrid-day-top) {
+    opacity: 1;
+}
+
+.calendarContainer :global(.fc-day-other .fc-daygrid-day-number) {
+    color: var(--color-text-secondary);
 }
 
 .calendarContainerCompact :global(.fc-daygrid-day-events) {
@@ -377,17 +388,17 @@
     line-height: 1.3;
 }
 
-/* Same colours as the Goals pane's due text. */
+/* The Goals pane's due colours, pulled toward the theme's ink so they read on block tints. */
 .eventGoalPrefix[data-due-tone='normal'] {
-    color: var(--color-brand-success);
+    color: color-mix(in srgb, var(--color-brand-success) 70%, var(--color-text-primary));
 }
 
 .eventGoalPrefix[data-due-tone='soon'] {
-    color: var(--color-brand-warning);
+    color: color-mix(in srgb, var(--color-brand-warning) 70%, var(--color-text-primary));
 }
 
 .eventGoalPrefix[data-due-tone='overdue'] {
-    color: var(--color-brand-danger);
+    color: color-mix(in srgb, var(--color-brand-danger) 70%, var(--color-text-primary));
 }
 
 .eventGoalIcon {
@@ -424,7 +435,8 @@
     border: 1px solid transparent;
     border-radius: 0;
     background: transparent;
-    color: var(--program-block-label-color);
+    /* Block colour pulled toward the theme's ink: keeps the hue, reads on the block tint. */
+    color: color-mix(in srgb, var(--program-block-label-color) 35%, var(--color-text-primary));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -469,7 +481,8 @@
     border: 1px solid color-mix(in srgb, var(--program-block-label-color) 55%, transparent);
     border-radius: 999px;
     background: color-mix(in srgb, var(--program-block-label-color) 14%, transparent);
-    color: var(--program-block-label-color);
+    /* Block colour pulled toward the theme's ink: keeps the hue, reads on the block tint. */
+    color: color-mix(in srgb, var(--program-block-label-color) 35%, var(--color-text-primary));
     font-size: 10px;
     font-style: normal;
     font-weight: 700;
@@ -480,7 +493,8 @@
 
 .weekCellLabel:hover,
 .weekCellLabel:focus-visible {
-    color: var(--program-block-label-color);
+    /* Block colour pulled toward the theme's ink: keeps the hue, reads on the block tint. */
+    color: color-mix(in srgb, var(--program-block-label-color) 35%, var(--color-text-primary));
     text-decoration: none;
 }
 
@@ -725,8 +739,9 @@
 }
 
 :global(.fc-day-today .fc-daygrid-day-number) {
-    color: var(--color-brand-primary) !important;
-    font-weight: inherit !important;
+    /* Today's outline marks it; brand blue on a block tint fell below 4.5:1. */
+    color: var(--color-text-primary) !important;
+    font-weight: 700 !important;
     text-decoration: none !important;
 }
 
@@ -1049,4 +1064,25 @@
 .calendarContainer[data-selection-mode="move"] :global(.fc-daygrid-day):focus-visible {
     outline: 2px solid var(--color-brand-primary);
     outline-offset: -2px;
+}
+
+/* Phones: day cells are too narrow for the block label beside the date, so it runs along the
+   cell's foot instead; event pills get a thumb-sized height. */
+@media (max-width: 768px) {
+    .blockCellLabel {
+        top: auto;
+        right: 2px;
+        bottom: 2px;
+        left: 2px;
+        max-width: none;
+        min-height: 24px;
+        font-size: 10px;
+        line-height: 22px;
+    }
+}
+
+@media (pointer: coarse) {
+    .eventPill {
+        min-height: 26px;
+    }
 }

@@ -169,11 +169,6 @@ function Selection() {
         return fractal?.display_level || null;
     };
 
-    const getFractalTypeColor = (fractal) => {
-        const level = getFractalLevelConfig(fractal);
-        return level?.color || getGoalColor(fractal.type);
-    };
-
     const getHighestPriorityRoot = () => {
         if (!fractals || fractals.length === 0) return null;
         const recentMatch = recentRootId
@@ -233,7 +228,7 @@ function Selection() {
     const HeaderIcon = animatedIcons && isHeaderSmart ? AnimatedGoalIcon : GoalIcon;
 
     if (authLoading || fractalsQuery.isLoading) {
-        return <LoadingState variant="page" skeleton="cards" label="Loading fractals…" />;
+        return <LoadingState variant="page" label="Loading fractals…" />;
     }
 
     return (
@@ -310,25 +305,21 @@ function Selection() {
                         const fractalShape = level?.icon || getGoalIcon(fractal.type) || 'circle';
 
                         return (
-                            <div
-                                key={fractal.id}
-                                className={styles.card}
-                                onClick={() => handleSelectRoot(fractal.id)}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(event) => {
-                                    if (event.key === 'Enter' || event.key === ' ') {
-                                        event.preventDefault();
-                                        handleSelectRoot(fractal.id);
-                                    }
-                                }}
-                            >
+                            <div key={fractal.id} className={styles.card}>
                                 <div className={styles.cardContent}>
-                                    <h3 className={styles.cardTitle}>{fractal.name}</h3>
-                                    <div
-                                        className={styles.cardType}
-                                        style={{ color: getFractalTypeColor(fractal) }}
-                                    >
+                                    {/* The title is the card's one button; its hit area stretches over the card,
+                                        so the delete button can sit on top without nesting controls. */}
+                                    <h3 className={styles.cardTitle}>
+                                        <button
+                                            type="button"
+                                            className={styles.cardOpen}
+                                            onClick={() => handleSelectRoot(fractal.id)}
+                                        >
+                                            {fractal.name}
+                                        </button>
+                                    </h3>
+                                    {/* The icon below carries the level's colour; the label stays in text ink. */}
+                                    <div className={styles.cardType}>
                                         {getTypeDisplayName(fractal.type)}
                                     </div>
                                     <div className={styles.cardTypeIcon}>

@@ -677,3 +677,10 @@
     color: white;
     border: 1px solid var(--color-brand-danger-hover);
 }
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .delete-btn {
+        opacity: 1;
+    }
+}

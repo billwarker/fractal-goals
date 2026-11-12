@@ -199,7 +199,7 @@ function SessionGoalHierarchyPanel({
                         onAdjustScope={!readOnly && !selectedActivity ? () => setScopeModalOpen(true) : undefined}
                     />
                     {displayHierarchy.length === 0 && sessionGoalsViewLoading && (
-                        <LoadingState skeleton="tree" label="Loading goals…" />
+                        <LoadingState label="Loading goals…" />
                     )}
                     {displayHierarchy.length === 0 && !sessionGoalsViewLoading && (
                         <div className={styles.emptyState}>

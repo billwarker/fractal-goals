@@ -224,14 +224,14 @@
 }
 
 .heroActionPrimary {
-    color: white;
+    color: var(--color-text-inverse);
     background: var(--color-brand-primary);
     border: 1px solid var(--color-border-btn);
 }
 
 .heroActionPrimary:hover,
 .heroActionPrimary:focus-visible {
-    color: white;
+    color: var(--color-text-inverse);
     background: var(--color-brand-primary-hover);
 }
 
@@ -1270,5 +1270,14 @@
 
     .exampleToggleIcon {
         transform: scale(0.82);
+    }
+}
+
+/* Touch screens and phones: thumb-sized legal links. */
+@media (pointer: coarse), (max-width: 768px) {
+    .footerLinks a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
     }
 }

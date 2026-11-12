@@ -761,7 +761,7 @@ function FractalGoals() {
 
     if (loading || !fractalData) {
         return (
-            <LoadingState variant="page" skeleton="tree" label="Loading your goals…" />
+            <LoadingState variant="page" label="Loading your goals…" />
         );
     }
 

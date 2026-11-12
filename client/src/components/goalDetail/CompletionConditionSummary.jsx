@@ -13,6 +13,7 @@ import {
 } from '../../utils/goalConditionText';
 import ChildGoalIconRow from './ChildGoalIconRow';
 import ConditionProgressBar from './ConditionProgressBar';
+import useReadableColor from '../../hooks/useReadableColor';
 import styles from './CompletionConditionSummary.module.css';
 
 function headline(completionCondition, condition, activity) {
@@ -46,6 +47,7 @@ function CompletionConditionSummary({
     const condition = getGoalCondition(goal);
     const activity = activityDefinitions.find((candidate) => candidate.id === condition?.activity_definition_id) || null;
     const tracksProgress = completionCondition !== 'manual';
+    const accentText = useReadableColor(goalColor, 'text');
     const { progressByGoalId } = useGoalConditionProgress(rootId, [goalId], { enabled: tracksProgress && !readOnly });
     const progress = readOnly ? snapshot?.progress : progressByGoalId[goalId];
     const completed = Boolean(goal?.completed ?? goal?.attributes?.completed);
@@ -62,7 +64,7 @@ function CompletionConditionSummary({
     const showsChildIcons = completionCondition === 'children' && childGoals.length > 0;
 
     return (
-        <section className={styles.section} aria-label="Completion" style={{ '--condition-accent': goalColor }}>
+        <section className={styles.section} aria-label="Completion" style={{ '--condition-accent': goalColor, '--condition-accent-text': accentText }}>
             <div className={styles.header}>
                 <span className={styles.label}>Completion</span>
                 {completed && source ? <span className={styles.source}>{describeCompletionSource(source)}</span> : null}

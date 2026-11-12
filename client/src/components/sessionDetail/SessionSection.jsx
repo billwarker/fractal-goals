@@ -391,7 +391,7 @@ const SessionSection = ({
                 })}
 
                 {instancesLoading && orderedItems.length === 0 && (
-                    <LoadingState skeleton="list" label="Loading activities…" />
+                    <LoadingState label="Loading activities…" />
                 )}
 
                 {isDragOver && draggedItem && (

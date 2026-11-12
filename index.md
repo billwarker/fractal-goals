@@ -59,8 +59,8 @@ mirrored before first paint by `public/boot/shell.js` (shared fixture `tests/fix
 lives per device in `theme-preference` and syncs to `user.preferences.appearance`. User-chosen goal colours
 are stored once and adapted for the light theme by `utils/themeColors.js` inside `GoalLevelsContext`.
 
-Loading: every loading state is `components/common/LoadingState` (variants `page` / `section` / `inline`,
-optional `skeleton` shapes, `error` + `onRetry`). It stays invisible for 200 ms, then shows; after 4 s it
+Loading: every loading state is `components/common/LoadingState`, always the spinner (variants `page` /
+`section` / `inline`, `error` + `onRetry`). It stays invisible for 200 ms, then shows; after 4 s it
 says "Still loading…", or that the server may be waking up while `offline/serverWarmth.js` sees reads
 waiting over 2.5 s (a Cloud Run cold start or a slow network). Suspense routes use `RouteFallback`. On
 the app host, `index.html` paints a matching boot loader before the bundle (with a waking hint after
@@ -650,6 +650,9 @@ cache policies without losing CSP or the other headers.
 read-only showcase fractal and admin user (`scripts/browser_showcase_seed.py`), with horizontal
 overflow, touch-target (24px minimum, 40px recommended) and axe findings per capture. It writes the
 `client/sweep-results/index.html` contact sheet; `SWEEP_ENFORCE=1` turns the findings into failures.
+`npm run sweep:quick` covers phone and desktop in both themes (about half the captures) for fast local
+checks. `.github/workflows/visual-sweep.yml` enforces it beside Frontend CI: the quick set on pull
+requests that touch the client, every viewport nightly and on demand; captures retry once.
 Add a manifest entry for every new page, modal or sheet.
 
 Test speed: logic-only Vitest files start with `// @vitest-environment node` (no jsdom; `src/test/setup.js`

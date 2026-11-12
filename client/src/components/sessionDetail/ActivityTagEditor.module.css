@@ -409,3 +409,10 @@
         box-sizing: border-box;
     }
 }
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .optionActions {
+        opacity: 1;
+    }
+}

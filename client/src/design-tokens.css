@@ -133,6 +133,8 @@
   --spacing-md: 12px;
   --spacing-lg: 16px;
   --spacing-xl: 24px;
+  /* Minimum tap target on touch screens (WCAG 2.5.5 AAA; Apple's 44pt guideline). */
+  --touch-target: 44px;
   --spacing-2xl: 32px;
   --spacing-3xl: 48px;
 

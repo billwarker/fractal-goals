@@ -1,0 +1,16 @@
+.segments {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 10px;
+    row-gap: 2px;
+}
+
+.segment {
+    min-width: 0;
+}
+
+.separator {
+    color: var(--color-text-muted);
+    font-weight: 600;
+}

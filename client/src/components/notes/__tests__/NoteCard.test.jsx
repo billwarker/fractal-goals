@@ -2,6 +2,7 @@ import React from 'react';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../../../test/test-utils';
 import NoteCard from '../NoteCard';
+import { adaptColorForTheme } from '../../../utils/themeColors';
 
 vi.mock('../../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({
@@ -105,7 +106,8 @@ describe('NoteCard', () => {
         );
 
         expect(screen.getByText('Session Note')).toBeInTheDocument();
-        expect(screen.getByText('Standard Practice Session')).toHaveStyle({ color: '#16a34a' });
+        // The template colour, made readable on its badge's tint for the theme (dark here).
+        expect(screen.getByText('Standard Practice Session')).toHaveStyle({ color: adaptColorForTheme('#16a34a', 'dark', 5.5) });
     });
 
     it('derives circuit run and round note labels from their canonical contexts', () => {

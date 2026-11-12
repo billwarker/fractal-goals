@@ -36,6 +36,8 @@ function CompletionCheckBadge({
         <span
             className={`${styles.badge} ${statusClass} ${compact ? styles.compact : ''} ${className}`.trim()}
             aria-hidden={decorative ? 'true' : undefined}
+            // A labelled status icon: role="img" makes the label valid on a span.
+            role={decorative ? undefined : 'img'}
             aria-label={decorative ? undefined : accessibleLabel}
         >
             {paused ? (

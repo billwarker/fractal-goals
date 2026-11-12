@@ -1,10 +1,10 @@
 /**
- * Theme adaptation for user-chosen colours (goal levels, completion colour).
+ * Theme adaptation for user-chosen colours (goal levels, completion, templates, programs).
  *
- * Those colours are stored once and were picked against the dark theme. In the light theme a
- * colour that is too pale to read against a light surface is darkened in OKLCH (same hue,
- * chroma kept where the sRGB gamut allows) until it reaches `minContrast`; colours that already
- * read are returned unchanged. The dark theme always returns the stored colour.
+ * Those colours are stored once. In the light theme a colour too pale for a light surface is
+ * darkened in OKLCH (same hue, chroma kept where the sRGB gamut allows) until it reaches the
+ * minimum contrast; in the dark theme a colour too dark for a dark surface is lightened the same
+ * way. Colours that already read are returned unchanged.
  */
 
 // Keep in step with --color-bg-card in design-tokens.css' light block;
@@ -88,7 +88,10 @@ function yellowHueShift(hue, progress) {
     return (GOLD_HUE - hue) * Math.min(1, progress);
 }
 
-/** `hex` darkened along OKLCH lightness until it reaches `minContrast` against `against`. */
+/**
+ * `hex` moved along OKLCH lightness, away from `against` (darker on a light surface, lighter on
+ * a dark one), until it reaches `minContrast`.
+ */
 export function ensureContrast(hex, against = LIGHT_THEME_CARD, minContrast = LIGHT_THEME_MIN_CONTRAST) {
     const rgb = parseHex(hex);
     const background = parseHex(against);
@@ -97,6 +100,13 @@ export function ensureContrast(hex, against = LIGHT_THEME_CARD, minContrast = LI
     const [lightness, a, b] = toOklab(rgb);
     const chroma = Math.hypot(a, b);
     const hue = Math.atan2(b, a);
+    if (relativeLuminance(background) < 0.2) {
+        for (let next = lightness + 0.01; next < 0.99; next += 0.01) {
+            const candidate = toHex(gamutMapped(next, a, b));
+            if (contrastRatio(candidate, against) >= minContrast) return candidate;
+        }
+        return '#ffffff';
+    }
     for (let next = lightness - 0.01; next > 0.05; next -= 0.01) {
         // Darkened yellow turns olive; easing it toward gold keeps it reading as yellow.
         const shifted = hue + yellowHueShift(hue, (lightness - next) / 0.3);
@@ -106,12 +116,25 @@ export function ensureContrast(hex, against = LIGHT_THEME_CARD, minContrast = LI
     return '#000000';
 }
 
+// Text in a user colour must meet the 4.5:1 text minimum (WCAG 1.4.3), not the 3:1 for marks,
+// on every light surface, so it is measured against the darkest one: the app canvas. Keep in step
+// with the light --color-bg-app (scripts/check-theme-contrast.mjs enforces it).
+export const LIGHT_THEME_TEXT_CONTRAST = 4.5;
+export const LIGHT_THEME_CANVAS = '#ededec';
+// The lightest dark surface text sits on (the dark --color-bg-card; checked by the same script).
+export const DARK_THEME_CARD = '#1c242e';
+
 const cache = new Map();
 
-/** The colour to show for a stored user colour in the given theme. */
-export function adaptColorForTheme(hex, theme) {
-    if (theme !== 'light' || !parseHex(hex)) return hex;
-    const key = String(hex).toLowerCase();
-    if (!cache.has(key)) cache.set(key, ensureContrast(hex));
+/**
+ * The colour to show for a stored user colour in the given theme. `minContrast` is 3:1 for
+ * marks (icons, dots, lines, borders); pass LIGHT_THEME_TEXT_CONTRAST when the colour is text.
+ */
+export function adaptColorForTheme(hex, theme, minContrast = LIGHT_THEME_MIN_CONTRAST) {
+    if (!parseHex(hex)) return hex;
+    const key = `${String(hex).toLowerCase()}@${theme}@${minContrast}`;
+    let against = DARK_THEME_CARD;
+    if (theme === 'light') against = minContrast >= LIGHT_THEME_TEXT_CONTRAST ? LIGHT_THEME_CANVAS : LIGHT_THEME_CARD;
+    if (!cache.has(key)) cache.set(key, ensureContrast(hex, against, minContrast));
     return cache.get(key);
 }

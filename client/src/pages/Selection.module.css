@@ -185,6 +185,7 @@
 }
 
 .cardType {
+    color: var(--color-text-secondary);
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -205,7 +206,38 @@
     width: 100%;
 }
 
+.cardOpen {
+    display: block;
+    width: 100%;
+    padding: 4px 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+/* Stretches the title button over the whole card. */
+.cardOpen::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+}
+
+.cardOpen:focus-visible {
+    outline: none;
+}
+
+.card:has(.cardOpen:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
 .deleteBtn {
+    z-index: 2;
     position: absolute;
     top: 8px;
     right: 8px;
@@ -224,8 +256,16 @@
     border-radius: 50%;
 }
 
-.card:hover .deleteBtn {
+.card:hover .deleteBtn,
+.card:focus-within .deleteBtn {
     opacity: 1;
+}
+
+/* No hover on touch screens: keep the delete button visible instead of invisible-but-tappable. */
+@media (hover: none) {
+    .deleteBtn {
+        opacity: 0.75;
+    }
 }
 
 .deleteBtn:hover {

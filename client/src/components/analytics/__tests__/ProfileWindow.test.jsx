@@ -326,7 +326,7 @@ describe('ProfileWindow', () => {
             canSplit
             onSplit={onSplit}
         />);
-        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split', exact: true }));
+        const open = () => fireEvent.click(screen.getByRole('button', { name: 'Split panel', exact: true }));
         const item = () => screen.queryByRole('button', { name: 'Split Vertical' });
 
         open();

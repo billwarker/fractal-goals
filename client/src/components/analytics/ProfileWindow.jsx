@@ -298,6 +298,7 @@ function ProfileWindow({
                     <div className={styles.navGroup}>
                         <Button
                             onClick={handleTop}
+                            aria-label="Back to all categories"
                             title="Top Level (All Categories)"
                             variant="secondary"
                             size="sm"
@@ -307,6 +308,7 @@ function ProfileWindow({
                         </Button>
                         <Button
                             onClick={handleBack}
+                            aria-label="Go back"
                             title="Go Back"
                             variant="secondary"
                             size="sm"
@@ -361,6 +363,10 @@ function ProfileWindow({
                                 variant="secondary"
                                 size="sm"
                                 style={{ padding: '0 8px' }}
+                                // Phones show only the icon, so the button needs its own name.
+                                aria-label="Split panel"
+                                aria-haspopup="menu"
+                                aria-expanded={showSplitMenu}
                             >
                                 <SplitIcon size={15} />
                                 {!isNarrow && <span>Split</span>}

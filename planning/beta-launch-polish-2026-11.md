@@ -375,3 +375,20 @@ Measured first (full Vitest run, summed across workers): about 270 s building js
 - Browser suite: one sign-in per run (a `setup` project and saved storage state, plus the API token for seeding specs). Gunicorn serves it with 3 workers and a 75 s keep-alive. Assertions wait 10 s instead of 5 s. `test:browser:smoke` covers 9 key journeys on desktop.
 - Server fixes found along the way: workers must not inherit the parent's DB connections (requests hung), and only the owning process may drop the test database (a worker exiting through the inherited `finally` dropped it mid-run).
 - Product finding: `GET /api/fractals` takes about 0.8 s even idle for a user with many fractals (Selection page). Profile it as a performance follow-up.
+
+### Phase 4 — Mobile pass (2026-11-11)
+
+Result: the full sweep (169 captures, 4 viewports × 2 themes) has no overflow, no tap targets under 24px and no serious axe violations. The baseline had 845 small targets and about 340 contrast failures.
+
+- **Sweep accuracy.** Checks are scoped to an open modal (the page behind it is inert). A checkbox inside its label is measured by the label. Goal-tree nodes are exempt, since they sit on a pinch-zoom canvas. `/landing-preview` is served by the fixture server; the landing capture had been a 404 since Phase 0.
+- **Touch.** A `--touch-target` token. Coarse-pointer sizes for icon toggles, note menus, set reorder/remove, switches, calendar pills, auth and setup links. Inline text buttons grow their tap area with padding plus a negative margin. Hover-only controls (Selection delete, note actions, associator remove, tag options) stay visible without hover. 16px fields on phones stop iOS zoom.
+- **Structure.** Selection cards use a stretched title button instead of a role=button card containing the delete button. Flow-tree edges are no longer focusable. Status badges have `role="img"`. The Analytics icon buttons are named. Session Detail's start/stop/duration fields stack below 480px.
+- **Colour.** `useReadableColor` adapts user colours per role (marks 3:1, text 4.5:1 against the light canvas, tinted text 5.5:1). Dark mode now lightens colours too dark for dark surfaces. Calendar day numbers, block labels and due prefixes, and the program block titles, mix the stored colour toward the ink. Primary buttons and Add Session use inverse text in dark mode. Coloured status text on its own tint uses ink.
+- **Reverted at your request.** The two-row phone header and wrapping header actions: page headers, the goal footer and the goal date row pan sideways again (the date row is now focusable). Modals stay centred modals; `Modal mobilePresentation="sheet" | "fullscreen"` is available as an opt-in, but nothing uses it yet.
+- **CI.** `.github/workflows/visual-sweep.yml` runs beside Frontend CI. `sweep:quick` (phone + desktop, both themes, 84 captures, ~3 min) runs on PRs that touch the client; the full sweep runs nightly and on demand. Captures retry once.
+
+Found for later:
+- Each animated goal icon renders its own `<style>` block (visible as `@keyframes` text in flow-tree nodes).
+- `GET /api/fractals` takes about 0.8 s for a user with many fractals.
+- Loading is spinner-only (your call): the skeleton variant and `LoadingSkeleton` are removed, so the boot loader, route changes and data loads all show the same spinner.
+- Phones open the goal hierarchy fitted: after the first draw, the view is refitted to what is actually drawn (text, icons and connector lines, which phones wrap differently from the layout's node sizes). The tree is centred, sits below the options pane and program label, never exceeds 100% zoom, and is checked at 320×568 up to 430×932 (`flowTree/flowTreeViewport.js` `fitViewportToDrawn`).

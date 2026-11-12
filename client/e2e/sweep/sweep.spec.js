@@ -43,18 +43,26 @@ function measureLayout({ touch, minimum, recommended }) {
     };
     const overflow = Math.max(0, document.documentElement.scrollWidth - window.innerWidth);
     const targets = [];
+    // With a modal open, only its controls can be reached; the page behind it is inert.
+    const modal = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].pop();
+    const scope = modal || document;
     if (touch) {
         const selector = 'button, a[href], input:not([type=hidden]), select, textarea, [role=button], [role=tab], [role=checkbox], [role=switch], [role=menuitem], [role=option]';
-        for (const element of document.querySelectorAll(selector)) {
+        for (const element of scope.querySelectorAll(selector)) {
             const rect = element.getBoundingClientRect();
             if (rect.width === 0 || rect.height === 0) continue;
             const style = getComputedStyle(element);
             if (style.visibility === 'hidden' || style.pointerEvents === 'none') continue;
             // Links inside running text are exempt from target size (WCAG 2.5.8).
             if (element.tagName === 'A' && style.display === 'inline') continue;
-            const size = Math.min(rect.width, rect.height);
+            // Goal-tree nodes sit on a pinch-zoomable canvas: their size follows the zoom.
+            if (element.closest('.react-flow__node')) continue;
+            // A checkbox or radio inside its <label> is tapped through the whole label.
+            const label = ['checkbox', 'radio'].includes(element.type) ? element.closest('label') : null;
+            const box = label ? label.getBoundingClientRect() : rect;
+            const size = Math.min(box.width, box.height);
             if (size < recommended) {
-                targets.push({ element: describe(element), width: Math.round(rect.width), height: Math.round(rect.height), failing: size < minimum });
+                targets.push({ element: describe(element), width: Math.round(box.width), height: Math.round(box.height), failing: size < minimum });
             }
         }
     }
@@ -102,10 +110,14 @@ for (const surface of SURFACES) {
         const layout = await target.evaluate(measureLayout, {
             touch, minimum: MINIMUM_TARGET, recommended: RECOMMENDED_TARGET,
         });
-        const axe = await new AxeBuilder({ page: target })
+        let axeBuilder = new AxeBuilder({ page: target })
             .withTags(['wcag2a', 'wcag2aa'])
-            .disableRules(['region'])
-            .analyze();
+            .disableRules(['region']);
+        // As with targets: with a modal open, check the modal, not the inert page behind it.
+        if (await target.locator('[role="dialog"][aria-modal="true"]').count()) {
+            axeBuilder = axeBuilder.include('[role="dialog"][aria-modal="true"]');
+        }
+        const axe = await axeBuilder.analyze();
         const violations = axe.violations.map((violation) => ({
             id: violation.id,
             impact: violation.impact,

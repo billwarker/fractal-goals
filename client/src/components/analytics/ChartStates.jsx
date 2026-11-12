@@ -29,9 +29,9 @@ export function useReportShownGrain(grain) {
     }, [grain, onGrainShown]);
 }
 
-/** A chart-shaped loading state; escalates like every other loading state. */
+/** A chart's loading state: the shared spinner, filling the chart's space. */
 export function ChartLoading({ label = 'Loading analytics…' }) {
-    return <LoadingState skeleton="chart" label={label} className={styles.loading} />;
+    return <LoadingState label={label} className={styles.loading} />;
 }
 
 export function ChartError({ message = 'Analytics could not be loaded.', onRetry = null }) {

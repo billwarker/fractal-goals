@@ -3,6 +3,10 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 
 import ProgramDayPane from '../ProgramDayPane';
+import { adaptColorForTheme, parseHex } from '../../../utils/themeColors';
+
+// The rgb() a stored colour renders as in the dark theme.
+const themed = (hex, minContrast) => `rgb(${parseHex(adaptColorForTheme(hex, 'dark', minContrast)).map((channel) => Math.round(channel * 255)).join(', ')})`;
 
 // Date notes are covered by ProgramDateNotes.test.jsx; they need a query client.
 vi.mock('../ProgramDateNotes', () => ({ default: () => null, ProgramDateNoteComposer: () => null }));
@@ -157,9 +161,10 @@ describe('ProgramDayPane', () => {
         const startLink = screen.getByRole('link', { name: 'Start Main work' });
         expect(within(startLink).getByText('Start')).toBeInTheDocument();
         expect(within(startLink).getByTitle('Main work').className).toContain('sizeSm');
+        // Template colours are made readable for the theme (dark here): text 5.5:1 (it sits on its own tint), border 3:1.
         expect(screen.getByTitle('Main work')).toHaveStyle({
-            borderColor: 'rgb(51, 102, 153)',
-            color: 'rgb(51, 102, 153)',
+            borderColor: themed('#336699'),
+            color: themed('#336699', 5.5),
         });
         expect(screen.getByText('Foundation')).toHaveStyle({ color: 'rgb(192, 90, 36)' });
         expect(screen.queryByText('Noisy activity detail')).not.toBeInTheDocument();
@@ -268,8 +273,8 @@ describe('ProgramDayPane', () => {
 
         expect(screen.getByRole('link', { name: 'Start Main work' }).className).toContain('startAction');
         expect(screen.getByRole('link', { name: 'Start Review' }).className).toContain('startAction');
-        expect(screen.getByTitle('Main work')).toHaveStyle({ color: 'rgb(51, 102, 153)' });
-        expect(screen.getByTitle('Review')).toHaveStyle({ color: 'rgb(13, 189, 201)' });
+        expect(screen.getByTitle('Main work')).toHaveStyle({ color: themed('#336699', 5.5) });
+        expect(screen.getByTitle('Review')).toHaveStyle({ color: themed('#0dbdc9', 5.5) });
     });
 
     it('offers every program day and a new day on an empty date, whichever block it is in', () => {

@@ -950,3 +950,10 @@
         gap: 8px;
     }
 }
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .removeBtn {
+        opacity: 1;
+    }
+}

@@ -31,7 +31,7 @@
 
 .title {
     flex: 1 1 auto;
-    color: var(--goal-header-color);
+    color: var(--goal-header-text, var(--goal-header-color));
     font-size: 24px;
     font-weight: 700;
     line-height: 1.2;
@@ -151,11 +151,10 @@
 }
 
 .dateLabel {
-    color: var(--goal-header-color);
+    color: var(--goal-header-text, var(--goal-header-color));
     font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    opacity: 0.9;
     text-transform: uppercase;
 }
 

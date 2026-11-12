@@ -515,6 +515,11 @@ def main():
         from app import app
         from extensions import limiter
 
+        # The landing page previews at /landing-preview on local hosts (src/utils/marketingHost.js);
+        # production serves it only on the marketing host, so only this fixture server adds the route.
+        from blueprints.pages import render_react_app
+        app.add_url_rule('/landing-preview', 'landing_preview', render_react_app)
+
         # RATELIMIT_ENABLED is read from app config, not the environment; every spec logs in
         # through the UI from one address, so the login limit must be off here.
         limiter.enabled = False

@@ -118,3 +118,12 @@
         flex-direction: column;
     }
 }
+
+/* Touch screens: the setup links get thumb-sized tap areas. */
+@media (pointer: coarse) {
+    .providerCard a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 40px;
+    }
+}

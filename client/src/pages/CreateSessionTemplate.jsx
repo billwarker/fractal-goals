@@ -217,7 +217,7 @@ function CreateSessionTemplate() {
     }
 
     if (loading) {
-        return <LoadingState variant="page" skeleton="list" label="Loading templates…" />;
+        return <LoadingState variant="page" label="Loading templates…" />;
     }
 
     return (

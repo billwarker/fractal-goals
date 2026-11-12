@@ -697,3 +697,10 @@ html {
 .add-goal-btn:hover {
     background: color-mix(in srgb, var(--color-brand-primary) 10%, transparent);
 }
+
+/* No hover on touch screens: show the control instead of leaving it invisible but tappable. */
+@media (hover: none) {
+    .delete-fractal-btn {
+        opacity: 1;
+    }
+}

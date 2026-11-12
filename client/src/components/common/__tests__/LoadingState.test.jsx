@@ -55,10 +55,4 @@ describe('LoadingState', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
         expect(onRetry).toHaveBeenCalledTimes(1);
     });
-
-    it('keeps the label for assistive tech behind a skeleton', () => {
-        const { container } = render(<LoadingState label="Loading activities…" skeleton="cards" delayMs={0} />);
-        expect(screen.getByRole('status')).toHaveTextContent('Loading activities…');
-        expect(container.querySelectorAll('[aria-hidden="true"] span')).toHaveLength(6);
-    });
 });

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LIGHT_THEME_CARD, contrastRatio } from '../src/utils/themeColors.js';
+import { DARK_THEME_CARD, LIGHT_THEME_CANVAS, LIGHT_THEME_CARD, contrastRatio } from '../src/utils/themeColors.js';
 
 const clientRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(clientRoot, 'src/design-tokens.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
@@ -86,7 +86,7 @@ const CHECKS = [
     ...pairs(BOTH, '--color-focus-ring', ['--color-bg-card', '--color-bg-app'], 3, 'focus ring'),
     // The light theme's filled buttons carry white text (dark ones use their own text tokens).
     ...pairs(['light'], '--color-text-inverse', ['--color-brand-primary', '--color-brand-success', '--color-brand-danger', '--color-accent'], 4.5, 'text on filled buttons'),
-    ...pairs(['dark'], '--color-text-inverse', ['--color-brand-danger'], 4.5, 'text on danger buttons'),
+    ...pairs(['dark'], '--color-text-inverse', ['--color-brand-danger', '--color-brand-success'], 4.5, 'text on danger and success buttons'),
     ...pairs(['light'], '--color-brand-primary', ['--color-bg-card', '--color-bg-elevated'], 4.5, 'link text'),
     ...pairs(['light'], '--color-brand-danger', ['--color-bg-card'], 4.5, 'error text'),
     ...pairs(['light'], '--color-brand-success', ['--color-bg-card'], 4.5, 'success text'),
@@ -112,6 +112,14 @@ for (const check of CHECKS) {
 
 if (colorOf('light', '--color-bg-card').toLowerCase() !== LIGHT_THEME_CARD.toLowerCase()) {
     failures.push(`LIGHT_THEME_CARD in src/utils/themeColors.js (${LIGHT_THEME_CARD}) must equal the light --color-bg-card (${colorOf('light', '--color-bg-card')})`);
+}
+
+if (colorOf('light', '--color-bg-app').toLowerCase() !== LIGHT_THEME_CANVAS.toLowerCase()) {
+    failures.push(`LIGHT_THEME_CANVAS in src/utils/themeColors.js (${LIGHT_THEME_CANVAS}) must equal the light --color-bg-app (${colorOf('light', '--color-bg-app')})`);
+}
+
+if (colorOf('dark', '--color-bg-card').toLowerCase() !== DARK_THEME_CARD.toLowerCase()) {
+    failures.push(`DARK_THEME_CARD in src/utils/themeColors.js (${DARK_THEME_CARD}) must equal the dark --color-bg-card (${colorOf('dark', '--color-bg-card')})`);
 }
 
 if (process.argv.includes('--verbose') || failures.length) console.log(rows.join('\n'));

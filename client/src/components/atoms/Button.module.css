@@ -75,7 +75,8 @@
 /* Primary - Brand Blue */
 .primary {
     background-color: var(--color-brand-primary);
-    color: white;
+    /* Dark ink on the dark theme's light blue, white on the light theme's deep blue. */
+    color: var(--color-text-inverse);
     border-color: transparent;
 }
 

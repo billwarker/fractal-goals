@@ -147,7 +147,7 @@
     align-items: center;
     justify-content: center;
     background: var(--color-brand-success);
-    color: white;
+    color: var(--color-text-inverse);
     padding: 6px 14px;
     border-radius: var(--border-radius-sm);
     font-weight: bold;
@@ -171,7 +171,7 @@
 .addSessionBtn:visited,
 .addSessionBtn:hover,
 .addSessionBtn:focus-visible {
-    color: white;
+    color: var(--color-text-inverse);
 }
 
 .addSessionBtn:hover {

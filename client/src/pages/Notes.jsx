@@ -130,7 +130,7 @@ function Notes() {
 
             <div className={styles.timelineArea}>
                 {isLoading && notes.length === 0 ? (
-                    <LoadingState skeleton="list" label="Loading notes…" />
+                    <LoadingState label="Loading notes…" />
                 ) : (
                     <NoteTimeline
                         notes={notes}

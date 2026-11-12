@@ -50,7 +50,7 @@ export default function GraphProfileModal({
 
                 <div className={styles.chartFrame}>
                     {isLoading ? (
-                        <LoadingState skeleton="chart" label="Loading graph…" />
+                        <LoadingState label="Loading graph…" />
                     ) : isError ? (
                         <div className={styles.state}>Graph could not be loaded.</div>
                     ) : Chart ? (
