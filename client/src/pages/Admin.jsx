@@ -458,7 +458,7 @@ function LandingExamplesPanel() {
             <div className={styles.landingExamplesHeader}>
                 <div>
                     <h2>Landing Examples</h2>
-                    <p>Choose admin-owned fractals to publish as read-only examples on the public landing page.</p>
+                    <p>Choose admin-owned fractals to publish as the live demo. Visitors pick one on the landing page and explore it read-only; the guided tour opens each example’s featured session and program.</p>
                     <a className={styles.landingExamplesPageLink} href={getLandingPageHref()} target="_blank" rel="noreferrer">
                         View landing page
                     </a>

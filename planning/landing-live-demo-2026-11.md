@@ -221,7 +221,13 @@ Found and fixed along the way:
 - Theme sync treated the demo guest as an account and tried to save the theme, which popped the write prompt for any visitor with a non-default theme. Theme sync now treats the guest as signed out (unit and e2e regression).
 - The sign-up modal kept its success state when reopened; it is now mounted per opening.
 
+Follow-ups (2026-11-12):
+- **One screen on desktop.** Hero type and spacing are capped by viewport height as well as width (`min(vw, vh)`), so header, hero, demo picker and footer fit without scrolling from 1280×720 to 1920×1080. The `index.html` boot shell mirrors the new sizes.
+- **Examples keep their owner's look.** `GoalLevelsProvider` read the root from `window.location`, which under `/demo/<root>` never matched, so the demo got the owner's account-wide default levels instead of the fractal's own colours and icons. It now reads the router's path. The demo session also carries each example owner's two completed-goal colour preferences (nothing else from their preferences), applied for the fractal being viewed.
+- Admin's Landing Examples intro now says the examples are the live demo.
+
 Not done / for later:
+- **Admin still edits content the new landing no longer shows.** The per-example "Landing page content" panel (goal bullets, tree-view defaults, featured activity and analytics views) fed the deleted landing sections; only the featured session and program are used by the tour. The goal bullets still count as "issues blocking publish", so publishing requires filling in text nobody sees.
 - The test fixture's two examples share one root icon (they use the same seeded level); production examples have their own.
 - "+ Add child goal" and similar affordances stay visible in the demo and lead to the write prompt on save (intended: visitors see what's possible). A later per-visitor sandbox would make them work.
 - Cloud Run `min-instances 1` is still awaiting your approval; the landing warms the API (`/healthz` on load, a demo session on hover).
