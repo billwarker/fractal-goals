@@ -35,6 +35,7 @@ from services.app_settings import (
 from services.events import Events
 from services.service_types import JsonDict, ServiceResult
 from services.telemetry_service import DEFAULT_RETENTION_DAYS, TelemetryService
+from services.demo_account_service import DEMO_ACCOUNT_ROLE
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
@@ -218,7 +219,7 @@ class AdminUsageService:
         return [{"date": str(row.day), "count": int(row.count)} for row in rows]
 
     def _per_user_activity(self, window_start, window_end):
-        users = self.db_session.query(User).filter(User.is_active.is_(True)).all()
+        users = self.db_session.query(User).filter(User.is_active.is_(True), User.role != DEMO_ACCOUNT_ROLE).all()
 
         page_view_rows = self.db_session.query(
             ProductEvent.user_id,

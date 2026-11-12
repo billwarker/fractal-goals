@@ -241,82 +241,17 @@ class AdminFeatureFlagsUpdateSchema(BaseModel):
     flags: Dict[str, bool]
 
 
-class LandingExampleShowcaseSchema(BaseModel):
+class LandingExampleTourSchema(BaseModel):
+    """The tour's optional featured picks, by source id (publishing maps them onto the snapshot)."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    session_id: Optional[str] = Field(None, min_length=1, max_length=120)
-    activity_ids: List[str] = Field(default_factory=list, max_length=1)
-    program_id: Optional[str] = Field(None, min_length=1, max_length=120)
-    program_start_date: Optional[str] = None
-    program_end_date: Optional[str] = None
-    analytics_view_ids: List[str] = Field(default_factory=list, max_length=3)
+    session_id: Optional[str] = Field(None, max_length=120)
+    program_id: Optional[str] = Field(None, max_length=120)
 
     @field_validator('session_id', 'program_id')
     @classmethod
-    def sanitize_showcase_id(cls, v: Optional[str]) -> Optional[str]:
-        return sanitize_string(v) if v else v
-
-    @field_validator('activity_ids', 'analytics_view_ids')
-    @classmethod
-    def sanitize_showcase_id_lists(cls, v: List[str]) -> List[str]:
-        cleaned = [sanitize_string(item) for item in v if item and item.strip()]
-        if len(cleaned) != len(set(cleaned)):
-            raise ValueError('Showcase id lists must not contain duplicates')
-        return cleaned
-
-    @field_validator('program_start_date', 'program_end_date')
-    @classmethod
-    def validate_showcase_date(cls, v: Optional[str]) -> Optional[str]:
-        if v is None or not v.strip():
-            return None
-        try:
-            date.fromisoformat(v)
-        except ValueError as exc:
-            raise ValueError('Showcase dates must be YYYY-MM-DD') from exc
-        return v
-
-    @model_validator(mode='after')
-    def validate_program_date_window(self) -> 'LandingExampleShowcaseSchema':
-        if self.program_start_date and self.program_end_date:
-            if date.fromisoformat(self.program_end_date) < date.fromisoformat(self.program_start_date):
-                raise ValueError('Showcase program end date must not be before the start date')
-        return self
-
-
-class LandingTreeViewSettingsSchema(BaseModel):
-    fadeInactiveBranches: bool = False
-    hideInactiveGoals: bool = False
-    hideCompletedGoals: bool = False
-    showMetricsOverlay: bool = False
-
-
-class LandingGoalBulletSchema(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True)
-
-    key: Literal['break_down', 'associate_activities', 'set_conditions']
-    heading: str = Field(..., min_length=1, max_length=100)
-    body: str = Field(..., min_length=1, max_length=600)
-    goal_id: Optional[str] = Field(None, min_length=1, max_length=120)
-
-    @field_validator('heading', 'body', 'goal_id')
-    @classmethod
-    def sanitize_landing_goal_content(cls, v: Optional[str]) -> Optional[str]:
-        return sanitize_string(v) if v else v
-
-
-class LandingGoalsPageSchema(BaseModel):
-    bullets: List[LandingGoalBulletSchema] = Field(..., min_length=3, max_length=3)
-
-    @field_validator('bullets')
-    @classmethod
-    def validate_goal_bullet_keys(cls, v: List[LandingGoalBulletSchema]) -> List[LandingGoalBulletSchema]:
-        if [bullet.key for bullet in v] != ['break_down', 'associate_activities', 'set_conditions']:
-            raise ValueError('Landing goal bullets must use the canonical order and keys')
-        return v
-
-
-class LandingExampleContentSchema(BaseModel):
-    goals: LandingGoalsPageSchema
+    def sanitize_tour_id(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_string(v) if v else None
 
 
 class LandingExampleSelectionSchema(BaseModel):
@@ -325,9 +260,7 @@ class LandingExampleSelectionSchema(BaseModel):
     root_id: str = Field(..., min_length=1, max_length=120)
     label: str = Field(..., min_length=1, max_length=120)
     sort_order: int = Field(..., ge=0, le=1000)
-    showcase: Optional[LandingExampleShowcaseSchema] = None
-    tree_view_settings: Optional[LandingTreeViewSettingsSchema] = None
-    landing_content: Optional[LandingExampleContentSchema] = None
+    tour: Optional[LandingExampleTourSchema] = None
 
     @field_validator('root_id', 'label')
     @classmethod

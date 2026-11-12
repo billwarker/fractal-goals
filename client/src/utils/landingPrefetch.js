@@ -32,11 +32,6 @@ const isLandingSnapshot = (payload) => (
         && typeof example === 'object'
         && typeof example.root_id === 'string'
         && example.root_id.length > 0
-        && (
-            !Number.isInteger(payload.schema_version)
-            || payload.schema_version < 12
-            || (example.tree !== null && typeof example.tree === 'object')
-        )
     ))
 );
 

@@ -5,6 +5,8 @@
 // Add a surface whenever a page, modal or sheet is added. `npm run sweep -- --grep <id>`
 // re-captures one surface.
 
+import { DEMO_SHOWCASE, demoId } from '../demoIds';
+
 export const ROOT = 'sweep-showcase-root';
 const r = (path) => `/${ROOT}${path}`;
 
@@ -17,9 +19,9 @@ export const SURFACES = [
     { id: 'landing', path: '/landing-preview', auth: false },
     { id: 'landing-waitlist', path: '/landing-preview', auth: false, open: clickText('or join the waitlist') },
     // The live demo: the real app, read-only, with the guide (src/demo/).
-    { id: 'demo-goals', path: `/demo${r('/goals')}?tour=1`, auth: false },
-    { id: 'demo-session', path: `/demo${r('/session/sweep-session-0')}`, auth: false },
-    { id: 'demo-signup', path: `/demo${r('/goals')}`, auth: false, open: clickText('Sign up to build your own') },
+    { id: 'demo-goals', path: `/demo/${DEMO_SHOWCASE}/goals?tour=1`, auth: false },
+    { id: 'demo-session', path: `/demo/${DEMO_SHOWCASE}/session/${demoId(ROOT, 'sweep-session-0')}`, auth: false },
+    { id: 'demo-signup', path: `/demo/${DEMO_SHOWCASE}/goals`, auth: false, open: clickText('Sign up to build your own') },
     { id: 'auth-login', path: '/', auth: false, open: clickText('LOG IN') },
 
     // Pages

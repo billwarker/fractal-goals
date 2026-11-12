@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import GoalIcon from '../components/atoms/GoalIcon';
 import ThemeToggleButton from '../components/common/ThemeToggleButton';
-import { getGoalIconProps } from '../utils/landingPageModel';
 import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
+import { demoIconProps, demoRootName } from './demoExamples';
 import { buildTourSteps } from './demoTour';
 import Spotlight from './Spotlight';
 import styles from './DemoGuide.module.css';
@@ -121,11 +121,11 @@ export default function DemoGuide({ examples, onSignup, onExit }) {
                                 key={example.root_id}
                                 className={`${styles.example} ${selected ? styles.exampleActive : ''}`}
                                 aria-pressed={selected}
-                                aria-label={example.root_name || example.label}
-                                title={example.root_name || example.label}
+                                aria-label={demoRootName(example)}
+                                title={demoRootName(example)}
                                 onClick={() => !selected && goTo(stepIndex, example)}
                             >
-                                <GoalIcon {...getGoalIconProps(example.tree)} size={26} />
+                                <GoalIcon {...demoIconProps(example.icon)} size={26} />
                             </button>
                         );
                     })}

@@ -33,6 +33,12 @@ export const getLandingPageHref = (hostname = (typeof window === 'undefined' ? '
     return 'https://fractalgoals.com/';
 };
 
+// The live demo of one published example, on the marketing host (src/demo/).
+export const getDemoHref = (rootId, hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
+    const path = `/demo/${encodeURIComponent(rootId)}/goals?tour=1`;
+    return isLocalDevHost(hostname) ? path : `https://fractalgoals.com${path}`;
+};
+
 // The authenticated app: where accounts are created and used (cookies are per host).
 export const getAppHref = (hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
     if (isLocalDevHost(hostname)) return '/';

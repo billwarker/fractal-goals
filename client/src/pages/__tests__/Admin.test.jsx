@@ -342,7 +342,8 @@ describe('Admin', () => {
                     },
                 ],
                 examples: [
-                    { root_id: 'root-1', label: 'Guitar practice', sort_order: 0 },
+                    { root_id: 'root-1', label: 'Guitar practice', sort_order: 0, tour: { session_id: null, program_id: null },
+                        snapshot: { root_id: 'snap-1', taken_at: '2026-06-09T12:00:00Z', counts: { goals: 8, sessions: 14 }, source_changed: true } },
                 ],
                 published_at: '2026-06-09T12:00:00Z',
                 published_example_count: 1,
@@ -351,18 +352,10 @@ describe('Admin', () => {
         getLandingExampleOptions.mockResolvedValue({
             data: {
                 root_id: 'root-1',
-                goals: [
-                    { id: 'goal-1', name: 'Build a repertoire', level_name: 'Long Term Goal', has_activity_condition: false },
-                    { id: 'goal-2', name: 'Play CAGED triads', level_name: 'Short Term Goal', has_activity_condition: false },
-                    { id: 'goal-3', name: 'Improve triad speed', level_name: 'Immediate Goal', has_activity_condition: true },
-                ],
                 sessions: [
-                    { id: 'session-empty', name: 'Timer only', session_start: '2026-06-09T12:00:00Z', activity_instance_count: 0 },
                     { id: 'session-work', name: 'Practice session', session_start: '2026-06-08T12:00:00Z', activity_instance_count: 3 },
                 ],
-                activities: [],
-                programs: [],
-                analytics_views: [],
+                programs: [{ id: 'program-1', name: 'Winter woodshed' }],
             },
         });
         updateLandingExamples.mockImplementation(({ examples }) => Promise.resolve({
@@ -376,12 +369,14 @@ describe('Admin', () => {
                 published_example_count: 1,
             },
         }));
-        publishLandingExamples.mockResolvedValue({
+        publishLandingExamples.mockImplementation(({ examples }) => Promise.resolve({
             data: {
+                eligible_fractals: [],
+                examples,
                 published_at: '2026-06-09T13:00:00Z',
-                published_example_count: 2,
+                published_example_count: examples.length,
             },
-        });
+        }));
         getBetaSignups.mockResolvedValue({
             data: {
                 requests: [
@@ -615,81 +610,48 @@ describe('Admin', () => {
             flags: { goal_surface_configuration: true },
         }));
     });
-    it('manages landing example draft selection and publish', async () => {
+    it('picks, labels, tours and publishes the live demo snapshots', async () => {
         renderAdmin();
-        fireEvent.click(screen.getByText('landing'));
-        await waitFor(() => expect(screen.getByText('Landing Examples')).toBeInTheDocument());
+        fireEvent.click(screen.getByText('live demo'));
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Live demo' })).toBeInTheDocument());
         expect(screen.getByRole('link', { name: 'View landing page' })).toHaveAttribute('href', '/landing-preview');
-        expect(screen.getByText(/Publishing makes the selected fractals publicly downloadable/)).toBeInTheDocument();
-        expect(screen.getAllByText('Guitar practice tracker').length).toBeGreaterThan(0);
         expect(screen.getByDisplayValue('Guitar practice')).toBeInTheDocument();
-        expect(screen.getByText('Chinese language tracker')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
-        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('3 issues blocking publish');
-        fireEvent.click(screen.getByRole('button', { name: /Landing page content/ }));
+
+        // What visitors see now, and whether the source has moved on since.
+        expect(screen.getByText(/8 goals · 14 sessions/)).toBeInTheDocument();
+        expect(screen.getByText('Source changed since snapshot')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Open demo' })).toHaveAttribute('href', '/demo/snap-1/goals?tour=1');
+
+        // Tour picks load the source's sessions and programs on demand.
+        fireEvent.click(screen.getByRole('button', { name: /Tour picks/ }));
         await waitFor(() => expect(getLandingExampleOptions).toHaveBeenCalledWith('root-1'));
-        expect((await screen.findAllByRole('tab')).map((tab) => tab.textContent))
-            .toEqual(['Goals', 'Sessions', 'Activities', 'Programs', 'Analytics']);
-        fireEvent.click(screen.getByRole('tab', { name: 'Sessions' }));
-        expect(screen.getByRole('option', { name: /Timer only.*no activities/ })).toBeDisabled();
-        expect(screen.getByRole('option', { name: /Practice session/ })).toBeEnabled();
-        fireEvent.click(screen.getByRole('tab', { name: 'Goals' }));
-        expect(screen.getByRole('group', { name: 'Goal tree viewer defaults' })).toBeInTheDocument(); ['Fade inactive branches', 'Hide inactive goals', 'Show metrics overlay'].forEach((label) => fireEvent.click(screen.getByLabelText(label)));
-        fireEvent.change(screen.getByLabelText('Example goal for Break it down'), {
-            target: { value: 'goal-1' },
-        });
-        fireEvent.change(screen.getByLabelText('Example goal for Connect your work to your goals'), {
-            target: { value: 'goal-2' },
-        });
-        const conditionGoalSelect = screen.getByLabelText('Example goal for Know when you’re done');
-        expect([...conditionGoalSelect.options].map((option) => option.value)).toEqual(['', 'goal-3']);
-        fireEvent.change(conditionGoalSelect, {
-            target: { value: 'goal-3' },
-        });
-        expect(screen.getByRole('button', { name: /Landing page content/ })).toHaveTextContent('0 issues blocking publish');
-        expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+        fireEvent.change(await screen.findByLabelText('Featured session'), { target: { value: 'session-work' } });
+        fireEvent.change(screen.getByLabelText('Featured program'), { target: { value: 'program-1' } });
+
+        // A second demo, not yet published; every demo needs a label.
         fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-        expect(screen.getByRole('status')).toHaveTextContent(/Chinese language tracker:.*select an example goal/);
-        expect(screen.getByRole('button', { name: 'Publish' })).toBeDisabled();
-        fireEvent.change(screen.getByDisplayValue('Guitar practice'), {
-            target: { value: 'Guitar practice refined' },
-        });
-        fireEvent.click(screen.getByText('Save Draft'));
-        const emptyShowcase = {
-            session_id: null,
-            activity_ids: [],
-            program_id: null,
-            program_start_date: null,
-            program_end_date: null,
-            analytics_view_ids: [],
-        };
+        expect(screen.getByText('Not published yet')).toBeInTheDocument();
+        const secondLabel = screen.getAllByLabelText('Public label')[1];
+        expect(secondLabel).toHaveValue('Chinese language tracker');
+        fireEvent.change(secondLabel, { target: { value: ' ' } });
+        expect(screen.getByRole('status')).toHaveTextContent('Every demo needs a public label.');
+        expect(screen.getByRole('button', { name: 'Publish demos' })).toBeDisabled();
+        fireEvent.change(secondLabel, { target: { value: 'Chinese' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
         await waitFor(() => expect(updateLandingExamples).toHaveBeenCalled());
-        const savedExamples = updateLandingExamples.mock.calls.at(-1)[0].examples;
-        expect(savedExamples).toHaveLength(2);
-        expect(savedExamples[0]).toEqual(expect.objectContaining({
-            root_id: 'root-1',
-            label: 'Guitar practice refined',
-            sort_order: 0,
-            showcase: emptyShowcase,
-            tree_view_settings: { fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true },
-        }));
-        expect(savedExamples[0].landing_content.goals.bullets.map((bullet) => [bullet.key, bullet.goal_id])).toEqual([
-            ['break_down', 'goal-1'],
-            ['associate_activities', 'goal-2'],
-            ['set_conditions', 'goal-3'],
+        expect(updateLandingExamples.mock.calls.at(-1)[0].examples).toEqual([
+            { root_id: 'root-1', label: 'Guitar practice', sort_order: 0, tour: { session_id: 'session-work', program_id: 'program-1' } },
+            { root_id: 'root-2', label: 'Chinese', sort_order: 1, tour: { session_id: null, program_id: null } },
         ]);
-        fireEvent.click(screen.getByRole('button', { name: 'Remove Chinese language tracker' }));
-        fireEvent.click(screen.getByText('Publish'));
+
+        // Publishing asks first, then copies the draft.
+        fireEvent.click(screen.getByRole('button', { name: 'Publish demos' }));
+        expect(screen.getByRole('status')).toHaveTextContent('Copies 2 fractals as they are now and replaces the current demo.');
+        expect(publishLandingExamples).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Publish now' }));
         await waitFor(() => expect(publishLandingExamples).toHaveBeenCalled());
-        const publishedExamples = publishLandingExamples.mock.calls.at(-1)[0].examples;
-        expect(publishedExamples).toHaveLength(1);
-        expect(publishedExamples[0].landing_content.goals.bullets[2]).toEqual({
-            key: 'set_conditions',
-            heading: 'Know when you’re done',
-            body: expect.any(String),
-            goal_id: 'goal-3',
-        });
-        expect(publishedExamples[0].tree_view_settings).toEqual({ fadeInactiveBranches: true, hideInactiveGoals: true, hideCompletedGoals: false, showMetricsOverlay: true });
+        expect(publishLandingExamples.mock.calls.at(-1)[0].examples.map((example) => example.root_id)).toEqual(['root-1', 'root-2']);
     });
     it('lists beta signups and updates their status', async () => {
         renderAdmin();

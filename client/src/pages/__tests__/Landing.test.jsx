@@ -27,9 +27,9 @@ vi.mock('../../contexts/ThemeContext', () => ({
 const SNAPSHOT = {
     examples: [
         { root_id: 'chinese', label: 'Chinese', sort_order: 1, root_name: 'Become fluent in Chinese',
-            tree: { id: 'chinese', name: 'Become fluent in Chinese', attributes: { type: 'UltimateGoal' } } },
+            icon: { shape: 'hexagon', color: '#0000ff' } },
         { root_id: 'guitar', label: 'Guitar', sort_order: 0, root_name: 'Become a skilled guitar player',
-            tree: { id: 'guitar', name: 'Become a skilled guitar player', attributes: { type: 'UltimateGoal' } } },
+            icon: { shape: 'star', color: '#d10000' } },
     ],
 };
 

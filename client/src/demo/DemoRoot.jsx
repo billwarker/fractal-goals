@@ -18,6 +18,7 @@ import { getLandingPageHref } from '../utils/marketingHost';
 import DemoGuide from './DemoGuide';
 import DemoSignupModal from './DemoSignupModal';
 import DemoWritePrompt from './DemoWritePrompt';
+import { sortDemoExamples } from './demoExamples';
 import { DEMO_BASE_PATH, setDemoMode } from './demoMode';
 import '../App.css';
 import '../app-shell-and-session.css';
@@ -35,16 +36,13 @@ function DemoApp() {
     const [navHeight, setNavHeight] = useState(60);
     usePageTitle('Live demo');
 
-    // The published examples: which fractals the demo tours, with their showcase picks.
+    // The published examples: which snapshot fractals the demo tours, and where the tour goes.
     const examplesQuery = useQuery({
         queryKey: queryKeys.landingExamples(),
         queryFn: fetchLandingExamples,
         staleTime: LANDING_EXAMPLES_STALE_TIME,
     });
-    const examples = useMemo(() => (examplesQuery.data?.examples || [])
-        .filter((example) => example?.root_id && example.tree)
-        .slice()
-        .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0)), [examplesQuery.data]);
+    const examples = useMemo(() => sortDemoExamples(examplesQuery.data), [examplesQuery.data]);
 
     useEffect(() => {
         document.documentElement.style.setProperty('--app-nav-height', `${navHeight}px`);

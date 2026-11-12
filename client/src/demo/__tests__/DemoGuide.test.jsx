@@ -8,13 +8,10 @@ vi.mock('../../components/atoms/GoalIcon', () => ({ default: () => <span /> }));
 vi.mock('../../components/common/ThemeToggleButton', () => ({ default: () => <button type="button">Theme</button> }));
 vi.mock('../Spotlight', () => ({ default: ({ selector, active }) => (active ? <i data-testid="spotlight" data-selector={selector} /> : null) }));
 
-const tree = (id, name) => ({
-    id, name, attributes: { type: 'UltimateGoal' },
-    children: [{ id: `${id}-stg`, name: 'Short term', attributes: { type: 'ShortTermGoal' }, children: [] }],
-});
 const EXAMPLES = [
-    { root_id: 'guitar', label: 'Guitar', root_name: 'Play guitar', tree: tree('guitar', 'Play guitar'), showcase: { session_id: 's-1', program_id: 'p-1' } },
-    { root_id: 'spanish', label: 'Spanish', root_name: 'Speak Spanish', tree: tree('spanish', 'Speak Spanish'), sessions: [{ id: 's-9' }] },
+    { root_id: 'guitar', label: 'Guitar', root_name: 'Play guitar', icon: { shape: 'star', color: '#f00' },
+        tour: { goal_id: 'guitar-stg', session_id: 's-1', program_id: 'p-1' } },
+    { root_id: 'spanish', label: 'Spanish', root_name: 'Speak Spanish', tour: { goal_id: null, session_id: 's-9', program_id: null } },
 ];
 
 function Location() {
@@ -36,13 +33,15 @@ function renderGuide(path = '/guitar/goals?tour=1', onSignup = vi.fn()) {
 describe('DemoGuide', () => {
     beforeEach(() => window.localStorage.clear());
 
-    it('deep-links every step to the example’s showcase picks', () => {
+    it('deep-links every step to the example’s published tour', () => {
         const steps = buildTourSteps(EXAMPLES[0]);
         expect(steps.map((step) => step.path)).toEqual([
             '/guitar/goals', '/guitar/goals?goal=guitar-stg', '/guitar/sessions', '/guitar/session/s-1',
             '/guitar/manage-activities', '/guitar/programs/p-1', '/guitar/analytics', '/guitar/notes', null,
         ]);
-        expect(buildTourSteps(EXAMPLES[1])[3].path).toBe('/spanish/session/s-9');
+        expect(buildTourSteps(EXAMPLES[1]).map((step) => step.path).slice(1, 6)).toEqual([
+            '/spanish/goals', '/spanish/sessions', '/spanish/session/s-9', '/spanish/manage-activities', '/spanish/programs',
+        ]);
     });
 
     it('walks the tour on the real pages, by button and keyboard', () => {

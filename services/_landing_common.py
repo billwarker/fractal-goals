@@ -1,4 +1,4 @@
-"""Landing publication settings keys, schema version, payload limits, and defaults.
+"""Live demo publication settings keys, schema version and limits.
 """
 
 import threading
@@ -22,76 +22,18 @@ LANDING_EXAMPLE_PUBLISH_LOCK_KEY = 1_176_518_982
 _landing_publish_process_lock = threading.Lock()
 
 
-# Bump when the published landing snapshot shape changes so the frontend / future
-# migrations can detect and handle stale caches.
-LANDING_EXAMPLE_SCHEMA_VERSION = 13
+# Bump when the published manifest's shape changes. 14: examples are demo snapshots
+# (root_id is the snapshot), carrying only label, name, icon, tour links and appearance.
+LANDING_EXAMPLE_SCHEMA_VERSION = 14
 
 
-# Match the production goal timeline's first-page depth so the landing modal
-# keeps feature parity while the payload stays lean through field compaction.
-LANDING_EXAMPLE_TIMELINE_LIMIT = 50
-
-
-LANDING_EXAMPLE_NOTES_LIMIT = 30
-
-
-LANDING_EXAMPLE_SESSIONS_LIMIT = 4
-
-
-LANDING_EXAMPLE_TEMPLATES_LIMIT = 4
-
-
-LANDING_EXAMPLE_ANALYTICS_LIMIT = 24
-
-
-# Bound the admin showcase picker lists so the options endpoint stays light.
+# Bound the admin tour picker so the options endpoint stays light.
 LANDING_EXAMPLE_OPTIONS_SESSIONS_LIMIT = 50
 
 
-LANDING_EXAMPLE_OPTIONS_ACTIVITIES_LIMIT = 200
+# The tour's optional featured picks, by source id; publishing maps them onto the snapshot.
+LANDING_EXAMPLE_TOUR_KEYS = ("session_id", "program_id")
 
 
-LANDING_EXAMPLE_ACTIVITY_CATALOGUE_LIMIT = 200
-
-
-LANDING_EXAMPLE_SHOWCASE_ACTIVITY_LIMIT = 1
-
-
-LANDING_EXAMPLE_SHOWCASE_ANALYTICS_VIEW_LIMIT = 3
-
-
-LANDING_EXAMPLE_SHOWCASE_KEYS = (
-    "session_id",
-    "activity_ids",
-    "program_id",
-    "program_start_date",
-    "program_end_date",
-    "analytics_view_ids",
-)
-
-
-LANDING_TREE_VIEW_SETTING_KEYS = (
-    "fadeInactiveBranches",
-    "hideInactiveGoals",
-    "hideCompletedGoals",
-    "showMetricsOverlay",
-)
-
-
-LANDING_GOAL_BULLET_DEFAULTS = (
-    {
-        "key": "break_down",
-        "heading": "Break it down",
-        "body": "Turn ambitious outcomes into achievable child goals. Map the journey one step at a time—and build momentum every time you complete one.",
-    },
-    {
-        "key": "associate_activities",
-        "heading": "Connect your work to your goals",
-        "body": "Attach activities as evidence of progress. Each completed activity advances the goal it supports and carries that evidence up through its lineage.",
-    },
-    {
-        "key": "set_conditions",
-        "heading": "Know when you're done",
-        "body": "Give each goal a clear finish line: an activity threshold, all of its child goals, or your call. Progress builds toward it on its own.",
-    },
-)
+# The owner preferences a demo carries (how completed goals are coloured).
+LANDING_EXAMPLE_APPEARANCE_KEYS = ("completed_primary_color", "completed_secondary_color")

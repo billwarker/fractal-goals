@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { DEMO_SHOWCASE, DEMO_SPANISH, demoId } from './demoIds';
 
 // The live demo is for visitors: no saved session, nothing stored.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const TOUR = [
-    { title: 'One ambition, broken down', path: /\/demo\/sweep-showcase-root\/goals$/ },
+    { title: 'One ambition, broken down', path: new RegExp(`/demo/${DEMO_SHOWCASE}/goals$`) },
     { title: 'Inside a goal', path: /\/goals(\?goal=.+)?$/ },
     { title: 'Every session, logged', path: /\/sessions$/ },
     { title: 'Inside a session', path: /\/session\/[^/]+$/ },
@@ -52,12 +53,12 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
     // Switch examples from the guide: same place, other fractal.
     await guide.getByRole('button', { name: 'Back', exact: true }).click();
     await guide.getByRole('button', { name: 'Hold a conversation in Spanish' }).click();
-    await expect(page).toHaveURL(/\/demo\/demo-spanish-root\/notes$/);
+    await expect(page).toHaveURL(new RegExp(`/demo/${DEMO_SPANISH}/notes$`));
     await expect(guide.getByText('Step 8 of 9')).toBeVisible();
 
     // Saving is refused before the network, with a prompt instead of an error.
     await guide.getByRole('button', { name: 'Minimise the demo guide' }).click();
-    await page.goto('/demo/sweep-showcase-root/goals?goal=sweep-goal-ii-v-i');
+    await page.goto(`/demo/${DEMO_SHOWCASE}/goals?goal=${demoId('sweep-showcase-root', 'sweep-goal-ii-v-i')}`);
     await page.getByRole('button', { name: 'Edit' }).first().click();
     await page.getByRole('button', { name: /^save/i }).first().click();
     const prompt = page.getByRole('dialog', { name: 'This is a live demo' });
@@ -87,7 +88,7 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
 test('the demo keeps nothing on the device and leaves cleanly', async ({ page }) => {
     // A visitor who prefers dark: the theme is theirs, not an account write to refuse.
     await page.addInitScript(() => localStorage.setItem('theme-preference', JSON.stringify({ mode: 'dark', darkFrom: '20:00', lightFrom: '07:00' })));
-    await page.goto('/demo/sweep-showcase-root/sessions');
+    await page.goto(`/demo/${DEMO_SHOWCASE}/sessions`);
     const guide = page.getByRole('region', { name: 'Demo guide' });
     await expect(guide).toBeVisible();
     await guide.getByRole('button', { name: 'Switch to light theme' }).click();

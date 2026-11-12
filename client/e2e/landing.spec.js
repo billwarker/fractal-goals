@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { DEMO_SHOWCASE } from './demoIds';
 
 // Public visitors and invitees: no saved session.
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -22,7 +23,7 @@ test('the landing is one hero that leads into the live demo or the waitlist', as
     // Each published example is a door into the demo; hovering previews it in the headline.
     const demos = page.getByRole('list', { name: 'Try the live demo' }).getByRole('link');
     await expect(demos).toHaveCount(2);
-    await expect(demos.first()).toHaveAttribute('href', '/demo/sweep-showcase-root/goals?tour=1');
+    await expect(demos.first()).toHaveAttribute('href', `/demo/${DEMO_SHOWCASE}/goals?tour=1`);
     if (testInfo.project.name === 'desktop') {
         await demos.first().hover();
         await expect(page.getByRole('heading', { level: 1 })).toHaveText('Play jazz guitar at a jam session');

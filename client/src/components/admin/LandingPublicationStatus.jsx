@@ -19,7 +19,7 @@ export function LandingPublicationSummary({ publishedAt, publishedCount, deliver
         <div className={styles.landingExamplesPublishMeta}>
             <span>Published</span>
             <strong>{formatDate(publishedAt)}</strong>
-            <span>{publishedCount || 0} examples live</span>
+            <span>{publishedCount || 0} {publishedCount === 1 ? 'demo' : 'demos'} live</span>
             {delivery?.status && (
                 <span>
                     Delivery: {delivery.status === 'delivered' ? 'static verified' : 'API only'}
@@ -32,15 +32,5 @@ export function LandingPublicationSummary({ publishedAt, publishedCount, deliver
                 </span>
             )}
         </div>
-    );
-}
-
-export function LandingPublicDataNotice() {
-    return (
-        <p className={styles.landingPublicDataNotice}>
-            Publishing makes the selected fractals publicly downloadable, including the bounded goal tree,
-            notes, timelines, sessions, activities, programs, completion conditions, and analytics included in the preview.
-            Review each example before publishing.
-        </p>
     );
 }

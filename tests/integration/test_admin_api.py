@@ -522,135 +522,49 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     ))
     db_session.commit()
 
-    catalogue_group = ActivityGroup(
-        id=str(uuid.uuid4()),
-        root_id=admin_landing_fractal.id,
-        name='Catalogue Group',
-        sort_order=0,
-    )
-    catalogue_only_activity = ActivityDefinition(
-        id=str(uuid.uuid4()),
-        root_id=admin_landing_fractal.id,
-        group_id=catalogue_group.id,
-        name='Catalogue-only Activity',
-    )
-    db_session.add_all([catalogue_group, catalogue_only_activity])
-    db_session.commit()
-
     publish_response = admin_client.post(
         '/api/admin/landing-examples/publish',
         data=json.dumps({}),
         content_type='application/json',
     )
     assert publish_response.status_code == 200
-    assert publish_response.get_json()['published_example_count'] == 1
+    published = publish_response.get_json()
+    assert published['published_example_count'] == 1
+    snapshot = published['examples'][0]['snapshot']
+    assert snapshot['root_id'] != admin_landing_fractal.id
+    assert snapshot['counts']['goals'] == 2 and snapshot['counts']['sessions'] == 1
+    assert snapshot['source_changed'] is False
 
+    # The public manifest names the snapshot and carries only what the landing draws.
     public_response = client.get('/api/public/landing-examples')
     assert public_response.status_code == 200
-    public_payload = public_response.get_json()
-    public_example = public_payload['examples'][0]
-    assert public_example['label'] == 'Software demo'
-    assert public_example['tree']['name'] == 'Public Demo Fractal'
-    assert public_example['tree']['children'][0]['name'] == 'Public Demo Child'
-    assert public_example['tree']['level']['icon'] == 'star'
-    assert public_example['tree']['attributes']['level']['color'] == '#66d9ef'
-    assert 'owner_id' not in public_example['tree']['attributes']
-    assert public_payload['published_at']
-
-    # The published snapshot is self-contained: each goal embeds its activities,
-    # timeline, and notes so the read-only landing modal needs no authenticated API.
-    root_attributes = public_example['tree']['attributes']
-    assert isinstance(root_attributes['associated_activities'], list)
-    assert isinstance(root_attributes['timeline_events'], list)
-    assert isinstance(root_attributes['notes'], list)
-    assert [a['name'] for a in root_attributes['associated_activities']] == ['Public Demo Activity']
-    assert root_attributes['associated_activities'][0]['has_direct_association'] is False
-    assert root_attributes['associated_activities'][0]['inherited_from_children'] is True
-    child_attributes = public_example['tree']['children'][0]['attributes']
-    assert isinstance(child_attributes['associated_activities'], list)
-    assert isinstance(child_attributes['timeline_events'], list)
-    assert isinstance(child_attributes['notes'], list)
-    # The child goal's associated activity and note are embedded in the snapshot.
-    assert [a['name'] for a in child_attributes['associated_activities']] == ['Public Demo Activity']
-    assert 'associated_goals' not in child_attributes['associated_activities'][0]
-    assert 'split_definitions' not in child_attributes['associated_activities'][0]
-    assert 'created_at' not in child_attributes['associated_activities'][0]
-    for event in child_attributes['timeline_events']:
-        assert 'root_id' not in (event.get('payload') or {})
-        assert 'updated_at' not in (event.get('payload') or {})
-    assert child_attributes['associated_activity_ids']
-    assert any(note.get('content') == 'Public-safe demo note' for note in child_attributes['notes'])
-
-    # The child is genuinely SMART; the snapshot uses the app's canonical SMART
-    # logic so is_smart is true (driving SMART icon styling on the landing page).
-    assert child_attributes['is_smart'] is True
-    assert child_attributes['smart_status']['measurable'] is True
-    assert child_attributes['smart_status']['achievable'] is True
-    assert public_example['tree']['children'][0]['is_smart'] is True
-
-    # Root-level flowtree data mirrors what the authenticated goals page consumes,
-    # so the landing view-options widget (fade/hide-inactive, hide-completed, metrics
-    # overlay, program alignment) acts on real data with no authenticated API.
-    assert isinstance(public_example['evidence_goal_ids'], list)
-    assert isinstance(public_example['metrics_summary'], dict)
-    assert isinstance(public_example['programs'], list)
-    assert [session['name'] for session in public_example['sessions']] == ['Public Demo Session']
-    assert [template['name'] for template in public_example['session_templates']] == ['Public Demo Template']
-    assert [activity['name'] for activity in public_example['activity_definitions']] == [
-        'Catalogue-only Activity', 'Public Demo Activity',
-    ]
-    assert [group['name'] for group in public_example['activity_groups']] == ['Catalogue Group']
-    demo_activity = next(
-        activity for activity in public_example['activity_definitions']
-        if activity['name'] == 'Public Demo Activity'
-    )
-    demo_activity_summary = public_example['activity_instantiation_summary'][demo_activity['id']]
-    assert demo_activity_summary['instance_count'] == 1
-    assert demo_activity_summary['average_duration_seconds'] == 2700
-    assert demo_activity_summary['last_used_at']
-    assert [view['name'] for view in public_example['analytics_views']] == [
-        'Public Demo Analytics View',
-    ]
-    assert child_attributes['completion_condition'] == 'activity_threshold'
-    condition_analytics = public_example['condition_analytics'][child_attributes['id']]
-    assert condition_analytics['condition']['kind'] == 'consistency'
-    assert len(condition_analytics['instances']) == 1
-    assert condition_analytics['activity_definition']['name'] == 'Public Demo Activity'
-    assert condition_analytics['progress']['required'] == 1
-
-    # Snapshot carries a schema version for forward-safe shape evolution.
-    assert public_example['schema_version'] == 13
-    assert public_payload['schema_version'] == 13
-    assert [bullet['key'] for bullet in public_example['landing_content']['goals']['bullets']] == [
-        'break_down', 'associate_activities', 'set_conditions',
-    ]
-    assert public_example['landing_content']['goals']['bullets'][0]['heading'] == 'Break it down'
-
-    # Without admin curation, the showcase key is still present with stable
-    # null/empty defaults so the frontend never branches on key existence.
-    assert public_example['showcase'] == {
-        'session_id': None,
-        'activity_ids': [],
-        'program_id': None,
-        'program_start_date': None,
-        'program_end_date': None,
-        'analytics_view_ids': [],
-    }
-    assert public_example['tree_view_settings'] == {
-        'fadeInactiveBranches': False,
-        'hideInactiveGoals': False,
-        'hideCompletedGoals': False,
-        'showMetricsOverlay': False,
-    }
-
-    # Published responses serve with short public caching; the cache only
-    # changes on manual publish.
     assert public_response.headers['Cache-Control'] == 'no-store'
+    public_payload = public_response.get_json()
+    assert public_payload['schema_version'] == 14
+    public_example = public_payload['examples'][0]
+    assert public_example == {
+        'root_id': snapshot['root_id'],
+        'label': 'Software demo',
+        'sort_order': 0,
+        'root_name': 'Public Demo Fractal',
+        'icon': {'shape': 'star', 'color': '#66d9ef', 'secondary_color': '#102235', 'smart': False},
+        'tour': {
+            'goal_id': public_example['tour']['goal_id'],
+            'session_id': public_example['tour']['session_id'],
+            'program_id': None,
+        },
+        'appearance': {},
+    }
+    tour_goal = db_session.get(Goal, public_example['tour']['goal_id'])
+    assert tour_goal.name == 'Public Demo Child' and tour_goal.root_id == snapshot['root_id']
+    copied_session = db_session.get(Session, public_example['tour']['session_id'])
+    assert copied_session.name == 'Public Demo Session' and copied_session.root_id == snapshot['root_id']
 
-    cache = db_session.get(AppSetting, 'landing_example_cache')
-    assert cache is not None
-    assert cache.value['examples'][0]['root_id'] == admin_landing_fractal.id
-    assert cache.value['schema_version'] == 13
+    # Editing the source afterwards is flagged until the next publish.
+    db_session.get(Goal, admin_landing_fractal.id).name = 'Renamed source'
+    db_session.commit()
+    status = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]['snapshot']
+    assert status['source_changed'] is True
 
 
 @pytest.mark.integration
@@ -680,379 +594,42 @@ def test_non_admin_cannot_manage_landing_examples(authed_client):
     assert response.status_code == 403
 
 
-def _landing_example_payload(root_id, showcase=None, tree_view_settings=None):
+def _landing_example_payload(root_id, tour=None):
     example = {'root_id': root_id, 'label': 'Software demo', 'sort_order': 0}
-    if showcase is not None:
-        example['showcase'] = showcase
-    if tree_view_settings is not None:
-        example['tree_view_settings'] = tree_view_settings
+    if tour is not None:
+        example['tour'] = tour
     return json.dumps({'examples': [example]})
 
 
 @pytest.mark.integration
-def test_landing_example_showcase_settings_round_trip(admin_client, db_session, admin_landing_fractal):
-    showcase = {
-        'session_id': 'session-1',
-        'activity_ids': ['activity-1'],
-        'program_id': 'program-1',
-        'program_start_date': '2026-01-05',
-        'program_end_date': '2026-01-20',
-        'analytics_view_ids': ['analytics-view-1'],
-    }
-    response = admin_client.patch(
-        '/api/admin/landing-examples',
-        data=_landing_example_payload(admin_landing_fractal.id, showcase),
-        content_type='application/json',
-    )
-    assert response.status_code == 200
-    saved = response.get_json()['examples'][0]['showcase']
-    assert saved == showcase
-
-    # GET returns the persisted, normalized showcase.
-    settings = admin_client.get('/api/admin/landing-examples').get_json()
-    assert settings['examples'][0]['showcase'] == showcase
-
-    # Saving without a showcase normalizes to stable null/empty defaults.
-    response = admin_client.patch(
-        '/api/admin/landing-examples',
-        data=_landing_example_payload(admin_landing_fractal.id),
-        content_type='application/json',
-    )
-    assert response.status_code == 200
-    assert response.get_json()['examples'][0]['showcase'] == {
-        'session_id': None,
-        'activity_ids': [],
-        'program_id': None,
-        'program_start_date': None,
-        'program_end_date': None,
-        'analytics_view_ids': [],
-    }
-
-
-@pytest.mark.integration
-def test_landing_tree_view_settings_round_trip_and_publish(
-    admin_client, client, admin_landing_fractal,
-):
-    tree_view_settings = {
-        'fadeInactiveBranches': True,
-        'hideInactiveGoals': True,
-        'hideCompletedGoals': False,
-        'showMetricsOverlay': True,
-    }
-    response = admin_client.patch(
-        '/api/admin/landing-examples',
-        data=_landing_example_payload(
-            admin_landing_fractal.id,
-            tree_view_settings=tree_view_settings,
-        ),
-        content_type='application/json',
-    )
-    assert response.status_code == 200
-    assert response.get_json()['examples'][0]['tree_view_settings'] == tree_view_settings
-    assert admin_client.get('/api/admin/landing-examples').get_json()[
-        'examples'
-    ][0]['tree_view_settings'] == tree_view_settings
-
-    publish_response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=json.dumps({}),
-        content_type='application/json',
-    )
-    assert publish_response.status_code == 200
-    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
-    assert public_example['tree_view_settings'] == tree_view_settings
-
-
-@pytest.mark.integration
-def test_landing_goals_content_round_trips_and_publishes_selected_examples(
-    admin_client, client, db_session, admin_landing_fractal,
-):
-    child = db_session.query(Goal).filter(
-        Goal.root_id == admin_landing_fractal.id,
-        Goal.parent_id.is_not(None),
-    ).first()
-    landing_content = {
-        'goals': {
-            'bullets': [
-                {
-                    'key': 'break_down',
-                    'heading': 'Build the path',
-                    'body': 'Turn the outcome into achievable steps.',
-                    'goal_id': child.id,
-                },
-                {
-                    'key': 'associate_activities',
-                    'heading': 'Connect the work',
-                    'body': 'Let evidence roll through the goal lineage.',
-                    'goal_id': child.id,
-                },
-                {
-                    'key': 'set_conditions',
-                    'heading': 'Measure the outcome',
-                    'body': 'Complete the goal when the work reaches a concrete threshold.',
-                    'goal_id': child.id,
-                },
-            ],
-        },
-    }
-    payload = {
-        'examples': [{
-            'root_id': admin_landing_fractal.id,
-            'label': 'Configured demo',
-            'sort_order': 0,
-            'landing_content': landing_content,
-        }],
-    }
-
-    response = admin_client.patch(
-        '/api/admin/landing-examples',
-        data=json.dumps(payload),
-        content_type='application/json',
-    )
-    assert response.status_code == 200
-    assert response.get_json()['examples'][0]['landing_content'] == landing_content
-
-    publish_response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=json.dumps(payload),
-        content_type='application/json',
-    )
-    assert publish_response.status_code == 200
-    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
-    assert public_example['landing_content'] == landing_content
-    published_child = public_example['tree']['children'][0]['attributes']
-    assert published_child['condition']['activity_definition_id'] == published_child['associated_activity_ids'][0]
-    assert published_child['condition']['required_count'] == 1
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize('showcase', [
-    {'activity_ids': ['a1', 'a2']},
-    {'analytics_view_ids': ['v1', 'v2', 'v3', 'v4']},
-    {'activity_ids': ['a1', 'a1']},
-    {'analytics_view_ids': ['v1', 'v1']},
-    {'program_start_date': 'not-a-date'},
-    {'program_start_date': '2026-02-01', 'program_end_date': '2026-01-01'},
-])
-def test_landing_example_showcase_validation_rejects_bad_payloads(
-    admin_client, admin_landing_fractal, showcase,
-):
-    response = admin_client.patch(
-        '/api/admin/landing-examples',
-        data=_landing_example_payload(admin_landing_fractal.id, showcase),
-        content_type='application/json',
-    )
-    assert response.status_code == 400
-
-
-@pytest.mark.integration
-def test_publish_honors_showcase_selections(admin_client, client, db_session, admin_landing_fractal):
-    root = admin_landing_fractal
-    featured_session = db_session.query(Session).filter_by(root_id=root.id).first()
-    # Push the featured session out of the most-recent-4 window.
-    for day in range(11, 15):
-        db_session.add(Session(
-            owner_id=root.owner_id,
-            completed=True,
-            id=str(uuid.uuid4()),
-            root_id=root.id,
-            name=f'Newer Session {day}',
-            session_start=datetime(2026, 1, day, 9, 0),
-            total_duration_seconds=600,
-        ))
-    # An activity no recent session references: only featuring it should publish it.
-    hidden_activity = ActivityDefinition(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        name='Hidden Featured Activity',
-        has_metrics=True,
-        track_progress=True,
-    )
-    hidden_metric = MetricDefinition(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        activity_id=hidden_activity.id,
-        name='Quality',
-        unit='Rating',
-        track_progress=True,
-    )
-    analytics_session = Session(
-        owner_id=root.owner_id,
-        completed=True,
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        name='Analytics-only Session',
-        session_start=datetime(2025, 12, 20, 9, 0),
-        total_duration_seconds=900,
-    )
-    analytics_instance = ActivityInstance(
-        id=str(uuid.uuid4()),
-        session_id=analytics_session.id,
-        activity_definition_id=hidden_activity.id,
-        root_id=root.id,
-        completed=True,
-        duration_seconds=900,
-        time_stop=datetime(2025, 12, 20, 9, 15),
-        data={},
-    )
-    hidden_metric_value = MetricValue(
-        id=str(uuid.uuid4()),
-        activity_instance_id=analytics_instance.id,
-        metric_definition_id=hidden_metric.id,
-        value=7,
-    )
-    program = Program(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        name='Public Demo Program',
-        start_date=datetime(2026, 1, 1),
-        end_date=datetime(2026, 3, 1),
-        weekly_schedule={},
-    )
-    analytics_view = AnalyticsDashboard(
-        id=str(uuid.uuid4()),
-        root_id=root.id,
-        user_id=root.owner_id,
-        name='Featured Analytics View',
-        kind='view',
-        layout={
-            'version': 3,
-            'layout': {
-                'type': 'grid',
-                'panels': [{'id': 'window-1', 'x': 0, 'y': 0, 'w': 96, 'h': 48}],
-            },
-            'window_states': {'window-1': {
-                'selectedCategory': 'activities',
-                'selectedVisualization': 'metricProgress',
-                'selectedActivity': {'id': hidden_activity.id, 'name': hidden_activity.name},
-                'selectedGoal': None,
-                'visualizationState': {'metric': hidden_metric.id},
-                'visualizationStateByKey': {
-                    'activities:metricProgress': {'metric': hidden_metric.id},
-                },
-            }},
-            'selected_window_id': 'window-1',
-            'global_filters': {
-                'goals': {'goalIds': [], 'includeDescendants': True, 'includeInheritedActivities': True},
-                'activities': {'activityIds': [hidden_activity.id], 'groupIds': [], 'includeChildren': True},
-            },
-            'layout_bounds': {'columns': 96, 'rows': 48},
-        },
-    )
-    db_session.add_all([
-        hidden_activity,
-        hidden_metric,
-        analytics_session,
-        analytics_instance,
-        hidden_metric_value,
-        program,
-        analytics_view,
-    ])
+def test_tour_picks_round_trip_and_follow_the_snapshot(admin_client, client, db_session, admin_landing_fractal):
+    program = Program(id=str(uuid.uuid4()), root_id=admin_landing_fractal.id, name='Featured Program',
+                      start_date=datetime(2026, 1, 1), end_date=datetime(2026, 3, 1), weekly_schedule={})
+    db_session.add(program)
     db_session.commit()
+    session_id = db_session.query(Session).filter(Session.root_id == admin_landing_fractal.id).first().id
+    tour = {'session_id': session_id, 'program_id': program.id}
 
-    showcase = {
-        'session_id': featured_session.id,
-        'activity_ids': [hidden_activity.id],
-        'program_id': program.id,
-        'program_start_date': '2026-01-05',
-        'program_end_date': '2026-01-20',
-        'analytics_view_ids': [analytics_view.id],
-    }
-    publish_response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=_landing_example_payload(root.id, showcase),
-        content_type='application/json',
-    )
-    assert publish_response.status_code == 200
-    assert publish_response.get_json()['showcase_warnings'] == []
+    saved = admin_client.patch('/api/admin/landing-examples', data=_landing_example_payload(admin_landing_fractal.id, tour),
+                               content_type='application/json')
+    assert saved.status_code == 200
+    assert saved.get_json()['examples'][0]['tour'] == tour
 
-    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
-    assert public_example['showcase'] == showcase
-    # The featured session is included even though it is not among the recent 4.
-    session_ids = [session['id'] for session in public_example['sessions']]
-    assert featured_session.id in session_ids
-    # The explicitly featured activity serializes despite no recent-session reference.
-    activity_names = [activity['name'] for activity in public_example['activity_definitions']]
-    assert 'Hidden Featured Activity' in activity_names
-    assert any(program_item['id'] == program.id for program_item in public_example['programs'])
-    assert [view['name'] for view in public_example['analytics_views']] == ['Featured Analytics View']
-    analytics_instances = public_example['analytics_activity_instances'][hidden_activity.id]
-    assert analytics_instances[0]['id'] == analytics_instance.id
-    assert analytics_instances[0]['session_name'] == 'Analytics-only Session'
-    assert analytics_instances[0]['progress_comparison']['previous_instance_id'] is None
-    assert analytics_instances[0]['progress_comparison']['is_first_instance'] is True
+    assert admin_client.post('/api/admin/landing-examples/publish', data=json.dumps({}),
+                             content_type='application/json').status_code == 200
+    published = client.get('/api/public/landing-examples').get_json()['examples'][0]
+    assert db_session.get(Program, published['tour']['program_id']).name == 'Featured Program'
+    assert published['tour']['program_id'] != program.id
+    assert db_session.get(Session, published['tour']['session_id']).root_id == published['root_id']
 
-
-@pytest.mark.integration
-def test_publish_drops_stale_showcase_refs_with_warnings(admin_client, client, admin_landing_fractal):
-    showcase = {
-        'session_id': str(uuid.uuid4()),
-        'activity_ids': [str(uuid.uuid4())],
-        'program_id': str(uuid.uuid4()),
-        'program_start_date': '2026-01-05',
-        'program_end_date': '2026-01-20',
-        'analytics_view_ids': [str(uuid.uuid4())],
-    }
-    publish_response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=_landing_example_payload(admin_landing_fractal.id, showcase),
-        content_type='application/json',
-    )
-    assert publish_response.status_code == 200
-    warnings = publish_response.get_json()['showcase_warnings']
-    assert len(warnings) == 4
-
-    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
-    assert public_example['showcase'] == {
-        'session_id': None,
-        'activity_ids': [],
-        'program_id': None,
-        'program_start_date': None,
-        'program_end_date': None,
-        'analytics_view_ids': [],
-    }
-
-    # Publishing reconciles unavailable references into the editable settings,
-    # so the same hidden selections cannot warn forever.
-    saved_example = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]
-    assert saved_example['showcase'] == public_example['showcase']
-    second_publish = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=json.dumps({}),
-        content_type='application/json',
-    )
-    assert second_publish.status_code == 200
-    assert second_publish.get_json()['showcase_warnings'] == []
-
-
-@pytest.mark.integration
-def test_publish_keeps_valid_analytics_view_while_reconciling_stale_selection(
-    admin_client,
-    db_session,
-    admin_landing_fractal,
-):
-    valid_view_id = db_session.query(AnalyticsDashboard.id).filter(
-        AnalyticsDashboard.root_id == admin_landing_fractal.id,
-        AnalyticsDashboard.kind == 'view',
-        AnalyticsDashboard.deleted_at.is_(None),
-    ).scalar()
-    stale_view_id = str(uuid.uuid4())
-    showcase = {'analytics_view_ids': [stale_view_id, valid_view_id]}
-
-    response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=_landing_example_payload(admin_landing_fractal.id, showcase),
-        content_type='application/json',
-    )
-
-    assert response.status_code == 200
-    payload = response.get_json()
-    assert payload['examples'][0]['showcase']['analytics_view_ids'] == [valid_view_id]
-    assert payload['showcase_warnings'] == [
-        'Software demo: 1 analytics view no longer exists and was removed',
-    ]
-    saved_example = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]
-    assert saved_example['showcase']['analytics_view_ids'] == [valid_view_id]
+    # Drafts saved before the snapshot demo kept the picks under `showcase`.
+    db_session.get(AppSetting, 'landing_example_settings').value = {'examples': [
+        {'root_id': admin_landing_fractal.id, 'label': 'Legacy', 'sort_order': 0,
+         'showcase': {'session_id': session_id, 'activity_ids': ['gone']}, 'landing_content': {}},
+    ]}
+    db_session.commit()
+    legacy = admin_client.get('/api/admin/landing-examples').get_json()['examples'][0]
+    assert legacy['tour'] == {'session_id': session_id, 'program_id': None}
 
 
 @pytest.mark.integration
@@ -1084,9 +661,9 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 13
+    assert static_payload['schema_version'] == 14
     assert static_payload['published_at'] == static_publish['published_at']
-    assert static_payload['examples'][0]['root_id'] == admin_landing_fractal.id
+    assert static_payload['examples'][0]['root_name'] == 'Public Demo Fractal'
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
 
     gcs_uploads = []
@@ -1125,7 +702,7 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
     gcs_payload = json.loads(gzip.decompress(gcs_uploads[0]['data']).decode('utf-8'))
     assert len(gcs_uploads[0]['data']) < len(json.dumps(gcs_payload).encode('utf-8'))
     assert gcs_payload['published_at'] == gcs_publish['published_at']
-    assert gcs_payload['examples'][0]['root_id'] == admin_landing_fractal.id
+    assert gcs_payload['examples'][0]['root_name'] == 'Public Demo Fractal'
 
     def _timed_out_upload(*args, **kwargs):
         raise TimeoutError('static upload exceeded its delivery budget')
@@ -1185,7 +762,7 @@ def test_publish_landing_examples_rejects_oversized_compressed_snapshot(
     )
 
     assert rejected.status_code == 413
-    assert rejected.get_json()['error'].startswith('Compressed landing snapshot is too large to publish')
+    assert rejected.get_json()['error'].startswith('The compressed demo manifest is too large to publish')
     assert admin_client.get('/api/public/landing-examples').get_json()['published_at'] is None
 
 
@@ -1265,19 +842,11 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     response = admin_client.get(f'/api/admin/landing-examples/options?root_id={root.id}')
     assert response.status_code == 200
     options = response.get_json()
+    assert set(options) == {'root_id', 'sessions', 'programs'}
     assert options['root_id'] == root.id
     assert [session['name'] for session in options['sessions']] == ['Public Demo Session']
-    assert options['sessions'][0]['total_duration_seconds'] == 2700
     assert options['sessions'][0]['activity_instance_count'] == 1
-    activity = next(item for item in options['activities'] if item['name'] == 'Public Demo Activity')
-    assert activity['associated_goal_count'] == 1
-    assert activity['group_id'] == group.id
-    assert [item['name'] for item in options['activity_groups']] == ['Options Group']
     assert [item['name'] for item in options['programs']] == ['Options Program']
-    assert [item['name'] for item in options['analytics_views']] == ['Public Demo Analytics View']
-    assert {item['name'] for item in options['goals']} == {'Public Demo Fractal', 'Public Demo Child'}
-    condition_goal = next(item for item in options['goals'] if item['has_activity_condition'])
-    assert condition_goal['completion_condition'] == 'activity_threshold'
 
     assert admin_client.get('/api/admin/landing-examples/options').status_code == 400
     # Roots not owned by an active admin are rejected.
@@ -1287,44 +856,6 @@ def test_landing_example_options_endpoint(admin_client, authed_client, db_sessio
     assert authed_client.get(
         f'/api/admin/landing-examples/options?root_id={root.id}'
     ).status_code == 403
-
-
-@pytest.mark.integration
-def test_publish_drops_featured_session_without_activities(
-    admin_client,
-    client,
-    db_session,
-    admin_landing_fractal,
-):
-    empty_session = Session(
-        owner_id=admin_landing_fractal.owner_id,
-        id=str(uuid.uuid4()),
-        root_id=admin_landing_fractal.id,
-        name='Timer-only session',
-        session_start=datetime(2026, 2, 1, 9, 0),
-        session_end=datetime(2026, 2, 1, 10, 0),
-        total_duration_seconds=3600,
-        completed=True,
-        attributes={'session_data': {'sections': [{'name': 'Exercises', 'activity_ids': []}]}},
-    )
-    db_session.add(empty_session)
-    db_session.commit()
-
-    publish_response = admin_client.post(
-        '/api/admin/landing-examples/publish',
-        data=_landing_example_payload(
-            admin_landing_fractal.id,
-            {'session_id': empty_session.id},
-        ),
-        content_type='application/json',
-    )
-
-    assert publish_response.status_code == 200
-    warnings = publish_response.get_json()['showcase_warnings']
-    assert len(warnings) == 1
-    assert warnings[0].endswith('Featured session has no activities and was skipped')
-    public_example = client.get('/api/public/landing-examples').get_json()['examples'][0]
-    assert public_example['showcase']['session_id'] is None
 
 
 @pytest.mark.integration

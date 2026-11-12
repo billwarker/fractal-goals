@@ -12,6 +12,8 @@ from blueprints.demo_access import DEMO_READ_ENDPOINTS
 from config import config
 from models import AppSetting, Goal, Note, Session, User
 from services.demo_access_service import DEMO_TOKEN_AUDIENCE
+from services.demo_account_service import DemoAccountService
+from services.landing_publish_service import LandingPublishService
 
 APP_SOURCE = Path(__file__).resolve().parents[2] / 'app.py'
 
@@ -75,7 +77,7 @@ def _root(db_session, owner, name):
 
 
 @pytest.fixture
-def demo_root(db_session, admin_owner):
+def source_root(db_session, admin_owner):
     return _root(db_session, admin_owner, 'Become a skilled guitar player')
 
 
@@ -85,12 +87,24 @@ def private_root(db_session, admin_owner):
 
 
 @pytest.fixture
-def published(db_session, demo_root):
-    db_session.add(AppSetting(key='landing_example_cache', value={
-        'published_at': '2026-11-01T00:00:00Z',
-        'examples': [{'root_id': demo_root.id, 'label': 'Guitar'}],
-    }))
+def published(db_session, admin_owner, source_root):
+    """Publish the source the real way: the demo serves its snapshot in the demo account."""
+    admin_owner.preferences = {
+        'completed_primary_color': '#ffaa00',
+        'completed_secondary_color': '#332200',
+        'theme': {'mode': 'dark'},
+    }
     db_session.commit()
+    service = LandingPublishService(db_session)
+    service.update_landing_example_settings({'examples': [{'root_id': source_root.id, 'label': 'Guitar', 'sort_order': 0}]})
+    payload, error, _ = service.publish_landing_examples()
+    assert error is None, error
+    return payload['examples'][0]['snapshot']['root_id']
+
+
+@pytest.fixture
+def demo_root(db_session, published):
+    return db_session.get(Goal, published)
 
 
 @pytest.fixture
@@ -117,13 +131,7 @@ class TestDemoAccess:
     def test_issues_a_token_only_while_examples_are_published(self, client, db_session):
         assert client.post('/api/public/demo-session').status_code == 404
 
-    def test_session_carries_only_the_owners_completed_colours(self, client, db_session, admin_owner, demo_root, published):
-        admin_owner.preferences = {
-            'completed_primary_color': '#ffaa00',
-            'completed_secondary_color': '#332200',
-            'theme': {'mode': 'dark'},
-        }
-        db_session.commit()
+    def test_session_carries_only_the_owners_completed_colours(self, client, demo_root):
         body = client.post('/api/public/demo-session').get_json()
         assert body['appearance'] == {
             demo_root.id: {'completed_primary_color': '#ffaa00', 'completed_secondary_color': '#332200'},
@@ -132,14 +140,21 @@ class TestDemoAccess:
     def test_the_token_is_not_a_login_session(self, client, demo_headers):
         assert client.get('/api/auth/me', headers=demo_headers).status_code == 403
 
-    def test_reads_the_published_example_as_its_owner(self, client, demo_headers, demo_root):
+    def test_reads_the_snapshot_never_the_source(self, client, demo_headers, demo_root, source_root):
         response = client.get(f'/api/{demo_root.id}/goals', headers=demo_headers)
         assert response.status_code == 200
         assert response.get_json()['name'] == 'Become a skilled guitar player'
+        assert demo_root.id != source_root.id
+        assert client.get(f'/api/{source_root.id}/goals', headers=demo_headers).status_code == 404
 
-    def test_never_reaches_an_unpublished_root_of_the_same_owner(self, client, demo_headers, private_root):
+    def test_never_reaches_the_owners_other_fractals(self, client, demo_headers, private_root):
         assert client.get(f'/api/{private_root.id}/goals', headers=demo_headers).status_code == 404
         assert client.get(f'/api/goal-levels?root_id={private_root.id}', headers=demo_headers).status_code == 404
+
+    def test_the_demo_runs_as_the_demo_account_not_the_admin(self, db_session, demo_root, admin_owner):
+        account = DemoAccountService(db_session).get()
+        assert demo_root.owner_id == account.id != admin_owner.id
+        assert account.role == 'demo'
 
     def test_lists_only_the_published_examples(self, client, demo_headers, demo_root, private_root):
         response = client.get('/api/fractals', headers=demo_headers)

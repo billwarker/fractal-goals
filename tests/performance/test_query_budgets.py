@@ -12,6 +12,7 @@ from models import (
     ActivityGroup,
     ActivityInstance,
     ActivityInstanceTag,
+    ActivitySet,
     ActivityTagDefinition,
     AnalyticsDashboard,
     Goal,
@@ -654,7 +655,7 @@ def test_activity_tag_catalog_query_budget_is_constant(
 def test_publish_landing_examples_query_budget(
     client, query_counter, landing_publish_budget_dataset
 ):
-    """Landing snapshot publish should batch goal tree enrichment instead of querying per goal."""
+    """Publishing a demo snapshot costs a fixed number of queries per table, not per row."""
     admin = landing_publish_budget_dataset["admin"]
     root = landing_publish_budget_dataset["root"]
 
@@ -679,14 +680,11 @@ def test_publish_landing_examples_query_budget(
         query_counter=query_counter,
     )
 
-    # Reusing the validated/preloaded goal graph across enrichment phases keeps
-    # this production-shaped 17-goal snapshot below one second locally while
-    # retaining CI headroom and a strict regression ceiling. Condition analytics
-    # load each example root's watched activity once (constant per root, not per goal).
+    # Collecting walks each copied table once per pass; inserts and link updates are batched.
     assert_response_budget(
-        response, max_bytes=140_000, max_ms=1_800, elapsed_ms=elapsed_ms
+        response, max_bytes=20_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 67  # +1: batched condition-tag load
+    assert query_counter["total"] <= 115
 
 
 @pytest.mark.integration
@@ -720,13 +718,59 @@ def test_publish_multiple_landing_examples_total_payload_budget(
     )
 
     assert_response_budget(
-        response, max_bytes=160_000, max_ms=3_000, elapsed_ms=elapsed_ms
+        response, max_bytes=20_000, max_ms=3_000, elapsed_ms=elapsed_ms
     )
     payload = response.get_json()
     assert payload["published_example_count"] == 2
-    assert payload["snapshot_bytes"] <= 400_000
-    assert payload["compressed_snapshot_bytes"] <= 100_000
-    assert query_counter["total"] <= 115
+    assert payload["snapshot_bytes"] <= 4_000
+    assert payload["compressed_snapshot_bytes"] <= 2_000
+    assert query_counter["total"] <= 190
+
+
+@pytest.mark.integration
+def test_publishing_a_large_fractal_scales_by_batches_not_rows(
+    client, db_session, query_counter, landing_publish_budget_dataset
+):
+    """500 sessions with sets and metrics: the copy costs batches, so queries barely grow."""
+    admin = landing_publish_budget_dataset["admin"]
+    root = landing_publish_budget_dataset["root"]
+    publish = lambda: timed_request(  # noqa: E731
+        client,
+        "post",
+        "/api/admin/landing-examples/publish",
+        data=json.dumps({"examples": [{"root_id": root.id, "label": "Large", "sort_order": 0}]}),
+        headers=auth_headers_for(admin),
+        content_type="application/json",
+        query_counter=query_counter,
+    )
+    publish()
+    query_counter["total"] = 0
+    publish()  # a republish: purge the copy, then take it again
+    small = query_counter["total"]
+
+    activity = db_session.query(ActivityDefinition).filter(ActivityDefinition.root_id == root.id).first()
+    start = datetime(2026, 1, 1, 18, 0)
+    for index in range(500):
+        session_id = str(uuid.uuid4())
+        db_session.add(PracticeSession(
+            id=session_id, root_id=root.id, owner_id=admin.id, name=f"Session {index}",
+            session_start=start + timedelta(days=index), completed=True,
+        ))
+        instance_id = str(uuid.uuid4())
+        db_session.add(ActivityInstance(id=instance_id, root_id=root.id, session_id=session_id,
+                                        activity_definition_id=activity.id, completed=True))
+        for set_index in range(3):
+            db_session.add(ActivitySet(id=str(uuid.uuid4()), activity_instance_id=instance_id,
+                                       sort_order=set_index, status="completed"))
+    db_session.commit()
+
+    query_counter["total"] = 0
+    response, elapsed_ms = publish()
+    assert response.status_code == 200
+    assert response.get_json()["examples"][0]["snapshot"]["counts"]["sessions"] >= 500
+    # Republishing purges the previous copy and walks ~3,000 more rows in 500-row batches.
+    assert query_counter["total"] - small <= 40
+    assert elapsed_ms <= 8_000
 
 
 @pytest.mark.integration

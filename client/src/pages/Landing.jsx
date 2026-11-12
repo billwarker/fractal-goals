@@ -10,7 +10,7 @@ import useMediaQuery from '../hooks/useMediaQuery';
 import { queryKeys } from '../hooks/queryKeys';
 import { globalApi, publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
-import { getGoalIconProps } from '../utils/landingPageModel';
+import { demoIconProps, demoRootName, sortDemoExamples } from '../demo/demoExamples';
 import { getAppHref } from '../utils/marketingHost';
 import styles from './Landing.module.css';
 
@@ -50,16 +50,12 @@ function Landing() {
         queryFn: fetchLandingExamples,
         staleTime: LANDING_EXAMPLES_STALE_TIME,
     });
-    const examples = useMemo(() => (examplesQuery.data?.examples || [])
-        .filter((example) => example?.root_id && example.tree)
-        .slice()
-        .sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0))
-        .map((example) => ({
-            id: example.root_id,
-            label: example.label,
-            root: example.root_name || example.tree?.name || example.label,
-            icon: getGoalIconProps(example.tree),
-        })), [examplesQuery.data]);
+    const examples = useMemo(() => sortDemoExamples(examplesQuery.data).map((example) => ({
+        id: example.root_id,
+        label: example.label,
+        root: demoRootName(example),
+        icon: demoIconProps(example.icon),
+    })), [examplesQuery.data]);
 
     // Wake the API while the visitor reads, so the demo opens on a warm server.
     useEffect(() => {

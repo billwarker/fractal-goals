@@ -80,23 +80,33 @@ complete. `client/e2e/onboarding.spec.js` drives the journey with the fixture's 
 accounts.
 
 Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
-demo. Each published landing example (Admin → Landing) is an icon linking to `/demo/<rootId>/goals?tour=1`;
+demo. Each published demo (Admin → Live demo) is an icon linking to `/demo/<snapshot root>/goals?tour=1`;
 "or join the waitlist" opens `demo/DemoSignupModal`. `index.html`'s boot copy mirrors the hero (an
 architecture test ties its words to landing.md). `main.jsx` keeps its three root imports (public landing,
 demo, app) as separate statements, so each root preloads its own CSS.
 
-Live demo (`src/demo/`, plan `planning/landing-live-demo-2026-11.md`): the real app, read-only, on the
-published examples. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
+Live demo (`src/demo/`, plans `planning/landing-live-demo-2026-11.md` and
+`planning/demo-snapshots-2026-11.md`): the real app, read-only, on frozen copies. Publishing (Admin → Live
+demo, `services/landing_publish_service.py`) copies each chosen admin fractal into the demo account
+(`role='demo'`, nobody can sign in; `services/demo_account_service.py`) with
+`services/demo_snapshot_service.py`: a metadata-driven copy of every row the fractal reaches, ids derived
+from the source's (uuid5, so demo links survive a republish), references remapped (JSON included), the
+fractal's effective goal levels copied as its own, database insert-trigger effects undone, media and agent
+state left out. Every reachable table must be in `COPY_TABLES` or `EXCLUDED_TABLES`; adding a table that
+reaches a fractal fails `tests/integration/test_demo_snapshots.py` until it is classified there, and the
+same file checks every allow-listed page reads the same on the copy as on the source. The public manifest
+(`landing_example_cache`, schema 14) carries only label, root name, icon, the tour's deep links and the
+owner's completed-goal colours. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
 audience (`services/demo_access_service.py`); `token_required` hands demo tokens to
 `blueprints/demo_access.py`, which serves only GET endpoints in `DEMO_READ_ENDPOINTS` on roots that are
-still published, as the root's owner, and never media, storage, account, agent, admin or log routes.
+still published, as the root's owner (the demo account), and never media, storage, account, agent, admin or log routes.
 `tests/integration/test_demo_access.py` walks every protected route in the URL map. Client: `DemoRoot`
 (BrowserRouter `basename="/demo"`, `DemoAuthProvider` guest, the shared `FractalRoutes` table) and
 `demoMode.js`, whose axios guard refuses writes before sending and opens `DemoWritePrompt`. In demo mode
 the outbox, persisted cache, service worker, theme sync, storage connections and attachments are off.
-`DemoGuide` is the tour (steps in `demoTour.js`, deep-linked via the snapshot's showcase picks; pages carry
+`DemoGuide` is the tour (steps in `demoTour.js`, deep-linked via the manifest's `tour`; pages carry
 `data-tour` anchors for `Spotlight`). Invite holders are sent to the app host's invite link. Covered by
-`client/e2e/demo.spec.js` and `landing.spec.js`.
+`client/e2e/demo.spec.js`, `landing.spec.js` and `admin-live-demo.spec.js` (snapshot ids from `e2e/demoIds.js`).
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context
@@ -564,8 +574,7 @@ Primary code: `services/note_service.py`, `services/analytics_*`, `blueprints/no
 `blueprints/analytics_api.py`, and `client/src/components/analytics/`.
 
 `services/goal_history_read_model.py` and `services/goal_note_read_model.py` are
-request-scoped bulk loaders. Landing publication reuses them while projecting each
-goal through the canonical timeline and note services. Analytics query caching is
+request-scoped bulk loaders. Analytics query caching is
 bounded in development/testing and bypassed in production-like multi-worker runtimes.
 
 ### Interaction contracts

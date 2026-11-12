@@ -85,6 +85,7 @@ from services._admin_common import (  # noqa: F401 - re-exported for existing im
     hash_invite_key,
 )
 from services._admin_beta_signups import _AdminBetaSignupsMixin
+from services.demo_account_service import DEMO_ACCOUNT_ROLE
 
 
 class AdminService(_AdminBetaSignupsMixin):
@@ -617,7 +618,7 @@ class AdminService(_AdminBetaSignupsMixin):
         }
 
     def list_users(self, search: str = "", limit: int = 50, offset: int = 0) -> ServiceResult[JsonDict]:
-        query = self.db_session.query(User)
+        query = self.db_session.query(User).filter(User.role != DEMO_ACCOUNT_ROLE)
         if search:
             term = f"%{search}%"
             query = query.filter((User.username.ilike(term)) | (User.email.ilike(term)))
@@ -633,12 +634,16 @@ class AdminService(_AdminBetaSignupsMixin):
     BETA_SIGNUP_STATUSES = ("new", "invited", "dismissed")
 
     def summary(self) -> ServiceResult[JsonDict]:
-        total_users = int(self.db_session.query(func.count(User.id)).scalar() or 0)
-        active_users = int(self.db_session.query(func.count(User.id)).filter(User.is_active.is_(True)).scalar() or 0)
-        total_fractals = int(self.db_session.query(func.count(Goal.id)).filter(
-            Goal.parent_id.is_(None), Goal.deleted_at.is_(None)
+        # The demo account's snapshots are copies, not usage.
+        people = User.role != DEMO_ACCOUNT_ROLE
+        total_users = int(self.db_session.query(func.count(User.id)).filter(people).scalar() or 0)
+        active_users = int(self.db_session.query(func.count(User.id)).filter(people, User.is_active.is_(True)).scalar() or 0)
+        total_fractals = int(self.db_session.query(func.count(Goal.id)).join(User, Goal.owner_id == User.id).filter(
+            people, Goal.parent_id.is_(None), Goal.deleted_at.is_(None)
         ).scalar() or 0)
-        total_sessions = int(self.db_session.query(func.count(Session.id)).filter(Session.deleted_at.is_(None)).scalar() or 0)
+        total_sessions = int(self.db_session.query(func.count(Session.id)).join(User, Session.owner_id == User.id).filter(
+            people, Session.deleted_at.is_(None)
+        ).scalar() or 0)
         total_storage = self._database_storage_bytes()
         invite_counts = {
             "available": 0,
@@ -648,7 +653,7 @@ class AdminService(_AdminBetaSignupsMixin):
         }
         for invite in self.db_session.query(SignupInviteKey).all():
             invite_counts[self.invite_status(invite)] += 1
-        recent_users = self.db_session.query(User).order_by(User.created_at.desc()).limit(5).all()
+        recent_users = self.db_session.query(User).filter(people).order_by(User.created_at.desc()).limit(5).all()
         recent_logins = self.db_session.query(User).filter(User.last_login_at.isnot(None)).order_by(User.last_login_at.desc()).limit(5).all()
         return {
             "total_users": total_users,

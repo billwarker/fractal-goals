@@ -1,23 +1,10 @@
-import { getGoalNodeId } from '../utils/goalNodeModel';
-import { findFirstGoalByType } from '../utils/landingPageModel';
-
 // The guided walkthrough, in order. Each step opens a real page and points at a real
-// element (`anchor`, a selector); deep links use the admin's showcase picks from the
-// published snapshot so every example opens on its best data.
-
-const firstGoalWorthOpening = (tree) => (
-    findFirstGoalByType(tree, 'ShortTermGoal')
-    || findFirstGoalByType(tree, 'MidTermGoal')
-    || findFirstGoalByType(tree, 'LongTermGoal')
-    || tree
-);
+// element (`anchor`, a selector). Deep links come from the published example's `tour`
+// (the admin's featured picks, mapped onto the snapshot when it was published).
 
 export function buildTourSteps(example) {
     const rootId = example?.root_id;
-    const showcase = example?.showcase || {};
-    const goalId = getGoalNodeId(firstGoalWorthOpening(example?.tree));
-    const sessionId = showcase.session_id || example?.sessions?.[0]?.id || null;
-    const programId = showcase.program_id || example?.programs?.[0]?.id || null;
+    const { goal_id: goalId = null, session_id: sessionId = null, program_id: programId = null } = example?.tour || {};
     const base = `/${rootId}`;
 
     return [
