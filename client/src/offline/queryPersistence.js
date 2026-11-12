@@ -43,6 +43,13 @@ export async function restoreQueryCache(queryClient, userId, { now = Date.now() 
     }
     // Hydrate never overwrites data newer than the persisted copy.
     hydrate(queryClient, saved.state);
+    // The copy can trail the server (writes are throttled), so what it restored is shown
+    // at once but refetched on mount when online; offline it stays as the data.
+    const cache = queryClient.getQueryCache();
+    for (const { queryKey, state } of saved.state.queries) {
+        const query = cache.find({ queryKey, exact: true });
+        if (query?.state.dataUpdatedAt === state.dataUpdatedAt) query.invalidate();
+    }
     return true;
 }
 
@@ -65,15 +72,21 @@ export function startQueryPersistence(queryClient, userId) {
         if (event?.type !== 'updated' || !PERSISTED_PREFIXES.has(event.query.queryKey?.[0])) return;
         timer ??= setTimeout(write, WRITE_THROTTLE_MS);
     });
-    const flushOnHide = () => {
-        if (document.visibilityState !== 'hidden' || !timer) return;
+    const flush = () => {
+        if (!timer) return;
         clearTimeout(timer);
         write();
     };
+    const flushOnHide = () => {
+        if (document.visibilityState === 'hidden') flush();
+    };
+    // A reload or close doesn't always report the page hidden first.
     document.addEventListener('visibilitychange', flushOnHide);
+    window.addEventListener('pagehide', flush);
     return () => {
         unsubscribe();
         document.removeEventListener('visibilitychange', flushOnHide);
+        window.removeEventListener('pagehide', flush);
         if (timer) {
             clearTimeout(timer);
             write();
