@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { apiToken, openOrigin } from './support/session.js';
+import { openGoalFromTree } from './support/goals.js';
 
 // Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
 // the API token for seeding.
@@ -60,10 +61,7 @@ test('a saved view shows on a goal beside its threshold chart, expands inline, a
     await page.goto(`/${root}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
     const charts = page.getByRole('region', { name: 'Analytics' });
-    await expect(async () => {
-        await page.locator('.react-flow__node').filter({ hasText: goalName }).getByText(goalName, { exact: true }).click();
-        await expect(charts).toBeVisible({ timeout: 2000 });
-    }).toPass();
+    await openGoalFromTree(page, goalName, charts);
     await expect(charts.getByText('1 of 2', { exact: true })).toBeVisible();
     await expect(charts.getByText(viewName, { exact: true })).toBeVisible();
     await charts.getByRole('button', { name: 'Next chart' }).click();
@@ -158,10 +156,7 @@ test('a saved session chart can be added from goal details', async ({ page }, te
     await page.goto(`/${root}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
     const charts = page.getByRole('region', { name: 'Analytics' });
-    await expect(async () => {
-        await page.locator('.react-flow__node').filter({ hasText: goalName }).getByText(goalName, { exact: true }).click();
-        await expect(charts).toBeVisible({ timeout: 2000 });
-    }).toPass();
+    await openGoalFromTree(page, goalName, charts);
     await charts.getByRole('button', { name: '+ Add chart' }).click();
     await page.getByRole('menuitem', { name: new RegExp(viewName) }).click();
     await expect(charts.getByText(viewName, { exact: true })).toBeVisible();

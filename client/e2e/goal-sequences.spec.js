@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { apiToken, openOrigin } from './support/session.js';
+import { openGoalFromTree } from './support/goals.js';
 
 // Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
 // the API token for seeding.
@@ -99,11 +100,7 @@ test('sequences sibling goals, then begins and re-pauses the next one through co
         await page.request.patch(`/api/${root}/goals/${done.id}/complete`, { headers, data: { completed: true } });
         await page.reload();
         const panel = page; // Desktop shows goal details in a side panel, not a dialog.
-        // The tree fades in after a reload, so retry the click until the details panel opens.
-        await expect(async () => {
-            await page.locator('.react-flow__node').filter({ hasText: second.name }).getByText(second.name, { exact: true }).click();
-            await expect(panel.getByRole('button', { name: 'Options', exact: true })).toBeVisible({ timeout: 2000 });
-        }).toPass();
+        await openGoalFromTree(page, second.name, panel.getByRole('button', { name: 'Options', exact: true }));
         await panel.getByRole('button', { name: 'Options', exact: true }).click();
         await panel.getByRole('button', { name: /^Sequence/ }).click();
         await expect(panel.getByRole('button', { name: `Add ${done.name} (completed)` })).toBeEnabled();

@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { apiToken, openOrigin } from './support/session.js';
+import { openGoalFromTree } from './support/goals.js';
 
 // Tests start signed in (e2e/auth.setup.js); this puts the page on the app's origin and returns
 // the API token for seeding.
@@ -26,10 +27,7 @@ test('a due review shows a Review banner and can be written from goal details', 
     await page.goto(`/${root}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
     const details = suffix === 'mobile' ? page.getByRole('dialog', { name: `Browser Planning ${suffix}` }) : page;
-    await expect(async () => {
-        await page.locator('.react-flow__node').filter({ hasText: `Browser Planning ${suffix}` }).getByText(`Browser Planning ${suffix}`, { exact: true }).click();
-        await expect(details.getByRole('region', { name: 'Review due' })).toBeVisible({ timeout: 2000 });
-    }).toPass();
+    await openGoalFromTree(page, `Browser Planning ${suffix}`, details.getByRole('region', { name: 'Review due' }));
     // The banner alone says a review is due; the details carry no schedule line.
     await expect(details.getByText(/Review every year/)).toHaveCount(0);
     // SMART's R is Reviewed: the due review takes it away until one is written.

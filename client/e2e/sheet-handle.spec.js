@@ -27,6 +27,7 @@ async function dragHandle(page, distance) {
 
 test('dragging the bar down closes each sidebar sheet; a short drag slides back', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'mobile', 'Bottom sheets are mobile only.');
+    test.setTimeout(60_000); // Six sheets, each opened and dragged twice: ~30 s on hosted runners.
     await openOrigin(page);
 
     for (const { name, path, open } of SHEETS) {

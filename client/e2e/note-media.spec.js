@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 import { apiToken, openOrigin } from './support/session.js';
+import { openGoalFromTree } from './support/goals.js';
 
 async function openGoalNotes(page, suffix, { beforeOpen } = {}) {
     await openOrigin(page);
@@ -8,12 +9,10 @@ async function openGoalNotes(page, suffix, { beforeOpen } = {}) {
     await beforeOpen?.(token);
     await page.goto(`/browser-root-${suffix}/goals`);
     if (suffix === 'mobile') await page.getByRole('button', { name: 'Tree', exact: true }).click();
-    await expect(async () => {
-        await page.locator('.react-flow__node').filter({ hasText: `Browser Practice ${suffix}` })
-            .getByText(`Browser Practice ${suffix}`, { exact: true }).click();
-        await page.getByRole('tab', { name: 'Notes', exact: true }).click({ timeout: 2000 });
-        await expect(page.getByPlaceholder('Add a goal note...')).toBeVisible({ timeout: 2000 });
-    }).toPass();
+    const notesTab = page.getByRole('tab', { name: 'Notes', exact: true });
+    await openGoalFromTree(page, `Browser Practice ${suffix}`, notesTab);
+    await notesTab.click();
+    await expect(page.getByPlaceholder('Add a goal note...')).toBeVisible();
 }
 
 async function mockConnectedStorage(page, uploads) {
