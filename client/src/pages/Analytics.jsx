@@ -470,7 +470,7 @@ function Analytics() {
     }
 
     return (
-        <div className={styles.pageContainer}>
+        <div className={styles.pageContainer} data-tour="analytics">
             <div className={`${styles.leftPanel} ${isMobile && activeMode === 'dashboard' ? styles.leftPanelWithMobileFooter : ''}`}>
                 <AnalyticsTopBar
                     currentViewName={currentViewName}

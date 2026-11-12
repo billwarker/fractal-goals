@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { isDemoMode } from '../demo/demoMode';
 import { storageApi } from '../utils/api/storageApi';
 import { STORAGE_CHANNEL, connectionResult } from '../utils/storageConnectionCopy';
 import { queryKeys } from './queryKeys';
@@ -24,6 +25,8 @@ export function useStorageConnections() {
         queryFn: async () => (await storageApi.connections()).data,
         staleTime: 30000,
         refetchOnWindowFocus: true,
+        // Account storage isn't part of the read-only demo.
+        enabled: !isDemoMode(),
     });
     const { refetch } = query;
 

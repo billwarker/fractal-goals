@@ -1,7 +1,7 @@
 import { NavigationHeader } from './components/layout/NavigationHeader';
 export { NavigationHeader } from './components/layout/NavigationHeader';
 import React, { useState, useEffect, Suspense } from 'react';
-import { Routes, Route, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { HeaderProvider } from './contexts/HeaderContext';
 import { useAuth } from './contexts/AuthContext';
 import useIsMobile from './hooks/useIsMobile';
@@ -16,16 +16,6 @@ import Selection from './pages/Selection';
 
 // Lazy load non-critical pages
 const Landing = lazyWithRetry(() => import('./pages/Landing'), 'pages/Landing');
-const FractalGoals = lazyWithRetry(() => import('./pages/FractalGoals'), 'pages/FractalGoals');
-const ProgramCalendarPage = lazyWithRetry(() => import('./pages/ProgramCalendarPage'), 'pages/ProgramCalendarPage');
-const Sessions = lazyWithRetry(() => import('./pages/Sessions'), 'pages/Sessions');
-const SessionDetail = lazyWithRetry(() => import('./pages/SessionDetail'), 'pages/SessionDetail');
-const CreateSession = lazyWithRetry(() => import('./pages/CreateSession'), 'pages/CreateSession');
-const CreateSessionTemplate = lazyWithRetry(() => import('./pages/CreateSessionTemplate'), 'pages/CreateSessionTemplate');
-const ManageActivities = lazyWithRetry(() => import('./pages/ManageActivities'), 'pages/ManageActivities');
-const Analytics = lazyWithRetry(() => import('./pages/Analytics'), 'pages/Analytics');
-const Logs = lazyWithRetry(() => import('./pages/Logs'), 'pages/Logs');
-const Notes = lazyWithRetry(() => import('./pages/Notes'), 'pages/Notes');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
@@ -38,7 +28,7 @@ const ForcePasswordChangeModal = lazyWithRetry(() => import('./components/modals
 const LegalAcceptanceModal = lazyWithRetry(() => import('./components/modals/LegalAcceptanceModal'), 'components/modals/LegalAcceptanceModal');
 import ComponentErrorBoundary from './components/ui/ComponentErrorBoundary';
 import RouteFallback from './components/common/RouteFallback';
-import LoadingState from './components/common/LoadingState';
+import FractalRoutes from './FractalRoutes';
 
 import { usePageTitle } from './hooks/usePageTitle';
 import { usePageViewTelemetry } from './hooks/usePageViewTelemetry';
@@ -50,21 +40,8 @@ import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicato
 import OfflineSignInScreen from './offline/OfflineSignInScreen';
 import { useIsOnline } from './offline/useIsOnline';
 
+export { RequireAdmin } from './FractalRoutes';
 export { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from './utils/marketingHost';
-
-export function RequireAdmin({ children }) {
-    const { user, loading } = useAuth();
-    const { rootId } = useParams();
-
-    // A reload or deep link renders before the current user resolves; redirecting then
-    // would send admins away from admin-only pages.
-    if (loading) return <LoadingState variant="page" label="Loading…" />;
-    if (!user?.is_admin) {
-        return <Navigate to={rootId ? `/${rootId}/goals` : '/'} replace />;
-    }
-
-    return children;
-}
 
 const appEnvironment = import.meta.env.VITE_ENV || 'development';
 const STORAGE_CONNECTED_PATH = '/storage/connected';
@@ -286,98 +263,7 @@ function App() {
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : (
-                        <Routes key={location.pathname}>
-                            <Route
-                                path="/:rootId/goals"
-                                element={
-                                    <ComponentErrorBoundary>
-                                        <Suspense fallback={<RouteFallback />}>
-                                            <FractalGoals />
-                                        </Suspense>
-                                    </ComponentErrorBoundary>
-                                }
-                            />
-                            <Route path="/:rootId/programs" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                            <ProgramCalendarPage />
-                                        </Suspense>
-                                    </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/programs/:programId" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <ProgramCalendarPage />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/programs/:programId/blocks" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <ProgramCalendarPage />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/sessions" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <Sessions />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/analytics" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <Analytics />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/notes" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <Notes />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/logs" element={
-                                <RequireAdmin>
-                                    <ComponentErrorBoundary>
-                                        <Suspense fallback={<RouteFallback />}>
-                                            <Logs />
-                                        </Suspense>
-                                    </ComponentErrorBoundary>
-                                </RequireAdmin>
-                            } />
-                            <Route path="/:rootId/session/:sessionId" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <SessionDetail />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/create-session" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <CreateSession />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/manage-session-templates" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <CreateSessionTemplate />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="/:rootId/manage-activities" element={
-                                <ComponentErrorBoundary>
-                                    <Suspense fallback={<RouteFallback />}>
-                                        <ManageActivities />
-                                    </Suspense>
-                                </ComponentErrorBoundary>
-                            } />
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
+                        <FractalRoutes />
                     )}
                 </div>
 

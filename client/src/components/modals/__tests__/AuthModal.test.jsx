@@ -114,6 +114,38 @@ describe('AuthModal', () => {
         ));
     });
 
+    it('signs a new account straight in and closes', async () => {
+        window.history.pushState({}, '', '/?invite_key=fg_invite_abc123&email=invitee%40example.com');
+        signup.mockResolvedValue({ id: 'user-new' });
+        const onClose = vi.fn();
+        render(<AuthModal isOpen={true} onClose={onClose} />);
+
+        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'newuser' } });
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
+        fireEvent.click(screen.getByRole('checkbox'));
+        fireEvent.click(screen.getByRole('button', { name: 'CREATE' }));
+
+        await waitFor(() => expect(login).toHaveBeenCalledWith('newuser', 'Password123', { rememberMe: false }));
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
+    });
+
+    it('falls back to the login form when signing in after signup fails', async () => {
+        window.history.pushState({}, '', '/?invite_key=fg_invite_abc123&email=invitee%40example.com');
+        signup.mockResolvedValue({ id: 'user-new' });
+        login.mockRejectedValue(new Error('rate limited'));
+        const onClose = vi.fn();
+        render(<AuthModal isOpen={true} onClose={onClose} />);
+
+        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'newuser' } });
+        fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Password123' } });
+        fireEvent.click(screen.getByRole('checkbox'));
+        fireEvent.click(screen.getByRole('button', { name: 'CREATE' }));
+
+        expect(await screen.findByLabelText('Username or Email')).toHaveValue('newuser');
+        expect(notify.success).toHaveBeenCalledWith('Account created! Please log in.');
+        expect(onClose).not.toHaveBeenCalled();
+    });
+
     it('states the age attestation and links both documents at signup', () => {
         window.history.pushState({}, '', '/?invite_key=fg_invite_abc123');
 

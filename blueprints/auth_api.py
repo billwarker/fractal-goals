@@ -15,6 +15,8 @@ from services.serializers import serialize_user
 from services.auth_service import AuthService
 from services.user_service import UserService
 from services.data_export_service import DataExportService
+from services.demo_access_service import DemoAccessService
+from blueprints.demo_access import authorize_demo_request
 from datetime import datetime, timezone
 
 from models import AdminAuditEvent, User, validate_root_goal
@@ -150,6 +152,14 @@ def token_required(f):
         db_session = get_db_session()
         authentication_complete = False
         try:
+            if DemoAccessService.is_demo_token(token):
+                owner, denied = authorize_demo_request(db_session, token, kwargs)
+                if denied:
+                    return denied
+                g.current_user = owner
+                authentication_complete = True
+                return f(owner, *args, **kwargs)
+
             service = AuthService(db_session)
             current_user, error, status = service.get_current_user_for_token(token)
             if error:
@@ -232,7 +242,9 @@ def token_required(f):
             return jsonify({'error': 'Internal server error during authentication'}), 500
         finally:
             db_session.close()
-            
+
+    # Lets tests/integration/test_demo_access.py find every protected route.
+    setattr(decorated, 'requires_token', True)
     return decorated
 
 @auth_bp.route('/signup', methods=['POST'])

@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { useHeader } from '../../contexts/HeaderContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { getLandingPageHref } from '../../utils/marketingHost';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useRootGoal } from '../../hooks/useGoalQueries';
@@ -204,8 +205,11 @@ export const NavigationHeader = ({ onOpenSettings, onOpenAgent, onHeightChange }
     // Event logs are platform telemetry surfaced through the admin usage
     // dashboard; the Logs page is admin-only.
     const showLogsNav = Boolean(user?.is_admin);
+    // The live demo is read-only: no AI, no account settings, and Exit leaves for the landing page.
+    const isDemo = Boolean(user?.isDemo);
     const showAgentAction = Boolean(
         user?.id
+        && !isDemo
         && (
             isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors)
             || isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentEmbedded)
@@ -298,17 +302,25 @@ export const NavigationHeader = ({ onOpenSettings, onOpenAgent, onHeightChange }
                                 </Link>
                             ))}
                         </nav>
-                        <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
-                            SETTINGS
-                        </button>
+                        {!isDemo && (
+                            <button className={`nav-text-link ${styles.mobileBtn}`} onClick={handleOpenSettings}>
+                                SETTINGS
+                            </button>
+                        )}
                         {showAgentAction && (
                             <button className={`nav-text-link ${styles.mobileBtn}`} onClick={onOpenAgent}>
                                 ASK AI
                             </button>
                         )}
-                        <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
-                            EXIT
-                        </Link>
+                        {isDemo ? (
+                            <a className={`nav-text-link home-link ${styles.mobileBtn}`} href={getLandingPageHref()}>
+                                EXIT DEMO
+                            </a>
+                        ) : (
+                            <Link className={`nav-text-link home-link ${styles.mobileBtn}`} to="/" onClick={handleRouteLinkClick}>
+                                EXIT
+                            </Link>
+                        )}
                     </div>
                 </div>
             </>
@@ -371,14 +383,21 @@ export const NavigationHeader = ({ onOpenSettings, onOpenAgent, onHeightChange }
                             <div className={`nav-separator ${styles.navSeparator}`}></div>
                         </>
                     )}
-                    <button className="nav-text-link" onClick={handleOpenSettings}>
-                        {isMobile ? 'SET' : 'SETTINGS'}
-                    </button>
-
-                    <div className={`nav-separator ${styles.navSeparator}`}></div>
-                    <Link className="nav-text-link home-link" to="/" onClick={handleRouteLinkClick}>
-                        {isMobile ? 'EXIT' : 'EXIT TO HOME'}
-                    </Link>
+                    {!isDemo && (
+                        <>
+                            <button className="nav-text-link" onClick={handleOpenSettings}>
+                                {isMobile ? 'SET' : 'SETTINGS'}
+                            </button>
+                            <div className={`nav-separator ${styles.navSeparator}`}></div>
+                        </>
+                    )}
+                    {isDemo ? (
+                        <a className="nav-text-link home-link" href={getLandingPageHref()}>EXIT DEMO</a>
+                    ) : (
+                        <Link className="nav-text-link home-link" to="/" onClick={handleRouteLinkClick}>
+                            {isMobile ? 'EXIT' : 'EXIT TO HOME'}
+                        </Link>
+                    )}
                 </div>
             </div>
         </div>

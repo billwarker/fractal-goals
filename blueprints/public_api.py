@@ -7,6 +7,7 @@ from blueprints.api_utils import get_db_session, internal_error
 from extensions import limiter
 from services.ops_log import log_ops_event
 from services.public_service import PublicService
+from services.demo_access_service import DemoAccessService
 from services.email_service import EmailService, EmailWebhookVerificationError
 from validators import BetaSignupRequestSchema, validate_request
 
@@ -33,6 +34,24 @@ def get_landing_examples():
         return response, status
     except SQLAlchemyError:
         return internal_error(logger, "Error fetching landing examples")
+    finally:
+        db_session.close()
+
+
+@public_bp.route('/demo-session', methods=['POST'])
+@limiter.limit("30 per minute")
+def create_demo_session():
+    """A short-lived read-only token for touring the published examples."""
+    db_session = get_db_session()
+    try:
+        payload, error, status = DemoAccessService(db_session).issue_demo_token()
+        if error:
+            return jsonify({"error": error}), status
+        response = jsonify(payload)
+        response.headers["Cache-Control"] = "no-store"
+        return response, status
+    except SQLAlchemyError:
+        return internal_error(logger, "Error starting a demo session")
     finally:
         db_session.close()
 

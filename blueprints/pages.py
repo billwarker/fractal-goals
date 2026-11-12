@@ -169,6 +169,8 @@ def serve_index_html():
 @pages_bp.route('/<root_id>/manage-activities')
 @pages_bp.route('/<root_id>/programs/<program_id>')
 @pages_bp.route('/<root_id>/programs/<program_id>/blocks')
+@pages_bp.route('/demo')
+@pages_bp.route('/demo/<path:_demo_path>')
 def client_route(**_route_parameters):
     """Serve the built SPA at canonical deep links, including browser reloads."""
     return render_react_app()

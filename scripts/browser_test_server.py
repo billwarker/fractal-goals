@@ -100,6 +100,32 @@ def _seed_planning_fractal(db, suffix, user, level, today):
     ))
 
 
+def _publish_demo_examples(db, now):
+    """Publish the showcase plus a second, smaller example: the landing's live demo tours both."""
+    from models import Goal
+    from scripts.browser_showcase_seed import SHOWCASE_ROOT_ID
+    from services.landing_publish_service import LandingPublishService
+
+    second = "demo-spanish-root"
+    db.add(Goal(id=second, root_id=second, owner_id="sweep-admin", level_id="browser-ultimate-level",
+                name="Hold a conversation in Spanish", created_at=now))
+    db.flush()
+    for index, name in enumerate(("Learn the 1,000 most common words", "Speak for ten minutes a day")):
+        db.add(Goal(id=f"demo-spanish-goal-{index}", root_id=second, parent_id=second, owner_id="sweep-admin",
+                    name=name, sort_order=index, created_at=now))
+    db.flush()
+    service = LandingPublishService(db)
+    _, error, _ = service.update_landing_example_settings({"examples": [
+        {"root_id": SHOWCASE_ROOT_ID, "label": "Jazz guitar", "sort_order": 0},
+        {"root_id": second, "label": "Spanish", "sort_order": 1},
+    ]})
+    if error:
+        raise RuntimeError(f"Could not save the demo examples: {error}")
+    _, error, _ = service.publish_landing_examples()
+    if error:
+        raise RuntimeError(f"Could not publish the demo examples: {error}")
+
+
 def _seed_embedded_proposal(db, suffix, user):
     """An Ask AI conversation whose last turn left a create-goal proposal awaiting review.
 
@@ -290,9 +316,11 @@ def main():
             ProgramDay,
             ProgramDayOccurrenceSchedule,
             Session,
+            SignupInviteKey,
             User,
         )
         from datetime import datetime, timedelta, timezone
+        from services._admin_common import hash_invite_key
 
         engine = models.get_engine()
         if engine.url.database != name:
@@ -325,6 +353,12 @@ def main():
                 )
                 welcome_user.set_password("WelcomeTest123!")
                 db.add(welcome_user)
+                # An emailed beta invite (e2e/landing.spec.js signs up through its link).
+                db.add(SignupInviteKey(
+                    key_hash=hash_invite_key(f"browser-invite-{project}"),
+                    label=f"Browser invite ({project})",
+                    assigned_email=f"invitee-{project}@example.invalid",
+                ))
             ultimate_level = GoalLevel(
                 id="browser-ultimate-level",
                 name="Ultimate Goal",
@@ -525,6 +559,8 @@ def main():
                 _seed_embedded_proposal(db, suffix, user)
             db.commit()
             seed_showcase(db, now, config)
+            db.commit()
+            _publish_demo_examples(db, now)
             db.commit()
         from app import app
         from extensions import limiter

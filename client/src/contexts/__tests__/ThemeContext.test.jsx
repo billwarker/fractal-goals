@@ -134,4 +134,13 @@ describe('ThemeProvider', () => {
         expect(screen.getByTestId('theme')).toHaveTextContent('dark');
         expect(updatePreferences).not.toHaveBeenCalled();
     });
+
+    it('keeps the live demo guest’s choice on the device', () => {
+        localStorage.setItem('theme-preference', JSON.stringify({ mode: 'dark', darkFrom: '20:00', lightFrom: '07:00' }));
+        mockAuth.current = { user: { id: 'demo', isDemo: true, preferences: {} }, setUser: vi.fn() };
+        renderProvider();
+        act(() => latest.setPreference({ mode: 'light' }));
+        expect(screen.getByTestId('theme')).toHaveTextContent('light');
+        expect(updatePreferences).not.toHaveBeenCalled();
+    });
 });

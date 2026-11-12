@@ -99,6 +99,12 @@ export function resolveGoalLevel(goalLevels, goalOrType) {
     return null;
 }
 
+const ROOT_PATH_PATTERN = /^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
+export function getRootIdFromPath(pathname) {
+    return pathname?.match(ROOT_PATH_PATTERN)?.[1] ?? null;
+}
+
 export function adjustBrightness(hex, percent) {
     hex = hex.replace('#', '');
     let r = parseInt(hex.substring(0, 2), 16);
@@ -122,22 +128,10 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
     // SMART) resolves from the published snapshot exactly like the authenticated app.
     const hasSeed = Array.isArray(seedLevels) && seedLevels.length > 0;
 
-    // Extract rootId from URL path (pattern: /:rootId/...)
-    // UUID pattern: 8-4-4-4-12 hex characters
-    const getRootIdFromUrl = () => {
-        const match = window.location.pathname.match(/^\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
-        return match ? match[1] : null;
-    };
-
-    const [currentRootId, setCurrentRootId] = React.useState(getRootIdFromUrl);
-
+    // The fractal's levels carry its own colours. Read the root from the router's path
+    // (/:rootId/...), not the window's, so it also resolves under the demo's /demo basename.
     const location = useLocation();
-
-    // Keep rootId in sync with URL changes efficiently
-    React.useEffect(() => {
-        const newRootId = getRootIdFromUrl();
-        setCurrentRootId(prev => prev !== newRootId ? newRootId : prev);
-    }, [location.pathname]);
+    const currentRootId = getRootIdFromPath(location.pathname);
 
     const {
         data: fetchedGoalLevels = [],

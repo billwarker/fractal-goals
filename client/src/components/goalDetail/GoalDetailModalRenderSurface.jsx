@@ -715,7 +715,7 @@ function GoalDetailModalRenderSurface({
     if (displayMode === 'panel') {
         return (
             <>
-                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`}>
+                <div className={`${styles.panelContainer} ${readOnly ? styles.readOnlySurface : ''}`} data-tour="goal-detail">
                     <div className={styles.panelContent} ref={contentScrollRef}>
                         {content}
                     </div>
@@ -745,7 +745,7 @@ function GoalDetailModalRenderSurface({
                 className={`${styles.modalContent} ${pickingLevel ? styles.levelPickerContent : ''} ${readOnly ? styles.readOnlySurface : ''}`}
                 style={{ '--goal-detail-accent': displayGoalColor }}
             >
-                <div className={styles.modalScrollArea} ref={contentScrollRef}>
+                <div className={styles.modalScrollArea} ref={contentScrollRef} data-tour="goal-detail">
                     {content}
                 </div>
                 {footerContent && (

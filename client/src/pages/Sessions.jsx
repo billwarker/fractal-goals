@@ -338,7 +338,7 @@ function Sessions() {
                     )}
                 />
 
-                <div className={styles.sessionsList}>
+                <div className={styles.sessionsList} data-tour="sessions">
                     {sessionsLoading ? (
                         <LoadingState label="Loading session data..." className={styles.loadingContainer} />
                     ) : sessionsError ? (

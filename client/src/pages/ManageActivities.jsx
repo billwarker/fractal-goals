@@ -476,7 +476,7 @@ function ManageActivities() {
                 )}
             />
 
-            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`}>
+            <div className={`${headerStyles.scrollContent} ${headerStyles.gridContent} ${styles.content}`} data-tour="activities">
                 {error && (
                     <div className={styles.errorMessage}>
                         {error}

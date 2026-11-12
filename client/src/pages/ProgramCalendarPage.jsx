@@ -733,7 +733,7 @@ function ProgramCalendarPage() {
     return (
         <div className={`${styles.container} ${isMobile ? styles.containerWithMobileDock : ''} page-reveal`}>
             <div className={`${styles.workspace} ${!isSidePaneVisible ? styles.workspaceNoSidePane : ''}`}>
-                <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`}>
+                <div className={`${styles.mainColumn} ${viewMode !== 'calendar' ? styles.mainColumnBlocksMode : ''}`} data-tour="programs">
                     <PageHeader
                         className={styles.compactHeader}
                         title={pageTitle}

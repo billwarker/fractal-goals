@@ -406,3 +406,21 @@ Still to do by you: turn on `onboarding_v1` in Admin → Feature flags for the b
 
 Not done from the plan: the invite → sign-up leg of the e2e (that belongs to Phase 6's funnel work), and the checklist's phone pill-to-sheet (it stays a compact floating card above the footer).
 
+### Phase 6 — Landing page and funnel (2026-11-11)
+
+> Superseded before commit by the live-demo redesign: see `planning/landing-live-demo-2026-11.md`. The `main.jsx` preload fix, theme toggle, sign-up auto-login, invite fixture keys and meta/OG copy below carry over; the multi-section page does not.
+
+- **One vertical page.** The desktop wheel-hijacked horizontal snap is gone (`landingScrollNavigation` deleted). Every width scrolls natively with a sticky header and scroll-spy; examples and features stay full-height app windows on wide screens. Section jumps land just below the header.
+- **Narrative.** New sections: How it works (goal → session → evidence → progress), And more (the previously dead "Feature Extras" and "More" copy, refreshed: completion conditions, SMART reviews, goal timelines and heatmap, notes with media, progress comparisons, themes) and FAQ (access, not a coach, phones and offline, data export, not only fitness). Hero: "Private beta" kicker plus Request access / Log in on every width (desktop had no call to action). Copy, SEO, static meta and the OG image updated.
+- **Theme toggle** in the header (light/dark for the device; Settings keeps the schedule modes).
+- **Boot copy.** `index.html`'s first-paint copy matched an old palette and nav; it now mirrors the new hero in both themes, and an architecture test ties its wording to landing.md.
+- **Fixed: the public landing never loaded its own CSS.** `main.jsx` chose the root with a ternary of two dynamic imports; the minifier folded them into one preload carrying AuthenticatedRoot's dependencies, so the landing (a) downloaded the authenticated shell's chunks and (b) only got its stylesheet by accident, when the features section's lazy chunk loaded. The boot copy stayed up until then. Split into two statements: the hand-off now happens in ~0.25 s and the landing no longer preloads the app shell.
+- **Funnel.** Signing up from an invite link now logs straight in (with the password just chosen; falls back to the login form if that fails) and lands in the Phase 5 welcome flow, instead of asking for the password again.
+- **e2e.** `client/e2e/landing.spec.js` (desktop and phone): section nav, tree unlock / full-screen explorer, feature tabs, FAQ, stubbed waitlist submit, theme toggle, no overflow; and invite link → prefilled sign-up → welcome flow (fixture invite keys `browser-invite-<project>`). Both new specs joined `test:browser:smoke`.
+
+Not done from the plan:
+- Lighthouse CI budgets (LCP/CLS) — not added, to keep CI time down; worth a one-off local run before launch.
+- Purpose-built phone compositions for the feature previews; they remain scaled desktop frames with "Explore full screen".
+- Restyling the auth modal in the landing's visual language.
+- FAQ has no pricing answer: there's nothing in the product to base one on, so that copy needs to come from you.
+

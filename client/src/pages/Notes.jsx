@@ -221,7 +221,7 @@ function Notes() {
     );
 
     return (
-        <div className={`${styles.pageContainer} page-reveal`}>
+        <div className={`${styles.pageContainer} page-reveal`} data-tour="notes">
             {leftColumn}
             {rightColumn}
 

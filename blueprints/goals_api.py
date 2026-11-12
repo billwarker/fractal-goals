@@ -1,10 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, g, request, jsonify
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
 from models import (
+    Goal,
     get_session,
 )
 from validators import (
@@ -265,6 +266,20 @@ def get_all_fractals(current_user):
     db_session = get_db_session()
     try:
         service = GoalService(db_session)
+        if g.get('access_mode') == 'demo':
+            # Only the published examples, whichever admin owns each one.
+            demo_root_ids = g.demo_root_ids
+            owner_ids = {
+                owner_id for (owner_id,) in db_session.query(Goal.owner_id).filter(Goal.id.in_(demo_root_ids))
+            }
+            fractals = [
+                fractal
+                for owner_id in owner_ids
+                for fractal in service.list_fractals(owner_id)[0] or []
+                if fractal['id'] in demo_root_ids
+            ]
+            fractals.sort(key=lambda fractal: demo_root_ids.index(fractal['id']))
+            return jsonify(fractals)
         fractals, _, _ = service.list_fractals(current_user.id)
         return jsonify(fractals)
     finally:

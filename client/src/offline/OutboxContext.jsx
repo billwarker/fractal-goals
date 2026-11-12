@@ -14,7 +14,8 @@ export const OutboxContext = createContext(null);
 export function OutboxProvider({ children }) {
     const queryClient = useQueryClient();
     const { user } = useAuth();
-    const userId = user?.id || null;
+    // The demo keeps nothing on the device: no outbox, persisted cache or service worker.
+    const userId = user?.isDemo ? null : (user?.id || null);
 
     // The sync engine loads on demand, so no route's initial bundle carries it. Until it
     // arrives (milliseconds; the service worker precaches it) writes take the direct path.

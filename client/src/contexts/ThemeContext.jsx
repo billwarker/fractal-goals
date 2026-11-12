@@ -67,7 +67,8 @@ const samePreference = (left, right) => (
  */
 export const ThemeProvider = ({ children }) => {
     const auth = useOptionalAuth();
-    const user = auth?.user ?? null;
+    // The demo's guest has no account to sync to: its choice stays on the device.
+    const user = auth?.user && !auth.user.isDemo ? auth.user : null;
     const setUser = auth?.setUser;
     const [preference, setPreferenceState] = useState(readStoredPreference);
     const [prefersLight, setPrefersLight] = useState(systemPrefersLight);

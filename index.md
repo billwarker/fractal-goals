@@ -78,6 +78,25 @@ Goals page. The Getting Started checklist (`onboarding_v1` flag) orders its step
 session → SMART → program, has "Show me" links, sits above the phone footer and celebrates once when
 complete. `client/e2e/onboarding.spec.js` drives the journey with the fixture's `welcome_user_<project>`
 accounts.
+
+Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
+demo. Each published landing example (Admin → Landing) is an icon linking to `/demo/<rootId>/goals?tour=1`;
+"or join the waitlist" opens `demo/DemoSignupModal`. `index.html`'s boot copy mirrors the hero (an
+architecture test ties its words to landing.md). `main.jsx` keeps its three root imports (public landing,
+demo, app) as separate statements, so each root preloads its own CSS.
+
+Live demo (`src/demo/`, plan `planning/landing-live-demo-2026-11.md`): the real app, read-only, on the
+published examples. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
+audience (`services/demo_access_service.py`); `token_required` hands demo tokens to
+`blueprints/demo_access.py`, which serves only GET endpoints in `DEMO_READ_ENDPOINTS` on roots that are
+still published, as the root's owner, and never media, storage, account, agent, admin or log routes.
+`tests/integration/test_demo_access.py` walks every protected route in the URL map. Client: `DemoRoot`
+(BrowserRouter `basename="/demo"`, `DemoAuthProvider` guest, the shared `FractalRoutes` table) and
+`demoMode.js`, whose axios guard refuses writes before sending and opens `DemoWritePrompt`. In demo mode
+the outbox, persisted cache, service worker, theme sync, storage connections and attachments are off.
+`DemoGuide` is the tour (steps in `demoTour.js`, deep-linked via the snapshot's showcase picks; pages carry
+`data-tour` anchors for `Spotlight`). Invite holders are sent to the app host's invite link. Covered by
+`client/e2e/demo.spec.js` and `landing.spec.js`.
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context

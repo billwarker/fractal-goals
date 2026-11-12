@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { isDemoMode } from '../demo/demoMode';
 import { storageApi } from '../utils/api/storageApi';
 import { queryKeys } from './queryKeys';
 import { useAttachmentDraft } from './useAttachmentDraft';
@@ -14,7 +15,8 @@ import { useAttachmentDraft } from './useAttachmentDraft';
 export function useGoalAttachments(rootId, goalId, enabled = true) {
     return useQuery({
         queryKey: queryKeys.goalAttachments(rootId, goalId),
-        queryFn: async () => (await storageApi.goalAttachments(rootId, goalId)).data,
+        // The demo never serves media (blueprints/demo_access.py): no attachments to show.
+        queryFn: async () => (isDemoMode() ? [] : (await storageApi.goalAttachments(rootId, goalId)).data),
         enabled: Boolean(enabled && rootId && goalId),
         staleTime: Infinity,
         refetchOnWindowFocus: false,  // Don't replace edits in progress.

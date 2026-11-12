@@ -15,6 +15,11 @@ const clickText = (text) => async (page) => {
 export const SURFACES = [
     // Logged out
     { id: 'landing', path: '/landing-preview', auth: false },
+    { id: 'landing-waitlist', path: '/landing-preview', auth: false, open: clickText('or join the waitlist') },
+    // The live demo: the real app, read-only, with the guide (src/demo/).
+    { id: 'demo-goals', path: `/demo${r('/goals')}?tour=1`, auth: false },
+    { id: 'demo-session', path: `/demo${r('/session/sweep-session-0')}`, auth: false },
+    { id: 'demo-signup', path: `/demo${r('/goals')}`, auth: false, open: clickText('Sign up to build your own') },
     { id: 'auth-login', path: '/', auth: false, open: clickText('LOG IN') },
 
     // Pages

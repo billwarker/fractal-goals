@@ -1,0 +1,94 @@
+.body {
+    display: grid;
+    gap: 14px;
+}
+
+.lead {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-relaxed);
+}
+
+.field {
+    display: grid;
+    gap: 6px;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 700;
+}
+
+.field input,
+.field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-weight: 400;
+    resize: vertical;
+}
+
+.field input:focus-visible,
+.field textarea:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 1px;
+}
+
+.primary {
+    min-height: 44px;
+    padding: 10px 16px;
+    border: 1px solid var(--color-border-btn);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-brand-primary);
+    color: var(--color-text-inverse);
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.primary:hover:not(:disabled) {
+    background: var(--color-brand-primary-hover);
+}
+
+.primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.switch {
+    justify-self: center;
+    min-height: 40px;
+    padding: 8px;
+    border: 0;
+    background: none;
+    color: var(--color-text-secondary);
+    font: inherit;
+    font-size: var(--font-size-sm);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.success {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-md);
+    line-height: var(--line-height-relaxed);
+}
+
+.error {
+    margin: 0;
+    color: var(--color-brand-danger);
+    font-size: var(--font-size-sm);
+}
+
+/* 16px fields stop iOS zooming on focus. */
+@media (max-width: 768px) {
+    .field input,
+    .field textarea {
+        font-size: max(var(--font-size-base), 16px);
+    }
+}

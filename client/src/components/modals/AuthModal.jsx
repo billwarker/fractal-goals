@@ -95,6 +95,14 @@ function AuthModalInner({ onClose }) {
                 onClose();
             } else {
                 await signup(formValues.username, formValues.email, formValues.password, formValues.inviteKey);
+                // Straight in with the password they just chose; if that fails, the
+                // account still exists and they can log in from the form below.
+                const signedIn = await login(formValues.username, formValues.password, { rememberMe: false })
+                    .then(() => true, () => false);
+                if (signedIn) {
+                    onClose();
+                    return;
+                }
                 setIsLogin(true);
                 setGeneralError(null);
                 notify.success("Account created! Please log in.");
