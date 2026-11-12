@@ -354,8 +354,8 @@ function Sessions() {
                         <EmptyState
                             className={styles.emptyState}
                             description={hasActiveFilters
-                                ? 'No sessions match the current filters.'
-                                : 'No sessions found. Start by clicking "+ ADD SESSION" in the navigation.'}
+                                ? 'No sessions match the current filters. Clear a filter or widen the dates.'
+                                : 'Sessions are where you record practice against your goals. Start one with + Add Session at the top.'}
                         />
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

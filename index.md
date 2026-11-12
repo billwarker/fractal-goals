@@ -68,6 +68,16 @@ the app host, `index.html` paints a matching boot loader before the bundle (with
 state or content. A timed-out request's reachability probe waits 30 s
 (`COLD_START_PROBE_TIMEOUT_MS`), so a waking server isn't reported offline. The maintainability audit
 rejects ad-hoc "Loading…" elements and the old `.loading-spinner` class.
+
+First run: a signed-in user with no fractals sees `components/onboarding/welcome/WelcomeFlow` on
+Selection (welcome → big goal → up to three long-term goals, with a live tree preview; full screen on
+phones; skipping is remembered per user in `welcome-dismissed:<userId>` and opens the normal create
+modal). It creates everything with one `POST /api/fractals/quickstart` (`@idempotent`, one transaction
+in `GoalService.quickstart_fractal`, goals quota checked for the whole tree up front), then lands on the
+Goals page. The Getting Started checklist (`onboarding_v1` flag) orders its steps explore → activity →
+session → SMART → program, has "Show me" links, sits above the phone footer and celebrates once when
+complete. `client/e2e/onboarding.spec.js` drives the journey with the fixture's `welcome_user_<project>`
+accounts.
 - `client/src/utils/` owns API adapters, normalization, formatting, and pure view models.
 
 Remote records live in TanStack Query. Components do not mirror API collections into context

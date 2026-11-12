@@ -392,3 +392,17 @@ Found for later:
 - `GET /api/fractals` takes about 0.8 s for a user with many fractals.
 - Loading is spinner-only (your call): the skeleton variant and `LoadingSkeleton` are removed, so the boot loader, route changes and data loads all show the same spinner.
 - Phones open the goal hierarchy fitted: after the first draw, the view is refitted to what is actually drawn (text, icons and connector lines, which phones wrap differently from the layout's node sizes). The tree is centred, sits below the options pane and program label, never exceeds 100% zoom, and is checked at 320×568 up to 430×932 (`flowTree/flowTreeViewport.js` `fitViewportToDrawn`).
+
+### Phase 5 — Onboarding (2026-11-11)
+
+- **Welcome flow.** A user with no fractals lands on a three-step flow instead of the empty Selection grid: what a fractal is (with a sample tree), the big goal (tap-to-fill examples), and up to three long-term goals with a live tree preview. Each step moves focus to its heading. Enter advances. Full screen on phones. "I’ll set it up myself" is remembered per user and opens the existing create modal. It is suppressed while an invite or sign-up dialog is open.
+- **One request.** `POST /api/fractals/quickstart` creates the fractal, its levels, onboarding state, starter template and the long-term goals in one transaction. It is `@idempotent` (the flow sends one key per visit, so a retried tap never makes two trees), rate limited to 5/min, and checks the goals quota for the whole tree before writing anything. `create_fractal` now shares `_build_fractal` with it. 7 integration tests: children, no children, replay, validation, quota rollback.
+- **Checklist.** Steps re-sequenced and reworded: Explore your goal tree → Create an activity → Run your first session → Make one goal SMART → Plan a program. The compact view's "Go" is now "Show me" (deep link plus details). On phones it sits above the page footer. Finishing every step shows a one-off "You’re all set up" celebration (only on the transition, never for accounts that were already complete).
+- **Empty states.** Quick sessions with no activities and the Sessions list now say what goes there and how to start.
+- **e2e.** `client/e2e/onboarding.spec.js` signs in as a fresh account on desktop and phone, walks the flow by keyboard and click, checks the tree on the Goals page, and that Selection then shows the new fractal with no welcome and no overflow.
+- **Also fixed.** `_skipWarmth` (Phase 2) was missing from the axios config type, so `npm run typecheck` had been failing; it's now declared in `src/types/axios.d.ts`.
+
+Still to do by you: turn on `onboarding_v1` in Admin → Feature flags for the beta. The code default stays off, so self-hosted and test environments are unchanged.
+
+Not done from the plan: the invite → sign-up leg of the e2e (that belongs to Phase 6's funnel work), and the checklist's phone pill-to-sheet (it stays a compact floating card above the footer).
+

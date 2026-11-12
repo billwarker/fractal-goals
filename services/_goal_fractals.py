@@ -3,12 +3,13 @@
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
+from collections.abc import Callable
 from datetime import datetime, timezone
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session as OrmSession, selectinload
 
-from models import Goal, GoalLevel, validate_root_goal
+from models import Goal, GoalLevel, SessionTemplate, validate_root_goal
 from validators.core import parse_date_string
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
@@ -22,8 +23,9 @@ from services.user_service import UserService
 
 
 class _GoalFractalsMixin:
-    # Host attribute supplied by GoalService; declared so the mixin type-checks on its own.
+    # Host attributes supplied by GoalService; declared so the mixin type-checks on its own.
     db_session: OrmSession
+    create_fractal_goal: Callable[..., ServiceResult[Goal]]
 
     def list_fractals(self, current_user_id) -> ServiceResult[JsonList]:
         roots = self.db_session.query(Goal).options(
@@ -77,6 +79,56 @@ class _GoalFractalsMixin:
         ], None, 200
 
     def create_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
+        built, error, status = self._build_fractal(current_user_id, data)
+        if error or built is None:
+            return None, error, status
+        new_fractal, starter_template = built
+        self.db_session.commit()
+        self.db_session.refresh(new_fractal)
+        self._emit_starter_template(new_fractal, starter_template)
+        return new_fractal, None, 201
+
+    def quickstart_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
+        """A new fractal and its first long-term goals in one transaction (the welcome flow).
+
+        Either everything is created or nothing is: a quota or validation failure on any goal
+        rolls the fractal back too.
+        """
+        child_names = data.get('long_term_goals') or []
+        _, quota_error, quota_status = QuotaService(self.db_session).check_available(
+            current_user_id, "goals", increment=1 + len(child_names),
+        )
+        if quota_error:
+            return None, quota_error, quota_status
+
+        built, error, status = self._build_fractal(current_user_id, {'name': data['name']})
+        if error or built is None:
+            self.db_session.rollback()
+            return None, error, status
+        new_fractal, starter_template = built
+
+        pending_events = []
+        for name in child_names:
+            _, error, status = self.create_fractal_goal(
+                new_fractal.id,
+                current_user_id,
+                {'name': name, 'type': 'LongTermGoal', 'parent_id': new_fractal.id},
+                commit=False,
+                pending_events=pending_events,
+            )
+            if error:
+                self.db_session.rollback()
+                return None, error, status
+
+        self.db_session.commit()
+        self.db_session.refresh(new_fractal)
+        self._emit_starter_template(new_fractal, starter_template)
+        for event in pending_events:
+            event_bus.emit(event)
+        return new_fractal, None, 201
+
+    def _build_fractal(self, current_user_id, data) -> ServiceResult[tuple[Goal, SessionTemplate | None]]:
+        """Add a fractal root, its levels, onboarding state and starter template, uncommitted."""
         quota_service = QuotaService(self.db_session)
         for resource in ("fractals", "goals"):
             _, quota_error, quota_status = quota_service.check_available(current_user_id, resource)
@@ -155,19 +207,21 @@ class _GoalFractalsMixin:
             new_fractal.id,
             current_user_id,
         )
-        self.db_session.commit()
-        self.db_session.refresh(new_fractal)
-        if starter_template is not None:
-            event_bus.emit(Event(
-                Events.SESSION_TEMPLATE_CREATED,
-                {
-                    'template_id': starter_template.id,
-                    'name': starter_template.name,
-                    'root_id': new_fractal.id,
-                },
-                source='goal_service.create_fractal',
-            ))
-        return new_fractal, None, 201
+        return (new_fractal, starter_template), None, 201
+
+    @staticmethod
+    def _emit_starter_template(new_fractal, starter_template):
+        if starter_template is None:
+            return
+        event_bus.emit(Event(
+            Events.SESSION_TEMPLATE_CREATED,
+            {
+                'template_id': starter_template.id,
+                'name': starter_template.name,
+                'root_id': new_fractal.id,
+            },
+            source='goal_service.create_fractal',
+        ))
 
     def delete_fractal(self, root_id, current_user_id) -> ServiceResult[JsonDict]:
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)

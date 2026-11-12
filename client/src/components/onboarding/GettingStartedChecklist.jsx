@@ -29,6 +29,13 @@ export default function GettingStartedChecklist({ inline = false }) {
     });
     const [detailsOpen, setDetailsOpen] = useState(() => !inline && readPreference(rootId, 'details', false));
     const [confirmDismiss, setConfirmDismiss] = useState(false);
+    // Finishing the last step ends onboarding on the server; mark the moment before it goes.
+    const [celebrating, setCelebrating] = useState(false);
+    const previousStatus = useRef(state?.status);
+    useEffect(() => {
+        if (previousStatus.current === 'active' && state?.status === 'completed') setCelebrating(true);
+        previousStatus.current = state?.status;
+    }, [state?.status]);
     const previousDoneById = useRef(Object.fromEntries(steps.map((step) => [step.id, step.done])));
     useEffect(() => {
         if (inline) return;
@@ -83,8 +90,24 @@ export default function GettingStartedChecklist({ inline = false }) {
         setDetailsOpen(false);
         try { localStorage.setItem(preferenceKey(rootId, 'details'), 'false'); } catch { /* optional preference */ }
     };
+    if (enabled && celebrating && !inline) {
+        return (
+            <aside className={`${styles.checklist} ${styles.floating} ${styles.celebration}`} aria-label="Getting started" role="status">
+                <CompletionCheckBadge checked label="All steps complete" className={styles.mark} />
+                <div>
+                    <strong>You’re all set up</strong>
+                    <p>Goals, activities, a session, a SMART goal and a program: everything’s in place.</p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setCelebrating(false)}>Close</Button>
+            </aside>
+        );
+    }
     if (!enabled || isLoading || state?.status !== 'active') return null;
     const currentStep = steps[currentStepIndex];
+    const showMe = () => {
+        navigate(currentStep.path);
+        openDetails();
+    };
 
     return (
         <>
@@ -105,7 +128,7 @@ export default function GettingStartedChecklist({ inline = false }) {
                             <li key={currentStep.id} className={currentStep.done ? styles.done : ''}>
                                 <CompletionCheckBadge checked={currentStep.done} label={currentStep.done ? 'Step complete' : 'Step incomplete'} className={styles.mark} />
                                 <div><strong>{currentStep.title}</strong><p>{currentStep.blurb}</p></div>
-                                <Button variant="ghost" size="sm" onClick={openDetails}>Go</Button>
+                                <Button variant="ghost" size="sm" onClick={showMe} aria-label={`Show me: ${currentStep.title}`}>Show me</Button>
                             </li>
                         </ol>
                     )}

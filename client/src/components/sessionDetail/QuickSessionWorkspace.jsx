@@ -152,7 +152,8 @@ function QuickSessionWorkspace({
                     {orderedInstances.length === 0 ? (
                         <EmptyState
                             className={styles.emptyState}
-                            description="No activities available for this quick session."
+                            title="This quick session has no activities"
+                            description="Its template is empty. Add activities to the template in Manage Session Templates, then start a new quick session."
                         />
                     ) : (
                         <div className={styles.activityList}>

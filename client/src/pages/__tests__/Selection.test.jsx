@@ -353,11 +353,8 @@ describe('Selection', () => {
 
         renderSelection(queryClient);
 
-        await waitFor(() => {
-            expect(screen.getByText('New Fractal')).toBeInTheDocument();
-        });
-
-        fireEvent.click(screen.getByText('New Fractal'));
+        // With no fractals the welcome flow comes first; setting up alone opens the create dialog.
+        fireEvent.click(await screen.findByRole('button', { name: 'I’ll set it up myself' }));
         fireEvent.click(screen.getByText('Submit fractal'));
 
         await waitFor(() => {

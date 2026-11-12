@@ -4,10 +4,11 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 const dismiss = vi.fn();
+const onboardingStatus = { current: 'active' };
 vi.mock('../../../contexts/OnboardingContext', () => ({
     useOnboarding: () => ({
         enabled: true,
-        state: { status: 'active' },
+        state: { status: onboardingStatus.current },
         completedCount: 1,
         isLoading: false,
         dismiss,
@@ -38,7 +39,9 @@ describe('GettingStartedChecklist', () => {
         expect(screen.queryByText('Run your first session')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Next checklist item' }));
 
-        fireEvent.click(screen.getByRole('button', { name: 'Go' }));
+        // "Show me" goes to the step's page and opens its detailed guide.
+        fireEvent.click(screen.getByRole('button', { name: 'Show me: Run your first session' }));
+        expect(screen.getByTestId('location')).toHaveTextContent('/root-1/create-session');
         expect(screen.getByText('a')).toBeInTheDocument();
         expect(screen.getByLabelText('Record values: incomplete')).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Go to Record values' }));
@@ -53,5 +56,24 @@ describe('GettingStartedChecklist', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss onboarding' }));
         fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
         expect(dismiss).toHaveBeenCalled();
+    });
+
+    it('celebrates when the last step finishes onboarding, then closes', () => {
+        onboardingStatus.current = 'active';
+        const { rerender } = render(<MemoryRouter><GettingStartedChecklist /></MemoryRouter>);
+        onboardingStatus.current = 'completed';
+        rerender(<MemoryRouter><GettingStartedChecklist /></MemoryRouter>);
+
+        expect(screen.getByRole('status')).toHaveTextContent('You’re all set up');
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        expect(screen.queryByText('You’re all set up')).not.toBeInTheDocument();
+        onboardingStatus.current = 'active';
+    });
+
+    it('stays hidden for onboarding that was already complete', () => {
+        onboardingStatus.current = 'completed';
+        render(<MemoryRouter><GettingStartedChecklist /></MemoryRouter>);
+        expect(screen.queryByLabelText('Getting started')).not.toBeInTheDocument();
+        onboardingStatus.current = 'active';
     });
 });
