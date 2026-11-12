@@ -131,10 +131,18 @@ test('session hierarchy shares mobile edges and metric inputs retain usable widt
                 expect(layout.timerRows.length).toBe(4);
                 for (const fields of layout.timerRows) {
                     expect(fields).toHaveLength(3);
-                    expect(new Set(fields.map((field) => field.y)).size).toBe(1);
-                    expect(fields[0].right).toBeLessThanOrEqual(fields[1].x);
-                    expect(fields[1].right).toBeLessThanOrEqual(fields[2].x);
-                    expect(fields[2].width).toBeGreaterThanOrEqual(64);
+                    if (width <= 480) {
+                        // Phones stack start, stop and duration, each full width.
+                        expect(new Set(fields.map((field) => field.x)).size).toBe(1);
+                        expect(fields[0].y + fields[0].height).toBeLessThanOrEqual(fields[1].y);
+                        expect(fields[1].y + fields[1].height).toBeLessThanOrEqual(fields[2].y);
+                        expect(new Set(fields.map((field) => field.width)).size).toBe(1);
+                    } else {
+                        expect(new Set(fields.map((field) => field.y)).size).toBe(1);
+                        expect(fields[0].right).toBeLessThanOrEqual(fields[1].x);
+                        expect(fields[1].right).toBeLessThanOrEqual(fields[2].x);
+                        expect(fields[2].width).toBeGreaterThanOrEqual(64);
+                    }
                     expect(fields.every((field) => field.height === 36)).toBe(true);
                 }
             } else {
