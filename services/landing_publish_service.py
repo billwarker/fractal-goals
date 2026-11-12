@@ -83,7 +83,9 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
         account_id = str(DemoAccountService(self.db_session).ensure().id)
         snapshot_service = DemoSnapshotService(self.db_session)
         previous = settings["snapshots"]
-        taken_at = format_utc(utc_now())
+        now = utc_now()
+        # To the microsecond: "source changed since snapshot" compares edits against it.
+        taken_at = now.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
         snapshots: dict[str, JsonDict] = {}
         published_examples = []
         for item in examples:
@@ -99,7 +101,7 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
                 snapshot_service.purge(snapshot["root_id"], account_id)
 
         cache = {
-            "published_at": taken_at,
+            "published_at": format_utc(now),
             "revision": str(uuid.uuid4()),
             "schema_version": LANDING_EXAMPLE_SCHEMA_VERSION,
             "examples": published_examples,

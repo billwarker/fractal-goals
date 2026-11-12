@@ -47,12 +47,12 @@ def showcase(db_session):
     # it to new instances, but the copy must keep each instance as it was.
     db_session.add(ActivityProgressDefault(id='sweep-progress-default', root_id=SOURCE,
                                            activity_definition_id='sweep-activity-comping',
-                                           session_template_id='sweep-template', compare_mode='best',
+                                           session_template_id='sweep-template', compare_mode='tags',
                                            same_template=True))
     db_session.flush()
     db_session.add(ActivityProgressDefaultTag(default_id='sweep-progress-default', tag_definition_id='sweep-tag'))
     # A globally unique value that isn't a reference: the copy needs its own.
-    db_session.get(EventLog, 'sweep-event-0-0').event_id = str(uuid.uuid4())
+    db_session.query(EventLog).filter(EventLog.root_id == SOURCE).order_by(EventLog.id).first().event_id = str(uuid.uuid4())
     db_session.commit()
     return owner
 

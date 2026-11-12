@@ -7,6 +7,7 @@ counts) lives beside the draft and is never published.
 
 import logging
 from copy import deepcopy
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import func
@@ -28,6 +29,15 @@ from services._landing_common import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_utc(value) -> datetime | None:
+    """A stored timestamp (naive UTC datetime or ISO string) as an aware UTC datetime."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
 
 class _LandingSettingsMixin:
@@ -133,10 +143,11 @@ class _LandingSettingsMixin:
     def _snapshot_status(self, source_root_id: str, snapshot: JsonDict | None) -> JsonDict | None:
         if not snapshot:
             return None
-        last_changed = self._source_last_changed(source_root_id)
+        last_changed = _parse_utc(self._source_last_changed(source_root_id))
+        taken_at = _parse_utc(snapshot.get("taken_at"))
         return {
             **snapshot,
-            "source_changed": bool(last_changed and format_utc(last_changed) > snapshot.get("taken_at", "")),
+            "source_changed": last_changed is not None and taken_at is not None and last_changed > taken_at,
         }
 
     def get_landing_example_settings(self) -> ServiceResult[JsonDict]:
