@@ -71,20 +71,31 @@ def check_runs_verdict(check_runs, required=REQUIRED_CHECKS):
     return failed + pending
 
 
-def _fetch_check_runs(repo, sha, token):
+def _github(repo, path, token):
     status, _, body = _request(
-        f"https://api.github.com/repos/{repo}/commits/{sha}/check-runs?per_page=100",
+        f"https://api.github.com/repos/{repo}/{path}",
         headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"},
     )
     if status != 200:
         # A private repo answers 404, not 403, to a token that cannot see it.
         hint = {
             401: "the token is invalid or expired",
-            403: "the token lacks Checks: read",
+            403: "the token lacks Actions: read",
             404: f"the token cannot see {repo} (check its repository access)",
         }.get(status, "unexpected response")
-        raise GateError(f"GitHub check-runs lookup failed with {status}: {hint}")
-    return json.loads(body).get("check_runs", [])
+        raise GateError(f"GitHub Actions lookup failed with {status}: {hint}")
+    return json.loads(body)
+
+
+def _fetch_check_runs(repo, sha, token):
+    """The commit's workflow jobs, shaped like check runs (each job reports as one).
+
+    Read through the Actions API because fine-grained tokens cannot be granted Checks.
+    """
+    jobs = []
+    for run in _github(repo, f"actions/runs?head_sha={sha}&per_page=100", token).get("workflow_runs", []):
+        jobs += _github(repo, f"actions/runs/{run['id']}/jobs?per_page=100", token).get("jobs", [])
+    return jobs
 
 
 def require_ci(repo, sha, token, *, wait_seconds=CI_WAIT_SECONDS, poll_seconds=CI_POLL_SECONDS,

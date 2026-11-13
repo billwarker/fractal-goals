@@ -111,7 +111,8 @@ serving against the migrated schema until promotion.
 
 - Secret `GITHUB_CHECKS_TOKEN`: a fine-grained GitHub token whose repository access
   includes `billwarker/fractal-goals` (the repo is private, so a token without it gets
-  404), with read-only **Checks**. Fine-grained tokens expire: a 401 at **Require
+  404), with read-only **Actions** (the gate reads the commit's workflow jobs; fine-grained
+  tokens cannot be granted Checks). Fine-grained tokens expire: a 401 at **Require
   Passing CI** means it needs rotating (`gcloud secrets versions add GITHUB_CHECKS_TOKEN
   --data-file=-`).
 - Bucket `gs://<project-id>-premigration-backups`, private, with an object lifecycle

@@ -95,7 +95,20 @@ def test_require_ci_gives_up_when_checks_never_finish():
     assert checks.now <= 600
 
 
-@pytest.mark.parametrize("status, hint", [(401, "invalid or expired"), (403, "Checks: read"), (404, "cannot see owner/repo")])
+def test_require_ci_reads_every_workflow_runs_jobs(monkeypatch):
+    jobs = {"1": _passing_runs()[:2], "2": _passing_runs()[2:]}
+
+    def github(url, **_kwargs):
+        if "actions/runs?head_sha=abc123" in url:
+            return 200, {}, b'{"workflow_runs": [{"id": 1}, {"id": 2}]}'
+        run_id = url.split("actions/runs/")[1].split("/")[0]
+        return 200, {}, gates.json.dumps({"jobs": jobs[run_id]}).encode()
+
+    monkeypatch.setattr(gates, "_request", github)
+    gates.require_ci("owner/repo", "abc123", "token")
+
+
+@pytest.mark.parametrize("status, hint", [(401, "invalid or expired"), (403, "Actions: read"), (404, "cannot see owner/repo")])
 def test_require_ci_explains_why_github_refused_the_token(monkeypatch, status, hint):
     monkeypatch.setattr(gates, "_request", lambda *_args, **_kwargs: (status, {}, b"{}"))
     with pytest.raises(gates.GateError, match=f"failed with {status}: .*{hint}"):

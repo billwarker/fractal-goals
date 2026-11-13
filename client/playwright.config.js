@@ -54,7 +54,9 @@ export default defineConfig({
     // on a busy runner doesn't fail the run. Workflow specs never retry.
     retries: sweeping ? 1 : 0,
     workers: sweeping ? 4 : 2,
-    timeout: sweeping ? 60_000 : 30_000,
+    // Hosted runners take 2-4x as long as a laptop, so a long workflow that fits 30 s here runs
+    // out on CI. They get 60 s there; tests that need more still set their own.
+    timeout: sweeping || process.env.CI ? 60_000 : 30_000,
     // Assertions wait up to 10 s: first loads after a fresh server and parallel browsers can
     // run past the 5 s default on a busy machine without anything being wrong.
     expect: { timeout: 10_000 },

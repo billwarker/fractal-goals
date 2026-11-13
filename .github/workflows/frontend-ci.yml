@@ -62,7 +62,8 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The suite has grown from ~7 to ~13 min on hosted runners; at 15 the job was cancelled mid-run.
+    timeout-minutes: 25
     env:
       ENV: testing
       DATABASE_URL: postgresql://fractal:fractal_dev_password@localhost:5432/postgres
