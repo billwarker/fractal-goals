@@ -119,8 +119,10 @@ export function adjustBrightness(hex, percent) {
     return `#${rr}${gg}${bb}`;
 }
 
-export function GoalLevelsProvider({ children, seedLevels = null }) {
+export function GoalLevelsProvider({ children, seedLevels = null, seedAppearance = null }) {
     const { isAuthenticated, user } = useAuth();
+    // Completed-goal colours: a seeded fractal (the landing preview) carries its owner's.
+    const preferences = seedAppearance || user?.preferences;
     const queryClient = useQueryClient();
     const userId = user?.id || null;
     // When seeded (e.g. the public landing page), use the provided levels directly
@@ -207,7 +209,7 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
 
         // Handle direct string passes (e.g., 'LongTermGoal' or 'Completed') from legacy components
         if (typeof goal === 'string') {
-            if (goal === 'Completed') return user?.preferences?.completed_primary_color || FALLBACK_COLOR;
+            if (goal === 'Completed') return preferences?.completed_primary_color || FALLBACK_COLOR;
 
             // Convert 'LongTermGoal' to 'Long Term Goal'
             const normalizedName = goal.replace(/([A-Z])/g, ' $1').trim();
@@ -223,7 +225,7 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
     // For when components know the name (e.g. from ThemeContext legacy calls)
     const getColorByName = (name) => {
         if (name === 'Completed') {
-            return adaptColorForTheme(user?.preferences?.completed_primary_color || FALLBACK_COLOR, resolvedTheme);
+            return adaptColorForTheme(preferences?.completed_primary_color || FALLBACK_COLOR, resolvedTheme);
         }
         const lvl = getLevelByName(name);
         return adaptColorForTheme(lvl?.color || FALLBACK_COLOR, resolvedTheme);
@@ -260,7 +262,7 @@ export function GoalLevelsProvider({ children, seedLevels = null }) {
     const getGoalSecondaryColor = (goal) => {
         // Handle Completed string first
         if (goal === 'Completed') {
-            if (user?.preferences?.completed_secondary_color) return user.preferences.completed_secondary_color;
+            if (preferences?.completed_secondary_color) return preferences.completed_secondary_color;
             const primary = getGoalColor(goal);
             return adjustBrightness(primary, -0.6);
         }

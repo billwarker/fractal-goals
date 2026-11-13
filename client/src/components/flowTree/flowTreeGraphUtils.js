@@ -149,7 +149,7 @@ export const convertTreeToFlow = (
                 hasChildren: normalizedNode.children.length > 0,
                 isSmart: normalizedNode.is_smart || isSMART(node),
                 layoutMode: 'tree',
-                onClick: () => onNodeClick(node),
+                onClick: onNodeClick ? () => onNodeClick(node) : undefined,
                 onAddChild: hasAddChild ? () => onAddChild(node) : null,
                 childTypeName,
             },

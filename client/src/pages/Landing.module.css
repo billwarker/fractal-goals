@@ -75,6 +75,85 @@
     text-align: center;
 }
 
+.intro {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+}
+
+/* Desktop: the copy and picker on the left, and the example's goal tree filling the right of
+   the screen, from the header to the footer and out to the window's edge. */
+@media (min-width: 1024px) {
+    .heroWithPreview {
+        display: grid;
+        grid-template-columns: clamp(360px, 36vw, 640px) minmax(0, 1fr);
+        align-items: stretch;
+        gap: clamp(24px, 3vw, 48px);
+        width: calc(100% + var(--landing-x));
+        max-width: none;
+        /* The copy starts at the page margin, under the logo; the tree runs to the window's right. */
+        margin: 0 calc(-1 * var(--landing-x)) 0 0;
+        padding: 0;
+        text-align: left;
+    }
+
+    /* The header and footer span the window too, so their edges line up with the columns. */
+    .pageWithPreview .header,
+    .pageWithPreview .footer {
+        max-width: none;
+    }
+
+    .heroWithPreview .intro {
+        align-self: center;
+        align-items: flex-start;
+        padding: clamp(0px, 1.5vh, 24px) 0;
+    }
+
+    /* Under the left-aligned headline, the copy and the demo picker centre in the column. */
+    .heroWithPreview .demo {
+        align-self: stretch;
+        align-items: center;
+        margin-top: clamp(12px, 2.6vh, 40px);
+        text-align: center;
+    }
+
+    .heroWithPreview .bodyPanel {
+        margin-top: clamp(12px, 2.4vh, 32px);
+        text-align: center;
+    }
+
+    /* The headline and the label above it centre in the column, like the copy below. */
+    .heroWithPreview .kicker {
+        align-self: center;
+    }
+
+    .heroWithPreview .title {
+        align-self: stretch;
+        place-items: center;
+        text-align: center;
+        font-size: clamp(2.3rem, min(4.2vw, 7vh), 5.2rem);
+    }
+
+    .heroWithPreview .bodyPanel p {
+        font-size: clamp(1rem, min(1.25vw, 2.2vh), 1.45rem);
+    }
+
+    .heroWithPreview .examples {
+        gap: clamp(12px, 2vw, 32px);
+    }
+}
+
+.preview {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+}
+
+.previewPlaceholder {
+    height: 100%;
+}
+
 .kicker {
     margin: 0;
     color: var(--color-brand-primary);

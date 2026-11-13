@@ -81,7 +81,15 @@ accounts.
 
 Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
 demo. Each published demo (Admin → Live demo) is an icon linking to `/demo/<snapshot root>/goals?tour=1`;
-"or join the waitlist" opens `demo/DemoSignupModal`. `index.html`'s boot copy mirrors the hero (an
+"or join the waitlist" opens `demo/DemoSignupModal`. From 1024px the hero is two columns: the copy and
+picker on the left, and filling the rest of the window (header to footer, out to the edge, no panel) the pointed-at example's goal tree (`components/landing/
+LandingTreePreview.jsx`, lazy, so phones never load React Flow; plan `planning/landing-tree-preview-2026-11.md`).
+It is the app's `FlowTree` inside a `GoalLevelsProvider` seeded with the example's published levels: visitors
+can pan and zoom, clicking a goal opens the demo on it (`/demo/<root>/goals?goal=<id>`, `hooks/useGoalDeepLink.js`),
+and the picker icons start the tour. Its frame snaps to the page's 20px grid, and a faint outline on those
+grid lines shows while the pointer is over it. Picker icons resolve through the same seeded levels (`LandingExampleIcon`), so they match the
+tree. `utils/landingPrefetch.js` accepts a static or preloaded manifest only at the current schema
+(`LANDING_SCHEMA_VERSION`), so a file from an older publish falls back to the API. `index.html`'s boot copy mirrors the hero (an
 architecture test ties its words to landing.md). `main.jsx` keeps its three root imports (public landing,
 demo, app) as separate statements, so each root preloads its own CSS.
 
@@ -95,8 +103,11 @@ fractal's effective goal levels copied as its own, database insert-trigger effec
 state left out. Every reachable table must be in `COPY_TABLES` or `EXCLUDED_TABLES`; adding a table that
 reaches a fractal fails `tests/integration/test_demo_snapshots.py` until it is classified there, and the
 same file checks every allow-listed page reads the same on the copy as on the source. The public manifest
-(`landing_example_cache`, schema 14) carries only label, root name, icon, the tour's deep links and the
-owner's completed-goal colours. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
+(`landing_example_cache`, schema 15) carries only label, root name, icon, the tour's deep links, the
+owner's completed-goal colours and a `preview`: the snapshot's effective levels and its goal tree as
+`serialize_goal` builds it, cut to the allowlists in `services/_landing_common.py`
+(`LANDING_PREVIEW_GOAL_FIELDS`, `_ATTRIBUTES`, `_LEVEL_FIELDS`); the snapshot test fails if any other field
+is published. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
 audience (`services/demo_access_service.py`); `token_required` hands demo tokens to
 `blueprints/demo_access.py`, which serves only GET endpoints in `DEMO_READ_ENDPOINTS` on roots that are
 still published, as the root's owner (the demo account), and never media, storage, account, agent, admin or log routes.

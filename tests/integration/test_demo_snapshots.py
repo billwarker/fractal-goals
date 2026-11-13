@@ -1,5 +1,6 @@
 """Demo snapshots: publishing copies the chosen fractals into the demo account (services/demo_snapshot_service.py)."""
 import datetime
+import json
 import uuid
 
 import pytest
@@ -14,6 +15,9 @@ from scripts.browser_showcase_seed import SHOWCASE_ROOT_ID, seed_showcase
 from services.demo_account_service import DEMO_ACCOUNT_ROLE, DemoAccountService
 from services.demo_snapshot_service import (
     COPY_TABLES, EXCLUDED_TABLES, DemoSnapshotService, reachable_fractal_tables,
+)
+from services._landing_common import (
+    LANDING_PREVIEW_GOAL_ATTRIBUTES, LANDING_PREVIEW_GOAL_FIELDS, LANDING_PREVIEW_LEVEL_FIELDS,
 )
 from services.landing_publish_service import LandingPublishService
 from tests.conftest import session_headers_for
@@ -193,7 +197,7 @@ class TestDemoSnapshots:
     def test_the_manifest_is_small_and_points_at_the_snapshot(self, db_session, showcase):
         snapshot_id = _publish(db_session, session_id='sweep-session-3', program_id='sweep-program')
         example = _manifest(db_session)['examples'][0]
-        assert set(example) == {'root_id', 'label', 'sort_order', 'root_name', 'icon', 'tour', 'appearance'}
+        assert set(example) == {'root_id', 'label', 'sort_order', 'root_name', 'icon', 'tour', 'appearance', 'preview'}
         assert example['root_id'] == snapshot_id
         assert example['root_name'] == 'Play jazz guitar at a jam session'
         assert example['appearance'] == {'completed_primary_color': '#ffaa00'}
@@ -203,6 +207,41 @@ class TestDemoSnapshots:
         assert copied_session.session_start == db_session.get(Session, 'sweep-session-3').session_start
         assert db_session.get(Goal, tour['goal_id']).root_id == snapshot_id
         assert tour['program_id'] and tour['program_id'] != 'sweep-program'
+
+    def test_the_preview_is_the_snapshots_tree_with_only_what_the_flow_tree_draws(self, client, db_session, showcase):
+        snapshot_id = _publish(db_session)
+        example = _manifest(db_session)['examples'][0]
+        tree, levels = example['preview']['tree'], example['preview']['levels']
+
+        def walk(node):
+            yield node
+            for child in node['children']:
+                yield from walk(child)
+
+        nodes = list(walk(tree))
+        live = db_session.query(Goal).filter(Goal.root_id == snapshot_id, Goal.deleted_at.is_(None)).count()
+        assert tree['id'] == snapshot_id and len(nodes) == live
+        allowed = set(LANDING_PREVIEW_GOAL_FIELDS) | {'attributes', 'children'}
+        for node in nodes:
+            assert set(node) == allowed
+            assert set(node['attributes']) == set(LANDING_PREVIEW_GOAL_ATTRIBUTES)
+        # It is the app's own tree, field for field, as the demo serves it.
+        demo_headers = {'Authorization': f"Bearer {client.post('/api/public/demo-session').get_json()['token']}"}
+        served = {node['id']: node for node in walk(client.get(f'/api/{snapshot_id}/goals', headers=demo_headers).get_json())}
+        for node in nodes:
+            for field in LANDING_PREVIEW_GOAL_FIELDS:
+                assert node[field] == served[node['id']][field], (node['id'], field)
+        # Small enough to ship with the landing.
+        assert len(json.dumps(example['preview'])) < 60_000
+
+        # The levels are the effective ones the demo resolves, and the picker icon is the root's.
+        served_levels = client.get(f'/api/goal-levels?root_id={snapshot_id}', headers=demo_headers).get_json()
+        assert [(level['id'], level['color'], level['icon']) for level in levels] == \
+            [(level['id'], level['color'], level['icon']) for level in served_levels]
+        assert set(levels[0]) == set(LANDING_PREVIEW_LEVEL_FIELDS)
+        root_level = next(level for level in levels if level['name'] == tree['level_name'])
+        assert example['icon']['shape'] == root_level['icon'] == 'star'
+        assert example['icon']['color'] == root_level['color'] == '#123456'
 
     def test_the_copy_is_isolated_from_the_source(self, db_session, showcase):
         snapshot_id = _publish(db_session)

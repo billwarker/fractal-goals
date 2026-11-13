@@ -540,7 +540,7 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
     assert public_response.status_code == 200
     assert public_response.headers['Cache-Control'] == 'no-store'
     public_payload = public_response.get_json()
-    assert public_payload['schema_version'] == 14
+    assert public_payload['schema_version'] == 15
     public_example = public_payload['examples'][0]
     assert public_example == {
         'root_id': snapshot['root_id'],
@@ -554,7 +554,9 @@ def test_admin_can_manage_and_publish_landing_examples(admin_client, client, db_
             'program_id': None,
         },
         'appearance': {},
+        'preview': public_example['preview'],
     }
+    assert public_example['preview']['tree']['name'] == 'Public Demo Fractal'
     tour_goal = db_session.get(Goal, public_example['tour']['goal_id'])
     assert tour_goal.name == 'Public Demo Child' and tour_goal.root_id == snapshot['root_id']
     copied_session = db_session.get(Session, public_example['tour']['session_id'])
@@ -661,7 +663,7 @@ def test_publish_landing_examples_static_delivery_contract(admin_client, admin_l
     static_publish = publish()
     assert static_publish['static_snapshot'] == 'ok'
     static_payload = json.loads(static_snapshot_path.read_text())
-    assert static_payload['schema_version'] == 14
+    assert static_payload['schema_version'] == 15
     assert static_payload['published_at'] == static_publish['published_at']
     assert static_payload['examples'][0]['root_name'] == 'Public Demo Fractal'
     monkeypatch.setattr(config, 'LANDING_EXAMPLES_STATIC_PATH', '')
