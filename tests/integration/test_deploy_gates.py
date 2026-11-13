@@ -51,6 +51,57 @@ def test_require_ci_fails_closed_without_a_token():
         gates.require_ci("owner/repo", "abc123", "")
 
 
+class _Checks:
+    """A GitHub stub answering each poll with the next list of check runs, on a fake clock."""
+
+    def __init__(self, *answers):
+        self.answers, self.now, self.polls = list(answers), 0, 0
+
+    def fetch(self, _repo, _sha, _token):
+        self.polls += 1
+        return self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+    def require(self, wait_seconds=600):
+        gates.require_ci("owner/repo", "abc123", "token", wait_seconds=wait_seconds, poll_seconds=30,
+                         fetch=self.fetch, sleep=self.sleep, clock=lambda: self.now)
+
+
+def _running(name):
+    return [run if run["name"] != name else {**run, "status": "in_progress", "conclusion": None}
+            for run in _passing_runs()]
+
+
+def test_require_ci_waits_for_running_and_unstarted_checks_then_passes():
+    checks = _Checks(_passing_runs()[2:], _running("browser"), _passing_runs())
+    checks.require()
+    assert checks.polls == 3
+
+
+def test_require_ci_fails_as_soon_as_a_check_fails_without_waiting_for_the_rest():
+    failed = [{**run, "conclusion": "failure"} if run["name"] == "coverage" else run for run in _running("browser")]
+    checks = _Checks(failed)
+    with pytest.raises(gates.GateError, match="coverage: completed/failure"):
+        checks.require()
+    assert checks.polls == 1
+
+
+def test_require_ci_gives_up_when_checks_never_finish():
+    checks = _Checks(_running("browser"))
+    with pytest.raises(gates.GateError, match="still not finished after 10 min: browser: in_progress"):
+        checks.require(wait_seconds=600)
+    assert checks.now <= 600
+
+
+@pytest.mark.parametrize("status, hint", [(401, "invalid or expired"), (403, "Checks: read"), (404, "cannot see owner/repo")])
+def test_require_ci_explains_why_github_refused_the_token(monkeypatch, status, hint):
+    monkeypatch.setattr(gates, "_request", lambda *_args, **_kwargs: (status, {}, b"{}"))
+    with pytest.raises(gates.GateError, match=f"failed with {status}: .*{hint}"):
+        gates.require_ci("owner/repo", "abc123", "token")
+
+
 def test_backend_smoke_passes_against_the_real_application(app):
     server = make_server("127.0.0.1", 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -125,6 +176,8 @@ def test_cloudbuild_gates_run_in_a_fail_closed_order():
     assert order.index("Promote Backend") < order.index("Update Analytics Export Job")
     assert order.index("Promote Backend") < order.index("Update Data Retention Job")
     assert document["substitutions"]["_ALLOW_UNVERIFIED_DEPLOY"] == "false"
+    # Room to wait out CI before the deploy's own ~30 min.
+    assert int(document["timeout"].rstrip("s")) >= gates.CI_WAIT_SECONDS + 1800
     assert {secret["env"] for secret in document["availableSecrets"]["secretManager"]} >= {
         "GITHUB_CHECKS_TOKEN", "SUPABASE_SESSION_POOLER_URL",
     }

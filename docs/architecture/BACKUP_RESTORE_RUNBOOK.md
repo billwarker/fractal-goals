@@ -90,7 +90,9 @@ Every Cloud Build deploy now runs these gates, in order, and stops on the first 
 
 1. **Require Passing CI.** `scripts/deploy_gates.py require-ci` confirms the commit's
    `migration-health`, `coverage`, `production-image`, `frontend` and `browser` checks
-   all succeeded, so only tested commits are built and deployed.
+   all succeeded, so only tested commits are built and deployed. The build starts on the
+   same push as CI, so checks still running are polled every 30 s for up to 40 min; a
+   failed check stops it at once.
 2. **Pre-Migration Backup.** A `postgres:17` step runs `pg_dump --format=custom`, proves it
    restorable with `pg_restore --list` (including `alembic_version`), and stores it at
    `gs://$PROJECT_ID-premigration-backups/premigration/$BUILD_ID.dump` *before*
@@ -107,8 +109,11 @@ serving against the migrated schema until promotion.
 
 ### One-time setup (required before the next deploy)
 
-- Secret `GITHUB_CHECKS_TOKEN`: a fine-grained GitHub token with read-only **Checks**
-  access to `billwarker/fractal-goals`.
+- Secret `GITHUB_CHECKS_TOKEN`: a fine-grained GitHub token whose repository access
+  includes `billwarker/fractal-goals` (the repo is private, so a token without it gets
+  404), with read-only **Checks**. Fine-grained tokens expire: a 401 at **Require
+  Passing CI** means it needs rotating (`gcloud secrets versions add GITHUB_CHECKS_TOKEN
+  --data-file=-`).
 - Bucket `gs://<project-id>-premigration-backups`, private, with an object lifecycle
   rule matching the published retention window (for example, delete after 30 days).
 - Cloud Build service account: Secret Manager Secret Accessor (both secrets), Storage
@@ -121,8 +126,8 @@ serving against the migrated schema until promotion.
 
 ### Proving the gates (do once in a staging trigger)
 
-1. Push a commit whose CI is red, or run the trigger before CI finishes: the build must
-   stop at **Require Passing CI** with no image pushed.
+1. Push a commit whose CI is red: the build must wait at **Require Passing CI** until
+   the failure is reported, then stop with no image pushed.
 2. Temporarily point `smoke-backend` at a path that returns 404: the build must stop at
    **Smoke Backend Candidate** and `gcloud run services describe fractal-backend` must
    still show 100% traffic on the previous revision.

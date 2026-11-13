@@ -2,8 +2,9 @@ steps:
   # ==========================================
   # 0. Release gate: this exact commit passed CI
   # ==========================================
-  # Fails closed: a missing token or an unfinished/failed required check stops the
-  # build before anything is built or migrated. _ALLOW_UNVERIFIED_DEPLOY=true is an
+  # Fails closed: a missing token, a failed required check, or one still unfinished after
+  # 40 min stops the build before anything is built or migrated. Checks still running are
+  # waited for, since this build starts on the same push as CI. _ALLOW_UNVERIFIED_DEPLOY=true is an
   # audited emergency override (see docs/architecture/BACKUP_RESTORE_RUNBOOK.md).
   - name: 'python:3.12-slim'
     id: 'Require Passing CI'
@@ -238,8 +239,8 @@ steps:
     entrypoint: gcloud
     args: ['run', 'services', 'update-traffic', 'fractal-frontend', '--region', '$_REGION', '--to-latest']
 
-# Global timeout
-timeout: '1800s'
+# Global timeout: up to 40 min waiting for CI (Require Passing CI), then the deploy itself.
+timeout: '4500s'
 
 # The public bucket and URL are derived from Cloud Build's built-in PROJECT_ID
 # and PROJECT_NUMBER values above, keeping every environment project-isolated.
