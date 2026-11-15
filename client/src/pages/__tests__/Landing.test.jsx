@@ -19,6 +19,12 @@ vi.mock('../../components/landing/LandingTreePreview', () => ({
     ),
 }));
 
+// Seeded tests never fetch; an unseeded render stays loading.
+vi.mock('../../utils/landingPrefetch', async (importOriginal) => ({
+    ...(await importOriginal()),
+    fetchLandingExamples: () => new Promise(() => {}),
+}));
+
 const { createBetaSignup, createDemoSession, probeHealth } = vi.hoisted(() => ({
     createBetaSignup: vi.fn(),
     createDemoSession: vi.fn(() => Promise.resolve({ data: {} })),
@@ -146,6 +152,14 @@ describe('Landing', () => {
         renderLanding(WITH_PREVIEWS);
         const icons = within(screen.getByRole('list', { name: landingContent.demo.label })).getAllByTestId('goal-icon');
         expect(icons.map((icon) => icon.textContent)).toEqual(['pentagon', 'pentagon']);
+    });
+
+    it('opens on desktop in the two columns while the examples load, as the boot shell draws it', () => {
+        media.wide = true;
+        const { container } = renderLanding(null);
+        expect(screen.getByRole('status', { name: 'Loading the demo examples' })).toBeInTheDocument();
+        expect(container.querySelector('section').className).toMatch(/heroWithPreview/);
+        expect(container.querySelector('main').className).toMatch(/pageWithPreview/);
     });
 
     it('stays one column on desktop when the published demos carry no tree to show', () => {

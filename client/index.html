@@ -77,6 +77,7 @@
       --boot-text: #e6edf5;
       --boot-text-2: #bcc9d8;
       --boot-brand: #4f9cf9;
+      --boot-x: clamp(16px, 4vw, 48px);
       position: fixed;
       inset: 0;
       z-index: 2147483647;
@@ -84,7 +85,7 @@
       display: flex;
       flex-direction: column;
       overflow: auto;
-      padding: 0 clamp(16px, 4vw, 48px);
+      padding: 0 var(--boot-x);
       background-color: var(--boot-bg);
       background-image:
         linear-gradient(var(--boot-grid) 1px, transparent 1px),
@@ -142,6 +143,7 @@
       padding: clamp(12px, 3vh, 48px) 0;
       text-align: center;
     }
+    .landing-boot-intro { display: flex; flex-direction: column; align-items: center; width: 100%; }
     .landing-boot-kicker {
       color: var(--boot-brand);
       font-size: 11px;
@@ -174,7 +176,40 @@
     }
     .landing-boot-copy-mobile { display: none; }
     .landing-boot-demo { margin-top: clamp(16px, 3.5vh, 44px); font-size: clamp(1.2rem, min(2.4vw, 3vh), 1.75rem); font-weight: 800; }
-    .landing-boot-examples { width: min(480px, 100%); height: 150px; }
+    .landing-boot-examples { width: min(480px, 100%); height: 150px; margin-top: 20px; }
+    .landing-boot-waitlist { display: flex; align-items: center; min-height: 40px; margin-top: 2px; padding: 0 12px; color: var(--boot-text-2); font-size: 13px; text-decoration: underline; }
+    .landing-boot-footer {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 24px;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 10px 0;
+      border-top: 1px solid var(--boot-border);
+      color: var(--boot-text-2);
+      font-size: 13px;
+    }
+    .landing-boot-footer span:last-child { display: flex; align-items: center; gap: 20px; min-height: 40px; }
+    /* Desktop: the two columns of Landing.module.css's .heroWithPreview, the right one left for the goal tree. */
+    @media (min-width: 1024px) {
+      .landing-boot-header, .landing-boot-footer { max-width: none; }
+      .landing-boot-hero {
+        display: grid;
+        grid-template-columns: clamp(360px, 36vw, 640px) minmax(0, 1fr);
+        gap: clamp(24px, 3vw, 48px);
+        width: calc(100% + var(--boot-x));
+        max-width: none;
+        margin: 0 calc(-1 * var(--boot-x)) 0 0;
+        padding: 0;
+      }
+      .landing-boot-intro { align-self: center; padding: clamp(0px, 1.5vh, 24px) 0; }
+      .landing-boot-hero h1 { font-size: clamp(2.3rem, min(4.2vw, 7vh), 5.2rem); }
+      .landing-boot-copy { margin-top: clamp(12px, 2.4vh, 32px); font-size: clamp(1rem, min(1.25vw, 2.2vh), 1.45rem); text-align: center; }
+      .landing-boot-demo { margin-top: clamp(12px, 2.6vh, 40px); }
+    }
     .boot-error { min-height: 100vh; display: grid; place-content: center; padding: 24px; text-align: center; }
     @media (max-width: 620px) {
       .landing-boot-brand-name { display: none; }
@@ -219,15 +254,22 @@
         <span class="landing-boot-tools" aria-hidden="true"><span>Log in</span><span class="landing-boot-toggle"></span></span>
       </header>
       <section class="landing-boot-hero">
-        <div class="landing-boot-kicker" aria-hidden="true">Private beta</div>
-        <h1>Achieve Your Most Ambitious Goals</h1>
-        <div class="landing-boot-copy">
-          <span class="landing-boot-copy-full">Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, then ties every session you log to the goals it serves, so the daily work and the big target stay in one connected system instead of five scattered apps.</span>
-          <span class="landing-boot-copy-mobile">Fractal Goals breaks any ambition into a tree of smaller goals, then ties every session you log to the goals it serves, so you can see whether the daily work is moving the big target.</span>
+        <div class="landing-boot-intro">
+          <div class="landing-boot-kicker" aria-hidden="true">Private beta</div>
+          <h1>Achieve Your Most Ambitious Goals</h1>
+          <div class="landing-boot-copy">
+            <span class="landing-boot-copy-full">Want to achieve big goals? Start by making them smaller. Fractal Goals breaks any ambition into a tree of smaller goals, then ties every session you log to the goals it serves, so the daily work and the big target stay in one connected system instead of five scattered apps.</span>
+            <span class="landing-boot-copy-mobile">Fractal Goals breaks any ambition into a tree of smaller goals, then ties every session you log to the goals it serves, so you can see whether the daily work is moving the big target.</span>
+          </div>
+          <div class="landing-boot-demo" aria-hidden="true">Try the live demo</div>
+          <div class="landing-boot-examples" aria-hidden="true"></div>
+          <div class="landing-boot-waitlist" aria-hidden="true">or join the waitlist</div>
         </div>
-        <div class="landing-boot-demo" aria-hidden="true">Try the live demo</div>
-        <div class="landing-boot-examples" aria-hidden="true"></div>
       </section>
+      <footer class="landing-boot-footer" aria-hidden="true">
+        <span>(c) Fractal Goals. Private beta.</span>
+        <span><span>Privacy Policy</span><span>Terms of Service</span></span>
+      </footer>
   </main>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>

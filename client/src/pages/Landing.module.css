@@ -150,10 +150,6 @@
     min-height: 0;
 }
 
-.previewPlaceholder {
-    height: 100%;
-}
-
 .kicker {
     margin: 0;
     color: var(--color-brand-primary);

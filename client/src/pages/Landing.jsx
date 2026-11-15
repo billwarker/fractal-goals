@@ -85,9 +85,9 @@ function Landing() {
     const treeExample = isWide
         ? [examples.find((example) => example.id === treeRootId), examples[0]].find((example) => example?.preview?.tree)
         : null;
-    // Only once a published tree is in hand: reserving the column while loading made the page
-    // jump back to one column whenever the manifest had no preview to show.
-    const showsPreviewColumn = Boolean(treeExample);
+    // Held from the first paint (index.html's boot shell draws the same two columns), so the
+    // page doesn't open in one column and then split. Only a publish without trees drops it.
+    const showsPreviewColumn = isWide && (examplesQuery.isPending || Boolean(treeExample));
     const heroTitle = previewed?.root || landingContent.hero.title;
     const heroBody = (isCompact && landingContent.hero.mobileBody) || landingContent.hero.body;
     const loginLabel = landingContent.header.nav[0]?.label || 'Log in';
@@ -160,13 +160,15 @@ function Landing() {
                 </div>
                 {showsPreviewColumn && (
                     <div className={styles.preview}>
-                        <Suspense fallback={<div className={styles.previewPlaceholder} />}>
-                            <LandingTreePreview
-                                example={treeExample}
-                                goalHref={(goalId) => demoGoalHref(treeExample.id, goalId)}
-                                onOpen={warmDemo}
-                            />
-                        </Suspense>
+                        {treeExample && (
+                            <Suspense fallback={null}>
+                                <LandingTreePreview
+                                    example={treeExample}
+                                    goalHref={(goalId) => demoGoalHref(treeExample.id, goalId)}
+                                    onOpen={warmDemo}
+                                />
+                            </Suspense>
+                        )}
                     </div>
                 )}
             </section>
