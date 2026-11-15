@@ -2,12 +2,11 @@ import React, { useMemo, useState } from 'react';
 
 import { MAX_QUICK_SESSION_ACTIVITIES, canAddQuickActivity } from '../../utils/createSessionQuickDraft';
 import CloseIcon from '../atoms/CloseIcon';
-import { Heading } from '../atoms/Typography';
-import SectionHeader from '../common/SectionHeader';
 import PlanItemPicker from '../prescriptions/PlanItemPicker';
 import PlanItemRow from '../prescriptions/PlanItemRow';
 import PrescriptionEditor from '../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick, shouldScopeOnFocus } from '../prescriptions/usePlanRowSelection';
+import StepHeader from './StepHeader';
 import styles from './QuickSessionSection.module.css';
 
 const NO_SCOPE = { key: null, setIndex: null };
@@ -43,17 +42,12 @@ function QuickSessionSection({
             aria-labelledby="quick-session-activities"
             onClick={(event) => { if (isCardBackgroundClick(event)) setScope(NO_SCOPE); }}
         >
-            <SectionHeader
-                className={styles.header}
-                title={(
-                    <Heading level={3} id="quick-session-activities" className={styles.title}>
-                        Activities
-                    </Heading>
-                )}
-                meta={items.length > 0 ? (
+            <div className={styles.header}>
+                <StepHeader stepNumber={2} id="quick-session-activities" title="Select Activities" />
+                {items.length > 0 ? (
                     <span className={styles.count}>{items.length} / {MAX_QUICK_SESSION_ACTIVITIES}</span>
                 ) : null}
-            />
+            </div>
 
             {items.length === 0 ? (
                 <p className={styles.empty}>

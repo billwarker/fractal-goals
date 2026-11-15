@@ -1,11 +1,10 @@
-// A quick session lives on the device as a draft until it is completed: the activities the
-// user added, in order, each with the values entered in the plan editor's shape
+// A quick session is a draft on Create Session until it is completed (leaving the page discards
+// it): the activities the user added, in order, each with the values entered in the plan editor's shape
 // (`{ metrics }` or `{ sets: [{ metrics, notes }] }`, plus `notes`). Completing sends it to
 // `POST /sessions/quick-complete`, which creates it already complete.
 
 // Mirrors MAX_QUICK_SESSION_ACTIVITIES in services/_session_creation.py.
 export const MAX_QUICK_SESSION_ACTIVITIES = 20;
-export const QUICK_DRAFT_VERSION = 3;
 export const QUICK_SESSION_NAME = 'Quick Session';
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
@@ -67,7 +66,7 @@ export function buildDraftItem(definition, { previous = null } = {}) {
 
 /** An empty quick session. It starts (``startedAt``) when its first activity is added. */
 export function createQuickDraft() {
-    return { version: QUICK_DRAFT_VERSION, startedAt: null, items: [] };
+    return { startedAt: null, items: [] };
 }
 
 export const canAddQuickActivity = (draft) => (draft?.items?.length || 0) < MAX_QUICK_SESSION_ACTIVITIES;
@@ -98,25 +97,6 @@ export function moveDraftActivity(draft, index, direction) {
 
 export function setDraftItemValue(draft, key, value) {
     return { ...draft, items: draft.items.map((item) => (item.key === key ? { ...item, value } : item)) };
-}
-
-/** Drafts saved by older versions (activity-instance shaped, some from templates) still resume. */
-export function upgradeQuickDraft(saved) {
-    if (!saved) return null;
-    if (saved.version === QUICK_DRAFT_VERSION) return saved;
-    if (!Array.isArray(saved.activityInstances)) return null;
-    return {
-        ...createQuickDraft(),
-        startedAt: saved.startedAt || null,
-        items: saved.activityInstances.map((instance) => ({
-            key: `quick-item-${instance.id}`,
-            activity_definition_id: instance.activity_definition_id,
-            name: instance.name || 'Activity',
-            has_sets: Boolean(instance.has_sets),
-            value: recordedValues(instance),
-            previous: null,
-        })),
-    };
 }
 
 /** The ``quick-complete`` body for a draft: its activities in order, with what was entered. */

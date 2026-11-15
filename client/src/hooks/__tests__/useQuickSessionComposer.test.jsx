@@ -1,6 +1,6 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMemoryStore, createOutbox } from '../../offline/outbox';
@@ -37,7 +37,7 @@ const pastSession = {
 function renderComposer(queryClient = new QueryClient(), activityDefinitions = [weighIn]) {
     const wrapper = ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
     return renderHook(
-        () => useQuickSessionComposer({ rootId: 'root-1', userId: 'user-1', activityDefinitions }),
+        () => useQuickSessionComposer({ rootId: 'root-1', activityDefinitions }),
         { wrapper },
     );
 }
@@ -49,20 +49,28 @@ describe('useQuickSessionComposer', () => {
         completeQuickSession.mockReset();
     });
 
-    it('picks up the unfinished draft saved on this device', async () => {
-        kv.set('quick-draft:user-1:root-1', {
-            savedAt: Date.now(),
-            draft: { version: 3, startedAt: null, items: [{ key: 'saved-1', activity_definition_id: 'weigh', name: 'Weigh-in', value: null }] },
-        });
-        const { result } = renderComposer();
+    it('keeps the draft only while the page is open: nothing is saved, and coming back starts empty', () => {
+        const first = renderComposer();
+        act(() => first.result.current.addActivity(weighIn));
+        expect(first.result.current.draft.items).toHaveLength(1);
+        first.unmount();
 
-        await waitFor(() => expect(result.current.draft.items).toHaveLength(1));
-        expect(result.current.hasUnfinishedDraft).toBe(true);
+        const again = renderComposer();
+        expect(again.result.current.draft.items).toEqual([]);
+        expect(kv.size).toBe(0);
+    });
 
+    it('starts over when the fractal changes', () => {
+        const { result, rerender } = renderHook(
+            ({ rootId }) => useQuickSessionComposer({ rootId, activityDefinitions: [weighIn] }),
+            {
+                initialProps: { rootId: 'root-1' },
+                wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,
+            },
+        );
         act(() => result.current.addActivity(weighIn));
-        expect(result.current.draft.items.map((item) => item.key)[0]).toBe('saved-1');
-        expect(result.current.draft.items).toHaveLength(2);
-        expect(result.current.hasUnfinishedDraft).toBe(false);
+        rerender({ rootId: 'root-2' });
+        expect(result.current.draft.items).toEqual([]);
     });
 
     it('replaces the activities with a past session\'s, with last time\'s values, leaving out deleted ones', () => {
@@ -113,7 +121,7 @@ describe('useQuickSessionComposer', () => {
         const gone = { id: 'gone', name: 'Gone', metric_definitions: [] };
         const definitions = [weighIn, gone];
         const { result, rerender } = renderHook(
-            ({ defs }) => useQuickSessionComposer({ rootId: 'root-1', userId: 'user-1', activityDefinitions: defs }),
+            ({ defs }) => useQuickSessionComposer({ rootId: 'root-1', activityDefinitions: defs }),
             {
                 initialProps: { defs: definitions },
                 wrapper: ({ children }) => <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>,

@@ -68,7 +68,7 @@ function ProgramDayPicker({
         if (previousSection) {
             return (
                 <StepContainer>
-                    <StepHeader stepNumber={1} title="Select a Previous Program Day" />
+                    <StepHeader stepNumber={2} title="Select a Previous Program Day" />
                     <p className={styles.previousHint}>Nothing is scheduled today.</p>
                     {previousSection}
                 </StepContainer>
@@ -76,7 +76,7 @@ function ProgramDayPicker({
         }
         return (
             <StepContainer>
-                <StepHeader stepNumber={1} title="Select a Day from Your Program" />
+                <StepHeader stepNumber={2} title="Select a Day from Your Program" />
                 {previousDaysLoading ? (
                     <LoadingState label="Loading previous program days…" />
                 ) : (
@@ -93,7 +93,7 @@ function ProgramDayPicker({
     return (
         <StepContainer>
             <StepHeader
-                stepNumber={1}
+                stepNumber={2}
                 title={groupedDays.length === 1 && groupedDays[0].block_name
                     ? <>Select a Program Day from <span
                         className={styles.blockName}

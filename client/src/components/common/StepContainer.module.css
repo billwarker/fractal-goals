@@ -1,13 +1,14 @@
+/* One inset for every Create Session step, so the step badges line up down the page. */
 .container {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: 8px;
-    padding: 24px;
-    margin-bottom: 24px;
+    padding: 16px;
+    margin-bottom: 16px;
 }
 
 @media (max-width: 768px) {
     .container {
-        padding: 20px;
+        padding: 14px;
     }
 }

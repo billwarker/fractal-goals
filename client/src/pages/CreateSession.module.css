@@ -87,6 +87,41 @@
     margin-inline: auto;
 }
 
+/* Desktop fits the window: each column scrolls on its own, and the goal hierarchy fills its column. */
+@media (min-width: 1025px) {
+    .content {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .inner {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+    }
+
+    .sessionWorkspaceLayout {
+        flex: 1;
+        align-items: stretch;
+        min-height: 0;
+    }
+
+    .requiredSessionFlow,
+    .goalScopeColumn {
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .goalScopeColumn {
+        display: flex;
+        flex-direction: column;
+    }
+}
+
 @media (max-width: 1024px) {
     .sessionWorkspaceLayout {
         grid-template-columns: 1fr;

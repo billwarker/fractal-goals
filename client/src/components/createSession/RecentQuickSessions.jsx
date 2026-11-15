@@ -22,7 +22,6 @@ function RecentQuickSessions({
     activityDefinitions = [],
     timezone,
     onRepeat,
-    stepNumber = 1,
 }) {
     const definitionById = useMemo(
         () => new Map((activityDefinitions || []).map((definition) => [definition.id, definition])),
@@ -73,7 +72,6 @@ function RecentQuickSessions({
     return (
         <StepContainer className={styles.container}>
             <StepHeader
-                stepNumber={stepNumber}
                 title="Recent Quick Sessions"
                 subtitle="Your latest quick session for each distinct set of activities. Pick one to log the same activities, with last time's values in each field."
             />

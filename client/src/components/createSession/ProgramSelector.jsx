@@ -21,7 +21,7 @@ function ProgramSelector({
 
     return (
         <StepContainer>
-            <StepHeader stepNumber={0} title="Choose a Program" />
+            <StepHeader stepNumber={1} title="Choose a Program" />
 
             <div className={styles.list}>
                 {programs.map((program) => {

@@ -36,3 +36,12 @@
     font-size: 12px;
     color: var(--color-text-secondary);
 }
+
+/* As step 3 the step card frames the chooser, so it drops its own card. */
+.container .chooser {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+}
+

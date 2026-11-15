@@ -35,6 +35,7 @@ describe('SessionPlanChooser', () => {
 
     it('lists one day\'s dated plans without repeating its name', () => {
         render(<SessionPlanChooser candidates={plans} value="template" onChange={vi.fn()} />);
+        expect(screen.getByRole('heading', { name: 'Select a Plan' })).toHaveTextContent(/^3Select a Plan/);
         expect(screen.getByRole('option', { name: /Nov 6 · not yet done/ })).toBeInTheDocument();
         expect(screen.getByRole('option', { name: /Oct 30 · already done/ })).toBeInTheDocument();
         expect(screen.queryByRole('option', { name: /Upper/ })).not.toBeInTheDocument();

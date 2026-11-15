@@ -11,34 +11,30 @@ import {
     recordedValues,
     removeDraftActivity,
     setDraftItemValue,
-    upgradeQuickDraft,
 } from '../utils/createSessionQuickDraft';
 import { orderedSessionInstances } from '../utils/quickSessionSummary';
 import { queryKeys } from './queryKeys';
 import { addPendingQuickSession } from './useRecentQuickSessions';
-import { hasQuickSessionInput, useQuickSessionPersistence } from './useQuickSessionPersistence';
+import { hasQuickSessionInput, useQuickSessionCompletion } from './useQuickSessionCompletion';
 
 /**
- * The quick session being logged on Create Session: its draft (kept on the device),
- * adding, editing, reordering, removing and repeating activities, and completing it.
- *
- * ``draft`` is always defined: until the user changes something it is the unfinished draft
- * saved on this device, or a new empty one.
+ * The quick session being logged on Create Session: adding, editing, reordering, removing
+ * and repeating activities, and completing it. The draft lives only while the page is open:
+ * leaving Create Session (or switching fractal) discards it.
  */
-export function useQuickSessionComposer({ rootId, userId, activityDefinitions }) {
+export function useQuickSessionComposer({ rootId, activityDefinitions }) {
     const queryClient = useQueryClient();
-    const [editedDraft, setEditedDraft] = useState(null);
+    // The draft belongs to the fractal it was started in.
+    const [state, setState] = useState(() => ({ rootId, draft: createQuickDraft() }));
     const [completing, setCompleting] = useState(false);
-    const persistence = useQuickSessionPersistence({ rootId, userId, draft: editedDraft });
+    const { queueCompletion } = useQuickSessionCompletion({ rootId });
     const definitionById = useMemo(
         () => new Map((activityDefinitions || []).map((definition) => [definition.id, definition])),
         [activityDefinitions],
     );
-    const resumedDraft = useMemo(() => upgradeQuickDraft(persistence.savedDraft?.draft), [persistence.savedDraft]);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh empty draft per fractal
     const emptyDraft = useMemo(() => createQuickDraft(), [rootId]);
-    const baseDraft = resumedDraft || emptyDraft;
-    const draft = editedDraft || baseDraft;
+    const draft = state.rootId === rootId ? state.draft : emptyDraft;
     // The draft as of the last render: a value committed by blurring its field just before
     // completing reaches the draft after the click that completes it.
     const latestDraft = useRef(draft);
@@ -46,10 +42,12 @@ export function useQuickSessionComposer({ rootId, userId, activityDefinitions })
         latestDraft.current = draft;
     }, [draft]);
 
-    // The first change starts from the resumed or empty draft.
     const update = useCallback((change) => {
-        setEditedDraft((previous) => change(previous || baseDraft));
-    }, [baseDraft]);
+        setState((previous) => ({
+            rootId,
+            draft: change(previous.rootId === rootId ? previous.draft : createQuickDraft()),
+        }));
+    }, [rootId]);
 
     const addActivity = useCallback((definition) => update((current) => addDraftActivities(current, [{ definition }])), [update]);
     const removeActivity = useCallback((key) => update((current) => removeDraftActivity(current, key)), [update]);
@@ -78,10 +76,7 @@ export function useQuickSessionComposer({ rootId, userId, activityDefinitions })
         return instances.length - entries.length;
     }, [definitionById, update]);
 
-    const reset = useCallback(async () => {
-        setEditedDraft(createQuickDraft());
-        await persistence.clearDraft();
-    }, [persistence]);
+    const reset = useCallback(() => update(() => createQuickDraft()), [update]);
 
     /**
      * Completes the draft: device first, through the outbox, so a dead zone never loses it.
@@ -95,7 +90,7 @@ export function useQuickSessionComposer({ rootId, userId, activityDefinitions })
         const logged = { ...draft, items: draft.items.filter((item) => definitionById.has(item.activity_definition_id)) };
         const payload = buildQuickSessionPayload(logged);
         try {
-            const queued = await persistence.queueCompletion(payload);
+            const queued = await queueCompletion(payload);
             if (queued) {
                 // A rejection is reported by the outbox and kept for review; the draft is done either way.
                 if (queued.outcome === 'queued') {
@@ -116,32 +111,28 @@ export function useQuickSessionComposer({ rootId, userId, activityDefinitions })
                 } else {
                     void queryClient.invalidateQueries({ queryKey: queryKeys.recentQuickSessions(rootId) });
                 }
-                await reset();
+                reset();
                 return queued;
             }
 
             const { data: completedSession } = await fractalApi.completeQuickSession(rootId, payload);
             updateCreatedSessionCaches(queryClient, rootId, completedSession);
             void queryClient.invalidateQueries({ queryKey: queryKeys.recentQuickSessions(rootId) });
-            await reset();
+            reset();
             return { outcome: 'synced', id: completedSession.id };
         } finally {
             setCompleting(false);
         }
-    }, [completing, definitionById, persistence, queryClient, reset, rootId]);
+    }, [completing, definitionById, queueCompletion, queryClient, reset, rootId]);
 
     return {
         draft,
-        // An unfinished draft from an earlier visit, not yet picked up.
-        hasUnfinishedDraft: !editedDraft && hasQuickSessionInput(resumedDraft),
-        savedAt: persistence.savedDraft?.savedAt || null,
         completing,
         addActivity,
         removeActivity,
         moveActivity,
         setActivityValue,
         repeat,
-        discard: reset,
         complete,
     };
 }

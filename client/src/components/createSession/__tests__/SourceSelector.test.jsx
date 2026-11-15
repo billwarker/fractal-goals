@@ -12,7 +12,7 @@ describe('SourceSelector', () => {
             programColor="#22c55e"
         />);
 
-        expect(screen.getByRole('heading', { name: 'Choose Session Source' })).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Choose Session Source' })).toHaveTextContent(/^1Choose Session Source/);
         expect(screen.getByRole('button', { name: /From Q4 2026/ })).toHaveTextContent('Selected');
         expect(screen.getByText('Q4 2026')).toHaveStyle({ color: '#22c55e' });
         fireEvent.click(screen.getByRole('button', { name: /From Template/ }));

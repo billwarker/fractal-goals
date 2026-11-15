@@ -9,8 +9,8 @@ import styles from './SourceSelector.module.css';
 
 function SourceSelector({ sessionSource, onSelectSource, programName, programColor, showProgram = true }) {
     return (
-        <StepContainer className={styles.container}>
-            <StepHeader stepNumber={0} title="Choose Session Source" />
+        <StepContainer>
+            <StepHeader stepNumber={1} title="Choose Session Source" />
 
             <div className={styles.grid}>
                 {showProgram && (

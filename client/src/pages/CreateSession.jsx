@@ -38,7 +38,7 @@ import headerStyles from '../components/layout/PageHeader.module.css';
 import styles from './CreateSession.module.css';
 import '../App.css';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDateValue, getISOYMDInTimezone } from '../utils/dateUtils';
+import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { useCreateSessionAutoSelection, useCreateSessionProgramContext } from '../hooks/useCreateSessionProgramContext';
 
 const SESSION_SOURCES = new Set(['program', 'template', 'quick']);
@@ -47,11 +47,12 @@ const SESSION_SOURCES = new Set(['program', 'template', 'quick']);
  * Create Session Page
  * Start a session from a program day or a template, or log a quick session.
  *
- * - ProgramSelector / SourceSelector (Step 0): choose a program, a template, or a quick session
- * - ProgramDayPicker / TemplatePicker (Step 1): pick what to start
+ * - ProgramSelector / SourceSelector (Step 1): choose a program, a template, or a quick session
+ * - ProgramDayPicker / TemplatePicker (Step 2): pick what to start
+ * - SessionPlanChooser (Step 3): which dated plan to run, when there are any
  * - SessionGoalScopePanel (beside): add manual scope beside locked activity-derived goals
- * - Quick session: RecentQuickSessions (Step 1) and QuickSessionSection (beside), completed
- *   from the header action instead of created
+ * - Quick session: QuickSessionSection (Step 2, beside) with RecentQuickSessions as a
+ *   shortcut into it, completed from the header action instead of created
  */
 function CreateSession() {
     const { rootId } = useParams();
@@ -93,7 +94,7 @@ function CreateSession() {
         goalTree,
         loading,
     } = useCreateSessionPageData(rootId, todayISO, timezone || 'UTC');
-    const quick = useQuickSessionComposer({ rootId, userId: user?.id, activityDefinitions });
+    const quick = useQuickSessionComposer({ rootId, activityDefinitions });
 
     useEffect(() => {
         if (!rootId) {
@@ -136,8 +137,8 @@ function CreateSession() {
     const selectedProgram = effectiveSelectedProgramId ? programsById[effectiveSelectedProgramId] : null;
     const recentQuickSessions = useRecentQuickSessions(rootId, { enabled: quickSelected });
 
-    const resetSelectionState = ({ keepProgramDay = false, keepManualGoals = false } = {}) => {
-        if (!keepManualGoals) setManualGoalIds([]);
+    // Chosen session goals stay: they can be picked before, and kept across, a template or day.
+    const resetSelectionState = ({ keepProgramDay = false } = {}) => {
         setSelectedTemplate(null);
         setSelectedProgramSession(null);
         if (!keepProgramDay) setSelectedProgramDay(null);
@@ -353,7 +354,7 @@ function CreateSession() {
             isLoading={Boolean(selectedTemplate) && scopePreviewQuery.isLoading}
             error={selectedTemplate ? scopePreviewQuery.error : null}
             onRetry={() => scopePreviewQuery.refetch()}
-            selectionDisabled={!selectedTemplate}
+            fill={!isMobile}
             awaitingTemplate={!selectedTemplate}
             embedded={isMobile}
             hideHeading={isMobile}
@@ -417,16 +418,6 @@ function CreateSession() {
                         <button type="button" onClick={() => setDeepLinkNotice(null)}>Dismiss</button>
                     </div>
                 ) : null}
-                {quick.hasUnfinishedDraft && !quickSelected ? (
-                    <div className={styles.notice} role="status">
-                        <span>
-                            Unfinished quick session: {quickActivityCount} {quickActivityCount === 1 ? 'activity' : 'activities'}
-                            {quick.savedAt ? ` (saved ${formatDateValue(new Date(quick.savedAt).toISOString(), 'h:mm A', timezone)})` : ''}
-                        </span>
-                        <button type="button" onClick={() => handleSelectSource('quick')}>Resume</button>
-                        <button type="button" onClick={() => void quick.discard()}>Discard</button>
-                    </div>
-                ) : null}
                 <div className={styles.sessionWorkspaceLayout}>
                     <div className={styles.requiredSessionFlow}>
                         {todayProgramView.hasProgramDayToday && primaryTodayProgramDay ? (
@@ -483,7 +474,7 @@ function CreateSession() {
                             </>
                         ) : null}
 
-                        {/* Step 1: Select Program Day */}
+                        {/* Step 2: Select Program Day */}
                         {!quickSelected && (effectiveSessionSource === 'program' || (hasProgramDays && !hasTemplates)) && (
                             <ProgramDayPicker
                                 programDays={currentProgramDays}
@@ -498,8 +489,7 @@ function CreateSession() {
                             />
                         )}
 
-                        {selectedTemplate ? <SessionPlanChooser {...planChoice} emptyMessage={selectedProgramDay?.is_previous ? 'No saved plans for this day. This session will use the template.' : null} /> : null}
-                        {/* Step 1: Select Template */}
+                        {/* Step 2: Select Template */}
                         {(effectiveSessionSource === 'template' || (!effectiveSessionSource && !hasProgramDays && hasTemplates)) && (
                             <TemplatePicker
                                 templates={templates}
@@ -514,6 +504,8 @@ function CreateSession() {
                             />
                         )}
 
+                        {/* Step 3: Select a Plan */}
+                        {selectedTemplate ? <SessionPlanChooser {...planChoice} emptyMessage={selectedProgramDay?.is_previous ? 'No saved plans for this day. This session will use the template.' : null} /> : null}
                     </div>
 
                     {!isMobile && (

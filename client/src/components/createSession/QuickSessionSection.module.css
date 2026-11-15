@@ -10,15 +10,12 @@
     min-width: 0;
 }
 
+/* Step 2's heading, with how many activities are logged on the right. */
 .header {
-    margin: 0;
-}
-
-.title {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--color-text-primary);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
 }
 
 .count {

@@ -9,7 +9,6 @@ import {
     removeDraftActivity,
     sanitizeMetrics,
     setDraftItemValue,
-    upgradeQuickDraft,
 } from '../createSessionQuickDraft';
 
 const scales = { id: 'activity-1', name: 'Scales', has_sets: true, metric_definitions: [{ id: 'bpm' }] };
@@ -117,22 +116,6 @@ describe('createSessionQuickDraft', () => {
                 },
             ],
         });
-    });
-
-    it('resumes drafts saved by older versions', () => {
-        const old = {
-            session: { id: 'queued-quick-template-1' },
-            activityInstances: [{
-                id: 'old-1', activity_definition_id: 'activity-2', name: 'Weigh-in', has_sets: false,
-                metrics: [{ metric_id: 'weight', value: '82' }], sets: [],
-            }],
-        };
-        const upgraded = upgradeQuickDraft(old);
-        expect(upgraded.items).toEqual([expect.objectContaining({
-            activity_definition_id: 'activity-2', value: { metrics: [{ metric_id: 'weight', value: 82 }] },
-        })]);
-        expect(upgradeQuickDraft(upgraded)).toBe(upgraded);
-        expect(upgradeQuickDraft(null)).toBeNull();
     });
 
     it('normalizes entered metric values and removes blank results', () => {

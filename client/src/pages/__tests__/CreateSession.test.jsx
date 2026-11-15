@@ -231,6 +231,18 @@ describe('CreateSession quick-session flow', () => {
         expect(screen.getAllByText('Logged Bodyweight (with last values)')).toHaveLength(1);
     });
 
+    it('lets session goals be chosen before a template, and keeps them once one is picked', () => {
+        renderPage('/root-1/session/create?source=template');
+        expect(goalScopeProps).toHaveBeenLastCalledWith(expect.objectContaining({ awaitingTemplate: true, fill: true }));
+        expect(goalScopeProps.mock.lastCall[0].selectionDisabled).toBeFalsy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Select child goal' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select Weigh Myself' }));
+
+        expect(screen.getByText('Session Goals · Manual: child')).toBeInTheDocument();
+        expect(goalScopeProps).toHaveBeenLastCalledWith(expect.objectContaining({ awaitingTemplate: false }));
+    });
+
     it('starts on a quick session when there is nothing else to start from', () => {
         mockPageData.value = { ...mockPageData.value, templates: [] };
         renderPage();

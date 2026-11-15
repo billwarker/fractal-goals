@@ -18,7 +18,7 @@ test('a quick session is logged on Create Session, completed in one step, and re
 
     await page.goto(`/${root}/create-session`);
     await page.getByRole('button', { name: /Quick Session/ }).first().click();
-    const section = page.getByRole('region', { name: 'Activities' });
+    const section = page.getByRole('region', { name: 'Select Activities' });
     await expect(section).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Quick Sessions' })).toBeVisible();
     const complete = page.getByRole('button', { name: 'Complete Session', exact: true }).first();

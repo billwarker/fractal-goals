@@ -40,6 +40,7 @@ function renderSection(items, handlers = {}) {
 describe('QuickSessionSection', () => {
     it('explains an empty quick session and adds activities only, no circuits', () => {
         const { onAddActivity } = renderSection([]);
+        expect(screen.getByRole('region', { name: 'Select Activities' })).toHaveTextContent(/^2Select Activities/);
         expect(screen.getByText(/Every activity is completed when you complete the session/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: '+ Add activity' }));
         expect(onAddActivity).toHaveBeenCalledWith(weighIn);

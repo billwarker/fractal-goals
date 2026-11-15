@@ -25,7 +25,7 @@ function CreateSessionActions({
 
     return (
         <StepContainer className={`${styles.container} ${footerMode ? styles.footerContainer : ''} ${headerMode ? styles.headerContainer : ''}`}>
-            {!headerMode && !footerMode && <StepHeader stepNumber={2} title={actionTitle} />}
+            {!headerMode && !footerMode && <StepHeader stepNumber={quick ? 3 : 4} title={actionTitle} />}
             {footerMode && <h2 className={styles.footerTitle}>{actionTitle}</h2>}
 
             {quick ? (

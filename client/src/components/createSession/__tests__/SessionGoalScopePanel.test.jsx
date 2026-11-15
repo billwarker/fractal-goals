@@ -42,7 +42,7 @@ describe('SessionGoalScopePanel', () => {
         }));
     });
 
-    it('disables selection until a template is chosen', () => {
+    it('lets goals be chosen before a template, saying its goals join once one is picked', () => {
         render(
             <SessionGoalScopePanel
                 goals={[]}
@@ -51,14 +51,13 @@ describe('SessionGoalScopePanel', () => {
                 onChange={vi.fn()}
                 isLoading={false}
                 awaitingTemplate
-                selectionDisabled
             />
         );
 
         expect(screen.getByText('Optional')).toBeInTheDocument();
-        expect(screen.getByText(/Select a template/i)).toBeInTheDocument();
+        expect(screen.getByText(/added, and locked, once you pick one/i)).toBeInTheDocument();
         expect(selectorProps).toHaveBeenCalledWith(expect.objectContaining({
-            selectionDisabled: true,
+            selectionDisabled: false,
         }));
     });
 

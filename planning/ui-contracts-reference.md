@@ -262,31 +262,37 @@ coverage lives in `client/e2e/session-detail-width.spec.js`.
 
 ## Create Session quick sessions
 
-Step 0 offers three sources: the active program (only with exactly one program), "From Template" and
+Steps are numbered from 1. Step 1 (source) offers three sources: the active program (only with exactly one program), "From Template" and
 "Quick Session"; with several programs, the program list keeps "Select Template Manually Instead" and
 adds "Log a Quick Session". With no program and no template, Create Session opens on a quick session.
-`?source=quick|template|program` deep-links a source.
+`?source=quick|template|program` deep-links a source. For a program or template, step 2 picks the
+program day or template, and step 3 ("Select a Plan") the dated plan to run, when there are any.
 
-Choosing Quick Session replaces the right column's Session Goals panel with an "Activities" card (an
+Choosing Quick Session replaces the right column's Session Goals panel with step 2, a "Select Activities" card (an
 `N / 20` count). Its activities use the program-day plan's pieces: `PlanItemRow` (name; move up/down and
 remove), `PrescriptionEditor` with `valueKind="logged"`, no tag pickers and no notes (values, and sets with
 "+ Add set"), and `PlanItemPicker` without circuits ("+ Add
 activity"; create and copy open the activity builder, and a saved activity is added at once). There is
 no timer, start/stop field or completion control. The same activity may be added twice. On phones the
-card sits under Step 0. Step 1 is "Recent Quick Sessions": one card per distinct selection of activities
+card sits under step 1. Below step 1, "Recent Quick Sessions" (unnumbered, a shortcut into step 2): one card per distinct selection of activities
 (order and repeats ignored), up to five, from the latest 30 quick sessions; each is the latest session with
 that selection and shows its date and its activity names in logged order, no values. They sit in one
 horizontal row, newest first, scrolling sideways when they don't fit. The whole card is the control:
-picking it replaces whatever the Activities card holds with its activities, without asking: empty inputs,
+picking it replaces whatever step 2 holds with its activities, without asking: empty inputs,
 last time's values as the inputs' placeholders and one empty set per past set. Activities since deleted
 are left out, with a notice.
 
 The header action (the sticky footer on phones) reads "Complete Session", disabled until an activity
 is added, with the summary "Quick session · N activities". Completing saves on the device first: with
 no signal the session appears at the top of the recent list as "Waiting to sync" and syncs on
-reconnect. The draft (activities and values) survives reloads for seven days; away from the quick
-source, an "Unfinished quick session" notice offers Resume or Discard. A completed quick session starts
-when its first activity was added and records no duration.
+reconnect. The quick session being logged lives only while Create Session is open: switching to
+another source keeps it, but leaving the page (or switching fractal) discards it, with no resume
+notice. A completed quick session starts when its first activity was added and records no duration.
+
+The Session Goals panel can be used before a template or program day is picked (its description says
+the template's activity goals join, locked, once one is), and the goals chosen stay when a template, day
+or source is picked. On desktop (over 1024px) Create Session fits the window: the left column scrolls on
+its own, and the goals panel fills the right column with only its hierarchy scrolling.
 
 A quick session opens in `sessions/QuickSessionModal` over the current page, never on its own Session
 Detail page: from the Sessions page (`?quickSessionId=`) and from a program day's session list in the

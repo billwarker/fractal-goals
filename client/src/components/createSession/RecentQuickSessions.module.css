@@ -1,6 +1,4 @@
 .container {
-    padding: 16px;
-    margin-bottom: 16px;
     min-width: 0;
 }
 
@@ -98,10 +96,6 @@
 }
 
 @media (max-width: 768px) {
-    .container {
-        padding: 14px;
-    }
-
     .item {
         flex-basis: min(260px, 80%);
     }

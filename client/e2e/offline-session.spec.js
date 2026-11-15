@@ -81,7 +81,7 @@ test('a quick session completed with no signal is kept on the device and syncs o
 
     await page.goto(`/${root}/create-session?source=quick`);
     await page.evaluate(() => navigator.serviceWorker.ready);
-    const section = page.getByRole('region', { name: 'Activities' });
+    const section = page.getByRole('region', { name: 'Select Activities' });
     await section.getByRole('button', { name: '+ Add activity' }).click();
     await page.getByRole('button', { name: /Dead-zone weigh-in/ }).first().click();
     await expect(section.getByText('Dead-zone weigh-in')).toBeVisible();

@@ -124,7 +124,7 @@ function TemplatePicker({
 
     return (
         <StepContainer>
-            <StepHeader stepNumber={1} title="Select a Template" />
+            <StepHeader stepNumber={2} title="Select a Template" />
 
             {templates.length === 0 ? (
                 <StarterTemplateEmptyState rootId={rootId} onSelectTemplate={onSelectTemplate} />

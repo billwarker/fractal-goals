@@ -129,7 +129,7 @@ the network; the session's queries refetch once its queue drains and stays quiet
 invariant "pending ⇒ a send is due" (store errors retry, a frozen tab's drain lock is taken over after an
 unanswered ping), the server records an idempotent write's commit in the write's own transaction, and
 `offline/__tests__/outbox.chaos.test.js` checks all of it under seeded random faults. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
-mirrored in `offline/circuitIds.js`). Quick-session drafts persist per user and fractal.
+mirrored in `offline/circuitIds.js`). A quick session being logged is not kept: leaving Create Session discards it.
 See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 
 Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx` (a fixed,
@@ -261,7 +261,7 @@ including paused sessions.
 
 Templates have one shape (sections of items; no `session_type`, migration `aa1d1082d073` turned the old
 quick templates into one-section templates). A quick session has no template: it is logged on Create
-Session (source "Quick Session", `?source=quick`) as a device draft (`hooks/useQuickSessionComposer.js`,
+Session (source "Quick Session", `?source=quick`) as a page-only draft (`hooks/useQuickSessionComposer.js`,
 `utils/createSessionQuickDraft.js`), one card of activities beside the distinct recent quick
 sessions (`GET …/sessions?session_type=quick`), and created already complete by `POST …/sessions/quick-complete`
 in one transaction (1–20 activities matched by position, `session_data.session_type = 'quick'`). `POST
