@@ -190,7 +190,8 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
     def _preview_levels(self, root: Goal) -> list[JsonDict]:
         """The snapshot's effective levels (system, then account, then fractal), as the app merges them."""
         levels, _, _ = GoalLevelService(self.db_session).list_goal_levels(root.owner_id, root_id=root.id)
-        return [{field: getattr(level, field) for field in LANDING_PREVIEW_LEVEL_FIELDS} for level in levels]
+        # Listing never fails; ServiceResult types the value as optional for the services that do.
+        return [{field: getattr(level, field) for field in LANDING_PREVIEW_LEVEL_FIELDS} for level in levels or ()]
 
     def _preview_tree(self, root_id: str) -> JsonDict:
         """The snapshot's goal tree as the app serializes it, cut to what the flow tree draws."""

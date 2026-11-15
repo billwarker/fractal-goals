@@ -681,10 +681,11 @@ def test_publish_landing_examples_query_budget(
     )
 
     # Collecting walks each copied table once per pass; inserts and link updates are batched.
+    # The demo preview (the published levels and goal tree) reads in two more queries.
     assert_response_budget(
         response, max_bytes=20_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 115
+    assert query_counter["total"] <= 118
 
 
 @pytest.mark.integration
@@ -722,9 +723,12 @@ def test_publish_multiple_landing_examples_total_payload_budget(
     )
     payload = response.get_json()
     assert payload["published_example_count"] == 2
-    assert payload["snapshot_bytes"] <= 4_000
+    # Each example carries its preview (levels and goal tree), which compresses well: the
+    # compressed bound is what visitors download.
+    assert payload["snapshot_bytes"] <= 14_000
     assert payload["compressed_snapshot_bytes"] <= 2_000
-    assert query_counter["total"] <= 190
+    # Per example, the preview's two reads and the program-day activity condition tables' copy.
+    assert query_counter["total"] <= 197
 
 
 @pytest.mark.integration
