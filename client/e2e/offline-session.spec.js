@@ -258,7 +258,7 @@ test('offline tag edits sync, and an activity added then deleted offline never r
 });
 
 test('a change the server keeps failing is set aside, and later changes still sync', async ({ page, context }, testInfo) => {
-    // Real backoff: eight failed attempts take roughly 60-125 s, so run once, on desktop.
+    // Real backoff: five failed attempts take roughly 15-30 s, so run once, on desktop.
     test.skip(testInfo.project.name !== 'desktop', 'Timing-bound; one project is enough');
     test.setTimeout(240_000);
     const token = await openSignedIn(page);
@@ -288,7 +288,7 @@ test('a change the server keeps failing is set aside, and later changes still sy
     await context.setOffline(false);
 
     // The later change waits behind the failing one, then syncs once that is set aside. Giving up
-    // takes 30 minutes, so the page's clock jumps ahead through its retries.
+    // takes 10 minutes, so the page's clock jumps ahead through its retries.
     await expect.poll(async () => {
         await page.clock.fastForward('10:00');
         const rows = await (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
@@ -299,6 +299,75 @@ test('a change the server keeps failing is set aside, and later changes still sy
     await status.getByRole('button', { name: 'Review' }).click();
     await expect(page.getByRole('dialog', { name: "Changes that couldn't sync" }).getByText(/kept failing to save this change/)).toBeVisible();
     await page.request.delete(`/api/${root}/sessions/${session.id}`, { headers });
+});
+
+/** A session with one timed activity, opened on `page`. */
+async function openTimedSession(page, testInfo, slug) {
+    const token = await openSignedIn(page);
+    const root = `browser-offline-${slug}-root-${testInfo.project.name}`;
+    const headers = { Authorization: `Bearer ${token}` };
+    const post = async (path, data) => {
+        const response = await page.request.post(`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${await response.text()}`).toBeTruthy();
+        return response.json();
+    };
+    // Unique per run, so a repeat in the same fractal never finds an earlier run's drill.
+    const drill = `Drill ${slug} ${Date.now()}`;
+    const definition = await post('activities', { name: drill, has_metrics: false });
+    const session = await post('sessions', {
+        name: `Sync ${slug}`, goal_ids: [root],
+        session_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_definition_id: definition.id }] }] },
+    });
+    await page.goto(`/${root}/session/${session.id}`);
+    await expect(page.getByText(drill).first()).toBeVisible();
+    const instances = async () => (await page.request.get(`/api/${root}/sessions/${session.id}/activities`, { headers })).json();
+    const cleanup = async () => {
+        const response = await page.request.delete(`/api/${root}/sessions/${session.id}`, { headers });
+        expect(response.ok(), `cleanup: ${await response.text()}`).toBeTruthy();
+    };
+    return { instances, cleanup };
+}
+
+test('a change sent with an expired token syncs on the renewed one, without asking to sign in', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    const { instances, cleanup } = await openTimedSession(page, testInfo, 'expiry');
+    const sentWith = [];
+    await page.route('**/activity-instances/*/start', (route) => {
+        sentWith.push(route.request().headers().authorization);
+        // The first attempt meets an expired token; the app renews it and sends again.
+        if (sentWith.length === 1) return route.fulfill({ status: 401, json: { error: 'Token has expired' } });
+        return route.continue();
+    });
+
+    await page.getByTitle('Start timer').first().click();
+
+    await expect(page.getByRole('status').filter({ hasText: 'All changes synced' })).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Sign in again to sync/)).toHaveCount(0);
+    expect(sentWith).toHaveLength(2);
+    expect(sentWith[1]).not.toBe(sentWith[0]);
+    expect((await instances())[0].time_start).toBeTruthy();
+    await cleanup();
+});
+
+test('a change the server is failing says when it will retry, and Retry now sends it', async ({ page }, testInfo) => {
+    test.setTimeout(60_000);
+    const { instances, cleanup } = await openTimedSession(page, testInfo, 'retrying');
+    let failing = true;
+    await page.route('**/activity-instances/*/start', (route) => (
+        failing ? route.fulfill({ status: 503, json: { error: 'Service Unavailable' } }) : route.continue()
+    ));
+
+    await page.getByTitle('Start timer').first().click();
+    const status = page.getByRole('status').filter({ hasText: 'Retrying' });
+    await expect(status).toContainText(/Retrying 1 change in \d+ s/, { timeout: 20_000 });
+    await expect(status).toContainText('server error 503');
+
+    failing = false;
+    await status.getByRole('button', { name: 'Retry now' }).click();
+
+    await expect(page.getByRole('status').filter({ hasText: 'All changes synced' })).toBeVisible({ timeout: 15_000 });
+    expect((await instances())[0].time_start).toBeTruthy();
+    await cleanup();
 });
 
 test('the offline kill switch removes the service worker on the next load', async ({ page }) => {

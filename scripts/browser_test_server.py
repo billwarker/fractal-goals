@@ -543,6 +543,8 @@ def main():
                     ("offline-circuit", "Offline Circuit"),
                     ("offline-edits", "Offline Edits"),
                     ("offline-ceiling", "Offline Ceiling"),
+                    ("offline-expiry", "Offline Expiry"),
+                    ("offline-retrying", "Offline Retrying"),
                     ("axis-room", "Axis Room"),
                     ("trend-goals", "Trend Goals"),
                     ("aligned-sessions", "Aligned Sessions"),

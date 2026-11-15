@@ -156,6 +156,8 @@ class Config:
     # Optional least-privilege PostgreSQL role for analytics raw SQL (SET LOCAL ROLE). It needs
     # SELECT on catalog tables only; see docs/architecture/ANALYTICS_SQL_BOUNDARY.md.
     ANALYTICS_SQL_ROLE = os.getenv('ANALYTICS_SQL_ROLE', '').strip() or None
+    # How long one request may run before gunicorn kills its worker (Dockerfile, cloudbuild.yaml).
+    REQUEST_TIMEOUT_SECONDS = int(os.getenv('GUNICORN_TIMEOUT', '210'))
     JWT_EXPIRATION_HOURS = int(os.getenv('JWT_EXPIRATION_HOURS', '72'))
     JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
     # Absolute session lifetime from the original login, across all refreshes.

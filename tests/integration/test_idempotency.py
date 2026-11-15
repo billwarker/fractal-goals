@@ -207,3 +207,86 @@ class TestIdempotentWrites:
         assert replay.get_json() == {'replayed': True}
         assert _instance_count(db_session, sample_practice_session.id) == 1
 
+
+
+@pytest.mark.integration
+class TestIdempotentCommitsAreRecordedWithTheWrite:
+    """A write that committed is never run again, even if recording its response failed."""
+
+    def _add_url(self, session):
+        return f'/api/{session.root_id}/sessions/{session.id}/activities'
+
+    def _age_claims(self, db_session):
+        db_session.expire_all()
+        for record in db_session.query(IdempotencyRecord).all():
+            record.created_at = utc_now() - timedelta(minutes=30)
+        db_session.commit()
+
+    def test_retry_after_the_response_was_lost_replays_instead_of_running_again(
+        self, client, auth_headers, db_session, monkeypatch, sample_practice_session, sample_activity_definition,
+    ):
+        from sqlalchemy.exc import OperationalError
+
+        from blueprints import idempotency
+
+        def lose_response(*_args, **_kwargs):
+            raise OperationalError('UPDATE idempotency_records', {}, Exception('connection reset'))
+
+        url = self._add_url(sample_practice_session)
+        body = json.dumps({'activity_definition_id': sample_activity_definition.id})
+        headers = _keyed(auth_headers, str(uuid4()))
+        with monkeypatch.context() as patch:
+            patch.setattr(idempotency, '_finish', lose_response)
+            first = client.post(url, data=body, headers=headers)
+        self._age_claims(db_session)
+
+        retry = client.post(url, data=body, headers=headers)
+
+        assert first.status_code == 201
+        assert retry.status_code == 200
+        assert retry.headers.get('Idempotent-Replayed') == 'true'
+        assert retry.get_json() == {'replayed': True}
+        assert _instance_count(db_session, sample_practice_session.id) == 1
+
+    def test_handler_failing_after_its_commit_replays_instead_of_running_again(
+        self, client, auth_headers, db_session, monkeypatch, sample_practice_session, sample_activity_definition,
+    ):
+        from blueprints import idempotency
+
+        real_make_response = idempotency.make_response
+        calls = {'count': 0}
+
+        def fail_once(*args, **kwargs):
+            calls['count'] += 1
+            if calls['count'] == 1:
+                raise RuntimeError('serializing the response failed')
+            return real_make_response(*args, **kwargs)
+
+        monkeypatch.setattr(idempotency, 'make_response', fail_once)
+        url = self._add_url(sample_practice_session)
+        body = json.dumps({'activity_definition_id': sample_activity_definition.id})
+        headers = _keyed(auth_headers, str(uuid4()))
+
+        first = client.post(url, data=body, headers=headers)
+        retry = client.post(url, data=body, headers=headers)
+
+        assert first.status_code == 500
+        assert retry.status_code == 200
+        assert retry.headers.get('Idempotent-Replayed') == 'true'
+        assert _instance_count(db_session, sample_practice_session.id) == 1
+
+    def test_failed_write_still_frees_its_key(
+        self, client, auth_headers, db_session, sample_practice_session,
+    ):
+        url = self._add_url(sample_practice_session)
+        headers = _keyed(auth_headers, str(uuid4()))
+
+        client.post(url, data=json.dumps({'activity_definition_id': str(uuid4())}), headers=headers)
+
+        assert db_session.query(IdempotencyRecord).count() == 0
+
+    def test_claims_are_not_taken_over_while_a_request_could_still_be_running(self):
+        import config
+        from blueprints import idempotency
+
+        assert idempotency.STALE_CLAIM_AFTER.total_seconds() > config.Config.REQUEST_TIMEOUT_SECONDS

@@ -40,9 +40,16 @@ const setHeader = (config, name, value) => {
 
 const getResponseHeader = (headers, name) => getHeader(headers, name);
 
+// Bumped whenever a new access token arrives, so a caller that got a 401 can tell whether
+// sign-in has been fixed since it sent (the outbox retries then instead of pausing).
+let authGeneration = 0;
+
+export const getAuthGeneration = () => authGeneration;
+
 export const setAccessToken = (token) => {
     accessToken = token || null;
     if (token) {
+        authGeneration += 1;
         hasDispatchedSessionExpired = false;
     }
 };
@@ -228,6 +235,8 @@ axios.interceptors.response.use(
 
                 processQueue(null, token);
 
+                // The first attempt carried the expired token; the request interceptor keeps an existing header.
+                if (token) setHeader(originalRequest, 'Authorization', `Bearer ${token}`);
                 if (!getHeader(originalRequest.headers, CSRF_HEADER_NAME) && needsCsrfHeader(originalRequest)) {
                     const csrfToken = await ensureCsrfToken(originalRequest);
                     if (csrfToken) {

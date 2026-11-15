@@ -3,6 +3,7 @@
 
 /**
  * @typedef {object} OutboxOp One queued write, persisted until the server acknowledges it.
+ * @property {number} [v] Op shape version (OP_VERSION); missing means 1.
  * @property {string} opId
  * @property {string} idempotencyKey
  * @property {string | null} scope
@@ -29,11 +30,22 @@
  */
 
 /**
+ * @typedef {object} OutboxSnapshot What the sync indicator reads (`getSnapshot`).
+ * @property {OutboxOp[]} ops
+ * @property {boolean} syncing A flush is running in this tab.
+ * @property {boolean} pausedForAuth Waiting for sign-in to be renewed.
+ * @property {boolean} volatile The device store failed, so queued changes live only in this tab for now.
+ * @property {boolean} waitingForTab A drain here waits for another tab's drain lock.
+ * @property {Record<string, number>} syncedAt When each scope last emptied.
+ */
+
+/**
  * @typedef {object} OutboxStore Durable op store (indexedDbStore, or memoryStore in tests).
  * @property {() => Promise<OutboxOp[]>} getAll
  * @property {(op: OutboxOp) => Promise<void>} put
  * @property {(opId: string) => Promise<void>} delete
  * @property {() => Promise<void>} [clear]
+ * @property {() => boolean} [isVolatile] True while ops are held in memory because the durable store failed.
  */
 
 /**
@@ -45,6 +57,7 @@
  * @property {(callback: () => Promise<unknown>, options?: { steal?: boolean }) => Promise<unknown>} [drainLock]
  * @property {(body: unknown) => unknown} [prepareBody]
  * @property {BroadcastChannel | null} [channel]
+ * @property {() => number} [authGeneration] Changes whenever sign-in is renewed.
  * @property {() => number} [now]
  * @property {() => number} [random]
  * @property {() => string} [createId]

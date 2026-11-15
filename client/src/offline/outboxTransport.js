@@ -48,6 +48,14 @@ export function countsTowardGivingUp(error) {
     return error?.response?.status >= 500 && !TRANSIENT_STATUSES.has(error.response.status);
 }
 
+/**
+ * A failure about this change rather than the connection or the whole server (an outage
+ * or rate limit says nothing about it): other sessions' changes may go ahead of it.
+ */
+export function isOpSpecificFailure(error) {
+    return countsTowardGivingUp(error) || isInFlightClaim(error);
+}
+
 /** The wait a `Retry-After` header asks for (seconds or a date), within reason; 0 without one. */
 export function retryAfterMs(error, now = Date.now()) {
     const headers = error?.response?.headers;

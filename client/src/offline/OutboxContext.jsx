@@ -6,6 +6,7 @@ import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFe
 import AppUpdatePrompt from './AppUpdatePrompt';
 import { checkConnectivity, isOnline, subscribeConnectivity } from './connectivity';
 import { OP_STATE } from './opKinds';
+import { scopeHeads } from './outboxQueue';
 import { registerAppServiceWorker, unregisterAppServiceWorker } from './serviceWorker';
 import { saveUserSnapshot } from './userSnapshot';
 
@@ -95,7 +96,7 @@ export function useOutbox() {
     return useContext(OutboxContext);
 }
 
-const EMPTY_SNAPSHOT = { ops: [], syncing: false, pausedForAuth: false, syncedAt: {} };
+const EMPTY_SNAPSHOT = { ops: [], syncing: false, pausedForAuth: false, volatile: false, waitingForTab: false, syncedAt: {} };
 const noopSubscribe = () => () => {};
 
 export function useOutboxStatus(scope = null) {
@@ -108,13 +109,25 @@ export function useOutboxStatus(scope = null) {
 
     return useMemo(() => {
         const inScope = scope ? snapshot.ops.filter((op) => op.scope === scope) : snapshot.ops;
+        const pending = inScope.filter((op) => op.state === OP_STATE.PENDING);
+        // The soonest head waiting to retry after a failure, so the indicator can say why it waits.
+        const retrying = scopeHeads(pending)
+            .filter((op) => op.lastError && op.nextAttemptAt)
+            .sort((left, right) => left.nextAttemptAt - right.nextAttemptAt)[0];
+        const createdTimes = pending.map((op) => Date.parse(op.createdAt || '')).filter((time) => !Number.isNaN(time));
         return {
             enabled: Boolean(outbox),
             online,
-            pendingCount: inScope.filter((op) => op.state === OP_STATE.PENDING).length,
+            pendingCount: pending.length,
             rejected: inScope.filter((op) => op.state === OP_STATE.REJECTED),
             syncing: snapshot.syncing,
             pausedForAuth: snapshot.pausedForAuth,
+            // Changes held in this tab's memory because the device store failed.
+            volatile: Boolean(snapshot.volatile),
+            waitingForTab: Boolean(snapshot.waitingForTab),
+            retryAt: retrying?.nextAttemptAt || null,
+            lastError: retrying?.lastError || null,
+            oldestPendingAt: createdTimes.length ? Math.min(...createdTimes) : null,
             // Without a scope, the most recent drain of any scope counts.
             lastSyncedAt: scope
                 ? snapshot.syncedAt?.[scope] || null

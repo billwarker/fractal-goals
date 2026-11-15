@@ -32,6 +32,16 @@ ALLOWED_EVENTS = frozenset({
     "offline_boot",
     "offline_detected",
     "offline_ops_expired",
+    # Each one means a wedge was caught and recovered; any of them is worth a look.
+    "offline_drain_error",
+    "offline_hydrate_error",
+    "offline_watchdog_flush",
+    "offline_store_volatile",
+    "offline_store_reopened",
+    "offline_submit_failed",
+    "offline_lock_reclaimed",
+    "offline_queue_stalled",
+    "offline_auth_paused",
 })
 
 MAX_BATCH_SIZE = 20

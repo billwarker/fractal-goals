@@ -124,8 +124,11 @@ Remote records live in TanStack Query. Components do not mirror API collections 
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
 affected read models. In-session writes go through the per-user outbox (`client/src/offline/`)
 instead. They patch the cache, persist, and sync in
-order with `Idempotency-Key` and `occurred_at`, sending under a separate lock so saving never waits on
-the network; the session's queries refetch once its queue drains and stays quiet. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
+order within each session with `Idempotency-Key` and `occurred_at`, sending under a separate lock so saving never waits on
+the network; the session's queries refetch once its queue drains and stays quiet. A watchdog keeps the
+invariant "pending ⇒ a send is due" (store errors retry, a frozen tab's drain lock is taken over after an
+unanswered ping), the server records an idempotent write's commit in the write's own transaction, and
+`offline/__tests__/outbox.chaos.test.js` checks all of it under seeded random faults. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
 mirrored in `offline/circuitIds.js`). Quick-session drafts persist per user and fractal.
 See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 

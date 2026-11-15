@@ -1,30 +1,35 @@
-import { createDrainWaiters, planRetry } from './outboxRetry';
+import { createDrainLiveness } from './drainLiveness';
+import { OP_STATE } from './opKinds';
 import {
-    classifyFailure, defaultDrainLock, defaultId, defaultLock, describeError, isLockStolen,
+    OP_VERSION, createDrainStats, createStallReporter, dropReplaced, isSupportedVersion, nextSeq, oldestPending,
+    pickNextReady, planReplacements,
+} from './outboxQueue';
+import { createDrainWaiters, planRetry } from './outboxRetry';
+import { createReviewActions } from './outboxReview';
+import { createWakeups } from './outboxWakeups';
+import {
+    classifyFailure, defaultDrainLock, defaultId, defaultLock, describeError, isLockStolen, isOpSpecificFailure,
 } from './outboxTransport';
 export { classifyFailure } from './outboxTransport';
 export { createMemoryStore } from './memoryStore';
 
 // Durable, ordered queue for in-session writes.
 //
-// Every op is persisted before it is sent, carries an Idempotency-Key, and is
-// replayed strictly in submission order. Transport failures keep the op and
-// retry with backoff; only a definitive server rejection (4xx) removes it from
-// the queue, and even then it stays visible as "rejected" until reviewed.
+// Every op is persisted before it is sent, carries an Idempotency-Key, and is replayed strictly
+// in submission order within its scope (a session). Transport failures keep the op and retry
+// with backoff; only a definitive server rejection (4xx) removes it from the queue, and even
+// then it stays visible as "rejected" until reviewed.
 //
 // The store is the source of truth. Two cross-tab locks keep the network out of every tap: `lock`
 // guards short store changes; `drainLock`, held while sending, stops two tabs sending at once.
 
 // Must outlast a request's timeout: other tabs won't coalesce or cancel an op while this holds.
 const SEND_LEASE_MS = 30000;
-// Rejected changes wait for review this long, then are discarded so they can't linger forever.
-const REJECTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-
-import { OP_STATE } from './opKinds';
 
 export { OP_STATE };
 
 /** @typedef {import('./outboxTypes').OutboxOp} OutboxOp */
+/** @typedef {import('./outboxTypes').OutboxSnapshot} OutboxSnapshot */
 
 /** @param {import('./outboxTypes').OutboxOptions} [options] `store` and `send` are required (checked below). */
 export function createOutbox({
@@ -41,7 +46,9 @@ export function createOutbox({
     createId = defaultId,
     setTimer = (callback, delay) => setTimeout(callback, delay),
     clearTimer = (handle) => clearTimeout(handle),
-    // Health events for telemetry: ('drained', stats) and ('rejected', details).
+    // Changes whenever sign-in is renewed: a 401 to a request sent before then says nothing now.
+    authGeneration = () => 0,
+    // Health events for telemetry: ('drained', stats), ('rejected', details), ('drain_error', ...), ...
     onEvent = () => {},
 } = {}) {
     if (!store || typeof send !== 'function') {
@@ -53,19 +60,23 @@ export function createOutbox({
     const listeners = new Set();
     let ops = [];
     const syncedAt = {};
-    let snapshot = { ops, syncing: false, pausedForAuth: false, syncedAt: {} };
+    /** @type {OutboxSnapshot} */
+    let snapshot = { ops, syncing: false, pausedForAuth: false, volatile: false, waitingForTab: false, syncedAt: {} };
     let syncing = false;
     let pausedForAuth = false;
     let flushing = null;
     let flushAgain = false;
-    let sendingHere = false;
-    let drainStats = { ops: 0, maxAgeMs: 0, retries: 0 };
-    let retryTimer = null;
+    // Until then, nothing is sent: the connection or the whole server failed, not one change.
+    let holdUntil = 0;
+    const drainStats = createDrainStats();
     let hydrated = null;
 
     const emit = () => {
-        snapshot = { ops, syncing, pausedForAuth, syncedAt: { ...syncedAt } };
+        const volatile = Boolean(store.isVolatile?.());
+        const waitingForTab = Boolean(flushing) && !liveness.isHolding();
+        snapshot = { ops, syncing, pausedForAuth, volatile, waitingForTab, syncedAt: { ...syncedAt } };
         listeners.forEach((listener) => listener());
+        wakeups.armWatchdog();
     };
 
     const refresh = async () => {
@@ -111,41 +122,40 @@ export function createOutbox({
         }
     };
 
-    const scheduleRetry = (at) => {
-        if (retryTimer) clearTimer(retryTimer);
-        retryTimer = setTimer(() => {
-            retryTimer = null;
-            void flush();
-        }, Math.max(0, at - now()));
-    };
+    const liveness = createDrainLiveness({ channel, createId, setTimer, clearTimer });
+    const wakeups = createWakeups({
+        wake: () => void flush(),
+        hasPending: () => pendingFor(null).length > 0,
+        check: (retryScheduled) => {
+            reportStall({ ops, online: isOnline(), pausedForAuth, volatile: snapshot.volatile, waitingForTab: snapshot.waitingForTab });
+            if (flushing) {
+                // Waiting on another tab's drain lock: take over if that tab stopped.
+                if (!liveness.isHolding()) void reclaimStalledDrain();
+            } else if (!retryScheduled && !pausedForAuth && isOnline()) {
+                safeEmit('watchdog_flush', { pending: pendingFor(null).length });
+                void flush();
+            }
+        },
+        setTimer,
+        clearTimer,
+        now,
+        emit: safeEmit,
+    });
+    const scheduleRetry = wakeups.scheduleAt;
 
-    const rejectOp = async (op, error) => {
-        const rejected = { ...op, state: OP_STATE.REJECTED, error, rejectedAt: now() };
-        await store.put(rejected);
-        ops = ops.map((entry) => (entry.opId === op.opId ? rejected : entry));
-        runHandler(rejected, 'onReject', error);
-        safeEmit('rejected', { kind: op.kind, status: error.status ?? null, code: error.code ?? null });
-        settle(op.opId, { ok: false, error: Object.assign(new Error(error.message), { outboxError: error }) });
-        announce({ type: 'rejected', opId: op.opId });
+    const reportStall = createStallReporter({ now, emit: safeEmit });
+    const retryAfterStoreFailure = wakeups.storeFailed;
 
-        // Later writes that touch records this op created cannot succeed either.
-        const created = op.creates || [];
-        if (created.length === 0) return;
-        const all = (await store.getAll()).sort((left, right) => left.seq - right.seq);
-        for (const dependent of all) {
-            if (dependent.seq <= op.seq || dependent.state !== OP_STATE.PENDING) continue;
-            if (!(dependent.entityIds || []).some((id) => created.includes(id))) continue;
-            await rejectOp(dependent, {
-                status: null,
-                code: 'dependency_rejected',
-                message: 'An earlier change this depends on could not be saved',
-            });
-        }
-    };
+    const { discard, retry, clear, expireRejected, rejectOp } = createReviewActions({
+        store, now, settle, settlers, announce, refresh, flush, emit: safeEmit,
+        onRejected: (rejected, error) => {
+            ops = ops.map((entry) => (entry.opId === rejected.opId ? rejected : entry));
+            runHandler(rejected, 'onReject', error);
+        },
+    });
 
-    const nextPending = async () => (await store.getAll())
-        .filter((op) => op.state === OP_STATE.PENDING)
-        .sort((left, right) => left.seq - right.seq)[0];
+    const nextPending = async () => oldestPending(await store.getAll());
+    const nextReady = async () => pickNextReady(await store.getAll(), now());
 
     const isBeingSent = (op) => Boolean(op.sendingUntil) && op.sendingUntil > now();
 
@@ -160,23 +170,39 @@ export function createOutbox({
     });
 
     const drainOnce = async (run = {}) => {
-        // Re-read the head each time: cascades, discards and other tabs change the queue.
-        for (let head = await nextPending(); head; head = await nextPending()) {
+        // Re-read the heads each time: cascades, discards and other tabs change the queue.
+        for (;;) {
             if (pausedForAuth || !isOnline() || run.stolen) return;
-            if (head.nextAttemptAt && head.nextAttemptAt > now()) {
-                scheduleRetry(head.nextAttemptAt);
+            if (holdUntil > now()) {
+                scheduleRetry(holdUntil);
                 return;
+            }
+            const { head, wakeAt } = await nextReady();
+            if (!head) {
+                if (wakeAt) scheduleRetry(wakeAt);
+                return;
+            }
+            if (!isSupportedVersion(head)) {
+                const message = 'Saved by a newer version of the app. Reload, then retry.';
+                await rejectOp(head, { status: null, code: 'unsupported_version', message });
+                await refresh();
+                continue;
             }
             const op = /** @type {OutboxOp | null} */ (await claimForSending(head.opId));
             if (!op) continue;
 
             let response;
-            sendingHere = true;
+            const sentWithAuth = authGeneration();
             try {
                 response = await send(op);
             } catch (error) {
-                sendingHere = false;
                 const verdict = classifyFailure(error);
+                if (verdict === 'auth' && authGeneration() !== sentWithAuth && !run.retriedAfterAuth) {
+                    // Sign-in was renewed while this was in flight; send it again now, once.
+                    run.retriedAfterAuth = true;
+                    await store.put({ ...op, sendingUntil: 0 });
+                    continue;
+                }
                 if (verdict === 'reject') {
                     await rejectOp(op, describeError(error));
                     await refresh();
@@ -197,13 +223,20 @@ export function createOutbox({
                 await store.put({ ...op, ...retry.fields, nextAttemptAt, lastError: described, sendingUntil: 0 });
                 if (verdict === 'auth') {
                     pausedForAuth = true;
-                } else {
-                    scheduleRetry(nextAttemptAt);
+                    safeEmit('auth_paused', { kind: op.kind, status: described.status });
+                    return;
                 }
-                return;
+                // The connection or the whole server is down: everything waits. Otherwise only this session does.
+                if (!isOpSpecificFailure(error)) {
+                    holdUntil = nextAttemptAt;
+                    scheduleRetry(nextAttemptAt);
+                    return;
+                }
+                continue;
             }
 
-            sendingHere = false;
+            run.retriedAfterAuth = false;
+            holdUntil = 0;
             // Another tab may have discarded it while it was in flight.
             await store.delete(op.opId);
             // Handlers ask "is anything newer still queued?"; this op no longer is.
@@ -214,41 +247,55 @@ export function createOutbox({
             if (op.scope && !ops.some((entry) => entry.scope === op.scope && entry.state === OP_STATE.PENDING)) {
                 syncedAt[op.scope] = now();
             }
-            drainStats.ops += 1;
-            drainStats.retries += op.attempts || 0;
-            drainStats.maxAgeMs = Math.max(drainStats.maxAgeMs, now() - Date.parse(op.createdAt || ''));
-            if (!ops.some((entry) => entry.state === OP_STATE.PENDING)) {
-                safeEmit('drained', {
-                    ops: drainStats.ops,
-                    max_age_s: Math.round(drainStats.maxAgeMs / 1000),
-                    retries: drainStats.retries,
-                });
-                drainStats = { ops: 0, maxAgeMs: 0, retries: 0 };
-            }
+            drainStats.record(op, now());
+            if (!ops.some((entry) => entry.state === OP_STATE.PENDING)) safeEmit('drained', drainStats.take());
             await refresh();
         }
     };
 
-    /** A stolen lock means another tab took over: this drain stops at its next step. */
+    /**
+     * A stolen lock means another tab took over: this drain stops at its next step.
+     * Any other failure (the store, usually) is retried later; a drain never just stops.
+     */
     const runDrain = async (options) => {
-        const run = { stolen: false };
+        const run = { stolen: false, retriedAfterAuth: false };
         try {
-            await drainLock(() => drainOnce(run), options);
+            await drainLock(async () => {
+                liveness.setHolding(true);
+                emit();
+                try {
+                    return await drainOnce(run);
+                } finally {
+                    liveness.setHolding(false);
+                }
+            }, options);
+            wakeups.storeRecovered();
         } catch (error) {
-            if (!isLockStolen(error)) throw error;
-            run.stolen = true;
+            if (isLockStolen(error)) {
+                run.stolen = true;
+                return;
+            }
+            retryAfterStoreFailure('drain_error', error);
         }
     };
 
     /**
-     * A frozen background tab keeps its drain lock forever. Once its lease on the head op has
-     * lapsed with no answer, the visible tab takes over; idempotency covers a request it had sent.
+     * A frozen background tab keeps its drain lock forever. The visible tab takes over once
+     * that tab's lease on the head op lapses, or once it fails to answer a ping while a drain
+     * here waits for the lock. Idempotency covers a request the frozen tab had sent.
      */
     async function reclaimStalledDrain() {
         await hydrated;
-        if (sendingHere) return;
+        if (liveness.isHolding()) return;
         const head = await nextPending();
-        if (!head?.sendingUntil || isBeingSent(head)) return;
+        if (!head) return;
+        const leaseLapsed = Boolean(head.sendingUntil) && !isBeingSent(head);
+        if (!leaseLapsed) {
+            if (!flushing || (await liveness.isHolderAlive()) !== false) return;
+            // The lock may have come here while the ping waited.
+            if (liveness.isHolding()) return;
+        }
+        safeEmit('lock_reclaimed', { reason: leaseLapsed ? 'lease' : 'no_answer' });
         await runDrain({ steal: true });
     }
 
@@ -269,17 +316,11 @@ export function createOutbox({
             } finally {
                 flushing = null;
                 syncing = false;
-                await refresh();
+                await refresh().catch((error) => retryAfterStoreFailure('drain_error', error));
             }
         })();
         return flushing;
     }
-
-    // Read inside the cross-tab lock, so two tabs never hand out the same position.
-    const nextSeq = (stored) => {
-        const highest = stored.reduce((max, op) => Math.max(max, op.seq || 0), 0);
-        return Math.max(highest + 1, now());
-    };
 
     async function submit({
         scope,
@@ -299,6 +340,7 @@ export function createOutbox({
         await hydrated;
         const opId = createId();
         const op = {
+            v: OP_VERSION,
             opId,
             idempotencyKey: createId(),
             scope: scope || null,
@@ -326,63 +368,34 @@ export function createOutbox({
         let cancelled = false;
         await lock(async () => {
             const stored = await store.getAll();
-            const unsent = (existing) => existing.state === OP_STATE.PENDING && !isBeingSent(existing);
-            if (coalesceKey) {
-                for (const existing of stored) {
-                    // The server may already be applying an in-flight one; the newer value follows it.
-                    if (existing.coalesceKey !== coalesceKey || !unsent(existing)) continue;
-                    await store.delete(existing.opId);
-                    const superseded = settlers.get(existing.opId) || [];
-                    settlers.delete(existing.opId);
-                    settlers.get(opId).push(...superseded);
-                }
-            }
-            if (supersedes.length) {
-                for (const existing of stored) {
-                    if (!unsent(existing) || !(existing.entityIds || []).some((id) => supersedes.includes(id))) continue;
-                    // Created and deleted before the server ever saw it: nothing needs sending at all.
-                    if ((existing.creates || []).some((id) => supersedes.includes(id))) cancelled = true;
-                    await store.delete(existing.opId);
-                    settle(existing.opId, { ok: true, value: { superseded: true } });
-                }
-            }
-            op.seq = nextSeq(await store.getAll());
+            const replaced = planReplacements(stored, op, { supersedes, isBeingSent });
+            cancelled = replaced.cancelled;
+            op.seq = nextSeq(stored, now());
+            // Durable first: nothing it replaces is dropped unless this is saved.
             if (!cancelled) await store.put(op);
+            await dropReplaced(store, op, replaced, { settlers, settle });
         });
         // Shown means saved: the kind's optimistic patch runs only once the op is durable.
         runHandler(op, 'optimistic');
         onPersisted?.(op);
-        if (cancelled) {
-            settle(opId, { ok: true, value: { superseded: true } });
-            await refresh();
-            announce({ type: 'changed' });
-            return { opId, settled };
-        }
-
-        await refresh();
+        if (cancelled) settle(opId, { ok: true, value: { superseded: true } });
+        // Saved already, so a failed re-read must not fail the save: the store retry re-reads and sends it.
+        await refresh().catch((error) => retryAfterStoreFailure('drain_error', error));
         announce({ type: 'changed' });
-        void flush();
+        if (!cancelled) void flush();
         return { opId, settled };
     }
 
-    async function discard(opId) {
-        await store.delete(opId);
-        settle(opId, { ok: false, error: new Error('Change discarded') });
-        announce({ type: 'changed' });
-        await refresh();
-    }
-
-    async function retry(opId) {
-        const op = (await store.getAll()).find((entry) => entry.opId === opId);
-        if (!op) return;
-        // A manual retry is a fresh start: the give-up budget counts from now, not from
-        // the failures that led to the rejection.
-        await store.put({
-            ...op, state: OP_STATE.PENDING, error: null, lastError: null,
-            attempts: 0, nextAttemptAt: 0, serverFailures: 0, firstServerFailureAt: undefined, sendingUntil: 0,
+    /** The user asked: send what is waiting now, skipping any backoff. */
+    async function retryNow() {
+        holdUntil = 0;
+        await lock(async () => {
+            for (const op of await store.getAll()) {
+                if (op.state === OP_STATE.PENDING && op.nextAttemptAt > now()) await store.put({ ...op, nextAttemptAt: 0 });
+            }
         });
-        announce({ type: 'changed' });
         await refresh();
+        void reclaimStalledDrain();
         void flush();
     }
 
@@ -393,31 +406,16 @@ export function createOutbox({
         void flush();
     }
 
-    async function clear() {
-        await store.clear();
-        settlers.forEach((_, opId) => settle(opId, { ok: false, error: new Error('Outbox cleared') }));
-        announce({ type: 'changed' });
-        await refresh();
-    }
-
     if (channel) {
-        channel.onmessage = () => {
+        channel.onmessage = (event) => {
+            if (liveness.handle(event?.data)) return;
             void refresh();
         };
     }
 
-    const expireRejected = async () => {
-        const expired = (await store.getAll()).filter((op) => (
-            op.state === OP_STATE.REJECTED && now() - (op.rejectedAt || Date.parse(op.createdAt || '')) >= REJECTED_TTL_MS
-        ));
-        for (const op of expired) await store.delete(op.opId);
-        if (expired.length) {
-            announce({ type: 'changed' });
-            safeEmit('expired', { count: expired.length });
-        }
-    };
-
-    hydrated = expireRejected().then(refresh);
+    // Never left rejected: everything awaits it. If the store can't be read yet, start empty
+    // (submit reads the store itself) and let the retry's flush load what is queued.
+    hydrated = expireRejected().then(refresh).catch((error) => retryAfterStoreFailure('hydrate_error', error));
 
     return {
         submit,
@@ -425,6 +423,7 @@ export function createOutbox({
         reclaimStalledDrain,
         discard,
         retry,
+        retryNow,
         clear,
         resumeAfterAuth,
         whenDrained: drainWaiters.whenDrained,
