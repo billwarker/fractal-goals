@@ -1,9 +1,10 @@
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from models import ActivityDefinition, ActivityInstance, Session
 from services.instance_goal_evidence import load_instance_goal_ids
+from services.session_runtime import SESSION_TYPE_NORMAL, SESSION_TYPE_QUICK, VALID_SESSION_TYPES, session_runtime_text
 from services.service_types import JsonDict
 
 
@@ -72,6 +73,10 @@ class SessionFilterService:
         if completed not in VALID_SESSION_COMPLETION_FILTERS:
             return None, "Invalid completed filter", 400
 
+        session_type = raw_filters.get("session_type") or None
+        if session_type is not None and session_type not in VALID_SESSION_TYPES:
+            return None, "Invalid session type filter", 400
+
         sort_by = raw_filters.get("sort_by") or "session_start"
         if sort_by not in VALID_SESSION_SORT_FIELDS:
             return None, "Invalid sort field", 400
@@ -126,6 +131,7 @@ class SessionFilterService:
 
         return {
             "completed": completed,
+            "session_type": session_type,
             "sort_by": sort_by,
             "sort_order": sort_order,
             "timezone": timezone_name,
@@ -201,6 +207,11 @@ class SessionFilterService:
             query = query.filter(Session.completed.is_(True))
         elif filters["completed"] == "incomplete":
             query = query.filter(Session.completed.is_(False))
+
+        if filters.get("session_type"):
+            runtime_type = func.lower(func.coalesce(session_runtime_text(Session.attributes, 'session_type'), SESSION_TYPE_NORMAL))
+            is_quick = runtime_type == SESSION_TYPE_QUICK
+            query = query.filter(is_quick if filters["session_type"] == SESSION_TYPE_QUICK else ~is_quick)
 
         if filters["utc_range_start"] is not None:
             query = query.filter(effective_timestamp >= filters["utc_range_start"])

@@ -17,5 +17,15 @@ describe('SourceSelector', () => {
         expect(screen.getByText('Q4 2026')).toHaveStyle({ color: '#22c55e' });
         fireEvent.click(screen.getByRole('button', { name: /From Template/ }));
         expect(onSelectSource).toHaveBeenCalledWith('template');
+        fireEvent.click(screen.getByRole('button', { name: /Quick Session/ }));
+        expect(onSelectSource).toHaveBeenCalledWith('quick');
+    });
+
+    it('offers templates and quick sessions without a program', () => {
+        render(<SourceSelector sessionSource="quick" onSelectSource={vi.fn()} showProgram={false} />);
+
+        expect(screen.queryByRole('button', { name: /From Active Program/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Quick Session/ })).toHaveTextContent('Selected');
+        expect(screen.getByRole('button', { name: /From Template/ })).not.toHaveTextContent('Selected');
     });
 });

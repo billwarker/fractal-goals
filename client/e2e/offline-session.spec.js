@@ -75,33 +75,29 @@ test('a quick session completed with no signal is kept on the device and syncs o
     const token = await openSignedIn(page);
     const root = `browser-offline-quick-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${token}` };
-    const activity = await (await page.request.post(`/api/${root}/activities`, {
+    expect((await page.request.post(`/api/${root}/activities`, {
         headers, data: { name: 'Dead-zone weigh-in', has_metrics: false },
-    })).json();
-    const templateName = `Offline Quick ${testInfo.project.name}`;
-    expect((await page.request.post(`/api/${root}/session-templates`, {
-        headers, data: { name: templateName, template_data: { session_type: 'quick', activities: [{ activity_id: activity.id }] } },
     })).ok()).toBeTruthy();
 
-    await page.goto(`/${root}/create-session`);
+    await page.goto(`/${root}/create-session?source=quick`);
     await page.evaluate(() => navigator.serviceWorker.ready);
-    const fromTemplate = page.getByText('From Template', { exact: true });
-    if (await fromTemplate.isVisible()) await fromTemplate.click();
-    await page.getByText(templateName, { exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: `Quick Session · ${templateName}` });
-    await expect(dialog).toBeVisible();
+    const section = page.getByRole('region', { name: 'Activities' });
+    await section.getByRole('button', { name: '+ Add activity' }).click();
+    await page.getByRole('button', { name: /Dead-zone weigh-in/ }).first().click();
+    await expect(section.getByText('Dead-zone weigh-in')).toBeVisible();
 
     await context.setOffline(true);
-    await dialog.getByRole('button', { name: '✓ Complete Quick Session', exact: true }).click();
+    await page.getByRole('button', { name: 'Complete Session', exact: true }).first().click();
     await expect(page.getByText("Quick session saved on this device. It will sync when you're back online.")).toBeVisible();
-    await expect(dialog).toBeHidden();
+    await expect(section.getByText('Dead-zone weigh-in')).toHaveCount(0);
+    await expect(page.getByText('Waiting to sync')).toBeVisible();
     const chip = page.getByRole('status').filter({ hasText: /Offline|Syncing|synced/ });
     await expect(chip).toContainText('1 change saved on this device');
 
     await context.setOffline(false);
     await expect(page.getByRole('status').filter({ hasText: 'All changes synced' })).toBeVisible({ timeout: 30_000 });
-    const sessions = await (await page.request.get(`/api/${root}/sessions`, { headers })).json();
-    const synced = sessions.sessions.filter((session) => session.template_id && session.completed);
+    const sessions = await (await page.request.get(`/api/${root}/sessions?session_type=quick`, { headers })).json();
+    const synced = sessions.sessions.filter((session) => session.completed && !session.template_id);
     expect(synced).toHaveLength(1);
     expect(errors).toEqual([]);
 });

@@ -11,9 +11,7 @@
 }
 
 .stripDate:focus-visible,
-.stripArrow:focus-visible,
-.addPlanItem:focus-visible,
-.planItemActions > button:focus-visible {
+.stripArrow:focus-visible {
     outline: 2px solid var(--color-focus-ring);
     outline-offset: 2px;
 }
@@ -323,120 +321,6 @@
 
 
 
-.planSection {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.planSectionTitle {
-    margin: 0;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-}
-
-.planItem {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 10px;
-    background: var(--color-bg-subtle);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    min-width: 0;
-}
-
-/* Editable items scope like session page activity cards: click to select. */
-.planItemSelectable {
-    cursor: pointer;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.planItemSelectable:hover {
-    border-color: var(--color-border-hover, var(--color-border-input));
-}
-
-.planItemSelected,
-.planItemSelected:hover {
-    background: var(--color-bg-card-alt);
-    border-color: var(--color-brand-success);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-success) 20%, transparent);
-    cursor: default;
-}
-
-.planItemHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-
-.planItemName {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    min-width: 0;
-}
-
-.planItemActions {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    flex: none;
-}
-
-.planItemActions > button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    background: none;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-}
-
-.planItemActions > button:hover:not(:disabled) {
-    color: var(--color-text-primary);
-    border-color: var(--color-border);
-}
-
-.planItemActions > button:disabled {
-    opacity: 0.35;
-    cursor: default;
-}
-
-.addPlanItem {
-    align-self: flex-start;
-    padding: 5px 10px;
-    font: inherit;
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    background: none;
-    border: 1px dashed var(--color-border);
-    border-radius: 6px;
-    cursor: pointer;
-}
-
-.addPlanItem:hover {
-    color: var(--color-text-primary);
-    border-color: var(--color-brand-primary);
-}
-
-.planPicker {
-    min-width: 0;
-}
-
 .planCardFooter {
     display: flex;
     justify-content: space-between;
@@ -478,7 +362,6 @@
 }
 
 @media (max-width: 768px) {
-    .planItemActions > button,
     .stripArrow,
     .stripDate {
         min-width: 44px;

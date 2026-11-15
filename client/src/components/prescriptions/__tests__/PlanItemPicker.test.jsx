@@ -2,11 +2,11 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const createCircuit = vi.fn();
-vi.mock('../../../../hooks/useCircuitQueries', () => ({
+vi.mock('../../../hooks/useCircuitQueries', () => ({
     useCircuitDefinitionMutations: () => ({ createMutation: { mutateAsync: createCircuit, isPending: false } }),
 }));
 // The builders are covered by their own tests; stubs show what the picker hands them.
-vi.mock('../../../ActivityBuilder', () => ({
+vi.mock('../../ActivityBuilder', () => ({
     default: ({ editingActivity, initialSelectedGoalIds, onSave, onClose }) => (
         <div role="dialog" aria-label="Activity builder">
             <span>Draft: {editingActivity?.name || '(blank)'}</span>
@@ -17,7 +17,7 @@ vi.mock('../../../ActivityBuilder', () => ({
         </div>
     ),
 }));
-vi.mock('../../../circuits/CircuitBuilderModal', () => ({
+vi.mock('../../circuits/CircuitBuilderModal', () => ({
     default: ({ circuit, onSave, errorMessage }) => (
         <div role="dialog" aria-label="Circuit builder">
             <span>Circuit: {circuit?.name || '(blank)'}</span>

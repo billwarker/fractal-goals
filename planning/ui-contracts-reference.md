@@ -260,6 +260,41 @@ also applies within the existing 760px container breakpoint in narrow desktop pa
 container spacing remains unchanged. Browser regression
 coverage lives in `client/e2e/session-detail-width.spec.js`.
 
+## Create Session quick sessions
+
+Step 0 offers three sources: the active program (only with exactly one program), "From Template" and
+"Quick Session"; with several programs, the program list keeps "Select Template Manually Instead" and
+adds "Log a Quick Session". With no program and no template, Create Session opens on a quick session.
+`?source=quick|template|program` deep-links a source.
+
+Choosing Quick Session replaces the right column's Session Goals panel with an "Activities" card (an
+`N / 20` count). Its activities use the program-day plan's pieces: `PlanItemRow` (name; move up/down and
+remove), `PrescriptionEditor` with `valueKind="logged"`, no tag pickers and no notes (values, and sets with
+"+ Add set"), and `PlanItemPicker` without circuits ("+ Add
+activity"; create and copy open the activity builder, and a saved activity is added at once). There is
+no timer, start/stop field or completion control. The same activity may be added twice. On phones the
+card sits under Step 0. Step 1 is "Recent Quick Sessions": one card per distinct selection of activities
+(order and repeats ignored), up to five, from the latest 30 quick sessions; each is the latest session with
+that selection and shows its date and its activity names in logged order, no values. They sit in one
+horizontal row, newest first, scrolling sideways when they don't fit. The whole card is the control:
+picking it replaces whatever the Activities card holds with its activities, without asking: empty inputs,
+last time's values as the inputs' placeholders and one empty set per past set. Activities since deleted
+are left out, with a notice.
+
+The header action (the sticky footer on phones) reads "Complete Session", disabled until an activity
+is added, with the summary "Quick session · N activities". Completing saves on the device first: with
+no signal the session appears at the top of the recent list as "Waiting to sync" and syncs on
+reconnect. The draft (activities and values) survives reloads for seven days; away from the quick
+source, an "Unfinished quick session" notice offers Resume or Discard. A completed quick session starts
+when its first activity was added and records no duration.
+
+A quick session opens in `sessions/QuickSessionModal` over the current page, never on its own Session
+Detail page: from the Sessions page (`?quickSessionId=`) and from a program day's session list in the
+program side pane (the day read model gives each session its `session_type`). The modal shows the
+session's name as plain text, its start and last-modified times (no program), and its activities; a
+completed quick session has no type pill and no completion button (only one left unfinished from before
+quick sessions were created complete offers "Complete").
+
 ## Session Detail one-off goal links
 
 Session Detail captures its goal-icon scope when opening create/copy definition drafts; copied

@@ -20,6 +20,7 @@ from services._landing_common import (
     LANDING_PREVIEW_GOAL_ATTRIBUTES, LANDING_PREVIEW_GOAL_FIELDS, LANDING_PREVIEW_LEVEL_FIELDS,
 )
 from services.landing_publish_service import LandingPublishService
+from services.session_runtime import get_session_runtime_data
 from tests.conftest import session_headers_for
 from tests.integration.test_demo_access import full_app  # noqa: F401  (fixture)
 
@@ -255,7 +256,10 @@ class TestDemoSnapshots:
         assert {goal.owner_id for goal in db_session.query(Goal).filter(Goal.root_id == snapshot_id)} == {demo_account.id}
         # Database triggers on insert didn't rewrite the copied instances.
         copied_instances = db_session.query(ActivityInstance).filter(ActivityInstance.root_id == snapshot_id).all()
-        assert len(copied_instances) == 42
+        assert len(copied_instances) == 44  # 14 sessions of three, and one quick session of two
+        assert get_session_runtime_data(
+            db_session.query(Session).filter(Session.root_id == snapshot_id, Session.name == 'Quick Session').one(),
+        )['session_type'] == 'quick'
         assert {instance.progress_compare_mode for instance in copied_instances} == {None}
         assert db_session.query(EventLog).filter(EventLog.root_id == snapshot_id).count() == \
             db_session.query(EventLog).filter(EventLog.root_id == SOURCE).count()

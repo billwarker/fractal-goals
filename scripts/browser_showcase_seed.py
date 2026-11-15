@@ -123,7 +123,6 @@ def seed_showcase(db, now, config):
                                                               activity_id=activity_ids[activity_key]))
 
     db.add(SessionTemplate(id="sweep-template", root_id=root, name="Daily practice", template_data={
-        "session_type": "normal",
         "sections": [{"name": "Warm-up", "items": [
             {"type": "activity", "activity_definition_id": activity_ids["scales"], "name": "Scale practice",
              "item_key": "scales"}]},
@@ -170,6 +169,23 @@ def seed_showcase(db, now, config):
             elif activity_key == "transcribe":
                 db.add(MetricValue(activity_instance_id=instance_id, metric_definition_id=metric_ids[("transcribe", 0)],
                                    value=4 + index % 5))
+
+    # One quick session (no template, created complete) for Create Session's recent list.
+    quick_start = (now - timedelta(days=3)).replace(hour=7, minute=15, second=0, microsecond=0)
+    quick_ids = ["sweep-quick-transcribe", "sweep-quick-comping"]
+    db.add(Session(
+        id="sweep-quick-session", root_id=root, owner_id=user.id, name="Quick Session",
+        session_start=quick_start, completed=True, completed_at=quick_start + timedelta(minutes=20),
+        attributes={"session_data": {"session_type": "quick", "activity_ids": quick_ids}},
+    ))
+    db.flush()
+    for instance_id, activity_key in zip(quick_ids, ("transcribe", "comping")):
+        db.add(ActivityInstance(id=instance_id, root_id=root, session_id="sweep-quick-session",
+                                activity_definition_id=activity_ids[activity_key], completed=True,
+                                created_at=quick_start, data={}))
+    db.flush()
+    db.add(MetricValue(activity_instance_id="sweep-quick-transcribe",
+                       metric_definition_id=metric_ids[("transcribe", 0)], value=6))
 
     today = now.date()
     db.add(Program(id="sweep-program", root_id=root, name="Winter woodshed",

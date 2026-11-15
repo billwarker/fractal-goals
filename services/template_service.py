@@ -21,7 +21,6 @@ from validators import validate_session_template_data
 STARTER_TEMPLATE_NAME = "Simple Empty Template"
 STARTER_TEMPLATE_DESCRIPTION = "A blank one-section session. Start here, add activities as you go."
 STARTER_TEMPLATE_DATA = {
-    "session_type": "normal",
     "sections": [{"name": "Main", "activities": []}],
 }
 
@@ -232,7 +231,7 @@ class TemplateService:
             return None, "Session not found", 404
 
         template_data = build_template_data_from_session(session)
-        if is_quick_session(session) and not template_data.get('activities'):
+        if is_quick_session(session) and not template_data.get('sections'):
             return None, "Quick sessions must include at least one activity", 400
 
         return self.create_template(root_id, current_user_id, {

@@ -14,7 +14,6 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import styles from './ProgramDayModal.module.css';
-import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { logError } from '../../utils/logger';
@@ -82,7 +81,6 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                 : '';
 
     const { sessionTemplates = [] } = useSessionTemplates(rootId);
-    const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
 
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
@@ -320,7 +318,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                                     fullWidth
                                 >
                                     <option value="">+ Add Session Template</option>
-                                    {availableProgramTemplates.map(t => (
+                                    {sessionTemplates.map(t => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
                                 </Select>

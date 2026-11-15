@@ -105,8 +105,8 @@ describe('useSessionPlanChoice', () => {
         expect(result.current.payload).toEqual({});
     });
 
-    it('never asks for plans for quick templates', () => {
-        const { result } = renderChoice(null, { id: 'quick', session_type: 'quick', template_data: { session_type: 'quick' } });
+    it('never asks for plans before a template is chosen', () => {
+        const { result } = renderChoice(null, null);
 
         expect(result.current.candidates).toEqual([]);
         expect(getSessionPlanCandidates).not.toHaveBeenCalled();

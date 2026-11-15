@@ -468,7 +468,11 @@ class TimerService:
             "progress_comparison": comparison,
         }, None, 200
 
-    def update_activity_instance(self, root_id, instance_id, current_user_id, data) -> ServiceResult[JsonDict]:
+    def update_activity_instance(
+        self, root_id, instance_id, current_user_id, data, *, commit=True, pending_events=None,
+    ) -> ServiceResult[JsonDict]:
+        """Update one instance. With ``commit=False`` the caller owns the transaction; events
+        go to ``pending_events`` when given (to emit after the caller's commit), else are emitted."""
         root = self._get_root(root_id, current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -586,12 +590,12 @@ class TimerService:
         self.db_session.flush()
         activity_name = instance.definition.name if instance.definition else "Unknown"
         serialized = serialize_activity_instance(instance)
-        pending_events = []
+        events = []
         updated_fields = list(data.keys())
         non_metric_fields = [field for field in updated_fields if field != 'sets']
         if 'sets' in data:
             for activity_set in updated_sets:
-                pending_events.append(Event(
+                events.append(Event(
                     Events.ACTIVITY_SET_UPDATED,
                     {
                         'activity_set_id': activity_set.id,
@@ -601,7 +605,7 @@ class TimerService:
                     },
                     source='timer_service.update_activity_instance',
                 ))
-            pending_events.append(Event(
+            events.append(Event(
                 Events.ACTIVITY_METRICS_UPDATED,
                 self._activity_event_payload(
                     instance,
@@ -613,7 +617,7 @@ class TimerService:
                 context={'db_session': self.db_session},
             ))
         if non_metric_fields:
-            pending_events.append(Event(
+            events.append(Event(
                 Events.ACTIVITY_INSTANCE_UPDATED,
                 self._activity_event_payload(
                     instance,
@@ -624,9 +628,10 @@ class TimerService:
                 source='timer_service.update_activity_instance',
                 context={'db_session': self.db_session},
             ))
-        self.db_session.commit()
-        for event in pending_events:
-            event_bus.emit(event)
+        if commit:
+            self.db_session.commit()
+        for event in events:
+            (pending_events.append if pending_events is not None else event_bus.emit)(event)
         return {
             "instance": instance,
             "serialized": serialized,

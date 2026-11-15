@@ -1,3 +1,5 @@
+from sqlalchemy import case, func
+
 import models
 
 DEFAULT_TEMPLATE_COLOR = '#4A90E2'
@@ -15,10 +17,22 @@ def normalize_session_type(value):
     return SESSION_TYPE_NORMAL
 
 
-def get_template_session_type(template_data):
-    if not isinstance(template_data, dict):
+def get_data_session_type(session_data):
+    """The type a session's runtime data records. Templates have no type; only sessions do."""
+    if not isinstance(session_data, dict):
         return SESSION_TYPE_NORMAL
-    return normalize_session_type(template_data.get('session_type'))
+    return normalize_session_type(session_data.get('session_type'))
+
+
+def session_runtime_text(attributes, key):
+    """SQL for a string field of a session's runtime data (``attributes.session_data``, else ``attributes``).
+
+    The one rule shared by the session list read model, the ``session_type`` filter and the
+    ``ix_sessions_root_quick_recent`` index predicate.
+    """
+    nested = case((func.jsonb_typeof(attributes['session_data'][key]) == 'string', attributes['session_data'][key].astext), else_=None)
+    direct = case((func.jsonb_typeof(attributes[key]) == 'string', attributes[key].astext), else_=None)
+    return case((func.jsonb_typeof(attributes['session_data']) == 'object', nested), else_=direct)
 
 
 def get_template_color(template_data):

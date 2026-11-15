@@ -15,7 +15,6 @@ function SessionGoalScopePanel({
     error,
     onRetry,
     selectionDisabled = false,
-    readOnly = false,
     awaitingTemplate = false,
     embedded = false,
     hideHeading = false,
@@ -27,25 +26,22 @@ function SessionGoalScopePanel({
     offScopeGoalCount = 0,
     onClearOffScopeGoals,
 }) {
-    const statusLabel = readOnly ? 'Read only' : 'Optional';
-    const description = readOnly
-        ? 'Goal scope cannot be edited for quick sessions.'
-        : awaitingTemplate
-            ? 'Select a template to review activity-derived goals and optionally add session goals.'
-            : 'Add optional goals to define this session\'s intent. Goals derived from template activities are locked.';
+    const description = awaitingTemplate
+        ? 'Select a template to review activity-derived goals and optionally add session goals.'
+        : 'Add optional goals to define this session\'s intent. Goals derived from template activities are locked.';
 
     return (
         <StepContainer className={`${styles.container} ${embedded ? styles.embedded : ''}`}>
             {!hideHeading && (
                 <div className={styles.header}>
                     <h2 className={styles.title}>Session Goals</h2>
-                    <span className={styles.optionalLabel}>{statusLabel}</span>
+                    <span className={styles.optionalLabel}>Optional</span>
                 </div>
             )}
             <p className={styles.description}>
                 {description}
             </p>
-            {programScopeAvailable && !readOnly ? (
+            {programScopeAvailable ? (
                 <div className={styles.scopeRow}>
                     <span
                         className={styles.programSwatch}

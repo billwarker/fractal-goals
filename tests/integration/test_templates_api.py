@@ -67,10 +67,19 @@ class TestSessionTemplates:
         response = authed_client.post(f'/api/{root_id}/session-templates', json=payload)
         assert response.status_code == 400
 
-        # Invalid quick template: no activities
+        # Templates have one shape: quick templates are gone.
         payload = {
             'name': 'Quick',
-            'template_data': {'session_type': 'quick', 'activities': []}
+            'template_data': {'session_type': 'quick', 'activities': [{'activity_id': 'any'}]}
+        }
+        response = authed_client.post(f'/api/{root_id}/session-templates', json=payload)
+        assert response.status_code == 400
+        assert 'Quick sessions no longer use templates' in json.dumps(response.get_json())
+
+        # A flat activity list is not a template either.
+        payload = {
+            'name': 'Flat',
+            'template_data': {'sections': [{'name': 'Main'}], 'activities': [{'activity_id': 'any'}]}
         }
         response = authed_client.post(f'/api/{root_id}/session-templates', json=payload)
         assert response.status_code == 400
@@ -99,7 +108,7 @@ class TestSessionTemplates:
         assert data['description'] == 'Created via API'
         assert data['updated_at'] is not None
         assert data['root_id'] == root_id
-        assert data['session_type'] == 'normal'
+        assert 'session_type' not in data
 
     def test_update_template(self, authed_client, sample_ultimate_goal, sample_session_template_api):
         """Test updating a template."""
@@ -160,17 +169,19 @@ class TestSessionTemplates:
         assert archived['is_effectively_active'] is False
         assert archived['archived_at'] is not None
 
-    def test_create_quick_template(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+    def test_template_drops_the_retired_session_type(self, authed_client, sample_ultimate_goal, sample_activity_definition):
+        """Older clients and agents still send session_type 'normal'; it is accepted and not stored."""
         root_id = sample_ultimate_goal.id
         payload = {
             'name': 'Daily Weight',
-            'description': 'Quick daily check-in',
+            'description': 'Daily check-in',
             'template_data': {
-                'session_type': 'quick',
+                'session_type': 'normal',
                 'template_color': '#123456',
-                'activities': [
-                    {'activity_id': sample_activity_definition.id, 'name': sample_activity_definition.name}
-                ]
+                'converted_from_quick': True,
+                'sections': [{'name': 'Main', 'items': [
+                    {'type': 'activity', 'activity_id': sample_activity_definition.id},
+                ]}],
             }
         }
 
@@ -182,9 +193,11 @@ class TestSessionTemplates:
 
         assert response.status_code == 201
         data = response.get_json()
-        assert data['session_type'] == 'quick'
+        assert 'session_type' not in data
+        assert 'session_type' not in data['template_data']
+        assert 'converted_from_quick' not in data['template_data']
         assert data['template_color'] == '#123456'
-        assert data['description'] == 'Quick daily check-in'
+        assert data['description'] == 'Daily check-in'
 
     def test_update_template_omits_template_data_to_preserve_existing(self, authed_client, sample_ultimate_goal, sample_session_template_api):
         """Omitting template_data should patch scalars without replacing the stored template body."""
@@ -200,7 +213,6 @@ class TestSessionTemplates:
         data = response.get_json()
         assert data['name'] == 'Patched Name Only'
         assert data['template_data'] == {
-            'session_type': 'normal',
             'sections': [{'name': 'Warmup', 'activities': []}]
         }
 

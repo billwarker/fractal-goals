@@ -59,7 +59,6 @@ class TestFractalEndpoints:
         assert starter.name == 'Simple Empty Template'
         assert starter.description == 'A blank one-section session. Start here, add activities as you go.'
         assert json.loads(starter.template_data) == {
-            'session_type': 'normal',
             'sections': [{'name': 'Main', 'activities': []}],
         }
 

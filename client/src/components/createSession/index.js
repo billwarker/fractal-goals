@@ -8,5 +8,6 @@ export { default as CreateSessionActions } from './CreateSessionActions';
 export { default as SessionGoalScopePanel } from './SessionGoalScopePanel';
 export { default as ProgramDayTodayBanner } from './ProgramDayTodayBanner';
 export { default as ProgramName } from '../atoms/ProgramName';
-export { default as QuickSessionModal } from './QuickSessionModal';
+export { default as QuickSessionSection } from './QuickSessionSection';
+export { default as RecentQuickSessions } from './RecentQuickSessions';
 export { default as SessionPlanChooser, useSessionPlanChoice } from './SessionPlanChooser';

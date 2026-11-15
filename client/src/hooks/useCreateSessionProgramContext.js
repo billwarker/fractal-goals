@@ -7,7 +7,7 @@ import { useCreateSessionPreferences } from './useCreateSessionPreferences';
 
 export function useCreateSessionProgramContext({
     rootId, userId, todayISO, programDays, selectedProgramDay, activeProgram,
-    goalTree, allGoals, manualGoalIds, quickTemplateSelected,
+    goalTree, allGoals, manualGoalIds, quickSessionSelected,
 }) {
     const { isProgramScopeEnabled, setProgramScopeEnabled, isHydrated } = useCreateSessionPreferences({ rootId, userId });
     const todayProgramView = useMemo(() => buildTodayProgramDayView(programDays), [programDays]);
@@ -36,7 +36,7 @@ export function useCreateSessionProgramContext({
             } : {}),
         };
     }, [activeBlock, activeProgram, selectedProgramDay]);
-    const programScopeAvailable = Boolean(programContext) && !quickTemplateSelected;
+    const programScopeAvailable = Boolean(programContext) && !quickSessionSelected;
     const programScopeEnabled = Boolean(
         isHydrated && programScopeAvailable && isProgramScopeEnabled(programContext?.program_id),
     );

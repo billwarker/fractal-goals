@@ -8,17 +8,26 @@ import CreateSession from '../CreateSession';
 
 const completeQuickSession = vi.fn();
 const previewSessionGoalScope = vi.fn();
+const getSessions = vi.fn();
 const mockIsMobile = vi.hoisted(() => ({ value: false }));
 const mockPageData = vi.hoisted(() => ({ value: null }));
 const goalScopeProps = vi.hoisted(() => vi.fn());
 
-const quickTemplate = {
-    id: 'quick-template-1',
+const template = {
+    id: 'template-1',
     name: 'Weigh Myself',
-    template_data: {
-        session_type: 'quick',
-        activities: [{ activity_definition_id: 'activity-1' }],
-    },
+    template_data: { sections: [{ name: 'Main', items: [] }] },
+};
+const pastQuickSession = {
+    id: 'past-quick-1',
+    session_start: '2026-11-12T08:00:00Z',
+    attributes: { session_data: { session_type: 'quick', activity_ids: ['past-instance-1'] } },
+    activity_instances: [{
+        id: 'past-instance-1',
+        activity_definition_id: 'activity-1',
+        metrics: [{ metric_id: 'weight', value: 82.4 }],
+        sets: [],
+    }],
 };
 
 vi.mock('../../hooks/useCreateSessionPageData', () => ({
@@ -37,13 +46,23 @@ vi.mock('../../contexts/AuthContext', () => ({
     useAuth: () => ({ user: { id: 'user-1' } }),
 }));
 
-vi.mock('../../contexts/ActiveSessionContext', () => ({
-    QueuedQuickSessionProvider: ({ children }) => <>{children}</>,
+vi.mock('../../offline/OutboxContext', () => ({ useOutbox: () => null }));
+
+vi.mock('../../offline/idbKeyValue', () => ({
+    idbGet: async () => undefined,
+    idbSet: async () => {},
+    idbDelete: async () => {},
 }));
 
 vi.mock('../../components/createSession', () => ({
     ProgramSelector: () => null,
-    SourceSelector: () => null,
+    SourceSelector: ({ sessionSource, onSelectSource }) => (
+        <div>
+            <span>Source: {sessionSource || 'none'}</span>
+            <button type="button" onClick={() => onSelectSource('quick')}>Quick Session source</button>
+            <button type="button" onClick={() => onSelectSource('template')}>Template source</button>
+        </div>
+    ),
     ProgramDayPicker: ({ selectedProgramDay, selectedProgramSession }) => (
         <div>Program picker: {selectedProgramDay?.day_name || 'none'} / {selectedProgramSession?.template_name || 'none'}</div>
     ),
@@ -52,7 +71,36 @@ vi.mock('../../components/createSession', () => ({
             Select Weigh Myself
         </button>
     ),
-    CreateSessionActions: ({ selectedTemplate }) => <button type="button">Create Session {selectedTemplate?.name || ''}</button>,
+    CreateSessionActions: ({ selectedTemplate, quickActivityCount = null, onCreateSession }) => (
+        quickActivityCount === null
+            ? <button type="button">Create Session {selectedTemplate?.name || ''}</button>
+            : (
+                <button type="button" disabled={quickActivityCount === 0} onClick={onCreateSession}>
+                    Complete Session ({quickActivityCount})
+                </button>
+            )
+    ),
+    QuickSessionSection: ({ draft, onAddActivity, onRemoveActivity, activityDefinitions }) => (
+        <section aria-label="Quick session activities">
+            {draft.items.map((item) => (
+                <div key={item.key}>
+                    <span>Logged {item.name}{item.previous ? ' (with last values)' : ''}</span>
+                    <button type="button" onClick={() => onRemoveActivity(item.key)}>Remove {item.name}</button>
+                </div>
+            ))}
+            <button type="button" onClick={() => onAddActivity(activityDefinitions[0])}>Add Bodyweight</button>
+        </section>
+    ),
+    RecentQuickSessions: ({ sessions, onRepeat }) => (
+        <div>
+            <span>Recent: {sessions.length}</span>
+            {sessions.map((session) => (
+                <button key={session.id} type="button" onClick={() => onRepeat(session)}>
+                    Repeat {session.id}
+                </button>
+            ))}
+        </div>
+    ),
     ProgramName: ({ name, color }) => <span style={{ color }}>{name}</span>,
     SessionGoalScopePanel: (props) => {
         goalScopeProps(props);
@@ -65,18 +113,13 @@ vi.mock('../../components/createSession', () => ({
     SessionPlanChooser: () => null,
     useSessionPlanChoice: () => ({ candidates: [], value: 'template', onChange: () => {}, payload: {} }),
     ProgramDayTodayBanner: ({ onJumpToProgramDay }) => <button type="button" onClick={onJumpToProgramDay}>Start this day</button>,
-    QuickSessionModal: ({ isOpen, onClose, onComplete }) => isOpen ? (
-        <div role="dialog" aria-label="Quick Session">
-            <button type="button" onClick={onClose}>Cancel quick session</button>
-            <button type="button" onClick={onComplete}>Submit quick session</button>
-        </div>
-    ) : null,
 }));
 
 vi.mock('../../utils/api', () => ({
     fractalApi: {
         previewSessionGoalScope: (...args) => previewSessionGoalScope(...args),
         completeQuickSession: (...args) => completeQuickSession(...args),
+        getSessions: (...args) => getSessions(...args),
     },
 }));
 
@@ -106,17 +149,18 @@ function LocationProbe() {
 }
 
 describe('CreateSession quick-session flow', () => {
+    let uuid = 0;
     beforeEach(() => {
         vi.clearAllMocks();
         window.localStorage.clear();
         mockIsMobile.value = false;
         goalScopeProps.mockClear();
         mockPageData.value = {
-            templates: [quickTemplate],
+            templates: [template],
             programDays: [],
             programsById: {},
             activeProgram: null,
-            activityDefinitions: [{ id: 'activity-1', name: 'Bodyweight' }],
+            activityDefinitions: [{ id: 'activity-1', name: 'Bodyweight', metric_definitions: [{ id: 'weight' }] }],
             activityGroups: [],
             allGoals: [],
             goalTree: null,
@@ -124,43 +168,73 @@ describe('CreateSession quick-session flow', () => {
         };
         completeQuickSession.mockResolvedValue({ data: { id: 'completed-quick-1' } });
         previewSessionGoalScope.mockResolvedValue({ data: { automatic_goal_ids: [] } });
-        vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'uuid-1') });
+        getSessions.mockResolvedValue({ data: { sessions: [pastQuickSession] } });
+        uuid = 0;
+        vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `uuid-${++uuid}`) });
     });
 
     afterEach(() => {
         vi.unstubAllGlobals();
     });
 
-    it('opens a modal for a quick template and discards the draft on cancel', () => {
+    it('offers a quick session as a source; it replaces the goals panel and lists recent ones', async () => {
         renderPage();
+        expect(screen.getByText(/Session Goals/)).toBeInTheDocument();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Select Weigh Myself' }));
-        expect(screen.getByRole('dialog', { name: 'Quick Session' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Quick Session source' }));
 
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel quick session' }));
-        expect(screen.queryByRole('dialog', { name: 'Quick Session' })).not.toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Quick session activities' })).toBeInTheDocument();
+        expect(screen.queryByText(/Session Goals/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Select Weigh Myself' })).not.toBeInTheDocument();
+        expect(await screen.findByText('Recent: 1')).toBeInTheDocument();
+        expect(getSessions).toHaveBeenCalledWith('root-1', expect.objectContaining({ session_type: 'quick', limit: 30 }));
+        expect(screen.getByRole('button', { name: 'Complete Session (0)' })).toBeDisabled();
     });
 
-    it('submits the queued activity values and closes after success', async () => {
+    it('deep-links the quick source', () => {
+        renderPage('/root-1/session/create?source=quick');
+        expect(screen.getByText('Source: quick')).toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Quick session activities' })).toBeInTheDocument();
+    });
+
+    it('adds and removes activities, then completes the session with what was logged', async () => {
+        renderPage('/root-1/session/create?source=quick');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add Bodyweight' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add Bodyweight' }));
+        expect(screen.getAllByText('Logged Bodyweight')).toHaveLength(2);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Remove Bodyweight' })[0]);
+        expect(screen.getAllByText('Logged Bodyweight')).toHaveLength(1);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Complete Session (1)' }));
+
+        await waitFor(() => {
+            expect(completeQuickSession).toHaveBeenCalledWith('root-1', {
+                name: 'Quick Session',
+                session_start: expect.any(String),
+                activity_instances: [expect.objectContaining({ activity_definition_id: 'activity-1' })],
+            });
+        });
+        await waitFor(() => expect(screen.queryByText('Logged Bodyweight')).not.toBeInTheDocument());
+        expect(screen.getByRole('button', { name: 'Complete Session (0)' })).toBeDisabled();
+    });
+
+    it('replaces the logged activities with a recent quick session\'s, with its last values as hints', async () => {
+        renderPage('/root-1/session/create?source=quick');
+        fireEvent.click(screen.getByRole('button', { name: 'Add Bodyweight' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Add Bodyweight' }));
+        expect(screen.getAllByText('Logged Bodyweight')).toHaveLength(2);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Repeat past-quick-1' }));
+
+        expect(screen.queryByText('Logged Bodyweight')).not.toBeInTheDocument();
+        expect(screen.getAllByText('Logged Bodyweight (with last values)')).toHaveLength(1);
+    });
+
+    it('starts on a quick session when there is nothing else to start from', () => {
+        mockPageData.value = { ...mockPageData.value, templates: [] };
         renderPage();
-
-        fireEvent.click(screen.getByRole('button', { name: 'Select Weigh Myself' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Submit quick session' }));
-
-        await waitFor(() => {
-            expect(completeQuickSession).toHaveBeenCalledWith(
-                'root-1',
-                expect.objectContaining({
-                    template_id: 'quick-template-1',
-                    activity_instances: [expect.objectContaining({
-                        activity_definition_id: 'activity-1',
-                    })],
-                })
-            );
-        });
-        await waitFor(() => {
-            expect(screen.queryByRole('dialog', { name: 'Quick Session' })).not.toBeInTheDocument();
-        });
+        expect(screen.getByText('Source: quick')).toBeInTheDocument();
     });
 
     it('discloses Session Goals from the mobile page header', () => {
@@ -180,6 +254,15 @@ describe('CreateSession quick-session flow', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Close' }));
         expect(screen.queryByRole('dialog', { name: 'Session Goals' })).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Show Session Goals' })).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('logs a quick session inline on mobile, completed from the footer', () => {
+        mockIsMobile.value = true;
+        renderPage('/root-1/session/create?source=quick');
+
+        expect(screen.queryByRole('button', { name: 'Show Session Goals' })).not.toBeInTheDocument();
+        expect(screen.getByRole('region', { name: 'Quick session activities' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Complete Session (0)' })).toBeInTheDocument();
     });
 
     it('auto-selects a single required program session and scopes goals to its lineage', async () => {

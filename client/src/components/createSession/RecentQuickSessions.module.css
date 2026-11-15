@@ -1,0 +1,108 @@
+.container {
+    padding: 16px;
+    margin-bottom: 16px;
+    min-width: 0;
+}
+
+.empty {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+}
+
+/* One row of cards, scrolling sideways (snapping to each card) when they don't all fit. */
+.list {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0;
+    padding: 2px 2px 6px;
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+    scrollbar-width: thin;
+}
+
+.item {
+    flex: 0 0 240px;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    scroll-snap-align: start;
+}
+
+/* The whole card is the control: picking it logs its activities again. */
+.card {
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    width: 100%;
+    min-height: 96px;
+    padding: 12px 14px;
+    font: inherit;
+    text-align: left;
+    color: inherit;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.card:hover:not(:disabled) {
+    border-color: var(--color-brand-primary);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-brand-primary) 25%, transparent);
+}
+
+.card:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.card:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.date {
+    color: var(--color-text-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.pending {
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* Activities stack as rows, like the plan items they will become. */
+.activities {
+    display: grid;
+    gap: 4px;
+}
+
+.activity {
+    min-width: 0;
+    overflow: hidden;
+    padding: 6px 8px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-subtle);
+    color: var(--color-text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 14px;
+    }
+
+    .item {
+        flex-basis: min(260px, 80%);
+    }
+}

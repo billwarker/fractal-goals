@@ -1,14 +1,8 @@
-import {
-    DEFAULT_TEMPLATE_COLOR,
-    SESSION_TYPE_NORMAL,
-    getSessionRuntimeType,
-    getTemplateColor,
-} from '../../utils/sessionRuntime';
+import { DEFAULT_TEMPLATE_COLOR, getTemplateColor } from '../../utils/sessionRuntime';
 
 
 const EMPTY_TEMPLATE = {
-    name: '', description: '', sessionType: SESSION_TYPE_NORMAL,
-    templateColor: DEFAULT_TEMPLATE_COLOR, sections: [], quickActivities: [],
+    name: '', description: '', templateColor: DEFAULT_TEMPLATE_COLOR, sections: [],
 };
 
 export function createSectionId() {
@@ -43,10 +37,6 @@ export function buildTemplateActivityCatalogue(activities = [], circuits = []) {
 
 export function isTemplateCircuitItem(item) {
     return item.item_type === 'circuit';
-}
-
-export function canUseTemplateItemInQuickSession(item) {
-    return !isTemplateCircuitItem(item);
 }
 
 export function getTemplateItemKey(item, index) {
@@ -109,7 +99,7 @@ export function buildActivityGroupOptions(activityGroups) {
 }
 
 export function buildInitialTemplate(editingTemplate, activities = []) {
-    if (!editingTemplate) return { ...EMPTY_TEMPLATE, sections: [], quickActivities: [] };
+    if (!editingTemplate) return { ...EMPTY_TEMPLATE, sections: [] };
     const sections = (editingTemplate.template_data?.sections || []).map((section) => ({
         ...section,
         id: section.id || section.template_section_id || createSectionId(),
@@ -120,9 +110,7 @@ export function buildInitialTemplate(editingTemplate, activities = []) {
     return {
         name: editingTemplate.name || '',
         description: editingTemplate.description || '',
-        sessionType: getSessionRuntimeType(editingTemplate),
         templateColor: getTemplateColor(editingTemplate),
         sections,
-        quickActivities: (editingTemplate.template_data?.activities || []).map((activity) => ({ ...activity })),
     };
 }

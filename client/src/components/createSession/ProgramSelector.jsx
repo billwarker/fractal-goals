@@ -15,6 +15,7 @@ function ProgramSelector({
     hasTemplates,
     sessionSource,
     onSelectTemplateSource,
+    onSelectQuickSource,
 }) {
     const programs = Object.values(programsById);
 
@@ -52,17 +53,25 @@ function ProgramSelector({
                 })}
             </div>
 
-            {hasTemplates ? (
-                <div className={styles.footer}>
-                    <div className={styles.orText}>or</div>
+            <div className={styles.footer}>
+                <div className={styles.orText}>or</div>
+                {hasTemplates ? (
                     <Button
                         onClick={onSelectTemplateSource}
                         variant={sessionSource === 'template' ? 'primary' : 'secondary'}
                     >
                         Select Template Manually Instead
                     </Button>
-                </div>
-            ) : null}
+                ) : null}
+                {onSelectQuickSource ? (
+                    <Button
+                        onClick={onSelectQuickSource}
+                        variant={sessionSource === 'quick' ? 'primary' : 'secondary'}
+                    >
+                        Log a Quick Session
+                    </Button>
+                ) : null}
+            </div>
         </StepContainer>
     );
 }

@@ -5,7 +5,7 @@ import copy
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import uuid
-from typing import Any
+from typing import Any, Callable
 from sqlalchemy import text
 from sqlalchemy.orm import Session as OrmSession, joinedload
 import models
@@ -18,6 +18,8 @@ from models import (
     session_goals,
     validate_root_goal,
 )
+from services.events import event_bus
+from services.occurred_at import MAX_CLIENT_LAG, parse_client_datetime, utc_now_naive
 from services.session_creation_events import publish_session_creation_events
 from services.goal_type_utils import get_canonical_goal_type
 from services.payload_normalizers import normalize_session_payload
@@ -28,8 +30,9 @@ from services.session_activity_service import SessionActivityService
 from services.session_runtime import (
     DEFAULT_TEMPLATE_COLOR,
     SESSION_TYPE_QUICK,
+    get_data_session_type,
+    get_session_runtime_data,
     get_template_color,
-    get_template_session_type,
 )
 from services.program_scope import resolve_program_scope
 from services.program_focus import resolve_day_focus_scope
@@ -47,6 +50,9 @@ from services._session_lifecycle_common import _parse_iso_datetime_strict
 # A create_session phase returns None to continue, or (message, status) to stop.
 PhaseError = tuple[ErrorPayload, int] | None
 
+# Mirrored by the client's MAX_QUICK_SESSION_ACTIVITIES (utils/createSessionQuickDraft.js).
+MAX_QUICK_SESSION_ACTIVITIES = 20
+
 
 @dataclass
 class _SessionDraft:
@@ -58,7 +64,8 @@ class _SessionDraft:
     quota_service: QuotaService
     new_session: Session
     session_data: Any  # decoded session JSON; phases guard its shape as the original flow did
-    template_session_type: str | None
+    # Activity definition ids, in order, for a quick session; None for every other session.
+    quick_activity_ids: list | None
     allow_archived_definitions: bool
     template: Any = None
     template_payload: dict = field(default_factory=dict)
@@ -86,8 +93,9 @@ def _index_prescriptions(sections):
 
 
 class _SessionCreationMixin:
-    # Host attribute supplied by SessionService; declared so the mixin type-checks on its own.
+    # Host attributes supplied by SessionService; declared so the mixin type-checks on its own.
     db_session: OrmSession
+    update_session: Callable[..., ServiceResult[JsonDict]]
 
     def create_session(
         self,
@@ -100,11 +108,21 @@ class _SessionCreationMixin:
         allow_archived_definitions=False,
         commit=True,
         pending_events=None,
+        quick_activity_ids=None,
     ) -> ServiceResult[JsonDict]:
+        """Create a session. Quick sessions come only from ``create_completed_quick_session``,
+        which passes ``quick_activity_ids``; templates have no type."""
         data = normalize_session_payload(data)
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
+
+        requested_type = get_data_session_type(models._safe_load_json(data.get('session_data'), {}))
+        if requested_type == SESSION_TYPE_QUICK and quick_activity_ids is None:
+            return None, {
+                "error": "Quick sessions are created already complete — use quick-complete",
+                "code": "quick_session_use_complete",
+            }, 400
 
         if reserve_active_slot:
             conflict = self._active_session_conflict(root_id, current_user_id)
@@ -145,7 +163,11 @@ class _SessionCreationMixin:
             template_id=data.get('template_id')
         )
 
-        session_data_dict = models._safe_load_json(data.get('session_data'), {})
+        is_quick = quick_activity_ids is not None
+        # A quick session has no template, program or plan: just the activities logged.
+        session_data_dict = models._safe_load_json(
+            {'session_type': SESSION_TYPE_QUICK} if is_quick else data.get('session_data'), {},
+        )
         new_session.attributes = copy.deepcopy(session_data_dict)
         draft = _SessionDraft(
             root_id=root_id,
@@ -154,20 +176,20 @@ class _SessionCreationMixin:
             quota_service=quota_service,
             new_session=new_session,
             session_data=session_data_dict,
-            template_session_type=get_template_session_type(session_data_dict),
+            quick_activity_ids=quick_activity_ids,
             allow_archived_definitions=allow_archived_definitions,
         )
 
-        error = self._apply_program_context(draft) or self._apply_template(draft)
-        if error:
-            message, status = error
-            return None, message, status
+        if not is_quick:
+            error = self._apply_program_context(draft) or self._apply_template(draft)
+            if error:
+                message, status = error
+                return None, message, status
 
         self.db_session.add(new_session)
         self.db_session.flush()
 
-        is_quick_template = draft.template_session_type == SESSION_TYPE_QUICK
-        if is_quick_template:
+        if is_quick:
             error = self._instantiate_quick_activities(draft)
         else:
             error = self._instantiate_section_items(draft)
@@ -177,13 +199,16 @@ class _SessionCreationMixin:
 
         new_session.attributes = copy.deepcopy(draft.session_data)
 
-        error = self._link_session_goals(draft, is_quick_template=is_quick_template)
+        error = self._link_session_goals(draft, is_quick=is_quick)
         if error:
             message, status = error
             return None, message, status
 
         if commit:
             self.db_session.commit()
+        else:
+            # The refresh below reloads the row; unflushed attribute changes would be lost.
+            self.db_session.flush()
 
         self._persist_session_times(new_session.id, s_start, s_end, commit=commit)
 
@@ -286,21 +311,12 @@ class _SessionCreationMixin:
             draft.template = template
             template_payload = models._safe_load_json(template.template_data, {})
             draft.template_payload = template_payload
-            draft.template_session_type = get_template_session_type(template_payload)
 
             session_data_dict.setdefault('template_id', template.id)
             session_data_dict.setdefault('template_name', template.name)
-            session_data_dict.setdefault('session_type', draft.template_session_type)
             session_data_dict.setdefault('template_color', get_template_color(template_payload) or DEFAULT_TEMPLATE_COLOR)
 
-            if draft.template_session_type == SESSION_TYPE_QUICK:
-                if draft.program_day_id:
-                    return "Quick session templates cannot be used from a program day", 400
-                if draft.data.get('program_session_plan_id') or draft.data.get('plan_ref'):
-                    return "Quick session templates cannot be planned", 400
-                if not new_session.session_start:
-                    new_session.session_start = datetime.now(timezone.utc)
-            elif isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
+            if isinstance(session_data_dict, dict) and not session_data_dict.get('sections'):
                 if isinstance(template_payload, dict) and template_payload.get('sections'):
                     session_data_dict['sections'] = template_payload.get('sections', [])
                     if (
@@ -373,22 +389,23 @@ class _SessionCreationMixin:
         return local_activity_ids, local_section_exercises, local_circuit_items
 
     def _instantiate_quick_activities(self, draft) -> PhaseError:
-        """Create the 1-5 flat activity instances a quick-session template lists."""
-        template_payload = draft.template_payload
-        quick_items = template_payload.get('activities', []) if isinstance(template_payload, dict) else []
-        normalized_quick_items = self._normalize_template_activities(quick_items)
-        if not (1 <= len(normalized_quick_items) <= 5):
-            return "Quick sessions must include between 1 and 5 activities", 400
+        """Create one flat activity instance per logged activity, in the order logged.
 
-        unique_activity_def_ids = {activity_id for _, activity_id in normalized_quick_items}
-        activities_query = self.db_session.query(ActivityDefinition).filter(
-            ActivityDefinition.id.in_(unique_activity_def_ids),
-            ActivityDefinition.root_id == draft.root_id,
-        )
-        if not (draft.allow_archived_definitions or draft.template):
-            activities_query = activities_query.filter(ActivityDefinition.deleted_at == None)
-        activities = activities_query.all()
-        found_activity_ids = {a.id for a in activities}
+        The same activity may appear more than once; each entry gets its own instance.
+        """
+        activity_ids = list(draft.quick_activity_ids or [])
+        if not (1 <= len(activity_ids) <= MAX_QUICK_SESSION_ACTIVITIES):
+            return f"Quick sessions must include between 1 and {MAX_QUICK_SESSION_ACTIVITIES} activities", 400
+
+        unique_activity_def_ids = set(activity_ids)
+        found_activity_ids = {
+            activity_id
+            for (activity_id,) in self.db_session.query(ActivityDefinition.id).filter(
+                ActivityDefinition.id.in_(unique_activity_def_ids),
+                ActivityDefinition.root_id == draft.root_id,
+                ActivityDefinition.deleted_at == None,
+            ).all()
+        }
         missing_activity_ids = unique_activity_def_ids - found_activity_ids
         if missing_activity_ids:
             return f"Invalid activity IDs for this fractal: {', '.join(sorted(missing_activity_ids))}", 400
@@ -396,27 +413,24 @@ class _SessionCreationMixin:
         _, quota_error, quota_status = draft.quota_service.check_available(
             draft.current_user_id,
             "activity_instances",
-            len(normalized_quick_items),
+            len(activity_ids),
         )
         if quota_error:
             return quota_error, quota_status
 
-        created_activity_ids = []
-        for raw_item, activity_id in normalized_quick_items:
-            raw_dict = raw_item if isinstance(raw_item, dict) else {}
-            instance_id = raw_dict.get('instance_id') or str(uuid.uuid4())
-            instance = ActivityInstance(
+        created_instance_ids = []
+        for activity_id in activity_ids:
+            instance_id = str(uuid.uuid4())
+            self.db_session.add(ActivityInstance(
                 id=instance_id,
                 session_id=draft.new_session.id,
                 activity_definition_id=activity_id,
                 root_id=draft.root_id,
-            )
-            self.db_session.add(instance)
-            self.db_session.flush()
-            created_activity_ids.append(instance_id)
+            ))
+            created_instance_ids.append(instance_id)
+        self.db_session.flush()
 
-        draft.session_data['activity_ids'] = created_activity_ids
-        draft.session_data.pop('sections', None)
+        draft.session_data['activity_ids'] = created_instance_ids
         return None
 
     def _instantiate_section_items(self, draft) -> PhaseError:
@@ -574,7 +588,7 @@ class _SessionCreationMixin:
             draft.session_data = copy.deepcopy(new_session.attributes)
         return None
 
-    def _link_session_goals(self, draft, *, is_quick_template) -> PhaseError:
+    def _link_session_goals(self, draft, *, is_quick) -> PhaseError:
         """Link activity-derived, manual, and immediate goals, honouring the program goal scope."""
         new_session = draft.new_session
         root_id = draft.root_id
@@ -583,7 +597,7 @@ class _SessionCreationMixin:
         session_data_dict = draft.session_data
         inherited_goal_map = {}
 
-        if not is_quick_template:
+        if not is_quick:
             created_definition_ids = {
                 definition_id
                 for (definition_id,) in self.db_session.query(ActivityInstance.activity_definition_id).filter(
@@ -614,7 +628,7 @@ class _SessionCreationMixin:
 
         linked_goal_ids = set()
 
-        if not is_quick_template:
+        if not is_quick:
             for goal_id, goal_obj in inherited_goal_map.items():
                 self.db_session.execute(
                     session_goals.insert().values(
@@ -684,95 +698,88 @@ class _SessionCreationMixin:
                     self.db_session.commit()
 
     def create_completed_quick_session(self, root_id, current_user_id, data) -> ServiceResult[JsonDict]:
-        create_payload = {key: value for key, value in data.items() if key != 'activity_instances'}
+        """Create a quick session already complete, with its logged values, in one transaction.
+
+        A quick session has no template: its instances are the payload's ``activity_instances``,
+        matched to the payload by position. A ``template_id`` sent by an older client's queued
+        completion is ignored, so those replays still sync.
+        """
+        draft_instances = list(data.get('activity_instances') or [])
+        pending_events = []
+        create_payload = {
+            key: data[key]
+            for key in ('id', 'name', 'description')
+            if data.get(key) is not None
+        }
+        create_payload.setdefault('name', 'Quick Session')
+        # The draft's start, within the window a queued write is still trusted; else now.
+        now = utc_now_naive()
+        started_at = parse_client_datetime(data.get('session_start')) or now
+        started_at = min(max(started_at, now - MAX_CLIENT_LAG), now)
+        create_payload['session_start'] = started_at.replace(tzinfo=timezone.utc).isoformat()
         created_session, error, status = self.create_session(
             root_id,
             current_user_id,
             create_payload,
             reserve_active_slot=False,
             initially_completed=True,
+            commit=False,
+            pending_events=pending_events,
+            quick_activity_ids=[item.get('activity_definition_id') for item in draft_instances],
         )
-        if error:
+        if error or created_session is None:
+            self.db_session.rollback()
             return None, error, status
 
-        session_id = created_session.get('id')
-        if not session_id:
-            return None, "Quick session creation returned no session id", 500
-
-        persisted_instances = self.db_session.query(ActivityInstance).filter(
-            ActivityInstance.session_id == session_id,
-            ActivityInstance.root_id == root_id,
-            ActivityInstance.deleted_at == None,
-        ).order_by(ActivityInstance.created_at.asc()).all()
-
-        instances_by_definition_id = {}
-        for instance in persisted_instances:
-            instances_by_definition_id.setdefault(instance.activity_definition_id, []).append(instance)
+        session_id = created_session['id']
+        instance_ids = get_session_runtime_data(self.db_session.get(Session, session_id)).get('activity_ids') or []
+        if len(instance_ids) != len(draft_instances):
+            self.db_session.rollback()
+            return None, "Quick session instances did not match the activities logged", 500
 
         from services.timer_service import TimerService
         timer_service = TimerService(self.db_session)
+        activity_service = SessionActivityService(self.db_session)
 
-        for draft_instance in data.get('activity_instances', []):
-            activity_definition_id = draft_instance.get('activity_definition_id')
-            persisted_candidates = instances_by_definition_id.get(activity_definition_id) or []
-            if not persisted_candidates:
-                continue
-
-            persisted_instance = persisted_candidates.pop(0)
-            notes = draft_instance.get('notes')
-
+        for instance_id, draft_instance in zip(instance_ids, draft_instances):
+            instance_payload = {'completed': True}
+            if draft_instance.get('notes') is not None:
+                instance_payload['notes'] = draft_instance['notes']
             if draft_instance.get('has_sets'):
-                update_payload = {
-                    'completed': True,
-                    'sets': draft_instance.get('sets', []),
-                }
-                if notes is not None:
-                    update_payload['notes'] = notes
-
-                _, instance_error, instance_status = timer_service.update_activity_instance(
-                    root_id,
-                    persisted_instance.id,
-                    current_user_id,
-                    update_payload,
-                )
-                if instance_error:
-                    return None, instance_error, instance_status
-                continue
-
-            metric_payload = draft_instance.get('metrics', [])
-            if metric_payload:
-                _, metrics_error, metrics_status = SessionActivityService(self.db_session).update_activity_metrics(
-                    root_id,
-                    session_id,
-                    persisted_instance.id,
-                    current_user_id,
-                    metric_payload,
+                instance_payload['sets'] = draft_instance.get('sets', [])
+            elif draft_instance.get('metrics'):
+                _, metrics_error, metrics_status = activity_service.update_activity_metrics(
+                    root_id, session_id, instance_id, current_user_id, draft_instance['metrics'],
+                    commit=False, pending_events=pending_events,
                 )
                 if metrics_error:
+                    self.db_session.rollback()
                     return None, metrics_error, metrics_status
 
-            instance_payload = {
-                'completed': True,
-            }
-            if notes is not None:
-                instance_payload['notes'] = notes
-
             _, instance_error, instance_status = timer_service.update_activity_instance(
-                root_id,
-                persisted_instance.id,
-                current_user_id,
-                instance_payload,
+                root_id, instance_id, current_user_id, instance_payload,
+                commit=False, pending_events=pending_events,
             )
             if instance_error:
+                self.db_session.rollback()
                 return None, instance_error, instance_status
 
-        completed_session, complete_error, complete_status = self.update_session(
+        _, complete_error, complete_status = self.update_session(
             root_id,
             session_id,
             current_user_id,
             {'completed': True},
+            commit=False,
+            pending_events=pending_events,
         )
         if complete_error:
+            self.db_session.rollback()
             return None, complete_error, complete_status
 
-        return completed_session, None, 201
+        self.db_session.commit()
+        for event in pending_events:
+            event_bus.emit(event)
+
+        completed_session = self.db_session.get(Session, session_id)
+        self.db_session.refresh(completed_session)
+        return serialize_session(completed_session), None, 201

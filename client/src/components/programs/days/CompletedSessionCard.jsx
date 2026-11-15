@@ -13,6 +13,8 @@ import {
 import { indexByAlignKey } from '../../../utils/planComparison';
 import { planAlignmentKeys } from '../../../utils/programDaysView';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
+import PlanItemRow from '../../prescriptions/PlanItemRow';
+import PlanSection from '../../prescriptions/PlanSection';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick } from '../../prescriptions/usePlanRowSelection';
 import LoadingState from '../../common/LoadingState';
@@ -195,8 +197,7 @@ export default function CompletedSessionCard({
             {sections.length === 0 ? <p className={styles.planEmpty}>No activities were recorded in this session.</p> : null}
             {sections.map((section, sectionIndex) => (
                 // Sections have no identity beyond their position in the session.
-                <section key={sectionIndex} className={styles.planSection} data-align-key={alignKeys?.sections[sectionIndex]}>
-                    <h4 className={styles.planSectionTitle}>{section.name}</h4>
+                <PlanSection key={sectionIndex} title={section.name} alignKey={alignKeys?.sections[sectionIndex]}>
                     {section.items.length === 0 ? <p className={styles.planEmpty}>No activities in this section.</p> : null}
                     {section.items.map((item, itemIndex) => {
                         const isCircuit = item.type === 'circuit';
@@ -208,12 +209,12 @@ export default function CompletedSessionCard({
                             : `a:${activityIdOf(item.activity)}:${item.activity.instance_id || item.activity.id || itemIndex}`;
                         const isHighlighted = selected?.key === itemKey;
                         return (
-                            <div
+                            <PlanItemRow
                                 key={itemKey}
-                                className={`${styles.planItem} ${styles.planItemSelectable} ${isHighlighted ? styles.planItemSelected : ''}`.trim()}
-                                data-align-key={alignKeys?.items[sectionIndex][itemIndex]}
-                                data-plan-item
-                                data-selected={isHighlighted ? 'true' : undefined}
+                                name={name}
+                                badges={isCircuit ? <Badge size="sm">Circuit</Badge> : null}
+                                selected={isHighlighted}
+                                alignKey={alignKeys?.items[sectionIndex][itemIndex]}
                                 onClick={(event) => {
                                     const selectsWholeItem = isItemSurfaceClick(event);
                                     setSelected((current) => !selectsWholeItem && current?.key === itemKey ? current : {
@@ -222,19 +223,13 @@ export default function CompletedSessionCard({
                                     });
                                 }}
                             >
-                                <div className={styles.planItemHeader}>
-                                    <span className={styles.planItemName}>
-                                        {name}
-                                        {isCircuit ? <Badge size="sm">Circuit</Badge> : null}
-                                    </span>
-                                </div>
                                 {isCircuit
                                     ? renderCircuit(item.circuit, alignKeys?.items[sectionIndex][itemIndex], itemKey)
                                     : renderActivity(item.activity, alignKeys?.items[sectionIndex][itemIndex])}
-                            </div>
+                            </PlanItemRow>
                         );
                     })}
-                </section>
+                </PlanSection>
             ))}
         </article>
     );

@@ -4,7 +4,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TemplateBuilderModal from '../TemplateBuilderModal';
 
 describe('TemplateBuilderModal', () => {
-    it('uses a tab-style session type toggle instead of a dropdown', () => {
+    it('has one template shape: no session type to choose', () => {
         render(
             <TemplateBuilderModal
                 isOpen={true}
@@ -16,12 +16,9 @@ describe('TemplateBuilderModal', () => {
             />
         );
 
-        expect(screen.queryByRole('combobox', { name: 'Session Type' })).not.toBeInTheDocument();
-        expect(screen.getByRole('tab', { name: 'Normal Session' })).toHaveAttribute('aria-selected', 'true');
-
-        fireEvent.click(screen.getByRole('tab', { name: 'Quick Session' }));
-
-        expect(screen.getByRole('tab', { name: 'Quick Session' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.queryByText('Session Type')).not.toBeInTheDocument();
+        expect(screen.queryByRole('tab', { name: 'Quick Session' })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '+ Add Section' })).toBeInTheDocument();
     });
 
     it('adds a selected activity to a section once', () => {

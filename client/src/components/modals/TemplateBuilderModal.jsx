@@ -17,15 +17,9 @@ import CircuitBuilderModal from '../circuits/CircuitBuilderModal';
 import EmptyState from '../common/EmptyState';
 import SectionHeader from '../common/SectionHeader';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
-import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
-import ViewToggleTabs from '../common/ViewToggleTabs';
 import TemplateItemPlanEditor from './TemplateItemPlanEditor';
 import useTemplateItemPlans from './useTemplateItemPlans';
 
-import {
-    SESSION_TYPE_NORMAL,
-    SESSION_TYPE_QUICK,
-} from '../../utils/sessionRuntime';
 import { summarizePrescription } from '../../utils/prescriptionModel';
 import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
 import ModalBackdrop from '../atoms/ModalBackdrop';
@@ -34,17 +28,14 @@ import {
     buildActivityPreview,
     buildInitialTemplate,
     buildTemplateActivityCatalogue,
-    canUseTemplateItemInQuickSession,
     createSectionId,
     getTemplateItemKey,
     isTemplateCircuitItem,
 } from './templateBuilderItems';
 import {
     buildTemplateData,
-    moveQuickActivity,
     moveSection,
     moveSectionItem,
-    removeQuickActivity,
     removeSection,
     removeSectionItem,
     validateSectionDraft,
@@ -78,10 +69,6 @@ function TemplateBuilderModalContent({
     const [isSavingCircuit, setIsSavingCircuit] = useState(false);
 
     const isExistingTemplate = Boolean(editingTemplate?.id);
-    const isQuickTemplate = currentTemplate.sessionType === SESSION_TYPE_QUICK;
-    const selectableActivities = isQuickTemplate
-        ? activities.filter(canUseTemplateItemInQuickSession)
-        : activities;
     // Sections pick activities and circuits through the picker's type toggle, so circuits
     // are not buried in the activity list's "Ungrouped" bucket.
     const sectionActivityDefinitions = useMemo(
@@ -197,32 +184,7 @@ function TemplateBuilderModalContent({
     };
 
     const handleAddActivity = (activity) => {
-        const activityToAdd = buildActivityPreview(activity);
-        if (isQuickTemplate) {
-            setCurrentTemplate((previous) => {
-                const existingIds = new Set(previous.quickActivities.map((activity) => activity.activity_id));
-                const nextActivities = [...previous.quickActivities];
-
-                if (!existingIds.has(activityToAdd.activity_id)) {
-                    nextActivities.push(activityToAdd);
-                    existingIds.add(activityToAdd.activity_id);
-                }
-
-                if (nextActivities.length > 5) {
-                    setAlertModal({ show: true, title: 'Validation Error', message: 'Quick sessions are limited to 5 activities.' });
-                    return previous;
-                }
-
-                return {
-                    ...previous,
-                    quickActivities: nextActivities,
-                };
-            });
-            resetActivityPicker();
-            return;
-        }
-
-        addItemToSection(selectedSectionIndex, activityToAdd);
+        addItemToSection(selectedSectionIndex, buildActivityPreview(activity));
         resetActivityPicker();
     };
 
@@ -307,21 +269,15 @@ function TemplateBuilderModalContent({
     const handleRemoveActivity = (sectionIndex, activityIndex) => setCurrentTemplate(
         (previous) => removeSectionItem(previous, sectionIndex, activityIndex),
     );
-    const handleRemoveQuickActivity = (activityIndex) => setCurrentTemplate(
-        (previous) => removeQuickActivity(previous, activityIndex),
-    );
     const handleMoveSection = (index, direction) => setCurrentTemplate(
         (previous) => moveSection(previous, index, direction),
     );
     const handleMoveActivity = (sectionIndex, activityIndex, direction) => setCurrentTemplate(
         (previous) => moveSectionItem(previous, sectionIndex, activityIndex, direction),
     );
-    const handleMoveQuickActivity = (activityIndex, direction) => setCurrentTemplate(
-        (previous) => moveQuickActivity(previous, activityIndex, direction),
-    );
 
     const handleSave = () => {
-        const error = validateTemplate(currentTemplate, { isQuick: isQuickTemplate });
+        const error = validateTemplate(currentTemplate);
         if (error) {
             setAlertModal({ show: true, title: 'Validation Error', message: error });
             return;
@@ -329,7 +285,7 @@ function TemplateBuilderModalContent({
         onSave({
             name: currentTemplate.name,
             description: currentTemplate.description,
-            template_data: buildTemplateData(currentTemplate, { isQuick: isQuickTemplate, totalDuration }),
+            template_data: buildTemplateData(currentTemplate, { totalDuration }),
         }, editingTemplate?.id);
     };
 
@@ -372,22 +328,6 @@ function TemplateBuilderModalContent({
                         </div>
 
                         <div className={styles.sessionMetaGrid}>
-                            <div className={styles.formGroup}>
-                                <span className={styles.label}>Session Type</span>
-                                <ViewToggleTabs
-                                    className={styles.sessionTypeToggle}
-                                    ariaLabel="Session Type"
-                                    value={currentTemplate.sessionType}
-                                    items={[
-                                        { value: SESSION_TYPE_NORMAL, label: 'Normal Session' },
-                                        { value: SESSION_TYPE_QUICK, label: 'Quick Session' },
-                                    ]}
-                                    onChange={(sessionType) => setCurrentTemplate((previous) => ({
-                                        ...previous,
-                                        sessionType,
-                                    }))}
-                                />
-                            </div>
 
                             <div className={styles.formGroup}>
                                 <label className={styles.label}>Template Color</label>
@@ -414,101 +354,9 @@ function TemplateBuilderModalContent({
                                     color={currentTemplate.templateColor}
                                     size="md"
                                 />
-                                <SessionTemplateTypePill sessionType={currentTemplate.sessionType} size="sm" />
                             </div>
                         </div>
 
-                        {isQuickTemplate ? (
-                            <div>
-                                <div className={styles.actionBar}>
-                                    <span className={styles.durationText}>
-                                        Quick Session: <strong className={styles.durationValue}>{currentTemplate.quickActivities.length}</strong> activit{currentTemplate.quickActivities.length === 1 ? 'y' : 'ies'}
-                                    </span>
-                                    {!showActivityModal && (
-                                        <Button
-                                            variant="primary"
-                                            size="sm"
-                                            onClick={() => {
-                                                setShowActivityModal(true);
-                                            }}
-                                        >
-                                            + Add Activity
-                                        </Button>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <h3 className={styles.sectionListTitle}>Activities</h3>
-                                    {currentTemplate.quickActivities.length === 0 ? (
-                                        <EmptyState
-                                            className={styles.emptyState}
-                                            description="Add between 1 and 5 activities for this quick session template."
-                                        />
-                                    ) : (
-                                        <div className={styles.sectionsContainer}>
-                                            {currentTemplate.quickActivities.map((activity, activityIndex) => (
-                                                <div key={`${activity.activity_id}-${activityIndex}`} className={styles.sectionCard}>
-                                                    <SectionHeader
-                                                        className={styles.sectionHeader}
-                                                        contentClassName={styles.sectionInfo}
-                                                        title={(
-                                                            <div className={styles.sectionTitleRow}>
-                                                                <strong className={styles.sectionName}>{activity.name}</strong>
-                                                            </div>
-                                                        )}
-                                                        meta={(
-                                                            <p className={styles.sectionMeta}>
-                                                                {activity.type || 'Activity'}
-                                                            </p>
-                                                        )}
-                                                        actions={(
-                                                            <div className={styles.sectionControls}>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="secondary"
-                                                                    onClick={() => handleMoveQuickActivity(activityIndex, 'up')}
-                                                                    disabled={activityIndex === 0}
-                                                                >
-                                                                    ↑
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="secondary"
-                                                                    onClick={() => handleMoveQuickActivity(activityIndex, 'down')}
-                                                                    disabled={activityIndex === currentTemplate.quickActivities.length - 1}
-                                                                >
-                                                                    ↓
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="danger"
-                                                                    onClick={() => handleRemoveQuickActivity(activityIndex)}
-                                                                    aria-label="Remove quick activity"
-                                                                >
-                                                                    <CloseIcon size={14} />
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {showActivityModal && (
-                                        <div className={styles.inlineActivitySelector}>
-                                            <ActivitySelectorPanel
-                                                activities={selectableActivities}
-                                                activityGroups={activityGroups}
-                                                onClose={resetActivityPicker}
-                                                onSelectActivity={handleAddActivity}
-                                                closeOnSelect={true}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
                             <div>
                                 <div className={styles.actionBar}>
                                     <span className={styles.durationText}>
@@ -729,7 +577,6 @@ function TemplateBuilderModalContent({
                                     )}
                                 </div>
                             </div>
-                        )}
                     </div>
                 </ModalBody>
 

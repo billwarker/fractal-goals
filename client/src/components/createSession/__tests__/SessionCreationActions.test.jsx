@@ -57,4 +57,23 @@ describe('session creation footer actions', () => {
         expect(screen.getByRole('button', { name: 'Create Session' })).toBeEnabled();
         expect(screen.queryByText(/isn.t part of today.s program day/i)).not.toBeInTheDocument();
     });
+
+    it('completes a quick session instead of creating one, once it has an activity', () => {
+        const onCreateSession = vi.fn();
+        const { rerender } = render(
+            <CreateSessionActions creating={false} onCreateSession={onCreateSession} quickActivityCount={0} footerMode />
+        );
+
+        expect(screen.getByRole('heading', { name: 'Complete Session' })).toBeInTheDocument();
+        expect(screen.getByText('Add an activity to complete')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Complete Session' })).toBeDisabled();
+
+        rerender(<CreateSessionActions creating={false} onCreateSession={onCreateSession} quickActivityCount={2} footerMode />);
+        expect(screen.getByText('Quick session · 2 activities')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Complete Session' }));
+        expect(onCreateSession).toHaveBeenCalledTimes(1);
+
+        rerender(<CreateSessionActions creating onCreateSession={onCreateSession} quickActivityCount={2} headerMode />);
+        expect(screen.getByRole('button', { name: /Completing/ })).toBeDisabled();
+    });
 });

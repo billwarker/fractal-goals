@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 
 import { useSessionPlanCandidates } from '../../hooks/useProgramSessionPlans';
 import { formatLiteralDate } from '../../utils/dateUtils';
-import { isQuickSession } from '../../utils/sessionRuntime';
 import styles from './SessionPlanChooser.module.css';
 
 const TEMPLATE_ONLY = 'template';
@@ -32,7 +31,7 @@ function candidateLabel(candidate, showDayName) {
  * A chosen previous day (`preferLatest`) instead defaults to its newest plan, even if already run.
  */
 export function useSessionPlanChoice(rootId, template, todayISO, programDayId = null, preferLatest = false) {
-    const enabled = Boolean(template && !isQuickSession(template));
+    const enabled = Boolean(template);
     const query = useSessionPlanCandidates(rootId, enabled ? template.id : null, todayISO);
     const candidates = useMemo(() => (query.data?.candidates || []).filter((candidate) => (
         !programDayId || String(candidate.program_day_id) === String(programDayId)

@@ -26,12 +26,12 @@ describe('buildTemplateSessionPayload', () => {
         ]);
     });
 
-    it('keeps quick-session payloads free of goal scope', () => {
+    it('never names a session type: a template session is always a normal session', () => {
         const payload = buildTemplateSessionPayload({
-            id: 'quick-1', name: 'Quick', template_data: { session_type: 'quick' },
+            id: 'template-1', name: 'Practice', template_data: { session_type: 'quick', sections: [] },
         }, null, ['goal-1']);
-        expect(payload).not.toHaveProperty('goal_ids');
-        expect(payload.session_data.session_type).toBe('quick');
+        expect(payload.goal_ids).toEqual(['goal-1']);
+        expect(payload.session_data).not.toHaveProperty('session_type');
     });
 
     it('snapshots complete program, block, and day display context', () => {

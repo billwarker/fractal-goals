@@ -86,7 +86,15 @@ class QuickSessionMetricValueSchema(BaseModel):
 class QuickSessionSetSchema(BaseModel):
     instance_id: Optional[str] = None
     completed: Optional[bool] = False
+    notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     metrics: List[QuickSessionMetricValueSchema] = Field(default_factory=list)
+
+    @field_validator('notes')
+    @classmethod
+    def sanitize_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v) or None
 
 
 class QuickSessionActivityInstanceSchema(BaseModel):
@@ -105,13 +113,31 @@ class QuickSessionActivityInstanceSchema(BaseModel):
         return sanitize_string(v)
 
 
-class QuickSessionCompleteSchema(SessionCreateSchema):
-    activity_instances: List[QuickSessionActivityInstanceSchema] = Field(default_factory=list)
+class QuickSessionCompleteSchema(BaseModel):
+    """A quick session, logged on the device and created already complete.
+
+    It has no template, program or goals: only the activities logged, in order. Older clients'
+    queued completions also send template and session fields; they are accepted and ignored.
+    """
+    model_config = ConfigDict(str_strip_whitespace=True, extra='ignore')
+
     # Client-minted id: a quick session completed offline is queued and replayed later.
     id: Optional[str] = Field(
         None,
         pattern=r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
     )
+    name: Optional[str] = Field(None, max_length=MAX_NAME_LENGTH)
+    description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
+    # When the user started logging; the server records the completion time itself.
+    session_start: Optional[str] = None
+    activity_instances: List[QuickSessionActivityInstanceSchema] = Field(..., min_length=1, max_length=20)
+
+    @field_validator('name', 'description')
+    @classmethod
+    def sanitize_text(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        return sanitize_string(v) or None
 
 
 

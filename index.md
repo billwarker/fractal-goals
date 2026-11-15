@@ -257,7 +257,18 @@ cache updates and evidence invalidation; duplication starts with no one-off link
 ### Sessions, activities, and progress
 
 Sessions are the execution container. Each user can have one unfinished session per fractal,
-including paused sessions. Session Detail offers duplication only for completed sessions after
+including paused sessions.
+
+Templates have one shape (sections of items; no `session_type`, migration `aa1d1082d073` turned the old
+quick templates into one-section templates). A quick session has no template: it is logged on Create
+Session (source "Quick Session", `?source=quick`) as a device draft (`hooks/useQuickSessionComposer.js`,
+`utils/createSessionQuickDraft.js`), one card of activities beside the distinct recent quick
+sessions (`GET …/sessions?session_type=quick`), and created already complete by `POST …/sessions/quick-complete`
+in one transaction (1–20 activities matched by position, `session_data.session_type = 'quick'`). `POST
+…/sessions` refuses quick sessions (`quick_session_use_complete`). Its activities are logged in the program-day
+plan's components (`prescriptions/PlanItemRow`, `PrescriptionEditor` with `valueKind="logged"`,
+`PlanItemPicker`); repeating a recent one shows last time's values as the inputs' placeholders.
+See [Quick sessions rework](planning/quick-sessions-create-session-rework-2026-11.md). Session Detail offers duplication only for completed sessions after
 the shared active-session query confirms none is ongoing. The Sessions sidebar has no completion
 filter; legacy completion URL parameters do not constrain its list or heatmap.
 
@@ -601,7 +612,8 @@ Circuit runs follow the same selection, lifecycle, timing, removal, metric, and 
 as regular session activities. The parent circuit owns its clock; rounds and members remain
 structural children, and circuit notes use canonical session-note targets rather than a parallel
 store. Completing a quick session completes every active activity instance, including untimed ones;
-quick-entry cards have no individual completion control and use the shared session completion button.
+quick-entry cards (Session Detail, for quick sessions started before they were created complete) have no timer or
+individual completion control; Create Session logs a new one in plan rows and completes them all at once.
 Quick-entry sessions remain activity-only; standard sessions and templates own the full
 circuit lifecycle. Detailed behavior is covered by the circuit component and service tests.
 

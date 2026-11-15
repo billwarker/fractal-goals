@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
 
 import { useActiveSessionActions, useActiveSessionData } from '../../contexts/ActiveSessionContext';
 import { useTimezone } from '../../contexts/TimezoneContext';
@@ -8,8 +7,6 @@ import CompletionCheckBadge from '../common/CompletionCheckBadge';
 import EmptyState from '../common/EmptyState';
 import MetaField from '../common/MetaField';
 import SessionCompletionButton from '../common/SessionCompletionButton';
-import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
-import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import SessionActivityItem from './SessionActivityItem';
 import { isQuickSession } from '../../utils/sessionRuntime';
 import styles from './QuickSessionWorkspace.module.css';
@@ -20,15 +17,9 @@ function buildOrderedInstances(activityIds, activityInstances) {
     return activityIds.map((id) => instanceMap.get(id)).filter(Boolean);
 }
 
-function QuickSessionWorkspace({
-    embedded = false,
-    onStartAnother,
-    showCompletionAction = true,
-    onOpenActivityBuilder = null,
-}) {
+function QuickSessionWorkspace({ onOpenActivityBuilder = null }) {
     const { timezone } = useTimezone();
     const {
-        rootId,
         session,
         localSessionData,
         activityInstances,
@@ -47,9 +38,7 @@ function QuickSessionWorkspace({
         [activityInstances, localSessionData?.activity_ids]
     );
     const completed = Boolean(session?.completed || session?.attributes?.completed);
-    const showActionBar = Boolean((completed && embedded && onStartAnother) || showCompletionAction);
     const quickSession = isQuickSession(session);
-    const programInfo = session?.program_info || null;
     const sessionStart = session?.attributes?.session_start
         || session?.session_start
         || localSessionData?.session_start
@@ -72,80 +61,47 @@ function QuickSessionWorkspace({
     }
 
     return (
-        <div className={`${styles.workspace} ${embedded ? styles.embeddedWorkspace : styles.standaloneWorkspace}`}>
+        <div className={`${styles.workspace} ${styles.standaloneWorkspace}`}>
             <div className={styles.surface}>
                 <div className={styles.headerSection}>
                     <div className={styles.topGrid}>
                         <div className={styles.titleGroup}>
                             <div className={styles.titleRow}>
-                                <SessionTemplateNameBadge
-                                    name={session?.name || localSessionData?.template_name || 'Quick Session'}
-                                    entity={session}
-                                    size="lg"
-                                />
+                                <h2 className={styles.title}>{session?.name || 'Quick Session'}</h2>
                                 {completed && <CompletionCheckBadge className={styles.completedBadge} />}
-                            </div>
-                            <div className={styles.metaRow}>
-                                <SessionTemplateTypePill entity={session} size="sm" />
                             </div>
                         </div>
 
                         <div className={styles.summaryGrid}>
                             <MetaField
                                 className={styles.summaryItem}
-                                label="Program"
-                                muted={!programInfo}
-                                valueClassName={styles.programFieldValue}
-                                value={programInfo ? (
-                                    <div className={styles.programValueGroup}>
-                                        <Link
-                                            to={`/${rootId}/programs/${programInfo.program_id}`}
-                                            className={styles.programLink}
-                                        >
-                                            {programInfo.program_name}
-                                        </Link>
-                                        <span className={styles.programSubtext}>
-                                            {programInfo.block_name} • {programInfo.day_name}
-                                        </span>
-                                    </div>
-                                ) : '-'}
-                            />
-                            <MetaField
-                                className={styles.summaryItem}
                                 label="Session Start"
+                                valueClassName={styles.summaryDate}
                                 value={sessionStart ? formatMetaDate(sessionStart) : '-'}
                                 muted={!sessionStart}
                             />
                             <MetaField
                                 className={styles.summaryItem}
                                 label="Last Modified"
+                                valueClassName={styles.summaryDate}
                                 value={updatedAt ? formatMetaDate(updatedAt) : '-'}
                                 muted={!updatedAt}
                             />
                         </div>
                     </div>
 
-                    {showActionBar && <div className={styles.actionBar}>
-                        <div className={styles.actionGroup}>
-                            {completed && embedded && onStartAnother && (
-                                <button
-                                    type="button"
-                                    onClick={onStartAnother}
-                                    className={styles.secondaryButton}
-                                    aria-label="Start another quick session from this template"
-                                >
-                                    Start Another
-                                </button>
-                            )}
-                            {showCompletionAction && (
+                    {/* Only a quick session left unfinished (from before they were created complete) needs completing. */}
+                    {!completed && (
+                        <div className={styles.actionBar}>
+                            <div className={styles.actionGroup}>
                                 <SessionCompletionButton
                                     onClick={toggleSessionComplete}
-                                    completed={completed}
+                                    completed={false}
                                     className={styles.actionButton}
                                 />
-                            )}
+                            </div>
                         </div>
-                    </div>}
+                    )}
                 </div>
 
                 <div className={styles.bodySection}>

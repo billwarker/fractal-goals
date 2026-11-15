@@ -7,15 +7,16 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const keyFor = (userId, rootId) => `quick-draft:${userId}:${rootId}`;
 
-export function saveQuickSessionDraft(userId, rootId, { draft, template }) {
-    if (!userId || !rootId || !draft || !template) return Promise.resolve();
-    return idbSet(keyFor(userId, rootId), { draft, template, savedAt: Date.now() });
+export function saveQuickSessionDraft(userId, rootId, { draft }) {
+    if (!userId || !rootId || !draft) return Promise.resolve();
+    return idbSet(keyFor(userId, rootId), { draft, savedAt: Date.now() });
 }
 
+/** The saved ``{ draft, savedAt }``. Drafts saved by older versions also carry their template. */
 export async function loadQuickSessionDraft(userId, rootId, { now = Date.now() } = {}) {
     if (!userId || !rootId) return null;
     const saved = await idbGet(keyFor(userId, rootId));
-    if (!saved?.draft || !saved?.template) return null;
+    if (!saved?.draft) return null;
     if (now - saved.savedAt > MAX_AGE_MS) {
         await idbDelete(keyFor(userId, rootId));
         return null;

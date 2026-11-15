@@ -51,6 +51,7 @@ def _parse_multi_value_arg(name):
 def _get_session_query_filters():
     return {
         'completed': request.args.get('completed'),
+        'session_type': request.args.get('session_type'),
         'sort_by': request.args.get('sort_by'),
         'sort_order': request.args.get('sort_order'),
         'range_start': request.args.get('range_start'),

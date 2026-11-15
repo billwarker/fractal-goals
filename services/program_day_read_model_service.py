@@ -27,7 +27,13 @@ from services.programs import ProgramService
 from services.note_program_dates import load_date_notes
 from services.serializers import serialize_note
 from services.session_filters import resolve_timezone, session_duration_seconds_from_row
-from services.session_runtime import get_session_template_color, get_session_template_name, get_template_color
+from services.session_runtime import (
+    get_data_session_type,
+    get_session_runtime_data,
+    get_session_template_color,
+    get_session_template_name,
+    get_template_color,
+)
 
 
 class ProgramDayReadModelService:
@@ -484,4 +490,6 @@ class ProgramDayReadModelService:
             ),
             "completed": bool(session.completed),
             "is_paused": bool(session.is_paused),
+            # A quick session opens in a modal rather than on its own page.
+            "session_type": get_data_session_type(get_session_runtime_data(session)),
         }
