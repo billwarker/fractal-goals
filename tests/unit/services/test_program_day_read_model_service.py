@@ -117,3 +117,15 @@ def test_day_review_session_summary_says_whether_the_session_is_quick():
     assert summary({"session_type": "quick"})["session_type"] == "quick"
     assert summary({"session_data": {}})["session_type"] == "normal"
     assert summary(None)["session_type"] == "normal"
+
+
+def test_calendar_session_says_whether_it_is_quick_so_the_calendar_can_count_them():
+    """Quick sessions have no template; the calendar groups them by type ("Quick Session ×N")."""
+    def calendar(attributes):
+        return ProgramDayReadModelService._serialize_calendar_session(SimpleNamespace(
+            id="session-1", name="Quick Session", template_id=None, program_day_id=None,
+            template=None, attributes=attributes,
+        ))
+
+    assert calendar({"session_data": {"session_type": "quick"}})["session_type"] == "quick"
+    assert calendar({"session_data": {}})["session_type"] == "normal"

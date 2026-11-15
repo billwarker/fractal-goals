@@ -91,6 +91,7 @@ def serialize_goal(goal, include_children=True):
         "source": getattr(goal, 'completion_source', None),
         "reason": getattr(goal, 'completion_reason', None),
         "manually_uncompleted_at": format_utc(getattr(goal, 'manually_uncompleted_at', None)),
+        "note_dismissed_at": format_utc(getattr(goal, 'completion_note_dismissed_at', None)),
     }
 
     result = {

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 
-from models.program import get_program_day_template_rules
+from models.program import get_program_day_activity_rules, get_program_day_template_rules
 
 
 def date_part(value):
@@ -215,9 +215,24 @@ def _credited_item(item):
     return item, getattr(item, "template_id", None)
 
 
-def evaluate_occurrence(day, sessions):
-    """Evaluate one occurrence from credit entries (or directly linked sessions)."""
+def _requirements_met(item_count, required_ids, completed_ids, minimum):
+    """Templates and activities are one pool: every required item done, and at least ``minimum``
+    items done when set; with neither, any one item done."""
+    met = bool(item_count) and required_ids.issubset(completed_ids)
+    if minimum:
+        return met and len(completed_ids) >= minimum
+    if not required_ids:
+        return met and bool(completed_ids)
+    return met
+
+
+def evaluate_occurrence(day, sessions, activity_evidence=None):
+    """Evaluate one occurrence from credit entries (or directly linked sessions) and the date's
+    activity evidence (``{activity_id: [EvidenceInstance]}``, any session that date)."""
+    from services.program_day_credits import activity_condition_met
+
     rules = get_program_day_template_rules(day)
+    activity_rules = get_program_day_activity_rules(day)
     configured_template_ids = {rule["template_id"] for rule in rules}
     completed_template_ids = {
         template_id
@@ -230,17 +245,30 @@ def evaluate_occurrence(day, sessions):
     required_template_ids = {
         rule["template_id"] for rule in rules if rule["is_required"]
     }
+    evidence = activity_evidence or {}
+    completed_activity_ids = {
+        rule["condition_id"] for rule in activity_rules
+        if activity_condition_met(rule, evidence.get(rule["activity_definition_id"], ()))
+    }
+    required_activity_ids = {rule["condition_id"] for rule in activity_rules if rule["is_required"]}
     minimum = getattr(day, "completion_min_templates", None)
-    requirements_met = bool(rules) and required_template_ids.issubset(completed_template_ids)
-    if minimum:
-        requirements_met = requirements_met and len(completed_template_ids) >= minimum
-    elif not required_template_ids:
-        requirements_met = requirements_met and bool(completed_template_ids)
+    requirements_met = _requirements_met(
+        len(rules) + len(activity_rules),
+        {("template", item) for item in required_template_ids} | {("activity", item) for item in required_activity_ids},
+        {("template", item) for item in completed_template_ids} | {("activity", item) for item in completed_activity_ids},
+        minimum,
+    )
     return {
         "required_template_ids": sorted(required_template_ids),
         "completed_template_ids": sorted(completed_template_ids),
         "scheduled_template_count": len(rules),
         "required_template_count": len(required_template_ids),
+        "activity_condition_ids": [rule["condition_id"] for rule in activity_rules],
+        "required_activity_condition_ids": sorted(required_activity_ids),
+        "completed_activity_condition_ids": sorted(completed_activity_ids),
+        "item_count": len(rules) + len(activity_rules),
+        "required_item_count": len(required_template_ids) + len(required_activity_ids),
+        "completed_item_count": len(completed_template_ids) + len(completed_activity_ids),
         "completion_min_templates": minimum,
         "requirements_met": requirements_met,
     }
@@ -250,48 +278,49 @@ def evaluate_date(occurrence_rows):
     """Evaluate one calendar date across all overlapping program-day definitions.
 
     ``completion_min_templates`` is a day-level threshold. Overlapping definitions
-    therefore contribute distinct templates to one pool and the strongest configured
-    threshold wins; thresholds are never added together. Calendar writes now keep one
-    definition per date (services/program_calendar_invariants.py); the merge stays as a
-    defensive fallback.
+    therefore contribute distinct templates and activity conditions to one pool and the
+    strongest configured threshold wins; thresholds are never added together. Calendar
+    writes now keep one definition per date (services/program_calendar_invariants.py);
+    the merge stays as a defensive fallback.
     """
     evaluations = [row["evaluation"] for row in occurrence_rows]
-    scheduled_template_ids = {
-        template_id
-        for evaluation in evaluations
-        for template_id in evaluation["required_template_ids"] + evaluation["completed_template_ids"]
-    }
+
+    def union(key):
+        return {item for evaluation in evaluations for item in evaluation.get(key, [])}
+
+    scheduled_template_ids = union("required_template_ids") | union("completed_template_ids")
     for row in occurrence_rows:
         scheduled_template_ids.update(
             rule["template_id"]
             for rule in get_program_day_template_rules(row["program_day"])
         )
-    completed_template_ids = {
-        template_id
-        for evaluation in evaluations
-        for template_id in evaluation["completed_template_ids"]
-    }
-    required_template_ids = {
-        template_id
-        for evaluation in evaluations
-        for template_id in evaluation["required_template_ids"]
-    }
+    completed_template_ids = union("completed_template_ids")
+    required_template_ids = union("required_template_ids")
+    activity_ids = union("activity_condition_ids")
+    completed_activity_ids = union("completed_activity_condition_ids")
+    required_activity_ids = union("required_activity_condition_ids")
     minimum = max(
         (evaluation["completion_min_templates"] or 0 for evaluation in evaluations),
         default=0,
     ) or None
-    requirements_met = bool(scheduled_template_ids)
-    requirements_met = requirements_met and required_template_ids.issubset(completed_template_ids)
-    if minimum:
-        requirements_met = requirements_met and len(completed_template_ids) >= minimum
-    elif not required_template_ids:
-        requirements_met = requirements_met and bool(completed_template_ids)
+    requirements_met = _requirements_met(
+        len(scheduled_template_ids) + len(activity_ids),
+        {("template", item) for item in required_template_ids} | {("activity", item) for item in required_activity_ids},
+        {("template", item) for item in completed_template_ids} | {("activity", item) for item in completed_activity_ids},
+        minimum,
+    )
     return {
         "required_template_ids": sorted(required_template_ids),
         "completed_template_ids": sorted(completed_template_ids),
         "scheduled_template_ids": sorted(scheduled_template_ids),
         "scheduled_template_count": len(scheduled_template_ids),
         "required_template_count": len(required_template_ids),
+        "activity_condition_ids": sorted(activity_ids),
+        "required_activity_condition_ids": sorted(required_activity_ids),
+        "completed_activity_condition_ids": sorted(completed_activity_ids),
+        "item_count": len(scheduled_template_ids) + len(activity_ids),
+        "required_item_count": len(required_template_ids) + len(required_activity_ids),
+        "completed_item_count": len(completed_template_ids) + len(completed_activity_ids),
         "completion_min_templates": minimum,
         "requirements_met": requirements_met,
     }
@@ -323,13 +352,15 @@ def index_period_coverage(periods, start, end):
 
 def build_day_facts(
     program, start, end, sessions, aligned_evidence, zone, local_today,
-    status_overrides=None, session_credits=None, periods=None,
+    status_overrides=None, session_credits=None, periods=None, activity_evidence=None,
 ):
     """Build canonical date facts and occurrence evaluations for a display range.
 
     ``sessions`` are credit candidates (see ``program_day_credits``); each
     occurrence row exposes its attributed ``credits`` and the distinct
     ``sessions`` behind them, and each fact exposes per-session credit facts.
+    ``activity_evidence`` (``load_program_activity_evidence``) meets the days'
+    activity conditions.
     """
     occurrences_by_date = build_occurrences(program, start, end)
     covering_periods, protecting_periods = index_period_coverage(periods, start, end)
@@ -351,7 +382,7 @@ def build_day_facts(
         for occurrence in occurrences_by_date.get(day_value, []):
             day = occurrence["program_day"]
             occurrence_credits = credits_by_occurrence.get((day.id, day_value), [])
-            evaluation = evaluate_occurrence(day, occurrence_credits)
+            evaluation = evaluate_occurrence(day, occurrence_credits, (activity_evidence or {}).get(day_value))
             occurrence_rows.append({
                 **occurrence,
                 "credits": occurrence_credits,
@@ -364,6 +395,7 @@ def build_day_facts(
         scheduled = bool(occurrence_rows)
         date_evaluation = evaluate_date(occurrence_rows)
         completed_count = len(date_evaluation["completed_template_ids"])
+        completed_item_count = date_evaluation["completed_item_count"]
         required_count = date_evaluation["required_template_count"]
         scheduled_template_count = date_evaluation["scheduled_template_count"]
         requirements_met = date_evaluation["requirements_met"]
@@ -373,7 +405,7 @@ def build_day_facts(
 
         if scheduled and requirements_met:
             automatic_state = "scheduled_met"
-        elif scheduled and completed_count:
+        elif scheduled and completed_item_count:
             automatic_state = "scheduled_partial"
         elif scheduled and closed:
             automatic_state = "scheduled_missed"
@@ -422,6 +454,9 @@ def build_day_facts(
             "completed_template_count": completed_count,
             "required_template_count": required_count,
             "scheduled_template_count": scheduled_template_count,
+            "completed_item_count": completed_item_count,
+            "required_item_count": date_evaluation["required_item_count"],
+            "item_count": date_evaluation["item_count"],
             "completion_min_templates": date_evaluation["completion_min_templates"],
             "date_evaluation": date_evaluation,
             "occurrences": occurrence_rows,

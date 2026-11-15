@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import { getISOYMDInTimezone } from '../../utils/dateUtils';
 import CreateSession from '../CreateSession';
+import notify from '../../utils/notify';
 
 const completeQuickSession = vi.fn();
 const previewSessionGoalScope = vi.fn();
@@ -195,6 +196,13 @@ describe('CreateSession quick-session flow', () => {
         renderPage('/root-1/session/create?source=quick');
         expect(screen.getByText('Source: quick')).toBeInTheDocument();
         expect(screen.getByRole('region', { name: 'Quick session activities' })).toBeInTheDocument();
+    });
+
+    it('starts a quick session with the activities a program day asks for, left out when deleted', async () => {
+        renderPage('/root-1/session/create?source=quick&activities=activity-1,deleted');
+
+        expect(await screen.findAllByText('Logged Bodyweight')).toHaveLength(1);
+        expect(notify.error).toHaveBeenCalledWith('1 activity no longer exists and was left out.');
     });
 
     it('adds and removes activities, then completes the session with what was logged', async () => {

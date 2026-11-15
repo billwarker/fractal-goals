@@ -35,6 +35,14 @@ const GoalReviewComposer = lazyWithRetry(
     () => import('./GoalReviewSection').then((module) => ({ default: module.GoalReviewComposer })),
     'components/goalDetail/GoalReviewSection:composer',
 );
+const GoalCompletionNotePrompt = lazyWithRetry(
+    () => import('./GoalCompletionNoteSection').then((module) => ({ default: module.GoalCompletionNotePrompt })),
+    'components/goalDetail/GoalCompletionNoteSection:prompt',
+);
+const GoalCompletionNoteComposer = lazyWithRetry(
+    () => import('./GoalCompletionNoteSection').then((module) => ({ default: module.GoalCompletionNoteComposer })),
+    'components/goalDetail/GoalCompletionNoteSection:composer',
+);
 const GoalActivityHeatmap = lazyWithRetry(() => import('./GoalActivityHeatmap'), 'components/goalDetail/GoalActivityHeatmap');
 function GoalDetailModalRenderSurface({
     activitiesAssociateAction,
@@ -68,6 +76,7 @@ function GoalDetailModalRenderSurface({
     goal,
     goalColor,
     goalCompletionNote,
+    promptCompletionNote = false,
     goalForSmart,
     goalHeaderRef,
     goalHeaderStickyOffset,
@@ -320,6 +329,11 @@ function GoalDetailModalRenderSurface({
                 ) : (
                     /* ============ VIEW MODE ============ */
                     <>
+                    {promptCompletionNote && goalId ? (
+                        <Suspense fallback={null}>
+                            <GoalCompletionNotePrompt rootId={rootId} goalId={goalId} onWrite={() => setViewState('completion-note')} />
+                        </Suspense>
+                    ) : null}
                     {!readOnly && mode !== 'create' && goalId && levelConfig?.uses_reviews ? (
                         <Suspense fallback={null}>
                             <GoalReviewPrompt rootId={rootId} goal={goal} goalId={goalId} onReview={() => openReview(null)} />
@@ -542,6 +556,17 @@ function GoalDetailModalRenderSurface({
                 />
             </Suspense>
         );
+    } else if (viewState === 'completion-note') {
+        content = (
+            <Suspense fallback={null}>
+                <GoalCompletionNoteComposer
+                    rootId={rootId}
+                    goalId={goalId}
+                    onDone={() => setViewState('goal')}
+                    registerFooterAction={setSubViewFooterAction}
+                />
+            </Suspense>
+        );
     } else if (viewState === 'goal-timeline') {
         content = (
             <Suspense fallback={<LoadingState label="Loading timeline…" />}>
@@ -561,7 +586,7 @@ function GoalDetailModalRenderSurface({
         content = renderGoalContent();
     }
 
-    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-review' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
+    const shouldShowPersistentHeader = (viewState === 'goal' || viewState === 'goal-review' || viewState === 'completion-note' || viewState === 'goal-options' || viewState === 'goal-notes' || viewState === 'goal-timeline' || viewState === 'goal-activities' || viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && !(needsLevelPicker && selectedChildType === null);
     if (shouldShowPersistentHeader) {
         const headerTabs = mode !== 'create' ? (
@@ -637,7 +662,7 @@ function GoalDetailModalRenderSurface({
     const showCompletionConfirmFooter = (viewState === 'complete-confirm' || viewState === 'uncomplete-confirm')
         && mode !== 'create'
         && !readOnly;
-    const showOptionsFooter = (viewState === 'goal-options' || viewState === 'goal-review')
+    const showOptionsFooter = (viewState === 'goal-options' || viewState === 'goal-review' || viewState === 'completion-note')
         && mode !== 'create'
         && !readOnly;
     const completionConfirmAccentColor = viewState === 'uncomplete-confirm' ? completedColor : goalColor;
@@ -671,7 +696,7 @@ function GoalDetailModalRenderSurface({
             activitiesAssociateAction={activitiesAssociateAction}
             showOptionsFooter={showOptionsFooter}
             onCancelOptions={viewState === 'goal-review' ? finishReview : () => handleGoalViewNavigation('goal')}
-            optionsFooterAction={['goal-options', 'goal-review'].includes(viewState) ? subViewFooterAction : null}
+            optionsFooterAction={['goal-options', 'goal-review', 'completion-note'].includes(viewState) ? subViewFooterAction : null}
             showDetailFooter={showDetailFooter}
             handleEditDetails={handleEditDetails}
             handleGoalViewNavigation={handleGoalViewNavigation}

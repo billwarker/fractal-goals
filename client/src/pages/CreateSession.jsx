@@ -54,6 +54,13 @@ const SESSION_SOURCES = new Set(['program', 'template', 'quick']);
  * - Quick session: QuickSessionSection (Step 2, beside) with RecentQuickSessions as a
  *   shortcut into it, completed from the header action instead of created
  */
+// Activities deleted since a past session or a program day named them are left out, and said so.
+function notifyMissingActivities(missing) {
+    if (missing > 0) {
+        notify.error(`${missing} ${missing === 1 ? 'activity no longer exists and was' : 'activities no longer exist and were'} left out.`);
+    }
+}
+
 function CreateSession() {
     const { rootId } = useParams();
     const navigate = useNavigate();
@@ -95,6 +102,21 @@ function CreateSession() {
         loading,
     } = useCreateSessionPageData(rootId, todayISO, timezone || 'UTC');
     const quick = useQuickSessionComposer({ rootId, activityDefinitions });
+    const { startWith: startQuickWith } = quick;
+
+    // ?source=quick&activities=a,b (a program day asking for activities) starts the quick
+    // session with them, once the activities are loaded; the link is then spent.
+    const requestedActivities = searchParams.get('activities');
+    useEffect(() => {
+        if (!requestedActivities || sessionSource !== 'quick' || !activityDefinitions?.length) return;
+        const missing = startQuickWith(requestedActivities.split(',').filter(Boolean));
+        notifyMissingActivities(missing);
+        setSearchParams((params) => {
+            const next = new URLSearchParams(params);
+            next.delete('activities');
+            return next;
+        }, { replace: true });
+    }, [activityDefinitions, requestedActivities, sessionSource, setSearchParams, startQuickWith]);
 
     useEffect(() => {
         if (!rootId) {
@@ -168,6 +190,13 @@ function CreateSession() {
         setSessionSource(source);
     };
 
+    // A program day that asks only for activities: log them in a quick session.
+    const handleLogDayActivities = (activityIds) => {
+        handleSelectSource('quick');
+        const missing = startQuickWith(activityIds);
+        notifyMissingActivities(missing);
+    };
+
     const handleSelectProgram = (programId) => {
         resetSelectionState();
         setSelectedProgramId(String(programId));
@@ -227,9 +256,7 @@ function CreateSession() {
 
     const handleRepeatQuickSession = (session) => {
         const missing = quick.repeat(session);
-        if (missing > 0) {
-            notify.error(`${missing} ${missing === 1 ? 'activity no longer exists and was' : 'activities no longer exist and were'} left out.`);
-        }
+        notifyMissingActivities(missing);
     };
 
     const handleSelectTemplate = (template) => {
@@ -486,6 +513,7 @@ function CreateSession() {
                                 onSelectProgramDay={handleSelectProgramDay}
                                 onSelectProgramSession={handleSelectProgramSession}
                                 onSwitchToTemplate={() => setSessionSource('template')}
+                                onLogActivities={handleLogDayActivities}
                             />
                         )}
 

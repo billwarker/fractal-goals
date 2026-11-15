@@ -63,3 +63,46 @@ test('a quick session is logged on Create Session, completed in one step, and re
     await expect(modal.getByRole('textbox').first()).toHaveValue(/^195/);
     expect(errors).toEqual([]);
 });
+
+test('a quick session that meets a threshold says so, and the goal asks for its completion note', async ({ page }, testInfo) => {
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await openOrigin(page);
+    const headers = { Authorization: `Bearer ${apiToken()}` };
+    const root = `browser-quick-session-root-${testInfo.project.name}`;
+    const suffix = Date.now().toString(36);
+    const api = async (path, data) => {
+        const response = await page.request.post(`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${response.status()}`).toBeTruthy();
+        return response.json();
+    };
+    const activity = await api('activities', {
+        name: `Toast Lever ${suffix}`, has_metrics: true, metrics: [{ name: 'Hold', unit: 'Seconds', input_type: 'number' }],
+    });
+    const goalName = `Hold the lever ${suffix}`;
+    await api('goals', {
+        name: goalName, type: 'ShortTermGoal', parent_id: root, completion_condition: 'activity_threshold',
+        condition: {
+            activity_definition_id: activity.id, kind: 'single_session', measure: 'sets', min_sets: 1,
+            rules: [{ metric_definition_id: activity.metric_definitions[0].id, operator: '>=', value: 5 }],
+        },
+    });
+
+    await page.goto(`/${root}/create-session?source=quick&activities=${activity.id}`);
+    const section = page.getByRole('region', { name: 'Select Activities' });
+    await expect(section.getByText(activity.name)).toBeVisible();
+    await section.getByRole('textbox', { name: 'logged Hold' }).fill('6');
+    await page.getByRole('button', { name: 'Complete Session', exact: true }).first().click();
+
+    const toast = page.getByText(`Completed — Short Term Goal: ${goalName}`);
+    await expect(toast).toBeVisible();
+    await page.getByRole('button', { name: 'Write note' }).click();
+    const note = page.getByRole('textbox', { name: 'Goal Completion Note' });
+    await expect(note).toBeVisible();
+    await note.fill('Six seconds, clean.');
+    await page.getByRole('button', { name: 'Save note' }).click();
+    await expect(page.getByText('Six seconds, clean.')).toBeVisible();
+    // With its note written, the goal no longer asks for one.
+    await expect(page.getByRole('region', { name: 'Add a completion note' })).toHaveCount(0);
+    expect(errors).toEqual([]);
+});

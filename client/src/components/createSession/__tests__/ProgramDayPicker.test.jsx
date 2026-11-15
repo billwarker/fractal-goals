@@ -46,6 +46,35 @@ describe('ProgramDayPicker', () => {
         expect(screen.getByText('Pickup Music')).toHaveStyle({ color: '#22c55e' });
     });
 
+    it('lists a day\'s activities, and logs an activities-only day with a quick session', () => {
+        const onLogActivities = vi.fn();
+        const onSelectProgramDay = vi.fn();
+        const programDay = {
+            program_name: 'Skills', day_id: 'day-1', day_name: 'Lever day', day_number: 2, sessions: [],
+            activity_conditions: [
+                { id: 'c1', activity_definition_id: 'lever', activity_name: 'Front Lever', completed: true,
+                    tags: [{ id: 't', name: 'Clean' }] },
+                { id: 'c2', activity_definition_id: 'hspu', activity_name: 'Handstand Push Ups', completed: false, tags: [] },
+            ],
+        };
+        render(<ProgramDayPicker
+            programDays={[programDay]}
+            hasTemplates
+            onSelectProgramDay={onSelectProgramDay}
+            onSelectProgramSession={vi.fn()}
+            onSwitchToTemplate={vi.fn()}
+            onLogActivities={onLogActivities}
+        />);
+
+        const list = screen.getByRole('list', { name: 'Activities for Lever day' });
+        expect(list).toHaveTextContent('✓ Front Lever (Clean)');
+        expect(list).toHaveTextContent('Handstand Push Ups');
+        fireEvent.click(screen.getByRole('button', { name: 'Log with a Quick Session' }));
+        // Only what's still to do.
+        expect(onLogActivities).toHaveBeenCalledWith(['hspu']);
+        expect(onSelectProgramDay).not.toHaveBeenCalled();
+    });
+
     describe('previous days', () => {
         const session = { template_id: 't1', template_name: 'Legs A' };
         const row = (date, overrides = {}) => ({

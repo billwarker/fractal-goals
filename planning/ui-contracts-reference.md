@@ -52,6 +52,25 @@ contained within the calendar and vertical scrolling owned by the modal/panel bo
 snapshots use the same list and local pagination without authenticated fetches or a lifetime heatmap.
 See [Goal Timeline](goal-activity-heatmap.md).
 
+## Goal completion feedback and notes
+
+A change that completes a goal by its condition toasts "Completed — <Level>: <name>" with a
+**Write note** action (opens the goal on its completion-note view); one that reverts it toasts
+"No longer complete — …". One toast per goal and state at a time. Goal Details for a completed goal
+with no completion note opens with a "Goal completed — add a note?" banner (Write note, Dismiss),
+above the review banner; the note view saves from the footer and returns to Details. A threshold
+goal's sentence sits under its description in the threshold builder's accent box; with no description of
+its own, the sentence is the description ("No description" isn't shown) and the goal counts as Specific.
+
+## Program day activities
+
+The program day editor has Sessions, then Activities ("+ Add Activity" opens the single-select activity
+picker; each row has its tags, Tags/Edit tags for the "Only count when tagged" control, Required, ×),
+then Completion: "At least N of M sessions and activities completed" and the day's rule in words.
+The day pane lists the activities with ✓ once done in any session that date, and today offers
+"Log in a quick session" for the rest. Create Session's program-day rows list their activities; a day
+with activities only shows "Log with a Quick Session".
+
 ## Goal completion conditions
 
 The edit form's "How does this goal complete?" field is a three-way tab set (Activity threshold,

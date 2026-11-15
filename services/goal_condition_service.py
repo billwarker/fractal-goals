@@ -33,7 +33,12 @@ from models import (
     activity_goal_associations,
     activity_instance_goal_associations,
 )
-from services._completion_context import _build_event, _queue_event, _track_goal_completion
+from services._completion_context import (
+    _build_event,
+    _queue_event,
+    _track_goal_completion,
+    _track_goal_uncompletion,
+)
 from services.events import Events
 from services.goal_condition_evaluator import (
     RULE_OPERATORS,
@@ -45,6 +50,7 @@ from services.goal_condition_evaluator import (
 from services.association_reconciliation import append_goal_association_event
 from services.goal_condition_evidence import associated_goal_ids, collect_goal_activity_instances, to_evidence
 from services.goal_contribution import as_utc_datetime
+from services.goal_type_utils import get_canonical_goal_type
 from services.goal_sequence_service import advance_after_completion, revert_after_uncompletion
 
 logger = logging.getLogger(__name__)
@@ -440,6 +446,11 @@ def _naive(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=None) if value else None
 
 
+def _announced(goal):
+    """What the client needs to announce a goal's change: "Completed: Skill: Full Front Lever"."""
+    return {'id': goal.id, 'name': goal.name, 'type': get_canonical_goal_type(goal)}
+
+
 def apply_evaluation(db_session, goal, evaluation: ConditionEvaluation | None, pending_events, *, trigger):
     """Bring the goal's completion in line with its condition. Returns 'completed', 'reverted', or None."""
     if evaluation is None:
@@ -456,6 +467,7 @@ def apply_evaluation(db_session, goal, evaluation: ConditionEvaluation | None, p
                 'reason': 'condition_unmet', 'triggered_by': trigger,
             }, db_session))
             revert_after_uncompletion(db_session, goal)
+            _track_goal_uncompletion(_announced(goal))
             return 'reverted'
         # Provenance follows the evidence that now satisfies the condition.
         goal.completed_at = _naive(evaluation.achieved_at) or goal.completed_at
@@ -473,7 +485,7 @@ def apply_evaluation(db_session, goal, evaluation: ConditionEvaluation | None, p
     goal.completion_source = 'condition'
     goal.completion_reason = 'condition_met'
     goal.manually_uncompleted_at = None
-    _track_goal_completion({'id': goal.id, 'name': goal.name})
+    _track_goal_completion(_announced(goal))
     _queue_event(pending_events, _build_event(Events.GOAL_COMPLETED, {
         'goal_id': goal.id, 'goal_name': goal.name, 'root_id': goal.root_id or goal.id,
         'auto_completed': True, 'reason': 'condition_met', 'triggered_by': trigger,

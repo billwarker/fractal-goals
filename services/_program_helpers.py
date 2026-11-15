@@ -10,9 +10,13 @@ from typing import List, Dict, Any
 
 from sqlalchemy.orm import selectinload
 
-from models import Program, ProgramDay, ProgramDayTemplate, Goal, GoalCompletionCondition, SessionTemplate, validate_root_goal, program_goals
+from models import (
+    ActivityDefinition, ActivityTagDefinition, Goal, GoalCompletionCondition, Program, ProgramDay,
+    ProgramDayActivityCondition, ProgramDayTemplate, SessionTemplate, program_goals, validate_root_goal,
+)
 from models.base import utc_now
 from models.goal import program_day_goals
+from models.program import program_day_activity_condition_loads
 from services import event_bus
 from services.goal_service import GoalService
 from services.program_scope import resolve_program_scope
@@ -31,6 +35,7 @@ class _ProgramHelpersMixin:
             selectinload(Program.blocks),
             day_load.selectinload(ProgramDay.goals),
             day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
+            *program_day_activity_condition_loads(day_load),
             template_goal_load.selectinload(Goal.level),
             template_goal_load.selectinload(Goal.condition).selectinload(GoalCompletionCondition.rules),
             template_goal_load.selectinload(Goal.condition).selectinload(GoalCompletionCondition.tags),
@@ -187,11 +192,69 @@ class _ProgramHelpersMixin:
                     'order': index,
                 })
 
-        min_templates = data.get('completion_min_templates')
-        if min_templates is not None and min_templates > len(configs):
-            raise ValueError("completion_min_templates cannot exceed the number of selected templates")
-
         return configs
+
+    @classmethod
+    def _normalize_activity_conditions(cls, session, root_id: str, raw_conditions) -> List[Dict[str, Any]]:
+        """The day's activity conditions in the order given: the same activity may appear again with
+        other tags, never twice alike. Activities and tags must be the fractal's; archived tags stay valid."""
+        configs: List[Dict[str, Any]] = []
+        seen = set()
+        for raw in raw_conditions or []:
+            activity_id = raw.get('activity_definition_id')
+            tag_ids = list(dict.fromkeys(raw.get('tag_ids') or []))
+            tag_match = (raw.get('tag_match') or 'contains') if tag_ids else 'contains'
+            key = (activity_id, frozenset(tag_ids), tag_match)
+            if not activity_id or key in seen:
+                continue
+            seen.add(key)
+            configs.append({
+                'activity_definition_id': activity_id,
+                'is_required': bool(raw.get('is_required', True)),
+                'tag_ids': tag_ids,
+                'tag_match': tag_match,
+            })
+        if not configs:
+            return configs
+
+        activity_ids = {config['activity_definition_id'] for config in configs}
+        found_activities = {activity_id for (activity_id,) in session.query(ActivityDefinition.id).filter(
+            ActivityDefinition.root_id == root_id,
+            ActivityDefinition.id.in_(activity_ids),
+            ActivityDefinition.deleted_at.is_(None),
+        )}
+        missing_activities = sorted(activity_ids - found_activities)
+        if missing_activities:
+            raise ValueError(f"Activities not found: {', '.join(missing_activities)}")
+
+        tag_ids = {tag_id for config in configs for tag_id in config['tag_ids']}
+        tags_by_id = {tag.id: tag for tag in session.query(ActivityTagDefinition).filter(
+            ActivityTagDefinition.root_id == root_id,
+            ActivityTagDefinition.id.in_(tag_ids),
+        )} if tag_ids else {}
+        missing_tags = sorted(tag_ids - set(tags_by_id))
+        if missing_tags:
+            raise ValueError(f"Activity tags not found: {', '.join(missing_tags)}")
+        for config in configs:
+            config['tags'] = [tags_by_id[tag_id] for tag_id in config['tag_ids']]
+        return configs
+
+    @classmethod
+    def _apply_program_day_activity_conditions(cls, session, day: ProgramDay, root_id: str, configs: List[Dict[str, Any]]):
+        """Replace the day's activity conditions (a day's definition changes as a whole)."""
+        day.activity_conditions = [
+            ProgramDayActivityCondition(
+                program_day_id=day.id,
+                root_id=root_id,
+                activity_definition_id=config['activity_definition_id'],
+                is_required=config['is_required'],
+                order=index,
+                tag_match=config['tag_match'],
+                tags=config['tags'],
+            )
+            for index, config in enumerate(configs)
+        ]
+        session.flush()
 
     @classmethod
     def _apply_program_day_template_configs(cls, session, day: ProgramDay, template_configs: List[Dict[str, Any]]):
@@ -226,9 +289,11 @@ class _ProgramHelpersMixin:
 
     @classmethod
     def _validate_program_day_completion_min(cls, day: ProgramDay):
-        min_templates = getattr(day, 'completion_min_templates', None)
-        if min_templates is not None and min_templates > len(day.templates or []):
-            raise ValueError("completion_min_templates cannot exceed the number of selected templates")
+        """"At least N completed" counts the day's templates and activities together."""
+        min_items = getattr(day, 'completion_min_templates', None)
+        item_count = len(day.templates or []) + len(getattr(day, 'activity_conditions', None) or [])
+        if min_items is not None and min_items > item_count:
+            raise ValueError("completion_min_templates cannot exceed the number of the day's sessions and activities")
 
     @classmethod
     def _program_scope_goal_ids(cls, session, program: Program, root_id: str) -> set[str]:

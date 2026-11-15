@@ -47,7 +47,8 @@ def calculate_smart_status(goal):
         is_measurable = True
 
     return {
-        "specific": bool(goal.description and goal.description.strip()),
+        # Specific: a description, or a threshold, whose sentence describes the goal (Goal Details shows it).
+        "specific": bool(goal.description and goal.description.strip()) or condition == 'activity_threshold',
         "measurable": is_measurable,
         "achievable": is_achievable,
         # R is Reviewed: reviews on, with a cadence, and none due. Levels that don't review count as met.

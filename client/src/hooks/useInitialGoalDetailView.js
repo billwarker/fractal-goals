@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const ENTRY_VIEWS = new Set(['goal-activities', 'goal-review']);
+const ENTRY_VIEWS = new Set(['goal-activities', 'goal-review', 'completion-note']);
 
 export default function useInitialGoalDetailView({
     goalId, initialView, initialViewKey, isOpen, mode, setViewState,

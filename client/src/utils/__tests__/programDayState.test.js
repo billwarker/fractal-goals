@@ -56,6 +56,21 @@ describe('buildCompletedSessionEvents', () => {
         }));
     });
 
+    it('counts a day\'s quick sessions as one row instead of repeating them', () => {
+        const events = buildCompletedSessionEvents([{ date: '2026-11-15', completed_sessions: [
+            { id: 'q1', name: 'Quick Session', session_type: 'quick' },
+            { id: 'q2', name: 'Morning mobility', session_type: 'quick' },
+            { id: 'q3', name: 'Quick Session', session_type: 'quick' },
+            { id: 'n1', name: 'Run' },
+        ] }], 'program-1');
+
+        expect(events.map((event) => [event.title, event.extendedProps.count])).toEqual([
+            ['Quick Session', 3],
+            ['Run', 1],
+        ]);
+        expect(events[0].extendedProps.sessionIds).toEqual(['q1', 'q2', 'q3']);
+    });
+
     it('returns no events without read-model days', () => {
         expect(buildCompletedSessionEvents(undefined, 'program-1')).toEqual([]);
     });

@@ -19,6 +19,7 @@ from models import (
     CircuitScopeTag,
     Goal,
     GoalConditionTag,
+    ProgramDayActivityConditionTag,
     utc_now,
 )
 from services.activity_tags import canonical_tag_name, name_taken_details, normalize_tag_name
@@ -470,6 +471,7 @@ class ActivityTagCatalogService:
         self._union_links(ActivityInstanceCompareTag, "activity_instance_id", source_ids, target.id)
         self._union_links(ActivityProgressDefaultTag, "default_id", source_ids, target.id)
         self._union_links(GoalConditionTag, "condition_id", source_ids, target.id)
+        self._union_links(ProgramDayActivityConditionTag, "condition_id", source_ids, target.id)
         for scope in self.db.query(CircuitScopeTag).filter(
             CircuitScopeTag.activity_tag_definition_id.in_(source_ids),
         ).all():

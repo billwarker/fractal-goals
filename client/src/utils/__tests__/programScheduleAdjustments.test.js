@@ -40,4 +40,23 @@ describe('schedule exception projections', () => {
             repeat_every_weeks: 2,
         }));
     });
+
+    it('copies the activities a day asks for, leaving deleted ones behind', async () => {
+        const source = { ...program, days: [{
+            ...program.days[0],
+            completion_min_templates: 2,
+            activity_conditions: [
+                { activity_definition_id: 'lever', is_required: true, tag_ids: ['clean'], tag_match: 'exact' },
+                { activity_definition_id: 'gone', activity_deleted: true, is_required: true, tag_ids: [] },
+            ],
+        }] };
+        await duplicateProgramStructure({ rootId: 'root', programId: 'copy', source, startDate: '2026-10-01' });
+        expect(fractalApi.createProgramDay).toHaveBeenLastCalledWith('root', 'copy', expect.objectContaining({
+            activity_conditions: [
+                { activity_definition_id: 'lever', is_required: true, tag_ids: ['clean'], tag_match: 'exact' },
+            ],
+            // Never more than the copy has.
+            completion_min_templates: 1,
+        }));
+    });
 });

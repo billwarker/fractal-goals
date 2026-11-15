@@ -30,6 +30,7 @@ from .session import (
 )
 from .program import (
     Program, ProgramBlock, ProgramDay, ProgramDayTemplate, ProgramDaySession,
+    ProgramDayActivityCondition, ProgramDayActivityConditionTag,
     ProgramDayStatusOverride, ProgramDaySessionCredit, ProgramDayOccurrenceSchedule, ProgramDayOccurrenceExclusion, ProgramSessionPlan,
     program_day_templates, program_goals, program_block_goals
 )

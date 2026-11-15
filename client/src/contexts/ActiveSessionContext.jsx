@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
-import useSessionAchievementNotifications from '../hooks/useSessionAchievementNotifications';
 import useSessionDetailData from '../hooks/useSessionDetailData';
 import useSessionDraftAutosave from '../hooks/useSessionDraftAutosave';
 import useSessionDetailMutations from '../hooks/useSessionDetailMutations';
@@ -52,7 +51,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
 
     const {
         session,
-        sessionLoading,
         sessionError,
         refreshSession,
         activityInstances,
@@ -195,15 +193,6 @@ export function ActiveSessionProvider({ rootId, sessionId, children }) {
         setActiveRootId(rootId);
         return () => setActiveRootId(null);
     }, [rootId, setActiveRootId]);
-
-    useSessionAchievementNotifications({
-        sessionId,
-        conditionProgressByGoalId,
-        sessionGoalsView,
-        sessionLoading,
-        instancesLoading,
-        sessionGoalsViewLoading,
-    });
 
     useEffect(() => {
         return () => {

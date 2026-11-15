@@ -28,7 +28,7 @@ from models import (
     SessionTemplate,
     validate_root_goal,
 )
-from models.program import get_program_day_template_rules
+from models.program import get_program_day_template_rules, program_day_activity_condition_loads
 from services import Event, Events, event_bus
 from services.plan_sections import (
     merge_template_changes,
@@ -304,6 +304,7 @@ class ProgramSessionPlanService:
                 selectinload(Program.days)
                 .selectinload(ProgramDay.template_links)
                 .joinedload(ProgramDayTemplate.template),
+                *program_day_activity_condition_loads(selectinload(Program.days)),
             )
             .filter(Program.id == program_id, Program.root_id == root_id)
             .first()

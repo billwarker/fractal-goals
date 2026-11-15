@@ -76,7 +76,8 @@ export function calculateSMARTStatus(goal) {
     }
 
     return {
-        specific: !!(description && description.trim().length > 0),
+        // A threshold's sentence describes the goal too (Goal Details shows it under the description).
+        specific: !!(description && description.trim().length > 0) || completionCondition === 'activity_threshold',
         measurable: !trackActivities || completionCondition !== 'manual',
         achievable: !trackActivities || (Array.isArray(associatedActivityIds) && associatedActivityIds.length > 0) || completedViaChildren,
         reviewed: isReviewed(goal, attrs),
@@ -118,7 +119,7 @@ export const SMART_CRITERIA = {
     specific: {
         letter: 'S',
         label: 'Specific',
-        description: 'Has a clear description'
+        description: 'Has a description, or an activity threshold that says what it takes'
     },
     measurable: {
         letter: 'M',

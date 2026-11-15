@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from sqlalchemy.orm import selectinload
 
 from models import Program, ProgramDay, ProgramDayTemplate, validate_root_goal
-from models.program import get_program_day_template_rules
+from models.program import get_program_day_template_rules, program_day_activity_condition_loads
 from services._serialize_common import format_utc
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.note_program_dates import load_range_date_notes
@@ -43,6 +43,7 @@ def _feed_load_options():
         day_load.selectinload(ProgramDay.occurrence_schedules),
         day_load.selectinload(ProgramDay.templates),
         day_load.selectinload(ProgramDay.template_links).selectinload(ProgramDayTemplate.template),
+        *program_day_activity_condition_loads(day_load),
     ]
 
 

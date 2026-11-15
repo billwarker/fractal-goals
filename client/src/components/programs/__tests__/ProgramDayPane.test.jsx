@@ -59,6 +59,30 @@ function renderPane(overrides = {}) {
 }
 
 describe('ProgramDayPane', () => {
+    it('lists the activities a day asks for, and logs the missing ones in a quick session', () => {
+        const [occurrence] = detail.occurrences;
+        renderPane({ query: { data: { detail: {
+            ...detail,
+            occurrences: [{
+                ...occurrence,
+                requirements: { ...occurrence.requirements, item_count: 3, completed_item_count: 1 },
+                activities: [
+                    { id: 'c1', activity_definition_id: 'lever', activity_name: 'Front Lever', is_required: true,
+                        tags: [{ id: 't', name: 'Clean' }], status: 'completed' },
+                    { id: 'c2', activity_definition_id: 'hspu', activity_name: 'Handstand Push Ups', is_required: false,
+                        tags: [], status: 'pending' },
+                ],
+            }],
+        } } } });
+
+        const list = screen.getByRole('list', { name: 'Activities for Strength day' });
+        expect(within(list).getByText('Front Lever').closest('li')).toHaveTextContent('✓Front LeverCleanDone');
+        expect(within(list).getByText('Handstand Push Ups').closest('li')).toHaveTextContent('Optional');
+        expect(screen.getByText('1 of 3 sessions and activities completed.')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Log in a quick session' }))
+            .toHaveAttribute('href', '/root-1/create-session?source=quick&activities=hspu');
+    });
+
     it('opens a blue status dropdown beside the name and offers all manual actions', async () => {
         const onSetDayStatus = vi.fn().mockResolvedValue(false);
         renderPane({

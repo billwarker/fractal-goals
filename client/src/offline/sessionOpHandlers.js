@@ -259,6 +259,8 @@ export function invalidateSessionAfterSync(queryClient, rootId, sessionId) {
         queryKeys.sessionsEvidenceGoalsRoot(rootId),
         queryKeys.sessionsFlowtreeMetricsRoot(rootId),
         queryKeys.programDayReadModelRoot(rootId),
+        // A day's activity conditions are met by activities in any session.
+        queryKeys.programDayOptions(rootId),
         queryKeys.activityHistoryRoot(rootId),
     ], staleOnly);
     invalidateSessionLists(queryClient, rootId, queryKeys, staleOnly);

@@ -337,6 +337,7 @@
     "completed_count",
     "completed_session_id",
     "completion_condition",
+    "completion_note_dismissed_at",
     "completion_reason",
     "completion_source",
     "created_at",

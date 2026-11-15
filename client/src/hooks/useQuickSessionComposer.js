@@ -76,6 +76,18 @@ export function useQuickSessionComposer({ rootId, activityDefinitions }) {
         return instances.length - entries.length;
     }, [definitionById, update]);
 
+    /**
+     * Starts the quick session with these activities, as a program day that asks for them does.
+     * Returns how many were left out because their activity no longer exists.
+     */
+    const startWith = useCallback((activityIds) => {
+        const entries = (activityIds || [])
+            .map((id) => ({ definition: definitionById.get(id) }))
+            .filter((entry) => entry.definition);
+        update(() => addDraftActivities(createQuickDraft(), entries));
+        return (activityIds || []).length - entries.length;
+    }, [definitionById, update]);
+
     const reset = useCallback(() => update(() => createQuickDraft()), [update]);
 
     /**
@@ -133,6 +145,7 @@ export function useQuickSessionComposer({ rootId, activityDefinitions }) {
         moveActivity,
         setActivityValue,
         repeat,
+        startWith,
         complete,
     };
 }

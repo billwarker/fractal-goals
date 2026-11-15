@@ -109,6 +109,8 @@ class GoalUpdateSchema(BaseModel):
     review_cadence_unit: Optional[Literal['days', 'weeks', 'months', 'years']] = None
     review_disabled: Optional[bool] = None
     review_deferred_until: Optional[str] = None
+    # True dismisses the "add a completion note" prompt for the goal's current completion.
+    completion_note_dismissed: Optional[bool] = None
     # Media on the description; ids of assets imported or uploaded into this fractal.
     attachments: Optional[list[NoteAttachmentSchema]] = Field(None, max_length=8)
 

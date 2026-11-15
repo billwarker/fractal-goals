@@ -261,6 +261,12 @@ class TestProgramCRUD:
             'scheduled_template_ids': [sample_session_template.id],
             'scheduled_template_count': 1,
             'required_template_count': 1,
+            'activity_condition_ids': [],
+            'required_activity_condition_ids': [],
+            'completed_activity_condition_ids': [],
+            'item_count': 1,
+            'required_item_count': 1,
+            'completed_item_count': 0,
             'completion_min_templates': None,
             'requirements_met': False,
         }

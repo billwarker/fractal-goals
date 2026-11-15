@@ -3,9 +3,11 @@
 // (`{ metrics }` or `{ sets: [{ metrics, notes }] }`, plus `notes`). Completing sends it to
 // `POST /sessions/quick-complete`, which creates it already complete.
 
+import { QUICK_SESSION_NAME } from './sessionRuntime';
+
 // Mirrors MAX_QUICK_SESSION_ACTIVITIES in services/_session_creation.py.
 export const MAX_QUICK_SESSION_ACTIVITIES = 20;
-export const QUICK_SESSION_NAME = 'Quick Session';
+export { QUICK_SESSION_NAME };
 
 const hasValue = (value) => value !== null && value !== undefined && String(value).trim() !== '';
 

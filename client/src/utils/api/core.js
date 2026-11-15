@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { isPublicLandingLocation } from '../marketingHost';
 import { isNetworkError } from '../networkErrors';
+import { publishGoalChangesFromResponse } from '../goalChanges';
 import { DemoReadOnlyError, isDemoMode, reportBlockedDemoWrite, shouldBlockDemoRequest } from '../../demo/demoMode';
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
@@ -168,7 +169,7 @@ axios.interceptors.request.use(async (config) => {
 });
 
 axios.interceptors.response.use(
-    (response) => response,
+    publishGoalChangesFromResponse,
     async (error) => {
         const originalRequest = error.config;
 

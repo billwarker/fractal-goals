@@ -434,3 +434,21 @@ def test_serialized_goal_attributes_hold_only_non_duplicated_fields(sample_ultim
     assert not top_level_duplicates & set(goal_dict["attributes"])
     assert "level_characteristics" not in goal_dict
     assert {"parent_id", "root_id", "associated_activity_ids"} <= set(goal_dict["attributes"])
+
+
+def test_a_threshold_goal_is_specific_without_a_description():
+    """Its threshold sentence describes the goal (Goal Details shows it under the description)."""
+    from types import SimpleNamespace
+
+    from services._serialize_common import calculate_smart_status
+
+    def specific(description, condition):
+        return calculate_smart_status(SimpleNamespace(
+            description=description, completion_condition=condition, track_activities=False,
+            deadline=None, associated_activities=[], associated_activity_groups=[],
+        ))["specific"]
+
+    assert specific('', 'activity_threshold') is True
+    assert specific('Hold it clean', 'manual') is True
+    assert specific('  ', 'manual') is False
+    assert specific(None, 'children') is False

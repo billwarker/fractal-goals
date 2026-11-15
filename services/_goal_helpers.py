@@ -419,6 +419,8 @@ class _GoalHelpersMixin:
             review_error = self._apply_review_fields(goal, data)
             if review_error:
                 return None, (review_error, 400)
+            if data.get('completion_note_dismissed'):
+                goal.completion_note_dismissed_at = datetime.now(timezone.utc).replace(tzinfo=None)
             if 'inherit_parent_activities' in data:
                 goal.inherit_parent_activities = data['inherit_parent_activities']
             if 'track_activities' in data:

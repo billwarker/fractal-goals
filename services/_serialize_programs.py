@@ -4,6 +4,7 @@
 from datetime import date
 from models import _safe_load_json
 from services._serialize_common import format_utc
+from services.activity_tags import serialize_tags
 from services._serialize_sessions import (
     serialize_program_day_session_light,
     serialize_session_template,
@@ -63,6 +64,23 @@ def serialize_program_block(block):
     }
 
 
+def serialize_program_day_activity_condition(condition):
+    """An activity the day asks for. A deleted activity still shows, so it can be removed."""
+    activity = getattr(condition, 'activity', None)
+    return {
+        "id": condition.id,
+        "activity_definition_id": condition.activity_definition_id,
+        "activity_name": getattr(activity, 'name', None),
+        "activity_has_sets": bool(getattr(activity, 'has_sets', False)),
+        "activity_deleted": activity is None or getattr(activity, 'deleted_at', None) is not None,
+        "is_required": bool(condition.is_required),
+        "order": condition.order or 0,
+        "tag_match": condition.tag_match or 'contains',
+        "tag_ids": [tag.id for tag in condition.tags],
+        "tags": serialize_tags(condition.tags),
+    }
+
+
 def serialize_program_day(day):
     """Serialize a ProgramDay object."""
     template_rules = {
@@ -87,6 +105,11 @@ def serialize_program_day(day):
         "repeat_every_weeks": day.repeat_every_weeks,
         "templates": serialized_templates,
         "goal_ids": [g.id for g in (day.goals or [])],
+        "activity_conditions": [
+            serialize_program_day_activity_condition(condition)
+            for condition in (getattr(day, 'activity_conditions', None) or [])
+        ],
+        # "At least N completed", counting the day's templates and activities together.
         "completion_min_templates": getattr(day, 'completion_min_templates', None),
         "sessions": [serialize_program_day_session_light(s) for s in day.completed_sessions if not s.deleted_at],
         "excluded_dates": [row.date.isoformat() for row in (day.occurrence_exclusions or [])],

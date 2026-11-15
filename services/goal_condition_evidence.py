@@ -189,6 +189,24 @@ def _tag_ids(tags) -> frozenset[str]:
     return frozenset(tag.id for tag in (tags or []))
 
 
+def to_tag_evidence(instance) -> EvidenceInstance:
+    """``to_evidence`` without metric values: each counted set's effective tags, which is all a
+    program day's activity condition matches on. An instance without sets is one implicit set."""
+    instance_tags = _tag_ids(getattr(instance, 'tags', None))
+    raw_sets = getattr(instance, 'sets', None) or []
+    sets = tuple(
+        EvidenceSet(values={}, tag_ids=instance_tags | _tag_ids(getattr(activity_set, 'tags', None)))
+        for activity_set in raw_sets
+        if activity_set.status not in SKIPPED_SET_STATUSES
+    ) or (() if raw_sets else (EvidenceSet(values={}, tag_ids=instance_tags),))
+    return EvidenceInstance(
+        id=instance.id,
+        session_id=instance.session_id,
+        occurred_at=instance_occurred_at(instance) or EPOCH,
+        sets=sets,
+    )
+
+
 def to_evidence(instance) -> EvidenceInstance:
     """Convert an ORM instance to the evaluator's shape.
 

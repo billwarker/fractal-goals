@@ -167,6 +167,8 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
 
     from blueprints.error_handlers import register_error_handlers
     register_error_handlers(test_app)
+    from blueprints.goal_changes import register_goal_changes
+    register_goal_changes(test_app)
 
     # Initialize Limiter
     from extensions import limiter

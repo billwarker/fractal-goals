@@ -85,6 +85,12 @@
 .dayStatusDropdown button:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 2px; }
 .dayStatusDropdown button:disabled { cursor: not-allowed; opacity: .5; }
 .dayStatusDropdown button[aria-pressed="true"] { border-color: var(--color-brand-primary); background: var(--color-brand-primary-soft); }
+.activityGroup { display: grid; gap: 6px; justify-items: start; }
+.activityList { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.activityList li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; color: var(--color-text-primary); font-size: 13px; }
+.activityList li > span:first-child { width: 14px; color: var(--color-text-muted); text-align: center; }
+.activityList li.activityDone > span:first-child { color: var(--color-brand-success); }
+.activityMeta { color: var(--color-text-muted); font-size: 11px; }
 .goalList { display: grid; gap: 4px; }
 .goalList button { display: flex; align-items: center; gap: 9px; min-height: 36px; padding: 5px 6px; border: 0; border-radius: var(--border-radius-sm); background: transparent; color: var(--color-text-primary); cursor: pointer; text-align: left; }
 .goalList button:hover { background: var(--color-bg-card-hover); }

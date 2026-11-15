@@ -280,8 +280,9 @@ class TestProgramDayReviewSummary:
         db_session.commit()
 
         assert count_statements() == baseline
-        # Includes one batched load of explicit occurrence schedules and one of calendar periods.
-        assert baseline <= 34
+        # Includes one batched load each of explicit occurrence schedules, calendar periods,
+        # and the days' activity conditions.
+        assert baseline <= 35
 
 
 @pytest.mark.integration

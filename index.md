@@ -165,7 +165,14 @@ recorded as `manual_override` unless the condition is `manual`. Progress is neve
 completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
 After a manual uncompletion only newer evidence re-completes a goal. Rule values are
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
-`goalConditionText.js` words it (never "sets" for set-free activities). `CompletionConditionEditor`
+`goalConditionText.js` words it (never "sets" for set-free activities); Goal Details shows that sentence
+under the description (`ConditionSentence`, the threshold builder's box in the goal's colour).
+Any write that completes or reverts a goal by its condition returns `goal_changes: {completed, uncompleted}`
+(`blueprints/goal_changes.py`, an `after_request` hook; never on a stored idempotent replay); the client's
+axios response hook publishes it, so `GoalChangeAnnouncer` toasts it wherever the change was made, a
+change synced later from the outbox included, with **Write note** for a completion. A completed goal
+without a completion note shows a dismissible prompt in Goal Details; dismissing stamps
+`goals.completion_note_dismissed_at`, and a later completion asks again. `CompletionConditionEditor`
 (with a debounced `condition/preview` of the unsaved draft) and `CompletionConditionSummary` render it, and `ConditionProgressChart`
 charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
 `goalCondition` query-key root.
@@ -175,6 +182,8 @@ revision-local SQL evidence in `migrations/condition_backfill.py`, feeding the c
 without hydrating current ORM models. Populated historical upgrades have their own integration gate.
 See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
 
+SMART's S is **Specific**: a description, or an activity threshold, whose sentence stands in as the
+description (`calculate_smart_status`, mirrored in `smartHelpers.js`).
 SMART's R is **Reviewed** (relevance statements were retired into goal notes by `c6d7e8f9a0b1`).
 Reviewed levels (`goal_levels.uses_reviews`; Ultimate, Long and Mid Term by default) review goals on a
 cadence: the goal's own (`goals.review_cadence_*`) or the level's. `services/goal_review_rules.py`
@@ -379,6 +388,17 @@ sessions identically. Manual Complete/Rest statuses and fractal-wide calendar ev
 (`services/calendar_periods.py`) resolve in that evaluator: manual override, then a streak-protecting
 event, then automatic evaluation. Streaks are drawn from server `chain_role`/`run_length_at_date`, never
 recomputed in the client.
+
+**Activity conditions.** A program day may also ask for activities (`program_day_activity_conditions`,
+optional tags in `program_day_activity_condition_tags`, `tag_match` contains/exact), each required or
+optional. One is met by any completed instance of the activity in any of the owner's sessions on the
+occurrence's date (a quick session included; the session's local date, as for credits), narrowed by its
+tags with the goal evaluator's `counted_sets`. `program_day_credits.load_program_activity_evidence` loads
+them in one query per window. Templates and activities are one pool: every required item done, and
+`completion_min_templates` (kept for API and analytics compatibility) counts both. A day may ask for
+activities only; Create Session then offers "Log with a Quick Session"
+(`/create-session?source=quick&activities=…`). App-only field: agent proposals don't set it.
+See [Program day activities and goal completion](planning/program-day-activities-and-goal-completion-2026-11.md).
 
 **Read models.** The client expects metrics calculation v10 (`services/program_metrics_service.py`,
 `program_rollups.py`, `program_block_metrics.py`), day read model schema v8

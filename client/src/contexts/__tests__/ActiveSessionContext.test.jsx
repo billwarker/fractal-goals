@@ -25,10 +25,6 @@ vi.mock('../../hooks/useSessionDetailMutations', () => ({
     default: () => ({}),
 }));
 
-vi.mock('../../hooks/useSessionAchievementNotifications', () => ({
-    default: () => {},
-}));
-
 vi.mock('../GoalsContext', () => ({
     useGoals: () => ({ setActiveRootId: vi.fn() }),
 }));

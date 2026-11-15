@@ -1,0 +1,21 @@
+.preview {
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--goal-edit-accent, var(--color-brand-primary)) 55%, var(--color-border));
+    font-size: var(--font-size-sm);
+    color: var(--color-text-primary);
+}
+
+.inline {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+}
+
+.tags {
+    display: inline-flex;
+    vertical-align: middle;
+}

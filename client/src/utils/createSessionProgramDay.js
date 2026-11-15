@@ -109,6 +109,10 @@ export function buildTodayProgramDayView(programDays = []) {
         const requiredIds = new Set(rules.filter((rule) => rule.isRequired).map((rule) => String(rule.templateKey)));
         const completedIds = new Set(programDaysForDate.flatMap((day) => day.completed_template_ids || []).map(String));
         const minimum = Math.max(...programDaysForDate.map((day) => Number(day.completion_min_templates || 0)));
+        // The server's verdict counts the day's activities too; the template count is the fallback.
+        if (programDaysForDate.every((day) => typeof day.requirements_met === 'boolean')) {
+            return programDaysForDate.every((day) => day.requirements_met) ? 'complete' : 'pending';
+        }
         const requiredComplete = [...requiredIds].every((id) => completedIds.has(id));
         const evidenceComplete = rules.length > 0 && requiredComplete
             && (minimum ? completedIds.size >= minimum : requiredIds.size > 0 || completedIds.size > 0);

@@ -1043,8 +1043,9 @@ def test_get_program_metrics_query_and_response_budget(
     )
     # One bounded query each loads occurrence-level status overrides, session
     # credits, and calendar periods for this window, plus one batched load of
-    # explicit occurrence schedules and one of the program's days.
-    assert query_counter["total"] <= 13
+    # explicit occurrence schedules, one of the program's days, and one of the
+    # days' activity conditions.
+    assert query_counter["total"] <= 14
 
     first = sample_program_tree.start_date.date()
     selected_dates = f"{first.isoformat()},{(first + timedelta(days=2)).isoformat()}"
@@ -1058,7 +1059,7 @@ def test_get_program_metrics_query_and_response_budget(
     assert_response_budget(
         selected_response, max_bytes=1_048_576, max_ms=750, elapsed_ms=selected_elapsed_ms
     )
-    assert query_counter["total"] <= 13
+    assert query_counter["total"] <= 14
 
 
 @pytest.mark.integration
@@ -1093,9 +1094,9 @@ def test_get_program_metrics_comparison_query_budget(
     )
     assert response.get_json()["programs"][0]["program_id"] == sample_program_tree.id
     # Session credits and calendar periods for every compared program each load
-    # in one bounded query; explicit occurrence schedules and program days each
-    # load in one batch.
-    assert query_counter["total"] <= 14
+    # in one bounded query; explicit occurrence schedules, program days, and the
+    # days' activity conditions each load in one batch.
+    assert query_counter["total"] <= 15
 
 
 @pytest.mark.integration

@@ -17,10 +17,16 @@ from services import event_bus, Event, Events
 from services.program_service_errors import ProgramServiceValidationError
 from services.owned_entity_queries import get_owned_program
 from services.serializers import format_utc, serialize_program_day, serialize_goal
+from services._serialize_programs import serialize_program_day_activity_condition
+from models.program import program_day_activity_condition_loads
 from services.session_runtime import get_template_color
 from services.program_scope import resolve_program_scopes
 from services.calendar_periods import load_calendar_periods
-from services.program_day_credits import load_program_credit_candidates, load_program_session_credits
+from services.program_day_credits import (
+    load_program_activity_evidence,
+    load_program_credit_candidates,
+    load_program_session_credits,
+)
 from services.program_day_occurrences import (
     block_for_date,
     build_occurrences,
@@ -109,6 +115,10 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         session.flush()
         if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
             cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
+        if data.get('activity_conditions'):
+            cls._apply_program_day_activity_conditions(
+                session, day, root_id, cls._normalize_activity_conditions(session, root_id, data['activity_conditions']),
+            )
         cls._validate_program_day_completion_min(day)
         cls._replace_day_goals(session, day, day_goal_ids, root_id)
         if data.get('excluded_dates'):
@@ -157,6 +167,10 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             day.repeat_every_weeks = data['repeat_every_weeks']
         if 'template_configs' in data or 'template_ids' in data or 'template_id' in data:
             cls._apply_program_day_template_configs(session, day, cls._normalize_template_configs(data))
+        if data.get('activity_conditions') is not None:
+            cls._apply_program_day_activity_conditions(
+                session, day, root_id, cls._normalize_activity_conditions(session, root_id, data['activity_conditions']),
+            )
         cls._validate_program_day_completion_min(day)
 
         if 'goal_ids' in data:
@@ -227,7 +241,7 @@ class _ProgramDaysMixin(_ProgramMixinBase):
 
     @classmethod
     def duplicate_program_day(cls, session, root_id: str, program_id: str, day_id: str, current_user_id: str | None = None) -> Dict[str, Any]:
-        """Copy a day's definition (templates, goals, notes) without its schedule.
+        """Copy a day's definition (templates, activities, goals, notes) without its schedule.
 
         The copy starts unscheduled, so it can never take a date from another day.
         """
@@ -251,6 +265,15 @@ class _ProgramDaysMixin(_ProgramMixinBase):
         session.add(copy)
         session.flush()
         cls._apply_program_day_template_configs(session, copy, cls._day_template_configs(source_day))
+        cls._apply_program_day_activity_conditions(session, copy, root_id, [
+            {
+                'activity_definition_id': condition.activity_definition_id,
+                'is_required': bool(condition.is_required),
+                'tag_match': condition.tag_match,
+                'tags': list(condition.tags),
+            }
+            for condition in source_day.activity_conditions
+        ])
         cls._replace_day_goals(session, copy, source_goal_ids, root_id)
         cls._commit(session, copy)
 
@@ -537,7 +560,8 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             selectinload(Program.days).selectinload(ProgramDay.templates),
             selectinload(Program.days)
                 .selectinload(ProgramDay.template_links)
-                .selectinload(ProgramDayTemplate.template)
+                .selectinload(ProgramDayTemplate.template),
+            *program_day_activity_condition_loads(selectinload(Program.days)),
         ).filter(
             Program.root_id == root_id,
             Program.start_date < next_day_start,
@@ -564,6 +588,9 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             session, root_id, current_user_id, active_programs,
             day_start, next_day_start, stored_credits,
         )
+        activity_evidence = load_program_activity_evidence(
+            session, root_id, current_user_id, active_programs, day_start, next_day_start, zone,
+        ).get(today)
         credits_by_occurrence = {}
         for program in active_programs:
             program_credits, _session_facts = resolve_occurrence_credits(
@@ -576,7 +603,9 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             program_scope = scopes.get(program.id)
             block = block_for_date(program, today)
             for day in program.days:
-                if day.templates and cls._program_day_scheduled_on(day, program, today):
+                # A day may ask for activities only (logged with a quick session, say).
+                asks_for_something = day.templates or day.activity_conditions
+                if asks_for_something and cls._program_day_scheduled_on(day, program, today):
                     session_details = []
                     template_rules = {
                         link.session_template_id: {
@@ -603,7 +632,8 @@ class _ProgramDaysMixin(_ProgramMixinBase):
                         })
 
                     occurrence_credits = credits_by_occurrence.get((day.id, today), [])
-                    evaluation = evaluate_occurrence(day, occurrence_credits)
+                    evaluation = evaluate_occurrence(day, occurrence_credits, activity_evidence)
+                    completed_activity_ids = set(evaluation["completed_activity_condition_ids"])
                     result.append({
                         "program_id": program.id,
                         "program_name": program.name,
@@ -630,5 +660,11 @@ class _ProgramDaysMixin(_ProgramMixinBase):
                             if entry["session"].completed
                         }),
                         "completed_template_ids": evaluation["completed_template_ids"],
+                        "activity_conditions": [
+                            {**serialize_program_day_activity_condition(condition),
+                             "completed": condition.id in completed_activity_ids}
+                            for condition in day.activity_conditions
+                        ],
+                        "requirements_met": evaluation["requirements_met"],
                     })
         return result

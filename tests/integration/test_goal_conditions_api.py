@@ -118,7 +118,7 @@ class TestConditionWrites:
         assert _complete(authed_client, root.id, total_only)["completed_goals"] == []
         one_set = _instance(db_session, session, activity, [{"Weight": 200, "Reps": 5}],
                             occurred=_now() + timedelta(minutes=2))
-        assert _complete(authed_client, root.id, one_set)["completed_goals"] == [{"id": goal["id"], "name": goal["name"]}]
+        assert _complete(authed_client, root.id, one_set)["completed_goals"] == [{"id": goal["id"], "name": goal["name"], "type": goal["type"]}]
         assert _goal(db_session, goal["id"]).completed is True
 
     def test_a_yield_per_set_goal_can_average_across_sets(
@@ -134,7 +134,7 @@ class TestConditionWrites:
         session = _session(db_session, root, started=_now() + timedelta(minutes=1))
         instance = _instance(db_session, session, activity, [{"Weight": 100, "Reps": 8}, {"Weight": 100, "Reps": 2}],
                              occurred=_now() + timedelta(minutes=1))
-        assert _complete(authed_client, root.id, instance)["completed_goals"] == [{"id": goal["id"], "name": goal["name"]}]
+        assert _complete(authed_client, root.id, instance)["completed_goals"] == [{"id": goal["id"], "name": goal["name"], "type": goal["type"]}]
 
     def test_yield_per_set_needs_sets_and_a_yield(
         self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
@@ -276,7 +276,7 @@ class TestReconciliation:
         result = _complete(authed_client, root.id, enough)
 
         stored = _goal(db_session, goal["id"])
-        assert result["completed_goals"] == [{"id": goal["id"], "name": goal["name"]}]
+        assert result["completed_goals"] == [{"id": goal["id"], "name": goal["name"], "type": goal["type"]}]
         assert stored.completed is True
         assert stored.completion_source == "condition"
         assert stored.completed_session_id == session.id
@@ -300,8 +300,11 @@ class TestReconciliation:
         assert first.status_code == replay.status_code == 200
         assert replay.headers.get("Idempotent-Replayed") == "true"
         assert replay.get_json()["completed_goals"] == first.get_json()["completed_goals"] == [
-            {"id": goal["id"], "name": goal["name"]},
+            {"id": goal["id"], "name": goal["name"], "type": goal["type"]},
         ]
+        # The first response announces the completion; the stored replay doesn't announce it again.
+        assert first.get_json()["goal_changes"]["completed"] == first.get_json()["completed_goals"]
+        assert "goal_changes" not in replay.get_json()
         stored = _goal(db_session, goal["id"])
         assert stored.completed is True
         assert stored.completion_source == "condition"
@@ -320,9 +323,43 @@ class TestReconciliation:
         response = authed_client.delete(f"/api/{root.id}/sessions/{session.id}/activities/{instance.id}")
 
         assert response.status_code == 200
+        assert response.get_json()["goal_changes"]["uncompleted"] == [
+            {"id": goal["id"], "name": goal["name"], "type": goal["type"]},
+        ]
         stored = _goal(db_session, goal["id"])
         assert stored.completed is False
         assert stored.completion_reason == "condition_unmet"
+
+    def test_a_quick_session_that_meets_the_threshold_announces_the_goal(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        goal = _create_goal(authed_client, root.id, root.id, _threshold(sample_activity_definition))
+        weight = _metric(sample_activity_definition, "Weight").id
+
+        response = authed_client.post(f"/api/{root.id}/sessions/quick-complete", json={
+            "session_start": (_now() + timedelta(minutes=1)).isoformat() + "Z",
+            "activity_instances": [{
+                "activity_definition_id": sample_activity_definition.id, "has_sets": True,
+                "sets": [{"metrics": [{"metric_id": weight, "value": 230}]}], "metrics": [],
+            }],
+        })
+
+        assert response.status_code == 201, response.get_json()
+        assert response.get_json()["goal_changes"] == {
+            "completed": [{"id": goal["id"], "name": goal["name"], "type": goal["type"]}], "uncompleted": [],
+        }
+        assert _goal(db_session, goal["id"]).completed is True
+
+    def test_a_change_that_completes_nothing_announces_nothing(
+        self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,
+    ):
+        root = sample_ultimate_goal
+        _create_goal(authed_client, root.id, root.id, _threshold(sample_activity_definition, weight=900))
+        session = _session(db_session, root, started=_now() + timedelta(minutes=1))
+        instance = _instance(db_session, session, sample_activity_definition, [{"Weight": 230}], occurred=_now() + timedelta(minutes=1))
+
+        assert "goal_changes" not in _complete(authed_client, root.id, instance)
 
     def test_deleting_the_session_reverts_the_goal(
         self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition,

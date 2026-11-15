@@ -16,6 +16,7 @@ import { buildConditionPayload, validateConditionDraft } from '../utils/goalCond
 import { isSMART } from '../utils/smartHelpers';
 import notify from '../utils/notify';
 import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../utils/activityBuilder';
+import { shouldPromptCompletionNote } from '../utils/goalCompletionNote';
 import { buildLiveSmartGoal, getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
@@ -175,6 +176,7 @@ function GoalDetailModal({
     ), [readOnly, goal?.attributes?.notes]);
     const {
         notes: goalNotes,
+        isLoading: goalNotesLoading,
         createNote: createGoalNote,
         deleteGoalCompletionNotes,
     } = useGoalNotes(queryRootId, queryGoalId);
@@ -184,6 +186,9 @@ function GoalDetailModal({
             note.note_kind === 'goal_completion' || note.note_type === 'goal_completion_note'
         )) || null
     ), [visibleGoalNotes]);
+    // Only once the notes are in, so the prompt never flashes for a goal that has its note.
+    const promptCompletionNote = !readOnly && mode !== 'create' && !goalNotesLoading
+        && shouldPromptCompletionNote(goal, goalCompletionNote);
 
     const {
         isEditing,
@@ -600,6 +605,7 @@ function GoalDetailModal({
             goal={goal}
             goalColor={goalColor}
             goalCompletionNote={goalCompletionNote}
+            promptCompletionNote={promptCompletionNote}
             goalForSmart={goalForSmart}
             goalHeaderRef={goalHeaderRef}
             goalHeaderStickyOffset={goalHeaderStickyOffset}
