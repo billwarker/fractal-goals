@@ -35,6 +35,38 @@ describe('GoalSmartSection', () => {
         expect(mocks.goalAttachments).not.toHaveBeenCalled();  // Media is only fetched when asked for.
     });
 
+    it('says in words what a threshold goal needs, under its description', () => {
+        render(<GoalSmartSection goal={{
+            id: 'g', name: 'Full Front Lever', completion_condition: 'activity_threshold',
+            attributes: { description: 'Hold it clean' },
+            condition: {
+                activity_name: 'Full Front Lever', kind: 'single_session', measure: 'sets', min_sets: 1,
+                activity_has_sets: true, set_aggregate: 'any',
+                rules: [{ metric_name: 'Hold Time', unit: 'Seconds', operator: '>=', value: 5 }],
+                tags: [{ id: 't', name: 'Clean' }], tag_match: 'contains',
+            },
+        }} />);
+
+        const sentence = screen.getByTestId('goal-threshold-sentence');
+        expect(sentence).toHaveTextContent(/^Full Front Lever: at least 1 set.*Hold Time ≥ 5 Seconds/);
+        expect(sentence).toHaveTextContent('Clean');
+    });
+
+    it('lets the threshold sentence stand as the description when there is none', () => {
+        render(<GoalSmartSection goal={{
+            id: 'g', name: 'Lever', completion_condition: 'activity_threshold', attributes: {},
+            condition: { activity_name: 'Front Lever', kind: 'single_session', measure: 'sets', min_sets: 1, rules: [] },
+        }} />);
+
+        expect(screen.getByTestId('goal-threshold-sentence')).toHaveTextContent(/^Front Lever/);
+        expect(screen.queryByText('No description')).toBeNull();
+    });
+
+    it('shows no threshold sentence for a goal completed by hand', () => {
+        render(<GoalSmartSection goal={goal} />);
+        expect(screen.queryByTestId('goal-threshold-sentence')).toBeNull();
+    });
+
     it('says when there is no description', () => {
         render(<GoalSmartSection goal={{ id: 'g', attributes: {} }} />);
         expect(screen.getByText('No description')).toBeInTheDocument();

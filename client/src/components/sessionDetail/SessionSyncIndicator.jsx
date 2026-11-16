@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 
 import { useOutbox, useOutboxStatus } from '../../offline/OutboxContext';
 import { SESSION_OP } from '../../offline/opKinds';
+import { STALLED_AFTER_MS, describeQueueForSupport } from '../../offline/outboxQueue';
+import { REJECTED_TTL_MS } from '../../offline/outboxReview';
+import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import styles from './SessionSyncIndicator.module.css';
 
@@ -45,6 +48,45 @@ export function describeOp(op) {
 
 const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+// The server refuses action times older than 7 days, so queued changes this old need signal soon.
+const OLD_PENDING_MS = 5 * DAY_MS;
+
+/** When an unreviewed refused change is discarded, in words. */
+export function describeExpiry(op, now) {
+    const left = (op.rejectedAt || Date.parse(op.createdAt || '')) + REJECTED_TTL_MS - now;
+    const days = Math.ceil(left / DAY_MS);
+    return days <= 1 ? 'Discarded within a day' : `Discarded in ${days} days`;
+}
+
+/** Why a change is waiting to be sent again, in a few words. */
+export function describeRetryReason(error) {
+    if (!error?.status) return 'no answer from the server';
+    if (error.code === 'idempotency_in_flight') return 'the server is still saving it';
+    if (error.status === 429) return 'the server asked to slow down';
+    return `server error ${error.status}`;
+}
+
+async function copyDiagnostics(outbox) {
+    try {
+        await navigator.clipboard.writeText(JSON.stringify(describeQueueForSupport(outbox.getSnapshot(), Date.now()), null, 2));
+        notify.success('Sync details copied');
+    } catch {
+        notify.error("Couldn't copy the sync details");
+    }
+}
+
+/** The current time, ticking each second while `active`. */
+function useNow(active) {
+    const [now, setNow] = useState(() => Date.now());
+    useEffect(() => {
+        if (!active) return undefined;
+        const timer = window.setInterval(() => setNow(Date.now()), 1000);
+        return () => window.clearInterval(timer);
+    }, [active]);
+    return now;
+}
+
 /**
  * Where queued changes are: on the device, syncing, synced, or needing review.
  * With a ``sessionId`` it covers that session; without one, every queued change.
@@ -61,6 +103,7 @@ export default function SessionSyncIndicator({
     const [dismissedSyncAt, setDismissedSyncAt] = useState(null);
     const showSynced = Boolean(status.lastSyncedAt) && status.lastSyncedAt !== dismissedSyncAt;
     const isReviewOpen = reviewOpen && status.rejected.length > 0;
+    const now = useNow(status.enabled && status.pendingCount > 0);
 
     // The "synced" confirmation shows briefly after each drain.
     useEffect(() => {
@@ -74,6 +117,10 @@ export default function SessionSyncIndicator({
 
     let tone = 'muted';
     let label = null;
+    let detail = null;
+    let offerRetryNow = false;
+    const changes = plural(status.pendingCount, 'change');
+    const stalled = Boolean(status.oldestPendingAt) && now - status.oldestPendingAt > STALLED_AFTER_MS;
     if (status.rejected.length > 0) {
         tone = 'danger';
         label = `${plural(status.rejected.length, 'change')} couldn't sync`;
@@ -82,11 +129,26 @@ export default function SessionSyncIndicator({
         label = `Sign in again to sync ${plural(status.pendingCount, 'change')}`;
     } else if (!status.online) {
         tone = 'warning';
-        label = status.pendingCount > 0
-            ? `Offline · ${plural(status.pendingCount, 'change')} saved on this device`
-            : idleOfflineLabel;
+        if (status.pendingCount === 0) label = idleOfflineLabel;
+        else label = `Offline · ${changes} saved ${status.volatile ? 'in this tab only' : 'on this device'}`;
+        if (status.pendingCount > 0 && now - status.oldestPendingAt > OLD_PENDING_MS) {
+            detail = 'connect soon: timings older than 7 days can’t be saved';
+        }
+    } else if (status.pendingCount > 0 && status.volatile) {
+        tone = 'warning';
+        label = `${changes} saved in this tab only · keep it open`;
+    } else if (status.pendingCount > 0 && status.retryAt > now) {
+        tone = stalled ? 'warning' : 'muted';
+        label = `Retrying ${changes} in ${Math.max(1, Math.ceil((status.retryAt - now) / 1000))} s`;
+        detail = describeRetryReason(status.lastError);
+        offerRetryNow = true;
     } else if (status.pendingCount > 0) {
-        label = `Syncing ${plural(status.pendingCount, 'change')}…`;
+        label = status.waitingForTab ? `Syncing ${changes} from another tab…` : `Syncing ${changes}…`;
+        if (stalled) {
+            tone = 'warning';
+            label = `Still syncing ${changes}…`;
+            offerRetryNow = true;
+        }
     } else if (showSynced) {
         tone = 'success';
         label = 'All changes synced';
@@ -107,6 +169,7 @@ export default function SessionSyncIndicator({
                                 <div className={styles.reviewText}>
                                     <span className={styles.reviewTitle}>{describeOp(op)}</span>
                                     <span className={styles.reviewReason}>{op.error?.message || 'Rejected by the server'}</span>
+                                    <span className={styles.reviewReason}>{describeExpiry(op, now)}</span>
                                 </div>
                                 <div className={styles.reviewActions}>
                                     <Button size="sm" variant="secondary" onClick={() => void outbox.retry(op.opId)}>
@@ -119,11 +182,20 @@ export default function SessionSyncIndicator({
                             </li>
                         ))}
                     </ul>
+                    <button type="button" className={styles.reviewToggle} onClick={() => void copyDiagnostics(outbox)}>
+                        Copy sync details for support
+                    </button>
                 </div>
             )}
             <div className={`${styles.pill} ${styles[tone]}`} role="status" aria-live="polite">
                 <span className={styles.dot} aria-hidden="true" />
                 <span>{label}</span>
+                {detail && <span className={styles.detail}>· {detail}</span>}
+                {offerRetryNow && (
+                    <button type="button" className={styles.reviewToggle} onClick={() => void outbox.retryNow()}>
+                        Retry now
+                    </button>
+                )}
                 {status.rejected.length > 0 && (
                     <button
                         type="button"

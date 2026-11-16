@@ -4,7 +4,7 @@ import {
     FolderIcon,
 } from '../atoms/AppIcons';
 import { getProgramColor } from '../../utils/programViewModel';
-import AttachableField from '../notes/AttachableField';
+import CompletionNoteFields from './CompletionNoteFields';
 import { getGoalCompletionCondition, getGoalCondition } from '../../utils/goalConditions';
 import { describeCondition } from '../../utils/goalConditionText';
 import styles from './GoalCompletionModal.module.css';
@@ -22,17 +22,6 @@ function GoalCompletionModal({
     onBeginNextChange,
     attachmentDraft = null,
 }) {
-    const noteInput = (onPaste) => (
-        <textarea
-            id="goal-completion-note"
-            className={styles.completionNoteInput}
-            value={completionNote}
-            onChange={(event) => onCompletionNoteChange?.(event.target.value)}
-            onPaste={onPaste}
-            placeholder="Capture what changed, what worked, or what to remember from completing this goal."
-            rows={4}
-        />
-    );
     const completionCondition = getGoalCompletionCondition(goal);
     const condition = getGoalCondition(goal);
     const activity = activityDefinitions.find((candidate) => candidate.id === condition?.activity_definition_id) || null;
@@ -57,19 +46,11 @@ function GoalCompletionModal({
                 </div>
             </div>
 
-            <div>
-                <label className={styles.sectionLabel} htmlFor="goal-completion-note">
-                    Goal Completion Note (optional):
-                </label>
-                {attachmentDraft ? (
-                    <AttachableField draft={attachmentDraft} label="Attachments for this completion note">
-                        {noteInput(attachmentDraft.handlePaste)}
-                    </AttachableField>
-                ) : noteInput()}
-                <p className={styles.completionNoteHint}>
-                    Paste a YouTube, Instagram, Google Drive, or direct video link on its own line to embed it as evidence.
-                </p>
-            </div>
+            <CompletionNoteFields
+                value={completionNote}
+                onChange={onCompletionNoteChange}
+                attachmentDraft={attachmentDraft}
+            />
 
             {/* Associated Programs */}
             <div>

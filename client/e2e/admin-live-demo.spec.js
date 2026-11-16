@@ -18,7 +18,7 @@ test('an admin sees each demo’s snapshot and opens the copy visitors explore',
     await page.getByRole('button', { name: 'live demo', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Live demo' })).toBeVisible();
     await expect(page.getByLabel('Public label').first()).toHaveValue('Jazz guitar');
-    await expect(page.getByText(/Snapshot .* · \d+ goals · 14 sessions/)).toBeVisible();
+    await expect(page.getByText(/Snapshot .* · \d+ goals · 15 sessions/)).toBeVisible();
 
     const openDemo = page.getByRole('link', { name: 'Open demo' }).first();
     await expect(openDemo).toHaveAttribute('href', `/demo/${DEMO_SHOWCASE}/goals?tour=1`);

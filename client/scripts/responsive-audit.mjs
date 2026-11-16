@@ -164,7 +164,9 @@ const checks = [
       /@container\s*\(max-width:\s*760px\)/,
       /\.timerControlsGrid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
       /\.timerActionColumn\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(120px,\s*100%\),\s*1fr\)\);/s,
-      /\.metricMeta,\s*\.metricMetaLarge\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*2;/s,
+      // Compact metric rows keep the unit (and its hints) after the field, on the same line.
+      /\.metricInputContainer\s*\{[^}]*grid-template-columns:\s*minmax\(72px,\s*max-content\)\s*minmax\(0,\s*1fr\)\s*auto;/s,
+      /\.metricMeta,\s*\.metricMetaLarge\s*\{[^}]*grid-column:\s*3;[^}]*grid-row:\s*1;/s,
       /\.metricUnit,\s*\.metricUnitLarge\s*\{[^}]*white-space:\s*nowrap;/s,
     ],
     forbiddenPatterns: [

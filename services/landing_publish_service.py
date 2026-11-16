@@ -18,9 +18,11 @@ from sqlalchemy import text
 from config import config
 from models import Goal, GoalLevel, Program, Session, User, _safe_load_json, utc_now
 from services.demo_account_service import DemoAccountService
+from services.goal_level_service import GoalLevelService
+from services.goal_service import GoalService
 from services.demo_snapshot_service import DemoSnapshotService, SnapshotResult, snapshot_root_id
 from services.ops_log import log_ops_event
-from services.serializers import format_utc
+from services.serializers import format_utc, serialize_goal
 from services._serialize_common import calculate_smart_status
 from services.service_types import JsonDict, ServiceResult
 from services._landing_common import (
@@ -30,6 +32,9 @@ from services._landing_common import (
     LANDING_EXAMPLE_PUBLISH_LOCK_KEY,
     LANDING_EXAMPLE_SCHEMA_VERSION,
     LANDING_EXAMPLE_SETTINGS_KEY,
+    LANDING_PREVIEW_GOAL_ATTRIBUTES,
+    LANDING_PREVIEW_GOAL_FIELDS,
+    LANDING_PREVIEW_LEVEL_FIELDS,
     _landing_publish_process_lock,
 )
 from services._landing_settings import _LandingSettingsMixin
@@ -166,31 +171,50 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
         preferences = _safe_load_json(owner.preferences, {}) if owner else {}
         if not isinstance(preferences, dict):
             preferences = {}
+        levels = self._preview_levels(root)
         return {
             "root_id": root_id,
             "label": item["label"],
             "sort_order": item["sort_order"],
             "root_name": source.name,
-            "icon": self._root_icon(root),
+            "icon": self._root_icon(root, levels),
             "tour": {
                 "goal_id": self._tour_goal_id(root_id),
                 "session_id": self._tour_session_id(root_id, result.id_map.get(item["tour"].get("session_id") or "")),
                 "program_id": self._tour_program_id(root_id, result.id_map.get(item["tour"].get("program_id") or "")),
             },
             "appearance": {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)},
+            "preview": {"levels": levels, "tree": self._preview_tree(root_id)},
         }
 
-    def _root_icon(self, root: Goal) -> JsonDict:
-        level = self.db_session.query(GoalLevel).filter(
-            GoalLevel.root_id == root.id,
-            GoalLevel.owner_id == root.owner_id,
-            GoalLevel.name == getattr(root.level, "name", None),
-            GoalLevel.deleted_at.is_(None),
-        ).first() or root.level
+    def _preview_levels(self, root: Goal) -> list[JsonDict]:
+        """The snapshot's effective levels (system, then account, then fractal), as the app merges them."""
+        levels, _, _ = GoalLevelService(self.db_session).list_goal_levels(root.owner_id, root_id=root.id)
+        # Listing never fails; ServiceResult types the value as optional for the services that do.
+        return [{field: getattr(level, field) for field in LANDING_PREVIEW_LEVEL_FIELDS} for level in levels or ()]
+
+    def _preview_tree(self, root_id: str) -> JsonDict:
+        """The snapshot's goal tree as the app serializes it, cut to what the flow tree draws."""
+        goals_by_id = GoalService(self.db_session)._load_fractal_goals_for_serialization(root_id)
+
+        def trim(node: JsonDict) -> JsonDict:
+            attributes = node.get("attributes") or {}
+            return {
+                **{field: node.get(field) for field in LANDING_PREVIEW_GOAL_FIELDS},
+                "attributes": {field: attributes.get(field) for field in LANDING_PREVIEW_GOAL_ATTRIBUTES},
+                "children": [trim(child) for child in node.get("children", [])],
+            }
+
+        return trim(serialize_goal(goals_by_id[root_id]))
+
+    def _root_icon(self, root: Goal, levels: list[JsonDict]) -> JsonDict:
+        # The root's level in the preview's own levels, so the picker and the tree agree.
+        level = next((level for level in levels if level["id"] == root.level_id), None) \
+            or next((level for level in levels if level["name"] == getattr(root.level, "name", None)), {})
         return {
-            "shape": getattr(level, "icon", None),
-            "color": getattr(level, "color", None),
-            "secondary_color": getattr(level, "secondary_color", None),
+            "shape": level.get("icon"),
+            "color": level.get("color"),
+            "secondary_color": level.get("secondary_color"),
             "smart": all(calculate_smart_status(root).values()),
         }
 

@@ -5,11 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import EmptyState from '../common/EmptyState';
 import SelectableCard from '../common/SelectableCard';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
-import SessionTemplateTypePill from '../common/SessionTemplateTypePill';
 import StepContainer from '../common/StepContainer';
 import StepHeader from './StepHeader';
 import ProgramName from '../atoms/ProgramName';
-import { isQuickSession } from '../../utils/sessionRuntime';
 import { formatLastUsed, getAverageDurationStat, getTemplateSortTimestamp } from '../../utils/durationStats';
 import styles from './TemplatePicker.module.css';
 import { fractalApi } from '../../utils/api';
@@ -23,7 +21,6 @@ const STARTER_TEMPLATE = {
     name: 'Simple Empty Template',
     description: 'A blank one-section session. Start here, add activities as you go.',
     template_data: {
-        session_type: 'normal',
         sections: [{ name: 'Main', activities: [] }],
     },
 };
@@ -78,14 +75,10 @@ function TemplatePicker({
 
     const renderTemplateCards = (items) => items.map((template) => {
         const isSelected = selectedTemplate?.id === template.id;
-        const quickTemplate = isQuickSession(template);
         const sectionCount = template.template_data?.sections?.length || 0;
-        const quickActivityCount = template.template_data?.activities?.length || 0;
         const averageDuration = getAverageDurationStat(template.stats);
         const lastUsedLabel = formatLastUsed(template.stats?.last_used_at);
-        const structureLabel = quickTemplate
-            ? `${quickActivityCount} activit${quickActivityCount === 1 ? 'y' : 'ies'}`
-            : `${sectionCount} section${sectionCount !== 1 ? 's' : ''}`;
+        const structureLabel = `${sectionCount} section${sectionCount !== 1 ? 's' : ''}`;
         const metaParts = [
             structureLabel,
             averageDuration ? `Avg ${averageDuration.label}` : null,
@@ -102,7 +95,6 @@ function TemplatePicker({
                 <div className={styles.identity}>
                     <SessionTemplateNameBadge entity={template} size="md" wrap />
                     <div className={styles.pillRow}>
-                        <SessionTemplateTypePill entity={template} size="sm" />
                         {template.is_archived ? <span className={styles.statusPill}>Archived</span> : null}
                         {template.is_used_in_active_program ? <span className={styles.activeProgramPill}>Active Program</span> : null}
                         {programTemplateIds.has(String(template.id)) ? (
@@ -132,7 +124,7 @@ function TemplatePicker({
 
     return (
         <StepContainer>
-            <StepHeader stepNumber={1} title="Select a Template" />
+            <StepHeader stepNumber={2} title="Select a Template" />
 
             {templates.length === 0 ? (
                 <StarterTemplateEmptyState rootId={rootId} onSelectTemplate={onSelectTemplate} />

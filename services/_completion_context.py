@@ -55,17 +55,30 @@ def clear_live_progress():
 
 
 def get_recent_achievements():
-    """Get goals completed during the current request. Called by API endpoints."""
-    return {'completed_goals': getattr(_achievement_context, 'completed_goals', [])}
+    """Goals this request completed or reverted by their conditions. Called by API endpoints."""
+    return {
+        'completed_goals': list(getattr(_achievement_context, 'completed_goals', [])),
+        'uncompleted_goals': list(getattr(_achievement_context, 'uncompleted_goals', [])),
+    }
 
 
 def clear_achievement_context():
     """Clear achievement tracking. Should be called at start of request."""
     _achievement_context.completed_goals = []
+    _achievement_context.uncompleted_goals = []
+
+
+def _track(kind: str, goal_data: dict):
+    if not hasattr(_achievement_context, kind):
+        setattr(_achievement_context, kind, [])
+    getattr(_achievement_context, kind).append(goal_data)
 
 
 def _track_goal_completion(goal_data: dict):
     """Track a goal completion for the current request."""
-    if not hasattr(_achievement_context, 'completed_goals'):
-        _achievement_context.completed_goals = []
-    _achievement_context.completed_goals.append(goal_data)
+    _track('completed_goals', goal_data)
+
+
+def _track_goal_uncompletion(goal_data: dict):
+    """Track a goal its condition no longer completes, for the current request."""
+    _track('uncompleted_goals', goal_data)

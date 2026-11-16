@@ -76,6 +76,8 @@ class _SessionUpdatesMixin:
         ).first()
         if not session:
             return None, "Session not found", 404
+        if is_quick_session(session):
+            return None, "Quick sessions are repeated from Create Session", 400
 
         template_id = None
         if getattr(session, 'template', None) and getattr(session.template, 'deleted_at', None) is None:

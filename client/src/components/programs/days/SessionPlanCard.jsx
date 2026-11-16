@@ -23,8 +23,10 @@ import {
     setPlanItemPrescription,
 } from '../../../utils/sessionPlanDraft';
 import CircuitPrescriptionEditor from '../../prescriptions/CircuitPrescriptionEditor';
+import PlanItemPicker from '../../prescriptions/PlanItemPicker';
+import PlanItemRow from '../../prescriptions/PlanItemRow';
+import PlanSection from '../../prescriptions/PlanSection';
 import { PlanCopyButton } from './PlanCopyControls';
-import PlanItemPicker from './PlanItemPicker';
 import ExecutedPlanSessions from './ExecutedPlanSessions';
 import styles from './ProgramDaysView.module.css';
 
@@ -219,12 +221,11 @@ export default function SessionPlanCard({
             <ExecutedPlanSessions rootId={rootId} sessions={entry.executed_sessions} />
 
             {sections.map((section, sectionIndex) => (
-                <section
+                <PlanSection
                     key={section.id || section.name}
-                    className={styles.planSection}
-                    data-align-key={alignKeys.sections[sectionIndex]}
+                    title={section.name}
+                    alignKey={alignKeys.sections[sectionIndex]}
                 >
-                    <h4 className={styles.planSectionTitle}>{section.name}</h4>
                     {(section.items || []).length === 0 ? (
                         <p className={styles.planEmpty}>No activities in this section.</p>
                     ) : null}
@@ -245,33 +246,27 @@ export default function SessionPlanCard({
                             onSelect: (rowIndex) => setScope({ ...NO_SCOPE, itemKey, rowIndex }),
                         };
                         return (
-                            <div
+                            <PlanItemRow
                                 key={itemKey}
-                                className={[
-                                    styles.planItem,
-                                    styles.planItemSelectable,
-                                    isHighlighted ? styles.planItemSelected : '',
-                                ].filter(Boolean).join(' ')}
-                                data-align-key={alignKeys.items[sectionIndex][itemIndex]}
-                                data-plan-item
-                                data-selected={isHighlighted ? 'true' : undefined}
+                                name={name}
+                                selected={isHighlighted}
+                                alignKey={alignKeys.items[sectionIndex][itemIndex]}
                                 onClick={(event) => {
                                     // A click on the item itself (not a set or a control) scopes back to the whole item.
                                     if (isItemSurfaceClick(event)) setScope({ ...NO_SCOPE, itemKey });
                                     else scopeItem(itemKey);
                                 }}
                                 onFocus={readOnly ? undefined : (event) => { if (shouldScopeOnFocus(event)) scopeItem(itemKey); }}
-                            >
-                                <div className={styles.planItemHeader}>
-                                    <span className={styles.planItemName}>
-                                        {name}
+                                badges={(
+                                    <>
                                         {item.type === 'circuit' ? <Badge size="sm">Circuit</Badge> : null}
                                         {comparedByKey && !compared ? (
                                             <Badge size="sm" title={`Not in ${formatCopyDate(comparison.date)}`}>New</Badge>
                                         ) : null}
-                                    </span>
-                                    {!readOnly ? (
-                                        <span className={styles.planItemActions}>
+                                    </>
+                                )}
+                                actions={readOnly ? null : (
+                                        <>
                                             <button
                                                 type="button"
                                                 onClick={() => edit((current) => movePlanItem(current, sectionIndex, itemIndex, -1))}
@@ -312,9 +307,9 @@ export default function SessionPlanCard({
                                                 }}
                                                 aria-label={`Remove ${name} from this plan`}
                                             ><CloseIcon size={12} /></button>
-                                        </span>
-                                    ) : null}
-                                </div>
+                                        </>
+                                )}
+                            >
                                 {definition ? (
                                     // A past day shows the same fields, read-only, so it lines up beside a live plan.
                                     <PrescriptionEditor
@@ -394,7 +389,7 @@ export default function SessionPlanCard({
                                 {item.type === 'activity' && !definition ? (
                                     <p className={styles.planEmpty}>This activity was deleted and will be skipped.</p>
                                 ) : null}
-                            </div>
+                            </PlanItemRow>
                         );
                     })}
                     {!readOnly ? (
@@ -410,7 +405,7 @@ export default function SessionPlanCard({
                             onAdd={(selection) => edit((current) => addPlanItem(current, sectionIndex, selection))}
                         />
                     ) : null}
-                </section>
+                </PlanSection>
             ))}
 
 

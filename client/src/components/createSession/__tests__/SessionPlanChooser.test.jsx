@@ -35,6 +35,7 @@ describe('SessionPlanChooser', () => {
 
     it('lists one day\'s dated plans without repeating its name', () => {
         render(<SessionPlanChooser candidates={plans} value="template" onChange={vi.fn()} />);
+        expect(screen.getByRole('heading', { name: 'Select a Plan' })).toHaveTextContent(/^3Select a Plan/);
         expect(screen.getByRole('option', { name: /Nov 6 · not yet done/ })).toBeInTheDocument();
         expect(screen.getByRole('option', { name: /Oct 30 · already done/ })).toBeInTheDocument();
         expect(screen.queryByRole('option', { name: /Upper/ })).not.toBeInTheDocument();
@@ -105,8 +106,8 @@ describe('useSessionPlanChoice', () => {
         expect(result.current.payload).toEqual({});
     });
 
-    it('never asks for plans for quick templates', () => {
-        const { result } = renderChoice(null, { id: 'quick', session_type: 'quick', template_data: { session_type: 'quick' } });
+    it('never asks for plans before a template is chosen', () => {
+        const { result } = renderChoice(null, null);
 
         expect(result.current.candidates).toEqual([]);
         expect(getSessionPlanCandidates).not.toHaveBeenCalled();

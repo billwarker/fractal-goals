@@ -9,9 +9,10 @@ const GoalDetailModal = lazyWithRetry(() => import('../ConnectedGoalDetailModal'
 
 /**
  * A note's goal, opened over a notes feed. With `reviewNote`, it opens on that review's form to edit the
- * answers and closes once the edit is saved or cancelled.
+ * answers and closes once the edit is saved or cancelled. `initialView` opens another view of the goal,
+ * such as `completion-note`.
  */
-export default function NoteGoalModal({ rootId, goalId, reviewNote = null, onClose }) {
+export default function NoteGoalModal({ rootId, goalId, reviewNote = null, initialView = null, onClose }) {
     const { updateGoal, toggleGoalCompletion } = useGoals();
     const { data: tree } = useFractalTree(rootId);
     const goal = tree ? findGoalNodeById(tree, goalId) : null;
@@ -24,7 +25,7 @@ export default function NoteGoalModal({ rootId, goalId, reviewNote = null, onClo
                 rootId={rootId}
                 treeData={tree}
                 displayMode="modal"
-                initialView={reviewNote ? 'goal-review' : 'goal'}
+                initialView={initialView || (reviewNote ? 'goal-review' : 'goal')}
                 initialReviewNote={reviewNote}
                 onUpdate={(id, updates) => updateGoal(rootId, id, updates)}
                 onToggleCompletion={(id, currentStatus, sequenceOptions = null) => (

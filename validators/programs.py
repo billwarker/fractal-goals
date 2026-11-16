@@ -4,7 +4,7 @@ Re-exported by the validators package __init__, so existing
 `from validators import <Schema>` imports keep working.
 """
 from datetime import date
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from .core import (
     MAX_NAME_LENGTH,
@@ -207,6 +207,21 @@ class ProgramDayTemplateConfigSchema(BaseModel):
     order: Optional[int] = 0
 
 
+MAX_DAY_ACTIVITY_CONDITIONS = 20
+MAX_DAY_ACTIVITY_CONDITION_TAGS = 10
+
+
+class ProgramDayActivityConditionSchema(BaseModel):
+    """An activity a program day asks for, optionally only when tagged; it counts with the templates."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    activity_definition_id: str = Field(..., min_length=1)
+    is_required: bool = True
+    order: int = Field(0, ge=0)
+    tag_ids: List[str] = Field(default_factory=list, max_length=MAX_DAY_ACTIVITY_CONDITION_TAGS)
+    tag_match: Literal['contains', 'exact'] = 'contains'
+
+
 class ProgramDayCreateBaseSchema(BaseModel):
     """Schema for adding a day to a program; weekdays repeat across the whole program."""
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -236,11 +251,15 @@ class ProgramDayCreateSchema(ProgramDayCreateBaseSchema):
     """Schema for adding a day to a program from the app.
 
     Adds ``scheduled_dates``, the replace-all set of explicit occurrence dates
-    (program_day_occurrence_schedules). Agent proposals extend the base schema,
-    so their reviewed contract is unchanged and they schedule dates one at a time.
+    (program_day_occurrence_schedules), and ``activity_conditions``, the replace-all set of
+    activities the day asks for. Agent proposals extend the base schema, so their reviewed
+    contract is unchanged and they schedule dates one at a time.
     """
     scheduled_dates: Optional[List[CalendarDate]] = None
     excluded_dates: Optional[List[CalendarDate]] = None
+    activity_conditions: Optional[List[ProgramDayActivityConditionSchema]] = Field(
+        None, max_length=MAX_DAY_ACTIVITY_CONDITIONS,
+    )
 
     @field_validator('scheduled_dates', 'excluded_dates', mode='before')
     @classmethod
@@ -277,10 +296,14 @@ class ProgramDayUpdateSchema(ProgramDayUpdateBaseSchema):
     """Schema for updating a program day from the app.
 
     Adds ``scheduled_dates``, the replace-all set of explicit occurrence dates
-    (program_day_occurrence_schedules). Agent proposals extend the base schema,
-    so their reviewed contract is unchanged and they schedule dates one at a time.
+    (program_day_occurrence_schedules), and ``activity_conditions``, the replace-all set of
+    activities the day asks for. Agent proposals extend the base schema, so their reviewed
+    contract is unchanged and they schedule dates one at a time.
     """
     scheduled_dates: Optional[List[CalendarDate]] = None
+    activity_conditions: Optional[List[ProgramDayActivityConditionSchema]] = Field(
+        None, max_length=MAX_DAY_ACTIVITY_CONDITIONS,
+    )
 
     @field_validator('scheduled_dates', mode='before')
     @classmethod

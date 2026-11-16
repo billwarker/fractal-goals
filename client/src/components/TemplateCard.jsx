@@ -1,21 +1,13 @@
 import React from 'react';
 
+import { getAverageDurationStat } from '../utils/durationStats';
 import Linkify from './atoms/Linkify';
 import { ClockIcon } from './atoms/AppIcons';
 import DeleteButton from './atoms/DeleteButton';
 import SessionTemplateNameBadge from './common/SessionTemplateNameBadge';
-import SessionTemplateTypePill from './common/SessionTemplateTypePill';
 import styles from './TemplateCard.module.css';
-import {
-    isQuickSession,
-} from '../utils/sessionRuntime';
-import { getAverageDurationStat } from '../utils/durationStats';
 
-function getQuickActivityCount(template) {
-    return template.template_data?.activities?.length || 0;
-}
-
-function getNormalActivityCount(template) {
+function getActivityCount(template) {
     return template.template_data?.sections?.reduce(
         (sum, section) => sum + (
             section.items?.filter((item) => item?.type === 'activity' || item?.type === 'circuit').length
@@ -31,9 +23,8 @@ function getNormalActivityCount(template) {
  * Template Card - Display card for session templates in grid view
  */
 function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle }) {
-    const quickTemplate = isQuickSession(template);
     const sectionCount = template.template_data?.sections?.length || 0;
-    const activityCount = quickTemplate ? getQuickActivityCount(template) : getNormalActivityCount(template);
+    const activityCount = getActivityCount(template);
     const averageDuration = getAverageDurationStat(template.stats);
     const isArchived = Boolean(template.is_archived);
     const isUsedInActiveProgram = Boolean(template.is_used_in_active_program);
@@ -47,7 +38,6 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle
                 <div className={styles.nameBlock}>
                     <SessionTemplateNameBadge entity={template} size="md" />
                     <div className={styles.pillRow}>
-                        <SessionTemplateTypePill entity={template} size="sm" />
                         {isArchived && (
                             <span className={styles.statusPill}>
                                 Archived
@@ -79,19 +69,17 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle
                         <span className={styles.sampleHint}>({averageDuration.sampleCount})</span>
                     </span>
                 )}
-                {!quickTemplate && (
-                    <span className={styles.stat}>
-                        <span className={styles.sectionIcon}>§</span>
-                        {sectionCount} section{sectionCount !== 1 ? 's' : ''}
-                    </span>
-                )}
+                <span className={styles.stat}>
+                    <span className={styles.sectionIcon}>§</span>
+                    {sectionCount} section{sectionCount !== 1 ? 's' : ''}
+                </span>
                 <span className={styles.stat}>
                     <span className={styles.activityIcon}>◆</span>
                     {activityCount} activit{activityCount !== 1 ? 'ies' : 'y'}
                 </span>
             </div>
 
-            {!quickTemplate && template.template_data?.sections?.length > 0 && (
+            {template.template_data?.sections?.length > 0 && (
                 <div className={styles.sectionsPreview}>
                     {template.template_data.sections.slice(0, 4).map((section) => (
                         <span key={section.id || section.name || 'section'} className={styles.sectionTag}>
@@ -101,24 +89,6 @@ function TemplateCard({ template, onEdit, onDelete, onDuplicate, onArchiveToggle
                     {template.template_data.sections.length > 4 && (
                         <span className={styles.moreTag}>
                             +{template.template_data.sections.length - 4} more
-                        </span>
-                    )}
-                </div>
-            )}
-
-            {quickTemplate && template.template_data?.activities?.length > 0 && (
-                <div className={styles.sectionsPreview}>
-                    {template.template_data.activities.slice(0, 4).map((activity) => (
-                        <span
-                            key={activity.id || activity.activity_id || activity.activity_definition_id || activity.name || 'activity'}
-                            className={styles.sectionTag}
-                        >
-                            {activity.name || 'Activity'}
-                        </span>
-                    ))}
-                    {template.template_data.activities.length > 4 && (
-                        <span className={styles.moreTag}>
-                            +{template.template_data.activities.length - 4} more
                         </span>
                     )}
                 </div>

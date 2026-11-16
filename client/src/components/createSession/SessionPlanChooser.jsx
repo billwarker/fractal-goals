@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 
 import { useSessionPlanCandidates } from '../../hooks/useProgramSessionPlans';
 import { formatLiteralDate } from '../../utils/dateUtils';
-import { isQuickSession } from '../../utils/sessionRuntime';
+import StepContainer from '../common/StepContainer';
+import StepHeader from './StepHeader';
 import styles from './SessionPlanChooser.module.css';
 
 const TEMPLATE_ONLY = 'template';
@@ -32,7 +33,7 @@ function candidateLabel(candidate, showDayName) {
  * A chosen previous day (`preferLatest`) instead defaults to its newest plan, even if already run.
  */
 export function useSessionPlanChoice(rootId, template, todayISO, programDayId = null, preferLatest = false) {
-    const enabled = Boolean(template && !isQuickSession(template));
+    const enabled = Boolean(template);
     const query = useSessionPlanCandidates(rootId, enabled ? template.id : null, todayISO);
     const candidates = useMemo(() => (query.data?.candidates || []).filter((candidate) => (
         !programDayId || String(candidate.program_day_id) === String(programDayId)
@@ -57,7 +58,19 @@ export function useSessionPlanChoice(rootId, template, todayISO, programDayId = 
     return { candidates, value, onChange: setChoice, payload, loading: query.isLoading };
 }
 
-export default function SessionPlanChooser({ candidates, value, onChange, loading = false, emptyMessage = null }) {
+/** Step 3 of Create Session, after a program day or template: which dated plan to run. */
+export default function SessionPlanChooser(props) {
+    const content = renderChooser(props);
+    if (!content) return null;
+    return (
+        <StepContainer className={styles.container}>
+            <StepHeader stepNumber={3} title="Select a Plan" />
+            {content}
+        </StepContainer>
+    );
+}
+
+function renderChooser({ candidates, value, onChange, loading = false, emptyMessage = null }) {
     if (!candidates.length) {
         if (loading || !emptyMessage) return null;
         return (

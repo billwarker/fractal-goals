@@ -36,6 +36,7 @@ import { trackEvent } from './utils/telemetry';
 import { LANDING_PREVIEW_PATH, isLandingPreviewPath, isPublicLandingLocation } from './utils/marketingHost';
 import GettingStartedChecklist from './components/onboarding/GettingStartedChecklist';
 import AgentChangeSubscription from './components/agent/AgentChangeSubscription';
+import GoalChangeAnnouncer from './components/goals/GoalChangeAnnouncer';
 import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicator';
 import OfflineSignInScreen from './offline/OfflineSignInScreen';
 import { useIsOnline } from './offline/useIsOnline';
@@ -196,6 +197,7 @@ function App() {
         <HeaderProvider>
             <div className="app-container">
                 <AgentChangeSubscription rootId={activeRootId} authenticated={isAuthenticated} />
+                {isAuthenticated ? <GoalChangeAnnouncer /> : null}
                 {/* Session Detail shows its own indicator; elsewhere this tracks every queued change. */}
                 {isAuthenticated && !/^\/[^/]+\/session\/[^/]+/.test(location.pathname) && (
                     <SessionSyncIndicator idleOfflineLabel="Offline" className={styles.globalSyncSlot} />

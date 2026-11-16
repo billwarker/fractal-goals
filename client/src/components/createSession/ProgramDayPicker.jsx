@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { formatLiteralDate } from '../../utils/dateUtils';
 import ProgramName from '../atoms/ProgramName';
+import Button from '../atoms/Button';
 import EmptyState from '../common/EmptyState';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import StepContainer from '../common/StepContainer';
@@ -21,7 +22,8 @@ function ProgramDayPicker({
     hasTemplates,
     onSelectProgramDay,
     onSelectProgramSession,
-    onSwitchToTemplate
+    onSwitchToTemplate,
+    onLogActivities,
 }) {
     // Group days by program and the block covering the date (none when outside every block).
     const groupedDays = useMemo(() => {
@@ -59,6 +61,7 @@ function ProgramDayPicker({
                     selectedProgramSession={selectedProgramSession}
                     onSelectProgramDay={onSelectProgramDay}
                     onSelectProgramSession={onSelectProgramSession}
+                    onLogActivities={onLogActivities}
                 />
             </div>
         </section>
@@ -68,7 +71,7 @@ function ProgramDayPicker({
         if (previousSection) {
             return (
                 <StepContainer>
-                    <StepHeader stepNumber={1} title="Select a Previous Program Day" />
+                    <StepHeader stepNumber={2} title="Select a Previous Program Day" />
                     <p className={styles.previousHint}>Nothing is scheduled today.</p>
                     {previousSection}
                 </StepContainer>
@@ -76,7 +79,7 @@ function ProgramDayPicker({
         }
         return (
             <StepContainer>
-                <StepHeader stepNumber={1} title="Select a Day from Your Program" />
+                <StepHeader stepNumber={2} title="Select a Day from Your Program" />
                 {previousDaysLoading ? (
                     <LoadingState label="Loading previous program days…" />
                 ) : (
@@ -93,7 +96,7 @@ function ProgramDayPicker({
     return (
         <StepContainer>
             <StepHeader
-                stepNumber={1}
+                stepNumber={2}
                 title={groupedDays.length === 1 && groupedDays[0].block_name
                     ? <>Select a Program Day from <span
                         className={styles.blockName}
@@ -112,6 +115,7 @@ function ProgramDayPicker({
                         selectedProgramSession={selectedProgramSession}
                         onSelectProgramDay={onSelectProgramDay}
                         onSelectProgramSession={onSelectProgramSession}
+                        onLogActivities={onLogActivities}
                     />
                 ))}
             </div>
@@ -125,7 +129,8 @@ function BlockGroup({
     selectedProgramDay,
     selectedProgramSession,
     onSelectProgramDay,
-    onSelectProgramSession
+    onSelectProgramSession,
+    onLogActivities,
 }) {
     return (
         <div className={styles.blockGroupContainer}>
@@ -159,13 +164,14 @@ function BlockGroup({
                     selectedProgramSession={selectedProgramSession}
                     onSelectProgramDay={onSelectProgramDay}
                     onSelectProgramSession={onSelectProgramSession}
+                    onLogActivities={onLogActivities}
                 />
             </div>
         </div>
     );
 }
 
-function DayRows({ days, selectedProgramDay, selectedProgramSession, onSelectProgramDay, onSelectProgramSession }) {
+function DayRows({ days, selectedProgramDay, selectedProgramSession, onSelectProgramDay, onSelectProgramSession, onLogActivities }) {
     return days.map((programDay, index) => {
         const isSelected = selectedProgramDay?.day_id === programDay.day_id;
         const hasMultipleSessions = programDay.sessions.length > 1;
@@ -178,6 +184,7 @@ function DayRows({ days, selectedProgramDay, selectedProgramSession, onSelectPro
                     isSelected={isSelected}
                     hasMultipleSessions={hasMultipleSessions}
                     onClick={() => onSelectProgramDay(programDay)}
+                    onLogActivities={onLogActivities}
                     isLast={isLast}
                 />
 
@@ -194,12 +201,21 @@ function DayRows({ days, selectedProgramDay, selectedProgramSession, onSelectPro
     });
 }
 
-function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, isLast }) {
+function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, onLogActivities, isLast }) {
+    const activities = (programDay.activity_conditions || []).filter((activity) => !activity.activity_deleted);
+    // A day that asks only for activities is logged with a quick session.
+    const activitiesOnly = programDay.sessions.length === 0 && activities.length > 0 && Boolean(onLogActivities);
+    const logActivities = () => onLogActivities(activities
+        .filter((activity) => !activity.completed)
+        .map((activity) => activity.activity_definition_id));
     // Its templates were deleted since: nothing left to start from.
-    const unavailable = programDay.sessions.length === 0;
+    const unavailable = programDay.sessions.length === 0 && !activitiesOnly;
+    let handleClick = onClick;
+    if (unavailable) handleClick = undefined;
+    else if (activitiesOnly) handleClick = logActivities;
     return (
         <div
-            onClick={unavailable ? undefined : onClick}
+            onClick={handleClick}
             aria-disabled={unavailable || undefined}
             className={`${styles.programDayRow} ${isSelected ? styles.programDayRowSelected : ''} ${!isLast ? styles.programDayRowBorderBottom : ''} ${unavailable ? styles.programDayRowUnavailable : ''}`}
         >
@@ -218,9 +234,30 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
                             </span>
                         )}
                     </div>
+                    {activities.length ? (
+                        <ul className={styles.programDayActivities} aria-label={`Activities for ${programDay.day_name}`}>
+                            {activities.map((activity) => (
+                                <li key={activity.id}>
+                                    {activity.completed ? <span aria-label="done">✓ </span> : null}
+                                    {activity.activity_name}
+                                    {activity.tags?.length ? ` (${activity.tags.map((tag) => tag.name).join(', ')})` : ''}
+                                </li>
+                            ))}
+                        </ul>
+                    ) : null}
                 </div>
 
-                {!hasMultipleSessions && !unavailable && (
+                {activitiesOnly ? (
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(event) => { event.stopPropagation(); logActivities(); }}
+                    >
+                        Log with a Quick Session
+                    </Button>
+                ) : null}
+
+                {!hasMultipleSessions && !unavailable && !activitiesOnly && (
                     <div className={styles.templateNameBadge}>
                         <SessionTemplateNameBadge
                             entity={programDay.sessions[0]}
@@ -230,7 +267,7 @@ function ProgramDayRow({ programDay, isSelected, hasMultipleSessions, onClick, i
                     </div>
                 )}
 
-                {isSelected && !hasMultipleSessions && !unavailable && (
+                {isSelected && !hasMultipleSessions && !unavailable && !activitiesOnly && (
                     <div className={styles.checkIcon}>
                         ✓
                     </div>

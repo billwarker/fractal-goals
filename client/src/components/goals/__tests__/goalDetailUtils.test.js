@@ -22,10 +22,18 @@ const edits = (overrides = {}) => ({
 
 describe('buildLiveSmartGoal', () => {
     it('recomputes SMART from unsaved edits instead of the saved server status', () => {
-        const live = buildLiveSmartGoal(savedSmartGoal, edits({ description: '', deadline: null }));
+        const live = buildLiveSmartGoal(savedSmartGoal, edits({ description: '', completionCondition: 'children', deadline: null }));
 
         expect(isSMART(live)).toBe(false);
         expect(calculateSMARTStatus(live)).toMatchObject({ specific: false, timeBound: false });
+    });
+
+    it('counts a threshold as Specific when there is no description: its sentence describes the goal', () => {
+        const threshold = buildLiveSmartGoal(savedSmartGoal, edits({ description: '' }));
+        const manual = buildLiveSmartGoal(savedSmartGoal, edits({ description: '  ', completionCondition: 'manual' }));
+
+        expect(calculateSMARTStatus(threshold).specific).toBe(true);
+        expect(calculateSMARTStatus(manual).specific).toBe(false);
     });
 
     it('reports SMART when the edited values satisfy every criterion', () => {

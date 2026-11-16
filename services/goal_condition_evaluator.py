@@ -230,8 +230,11 @@ def _ordered(instances) -> list[EvidenceInstance]:
     return sorted(instances, key=lambda instance: (instance.occurred_at, instance.id))
 
 
-def _counted(instance: EvidenceInstance, tag_ids: frozenset[str], tag_match: str = 'contains') -> EvidenceInstance:
-    """The instance as a tagged condition sees it: only sets carrying every tag (or exactly them)."""
+def counted_sets(instance: EvidenceInstance, tag_ids: frozenset[str], tag_match: str = 'contains') -> EvidenceInstance:
+    """The instance as a tagged condition sees it: only sets carrying every tag (or exactly them).
+
+    Shared with program days' activity conditions (services/program_day_credits.py).
+    """
     if not tag_ids:
         return instance
     exact = tag_match == 'exact'
@@ -461,7 +464,7 @@ def _evaluate_consistency(spec: ConditionSpec, instances: list[EvidenceInstance]
 
 
 def evaluate_condition(spec: ConditionSpec, instances) -> ConditionEvaluation:
-    ordered = [_counted(instance, spec.tag_ids, spec.tag_match) for instance in _ordered(instances)]
+    ordered = [counted_sets(instance, spec.tag_ids, spec.tag_match) for instance in _ordered(instances)]
     if spec.kind == 'single_session' and spec.measure == 'sets' and spec.averages:
         evaluation = _evaluate_single_session_average(spec, ordered)
     elif spec.kind == 'single_session' and spec.measure == 'sets':

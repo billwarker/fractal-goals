@@ -2,11 +2,11 @@ import { countsTowardGivingUp, retryAfterMs } from './outboxTransport';
 
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60000;
-// A change the server keeps failing (not one waiting for signal) is given up on
-// after this, so it can never block every later change behind it. Both limits must
+// A change the server keeps failing (not one waiting for signal) goes to review
+// after this, so it can't hold up its session's later changes for long. Both limits must
 // pass, because a short outage must never cost changes.
-const MAX_SERVER_FAILURES = 8;
-const MIN_SERVER_FAILURE_AGE_MS = 30 * 60 * 1000;
+const MAX_SERVER_FAILURES = 5;
+const MIN_SERVER_FAILURE_AGE_MS = 10 * 60 * 1000;
 // The server answering but never saving (an overload or a long outage) ends here.
 const MAX_SERVER_FAILURE_AGE_MS = 24 * 60 * 60 * 1000;
 

@@ -279,28 +279,18 @@ class TestTimerStartStop:
         sample_activity_definition,
     ):
         root_id = sample_ultimate_goal.id
-        quick_template = SessionTemplate(
-            id=f'quick-{sample_activity_definition.id}',
-            name='Quick Template',
-            root_id=root_id,
-            template_data=json.dumps({
-                'session_type': 'quick',
-                'activities': [{'activity_id': sample_activity_definition.id}],
-            }),
-        )
-        db_session.add(quick_template)
+        # Quick sessions are now created already complete; an unfinished one predates that.
+        session = {'id': str(uuid4())}
+        instance_id = str(uuid4())
+        db_session.add(Session(
+            id=session['id'], root_id=root_id, owner_id=sample_ultimate_goal.owner_id, name='Quick Session',
+            attributes={'session_data': {'session_type': 'quick', 'activity_ids': [instance_id]}},
+        ))
+        db_session.add(ActivityInstance(
+            id=instance_id, session_id=session['id'], root_id=root_id,
+            activity_definition_id=sample_activity_definition.id,
+        ))
         db_session.commit()
-
-        create_response = authed_client.post(
-            f'/api/{root_id}/sessions',
-            json={
-                'name': 'Quick Session',
-                'template_id': quick_template.id,
-            }
-        )
-        assert create_response.status_code == 201
-        session = create_response.get_json()
-        instance_id = session['activity_instances'][0]['id']
 
         start_response = authed_client.post(f'/api/{root_id}/activity-instances/{instance_id}/start')
         assert start_response.status_code == 400

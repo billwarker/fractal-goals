@@ -170,6 +170,8 @@ class Goal(Base):
     completion_source = Column(String, nullable=True)
     completion_reason = Column(String, nullable=True)
     manually_uncompleted_at = Column(DateTime, nullable=True)
+    # When the "add a completion note" prompt was dismissed; it returns for a later completion.
+    completion_note_dismissed_at = Column(DateTime, nullable=True)
     completed_session_id = Column(
         String,
         ForeignKey(

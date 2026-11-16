@@ -4,7 +4,6 @@ import { useActivityTagCatalog } from '../../hooks/useActivityTagCatalog';
 import { useGoalConditionPreview } from '../../hooks/useGoalConditionQueries';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
-import ActivityTagBadges from '../common/ActivityTagBadges';
 import ViewToggleTabs from '../common/ViewToggleTabs';
 import {
     COMPLETION_CONDITION_LABELS,
@@ -21,7 +20,7 @@ import {
     validateConditionDraft,
     yieldMetricIds,
 } from '../../utils/goalConditions';
-import { describeConditionParts, describeTagMatch } from '../../utils/goalConditionText';
+import ConditionSentence from './ConditionSentence';
 import { ConditionTagFilter, OperatorSelect, RuleRow, SetAggregateToggle } from './ConditionEditorFields';
 import styles from './CompletionConditionEditor.module.css';
 
@@ -135,7 +134,6 @@ function ThresholdEditor({
         rules: draft.rules,
         tags: requiredTags,
     } : null;
-    const [previewBefore, previewAfter] = describeConditionParts(previewCondition, activity);
 
     return (
         <div className={styles.editor}>
@@ -399,16 +397,12 @@ function ThresholdEditor({
                             ) : null}
 
                             {previewCondition ? (
-                                <p className={styles.preview} data-testid="condition-preview">
-                                    {previewBefore}
-                                    {requiredTags.length ? (
-                                        <>
-                                            {` ${describeTagMatch(previewCondition)} `}
-                                            <ActivityTagBadges tags={requiredTags} className={styles.previewTrail} ariaLabel="Required tags" />
-                                        </>
-                                    ) : null}
-                                    {previewAfter}
-                                </p>
+                                <ConditionSentence
+                                    variant="preview"
+                                    condition={previewCondition}
+                                    activity={activity}
+                                    data-testid="condition-preview"
+                                />
                             ) : null}
                         </>
                     ) : null}

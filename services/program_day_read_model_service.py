@@ -7,6 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.orm import selectinload
 from models import Program, ProgramDayStatusOverride, Session, validate_root_goal
 from services.program_day_credits import (
+    load_program_activity_evidence,
     effective_session_timestamp,
     load_program_credit_candidates,
     load_program_session_credits,
@@ -26,8 +27,15 @@ from services.program_scope import resolve_program_scope
 from services.programs import ProgramService
 from services.note_program_dates import load_date_notes
 from services.serializers import serialize_note
+from services._serialize_programs import serialize_program_day_activity_condition
 from services.session_filters import resolve_timezone, session_duration_seconds_from_row
-from services.session_runtime import get_session_template_color, get_session_template_name, get_template_color
+from services.session_runtime import (
+    get_data_session_type,
+    get_session_runtime_data,
+    get_session_template_color,
+    get_session_template_name,
+    get_template_color,
+)
 
 
 class ProgramDayReadModelService:
@@ -149,9 +157,13 @@ class ProgramDayReadModelService:
             start=start, end=min(end, local_today),
         )
         aligned_evidence = [item for item in range_evidence if item["in_scope_ids"]]
+        activity_evidence = load_program_activity_evidence(
+            self.db_session, root_id, current_user_id, [program], utc_start, utc_end, zone,
+        )
         all_facts = build_day_facts(
             program, chain_start, chain_end, sessions, aligned_evidence, zone, local_today,
             status_overrides=status_overrides, session_credits=session_credits, periods=periods,
+            activity_evidence=activity_evidence,
         )
         return {
             "all_facts": all_facts,
@@ -303,6 +315,7 @@ class ProgramDayReadModelService:
         for row in occurrence_rows:
             day = row["program_day"]
             completed_ids = set(row["evaluation"]["completed_template_ids"])
+            completed_activity_ids = set(row["evaluation"].get("completed_activity_condition_ids", []))
             occurrences.append({
                 "occurrence_key": f"{day.id}:{detail_date.isoformat()}",
                 "program_day_id": day.id,
@@ -329,6 +342,13 @@ class ProgramDayReadModelService:
                         ),
                     } for rule in day.template_links or [] if rule.template is not None
                 ],
+                # Activities the day asks for, met by any session that date.
+                "activities": [
+                    serialize_program_day_activity_condition(condition) | {
+                        "status": "completed" if condition.id in completed_activity_ids else "pending",
+                    }
+                    for condition in getattr(day, "activity_conditions", None) or []
+                ],
                 "credits": [
                     {
                         "session_id": entry["session"].id,
@@ -345,6 +365,7 @@ class ProgramDayReadModelService:
             "manual_status": fact["manual_status"] if fact else None,
             "scheduled": fact["scheduled"] if fact else False,
             "completed_template_count": fact["completed_template_count"] if fact else 0,
+            "completed_item_count": fact["completed_item_count"] if fact else 0,
             "requirements": date_evaluation,
             "occurrences": occurrences,
             "notes": [serialize_note(note) for note in load_date_notes(self.db_session, program.id, detail_date)],
@@ -435,6 +456,7 @@ class ProgramDayReadModelService:
             "template_id": session.template_id,
             "template_name": get_session_template_name(session),
             "template_color": get_session_template_color(session),
+            "session_type": get_data_session_type(get_session_runtime_data(session)),
             "program_day_ids": list(credit_fact["program_day_ids"])
             if credit_fact and credit_fact.get("source") and not credit_fact.get("excluded") else [],
             "program_day_id": session.program_day_id,
@@ -484,4 +506,6 @@ class ProgramDayReadModelService:
             ),
             "completed": bool(session.completed),
             "is_paused": bool(session.is_paused),
+            # A quick session opens in a modal rather than on its own page.
+            "session_type": get_data_session_type(get_session_runtime_data(session)),
         }

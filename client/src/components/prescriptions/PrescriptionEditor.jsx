@@ -69,6 +69,10 @@ export default function PrescriptionEditor({
     selectedSetIndex,
     onSelectSet = null,
     showItemTags = true,
+    // False hides every tag picker, the item's and its sets' (a quick session logs no tags).
+    allowTags = true,
+    // False hides the note composer and notes (a quick session logs no notes).
+    allowNotes = true,
     readOnly = false,
     valueKind = 'planned',
     emptyText = null,
@@ -95,6 +99,8 @@ export default function PrescriptionEditor({
     const activityTagIds = value?.tags || [];
     const activityTags = (definition?.tags || []).filter((tag) => activityTagIds.includes(tag.id));
     const editable = active && !disabled && !readOnly;
+    // Editable logged values are a quick session being logged, not a plan being programmed.
+    const logging = valueKind === 'logged';
     const name = itemName || definition?.name || 'this activity';
 
     const commitValue = (column, rawValue, setIndex = null) => {
@@ -135,7 +141,7 @@ export default function PrescriptionEditor({
     );
 
     const scopedSet = selectedIndex == null ? null : sets[selectedIndex];
-    const activityTagsControl = showItemTags ? (
+    const activityTagsControl = showItemTags && allowTags ? (
         <PlanTagEditor
             rootId={rootId}
             definition={definition}
@@ -145,7 +151,7 @@ export default function PrescriptionEditor({
         />
     ) : null;
     // The scoped note is edited in the composer, so it isn't repeated above it.
-    const showActivityNote = Boolean(value?.notes) && !(active && !readOnly && selectedIndex == null);
+    const showActivityNote = allowNotes && Boolean(value?.notes) && !(active && !readOnly && selectedIndex == null);
     const groupLabel = `${valueKind === 'logged' ? 'Logged' : 'Planned'} ${hasSets ? 'sets' : 'values'}`;
 
     const hasContent = Boolean(value?.metrics?.length || sets.length || value?.notes || activityTagIds.length);
@@ -186,7 +192,7 @@ export default function PrescriptionEditor({
                     {sets.map((plannedSet, setIndex) => {
                         const isSelected = selectedIndex === setIndex;
                         const setTagIds = plannedSet.tags || [];
-                        const showSetNote = Boolean(plannedSet.notes) && !isSelected;
+                        const showSetNote = allowNotes && Boolean(plannedSet.notes) && !isSelected;
                         return (
                             // Planned sets have no identity beyond their position.
                             <div
@@ -230,15 +236,17 @@ export default function PrescriptionEditor({
                                                 comparisonDate={comparisonDate}
                                             />
                                         ) : null}
-                                        <PlanTagEditor
-                                            rootId={rootId}
-                                            definition={definition}
-                                            tagIds={setTagIds}
-                                            onChangeTags={(tagIds) => onChange(withSetTags(value, setIndex, tagIds))}
-                                            editable={editable && isSelected}
-                                            inheritedTags={activityTags}
-                                            setScope
-                                        />
+                                        {allowTags ? (
+                                            <PlanTagEditor
+                                                rootId={rootId}
+                                                definition={definition}
+                                                tagIds={setTagIds}
+                                                onChangeTags={(tagIds) => onChange(withSetTags(value, setIndex, tagIds))}
+                                                editable={editable && isSelected}
+                                                inheritedTags={activityTags}
+                                                setScope
+                                            />
+                                        ) : null}
                                     </span>
                                     {/* Read-only keeps the remove column empty so values sit where a live plan's do. */}
                                     {readOnly ? <span className={styles.rowActionSpacer} aria-hidden="true" /> : (
@@ -250,7 +258,7 @@ export default function PrescriptionEditor({
                                                 onChange(withRemovedSet(value, setIndex));
                                             }}
                                             disabled={disabled}
-                                            aria-label={`Remove planned set ${setIndex + 1}`}
+                                            aria-label={logging ? `Remove set ${setIndex + 1}` : `Remove planned set ${setIndex + 1}`}
                                         >
                                             <CloseIcon size={12} />
                                         </IconButton>
@@ -297,7 +305,7 @@ export default function PrescriptionEditor({
                     alignKey={planRowAlignKey(alignKey, 'summary')}
                 />
             ) : null}
-            {active && !readOnly ? (
+            {active && !readOnly && allowNotes ? (
                 scopedSet ? (
                     <PlanNoteComposer
                         scopeKey={`set-${selectedIndex}`}

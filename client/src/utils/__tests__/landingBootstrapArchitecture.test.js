@@ -39,6 +39,11 @@ describe('landing bootstrap architecture', () => {
         const titleSize = 'font-size: clamp(2.5rem, min(6.2vw, 8.5vh), 6.4rem)';
         expect(html).toContain(titleSize);
         expect(landingCss).toContain(titleSize);
+        // On desktop it opens in the same two columns, so the page doesn't start in one and split.
+        for (const rule of ['grid-template-columns: clamp(360px, 36vw, 640px) minmax(0, 1fr)', 'font-size: clamp(2.3rem, min(4.2vw, 7vh), 5.2rem)']) {
+            expect(html).toContain(rule);
+            expect(landingCss).toContain(rule);
+        }
         // The words match landing.md, so the hand-off doesn't change them.
         expect(html).toContain(`<span>${landingContent.header.nav[0].label}</span>`);
         expect(html).toContain(`<div class="landing-boot-kicker" aria-hidden="true">${landingContent.hero.kicker}</div>`);
@@ -46,6 +51,8 @@ describe('landing bootstrap architecture', () => {
         expect(html).toContain(landingContent.hero.body);
         expect(html).toContain(landingContent.hero.mobileBody);
         expect(html).toContain(`>${landingContent.demo.label}</div>`);
+        expect(html).toContain(`>${landingContent.demo.waitlistLabel}</div>`);
+        expect(html).toContain(`<span>${landingContent.footer.note}</span>`);
         expect(html).toContain(`<title>${landingContent.seo.title}</title>`);
         expect(html).toContain(`content="${landingContent.seo.description}"`);
         expect(landingCss).toContain('--landing-css-ready: 1');

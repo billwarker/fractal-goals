@@ -81,7 +81,15 @@ accounts.
 
 Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
 demo. Each published demo (Admin → Live demo) is an icon linking to `/demo/<snapshot root>/goals?tour=1`;
-"or join the waitlist" opens `demo/DemoSignupModal`. `index.html`'s boot copy mirrors the hero (an
+"or join the waitlist" opens `demo/DemoSignupModal`. From 1024px the hero is two columns: the copy and
+picker on the left, and filling the rest of the window (header to footer, out to the edge, no panel) the pointed-at example's goal tree (`components/landing/
+LandingTreePreview.jsx`, lazy, so phones never load React Flow; plan `planning/landing-tree-preview-2026-11.md`).
+It is the app's `FlowTree` inside a `GoalLevelsProvider` seeded with the example's published levels: visitors
+can pan and zoom, clicking a goal opens the demo on it (`/demo/<root>/goals?goal=<id>`, `hooks/useGoalDeepLink.js`),
+and the picker icons start the tour. Its frame snaps to the page's 20px grid, and a faint outline on those
+grid lines shows while the pointer is over it. Picker icons resolve through the same seeded levels (`LandingExampleIcon`), so they match the
+tree. `utils/landingPrefetch.js` accepts a static or preloaded manifest only at the current schema
+(`LANDING_SCHEMA_VERSION`), so a file from an older publish falls back to the API. `index.html`'s boot copy mirrors the hero (an
 architecture test ties its words to landing.md). `main.jsx` keeps its three root imports (public landing,
 demo, app) as separate statements, so each root preloads its own CSS.
 
@@ -95,8 +103,11 @@ fractal's effective goal levels copied as its own, database insert-trigger effec
 state left out. Every reachable table must be in `COPY_TABLES` or `EXCLUDED_TABLES`; adding a table that
 reaches a fractal fails `tests/integration/test_demo_snapshots.py` until it is classified there, and the
 same file checks every allow-listed page reads the same on the copy as on the source. The public manifest
-(`landing_example_cache`, schema 14) carries only label, root name, icon, the tour's deep links and the
-owner's completed-goal colours. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
+(`landing_example_cache`, schema 15) carries only label, root name, icon, the tour's deep links, the
+owner's completed-goal colours and a `preview`: the snapshot's effective levels and its goal tree as
+`serialize_goal` builds it, cut to the allowlists in `services/_landing_common.py`
+(`LANDING_PREVIEW_GOAL_FIELDS`, `_ATTRIBUTES`, `_LEVEL_FIELDS`); the snapshot test fails if any other field
+is published. Server boundary: `POST /api/public/demo-session` issues a 2-hour JWT with its own
 audience (`services/demo_access_service.py`); `token_required` hands demo tokens to
 `blueprints/demo_access.py`, which serves only GET endpoints in `DEMO_READ_ENDPOINTS` on roots that are
 still published, as the root's owner (the demo account), and never media, storage, account, agent, admin or log routes.
@@ -113,9 +124,12 @@ Remote records live in TanStack Query. Components do not mirror API collections 
 or local storage. Mutation success invalidates the narrow shared query-key root that owns the
 affected read models. In-session writes go through the per-user outbox (`client/src/offline/`)
 instead. They patch the cache, persist, and sync in
-order with `Idempotency-Key` and `occurred_at`, sending under a separate lock so saving never waits on
-the network; the session's queries refetch once its queue drains and stays quiet. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
-mirrored in `offline/circuitIds.js`). Quick-session drafts persist per user and fractal.
+order within each session with `Idempotency-Key` and `occurred_at`, sending under a separate lock so saving never waits on
+the network; the session's queries refetch once its queue drains and stays quiet. A watchdog keeps the
+invariant "pending ⇒ a send is due" (store errors retry, a frozen tab's drain lock is taken over after an
+unanswered ping), the server records an idempotent write's commit in the write's own transaction, and
+`offline/__tests__/outbox.chaos.test.js` checks all of it under seeded random faults. Circuits created offline use deterministic UUIDv5 child IDs (`services/circuit_ids.py`,
+mirrored in `offline/circuitIds.js`). A quick session being logged is not kept: leaving Create Session discards it.
 See [ADR 0004](docs/architecture/ADR_0004_OFFLINE_SESSION_OUTBOX.md).
 
 Programs, Sessions, Notes, and Analytics share `components/layout/MobilePageFooter.jsx` (a fixed,
@@ -151,7 +165,14 @@ recorded as `manual_override` unless the condition is `manual`. Progress is neve
 completes or reverts goals with `completion_source == 'condition'` in the writing transaction.
 After a manual uncompletion only newer evidence re-completes a goal. Rule values are
 `Numeric(14,4)`. `client/src/utils/goalConditions.js` mirrors server validation and wording;
-`goalConditionText.js` words it (never "sets" for set-free activities). `CompletionConditionEditor`
+`goalConditionText.js` words it (never "sets" for set-free activities); Goal Details shows that sentence
+under the description (`ConditionSentence`, the threshold builder's box in the goal's colour).
+Any write that completes or reverts a goal by its condition returns `goal_changes: {completed, uncompleted}`
+(`blueprints/goal_changes.py`, an `after_request` hook; never on a stored idempotent replay); the client's
+axios response hook publishes it, so `GoalChangeAnnouncer` toasts it wherever the change was made, a
+change synced later from the outbox included, with **Write note** for a completion. A completed goal
+without a completion note shows a dismissible prompt in Goal Details; dismissing stamps
+`goals.completion_note_dismissed_at`, and a later completion asks again. `CompletionConditionEditor`
 (with a debounced `condition/preview` of the unsaved draft) and `CompletionConditionSummary` render it, and `ConditionProgressChart`
 charts a threshold's sessions (goal details' chart, the Progress pane's Goal progress), under the
 `goalCondition` query-key root.
@@ -161,6 +182,8 @@ revision-local SQL evidence in `migrations/condition_backfill.py`, feeding the c
 without hydrating current ORM models. Populated historical upgrades have their own integration gate.
 See [Goal conditions plan](planning/goal-conditions-hierarchy-creation-sequencing.md).
 
+SMART's S is **Specific**: a description, or an activity threshold, whose sentence stands in as the
+description (`calculate_smart_status`, mirrored in `smartHelpers.js`).
 SMART's R is **Reviewed** (relevance statements were retired into goal notes by `c6d7e8f9a0b1`).
 Reviewed levels (`goal_levels.uses_reviews`; Ultimate, Long and Mid Term by default) review goals on a
 cadence: the goal's own (`goals.review_cadence_*`) or the level's. `services/goal_review_rules.py`
@@ -243,7 +266,18 @@ cache updates and evidence invalidation; duplication starts with no one-off link
 ### Sessions, activities, and progress
 
 Sessions are the execution container. Each user can have one unfinished session per fractal,
-including paused sessions. Session Detail offers duplication only for completed sessions after
+including paused sessions.
+
+Templates have one shape (sections of items; no `session_type`, migration `aa1d1082d073` turned the old
+quick templates into one-section templates). A quick session has no template: it is logged on Create
+Session (source "Quick Session", `?source=quick`) as a page-only draft (`hooks/useQuickSessionComposer.js`,
+`utils/createSessionQuickDraft.js`), one card of activities beside the distinct recent quick
+sessions (`GET …/sessions?session_type=quick`), and created already complete by `POST …/sessions/quick-complete`
+in one transaction (1–20 activities matched by position, `session_data.session_type = 'quick'`). `POST
+…/sessions` refuses quick sessions (`quick_session_use_complete`). Its activities are logged in the program-day
+plan's components (`prescriptions/PlanItemRow`, `PrescriptionEditor` with `valueKind="logged"`,
+`PlanItemPicker`); repeating a recent one shows last time's values as the inputs' placeholders.
+See [Quick sessions rework](planning/quick-sessions-create-session-rework-2026-11.md). Session Detail offers duplication only for completed sessions after
 the shared active-session query confirms none is ongoing. The Sessions sidebar has no completion
 filter; legacy completion URL parameters do not constrain its list or heatmap.
 
@@ -354,6 +388,17 @@ sessions identically. Manual Complete/Rest statuses and fractal-wide calendar ev
 (`services/calendar_periods.py`) resolve in that evaluator: manual override, then a streak-protecting
 event, then automatic evaluation. Streaks are drawn from server `chain_role`/`run_length_at_date`, never
 recomputed in the client.
+
+**Activity conditions.** A program day may also ask for activities (`program_day_activity_conditions`,
+optional tags in `program_day_activity_condition_tags`, `tag_match` contains/exact), each required or
+optional. One is met by any completed instance of the activity in any of the owner's sessions on the
+occurrence's date (a quick session included; the session's local date, as for credits), narrowed by its
+tags with the goal evaluator's `counted_sets`. `program_day_credits.load_program_activity_evidence` loads
+them in one query per window. Templates and activities are one pool: every required item done, and
+`completion_min_templates` (kept for API and analytics compatibility) counts both. A day may ask for
+activities only; Create Session then offers "Log with a Quick Session"
+(`/create-session?source=quick&activities=…`). App-only field: agent proposals don't set it.
+See [Program day activities and goal completion](planning/program-day-activities-and-goal-completion-2026-11.md).
 
 **Read models.** The client expects metrics calculation v10 (`services/program_metrics_service.py`,
 `program_rollups.py`, `program_block_metrics.py`), day read model schema v8
@@ -587,7 +632,8 @@ Circuit runs follow the same selection, lifecycle, timing, removal, metric, and 
 as regular session activities. The parent circuit owns its clock; rounds and members remain
 structural children, and circuit notes use canonical session-note targets rather than a parallel
 store. Completing a quick session completes every active activity instance, including untimed ones;
-quick-entry cards have no individual completion control and use the shared session completion button.
+quick-entry cards (Session Detail, for quick sessions started before they were created complete) have no timer or
+individual completion control; Create Session logs a new one in plan rows and completes them all at once.
 Quick-entry sessions remain activity-only; standard sessions and templates own the full
 circuit lifecycle. Detailed behavior is covered by the circuit component and service tests.
 

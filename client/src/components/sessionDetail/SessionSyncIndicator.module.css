@@ -48,6 +48,10 @@
     color: var(--color-brand-danger);
 }
 
+.detail {
+    font-weight: 400;
+}
+
 .reviewToggle {
     margin-left: 2px;
     padding: 0;

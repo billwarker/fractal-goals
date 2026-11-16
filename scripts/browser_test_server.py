@@ -68,7 +68,7 @@ def _seed_planning_fractal(db, suffix, user, level, today):
     ))
     db.add(SessionTemplate(
         id=f"browser-plan-template-{suffix}", root_id=root_id, name="Bench Day",
-        template_data={"session_type": "normal", "sections": [{"name": "Main", "items": [{
+        template_data={"sections": [{"name": "Main", "items": [{
             "type": "activity", "activity_definition_id": f"browser-plan-bench-{suffix}",
             "name": "Bench Press", "item_key": "bench",
         }, {
@@ -543,6 +543,8 @@ def main():
                     ("offline-circuit", "Offline Circuit"),
                     ("offline-edits", "Offline Edits"),
                     ("offline-ceiling", "Offline Ceiling"),
+                    ("offline-expiry", "Offline Expiry"),
+                    ("offline-retrying", "Offline Retrying"),
                     ("axis-room", "Axis Room"),
                     ("trend-goals", "Trend Goals"),
                     ("aligned-sessions", "Aligned Sessions"),

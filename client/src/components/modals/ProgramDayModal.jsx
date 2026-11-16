@@ -14,7 +14,6 @@ import Button from '../atoms/Button';
 import Input from '../atoms/Input';
 import Select from '../atoms/Select';
 import styles from './ProgramDayModal.module.css';
-import { isQuickSession } from '../../utils/sessionRuntime';
 
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { logError } from '../../utils/logger';
@@ -32,6 +31,9 @@ import {
 } from '../../utils/programCalendarConflicts';
 
 import { buildInitialProgramDayState } from './programDayModalState';
+import ProgramDayActivitiesField from './ProgramDayActivitiesField';
+import ProgramDayCompletionRule from './ProgramDayCompletionRule';
+import { describeDayCompletion } from '../../utils/programDayRules';
 
 const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, program, initialData, goals = [], focusScope = null }) => {
     const queryClient = useQueryClient();
@@ -43,6 +45,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
     const [scheduleMode, setScheduleMode] = useState(initialState.scheduleMode);
     const [specificDates, setSpecificDates] = useState(initialState.specificDates);
 
+    const [activityConditions, setActivityConditions] = useState(initialState.activityConditions);
     const [completionMinTemplates, setCompletionMinTemplates] = useState(initialState.completionMinTemplates);
     const [goalIds, setGoalIds] = useState(initialState.goalIds);
     const focusGoals = focusScope ? goalsInScope(goals, focusScope) : goals;
@@ -82,7 +85,6 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                 : '';
 
     const { sessionTemplates = [] } = useSessionTemplates(rootId);
-    const availableProgramTemplates = sessionTemplates.filter((template) => !isQuickSession(template));
 
     const { activities = [] } = useActivities(rootId);
     const { activityGroups = [] } = useActivityGroups(rootId);
@@ -125,7 +127,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
         }));
         const parsedMinTemplates = completionMinTemplates === ''
             ? null
-            : Math.max(1, Math.min(Number(completionMinTemplates) || 1, templateConfigs.length || 1));
+            : Math.max(1, Math.min(Number(completionMinTemplates) || 1, itemCount || 1));
 
         try {
             await onSave({
@@ -136,6 +138,12 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                 day_of_week: isDatesMode ? [] : selectedDaysOfWeek,
                 repeat_every_weeks: isDatesMode ? 1 : Number(repeatEveryWeeks || 1),
                 scheduled_dates: specificDates,
+                activity_conditions: activityConditions.map((condition) => ({
+                    activity_definition_id: condition.activityDefinitionId,
+                    is_required: condition.isRequired,
+                    tag_ids: condition.tagIds,
+                    tag_match: condition.tagMatch,
+                })),
                 completion_min_templates: parsedMinTemplates,
                 goal_ids: goalIds,
             });
@@ -159,7 +167,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
         setSpecificDates((current) => current.filter((entry) => entry !== value));
     };
 
-    // The copy keeps templates, goals and notes but starts unscheduled, so it never
+    // The copy keeps templates, activities, goals and notes but starts unscheduled, so it never
     // takes a date from this day.
     const handleDuplicate = async () => {
         if (!onDuplicate || isDuplicating) return;
@@ -193,14 +201,22 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
         }
     };
 
+    // "At least N" never asks for more items than the day has.
+    const capMinimum = (nextItemCount) => {
+        if (completionMinTemplates !== '' && Number(completionMinTemplates) > nextItemCount) {
+            setCompletionMinTemplates(nextItemCount > 0 ? String(nextItemCount) : '');
+        }
+    };
+
     const handleRemoveTemplate = (indexToRemove) => {
-        setSelectedTemplates((current) => {
-            const nextTemplates = current.filter((_, index) => index !== indexToRemove);
-            if (completionMinTemplates !== '' && Number(completionMinTemplates) > nextTemplates.length) {
-                setCompletionMinTemplates(nextTemplates.length > 0 ? String(nextTemplates.length) : '');
-            }
-            return nextTemplates;
-        });
+        const nextTemplates = selectedTemplates.filter((_, index) => index !== indexToRemove);
+        setSelectedTemplates(nextTemplates);
+        capMinimum(nextTemplates.length + activityConditions.length);
+    };
+
+    const handleActivityConditionsChange = (next) => {
+        setActivityConditions(next);
+        capMinimum(selectedTemplates.length + next.length);
     };
 
     const handleToggleRequired = (indexToToggle) => {
@@ -211,17 +227,13 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
         )));
     };
 
-    const requiredTemplateCount = selectedTemplates.filter((entry) => entry.isRequired !== false).length;
-    const completionSummaryParts = [];
-    if (requiredTemplateCount > 0) {
-        completionSummaryParts.push(`Requires ${requiredTemplateCount} required session${requiredTemplateCount === 1 ? '' : 's'}`);
-    }
-    if (completionMinTemplates !== '') {
-        completionSummaryParts.push(`at least ${completionMinTemplates} total`);
-    }
-    const completionSummary = completionSummaryParts.length > 0
-        ? completionSummaryParts.join(' and ')
-        : 'Completes after any selected session is completed';
+    const itemCount = selectedTemplates.length + activityConditions.length;
+    const completionSummary = describeDayCompletion({
+        requiredSessions: selectedTemplates.filter((entry) => entry.isRequired !== false).length,
+        requiredActivities: activityConditions.filter((condition) => condition.isRequired).length,
+        minimum: completionMinTemplates === '' ? null : Number(completionMinTemplates),
+        itemCount,
+    });
 
     const handleTemplateBuilderSave = async (payload, templateId) => {
         try {
@@ -320,7 +332,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                                     fullWidth
                                 >
                                     <option value="">+ Add Session Template</option>
-                                    {availableProgramTemplates.map(t => (
+                                    {sessionTemplates.map(t => (
                                         <option key={t.id} value={t.id}>{t.name}</option>
                                     ))}
                                 </Select>
@@ -332,41 +344,22 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                                     + New
                                 </Button>
                             </div>
-                            {selectedTemplates.length > 0 && (
-                                <div className={styles.completionRuleRow}>
-                                    <label className={styles.checkboxLabel}>
-                                        <input
-                                            type="checkbox"
-                                            checked={completionMinTemplates !== ''}
-                                            onChange={(event) => setCompletionMinTemplates(event.target.checked ? String(Math.min(1, selectedTemplates.length)) : '')}
-                                            className={styles.checkbox}
-                                        />
-                                        <span>At least</span>
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max={selectedTemplates.length}
-                                        disabled={completionMinTemplates === ''}
-                                        value={completionMinTemplates}
-                                        onChange={(event) => {
-                                            const value = event.target.value;
-                                            if (value === '') {
-                                                setCompletionMinTemplates('');
-                                                return;
-                                            }
-                                            setCompletionMinTemplates(String(Math.max(1, Math.min(Number(value) || 1, selectedTemplates.length))));
-                                        }}
-                                        className={styles.minTemplatesInput}
-                                        aria-label="Minimum completed sessions"
-                                    />
-                                    <span className={styles.completionRuleText}>completed</span>
-                                </div>
-                            )}
-                            {selectedTemplates.length > 0 && (
-                                <div className={styles.hint}>{completionSummary}.</div>
-                            )}
                         </div>
+
+                        <ProgramDayActivitiesField
+                            rootId={rootId}
+                            activities={activities}
+                            activityGroups={activityGroups}
+                            conditions={activityConditions}
+                            onChange={handleActivityConditionsChange}
+                        />
+
+                        <ProgramDayCompletionRule
+                            minimum={completionMinTemplates}
+                            onMinimumChange={setCompletionMinTemplates}
+                            itemCount={itemCount}
+                            summary={completionSummary}
+                        />
 
                         {isEdit && onDuplicate && (
                             <div className={styles.copyArea}>
@@ -380,7 +373,7 @@ const ProgramDayModalInner = ({ onClose, onSave, onDuplicate, onDelete, rootId, 
                                     Duplicate day
                                 </Button>
                                 <div className={styles.hint}>
-                                    Makes an unscheduled copy with the same sessions and goals.
+                                    Makes an unscheduled copy with the same sessions, activities and goals.
                                 </div>
                             </div>
                         )}

@@ -83,6 +83,17 @@ describe('createSessionProgramDay', () => {
         expect(view.isDayComplete).toBe(true);
     });
 
+    it('takes the server\'s verdict, which counts the day\'s activities too', () => {
+        const day = {
+            day_id: 'day-1',
+            sessions: [{ template_id: 'warmup', is_required: false }],
+            completed_template_ids: ['warmup'],
+            activity_conditions: [{ id: 'lever', is_required: true, completed: false }],
+        };
+        expect(buildTodayProgramDayView([{ ...day, requirements_met: false }]).isDayComplete).toBe(false);
+        expect(buildTodayProgramDayView([{ ...day, sessions: [], requirements_met: true }]).isDayComplete).toBe(true);
+    });
+
     it('returns an empty, incomplete view for no days', () => {
         expect(buildTodayProgramDayView([])).toMatchObject({
             hasProgramDayToday: false,

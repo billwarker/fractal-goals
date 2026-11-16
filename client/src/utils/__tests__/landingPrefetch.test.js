@@ -14,7 +14,9 @@ vi.mock('../api', () => ({
 
 import { publicApi } from '../api';
 import { getLandingPageHref, isLandingPreviewPath, isPublicLandingLocation, isPublicMarketingHost } from '../marketingHost';
-import { fetchLandingExamples, maybePrefetchLandingExamples } from '../landingPrefetch';
+import { fetchLandingExamples, LANDING_SCHEMA_VERSION, maybePrefetchLandingExamples } from '../landingPrefetch';
+
+const published = (examples) => ({ schema_version: LANDING_SCHEMA_VERSION, revision: 'rev-1', examples });
 
 describe('isPublicMarketingHost', () => {
     it('treats only the apex marketing domains as public hosts', () => {
@@ -96,9 +98,9 @@ describe('fetchLandingExamples', () => {
     });
 
     it('consumes the index.html preload promise once, then uses the API', async () => {
-        window.__fgLandingExamplesPreload = Promise.resolve({ examples: [{ root_id: 'r1' }] });
+        window.__fgLandingExamplesPreload = Promise.resolve(published([{ root_id: 'r1' }]));
 
-        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [{ root_id: 'r1' }] });
+        await expect(fetchLandingExamples()).resolves.toEqual(published([{ root_id: 'r1' }]));
         expect(window.__fgLandingExamplesPreload).toBeUndefined();
         expect(publicApi.getLandingExamples).not.toHaveBeenCalled();
 
@@ -128,7 +130,7 @@ describe('fetchLandingExamples', () => {
 
     it('ignores the preload when the app is not calling same-origin /api', async () => {
         apiState.apiBase = 'http://localhost:8001/api';
-        window.__fgLandingExamplesPreload = Promise.resolve({ examples: [{ root_id: 'r1' }] });
+        window.__fgLandingExamplesPreload = Promise.resolve(published([{ root_id: 'r1' }]));
 
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
         expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
@@ -151,9 +153,9 @@ describe('fetchLandingExamples', () => {
 
     it('uses the configured static snapshot before the API', async () => {
         window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
-        publicApi.getStaticLandingExamples.mockResolvedValueOnce({ data: { examples: [{ root_id: 'static-root' }] } });
+        publicApi.getStaticLandingExamples.mockResolvedValueOnce({ data: published([{ root_id: 'static-root' }]) });
 
-        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [{ root_id: 'static-root' }] });
+        await expect(fetchLandingExamples()).resolves.toEqual(published([{ root_id: 'static-root' }]));
         expect(publicApi.getStaticLandingExamples).toHaveBeenCalledWith('/landing-examples.json');
         expect(publicApi.getLandingExamples).not.toHaveBeenCalled();
     });
@@ -177,7 +179,17 @@ describe('fetchLandingExamples', () => {
     it('rejects a current-schema static snapshot without its publication revision', async () => {
         window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
         publicApi.getStaticLandingExamples.mockResolvedValueOnce({
-            data: { schema_version: 12, examples: [{ root_id: 'root', tree: {} }] },
+            data: { schema_version: LANDING_SCHEMA_VERSION, examples: [{ root_id: 'root' }] },
+        });
+
+        await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });
+        expect(publicApi.getLandingExamples).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([12, 14])('passes over a static file from an older publish (schema %i) for the API', async (version) => {
+        window.__fgLandingExamplesStaticUrl = '/landing-examples.json';
+        publicApi.getStaticLandingExamples.mockResolvedValueOnce({
+            data: { schema_version: version, revision: 'old', examples: [{ root_id: 'root', tree: {} }] },
         });
 
         await expect(fetchLandingExamples()).resolves.toEqual({ examples: [] });

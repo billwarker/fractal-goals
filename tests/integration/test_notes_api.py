@@ -253,24 +253,9 @@ class TestNotesApiNanoValidation:
 
     def test_create_note_rejects_quick_session(self, authed_client, db_session, sample_ultimate_goal, sample_activity_definition):
         root_id = sample_ultimate_goal.id
-        quick_template = SessionTemplate(
-            id=str(uuid.uuid4()),
-            name='Quick Template',
-            root_id=root_id,
-            template_data=json.dumps({
-                'session_type': 'quick',
-                'activities': [{'activity_id': sample_activity_definition.id}],
-            }),
-        )
-        db_session.add(quick_template)
-        db_session.commit()
-
         create_response = authed_client.post(
-            f'/api/{root_id}/sessions',
-            json={
-                'name': 'Quick Session',
-                'template_id': quick_template.id,
-            }
+            f'/api/{root_id}/sessions/quick-complete',
+            json={'activity_instances': [{'activity_definition_id': sample_activity_definition.id}]},
         )
         assert create_response.status_code == 201
         session = create_response.get_json()

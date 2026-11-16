@@ -59,7 +59,6 @@ class TestFractalEndpoints:
         assert starter.name == 'Simple Empty Template'
         assert starter.description == 'A blank one-section session. Start here, add activities as you go.'
         assert json.loads(starter.template_data) == {
-            'session_type': 'normal',
             'sections': [{'name': 'Main', 'activities': []}],
         }
 
@@ -420,6 +419,21 @@ class TestGoalCompletionEndpoints:
         data = json.loads(response.data)
         assert data['completed'] == initial_status
     
+    def test_dismissing_the_completion_note_prompt_is_remembered(self, authed_client, sample_goal_hierarchy):
+        """Goal Detail stops asking for a completion note once dismissed, for that completion."""
+        root = sample_goal_hierarchy['ultimate']
+        goal = sample_goal_hierarchy['long_term']
+        assert authed_client.patch(f'/api/goals/{goal.id}/complete').status_code == 200
+        before = authed_client.get(f'/api/goals/{goal.id}').get_json()
+        assert before['completion_state']['note_dismissed_at'] is None
+
+        response = authed_client.put(f'/api/{root.id}/goals/{goal.id}', json={'completion_note_dismissed': True})
+
+        assert response.status_code == 200, response.get_json()
+        dismissed_at = response.get_json()['completion_state']['note_dismissed_at']
+        assert dismissed_at is not None
+        assert dismissed_at >= response.get_json()['completed_at']
+
     def test_toggle_completion_nonexistent_goal(self, authed_client):
         """Test toggling completion for nonexistent goal."""
         response = authed_client.patch('/api/goals/nonexistent-id/complete')

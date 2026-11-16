@@ -1,0 +1,21 @@
+.message {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+}
+
+.action {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-brand-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.action:hover,
+.action:focus-visible {
+    text-decoration: underline;
+}

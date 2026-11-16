@@ -1,5 +1,4 @@
 import { getLocalISOString } from './dateUtils';
-import { isQuickSession } from './sessionRuntime';
 
 export function extractActivityId(item) {
     if (typeof item === 'string') return item;
@@ -43,9 +42,8 @@ function normalizeSection(section) {
     };
 }
 
-/** `planReference` names the dated program session plan a normal session executes, if any. */
+/** `planReference` names the dated program session plan the session executes, if any. */
 export function buildTemplateSessionPayload(template, selectedProgramDay, goalIds = [], planReference = {}) {
-    const quickTemplate = isQuickSession(template);
     const shared = {
         template_id: template.id,
         template_name: template.name,
@@ -70,22 +68,19 @@ export function buildTemplateSessionPayload(template, selectedProgramDay, goalId
             ? { goal_scope_enabled: selectedProgramDay.goal_scope_enabled }
             : {}),
     } : null;
-    const sessionDataPayload = quickTemplate
-        ? { ...shared, session_type: 'quick', program_context: null }
-        : {
-            ...shared,
-            session_type: 'normal',
-            program_context: programContext,
-            sections: (template.template_data?.sections || []).map(normalizeSection),
-            total_duration_minutes: template.template_data?.total_duration_minutes || 0,
-        };
     return {
         name: template.name,
         description: template.description || '',
         template_id: template.id,
-        duration_minutes: quickTemplate ? 0 : (template.template_data?.total_duration_minutes || 0),
+        duration_minutes: template.template_data?.total_duration_minutes || 0,
         session_start: getLocalISOString(),
-        session_data: sessionDataPayload,
-        ...(quickTemplate ? {} : { goal_ids: goalIds, ...planReference }),
+        session_data: {
+            ...shared,
+            program_context: programContext,
+            sections: (template.template_data?.sections || []).map(normalizeSection),
+            total_duration_minutes: template.template_data?.total_duration_minutes || 0,
+        },
+        goal_ids: goalIds,
+        ...planReference,
     };
 }

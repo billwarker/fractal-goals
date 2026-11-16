@@ -9,6 +9,7 @@ import { trackedBlockWeeks } from './programBlockWeeks';
 import { buildProgramGoalScope } from './programGoalWindow';
 import { isBlockActive } from './programUtils.jsx';
 import { getProgramDayScheduledDates } from './programDaySchedule';
+import { collapseQuickSessions } from './programDayState';
 
 export { WEEKDAY_NAMES, getProgramDayWeekdays, getProgramDaySpecificDates, formatWeekdaySchedule,
     formatSpecificDatesSummary, getProgramDayScheduleLabel, getProgramDayScheduledDates } from './programDaySchedule';
@@ -552,11 +553,11 @@ export function buildProgramCalendarEvents({
             });
         });
 
-        data.unlinkedSessions.forEach((session) => {
+        collapseQuickSessions(data.unlinkedSessions).forEach(({ session, title }) => {
             const completed = isCompletedSession(session);
             events.push({
                 id: `session-${includeProgramId ? `${program.id}-` : ''}${session.id}`,
-                title: session.name,
+                title,
                 start: dateStr,
                 allDay: true,
                 backgroundColor: 'transparent',

@@ -60,6 +60,7 @@ from blueprints.telemetry_api import telemetry_bp
 from blueprints.circuits_api import circuits_bp
 from blueprints.agent_api import agent_bp, agent_internal_bp, agent_metadata_bp, agent_oauth_bp
 from blueprints.error_handlers import register_error_handlers
+from blueprints.goal_changes import register_goal_changes
 from services.completion_handlers import clear_achievement_context, clear_live_progress
 from services import init_services
 from services.db_migration_service import apply_startup_migrations
@@ -231,6 +232,7 @@ app.register_blueprint(agent_oauth_bp)
 app.register_blueprint(agent_internal_bp)
 app.register_blueprint(agent_metadata_bp)
 register_error_handlers(app)
+register_goal_changes(app)
 
 # Initialize services (event bus, completion handlers, etc.)
 init_services()

@@ -39,6 +39,15 @@ export function buildInitialProgramDayState(initialData) {
         scheduleMode: specificDates.length && !selectedDaysOfWeek.length
             ? SCHEDULE_MODES.dates
             : SCHEDULE_MODES.weekly,
+        activityConditions: (initialData?.activity_conditions || []).map((condition) => ({
+            key: condition.id,
+            activityDefinitionId: condition.activity_definition_id,
+            activityName: condition.activity_name || null,
+            isRequired: condition.is_required !== false,
+            tagIds: condition.tag_ids || [],
+            tagMatch: condition.tag_match || 'contains',
+        })),
+        // "At least N completed", counting sessions and activities together.
         completionMinTemplates: initialData?.completion_min_templates || '',
         goalIds: initialData?.goal_ids || [],
     };

@@ -151,12 +151,12 @@ export function useOfflineSessionWrites({
                     )),
                 };
             });
-            void enqueue(
+            enqueue(
                 SESSION_OP.ACTIVITY_REMOVE,
                 { method: 'delete', url: `/${rootId}/sessions/${sessionId}/activities/${instanceId}` },
                 { instanceId },
                 { entityIds: [instanceId], supersedes: [instanceId] },
-            );
+            ).catch(() => {}); // The outbox has already said it couldn't be saved.
         };
 
         const updateTimer = async (instanceId, action, extraData = {}) => {

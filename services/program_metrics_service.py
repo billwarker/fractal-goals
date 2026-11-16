@@ -6,7 +6,10 @@ import logging
 import time as time_module
 from sqlalchemy.orm import joinedload, selectinload
 
-from models import ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Session, validate_root_goal
+from models import (
+    ActivityInstance, Program, ProgramDay, ProgramDayTemplate, Session, validate_root_goal,
+)
+from models.program import program_day_activity_condition_loads
 from services.analytics_engine import build_scoped_dataset_query, get_analytics_dataset
 from services.calendar_periods import load_calendar_periods, serialize_calendar_period
 from services.effective_goal_activities import resolve_effective_goals_by_activity
@@ -22,6 +25,7 @@ from services.program_scope import ProgramScope, expand_descendants, resolve_pro
 from services.program_day_credits import (
     completed_credits_by_occurrence_template,
     credited_block_ids_by_session,
+    load_program_activity_evidence,
     load_program_credit_candidates,
     load_program_session_credits,
     local_date_utc_bounds,
@@ -80,6 +84,7 @@ class ProgramMetricsService:
             joinedload(Program.blocks),
             days.selectinload(ProgramDay.template_links).joinedload(ProgramDayTemplate.template),
             days.joinedload(ProgramDay.templates),
+            *program_day_activity_condition_loads(days),
         )
 
     def load_resolved_evidence(
@@ -186,6 +191,9 @@ class ProgramMetricsService:
         program_sessions = load_program_credit_candidates(
             self.db_session, root_id, current_user_id, [program], utc_start, utc_end, session_credits,
         )[program.id]
+        activity_evidence = load_program_activity_evidence(
+            self.db_session, root_id, current_user_id, [program], utc_start, utc_end, zone,
+        )
         status_overrides = load_program_status_overrides(
             self.db_session, [program.id], window["display_start"], window["display_end"]
         )[program.id]
@@ -207,6 +215,7 @@ class ProgramMetricsService:
             status_overrides=status_overrides,
             session_credits=session_credits[program.id],
             periods=periods,
+            activity_evidence=activity_evidence,
         )
         duration_ms = round((time_module.perf_counter() - started) * 1000, 2)
         logger.info(
@@ -287,6 +296,9 @@ class ProgramMetricsService:
         sessions_by_program = load_program_credit_candidates(
             self.db_session, root_id, current_user_id, programs, utc_start, utc_end, credits_by_program,
         )
+        activity_evidence = load_program_activity_evidence(
+            self.db_session, root_id, current_user_id, programs, utc_start, utc_end, zone,
+        )
         overrides_by_program = load_program_status_overrides(self.db_session, ordered_ids, *observation)
         periods = load_calendar_periods(self.db_session, root_id, current_user_id, *observation)
         rows = []
@@ -312,6 +324,7 @@ class ProgramMetricsService:
                 status_overrides=overrides_by_program[program.id],
                 session_credits=credits_by_program[program.id],
                 periods=periods,
+                activity_evidence=activity_evidence,
             )
             scheduled_facts = [item for item in facts if item["counts_toward_adherence"]]
             observed_scheduled = [
@@ -479,7 +492,7 @@ class ProgramMetricsService:
         seed_ids = frozenset(goal_id for _, _, goal_id in seed_rows if goal_id in goals_by_id)
         return focus, ProgramScope(seed_ids, expand_descendants(seed_ids, children))
 
-    def _aggregate(self, *, program, scope, focus, goals_by_id, evidence, program_sessions, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=()):
+    def _aggregate(self, *, program, scope, focus, goals_by_id, evidence, program_sessions, window, zone, timezone_name, local_today, status_overrides, session_credits=(), periods=(), activity_evidence=None):
         program_start, program_end = _date_part(program.start_date), _date_part(program.end_date)
         if local_today < program_start:
             status = "upcoming"
@@ -506,6 +519,7 @@ class ProgramMetricsService:
             status_overrides=status_overrides,
             session_credits=session_credits,
             periods=periods,
+            activity_evidence=activity_evidence,
         )
         credited_blocks_by_session = credited_block_ids_by_session(day_facts)
         # Execution metrics describe completed sessions linked to or credited to

@@ -213,10 +213,16 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
         raise ValueError('template_data must be an object')
 
     normalized = dict(template_data)
-    session_type = str(normalized.get('session_type') or 'normal').strip().lower()
-    if session_type not in {'normal', 'quick'}:
-        raise ValueError("template_data.session_type must be 'normal' or 'quick'")
-    normalized['session_type'] = session_type
+    # Templates have one shape. Older clients and agents still send session_type 'normal'.
+    session_type = str(normalized.pop('session_type', None) or 'normal').strip().lower()
+    if session_type == 'quick':
+        raise ValueError('Quick sessions no longer use templates — start one from Create Session')
+    if session_type != 'normal':
+        raise ValueError("template_data.session_type is no longer used; omit it")
+    normalized.pop('converted_from_quick', None)
+    if isinstance(normalized.get('activities'), list) and normalized['activities']:
+        raise ValueError('templates list activities inside sections')
+    normalized.pop('activities', None)
 
     template_color = normalized.get('template_color')
     if template_color in ('', None):
@@ -226,51 +232,39 @@ def validate_session_template_data(template_data: Dict[str, Any]) -> Dict[str, A
             raise ValueError('template_data.template_color must be a valid #RRGGBB hex color')
         normalized['template_color'] = template_color.strip()
 
-    if session_type == 'normal':
-        sections = normalized.get('sections')
-        if not isinstance(sections, list) or len(sections) == 0:
-            raise ValueError('normal templates must include at least one section')
-        seen_item_keys = set()
-        for section in sections:
-            if not isinstance(section, dict):
-                raise ValueError('each section must be an object')
-            section_name = sanitize_string(section.get('name') or '')
-            if not section_name:
-                raise ValueError('each section must include a name')
-            section['name'] = section_name
-            default_group_id = section.get('default_activity_group_id')
-            if default_group_id in ('', None):
-                section.pop('default_activity_group_id', None)
-            elif not isinstance(default_group_id, str):
-                raise ValueError('section default_activity_group_id must be a string')
+    sections = normalized.get('sections')
+    if not isinstance(sections, list) or len(sections) == 0:
+        raise ValueError('templates must include at least one section')
+    seen_item_keys = set()
+    for section in sections:
+        if not isinstance(section, dict):
+            raise ValueError('each section must be an object')
+        section_name = sanitize_string(section.get('name') or '')
+        if not section_name:
+            raise ValueError('each section must include a name')
+        section['name'] = section_name
+        default_group_id = section.get('default_activity_group_id')
+        if default_group_id in ('', None):
+            section.pop('default_activity_group_id', None)
+        elif not isinstance(default_group_id, str):
+            raise ValueError('section default_activity_group_id must be a string')
+        else:
+            stripped_group_id = default_group_id.strip()
+            if stripped_group_id:
+                section['default_activity_group_id'] = stripped_group_id
             else:
-                stripped_group_id = default_group_id.strip()
-                if stripped_group_id:
-                    section['default_activity_group_id'] = stripped_group_id
-                else:
-                    section.pop('default_activity_group_id', None)
-            section_activities = None
-            for key in ('items', 'activities', 'exercises', 'activity_ids'):
-                if key in section:
-                    section_activities = section.get(key)
-                    break
-            if section_activities is None:
-                continue
-            if not isinstance(section_activities, list):
-                raise ValueError('section activities must be a list')
-            if 'items' in section:
-                validate_section_items(section_activities, seen_item_keys)
-        quick_activities = normalized.get('activities')
-        if isinstance(quick_activities, list) and len(quick_activities) > 0:
-            raise ValueError('normal templates cannot define top-level activities')
-    else:
-        activities = normalized.get('activities')
-        if not isinstance(activities, list) or not (1 <= len(activities) <= 5):
-            raise ValueError('quick templates must include between 1 and 5 activities')
-        sections = normalized.get('sections')
-        if isinstance(sections, list) and len(sections) > 0:
-            raise ValueError('quick templates cannot define sections')
-        normalized.pop('sections', None)
+                section.pop('default_activity_group_id', None)
+        section_activities = None
+        for key in ('items', 'activities', 'exercises', 'activity_ids'):
+            if key in section:
+                section_activities = section.get(key)
+                break
+        if section_activities is None:
+            continue
+        if not isinstance(section_activities, list):
+            raise ValueError('section activities must be a list')
+        if 'items' in section:
+            validate_section_items(section_activities, seen_item_keys)
 
     return normalized
 

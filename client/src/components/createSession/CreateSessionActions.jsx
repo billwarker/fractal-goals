@@ -15,15 +15,28 @@ function CreateSessionActions({
     scopeReady = true,
     footerMode = false,
     headerMode = false,
+    // A number while a quick session is being logged: it is completed here, not created.
+    quickActivityCount = null,
 }) {
-    const isDisabled = !selectedTemplate || creating || !scopeReady;
+    const quick = quickActivityCount !== null;
+    const actionTitle = quick ? 'Complete Session' : 'Create Session';
+    const isDisabled = creating || (quick ? quickActivityCount === 0 : !selectedTemplate || !scopeReady);
+    const pendingLabel = quick ? 'Completing...' : 'Creating...';
 
     return (
         <StepContainer className={`${styles.container} ${footerMode ? styles.footerContainer : ''} ${headerMode ? styles.headerContainer : ''}`}>
-            {!headerMode && !footerMode && <StepHeader stepNumber={2} title="Create Session" />}
-            {footerMode && <h2 className={styles.footerTitle}>Create Session</h2>}
+            {!headerMode && !footerMode && <StepHeader stepNumber={quick ? 3 : 4} title={actionTitle} />}
+            {footerMode && <h2 className={styles.footerTitle}>{actionTitle}</h2>}
 
-            {selectedTemplate ? (
+            {quick ? (
+                <div className={styles.summary}>
+                    <div className={styles.summaryLine}>
+                        {quickActivityCount === 0
+                            ? 'Add an activity to complete'
+                            : `Quick session · ${quickActivityCount} ${quickActivityCount === 1 ? 'activity' : 'activities'}`}
+                    </div>
+                </div>
+            ) : selectedTemplate ? (
                 <SessionSummary
                     selectedTemplate={selectedTemplate}
                     selectedProgramDay={selectedProgramDay}
@@ -38,7 +51,7 @@ function CreateSessionActions({
                 size={headerMode || footerMode ? 'md' : 'lg'}
                 className={styles.button}
             >
-                {creating ? 'Creating...' : 'Create Session'}
+                {creating ? pendingLabel : actionTitle}
             </Button>
         </StepContainer>
     );

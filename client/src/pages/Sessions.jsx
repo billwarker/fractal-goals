@@ -1,5 +1,4 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -13,8 +12,7 @@ import useIsMobile from '../hooks/useIsMobile';
 import usePersistedPaneOpen from '../hooks/usePersistedPaneOpen';
 import { SessionsQuerySidebar, SessionCardExpanded } from '../components/sessions';
 import WindowedSessionRow from '../components/sessions/WindowedSessionRow';
-import CardCornerActionButton from '../components/common/CardCornerActionButton';
-import ModalBackdrop from '../components/atoms/ModalBackdrop';
+import QuickSessionModal from '../components/sessions/QuickSessionModal';
 import Spinner from '../components/atoms/Spinner';
 import EmptyState from '../components/common/EmptyState';
 import LoadingState from '../components/common/LoadingState';
@@ -32,10 +30,8 @@ import { isQuickSession } from '../utils/sessionRuntime';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import '../App.css';
 import styles from './Sessions.module.css';
-import { ActiveSessionProvider } from '../contexts/ActiveSessionContext';
 import { logError } from '../utils/logger';
 import { invalidateNotesAfterDelete } from '../utils/queryInvalidation';
-const QuickSessionWorkspace = lazyWithRetry(() => import('../components/sessionDetail/QuickSessionWorkspace'), 'components/sessionDetail/QuickSessionWorkspace');
 const GoalDetailModal = lazyWithRetry(() => import('../components/ConnectedGoalDetailModal'), 'components/ConnectedGoalDetailModal');
 function Sessions() {
     const { getGoalColor } = useGoalLevels();
@@ -52,7 +48,6 @@ function Sessions() {
         toggleGoalCompletion,
     } = useGoals();
     const isMobile = useIsMobile();
-    const quickSessionDialogRef = useRef(null);
 
     const [selectedSessionId, setSelectedSessionId] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
@@ -164,50 +159,6 @@ function Sessions() {
         nextSearchParams.delete('quickSessionId');
         setSearchParams(nextSearchParams);
     }, [searchParams, setSearchParams]);
-
-    useEffect(() => {
-        if (!activeQuickSession || !quickSessionDialogRef.current) return undefined;
-
-        const dialog = quickSessionDialogRef.current;
-        dialog.focus();
-
-        const handleKeyDown = (event) => {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                handleCloseQuickSessionModal();
-                return;
-            }
-
-            if (event.key !== 'Tab') return;
-
-            const focusableElements = dialog.querySelectorAll(
-                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-            );
-            const focusable = Array.from(focusableElements).filter((element) => (
-                !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true'
-            ));
-
-            if (focusable.length === 0) {
-                event.preventDefault();
-                dialog.focus();
-                return;
-            }
-
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
-            }
-        };
-
-        dialog.addEventListener('keydown', handleKeyDown);
-        return () => dialog.removeEventListener('keydown', handleKeyDown);
-    }, [activeQuickSession, handleCloseQuickSessionModal]);
 
     const goalOptions = useMemo(() => goalFilterOptions(goalTree), [goalTree]);
 
@@ -442,33 +393,13 @@ function Sessions() {
                 </Suspense>
             )}
 
-            {activeQuickSession && isQuickSession(activeQuickSession) && createPortal(
-                <ModalBackdrop
-                    className={styles.quickSessionModalOverlay}
+            {activeQuickSession && isQuickSession(activeQuickSession) && (
+                <QuickSessionModal
+                    rootId={rootId}
+                    sessionId={activeQuickSession.id}
+                    sessionName={activeQuickSession.name}
                     onClose={handleCloseQuickSessionModal}
-                    role="presentation"
-                >
-                    <div
-                        ref={quickSessionDialogRef}
-                        className={styles.quickSessionModal}
-                        onClick={(event) => event.stopPropagation()}
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label={`Quick session: ${activeQuickSession.name}`}
-                        tabIndex={-1}
-                    >
-                        <CardCornerActionButton
-                            className={styles.quickSessionModalClose}
-                            onClick={handleCloseQuickSessionModal}
-                            label="Close quick session"
-                            title="Close"
-                        />
-                        <ActiveSessionProvider rootId={rootId} sessionId={activeQuickSession.id}>
-                            <Suspense fallback={<LoadingState label="Loading session…" />}><QuickSessionWorkspace /></Suspense>
-                        </ActiveSessionProvider>
-                    </div>
-                </ModalBackdrop>,
-                document.body,
+                />
             )}
         </div>
     );

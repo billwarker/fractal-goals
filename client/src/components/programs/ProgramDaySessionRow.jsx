@@ -7,6 +7,8 @@ import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import useAnchoredMenuController from '../../hooks/useAnchoredMenuController';
 import { formatDateValue, formatDurationHuman } from '../../utils/dateUtils';
 import { sessionCreditActions } from '../../utils/programDaySessionCredit';
+import { isQuickSession } from '../../utils/sessionRuntime';
+import QuickSessionModal from '../sessions/QuickSessionModal';
 import styles from './ProgramSidePane.module.css';
 
 function SessionCreditMenu({ session, actions, pending, onChoose }) {
@@ -56,23 +58,40 @@ export default function ProgramDaySessionRow({
     const endTime = formatDateValue(session.session_end || session.completed_at, 'h:mm A', timezone);
     const actions = sessionCreditActions(session, canEditCredits);
     const choose = (action) => onSetCredit?.(session, action.disposition, action.templateId);
+    const [quickSessionOpen, setQuickSessionOpen] = useState(false);
+
+    const identity = (
+        <span className={styles.sessionTemplateStatus}>
+            {session.template ? (
+                <SessionTemplateNameBadge name={session.template.name} color={session.template.color} size="sm" wrap />
+            ) : <strong>{session.name}</strong>}
+            <CompletionCheckBadge
+                checked={Boolean(session.completed)}
+                inProgress={!session.completed && !session.is_paused}
+                paused={Boolean(session.is_paused)}
+                label={`${session.name}: ${session.completed ? 'completed' : session.is_paused ? 'paused' : 'in progress'}`}
+            />
+        </span>
+    );
 
     return (
         <div className={styles.sessionCard}>
             <div className={styles.sessionIdentity}>
-                <Link to={`/${rootId}/session/${session.id}`} className={styles.sessionRow}>
-                    <span className={styles.sessionTemplateStatus}>
-                        {session.template ? (
-                            <SessionTemplateNameBadge name={session.template.name} color={session.template.color} size="sm" wrap />
-                        ) : <strong>{session.name}</strong>}
-                        <CompletionCheckBadge
-                            checked={Boolean(session.completed)}
-                            inProgress={!session.completed && !session.is_paused}
-                            paused={Boolean(session.is_paused)}
-                            label={`${session.name}: ${session.completed ? 'completed' : session.is_paused ? 'paused' : 'in progress'}`}
-                        />
-                    </span>
-                </Link>
+                {/* A quick session opens over the program, as on the Sessions page; others open their page. */}
+                {isQuickSession(session) ? (
+                    <button
+                        type="button"
+                        className={`${styles.sessionRow} ${styles.sessionRowButton}`}
+                        aria-haspopup="dialog"
+                        onClick={() => setQuickSessionOpen(true)}
+                    >
+                        {identity}
+                    </button>
+                ) : (
+                    <Link to={`/${rootId}/session/${session.id}`} className={styles.sessionRow}>
+                        {identity}
+                    </Link>
+                )}
                 {actions.length ? (
                     <SessionCreditMenu session={session} actions={actions} pending={pending} onChoose={choose} />
                 ) : null}
@@ -82,6 +101,14 @@ export default function ProgramDaySessionRow({
                 <span>End <time dateTime={session.session_end || session.completed_at}>{endTime || '—'}</time></span>
                 <span className={styles.sessionDuration}>{formatDurationHuman(session.total_duration_seconds)}</span>
             </div>
+            {quickSessionOpen ? (
+                <QuickSessionModal
+                    rootId={rootId}
+                    sessionId={session.id}
+                    sessionName={session.name}
+                    onClose={() => setQuickSessionOpen(false)}
+                />
+            ) : null}
         </div>
     );
 }

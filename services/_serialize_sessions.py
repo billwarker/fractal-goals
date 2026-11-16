@@ -9,8 +9,8 @@ from models import _safe_load_json
 from .session_runtime import (
     get_session_template_color,
     get_session_template_name,
+    get_data_session_type,
     get_template_color,
-    get_template_session_type,
 )
 from services._serialize_common import format_utc
 from services._serialize_activities import serialize_activity_instance, serialize_circuit_run
@@ -181,8 +181,6 @@ def _apply_template_metadata(session, session_data, template_payload):
     template_color = get_session_template_color(session)
     if template_color:
         session_data["template_color"] = template_color
-    if not session_data.get("session_type"):
-        session_data["session_type"] = get_template_session_type(template_payload)
 
 
 def _serialize_session_program_info(session, session_data):
@@ -409,7 +407,7 @@ def serialize_session(session):
     _apply_template_metadata(session, session_data, template_payload)
 
     result["attributes"]["session_data"] = session_data
-    result["session_type"] = get_template_session_type(session_data)
+    result["session_type"] = get_data_session_type(session_data)
     result["template_color"] = get_template_color(session_data)
 
     _hydrate_session_sections_from_instances(
@@ -494,7 +492,6 @@ def serialize_session_template(template):
         "description": getattr(template, 'description', '') or '',
         "root_id": getattr(template, 'root_id', None),
         "template_data": template_data,
-        "session_type": get_template_session_type(template_data),
         "template_color": get_template_color(template_data),
         "revision": getattr(template, 'revision', None) or 1,
         "archived_at": format_utc(archived_at),

@@ -1,6 +1,8 @@
 export const DEFAULT_TEMPLATE_COLOR = '#4A90E2';
 export const SESSION_TYPE_NORMAL = 'normal';
 export const SESSION_TYPE_QUICK = 'quick';
+// The name a quick session gets, and the label quick sessions share where they are grouped.
+export const QUICK_SESSION_NAME = 'Quick Session';
 
 export function normalizeSessionType(value) {
     if (typeof value !== 'string') return SESSION_TYPE_NORMAL;

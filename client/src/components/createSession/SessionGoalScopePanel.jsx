@@ -15,9 +15,10 @@ function SessionGoalScopePanel({
     error,
     onRetry,
     selectionDisabled = false,
-    readOnly = false,
     awaitingTemplate = false,
     embedded = false,
+    // Fill the parent's height, the hierarchy taking what the rest leaves (desktop Create Session).
+    fill = false,
     hideHeading = false,
     programScopeAvailable = false,
     programScopeEnabled = false,
@@ -27,25 +28,22 @@ function SessionGoalScopePanel({
     offScopeGoalCount = 0,
     onClearOffScopeGoals,
 }) {
-    const statusLabel = readOnly ? 'Read only' : 'Optional';
-    const description = readOnly
-        ? 'Goal scope cannot be edited for quick sessions.'
-        : awaitingTemplate
-            ? 'Select a template to review activity-derived goals and optionally add session goals.'
-            : 'Add optional goals to define this session\'s intent. Goals derived from template activities are locked.';
+    const description = awaitingTemplate
+        ? 'Add optional goals for this session. Goals from the template\'s activities are added, and locked, once you pick one.'
+        : 'Add optional goals to define this session\'s intent. Goals derived from template activities are locked.';
 
     return (
-        <StepContainer className={`${styles.container} ${embedded ? styles.embedded : ''}`}>
+        <StepContainer className={[styles.container, embedded ? styles.embedded : '', fill ? styles.fill : ''].filter(Boolean).join(' ')}>
             {!hideHeading && (
                 <div className={styles.header}>
                     <h2 className={styles.title}>Session Goals</h2>
-                    <span className={styles.optionalLabel}>{statusLabel}</span>
+                    <span className={styles.optionalLabel}>Optional</span>
                 </div>
             )}
             <p className={styles.description}>
                 {description}
             </p>
-            {programScopeAvailable && !readOnly ? (
+            {programScopeAvailable ? (
                 <div className={styles.scopeRow}>
                     <span
                         className={styles.programSwatch}

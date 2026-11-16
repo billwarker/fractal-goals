@@ -6,7 +6,8 @@ const SHEETS = [
     { name: 'Notes', path: 'browser-root-mobile/notes', open: { name: 'Show Filters' } },
     { name: 'Analytics', path: 'browser-root-mobile/analytics', open: { name: 'Show Sidebar' } },
     { name: 'Session Detail', path: 'browser-root-mobile/session/browser-session-mobile', open: { name: 'Details', exact: true } },
-    { name: 'Create Session', path: 'browser-sheet-handle-root-mobile/create-session', open: { name: 'Show Session Goals' } },
+    // With nothing to start from, Create Session opens on a quick session; the goals sheet belongs to templates.
+    { name: 'Create Session', path: 'browser-sheet-handle-root-mobile/create-session?source=template', open: { name: 'Show Session Goals' } },
     { name: 'Programs', path: 'browser-plan-root-mobile/programs', open: { name: 'Show Sidebar' } },
 ];
 

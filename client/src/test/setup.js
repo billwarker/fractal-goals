@@ -11,6 +11,13 @@ import { afterEach, vi } from 'vitest';
 const hasDom = typeof window !== 'undefined';
 let cleanup = null;
 
+// Node 25's Web Locks are shared by every worker thread in the process, so code that falls
+// back to navigator.locks (the outbox's default locks) would contend across test files. Tests
+// that need locking inject their own.
+if (typeof navigator !== 'undefined' && navigator.locks) {
+    Object.defineProperty(navigator, 'locks', { configurable: true, value: undefined });
+}
+
 if (hasDom) {
     await import('@testing-library/jest-dom');
     ({ cleanup } = await import('@testing-library/react'));

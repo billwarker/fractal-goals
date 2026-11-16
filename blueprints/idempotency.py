@@ -5,6 +5,12 @@ The first 2xx response is stored and replayed verbatim to later retries. Non-2xx
 responses release the key so a retry re-executes; rejections are deterministic,
 so the client still sees the same answer. Requests without the header behave
 exactly as before.
+
+The claim is committed on its own connection, so a concurrent retry sees it at once.
+The handler's first commit also marks the claim ``committed`` in the same transaction
+as the write. If the response is then lost (the instance dies, storing it fails, or the
+handler raises after committing), a retry gets a status-only replay and the write never
+runs twice.
 """
 import hashlib
 import logging
@@ -13,9 +19,12 @@ from functools import wraps
 from typing import cast
 
 from flask import Response, jsonify, make_response, request
+from sqlalchemy import event, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 import models
+from blueprints.api_utils import get_db_session
+from config import Config
 from models import IdempotencyRecord
 
 logger = logging.getLogger(__name__)
@@ -23,8 +32,11 @@ logger = logging.getLogger(__name__)
 IDEMPOTENCY_HEADER = 'Idempotency-Key'
 REPLAY_HEADER = 'Idempotent-Replayed'
 MAX_KEY_LENGTH = 255
-# A claim older than this belongs to a request that died mid-flight.
-STALE_CLAIM_AFTER = timedelta(minutes=2)
+# A claim older than this belongs to a request that died mid-flight: no request outlives the
+# worker timeout, so an older claim can't still be running.
+STALE_CLAIM_AFTER = timedelta(seconds=Config.REQUEST_TIMEOUT_SECONDS + 30)
+# The handler's write committed, but its response wasn't stored (or the handler failed after).
+COMMITTED = 'committed'
 RECORD_TTL = timedelta(days=14)
 # Larger responses are recorded as status only; the client's post-sync refresh fetches the data.
 MAX_STORED_BODY_BYTES = 64 * 1024
@@ -90,7 +102,7 @@ def _claim(db, user_id, key, request_hash):
             'error': 'Idempotency-Key was reused with a different request',
             'code': 'idempotency_key_mismatch',
         }), 422)
-    if existing.status == 'done':
+    if existing.status in ('done', COMMITTED):
         replay = _replay(existing)
         db.rollback()
         return None, replay
@@ -119,9 +131,31 @@ def _purge_globally_if_due(db, now):
     purge_expired_idempotency_records(db, now=now)
 
 
+def _mark_committed_with_write(business_db, user_id, key):
+    """Mark the claim committed inside the handler's first commit. Returns the remover."""
+    def mark(session):
+        session.execute(
+            update(IdempotencyRecord)
+            .where(IdempotencyRecord.user_id == user_id, IdempotencyRecord.key == key)
+            .values(status=COMMITTED)
+        )
+
+    event.listen(business_db, 'before_commit', mark, once=True)
+
+    def remove():
+        if event.contains(business_db, 'before_commit', mark):
+            event.remove(business_db, 'before_commit', mark)
+
+    return remove
+
+
 def _finish(db, user_id, key, response: Response):
     record = db.get(IdempotencyRecord, (user_id, key))
     if record is None:
+        return
+    db.refresh(record)
+    if record.status == COMMITTED and not 200 <= response.status_code < 300:
+        # Saved, then answered with an error: replay "saved" so the client refetches rather than undoing it.
         return
     if 200 <= response.status_code < 300:
         body = response.get_data(as_text=True)
@@ -135,8 +169,12 @@ def _finish(db, user_id, key, response: Response):
 
 
 def _release(db, user_id, key):
+    """Free the key for a retry, unless the write it guarded had already committed."""
     record = db.get(IdempotencyRecord, (user_id, key))
-    if record is not None:
+    if record is None:
+        return
+    db.refresh(record)
+    if record.status != COMMITTED:
         db.delete(record)
         db.commit()
 
@@ -159,9 +197,11 @@ def idempotent(handler):
             if not claimed:
                 return early_response
             response = None
+            stop_marking = _mark_committed_with_write(get_db_session(), user_id, key)
             try:
                 response = make_response(handler(current_user, *args, **kwargs))
             finally:
+                stop_marking()
                 if response is None:
                     # The handler raised: free the key so the client's retry re-executes.
                     db.rollback()

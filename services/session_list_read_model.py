@@ -3,7 +3,7 @@ from sqlalchemy import case, func, select, union
 from models import Goal, _safe_load_json, Program, ProgramBlock, ProgramDay, Session, SessionTemplate, session_goals
 from services.goal_loading import goal_serializer_relationship_loaders
 from services.serializers import format_utc, serialize_goal
-from services.session_runtime import get_template_color, normalize_session_type
+from services.session_runtime import get_template_color, normalize_session_type, session_runtime_text
 
 
 class SessionListReadModel:
@@ -49,9 +49,7 @@ class SessionListReadModel:
     def load(self, filtered_query, ordering, limit, offset):
         attrs = Session.attributes
         def runtime_text(key):
-            nested = case((func.jsonb_typeof(attrs['session_data'][key]) == 'string', attrs['session_data'][key].astext), else_=None)
-            direct = case((func.jsonb_typeof(attrs[key]) == 'string', attrs[key].astext), else_=None)
-            return case((func.jsonb_typeof(attrs['session_data']) == 'object', nested), else_=direct)
+            return session_runtime_text(attrs, key)
         columns = [getattr(Session, key) for key in (
             'id', 'root_id', 'name', 'description', 'session_start', 'session_end', 'completed',
             'completed_at', 'created_at', 'updated_at', 'duration_minutes', 'total_duration_seconds',

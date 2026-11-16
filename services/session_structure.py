@@ -1,12 +1,12 @@
 import copy
+from typing import Any
 import uuid
 
 import models
 
 from services.session_runtime import (
-    SESSION_TYPE_QUICK,
+    SESSION_TYPE_NORMAL,
     get_template_color,
-    get_template_session_type,
 )
 
 
@@ -61,12 +61,6 @@ def _session_runtime_data(session):
 
 def _template_runtime_data(session):
     return models._safe_load_json(getattr(getattr(session, 'template', None), 'template_data', None), {})
-
-
-def _resolve_session_type(runtime_data, template_data):
-    if isinstance(runtime_data, dict) and runtime_data.get('session_type'):
-        return get_template_session_type(runtime_data)
-    return get_template_session_type(template_data)
 
 
 def _resolve_template_color(runtime_data, template_data):
@@ -286,47 +280,38 @@ def _project_session_sections(runtime_data, active_instances, circuit_runs, acti
 def build_template_data_from_session(session):
     runtime_data = _session_runtime_data(session)
     template_runtime_data = _template_runtime_data(session)
-    session_type = _resolve_session_type(runtime_data, template_runtime_data)
     template_color = _resolve_template_color(runtime_data, template_runtime_data)
     active_instances = _active_instances(session)
 
-    if session_type == SESSION_TYPE_QUICK:
-        payload = {
-            'session_type': SESSION_TYPE_QUICK,
-            'activities': [_build_template_activity_item(instance) for instance in active_instances],
-        }
-    else:
-        sections = []
-        total_duration_minutes = 0
+    # Templates have one shape: a quick session's flat activity list becomes one section.
+    sections = []
+    total_duration_minutes = 0
 
-        for section in _project_session_sections(
-            runtime_data,
-            active_instances,
-            getattr(session, 'circuit_runs', None) or [],
-            _build_template_activity_item,
-        ):
-            normalized_duration = _normalize_duration(
-                section.get('duration_minutes', section.get('estimated_duration_minutes'))
-            )
-            if normalized_duration is not None:
-                total_duration_minutes += normalized_duration
+    for section in _project_session_sections(
+        runtime_data,
+        active_instances,
+        getattr(session, 'circuit_runs', None) or [],
+        _build_template_activity_item,
+    ):
+        normalized_duration = _normalize_duration(
+            section.get('duration_minutes', section.get('estimated_duration_minutes'))
+        )
+        if normalized_duration is not None:
+            total_duration_minutes += normalized_duration
 
-            section_payload = _copy_section_metadata(section)
-            section_payload.pop('estimated_duration_minutes', None)
-            if normalized_duration is not None:
-                section_payload['duration_minutes'] = normalized_duration
-            section_payload['activities'] = copy.deepcopy(section.get('items') or [])
-            sections.append(section_payload)
+        section_payload: dict[str, Any] = _copy_section_metadata(section)
+        section_payload.pop('estimated_duration_minutes', None)
+        if normalized_duration is not None:
+            section_payload['duration_minutes'] = normalized_duration
+        section_payload['activities'] = copy.deepcopy(section.get('items') or [])
+        sections.append(section_payload)
 
-        payload = {
-            'session_type': 'normal',
-            'sections': sections,
-        }
-        fallback_total_duration = _normalize_duration(runtime_data.get('total_duration_minutes'))
-        if total_duration_minutes > 0:
-            payload['total_duration_minutes'] = total_duration_minutes
-        elif fallback_total_duration is not None:
-            payload['total_duration_minutes'] = fallback_total_duration
+    payload: dict[str, Any] = {'sections': sections}
+    fallback_total_duration = _normalize_duration(runtime_data.get('total_duration_minutes'))
+    if total_duration_minutes > 0:
+        payload['total_duration_minutes'] = total_duration_minutes
+    elif fallback_total_duration is not None:
+        payload['total_duration_minutes'] = fallback_total_duration
 
     if template_color:
         payload['template_color'] = template_color
@@ -337,12 +322,11 @@ def build_template_data_from_session(session):
 def build_duplicate_session_data(session):
     runtime_data = _session_runtime_data(session)
     template_runtime_data = _template_runtime_data(session)
-    session_type = _resolve_session_type(runtime_data, template_runtime_data)
     template_color = _resolve_template_color(runtime_data, template_runtime_data)
     active_instances = _active_instances(session)
 
     payload = {
-        'session_type': session_type,
+        'session_type': SESSION_TYPE_NORMAL,
     }
 
     template_name = runtime_data.get('template_name') or getattr(getattr(session, 'template', None), 'name', None)
@@ -351,10 +335,6 @@ def build_duplicate_session_data(session):
 
     if template_color:
         payload['template_color'] = template_color
-
-    if session_type == SESSION_TYPE_QUICK:
-        payload['activities'] = [_build_template_activity_item(instance) for instance in active_instances]
-        return payload
 
     sections = []
     total_duration_minutes = 0

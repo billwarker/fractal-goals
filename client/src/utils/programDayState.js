@@ -1,4 +1,5 @@
 import { addDaysToDateString } from './dateUtils';
+import { isQuickSession, QUICK_SESSION_NAME } from './sessionRuntime';
 
 export const PROGRAM_DAY_STATE_META = {
     scheduled_met: { label: 'requirements met' },
@@ -70,6 +71,18 @@ export function mergeCompletedSessionDays(...dayCollections) {
     }));
 }
 
+/** Sessions with the quick ones as one entry, `{ session, title }`: "Quick Session ×N" for several. */
+export function collapseQuickSessions(sessions = []) {
+    const quick = sessions.filter(isQuickSession);
+    return [
+        ...sessions.filter((session) => !isQuickSession(session)).map((session) => ({ session, title: session.name })),
+        ...(quick.length ? [{
+            session: quick[0],
+            title: quick.length > 1 ? `${QUICK_SESSION_NAME} ×${quick.length}` : quick[0].name,
+        }] : []),
+    ];
+}
+
 /** Display completed session events on every date, alongside any scheduled day ribbon. */
 export function buildCompletedSessionEvents(days = [], programId = null) {
     return (days || []).flatMap((day) => {
@@ -79,11 +92,13 @@ export function buildCompletedSessionEvents(days = [], programId = null) {
                 ...(session.program_day_id ? [String(session.program_day_id)] : []),
                 ...(session.program_day_ids || []).map(String),
             ])].sort();
-            const templateKey = session.template_id
-                ? `template:${session.template_id}`
-                : session.template_name?.trim()
-                    ? `template-name:${session.template_name.trim().toLocaleLowerCase()}`
-                    : `session:${session.id}`;
+            // Quick sessions have no template; they share one row, "Quick Session ×N".
+            let templateKey = `session:${session.id}`;
+            if (isQuickSession(session)) templateKey = 'quick';
+            else if (session.template_id) templateKey = `template:${session.template_id}`;
+            else if (session.template_name?.trim()) {
+                templateKey = `template-name:${session.template_name.trim().toLocaleLowerCase()}`;
+            }
             const groupKey = `${templateKey}|program-days:${programDayIds.join(',')}`;
             const group = groups.get(groupKey);
             if (group) group.sessions.push(session);
@@ -92,9 +107,10 @@ export function buildCompletedSessionEvents(days = [], programId = null) {
 
         return [...groups.values()].map(({ sessions, sortOrder, programDayIds }) => {
             const representative = sessions[0];
+            const quick = isQuickSession(representative);
             return {
                 id: `completed-session-${representative.id}`,
-                title: representative.name,
+                title: quick && sessions.length > 1 ? QUICK_SESSION_NAME : representative.name,
                 start: day.date,
                 allDay: true,
                 backgroundColor: 'transparent',

@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom';
 import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
 import GoalDueText from '../goals/GoalDueText';
+import ActivityTagBadges from '../common/ActivityTagBadges';
 import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatLiteralDate } from '../../utils/dateUtils';
+import { quickSessionWithActivitiesPath } from '../../utils/programDayRules';
 import { sortProgramDays } from '../../utils/programViewModel';
 import LoadingState from '../common/LoadingState';
 import ProgramDateNotes from './ProgramDateNotes';
@@ -97,6 +99,39 @@ function StartActions({ rootId, program, occurrence, date, sessionsById }) {
                     </Link>
                 );
             })}
+        </div>
+    );
+}
+
+/** The activities a day asks for, each ticked once done in any session that date. */
+function DayActivities({ rootId, occurrence, date, today }) {
+    const activities = occurrence.activities || [];
+    if (!activities.length) return null;
+    const pending = activities.filter((activity) => activity.status !== 'completed' && !activity.activity_deleted);
+    return (
+        <div className={styles.activityGroup}>
+            <ul className={styles.activityList} aria-label={`Activities for ${occurrence.name}`}>
+                {activities.map((activity) => {
+                    const done = activity.status === 'completed';
+                    const name = activity.activity_deleted ? 'Deleted activity' : activity.activity_name;
+                    return (
+                        <li key={activity.id} className={done ? styles.activityDone : undefined}>
+                            <span aria-hidden="true">{done ? '✓' : '○'}</span>
+                            <span>{name}</span>
+                            <ActivityTagBadges tags={activity.tags} ariaLabel={`Tags required for ${name}`} />
+                            <span className={styles.activityMeta}>
+                                {done ? 'Done' : activity.is_required ? 'Required' : 'Optional'}
+                            </span>
+                        </li>
+                    );
+                })}
+            </ul>
+            {date === today && pending.length ? (
+                <Link
+                    className={styles.quietAction}
+                    to={quickSessionWithActivitiesPath(rootId, pending.map((activity) => activity.activity_definition_id))}
+                >Log in a quick session</Link>
+            ) : null}
         </div>
     );
 }
@@ -201,14 +236,17 @@ export default function ProgramDayPane({
                             </div>
                         </div>
                         <p className={styles.explainer}>
-                            {requirements.completed_template_ids.length} of this definition’s templates completed.
+                            {occurrence.activities?.length
+                                ? `${requirements.completed_item_count} of ${requirements.item_count} sessions and activities completed.`
+                                : `${requirements.completed_template_ids.length} of this definition’s templates completed.`}
                         </p>
                         {index === 0 && dayRequirements ? (
                             <p className={styles.explainer}>
-                                {dayRequirements.completed_template_ids.length} completed; {dayRequirements.required_template_ids.length} required
+                                {dayRequirements.completed_item_count ?? dayRequirements.completed_template_ids.length} completed; {dayRequirements.required_item_count ?? dayRequirements.required_template_ids.length} required
                                 {dayRequirements.completion_min_templates ? `; ${dayRequirements.completion_min_templates} needed to meet this day` : ''}.
                             </p>
                         ) : null}
+                        <DayActivities rootId={rootId} occurrence={occurrence} date={date} today={today} />
                         {!requirements.requirements_met && date === today ? (
                             <StartActions
                                 rootId={rootId}

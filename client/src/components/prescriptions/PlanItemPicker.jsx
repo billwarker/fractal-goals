@@ -1,16 +1,16 @@
 import React, { Suspense, useState } from 'react';
 
-import ActivitySelectorPanel from '../../common/ActivitySelectorPanel';
-import CircuitBuilderModal from '../../circuits/CircuitBuilderModal';
-import { useCircuitDefinitionMutations } from '../../../hooks/useCircuitQueries';
-import useScopedSessionActivityOptions from '../../../hooks/useScopedSessionActivityOptions';
-import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../../utils/activityBuilder';
-import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../../utils/circuitDefinition';
-import { getGoalNodeActivityGroupId } from '../../../utils/goalNodeModel';
-import { lazyWithRetry } from '../../../utils/lazyWithRetry';
-import styles from './ProgramDaysView.module.css';
+import ActivitySelectorPanel from '../common/ActivitySelectorPanel';
+import CircuitBuilderModal from '../circuits/CircuitBuilderModal';
+import { useCircuitDefinitionMutations } from '../../hooks/useCircuitQueries';
+import useScopedSessionActivityOptions from '../../hooks/useScopedSessionActivityOptions';
+import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../utils/activityBuilder';
+import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
+import { getGoalNodeActivityGroupId } from '../../utils/goalNodeModel';
+import { lazyWithRetry } from '../../utils/lazyWithRetry';
+import styles from './PlanItem.module.css';
 
-const ActivityBuilder = lazyWithRetry(() => import('../../ActivityBuilder'), 'components/ActivityBuilder');
+const ActivityBuilder = lazyWithRetry(() => import('../ActivityBuilder'), 'components/ActivityBuilder');
 
 function errorMessage(error) {
     return error?.response?.data?.error || error?.message || 'Unable to create the circuit.';
@@ -22,15 +22,18 @@ function errorMessage(error) {
  * no match). A created definition joins the plan's unsaved draft like a picked one.
  * `activityGoalScope` (a goal scoped in the Goals side pane) narrows the choices and is the
  * new definition's default goal; otherwise `defaultGoalIds` (the program day's goals) are.
+ * `allowCircuits={false}` offers activities only (a quick session has no circuits).
  */
 export default function PlanItemPicker({
     rootId,
     section,
     activities,
-    circuits,
+    circuits = [],
     activityGroups,
     activityGoalScope = null,
     defaultGoalIds = [],
+    allowCircuits = true,
+    label = '+ Add activity',
     onAdd,
 }) {
     const [open, setOpen] = useState(false);
@@ -76,10 +79,10 @@ export default function PlanItemPicker({
                 <div className={styles.planPicker} data-plan-picker>
                     <ActivitySelectorPanel
                         activities={scopedActivities}
-                        circuits={scopedCircuitDefinitions}
+                        circuits={allowCircuits ? scopedCircuitDefinitions : []}
                         activityGroups={activityGroups}
                         activityGoalScope={activityGoalScope}
-                        showTypeToggle
+                        showTypeToggle={allowCircuits}
                         closeOnSelect
                         allowCreate
                         allowCopy
@@ -89,13 +92,17 @@ export default function PlanItemPicker({
                         onSelectCircuit={(circuit) => { addCircuit(circuit); close(); }}
                         onCreateActivityDefinition={(seed) => openActivityBuilder(prepareActivityDefinitionDraft(seed))}
                         onCopyActivityDefinition={(activity) => openActivityBuilder(prepareActivityDefinitionCopy(activity))}
-                        onCreateCircuitDefinition={(seed) => openCircuitBuilder('create', prepareCircuitDefinitionDraft(seed))}
-                        onCopyCircuitDefinition={(circuit) => openCircuitBuilder('copy', prepareCircuitDefinitionCopy(circuit))}
+                        onCreateCircuitDefinition={allowCircuits
+                            ? (seed) => openCircuitBuilder('create', prepareCircuitDefinitionDraft(seed))
+                            : undefined}
+                        onCopyCircuitDefinition={allowCircuits
+                            ? (circuit) => openCircuitBuilder('copy', prepareCircuitDefinitionCopy(circuit))
+                            : undefined}
                     />
                 </div>
             ) : (
                 <button type="button" className={styles.addPlanItem} onClick={() => setOpen(true)}>
-                    + Add activity
+                    {label}
                 </button>
             )}
             {activityBuilder ? (

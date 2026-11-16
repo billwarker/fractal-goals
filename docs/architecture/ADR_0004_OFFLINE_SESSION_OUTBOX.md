@@ -22,11 +22,13 @@ Once a session is open, in-session writes are **device-first**:
 1. The mutation hook patches the TanStack Query cache immediately.
 2. It persists an op to a per-user IndexedDB **outbox** (`client/src/offline/outbox.js`) before
    any network call.
-3. One tab at a time (a drain Web Lock) sends ops strictly in submission order, each with an
-   `Idempotency-Key` and, for timing actions, the user's action time as `occurred_at`. Store
-   changes use a separate short lock, so saving a change never waits on a request. A lease
-   (`sendingUntil`) stops other tabs coalescing or cancelling the op being sent, and a visible tab
-   takes the drain lock from a frozen one once that lease lapses.
+3. One tab at a time (a drain Web Lock) sends ops in submission order **within each session**
+   (the op's scope), each with an `Idempotency-Key` and, for timing actions, the user's action
+   time as `occurred_at`. Store changes use a separate short lock, so saving a change never
+   waits on a request. A lease (`sendingUntil`) stops other tabs coalescing or cancelling the op
+   being sent. A tab waiting for the drain lock takes it over when that tab's lease lapses, or
+   when the holder doesn't answer a ping on the user's BroadcastChannel within 3 s
+   (`offline/drainLiveness.js`). A frozen tab can't answer; a live one waiting on a request can.
 
 Supporting rules:
 
@@ -34,6 +36,12 @@ Supporting rules:
   the first 2xx response, which later retries receive as-is. A non-2xx response frees the key.
   A key reused with a different body returns 422; a concurrent duplicate returns 409
   `idempotency_in_flight`, which the client retries.
+  - **Commit marker.** The claim commits on its own connection, so a concurrent retry sees it at
+    once. The handler's first commit also sets the claim to `committed` in the same transaction
+    as the write. If the response is then lost (the instance dies, storing it fails, or the
+    handler raises after committing), a retry gets a status-only `200 {"replayed": true}` and
+    the write never runs twice. A claim is taken over as stale only after the worker timeout
+    (`REQUEST_TIMEOUT_SECONDS`) plus 30 s, when the request can no longer be running.
 - **Action time.** `services/occurred_at.py` accepts `occurred_at` on timer, pause/resume,
   circuit start/complete, and session completion. The value is clamped to no earlier than the
   session's latest timing boundary and no later than server time. Values older than 7 days are
@@ -50,13 +58,36 @@ Supporting rules:
 - **Failures.** Network errors, 5xx, 408 and 429 keep the op and retry with backoff. Other 4xx
   responses mark it *rejected* and roll back only that op; the sync indicator lists it for Retry
   or Discard.
+  - **Isolation:** a failure about the change itself (a counted 5xx, `idempotency_in_flight`)
+    holds only its session; other sessions keep sending. A failure about the connection or the
+    whole server (no answer, 408, 429, 502/503/504) holds every session until its backoff ends.
   - **Retry ceiling:** a 5xx other than 502/503/504 counts toward giving up, and the op is rejected
-    with `retry_exhausted` after 8 of them and at least 30 minutes. Any answered failure, including
+    with `retry_exhausted` after 5 of them and at least 10 minutes. Any answered failure, including
     408, 429, 502/503/504 and `idempotency_in_flight`, ends at 24 h. `Retry-After` is honoured.
     Offline (no response) never exhausts.
   - **Expiry:** rejected ops expire after 7 days.
   - **Auth:** a network failure never signs the user out. A 401, or a failure from `/auth/*` or a
-    CSRF check, pauses the queue and rejects nothing.
+    CSRF check, pauses the queue and rejects nothing. A request retried after a token refresh
+    carries the new token. If sign-in was renewed while an op was in flight (`getAuthGeneration`
+    in `utils/api/core.js`), its 401 is stale: the op is sent again at once instead of pausing.
+- **Liveness.** Invariant: while a change is pending and could be sent, something is due to send
+  it (`offline/outboxWakeups.js`).
+  - A store error during a drain, during startup, or in the re-read after a save schedules a
+    store retry with backoff (1 s, doubling to 30 s). It never stops the queue, and it never
+    fails a save that is already durable.
+  - A watchdog checks the invariant every 10 s while anything is pending, and flushes or
+    reclaims the drain lock if it doesn't hold.
+  - `offline/__tests__/outbox.chaos.test.js` runs 500 seeded schedules of random faults (store,
+    network, outages, lost responses, connectivity) and checks every saved change is settled,
+    in order per session, with nothing left pending.
+- **Device storage.** Writes use strict durability. A dropped IndexedDB connection (iOS Safari
+  after backgrounding, a versionchange) is reopened and the operation retried once. The first
+  queued change asks for persistent storage. If IndexedDB can't be opened, changes are held in
+  the tab's memory, the indicator says so, and they move back to IndexedDB once it opens. A
+  newer edit is stored before the older one it replaces is dropped, so a failed save never
+  loses the earlier change.
+- **Op versions.** Ops carry `v` (`OP_VERSION`). One from a newer build (after a rollback) is
+  sent to review instead of being sent.
 - **Replays.** Creates with client IDs are idempotent beyond the idempotency record: a matching
   existing row returns 200.
 - **Supersede.** Deletes supersede queued edits to the same record, and a create followed by a
@@ -98,10 +129,24 @@ Supporting rules:
   Signed out with no signal, an offline screen replaces sign-in and gives way automatically once
   the connection returns.
 - **Status.** The session page shows its own sync indicator; every other page shows an app-wide
-  one for all queued changes, with the same review list.
-- **Health telemetry.** `offline_sync_drained` (op count, maximum queued age, retries),
-  `offline_op_rejected` (kind, status, code), `offline_detected` (reason) and `offline_boot`
-  (seconds offline, recorded on reconnect) carry counts and codes only, never content.
+  one for all queued changes, with the same review list. The indicator states its real
+  situation:
+  - "Retrying N changes in 40 s · server error 503", with **Retry now**
+  - "Syncing N changes from another tab…"
+  - "N changes saved in this tab only · keep it open"
+  - "Still syncing…" with **Retry now** after 2 minutes online
+
+  The review list says when each refused change will be discarded, and offers "Copy sync
+  details for support" (kinds, states, codes and ages; no content). Offline changes older than
+  5 days carry a warning, since action times older than 7 days are refused.
+- **Health telemetry.** Events carry counts and codes only, never content.
+  - Routine: `offline_sync_drained` (op count, maximum queued age, retries),
+    `offline_op_rejected` (kind, status, code), `offline_detected` (reason) and `offline_boot`
+    (seconds offline, recorded on reconnect).
+  - Recoveries, each worth a look: `offline_queue_stalled` (the oldest change has waited
+    2 minutes with signal, and why), `offline_drain_error`, `offline_hydrate_error`,
+    `offline_watchdog_flush`, `offline_store_volatile`, `offline_store_reopened`,
+    `offline_submit_failed`, `offline_lock_reclaimed` and `offline_auth_paused`.
 
 ## Consequences
 

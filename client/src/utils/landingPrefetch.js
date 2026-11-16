@@ -13,19 +13,23 @@ const PRELOAD_GLOBAL_KEY = '__fgLandingExamplesPreload';
 const STATIC_URL_GLOBAL_KEY = '__fgLandingExamplesStaticUrl';
 const STATIC_ATTEMPTED_GLOBAL_KEY = '__fgLandingExamplesStaticAttempted';
 
+// The manifest shape this build draws (services/_landing_common.py's
+// LANDING_EXAMPLE_SCHEMA_VERSION). A cached or static file from an older publish lacks
+// what the landing needs (icons, previews), so it is passed over for the API's.
+export const LANDING_SCHEMA_VERSION = 15;
+
 const isLandingSnapshot = (payload) => (
     payload !== null
     && typeof payload === 'object'
     && Array.isArray(payload.examples)
     && (
-        payload.schema_version === undefined
-        || payload.schema_version === null
-        || Number.isInteger(payload.schema_version)
-    )
-    && (
-        !Number.isInteger(payload.schema_version)
-        || payload.schema_version < 12
-        || (typeof payload.revision === 'string' && payload.revision.length > 0)
+        payload.examples.length === 0
+        || (
+            Number.isInteger(payload.schema_version)
+            && payload.schema_version >= LANDING_SCHEMA_VERSION
+            && typeof payload.revision === 'string'
+            && payload.revision.length > 0
+        )
     )
     && payload.examples.every((example) => (
         example !== null

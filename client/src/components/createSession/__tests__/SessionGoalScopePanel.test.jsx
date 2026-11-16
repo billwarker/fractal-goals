@@ -42,7 +42,7 @@ describe('SessionGoalScopePanel', () => {
         }));
     });
 
-    it('labels quick-session scope as read-only and disables selection', () => {
+    it('lets goals be chosen before a template, saying its goals join once one is picked', () => {
         render(
             <SessionGoalScopePanel
                 goals={[]}
@@ -50,15 +50,14 @@ describe('SessionGoalScopePanel', () => {
                 automaticGoalIds={[]}
                 onChange={vi.fn()}
                 isLoading={false}
-                readOnly
-                selectionDisabled
+                awaitingTemplate
             />
         );
 
-        expect(screen.getByText('Read only')).toBeInTheDocument();
-        expect(screen.getByText(/cannot be edited/i)).toBeInTheDocument();
+        expect(screen.getByText('Optional')).toBeInTheDocument();
+        expect(screen.getByText(/added, and locked, once you pick one/i)).toBeInTheDocument();
         expect(selectorProps).toHaveBeenCalledWith(expect.objectContaining({
-            selectionDisabled: true,
+            selectionDisabled: false,
         }));
     });
 
@@ -124,15 +123,14 @@ describe('SessionGoalScopePanel', () => {
         }));
     });
 
-    it('does not expose a program toggle for read-only quick sessions', () => {
+    it('does not expose a program toggle when program scope is unavailable', () => {
         render(<SessionGoalScopePanel
             goals={[]}
             manualGoalIds={[]}
             automaticGoalIds={[]}
             onChange={vi.fn()}
             isLoading={false}
-            readOnly
-            programScopeAvailable
+            programScopeAvailable={false}
             programScopeEnabled
             programName="Strength"
         />);

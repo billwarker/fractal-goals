@@ -33,6 +33,16 @@ function dayTemplateConfigs(day) {
     })).filter((config) => Boolean(config.template_id));
 }
 
+// Deleted activities can't be asked for again, so they stay behind.
+function dayActivityConditions(day) {
+    return (day.activity_conditions || []).filter((condition) => !condition.activity_deleted).map((condition) => ({
+        activity_definition_id: condition.activity_definition_id,
+        is_required: condition.is_required !== false,
+        tag_ids: condition.tag_ids || [],
+        tag_match: condition.tag_match || 'contains',
+    }));
+}
+
 export async function duplicateProgramStructure({ rootId, programId, source, startDate, programGoalIds = [] }) {
     const dayOffset = getDayOffset(source.start_date, startDate);
     for (const sourceBlock of source.blocks || []) {
@@ -48,6 +58,7 @@ export async function duplicateProgramStructure({ rootId, programId, source, sta
     // Program days belong to the program; their specific dates shift with it.
     for (const sourceDay of source.days || []) {
         const templateConfigs = dayTemplateConfigs(sourceDay);
+        const activityConditions = dayActivityConditions(sourceDay);
         await fractalApi.createProgramDay(rootId, programId, {
             name: sourceDay.name,
             day_of_week: sourceDay.day_of_week || [],
@@ -58,7 +69,10 @@ export async function duplicateProgramStructure({ rootId, programId, source, sta
             excluded_dates: (sourceDay.excluded_dates || []).map((value) => shiftDatePart(value, dayOffset)).filter(Boolean),
             template_ids: templateConfigs.map((config) => config.template_id),
             template_configs: templateConfigs,
-            completion_min_templates: sourceDay.completion_min_templates || null,
+            activity_conditions: activityConditions,
+            completion_min_templates: Math.min(
+                sourceDay.completion_min_templates || 0, templateConfigs.length + activityConditions.length,
+            ) || null,
             goal_ids: (sourceDay.goal_ids || []).filter((goalId) => programGoalIds.includes(goalId)),
         });
     }

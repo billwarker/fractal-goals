@@ -1,12 +1,9 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
-import { SESSION_TYPE_NORMAL, SESSION_TYPE_QUICK } from '../../../utils/sessionRuntime';
 import {
-    MAX_QUICK_ACTIVITIES,
     buildTemplateData,
     moveListItem,
-    moveQuickActivity,
     moveSection,
     moveSectionItem,
     removeSectionItem,
@@ -22,7 +19,6 @@ const template = (overrides = {}) => ({
         { id: 's1', name: 'Warm up', duration_minutes: 5, activities: [{ id: 'a' }, { id: 'b' }, { id: 'c' }] },
         { id: 's2', name: 'Main', duration_minutes: 20, activities: [] },
     ],
-    quickActivities: [{ id: 'q1' }, { id: 'q2' }],
     ...overrides,
 });
 
@@ -44,7 +40,6 @@ describe('template list updates', () => {
         const current = template();
         expect(moveSection(current, 0, 'up')).toBe(current);
         expect(moveSectionItem(current, 0, 2, 'down')).toBe(current);
-        expect(moveQuickActivity(current, 1, 'down')).toBe(current);
     });
 
     it('moves an item only within its own section', () => {
@@ -74,33 +69,19 @@ describe('validateSectionDraft', () => {
 });
 
 describe('validateTemplate', () => {
-    it('requires a name and at least one section for normal templates', () => {
-        expect(validateTemplate(template({ name: ' ' }), { isQuick: false })).toBe('Template name is required');
-        expect(validateTemplate(template({ sections: [] }), { isQuick: false })).toMatch(/at least one section/);
-        expect(validateTemplate(template(), { isQuick: false })).toBeNull();
-    });
-
-    it('bounds quick templates between one and the maximum activities', () => {
-        const quick = (count) => template({ quickActivities: Array.from({ length: count }, (_, i) => ({ id: `q${i}` })) });
-        expect(validateTemplate(quick(0), { isQuick: true })).toMatch(/at least one activity/);
-        expect(validateTemplate(quick(1), { isQuick: true })).toBeNull();
-        expect(validateTemplate(quick(MAX_QUICK_ACTIVITIES), { isQuick: true })).toBeNull();
-        expect(validateTemplate(quick(MAX_QUICK_ACTIVITIES + 1), { isQuick: true })).toMatch(/limited to 5/);
+    it('requires a name and at least one section', () => {
+        expect(validateTemplate(template({ name: ' ' }))).toBe('Template name is required');
+        expect(validateTemplate(template({ sections: [] }))).toMatch(/at least one section/);
+        expect(validateTemplate(template())).toBeNull();
     });
 });
 
 describe('buildTemplateData', () => {
-    it('serializes quick templates as a flat activity list', () => {
-        expect(buildTemplateData(template(), { isQuick: true, totalDuration: 0 })).toEqual({
-            session_type: SESSION_TYPE_QUICK,
-            template_color: '#123456',
-            activities: [{ id: 'q1' }, { id: 'q2' }],
-        });
-    });
-
-    it('serializes normal templates as sections of items with the total duration', () => {
-        const data = buildTemplateData(template(), { isQuick: false, totalDuration: 25 });
-        expect(data.session_type).toBe(SESSION_TYPE_NORMAL);
+    it('serializes sections of items with the total duration and no session type', () => {
+        const data = buildTemplateData(template(), { totalDuration: 25 });
+        expect(data).not.toHaveProperty('session_type');
+        expect(data).not.toHaveProperty('activities');
+        expect(data.template_color).toBe('#123456');
         expect(data.total_duration_minutes).toBe(25);
         expect(data.sections).toHaveLength(2);
         expect(data.sections[0]).not.toHaveProperty('activities');

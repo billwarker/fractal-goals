@@ -76,6 +76,17 @@
     margin-top: 2px;
 }
 
+.programDayActivities {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 12px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
 .sessionCountBadge {
     margin-left: 8px;
     color: var(--color-brand-primary);

@@ -191,6 +191,15 @@ class ProgramDay(Base):
         order_by="ProgramDayOccurrenceExclusion.date",
     )
 
+    # Activities that count toward the day besides its session templates (any session that date).
+    activity_conditions = relationship(
+        "ProgramDayActivityCondition",
+        back_populates="program_day",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ProgramDayActivityCondition.order",
+    )
+
     goals = relationship(
         "Goal",
         secondary="program_day_goals",
@@ -204,6 +213,87 @@ class ProgramDayTemplate(Base):
 
     program_day = relationship("ProgramDay", back_populates="template_links")
     template = relationship("SessionTemplate")
+
+class ProgramDayActivityCondition(Base):
+    """An activity a program day asks for: met by any completed instance of it on the occurrence's date,
+    in any session (a quick session included). With `tags`, only an instance with a set (or the
+    instance itself, when it has no sets) carrying every tag counts; `tag_match = 'exact'`: just these tags.
+
+    It counts with the day's templates: required items must all be done, and `completion_min_templates`
+    counts templates and activities together.
+    """
+    __tablename__ = 'program_day_activity_conditions'
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    program_day_id = Column(String, ForeignKey('program_days.id', ondelete='CASCADE'), nullable=False, index=True)
+    root_id = Column(String, ForeignKey('goals.id', ondelete='CASCADE'), nullable=False, index=True)
+    activity_definition_id = Column(
+        String, ForeignKey('activity_definitions.id', ondelete='CASCADE'), nullable=False, index=True,
+    )
+    is_required = Column(Boolean, nullable=False, default=True, server_default=text('true'))
+    order = Column(Integer, nullable=False, default=0, server_default='0')
+    tag_match = Column(String, nullable=False, default='contains', server_default='contains')
+    created_at = Column(DateTime, default=utc_now)
+
+    __table_args__ = (
+        CheckConstraint("tag_match IN ('contains', 'exact')", name='ck_program_day_activity_conditions_tag_match'),
+    )
+
+    program_day = relationship("ProgramDay", back_populates="activity_conditions")
+    activity = relationship("ActivityDefinition")
+    tags = relationship(
+        "ActivityTagDefinition", secondary="program_day_activity_condition_tags",
+        order_by="(ActivityTagDefinition.sort_order, ActivityTagDefinition.name, ActivityTagDefinition.id)",
+    )
+
+
+class ProgramDayActivityConditionTag(Base):
+    """A tag the activity counted toward a program day's condition must carry."""
+    __tablename__ = 'program_day_activity_condition_tags'
+
+    condition_id = Column(
+        String, ForeignKey('program_day_activity_conditions.id', ondelete='CASCADE'), primary_key=True,
+    )
+    tag_definition_id = Column(
+        String, ForeignKey('activity_tag_definitions.id', ondelete='CASCADE'), primary_key=True,
+    )
+
+    __table_args__ = (
+        Index('ix_program_day_activity_condition_tags_tag', 'tag_definition_id', 'condition_id'),
+    )
+
+
+# A day's activity condition and its tags share a fractal, whatever the write path.
+PROGRAM_DAY_ACTIVITY_CONDITION_TAG_TRIGGER_SQL = """
+CREATE OR REPLACE FUNCTION enforce_program_day_activity_condition_tag_root() RETURNS trigger AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM program_day_activity_conditions condition_row
+        JOIN activity_tag_definitions tag ON tag.root_id = condition_row.root_id
+        WHERE condition_row.id = NEW.condition_id AND tag.id = NEW.tag_definition_id
+    ) THEN
+        RAISE EXCEPTION 'condition and tag must share a fractal' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_program_day_activity_condition_tags_root ON program_day_activity_condition_tags;
+CREATE TRIGGER trg_program_day_activity_condition_tags_root
+BEFORE INSERT OR UPDATE ON program_day_activity_condition_tags
+FOR EACH ROW EXECUTE FUNCTION enforce_program_day_activity_condition_tag_root();
+"""
+
+
+def _install_program_day_activity_condition_tag_trigger(_target, connection, **_kwargs):
+    if connection.dialect.name == 'postgresql':
+        connection.exec_driver_sql(PROGRAM_DAY_ACTIVITY_CONDITION_TAG_TRIGGER_SQL)
+
+
+event.listen(
+    ProgramDayActivityConditionTag.__table__, 'after_create', _install_program_day_activity_condition_tag_trigger,
+)
+
 
 class ProgramDaySession(Base):
     """Historical ledger retained for analytics compatibility, never day-status authority."""
@@ -371,6 +461,34 @@ class ProgramSessionPlan(Base):
 
     program_day = relationship('ProgramDay')
     template = relationship('SessionTemplate')
+
+
+def program_day_activity_condition_loads(day_load):
+    """Eager loads for the days' activity conditions under ``day_load`` (a loader of ProgramDay),
+    so evaluating or serializing many days reads them in a fixed number of queries."""
+    conditions = day_load.selectinload(ProgramDay.activity_conditions)
+    return [
+        conditions.selectinload(ProgramDayActivityCondition.tags),
+        conditions.joinedload(ProgramDayActivityCondition.activity),
+    ]
+
+
+def get_program_day_activity_rules(day):
+    """The day's activity conditions, in order, skipping deleted activities (as templates are skipped)."""
+    conditions = sorted(getattr(day, 'activity_conditions', None) or [], key=lambda condition: condition.order or 0)
+    return [
+        {
+            'condition': condition,
+            'condition_id': condition.id,
+            'activity_definition_id': condition.activity_definition_id,
+            'is_required': bool(condition.is_required),
+            'order': condition.order or 0,
+            'tag_ids': frozenset(tag.id for tag in condition.tags),
+            'tag_match': condition.tag_match or 'contains',
+        }
+        for condition in conditions
+        if condition.activity is not None and not getattr(condition.activity, 'deleted_at', None)
+    ]
 
 
 def get_program_day_template_rules(day):

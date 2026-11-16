@@ -681,10 +681,11 @@ def test_publish_landing_examples_query_budget(
     )
 
     # Collecting walks each copied table once per pass; inserts and link updates are batched.
+    # The demo preview (the published levels and goal tree) reads in two more queries.
     assert_response_budget(
         response, max_bytes=20_000, max_ms=1_800, elapsed_ms=elapsed_ms
     )
-    assert query_counter["total"] <= 115
+    assert query_counter["total"] <= 118
 
 
 @pytest.mark.integration
@@ -722,9 +723,12 @@ def test_publish_multiple_landing_examples_total_payload_budget(
     )
     payload = response.get_json()
     assert payload["published_example_count"] == 2
-    assert payload["snapshot_bytes"] <= 4_000
+    # Each example carries its preview (levels and goal tree), which compresses well: the
+    # compressed bound is what visitors download.
+    assert payload["snapshot_bytes"] <= 14_000
     assert payload["compressed_snapshot_bytes"] <= 2_000
-    assert query_counter["total"] <= 190
+    # Per example, the preview's two reads and the program-day activity condition tables' copy.
+    assert query_counter["total"] <= 197
 
 
 @pytest.mark.integration
@@ -1043,8 +1047,9 @@ def test_get_program_metrics_query_and_response_budget(
     )
     # One bounded query each loads occurrence-level status overrides, session
     # credits, and calendar periods for this window, plus one batched load of
-    # explicit occurrence schedules and one of the program's days.
-    assert query_counter["total"] <= 13
+    # explicit occurrence schedules, one of the program's days, and one of the
+    # days' activity conditions.
+    assert query_counter["total"] <= 14
 
     first = sample_program_tree.start_date.date()
     selected_dates = f"{first.isoformat()},{(first + timedelta(days=2)).isoformat()}"
@@ -1058,7 +1063,7 @@ def test_get_program_metrics_query_and_response_budget(
     assert_response_budget(
         selected_response, max_bytes=1_048_576, max_ms=750, elapsed_ms=selected_elapsed_ms
     )
-    assert query_counter["total"] <= 13
+    assert query_counter["total"] <= 14
 
 
 @pytest.mark.integration
@@ -1093,9 +1098,9 @@ def test_get_program_metrics_comparison_query_budget(
     )
     assert response.get_json()["programs"][0]["program_id"] == sample_program_tree.id
     # Session credits and calendar periods for every compared program each load
-    # in one bounded query; explicit occurrence schedules and program days each
-    # load in one batch.
-    assert query_counter["total"] <= 14
+    # in one bounded query; explicit occurrence schedules, program days, and the
+    # days' activity conditions each load in one batch.
+    assert query_counter["total"] <= 15
 
 
 @pytest.mark.integration

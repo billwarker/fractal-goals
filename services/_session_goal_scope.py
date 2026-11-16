@@ -11,7 +11,6 @@ import models
 from models import CircuitDefinition, Goal, session_goals, validate_root_goal
 from services.goal_type_utils import get_canonical_goal_type
 from services.service_types import JsonDict, ServiceResult
-from services.session_runtime import SESSION_TYPE_QUICK, get_template_session_type
 from services.session_structure import extract_activity_definition_id
 from services.program_focus import resolve_day_focus_scope
 
@@ -101,8 +100,6 @@ class _SessionGoalScopeMixin:
         ).first()
         if not template:
             return None, "Template not found in this fractal", 404
-        if get_template_session_type(models._safe_load_json(template.template_data, {})) == SESSION_TYPE_QUICK:
-            return {"automatic_goal_ids": [], "program_scope_goal_ids": []}, None, 200
 
         activity_ids, activity_error = self._template_activity_definition_ids(root_id, template)
         if activity_error:

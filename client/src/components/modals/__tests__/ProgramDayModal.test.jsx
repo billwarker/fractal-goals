@@ -13,6 +13,7 @@ const getCircuits = vi.fn();
 vi.mock('../../../utils/api', () => ({
     fractalApi: {
         getSessionTemplates: (...args) => getSessionTemplates(...args),
+        getActivityTagCatalog: vi.fn(async () => ({ data: { families: [], tags: [{ id: 'tag-clean', name: 'Clean' }] } })),
         getActivities: (...args) => getActivities(...args),
         getActivityGroups: (...args) => getActivityGroups(...args),
         getCircuits: (...args) => getCircuits(...args),
@@ -96,6 +97,60 @@ describe('ProgramDayModal', () => {
         ]);
     });
 
+    it('asks for activities beside sessions, counted together toward "at least"', async () => {
+        const queryClient = createQueryClient();
+        const onSave = vi.fn();
+        getSessionTemplates.mockResolvedValueOnce({ data: [{ id: 'template-1', name: 'Warmup' }] });
+        getActivities.mockResolvedValueOnce({ data: [
+            { id: 'lever', name: 'Front Lever', has_sets: true },
+            { id: 'hspu', name: 'Handstand Push Ups', has_sets: true },
+        ] });
+        getActivityGroups.mockResolvedValueOnce({ data: [] });
+
+        render(
+            <QueryClientProvider client={queryClient}>
+                <ProgramDayModal
+                    isOpen
+                    onClose={vi.fn()}
+                    onSave={onSave}
+                    rootId="root-1"
+                    initialData={{
+                        id: 'day-1',
+                        name: 'Skill day',
+                        templates: [{ id: 'template-1', name: 'Warmup', is_required: false, order: 0 }],
+                        activity_conditions: [{
+                            id: 'condition-1', activity_definition_id: 'lever', activity_name: 'Front Lever',
+                            is_required: true, tag_ids: ['tag-clean'], tag_match: 'exact',
+                        }],
+                    }}
+                />
+            </QueryClientProvider>
+        );
+
+        expect(await screen.findByText('Front Lever')).toBeInTheDocument();
+        expect(await screen.findByText('Clean')).toBeInTheDocument();
+        expect(screen.getByText('Done when its 1 required activity is completed.')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '+ Add Activity' }));
+        fireEvent.click(await screen.findByText('Handstand Push Ups'));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Remove Handstand Push Ups' })).toBeInTheDocument());
+        fireEvent.click(screen.getByLabelText('Mark Handstand Push Ups required'));
+
+        fireEvent.click(screen.getByLabelText('At least'));
+        const minimum = screen.getByLabelText('Minimum completed sessions and activities');
+        fireEvent.change(minimum, { target: { value: '9' } });
+        expect(minimum).toHaveValue(3);
+        fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+        expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+            activity_conditions: [
+                { activity_definition_id: 'lever', is_required: true, tag_ids: ['tag-clean'], tag_match: 'exact' },
+                { activity_definition_id: 'hspu', is_required: false, tag_ids: [], tag_match: 'contains' },
+            ],
+            completion_min_templates: 3,
+        }));
+    });
+
     it('saves per-template required flags and minimum completion threshold', async () => {
         const queryClient = createQueryClient();
         const onSave = vi.fn();
@@ -132,7 +187,7 @@ describe('ProgramDayModal', () => {
         });
 
         fireEvent.click(screen.getByLabelText('At least'));
-        fireEvent.change(screen.getByLabelText('Minimum completed sessions'), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText('Minimum completed sessions and activities'), { target: { value: '2' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({

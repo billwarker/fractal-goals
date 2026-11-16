@@ -46,6 +46,7 @@ COPY_TABLES = frozenset({
     'goal_completion_conditions', 'goal_condition_metric_rules', 'goal_condition_tags',
     'programs', 'program_blocks', 'program_block_goals', 'program_goals',
     'program_days', 'program_day_goals', 'program_day_templates', 'program_day_sessions',
+    'program_day_activity_conditions', 'program_day_activity_condition_tags',
     'program_day_status_overrides', 'program_day_session_credits',
     'program_day_occurrence_exclusions', 'program_day_occurrence_schedules', 'program_session_plans',
     'session_templates', 'session_template_goals', 'session_template_stats', 'template_section_stats',

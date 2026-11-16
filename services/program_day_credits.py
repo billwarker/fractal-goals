@@ -9,8 +9,9 @@ from collections import defaultdict
 from datetime import datetime, time, timedelta, timezone
 
 from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import selectinload
 
-from models import ProgramDaySessionCredit, Session
+from models import ActivityInstance, ActivitySet, ProgramDaySessionCredit, Session
 
 
 def effective_session_timestamp():
@@ -95,6 +96,60 @@ def load_program_credit_candidates(
             ):
                 grouped[program.id].append(session)
     return grouped
+
+
+def program_activity_ids(programs):
+    """Activities any program-day definition in ``programs`` asks for."""
+    return {
+        condition.activity_definition_id
+        for program in programs or []
+        for day in program.days or []
+        for condition in getattr(day, 'activity_conditions', None) or []
+    }
+
+
+def load_program_activity_evidence(db_session, root_id, owner_id, programs, utc_start, utc_end, zone):
+    """Completed instances of the activities ``programs`` ask for, in any of the owner's sessions,
+    by the session's local date: ``{date: {activity_id: [EvidenceInstance]}}``.
+
+    One query for the window; an instance counts on its session's date, as a session credit does.
+    """
+    from services.goal_condition_evidence import to_tag_evidence
+    from services.program_day_occurrences import effective_session_date
+
+    activity_ids = program_activity_ids(programs)
+    evidence = defaultdict(lambda: defaultdict(list))
+    if not activity_ids:
+        return evidence
+    effective = effective_session_timestamp()
+    rows = db_session.query(ActivityInstance).join(Session, Session.id == ActivityInstance.session_id).options(
+        selectinload(ActivityInstance.tags),
+        selectinload(ActivityInstance.sets).selectinload(ActivitySet.tags),
+        selectinload(ActivityInstance.session),
+    ).filter(
+        ActivityInstance.root_id == root_id,
+        ActivityInstance.activity_definition_id.in_(activity_ids),
+        ActivityInstance.completed.is_(True),
+        ActivityInstance.deleted_at.is_(None),
+        Session.owner_id == owner_id,
+        Session.deleted_at.is_(None),
+        effective >= utc_start,
+        effective < utc_end,
+    ).all()
+    for instance in rows:
+        day_value = effective_session_date(instance.session, zone)
+        if day_value is not None:
+            evidence[day_value][instance.activity_definition_id].append(to_tag_evidence(instance))
+    return evidence
+
+
+def activity_condition_met(rule, instances):
+    """A day's activity condition: any completed instance that date, narrowed by its tags."""
+    from services.goal_condition_evaluator import counted_sets
+
+    if not rule['tag_ids']:
+        return bool(instances)
+    return any(counted_sets(instance, rule['tag_ids'], rule['tag_match']).sets for instance in instances)
 
 
 def credited_block_ids_by_session(day_facts):

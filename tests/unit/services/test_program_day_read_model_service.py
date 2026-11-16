@@ -102,3 +102,30 @@ def test_session_cursor_round_trips_non_negative_offsets(offset):
 def test_session_cursor_rejects_malformed_negative_and_wrong_prefix_values(cursor):
     with pytest.raises(ValueError, match="Invalid cursor"):
         ProgramDayReadModelService._decode_cursor(cursor)
+
+
+def test_day_review_session_summary_says_whether_the_session_is_quick():
+    """The side pane opens a quick session in a modal, so each row carries its type."""
+    def summary(attributes):
+        return ProgramDayReadModelService._serialize_session(SimpleNamespace(
+            id="session-1", name="Quick Session", template_id=None, program_day_id="day-1",
+            session_start=None, session_end=None, completed_at=None, total_duration_seconds=None,
+            duration_minutes=None, completed=True, is_paused=False, template=None, attributes=attributes,
+        ))
+
+    assert summary({"session_data": {"session_type": "quick"}})["session_type"] == "quick"
+    assert summary({"session_type": "quick"})["session_type"] == "quick"
+    assert summary({"session_data": {}})["session_type"] == "normal"
+    assert summary(None)["session_type"] == "normal"
+
+
+def test_calendar_session_says_whether_it_is_quick_so_the_calendar_can_count_them():
+    """Quick sessions have no template; the calendar groups them by type ("Quick Session ×N")."""
+    def calendar(attributes):
+        return ProgramDayReadModelService._serialize_calendar_session(SimpleNamespace(
+            id="session-1", name="Quick Session", template_id=None, program_day_id=None,
+            template=None, attributes=attributes,
+        ))
+
+    assert calendar({"session_data": {"session_type": "quick"}})["session_type"] == "quick"
+    assert calendar({"session_data": {}})["session_type"] == "normal"

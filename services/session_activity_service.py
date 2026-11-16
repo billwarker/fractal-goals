@@ -448,7 +448,11 @@ class SessionActivityService:
             "activity_name": instance.definition.name if instance.definition else 'Unknown',
         }, None, 200
 
-    def update_activity_metrics(self, root_id, session_id, instance_id, current_user_id, metric_data_list) -> ServiceResult[JsonDict]:
+    def update_activity_metrics(
+        self, root_id, session_id, instance_id, current_user_id, metric_data_list, *, commit=True, pending_events=None,
+    ) -> ServiceResult[JsonDict]:
+        """Replace an instance's set-free metric values. With ``commit=False`` the caller owns the
+        transaction; the event goes to ``pending_events`` when given, else is emitted."""
         root = validate_root_goal(self.db_session, root_id, owner_id=current_user_id)
         if not root:
             return None, "Fractal not found or access denied", 404
@@ -509,9 +513,13 @@ class SessionActivityService:
             if key not in updated_keys:
                 self.db_session.delete(existing_metric)
 
-        self.db_session.commit()
-        self.db_session.refresh(instance)
-        event_bus.emit(Event(
+        if commit:
+            self.db_session.commit()
+            self.db_session.refresh(instance)
+        else:
+            self.db_session.flush()
+            self.db_session.expire(instance)
+        (pending_events.append if pending_events is not None else event_bus.emit)(Event(
             Events.ACTIVITY_METRICS_UPDATED,
             {
                 'instance_id': instance.id,
