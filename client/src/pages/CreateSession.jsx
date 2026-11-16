@@ -367,7 +367,8 @@ function CreateSession() {
                 selectedProgramDay={selectedProgramDay}
                 creating={creating}
                 onCreateSession={handleCreateSession}
-                scopeReady={!selectedTemplate || scopePreviewQuery.isSuccess}
+                // Wait for the goal scope and the dated plans, or the session starts without its plan.
+                ready={!selectedTemplate || (scopePreviewQuery.isSuccess && !planChoice.loading)}
                 {...placementProps}
             />
         );

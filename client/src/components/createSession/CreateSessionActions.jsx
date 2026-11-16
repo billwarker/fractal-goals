@@ -12,7 +12,7 @@ function CreateSessionActions({
     selectedProgramDay,
     creating,
     onCreateSession,
-    scopeReady = true,
+    ready = true,
     footerMode = false,
     headerMode = false,
     // A number while a quick session is being logged: it is completed here, not created.
@@ -20,7 +20,7 @@ function CreateSessionActions({
 }) {
     const quick = quickActivityCount !== null;
     const actionTitle = quick ? 'Complete Session' : 'Create Session';
-    const isDisabled = creating || (quick ? quickActivityCount === 0 : !selectedTemplate || !scopeReady);
+    const isDisabled = creating || (quick ? quickActivityCount === 0 : !selectedTemplate || !ready);
     const pendingLabel = quick ? 'Completing...' : 'Creating...';
 
     return (
