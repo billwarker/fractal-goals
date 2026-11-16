@@ -57,6 +57,8 @@ test('single and bulk program-day statuses persist in the calendar', async ({ pa
     await expect(page.locator(`.fc-daygrid-day[data-date="${today}"]`)).not.toHaveAttribute('aria-selected', 'true');
     if (device === 'desktop') {
         await page.getByRole('button', { name: 'Select Multiple Days' }).click();
+        // The status toasts sit bottom-centre, over the middle of the week; let them go first.
+        await expect(page.getByRole('status').filter({ hasText: /marked/ })).toHaveCount(0);
         await dragBetween(
             page,
             page.locator(`.fc-daygrid-day[data-date="${today}"]`),
