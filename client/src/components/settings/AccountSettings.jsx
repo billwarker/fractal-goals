@@ -1,8 +1,10 @@
 import React from 'react';
 
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useGoals } from '../../contexts/GoalsContext';
 import { useAccountSettings } from '../../hooks/useAccountSettings';
 import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
 import Input from '../atoms/Input';
 import LoadingState from '../common/LoadingState';
 import SettingsSection, { SettingsRow } from './SettingsSection';
@@ -36,6 +38,21 @@ function UsageItem({ row }) {
     );
 }
 
+/** A fractal's root goal icon, styled by its level as on the fractal list. */
+function FractalRootIcon({ fractal }) {
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    const level = fractal.display_level || null;
+    return (
+        <GoalIcon
+            shape={level?.icon || getGoalIcon(fractal.type) || 'circle'}
+            color={level?.color || getGoalColor(fractal.type)}
+            secondaryColor={level?.secondary_color || getGoalSecondaryColor(fractal.type)}
+            isSmart={Boolean(fractal.is_smart)}
+            size={18}
+        />
+    );
+}
+
 function MembershipSection({ account }) {
     const { activeRootId } = useGoals();
     const {
@@ -61,27 +78,36 @@ function MembershipSection({ account }) {
                             <legend className={styles.scopeTitle}>
                                 Count from <span>{quotaScopeLabel}</span>
                             </legend>
-                            <div className={styles.scopeOptions}>
-                                <label className={styles.scopeOption}>
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedQuotaRootIds.length === 0}
-                                        onChange={() => setSelectedQuotaRootIds([])}
-                                    />
-                                    <span>All fractals</span>
-                                </label>
-                                {availableFractals.map((fractal) => (
-                                    <label key={fractal.id} className={styles.scopeOption}>
+                            <ul className={styles.scopeOptions}>
+                                <li>
+                                    <label className={styles.scopeOption}>
                                         <input
                                             type="checkbox"
-                                            checked={selectedQuotaRootIds.includes(fractal.id)}
-                                            onChange={() => handleQuotaRootToggle(fractal.id)}
+                                            checked={selectedQuotaRootIds.length === 0}
+                                            onChange={() => setSelectedQuotaRootIds([])}
                                         />
-                                        <span>{fractal.name}{fractal.id === activeRootId ? ' (current)' : ''}</span>
+                                        <span className={styles.scopeIcon} aria-hidden="true" />
+                                        <span className={styles.scopeName}>All fractals</span>
                                     </label>
+                                </li>
+                                {availableFractals.map((fractal) => (
+                                    <li key={fractal.id}>
+                                        <label className={styles.scopeOption}>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedQuotaRootIds.includes(fractal.id)}
+                                                onChange={() => handleQuotaRootToggle(fractal.id)}
+                                            />
+                                            <span className={styles.scopeIcon} aria-hidden="true">
+                                                <FractalRootIcon fractal={fractal} />
+                                            </span>
+                                            <span className={styles.scopeName}>{fractal.name}</span>
+                                            {fractal.id === activeRootId ? <span className={styles.scopeCurrent}>Current</span> : null}
+                                        </label>
+                                    </li>
                                 ))}
-                                {fractalsLoading && <LoadingState variant="inline" label="Loading fractals…" />}
-                            </div>
+                            </ul>
+                            {fractalsLoading && <LoadingState variant="inline" label="Loading fractals…" />}
                         </fieldset>
 
                         <ul className={styles.usage} aria-label="Usage">
