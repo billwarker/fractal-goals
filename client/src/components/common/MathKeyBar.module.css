@@ -1,0 +1,78 @@
+/* A number field with its +− toggle; the keys open beneath it. */
+.field {
+    position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+}
+
+.field > input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.toggle {
+    flex: 0 0 auto;
+    min-width: 36px;
+    min-height: 32px;
+    padding: 0 6px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-secondary);
+    font-family: var(--font-family-mono);
+    font-size: 14px;
+    touch-action: manipulation;
+}
+
+.toggle[aria-expanded="true"] {
+    border-color: var(--color-brand-primary);
+    color: var(--color-brand-primary);
+}
+
+.bar {
+    position: absolute;
+    z-index: var(--z-dropdown);
+    top: calc(100% + 4px);
+    right: 0;
+    display: flex;
+    gap: 4px;
+    width: min(300px, calc(100vw - 32px));
+    padding: 4px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-card);
+    box-shadow: var(--shadow-md);
+    box-sizing: border-box;
+}
+
+.key {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-sm);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-family: var(--font-family-mono);
+    font-size: 16px;
+    touch-action: manipulation;
+}
+
+.key:active {
+    background: var(--color-bg-card-hover);
+}
+
+.equals {
+    flex: 2 1 0;
+    overflow: hidden;
+    color: var(--color-brand-primary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.equals:disabled {
+    color: var(--color-text-muted);
+}

@@ -77,8 +77,10 @@ export function clampMetricValue(metricDef, value) {
     return nextValue;
 }
 
+/** Arithmetic in a metric field ("2.5*4", "100 - 2.5", "(5+5)÷2"); null unless it works out. */
 export function evaluateArithmeticExpression(value) {
-    const input = String(value ?? '').trim();
+    // The typographic signs (from the phone key bar, or pasted) mean the ASCII operators.
+    const input = String(value ?? '').trim().replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
     if (!input) return null;
     if (input.length > 80) return null;
     if (!/^[\d+\-*/().\s]+$/.test(input)) return null;
