@@ -180,17 +180,18 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const signup = async (username, email, password, inviteKey) => {
+    const signup = async (username, email, password, inviteKey, { acceptedTerms = false } = {}) => {
         try {
             const res = await authApi.signup({
                 username,
                 email,
                 password,
                 invite_key: inviteKey,
+                // What the person ticked, never assumed: the server refuses an account without it.
                 // Consent is recorded against the document versions actually
                 // shown at signup, read from the markdown rather than a
                 // constant, so a copy revision cannot record a stale version.
-                accepted_terms: true,
+                accepted_terms: acceptedTerms === true,
                 terms_version: TERMS_VERSION,
                 privacy_version: PRIVACY_VERSION,
             });

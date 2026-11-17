@@ -56,7 +56,7 @@ function createQueryClient() {
 }
 
 function AuthHarness() {
-    const { user, login, logout, signOutEverywhere, setUser, loading } = useAuth();
+    const { user, login, logout, signOutEverywhere, setUser, signup, loading } = useAuth();
     return (
         <div>
             <div data-testid="loading">{String(loading)}</div>
@@ -67,6 +67,8 @@ function AuthHarness() {
             <button onClick={() => logout()}>Logout</button>
             <button onClick={() => signOutEverywhere().catch(() => {})}>Sign Out Everywhere</button>
             <button onClick={() => setUser({ id: user?.id, username: 'renamed' })}>Update Same User</button>
+            <button onClick={() => signup('new', 'new@example.com', 'Password123', 'key').catch(() => {})}>Signup Unticked</button>
+            <button onClick={() => signup('new', 'new@example.com', 'Password123', 'key', { acceptedTerms: true })}>Signup Ticked</button>
         </div>
     );
 }
@@ -102,6 +104,16 @@ describe('AuthContext cache boundary', () => {
         authApi.logout.mockResolvedValue({});
         userSnapshot.loadUserSnapshot.mockResolvedValue(null);
         userSnapshot.clearUserSnapshot.mockResolvedValue(undefined);
+    });
+
+    it('sends the consent the person gave at signup, never an assumed one', async () => {
+        authApi.signup.mockResolvedValue({ data: {} });
+        renderAuthHarness();
+        await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
+        fireEvent.click(screen.getByRole('button', { name: 'Signup Unticked' }));
+        await waitFor(() => expect(authApi.signup).toHaveBeenLastCalledWith(expect.objectContaining({ accepted_terms: false })));
+        fireEvent.click(screen.getByRole('button', { name: 'Signup Ticked' }));
+        await waitFor(() => expect(authApi.signup).toHaveBeenLastCalledWith(expect.objectContaining({ accepted_terms: true })));
     });
 
     it('opens from the on-device snapshot when the boot check cannot reach the server', async () => {

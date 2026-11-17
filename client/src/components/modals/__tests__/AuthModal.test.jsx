@@ -111,6 +111,7 @@ describe('AuthModal', () => {
             'invitee@example.com',
             'Password123',
             'fg_invite_abc123',
+            { acceptedTerms: true },
         ));
     });
 

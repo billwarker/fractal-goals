@@ -94,7 +94,9 @@ function AuthModalInner({ onClose }) {
                 await login(formValues.usernameOrEmail, formValues.password, { rememberMe: formValues.rememberMe });
                 onClose();
             } else {
-                await signup(formValues.username, formValues.email, formValues.password, formValues.inviteKey);
+                await signup(formValues.username, formValues.email, formValues.password, formValues.inviteKey, {
+                    acceptedTerms: formValues.acceptedTerms === true,
+                });
                 // Straight in with the password they just chose; if that fails, the
                 // account still exists and they can log in from the form below.
                 const signedIn = await login(formValues.username, formValues.password, { rememberMe: false })
