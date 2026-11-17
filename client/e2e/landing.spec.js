@@ -123,7 +123,7 @@ test('a goal clicked in the tree opens the demo on that goal', async ({ page }, 
     await expect(page.getByText('Ten tunes I can call at any jam.')).toBeVisible();
 });
 
-test('an emailed invite opens a prefilled sign-up that lands in the welcome flow', async ({ page }, testInfo) => {
+test('an emailed invite opens a prefilled sign-up that lands on Selection, ready for a first fractal', async ({ page }, testInfo) => {
     const project = testInfo.project.name;
     const email = `invitee-${project}@example.invalid`;
 
@@ -139,7 +139,8 @@ test('an emailed invite opens a prefilled sign-up that lands in the welcome flow
     await expect(dialog.getByRole('checkbox')).toBeChecked();
     await dialog.getByRole('button', { name: 'CREATE' }).click();
 
-    // A brand-new account goes straight into the welcome flow, with the invite gone from the URL.
-    await expect(page.getByRole('heading', { name: 'Turn a big goal into a tree you can work on' })).toBeVisible();
+    // A brand-new account lands on Selection, ready to make its first fractal, with the invite gone from the URL.
+    await expect(page.getByText(`Welcome, invitee_${project}`)).toBeVisible();
+    await expect(page.getByRole('button', { name: /New Fractal/ })).toBeVisible();
     await expect(page).not.toHaveURL(/invite_key/);
 });

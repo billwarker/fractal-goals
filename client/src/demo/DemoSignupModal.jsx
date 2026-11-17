@@ -9,7 +9,7 @@ import styles from './DemoSignupModal.module.css';
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // During the private beta, signing up means joining the waitlist. An invite key skips the
-// wait: the app host's invite link prefills sign-up, logs in and opens the welcome flow.
+// wait: the app host's invite link prefills sign-up, logs in and lands on the fractal list.
 export function inviteSignupHref(inviteKey, email, appHref = getAppHref()) {
     const params = new URLSearchParams({ invite_key: inviteKey.trim() });
     if (email.trim()) params.set('email', email.trim());
