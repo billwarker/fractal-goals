@@ -691,7 +691,8 @@
 }
 
 .setMetricsContent {
-    flex: 1;
+    /* Only as wide as its fields, so the cascade buttons follow the last one. */
+    flex: 0 1 auto;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -765,10 +766,6 @@
     flex-direction: column;
     gap: 4px;
     min-width: 0;
-}
-
-.metricValueWithAction {
-    display: contents;
 }
 
 .metricSelect {
@@ -961,9 +958,9 @@
 
 .cascadeButtonsContainer {
     display: flex;
+    flex: 0 0 auto;
     gap: 8px;
     align-items: center;
-    margin-left: 12px;
     padding-left: 12px;
     border-left: 1px solid var(--color-border);
 }
@@ -1156,9 +1153,10 @@
         min-width: 0;
     }
 
-    /* Stacked layout: drop the left divider/indent on cascade buttons */
+    /* Stacked layout: cascade buttons get their own row under the fields and set controls. */
     .cascadeButtonsContainer {
-        margin-left: 0;
+        grid-column: 2 / 4;
+        grid-row: 3;
         padding-left: 0;
         border-left: none;
         flex-wrap: wrap;
@@ -1392,26 +1390,6 @@
         min-width: 96px;
     }
 
-    :global([data-session-detail-content]) .metricValueWithAction {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-
-    :global([data-session-detail-content]) .metricValueWithAction > input,
-    :global([data-session-detail-content]) .metricValueWithAction > select {
-        flex: 1 0 96px;
-    }
-
-    :global([data-session-detail-content]) .metricValueWithAction > button {
-        margin: 0;
-        max-width: 100%;
-        white-space: normal;
-        overflow-wrap: anywhere;
-    }
-
     :global([data-session-detail-content]) .metricLabel,
     :global([data-session-detail-content]) .metricLabelLarge {
         grid-column: 1;
@@ -1460,21 +1438,6 @@
     :global([data-session-detail-content]) .metricMeta,
     :global([data-session-detail-content]) .metricMetaLarge {
         display: contents;
-    }
-
-    :global([data-session-detail-content]) .metricValueWithAction {
-        display: contents;
-    }
-
-    :global([data-session-detail-content]) .metricValueWithAction > input,
-    :global([data-session-detail-content]) .metricValueWithAction > select {
-        grid-column: 2;
-        grid-row: 1;
-    }
-
-    :global([data-session-detail-content]) .metricValueWithAction > button {
-        grid-column: 2;
-        grid-row: auto;
     }
 
     :global([data-session-detail-content]) .metricUnit,

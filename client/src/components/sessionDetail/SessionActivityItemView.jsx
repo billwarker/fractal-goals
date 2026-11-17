@@ -200,6 +200,31 @@ function SessionActivityItemView({
         ),
     });
 
+    // "Cascade" copies a set's value into the following empty sets; the last set has none to fill.
+    const renderCascadeButtons = (set, setIdx) => {
+        if (setIdx >= exercise.sets.length - 1) return null;
+        const buttons = [];
+        const addButton = (m, splitId = null) => {
+            const val = getMetricValue(set.metrics, m.id, splitId);
+            if (isMetricValueEmpty(val) || !isNextSetEmpty(setIdx, m.id, splitId)) return;
+            buttons.push(
+                <MetricCascadeButton
+                    key={splitId ? `${splitId}-${m.id}` : m.id}
+                    value={val}
+                    unit={m.unit}
+                    destinationLabel="sets"
+                    onClick={() => handleCascade(m.id, val, splitId, setIdx)}
+                />
+            );
+        };
+        if (hasSplits) {
+            def.split_definitions.forEach((split) => def.metric_definitions.forEach((m) => addButton(m, split.id)));
+        } else {
+            def.metric_definitions.forEach((m) => addButton(m));
+        }
+        return buttons.length ? <div className={styles.cascadeButtonsContainer}>{buttons}</div> : null;
+    };
+
     return (
         <SessionItemCard
             onClick={handleActivityCardClick}
@@ -628,40 +653,10 @@ function SessionActivityItemView({
                                             <p className={styles.planNote}>{getSetPlanNote(setIdx)}</p>
                                         )}
 
-                                        {/* Cascade Buttons Container */}
-                                        {setIdx < exercise.sets.length - 1 && (
-                                            <div className={styles.cascadeButtonsContainer}>
-                                                {(() => {
-                                                    const buttons = [];
-                                                    const checkAndAddButton = (m, splitId = null) => {
-                                                        const val = getMetricValue(set.metrics, m.id, splitId);
-                                                        if (!isMetricValueEmpty(val) && isNextSetEmpty(setIdx, m.id, splitId)) {
-                                                            const key = splitId ? `${splitId}-${m.id}` : m.id;
-                                                            buttons.push(
-                                                                <MetricCascadeButton
-                                                                    key={key}
-                                                                    value={val}
-                                                                    unit={m.unit}
-                                                                    destinationLabel="sets"
-                                                                    onClick={() => handleCascade(m.id, val, splitId, setIdx)}
-                                                                />
-                                                            );
-                                                        }
-                                                    };
-                                                    if (hasSplits) {
-                                                        def.split_definitions.forEach(split => {
-                                                            def.metric_definitions.forEach(m => checkAndAddButton(m, split.id));
-                                                        });
-                                                    } else {
-                                                        def.metric_definitions.forEach(m => checkAndAddButton(m));
-                                                    }
-                                                    if (buttons.length === 0) return null;
-                                                    return buttons;
-                                                })()}
-                                            </div>
-                                        )}
-
                                     </div>
+
+                                    {/* Cascade buttons sit after every field, so fields line up across sets. */}
+                                    {renderCascadeButtons(set, setIdx)}
 
                                     {(yieldBySetIndex?.[setIdx] != null || (!quickMode && activityDefinition?.id && set.id)) && (
                                         <div className={styles.setTrailingControls}>

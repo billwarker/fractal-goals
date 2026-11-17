@@ -162,21 +162,12 @@
     min-width: 0;
 }
 
-/* Keep the desktop input / metadata / cascade order. On mobile the editor's
-   value action stays inside the value cell and metadata joins the outer grid. */
+/* On mobile the editor's metadata joins the outer grid. */
 .memberMetricControl {
     display: flex;
     align-items: center;
     gap: 4px;
     min-width: 0;
-}
-
-.memberMetricControl > span {
-    order: 1;
-}
-
-.memberMetricControl button {
-    order: 2;
 }
 
 .memberMetricError {
@@ -292,7 +283,8 @@
         margin-left: 0;
     }
 
-    .memberMetrics .memberMetricsContent {
+    .memberMetrics .memberMetricsContent,
+    .memberMetrics .memberCascade {
         grid-column: 1 / -1;
     }
 

@@ -119,10 +119,6 @@ export default function CircuitMemberMetrics({
         const inputId = `circuit-metric-${memberId}-${key}`;
         const isSplitMetric = Boolean(split);
         const currentValue = valueFor(metric.id, split?.id);
-        const showCascade = !disabled
-            && !saving
-            && !isMetricValueEmpty(currentValue)
-            && canCascade?.(metric.id, split?.id || null);
         return (
             <div key={key} className={activityStyles.metricInputContainer}>
                 <label
@@ -152,14 +148,6 @@ export default function CircuitMemberMetrics({
                         )}
                         disabled={disabled || saving}
                         inputId={inputId}
-                        valueAction={showCascade ? (
-                            <MetricCascadeButton
-                                value={currentValue}
-                                unit={metric.unit}
-                                destinationLabel="rounds"
-                                onClick={() => onCascade(metric.id, split?.id || null)}
-                            />
-                        ) : null}
                         onDraftChange={(value) => {
                             draftsRef.current[key] = value;
                         }}
@@ -169,6 +157,24 @@ export default function CircuitMemberMetrics({
             </div>
         );
     };
+
+    // Cascade buttons sit after every field (as on sets), so fields line up from round to round.
+    const fields = splits.length > 0
+        ? splits.flatMap((split) => metricDefinitions.map((metric) => ({ metric, split })))
+        : metricDefinitions.map((metric) => ({ metric, split: null }));
+    const cascadeButtons = disabled || saving ? [] : fields.flatMap(({ metric, split }) => {
+        const currentValue = valueFor(metric.id, split?.id);
+        if (isMetricValueEmpty(currentValue) || !canCascade?.(metric.id, split?.id || null)) return [];
+        return [(
+            <MetricCascadeButton
+                key={metricKey(metric.id, split?.id)}
+                value={currentValue}
+                unit={metric.unit}
+                destinationLabel="rounds"
+                onClick={() => onCascade(metric.id, split?.id || null)}
+            />
+        )];
+    });
 
     return (
         <div className={`${activityStyles.setRow} ${styles.memberMetrics}`} aria-label={`${definition.name} metrics`}>
@@ -183,6 +189,9 @@ export default function CircuitMemberMetrics({
                     : metricDefinitions.map((metric) => renderMetric(metric))}
                 {error && <p className={styles.memberMetricError} role="alert">{error}</p>}
             </div>
+            {cascadeButtons.length > 0 && (
+                <div className={`${activityStyles.cascadeButtonsContainer} ${styles.memberCascade}`}>{cascadeButtons}</div>
+            )}
         </div>
     );
 }

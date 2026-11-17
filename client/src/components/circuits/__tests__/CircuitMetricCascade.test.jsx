@@ -10,6 +10,7 @@ vi.mock('../../../hooks/useRootProgressSettings', () => ({
     useRootProgressSettings: () => ({ progressSettings: { delta_display_mode: 'percent' } }),
 }));
 
+import CircuitMemberMetrics from '../CircuitMemberMetrics';
 import CircuitRunCard from '../CircuitRunCard';
 
 
@@ -92,4 +93,32 @@ it('cascades a zero metric into later empty rounds of the same slot', async () =
         memberId: 'member-a',
         value: { metricId: 'metric-weight', splitId: null },
     }));
+});
+
+it('puts the cascade buttons after every metric field, so fields line up across rounds', () => {
+    const definition = {
+        id: 'activity-a',
+        name: 'Press',
+        metric_definitions: [
+            { id: 'metric-weight', name: 'Weight', unit: 'lbs', input_type: 'number' },
+            { id: 'metric-reps', name: 'Reps', unit: 'reps', input_type: 'integer' },
+        ],
+    };
+    render(
+        <CircuitMemberMetrics
+            memberId="member-a"
+            rootId="root"
+            definition={definition}
+            metrics={[{ metric_id: 'metric-weight', value: 100 }, { metric_id: 'metric-reps', value: 5 }]}
+            onSave={vi.fn()}
+            canCascade={() => true}
+            onCascade={vi.fn()}
+        />,
+    );
+    const lastField = screen.getByLabelText('Reps');
+    const buttons = [screen.getByRole('button', { name: 'Cascade lbs' }), screen.getByRole('button', { name: 'Cascade reps' })];
+    buttons.forEach((button) => {
+        expect(lastField.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+    expect(buttons[0].parentElement).toBe(buttons[1].parentElement);
 });
