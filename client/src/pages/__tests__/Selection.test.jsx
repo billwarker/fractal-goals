@@ -104,7 +104,7 @@ vi.mock('../../components/atoms/GoalIcon', () => ({
 }));
 
 vi.mock('../../components/atoms/AnimatedGoalIcon', () => ({
-    default: (props) => <div data-testid="animated-goal-icon" data-is-smart={String(props.isSmart)} />,
+    default: (props) => <div data-testid="animated-goal-icon" data-is-smart={String(props.isSmart)} data-shape={props.shape} />,
 }));
 
 vi.mock('../../components/modals/DeleteConfirmModal', () => ({
@@ -135,11 +135,11 @@ function createQueryClient() {
     });
 }
 
-function renderSelection(queryClient, initialEntries = ['/']) {
+function renderSelection(queryClient, initialEntries = ['/'], props = {}) {
     return render(
         <QueryClientProvider client={queryClient}>
             <MemoryRouter initialEntries={initialEntries}>
-                <Selection />
+                <Selection {...props} />
             </MemoryRouter>
         </QueryClientProvider>
     );
@@ -183,6 +183,18 @@ describe('Selection', () => {
         ...overrides,
     });
 
+    it('opens Settings from the button to the left of Logout', async () => {
+        getAllFractals.mockResolvedValue({ data: [headerRoot()] });
+        getGoalLevels.mockResolvedValue({ data: [] });
+        const onOpenSettings = vi.fn();
+        renderSelection(createQueryClient(), ['/'], { onOpenSettings });
+        const settings = await screen.findByRole('button', { name: 'SETTINGS' });
+        const logout = screen.getByRole('button', { name: 'LOGOUT' });
+        expect(settings.nextElementSibling).toBe(logout);
+        fireEvent.click(settings);
+        expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    });
+
     it('animates the header root icon when the root is SMART and animated icons are on', async () => {
         getAllFractals.mockResolvedValueOnce({ data: [headerRoot()] });
 
@@ -214,6 +226,32 @@ describe('Selection', () => {
             expect(screen.getByText('Root 1')).toBeInTheDocument();
         });
         expect(screen.queryByTestId('animated-goal-icon')).not.toBeInTheDocument();
+    });
+
+    it('keeps the header logo on the current fractal while opening another one', async () => {
+        localStorage.setItem('fractal_recent_root_id:user-1', 'root-1');
+        getAllFractals.mockResolvedValueOnce({
+            data: [
+                headerRoot({ display_level: { name: 'Ultimate Goal', color: '#111111', secondary_color: '#222222', icon: 'impossible-ring' } }),
+                headerRoot({
+                    id: 'root-2',
+                    name: 'Root 2',
+                    display_level: { name: 'Ultimate Goal', color: '#333333', secondary_color: '#444444', icon: 'cube-star' },
+                }),
+            ],
+        });
+
+        renderSelection(createQueryClient());
+        await waitFor(() => {
+            expect(screen.getByTestId('animated-goal-icon')).toHaveAttribute('data-shape', 'impossible-ring');
+        });
+
+        fireEvent.click(screen.getByText('Root 2'));
+
+        expect(mockNavigate).toHaveBeenCalledWith('/root-2/goals');
+        expect(localStorage.getItem('fractal_recent_root_id:user-1')).toBe('root-2');
+        // Swapping the logo here would flash the new fractal before the next page appears.
+        expect(screen.getByTestId('animated-goal-icon')).toHaveAttribute('data-shape', 'impossible-ring');
     });
 
     it('stores fractals under user-scoped query keys without per-root level fetches', async () => {
@@ -353,8 +391,8 @@ describe('Selection', () => {
 
         renderSelection(queryClient);
 
-        // With no fractals the welcome flow comes first; setting up alone opens the create dialog.
-        fireEvent.click(await screen.findByRole('button', { name: 'I’ll set it up myself' }));
+        // With no fractals the page is the usual one: the New Fractal card opens the create dialog.
+        fireEvent.click(await screen.findByRole('button', { name: /New Fractal/ }));
         fireEvent.click(screen.getByText('Submit fractal'));
 
         await waitFor(() => {

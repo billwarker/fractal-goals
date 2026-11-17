@@ -62,6 +62,18 @@ describe('SettingsModal', () => {
         expect(listConnections).not.toHaveBeenCalled();
     });
 
+    it('leaves out Goal Characteristics outside a fractal, falling back to General for its link', () => {
+        renderSettings({ inFractal: false, initialTab: 'styling' });
+        expect(screen.queryByRole('tab', { name: 'Goal Characteristics' })).not.toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Account' })).toBeInTheDocument();
+        expect(screen.getByRole('tabpanel')).toHaveTextContent('General section');
+    });
+
+    it('shows Goal Characteristics inside a fractal', () => {
+        renderSettings({ initialTab: 'styling' });
+        expect(screen.getByRole('tabpanel')).toHaveTextContent('Characteristics section');
+    });
+
     it('falls back to General for a deep link to a hidden section', () => {
         renderSettings({ initialTab: 'getting-started' });
         expect(screen.getByRole('tabpanel')).toHaveTextContent('General section');

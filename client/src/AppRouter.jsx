@@ -73,6 +73,10 @@ function App() {
     // checkbox and the landing footer both link here before an account exists.
     const showLegalPage = LEGAL_PATHS.includes(location.pathname);
     const showSelectionPage = location.pathname === '/' && !showLandingPage;
+    const openSettings = () => {
+        trackEvent('settings_opened');
+        setIsSettingsOpen(true);
+    };
     const activeRootId = location.pathname.split('/')[1] || '';
     const agentShellAvailable = isAuthenticated && Boolean(activeRootId)
         && !showSelectionPage
@@ -214,10 +218,7 @@ function App() {
                 )}
                 {!showSelectionPage && !showLandingPage && !showLegalPage && !redirectDeprecatedLandingRoute && !STANDALONE_PATHS.has(location.pathname) && (
                     <NavigationHeader
-                        onOpenSettings={() => {
-                            trackEvent('settings_opened');
-                            setIsSettingsOpen(true);
-                        }}
+                        onOpenSettings={openSettings}
                         onOpenAgent={() => {
                             setHasOpenedAgentChat(true);
                             setIsAgentChatOpen(true);
@@ -245,7 +246,7 @@ function App() {
                             </Suspense>
                         </ComponentErrorBoundary>
                     ) : showSelectionPage ? (
-                        <Selection />
+                        <Selection onOpenSettings={openSettings} />
                     ) : location.pathname === '/admin' ? (
                         <ComponentErrorBoundary>
                             <Suspense fallback={<RouteFallback />}>
@@ -275,6 +276,7 @@ function App() {
                         <SettingsModal
                             isOpen={isSettingsOpen}
                             initialTab={settingsTab}
+                            inFractal={!showSelectionPage}
                             onClose={() => { setIsSettingsOpen(false); setSettingsTab(null); }}
                         />
                     )}

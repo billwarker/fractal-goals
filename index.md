@@ -69,15 +69,12 @@ state or content. A timed-out request's reachability probe waits 30 s
 (`COLD_START_PROBE_TIMEOUT_MS`), so a waking server isn't reported offline. The maintainability audit
 rejects ad-hoc "Loading…" elements and the old `.loading-spinner` class.
 
-First run: a signed-in user with no fractals sees `components/onboarding/welcome/WelcomeFlow` on
-Selection (welcome → big goal → up to three long-term goals, with a live tree preview; full screen on
-phones; skipping is remembered per user in `welcome-dismissed:<userId>` and opens the normal create
-modal). It creates everything with one `POST /api/fractals/quickstart` (`@idempotent`, one transaction
-in `GoalService.quickstart_fractal`, goals quota checked for the whole tree up front), then lands on the
-Goals page. The Getting Started checklist (`onboarding_v1` flag) orders its steps explore → activity →
-session → SMART → program, has "Show me" links, sits above the phone footer and celebrates once when
-complete. `client/e2e/onboarding.spec.js` drives the journey with the fixture's `welcome_user_<project>`
-accounts.
+First run: a signed-in user with no fractals sees the ordinary Selection page and starts with its
+**New Fractal** card (`GoalModal`); there is no separate welcome flow. Selection's profile row has
+Settings beside Logout (`AppRouter` passes the same opener the navigation header uses). The Getting
+Started checklist (`onboarding_v1` flag) orders its steps explore → activity → session → SMART →
+program, has "Show me" links, sits above the phone footer and celebrates once when complete.
+`client/e2e/onboarding.spec.js` drives the first fractal with the fixture's `new_user_<project>` accounts.
 
 Landing (`pages/Landing.jsx`, copy in `content/landing.md`): one hero whose call to action is the live
 demo. Each published demo (Admin → Live demo) is an icon linking to `/demo/<snapshot root>/goals?tour=1`;
@@ -656,7 +653,8 @@ Settings (`components/modals/SettingsModal.jsx`) is a shell over one component p
 `components/settings/`, built from `SettingsSection`/`SettingsRow` (label and help left, control
 right, stacking on phones) and `atoms/Switch`. Desktop uses a vertical ARIA tablist (arrow keys,
 Home/End); phones get a list that drills into one section. `useVisibleSettingsSections` hides AI
-Connections unless an AI flag is on or the user still has a connection to revoke; a `?settings=`
+Connections unless an AI flag is on or the user still has a connection to revoke, and Goal
+Characteristics outside a fractal (opened from Selection, `inFractal={false}`); a `?settings=`
 deep link to a hidden section falls back to General until it becomes visible.
 
 Session tokens carry the session audience, `users.session_version`, and the original login

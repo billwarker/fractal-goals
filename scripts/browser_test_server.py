@@ -339,20 +339,20 @@ def main():
             )
             user.set_password("BrowserTest123!")
             db.add(user)
-            # New accounts with no fractals, one per workflow project, for the welcome flow
+            # New accounts with no fractals, one per workflow project, for the first run
             # (e2e/onboarding.spec.js creates a fractal, so projects can't share one).
             for project in ("desktop", "mobile"):
-                welcome_user = User(
-                    id=f"welcome-user-{project}",
-                    username=f"welcome_user_{project}",
-                    email=f"welcome-{project}@example.invalid",
+                new_user = User(
+                    id=f"new-user-{project}",
+                    username=f"new_user_{project}",
+                    email=f"new-{project}@example.invalid",
                     terms_accepted_version=config.TERMS_VERSION,
                     terms_accepted_at=now,
                     privacy_accepted_version=config.PRIVACY_VERSION,
                     privacy_accepted_at=now,
                 )
-                welcome_user.set_password("WelcomeTest123!")
-                db.add(welcome_user)
+                new_user.set_password("NewUserTest123!")
+                db.add(new_user)
                 # An emailed beta invite (e2e/landing.spec.js signs up through its link).
                 db.add(SignupInviteKey(
                     key_hash=hash_invite_key(f"browser-invite-{project}"),

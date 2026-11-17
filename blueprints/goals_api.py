@@ -16,7 +16,6 @@ from validators import (
     GoalPauseSchema,
     GoalMoveSchema,
     FractalCreateSchema,
-    FractalQuickstartSchema,
 )
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
@@ -303,28 +302,6 @@ def create_fractal(current_user, validated_data):
     except SQLAlchemyError:
         db_session.rollback()
         logger.exception("Error creating fractal")
-        return internal_error(logger, "Goals API request failed")
-    finally:
-        db_session.close()
-
-
-@goals_bp.route('/fractals/quickstart', methods=['POST'])
-@token_required
-@idempotent
-@validate_request(FractalQuickstartSchema)
-@limiter.limit("5 per minute")
-def quickstart_fractal(current_user, validated_data):
-    """Create a fractal and its first long-term goals in one transaction (the welcome flow)."""
-    db_session = get_db_session()
-    try:
-        service = GoalService(db_session)
-        new_fractal, error, status = service.quickstart_fractal(current_user.id, validated_data)
-        if error:
-            return jsonify({"error": error}), status
-        return jsonify(serialize_goal(new_fractal, include_children=False)), 201
-    except SQLAlchemyError:
-        db_session.rollback()
-        logger.exception("Error creating quickstart fractal")
         return internal_error(logger, "Goals API request failed")
     finally:
         db_session.close()

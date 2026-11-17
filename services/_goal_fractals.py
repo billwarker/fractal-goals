@@ -88,45 +88,6 @@ class _GoalFractalsMixin:
         self._emit_starter_template(new_fractal, starter_template)
         return new_fractal, None, 201
 
-    def quickstart_fractal(self, current_user_id, data) -> ServiceResult[Goal]:
-        """A new fractal and its first long-term goals in one transaction (the welcome flow).
-
-        Either everything is created or nothing is: a quota or validation failure on any goal
-        rolls the fractal back too.
-        """
-        child_names = data.get('long_term_goals') or []
-        _, quota_error, quota_status = QuotaService(self.db_session).check_available(
-            current_user_id, "goals", increment=1 + len(child_names),
-        )
-        if quota_error:
-            return None, quota_error, quota_status
-
-        built, error, status = self._build_fractal(current_user_id, {'name': data['name']})
-        if error or built is None:
-            self.db_session.rollback()
-            return None, error, status
-        new_fractal, starter_template = built
-
-        pending_events = []
-        for name in child_names:
-            _, error, status = self.create_fractal_goal(
-                new_fractal.id,
-                current_user_id,
-                {'name': name, 'type': 'LongTermGoal', 'parent_id': new_fractal.id},
-                commit=False,
-                pending_events=pending_events,
-            )
-            if error:
-                self.db_session.rollback()
-                return None, error, status
-
-        self.db_session.commit()
-        self.db_session.refresh(new_fractal)
-        self._emit_starter_template(new_fractal, starter_template)
-        for event in pending_events:
-            event_bus.emit(event)
-        return new_fractal, None, 201
-
     def _build_fractal(self, current_user_id, data) -> ServiceResult[tuple[Goal, SessionTemplate | None]]:
         """Add a fractal root, its levels, onboarding state and starter template, uncommitted."""
         quota_service = QuotaService(self.db_session)

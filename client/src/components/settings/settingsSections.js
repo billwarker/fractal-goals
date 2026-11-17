@@ -16,9 +16,10 @@ export const SETTINGS_SECTIONS = [
 
 /**
  * The sections this user can open. AI Connections shows while either AI flag is on, or while the
- * user still has a connection (so it can be revoked after the feature is switched off).
+ * user still has a connection (so it can be revoked after the feature is switched off). Goal
+ * Characteristics styles a fractal's levels, so it shows only inside a fractal (`inFractal`).
  */
-export function useVisibleSettingsSections() {
+export function useVisibleSettingsSections({ inFractal = true } = {}) {
     const { flags } = useFeatureFlags();
     const onboarding = useOptionalOnboarding();
     const aiEnabled = isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors)
@@ -33,6 +34,7 @@ export function useVisibleSettingsSections() {
     const hasConnections = (connections.data?.length ?? 0) > 0;
 
     return SETTINGS_SECTIONS.filter(({ id }) => {
+        if (id === 'styling') return inFractal;
         if (id === 'ai-connections') return aiEnabled || hasConnections;
         if (id === 'getting-started') return Boolean(onboarding?.enabled);
         return true;

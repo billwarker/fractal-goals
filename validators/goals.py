@@ -289,28 +289,6 @@ class GoalAssociationBatchSchema(BaseModel):
     group_ids: List[str] = Field(default_factory=list)
 
 
-class FractalQuickstartSchema(BaseModel):
-    """The welcome flow: a fractal's name and up to three first long-term goals."""
-    model_config = ConfigDict(str_strip_whitespace=True, extra='forbid')
-
-    name: str = Field(..., min_length=1, max_length=MAX_NAME_LENGTH)
-    long_term_goals: List[str] = Field(default_factory=list, max_length=3)
-
-    @field_validator('name')
-    @classmethod
-    def sanitize_name(cls, v: str) -> str:
-        return sanitize_string(v)
-
-    @field_validator('long_term_goals')
-    @classmethod
-    def clean_goal_names(cls, names: List[str]) -> List[str]:
-        cleaned = [sanitize_string(name.strip()) for name in names if name and name.strip()]
-        for name in cleaned:
-            if len(name) > MAX_NAME_LENGTH:
-                raise ValueError(f'Goal names must be at most {MAX_NAME_LENGTH} characters')
-        return cleaned
-
-
 class FractalCreateSchema(BaseModel):
     """Schema for creating a new fractal (root goal)."""
     model_config = ConfigDict(str_strip_whitespace=True)

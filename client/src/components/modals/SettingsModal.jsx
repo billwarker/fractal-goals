@@ -151,9 +151,9 @@ function MobileSettings({ sections, openId, onOpen }) {
     );
 }
 
-const SettingsModalInner = ({ onClose, initialTab }) => {
+const SettingsModalInner = ({ onClose, initialTab, inFractal }) => {
     const isMobile = useIsMobile();
-    const sections = useVisibleSettingsSections();
+    const sections = useVisibleSettingsSections({ inFractal });
     // The requested section is kept even while hidden, so a deep link to a section behind a
     // feature flag opens once the flags arrive.
     const [requested, setRequested] = useState(initialTab || null);
@@ -182,12 +182,13 @@ const SettingsModalInner = ({ onClose, initialTab }) => {
     );
 };
 
-const SettingsModal = ({ isOpen, onClose, initialTab = null }) => {
+/** `inFractal`: opened inside a fractal, not from the fractal list (where its styling doesn't apply). */
+const SettingsModal = ({ isOpen, onClose, initialTab = null, inFractal = true }) => {
     if (!isOpen) {
         return null;
     }
 
-    return <SettingsModalInner onClose={onClose} initialTab={initialTab} />;
+    return <SettingsModalInner onClose={onClose} initialTab={initialTab} inFractal={inFractal} />;
 };
 
 export default SettingsModal;

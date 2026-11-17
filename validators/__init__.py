@@ -51,7 +51,6 @@ from .auth import (
 )
 from .goals import (
     FractalCreateSchema,
-    FractalQuickstartSchema,
     GoalAssociationBatchSchema,
     GoalCompletionUpdateSchema,
     GoalConvertLevelSchema,
@@ -220,7 +219,6 @@ __all__ = [
     "DashboardCreateSchema",
     "DashboardUpdateSchema",
     "FractalCreateSchema",
-    "FractalQuickstartSchema",
     "FractalMetricCreateSchema",
     "FractalMetricUpdateSchema",
     "GoalAssociationBatchSchema",

@@ -11,7 +11,6 @@ import GoalIcon from '../components/atoms/GoalIcon';
 import AnimatedGoalIcon from '../components/atoms/AnimatedGoalIcon';
 import { useAuth } from '../contexts/AuthContext';
 import { queryKeys } from '../hooks/queryKeys';
-import WelcomeFlow from '../components/onboarding/welcome/WelcomeFlow';
 import LoadingState from '../components/common/LoadingState';
 import styles from './Selection.module.css'; // Import CSS Module
 import { useGoalLevels } from '../contexts/GoalLevelsContext';
@@ -26,7 +25,7 @@ import { useGuardedLogout } from '../offline/OutboxContext';
  * Selection Page - Fractal Goal Selection
  * Displays all root goals as cards and allows navigation to specific fractal views
  */
-function Selection() {
+function Selection({ onOpenSettings = null }) {
     const RECENT_ROOT_STORAGE_PREFIX = 'fractal_recent_root_id';
     const navigate = useNavigate();
     const location = useLocation();
@@ -90,36 +89,6 @@ function Selection() {
         },
     });
 
-    const quickstartMutation = useMutation({
-        mutationFn: async ({ data, idempotencyKey }) => (await globalApi.quickstartFractal(data, idempotencyKey)).data,
-        onSuccess: async (createdFractal) => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.fractals(userId) });
-            if (createdFractal?.id) handleSelectRoot(createdFractal.id);
-        },
-        onError: (error) => {
-            notify.error(`Couldn’t create your goal: ${formatError(error)}`);
-        },
-    });
-
-    // Someone with no fractals gets the welcome flow, unless they chose to set up on their own.
-    const welcomeDismissedKey = userId ? `welcome-dismissed:${userId}` : null;
-    const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
-        try {
-            return Boolean(welcomeDismissedKey && localStorage.getItem(welcomeDismissedKey));
-        } catch {
-            return false;
-        }
-    });
-    const dismissWelcome = () => {
-        try {
-            if (welcomeDismissedKey) localStorage.setItem(welcomeDismissedKey, '1');
-        } catch {
-            // Private mode: the choice lasts for this visit only.
-        }
-        setWelcomeDismissed(true);
-        setCreateModalOpen(true);
-    };
-
     const deleteFractalMutation = useMutation({
         mutationFn: async (rootId) => {
             const res = await globalApi.deleteFractal(rootId);
@@ -147,10 +116,12 @@ function Selection() {
     });
 
     const handleSelectRoot = (rootId) => {
+        // Only remember the choice: the header picks it up from storage the next time this page
+        // mounts. Updating it here would swap the big header logo to the new fractal while the
+        // next page is still loading, a visible flicker on the way out.
         if (recentRootStorageKey) {
             localStorage.setItem(recentRootStorageKey, rootId);
         }
-        setRecentRootId(rootId);
         navigate(`/${rootId}/goals`);
     };
 
@@ -262,17 +233,6 @@ function Selection() {
         return <LoadingState variant="page" label="Loading fractals…" />;
     }
 
-    // An invite or sign-in link opens the auth dialog here; the welcome flow waits until it's done.
-    if (isAuthenticated && fractalsQuery.isSuccess && fractals.length === 0 && !welcomeDismissed && !authModalRequested) {
-        return (
-            <WelcomeFlow
-                creating={quickstartMutation.isPending}
-                onCreate={(data, idempotencyKey) => quickstartMutation.mutate({ data, idempotencyKey })}
-                onSkip={dismissWelcome}
-            />
-        );
-    }
-
     return (
         <div className={`${styles.container} page-reveal`}>
             {isAuthenticated && user?.is_admin && (
@@ -317,12 +277,16 @@ function Selection() {
                         <div className={styles.welcomeText}>
                             Welcome, <span className={styles.username}>{user?.username}</span>
                         </div>
-                        <button
-                            onClick={logout}
-                            className={styles.logoutBtn}
-                        >
-                            LOGOUT
-                        </button>
+                        <div className={styles.profileActions}>
+                            {onOpenSettings && (
+                                <button type="button" onClick={onOpenSettings} className={styles.profileButton}>
+                                    SETTINGS
+                                </button>
+                            )}
+                            <button type="button" onClick={logout} className={styles.profileButton}>
+                                LOGOUT
+                            </button>
+                        </div>
                     </div>
                 )}
 
