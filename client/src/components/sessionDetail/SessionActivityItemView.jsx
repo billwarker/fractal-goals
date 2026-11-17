@@ -448,7 +448,7 @@ function SessionActivityItemView({
                                                 <label className={styles.timerLabel}>Duration</label>
                                                 <input
                                                     type="text"
-                                                    placeholder="MM:SS"
+                                                    placeholder="30m"
                                                     value={targetDurationInput}
                                                     onChange={(e) => {
                                                         setTargetDurationInput(e.target.value);

@@ -14,18 +14,6 @@ export function isMetricValueEmpty(value) {
     return value === '' || value === null || value === undefined;
 }
 
-export function parseMMSS(value) {
-    const trimmed = value?.trim();
-    if (!trimmed) return null;
-    const match = trimmed.match(/^(\d+):(\d{1,2})$/);
-    if (!match) return null;
-    const mins = Number(match[1]);
-    const secs = Number(match[2]);
-    if (!Number.isInteger(mins) || !Number.isInteger(secs) || secs > 59) return null;
-    const totalSeconds = mins * 60 + secs;
-    return totalSeconds > 0 ? totalSeconds : null;
-}
-
 export function formatMetricNumber(value) {
     if (value == null || Number.isNaN(Number(value))) return null;
     const numericValue = Number(value);

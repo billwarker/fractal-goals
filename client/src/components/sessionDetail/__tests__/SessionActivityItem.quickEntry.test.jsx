@@ -154,7 +154,7 @@ it('renders timer controls, notes, and delete button in regular mode', () => {
         expect(screen.queryByRole('button', { name: 'Add tag' })).not.toBeInTheDocument();
     });
 
-it('starts countdown mode when a valid MM:SS target is entered', () => {
+it('starts countdown mode from a typed duration such as 30m', () => {
         renderWithProviders(
             <SessionActivityItem
                 exercise={baseExercise}
@@ -169,12 +169,12 @@ it('starts countdown mode when a valid MM:SS target is entered', () => {
             }
         );
 
-        fireEvent.change(screen.getByPlaceholderText('MM:SS'), { target: { value: '01:30' } });
-        expect(screen.getByText('Countdown 01:30')).toBeInTheDocument();
+        fireEvent.change(screen.getByPlaceholderText('30m'), { target: { value: '30m' } });
+        expect(screen.getByText('Countdown 30:00')).toBeInTheDocument();
         fireEvent.click(screen.getByTitle('Start timer'));
 
         expect(updateTimer).toHaveBeenCalledWith('quick-instance-1', 'start', {
-            target_duration_seconds: 90,
+            target_duration_seconds: 1800,
         });
     });
 
@@ -193,11 +193,11 @@ it('rejects invalid countdown targets before starting', () => {
             }
         );
 
-        fireEvent.change(screen.getByPlaceholderText('MM:SS'), { target: { value: '01:99' } });
+        fireEvent.change(screen.getByPlaceholderText('30m'), { target: { value: '-5m' } });
         fireEvent.click(screen.getByTitle('Start timer'));
 
         expect(updateTimer).not.toHaveBeenCalled();
-        expect(screen.getByText('Use MM:SS, seconds 00-59')).toBeInTheDocument();
+        expect(screen.getByText('Use 30m, 1h30m, or 2:30')).toBeInTheDocument();
     });
 
 it('truncates long descriptions to one line and exposes the full value in a tooltip', () => {

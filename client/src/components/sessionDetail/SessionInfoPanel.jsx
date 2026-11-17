@@ -5,7 +5,7 @@ import { useActiveSessionActions, useActiveSessionData } from '../../contexts/Ac
 import { useTimezone } from '../../contexts/TimezoneContext';
 import useLiveActivityDuration from '../../hooks/useLiveActivityDuration';
 import { useLivePausedDuration, useLiveSessionDuration } from '../../hooks/useSessionDuration';
-import { formatDateInTimezone, formatForInput, localToISO } from '../../utils/dateUtils';
+import { formatDateInTimezone, formatForInput, localToISO, validateTimerRange } from '../../utils/dateUtils';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import CheckIcon from '../atoms/CheckIcon';
@@ -19,6 +19,7 @@ import SessionTemplateNameBadge from '../common/SessionTemplateNameBadge';
 import { formatClockDuration } from '../../utils/sessionTime';
 import { getTemplateColor } from '../../utils/sessionRuntime';
 
+import useRelativeTimeAdjustment from './useRelativeTimeAdjustment';
 import styles from './SessionInfoPanel.module.css';
 import { logError } from '../../utils/logger';
 
@@ -50,6 +51,16 @@ function SessionInfoPanel() {
     const programContextTitle = [programInfo?.program_name, programInfo?.block_name, programDayLabel]
         .filter(Boolean)
         .join(' · ');
+
+    const startTime = session?.session_start || sessionData?.session_start;
+    const endTime = session?.session_end || sessionData?.session_end;
+    // "+10m", "-1h30m", "now" or "now - 30m" from the ± beside a time, as on activity timers.
+    const relativeTimeAdjustment = useRelativeTimeAdjustment({
+        timezone,
+        align: 'end',
+        validate: (target, candidateIso) => validateTimerRange({ target, candidateIso, startIso: startTime, stopIso: endTime }),
+        onApply: (target, isoValue) => updateSession({ [target === 'start' ? 'session_start' : 'session_end']: isoValue }),
+    });
 
     const formatDate = (dateString) => {
         if (!dateString) return '—';
@@ -97,10 +108,6 @@ function SessionInfoPanel() {
             setSaving(false);
         }
     };
-
-    // Determine values safely
-    const startTime = session?.session_start || sessionData?.session_start;
-    const endTime = session?.session_end || sessionData?.session_end;
 
     return (
         <div className={styles.sessionInfoPanel}>
@@ -209,6 +216,8 @@ function SessionInfoPanel() {
                             ) : (
                                 <div className={styles.valueWithEdit}>
                                     <span>{formatDate(startTime)}</span>
+                                    {startTime && relativeTimeAdjustment.renderToggle('start')}
+                                    {relativeTimeAdjustment.renderPanel('start', formatForInput(startTime, timezone))}
                                     <button
                                         type="button"
                                         className={styles.iconButton}
@@ -245,6 +254,8 @@ function SessionInfoPanel() {
                             ) : (
                                 <div className={styles.valueWithEdit}>
                                     <span>{formatDate(endTime)}</span>
+                                    {endTime && relativeTimeAdjustment.renderToggle('stop')}
+                                    {relativeTimeAdjustment.renderPanel('stop', formatForInput(endTime, timezone))}
                                     <button
                                         type="button"
                                         className={styles.iconButton}

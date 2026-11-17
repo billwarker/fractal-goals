@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import Button from '../atoms/Button';
 import CloseIcon from '../atoms/CloseIcon';
+import { DURATION_HINT } from '../../utils/timeExpressions';
 import styles from './SessionActivityItem.module.css';
 
 const CONFLICT_VISIBLE_MS = 10_000;
@@ -11,7 +12,7 @@ export async function startTimerWithConflict(event, options) {
     const { autoCompletedRef, hasTargetDurationInput, parsedTargetDuration, onUpdate, setError, setConflict } = options;
     event.stopPropagation();
     autoCompletedRef.current = false;
-    if (hasTargetDurationInput && !parsedTargetDuration) return setError('Use MM:SS, seconds 00-59');
+    if (hasTargetDurationInput && !parsedTargetDuration) return setError(DURATION_HINT);
     const extras = parsedTargetDuration ? { target_duration_seconds: parsedTargetDuration } : {};
     try {
         await onUpdate('timer_action', 'start', extras);

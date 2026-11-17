@@ -2,10 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 
 import { isTextEditingElement } from '../../hooks/useModalBackdropDismiss';
 import { applyRelativeTimeAdjustment } from '../../utils/dateUtils';
+import { TIME_ADJUSTMENT_HINT } from '../../utils/timeExpressions';
 import Button from '../atoms/Button';
 import styles from './SessionActivityItem.module.css';
 
-export default function useRelativeTimeAdjustment({ timezone, validate, onApply }) {
+/**
+ * A ± button beside a start or stop time that opens a small field for "+10m", "-1h30m", "now" or
+ * "now - 30m". `align: 'end'` opens the field toward the left, for a time at a row's right edge.
+ */
+export default function useRelativeTimeAdjustment({ timezone, validate, onApply, align = 'start' }) {
     const [activeTarget, setActiveTarget] = useState(null);
     const [drafts, setDrafts] = useState({ start: '', stop: '' });
     const [errors, setErrors] = useState({ start: '', stop: '' });
@@ -61,7 +66,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
                 [target]: error?.response?.data?.error
                     || error?.message
                     || (typeof error === 'string' ? error : '')
-                    || 'Use +10M, -2H, or +30S',
+                    || TIME_ADJUSTMENT_HINT,
             }));
         } finally {
             setApplyingTarget(null);
@@ -87,7 +92,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
         return (
             <div
                 ref={panelRef}
-                className={styles.timeAdjustmentPanel}
+                className={`${styles.timeAdjustmentPanel} ${align === 'end' ? styles.timeAdjustmentPanelEnd : ''}`}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => event.stopPropagation()}
             >
@@ -96,7 +101,7 @@ export default function useRelativeTimeAdjustment({ timezone, validate, onApply 
                         type="text"
                         inputMode="text"
                         aria-label={`Relative ${target} adjustment`}
-                        placeholder="+10M"
+                        placeholder="+10m or now"
                         value={drafts[target]}
                         onChange={(event) => {
                             setDrafts((current) => ({ ...current, [target]: event.target.value }));

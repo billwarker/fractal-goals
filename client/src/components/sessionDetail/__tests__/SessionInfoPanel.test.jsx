@@ -72,6 +72,37 @@ describe('SessionInfoPanel', () => {
         });
     });
 
+    it('adjusts the start by an offset or from now with the ± field', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-01-01T02:00:00Z'));
+        try {
+            renderWithProviders(<SessionInfoPanel />, {
+                withTimezone: false,
+                withAuth: false,
+                withGoalLevels: false,
+                withTheme: false
+            });
+            fireEvent.click(screen.getByTitle('Expand'));
+            // No end yet, so only the start can be adjusted.
+            expect(screen.queryByRole('button', { name: 'Adjust stop time' })).not.toBeInTheDocument();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Adjust start time' }));
+            const field = screen.getByLabelText('Relative start adjustment');
+            expect(field).toHaveAttribute('placeholder', '+10m or now');
+            fireEvent.change(field, { target: { value: '+15m' } });
+            fireEvent.keyDown(field, { key: 'Enter' });
+            await waitFor(() => expect(updateSession).toHaveBeenCalledWith({ session_start: '2026-01-01T00:15:00.000Z' }));
+
+            fireEvent.click(screen.getByRole('button', { name: 'Adjust start time' }));
+            const again = screen.getByLabelText('Relative start adjustment');
+            fireEvent.change(again, { target: { value: 'now - 30m' } });
+            fireEvent.keyDown(again, { key: 'Enter' });
+            await waitFor(() => expect(updateSession).toHaveBeenCalledWith({ session_start: '2026-01-01T01:30:00.000Z' }));
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('uses one shared template badge in the header without redundant metadata', () => {
         renderWithProviders(<SessionInfoPanel />, {
             withTimezone: false,

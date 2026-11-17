@@ -28,7 +28,6 @@ import {
 import { getAverageDurationStat } from '../../utils/durationStats';
 import {
     formatDuration,
-    parseMMSS,
     formatMetricNumber,
     normalizeMetricValueForStorage,
     getMetricDefaultStorageValue,
@@ -38,6 +37,7 @@ import {
     isMetricValueEmpty,
 } from '../../utils/sessionActivityMetrics';
 import { isInstanceTimerRunning, liveInstanceSeconds } from '../../utils/sessionTime';
+import { parseDurationExpression } from '../../utils/timeExpressions';
 import useSecondTicker from '../../hooks/useSecondTicker';
 
 /**
@@ -119,12 +119,12 @@ function SessionActivityItem({
     const [startTimeDraft, setStartTimeDraft] = useState(null);
     const [stopTimeDraft, setStopTimeDraft] = useState(null);
     const [selectedSetIndex, setSelectedSetIndex] = useState(null);
-    // Pre-start duration input (MM:SS) — if set before Start, enables countdown mode
+    // Pre-start duration ("30m", "1h30m", "2:30") — if set before Start, enables countdown mode
     const [targetDurationInput, setTargetDurationInput] = useState('');
     const [targetDurationError, setTargetDurationError] = useState('');
     const autoCompletedRef = React.useRef(false);
     const hasTargetDurationInput = Boolean(targetDurationInput.trim());
-    const parsedTargetDuration = useMemo(() => parseMMSS(targetDurationInput), [targetDurationInput]);
+    const parsedTargetDuration = useMemo(() => parseDurationExpression(targetDurationInput), [targetDurationInput]);
     const countdownPreview = !exercise.time_start
         && hasTargetDurationInput
         && parsedTargetDuration

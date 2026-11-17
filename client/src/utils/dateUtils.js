@@ -7,6 +7,8 @@ import {
     subDays,
 } from 'date-fns';
 
+import { parseTimeExpression, resolveTimeExpression, TIME_ADJUSTMENT_HINT } from './timeExpressions';
+
 /**
  * Date/Time formatting utilities with timezone support
  * 
@@ -474,29 +476,23 @@ export const localToISO = (localDateStr, timezone) => {
     return adjustedDate.toISOString();
 };
 
+/** A signed offset ("+10m", "-1h30m") in seconds; throws with the forms to use otherwise. */
 export const parseRelativeTimeAdjustment = (adjustmentCode) => {
-    const match = String(adjustmentCode).trim().match(/^([+-])\s*(\d+)\s*([HMS])$/i);
-    if (!match) {
-        throw new Error('Use +10M, -2H, or +30S');
-    }
-
-    const [, sign, amountValue, unitValue] = match;
-    const amount = Number(amountValue);
-    if (!Number.isSafeInteger(amount)) {
-        throw new Error('Invalid adjustment amount');
-    }
-
-    const unit = unitValue.toUpperCase();
-    const multiplier = unit === 'H' ? 3600 : unit === 'M' ? 60 : 1;
-    return (sign === '-' ? -1 : 1) * amount * multiplier;
+    const parsed = parseTimeExpression(adjustmentCode);
+    if (!parsed?.signed) throw new Error(TIME_ADJUSTMENT_HINT);
+    return parsed.seconds;
 };
 
-export const applyRelativeTimeAdjustment = (localDateStr, adjustmentCode, timezone) => {
-    const isoValue = localToISO(localDateStr, timezone);
-    const adjustmentSeconds = parseRelativeTimeAdjustment(adjustmentCode);
-    const adjustedDate = new Date(new Date(isoValue).getTime() + adjustmentSeconds * 1000);
-    return adjustedDate.toISOString();
-};
+/**
+ * The ISO time an adjustment of a local wall time names: a signed offset from it ("+10m"), or
+ * "now" with an optional offset ("now - 30m").
+ */
+export const applyRelativeTimeAdjustment = (localDateStr, adjustmentCode, timezone, nowMs = Date.now()) => (
+    resolveTimeExpression(adjustmentCode, {
+        baseIso: localDateStr ? localToISO(localDateStr, timezone) : null,
+        nowMs,
+    })
+);
 
 export const validateTimerRange = ({ target, candidateIso, startIso, stopIso }) => {
     const candidate = new Date(candidateIso).getTime();

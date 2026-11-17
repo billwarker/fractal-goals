@@ -200,10 +200,11 @@ describe('local input conversion', () => {
 });
 
 describe('relative time adjustment parsing', () => {
-    it('parses hours, minutes, and seconds codes', () => {
+    it('parses hours, minutes, and seconds codes, alone or together', () => {
         expect(parseRelativeTimeAdjustment('+2H')).toBe(7200);
         expect(parseRelativeTimeAdjustment('-10M')).toBe(-600);
         expect(parseRelativeTimeAdjustment('+30S')).toBe(30);
+        expect(parseRelativeTimeAdjustment('-1h30m')).toBe(-5400);
     });
 
     it('applies relative adjustments to local datetime values', () => {
@@ -211,9 +212,21 @@ describe('relative time adjustment parsing', () => {
         expect(applyRelativeTimeAdjustment('2026-07-04 13:21:14', '-30S', 'UTC')).toBe('2026-07-04T13:20:44.000Z');
     });
 
+    it('sets the time from now, with an optional offset', () => {
+        const nowMs = Date.parse('2026-07-04T15:00:00.000Z');
+        expect(applyRelativeTimeAdjustment('2026-07-04 13:21:14', 'now', 'UTC', nowMs)).toBe('2026-07-04T15:00:00.000Z');
+        expect(applyRelativeTimeAdjustment('2026-07-04 13:21:14', 'now - 30m', 'UTC', nowMs)).toBe('2026-07-04T14:30:00.000Z');
+    });
+
+    it('offsets the wall time in its own timezone across a DST change', () => {
+        // 01:30 EDT on the day clocks fall back, plus an hour, is 01:30 EST: an hour later, not two.
+        expect(applyRelativeTimeAdjustment('2026-11-01 01:30:00', '+1h', 'America/New_York')).toBe('2026-11-01T06:30:00.000Z');
+    });
+
     it('rejects invalid adjustment codes', () => {
-        expect(() => parseRelativeTimeAdjustment('10M')).toThrow('Use +10M, -2H, or +30S');
-        expect(() => parseRelativeTimeAdjustment('+1D')).toThrow('Use +10M, -2H, or +30S');
+        expect(() => parseRelativeTimeAdjustment('10M')).toThrow('Use +10m, -1h30m, now, or now - 30m');
+        expect(() => parseRelativeTimeAdjustment('+1D')).toThrow('Use +10m, -1h30m, now, or now - 30m');
+        expect(() => parseRelativeTimeAdjustment('now')).toThrow('Use +10m, -1h30m, now, or now - 30m');
     });
 
     it('does not compare an active start adjustment with a missing stop', () => {

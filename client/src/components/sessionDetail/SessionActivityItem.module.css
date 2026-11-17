@@ -358,6 +358,11 @@
     box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
+.timeAdjustmentPanelEnd {
+    left: auto;
+    right: 0;
+}
+
 .timeAdjustmentControls {
     display: flex;
     align-items: stretch;
