@@ -41,7 +41,7 @@ describe('planCopyEligibility', () => {
 });
 
 describe('copyActivityValues', () => {
-    it('keeps values only: no notes or tags, no empty sets, no unknown metrics', () => {
+    it('keeps values and tags: no notes, no empty sets, no unknown metrics', () => {
         const copied = copyActivityValues({
             notes: 'Pause', tags: ['t'],
             sets: [
@@ -51,10 +51,24 @@ describe('copyActivityValues', () => {
                 { metrics: [{ metric_definition_id: 'w', value: '102.5' }] },
             ],
         }, bench);
-        expect(copied).toEqual({ schema: 1, sets: [
-            { metrics: set(100, 5).metrics, notes: null },
+        expect(copied).toEqual({ schema: 1, tags: ['t'], sets: [
+            { metrics: set(100, 5).metrics, notes: null, tags: ['t2'] },
             { metrics: [{ metric_id: 'w', split_id: null, value: 102.5 }], notes: null },
         ] });
+    });
+
+    it('keeps a set that has only tags, and the tags of activities without sets', () => {
+        expect(copyActivityValues({ sets: [{ metrics: [], tags: ['warmup'] }, set(100, 5)] }, bench)).toEqual({ schema: 1, sets: [
+            { metrics: [], notes: null, tags: ['warmup'] },
+            { metrics: set(100, 5).metrics, notes: null },
+        ] });
+        expect(copyActivityValues({ tags: ['easy'], metrics: [] }, plank)).toEqual({ schema: 1, tags: ['easy'] });
+    });
+
+    it('leaves out the tags keepTag refuses', () => {
+        const keepTag = (tagId) => tagId !== 'archived';
+        expect(copyActivityValues({ tags: ['archived', 't'], sets: [{ metrics: [], tags: ['archived'] }] }, bench, keepTag))
+            .toEqual({ schema: 1, tags: ['t'] });
     });
 
     it('caps sets and copies flat values for activities without sets', () => {
@@ -75,6 +89,14 @@ describe('copyCircuitValues', () => {
             ] }],
         }, circuit, activityById)).toEqual({ schema: 1, rounds: [{ notes: null, slots: [
             { slot_id: 'slot-a', metrics: [{ metric_id: 's', split_id: null, value: 30 }] },
+        ] }] });
+    });
+
+    it('keeps circuit, round and member tags, and a member that has only tags', () => {
+        expect(copyCircuitValues({
+            tags: ['c'], rounds: [{ tags: ['r'], slots: [{ slot_id: 'slot-a', metrics: [], tags: ['m'] }] }],
+        }, circuit, activityById)).toEqual({ schema: 1, tags: ['c'], rounds: [{ notes: null, tags: ['r'], slots: [
+            { slot_id: 'slot-a', metrics: [], tags: ['m'] },
         ] }] });
     });
 });
@@ -146,6 +168,34 @@ describe('copyPlanSections', () => {
             { name: 'Old lift', reason: 'this activity was deleted' },
             { name: 'Gone', reason: 'this circuit was deleted' },
         ]);
+    });
+
+    it('copies planned tags, leaving out archived and deleted ones and saying so once each', () => {
+        const tags = [{ id: 'heavy', name: 'Heavy' }, { id: 'old', name: 'Old', archived: true }];
+        const source = { kind: 'plan', sections: [{ name: 'Main', items: [
+            { type: 'activity', activity_definition_id: 'bench', item_key: 't-bench', prescription: {
+                tags: ['heavy', 'old'], sets: [set(100, 5, { tags: ['old', 'gone'] })],
+            } },
+            { type: 'circuit', circuit_definition_id: 'circ', item_key: 'c1', prescription: {
+                tags: ['old'], rounds: [{ tags: ['heavy'], slots: [] }],
+            } },
+        ] }] };
+        const { sections, skipped } = copyPlanSections({ templateId: 'tmpl', source, targetSections: target, activityById, circuitById, tags, makeKey });
+        expect(sections[1].items[0].prescription).toEqual({ schema: 1, tags: ['heavy'], sets: [{ metrics: set(100, 5).metrics, notes: null }] });
+        expect(sections[1].items[1].prescription).toEqual({ schema: 1, rounds: [{ notes: null, tags: ['heavy'], slots: [] }] });
+        expect(skipped).toEqual([
+            { name: 'Tag “Old”', reason: 'it is archived' },
+            { name: 'A tag', reason: 'it was deleted' },
+        ]);
+    });
+
+    it('keeps every tag while the tag catalog is unknown', () => {
+        const source = { kind: 'plan', sections: [{ name: 'Main', items: [
+            { type: 'activity', activity_definition_id: 'bench', item_key: 't-bench', prescription: { tags: ['any'] } },
+        ] }] };
+        const { sections, skipped } = copyPlanSections({ templateId: 'tmpl', source, targetSections: target, activityById, circuitById, makeKey });
+        expect(sections[1].items[0].prescription).toEqual({ schema: 1, tags: ['any'] });
+        expect(skipped).toEqual([]);
     });
 
     it('never uses one key twice', () => {

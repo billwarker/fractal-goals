@@ -1,5 +1,5 @@
 // Copy one program day date's plan, or what its session logged, onto another date's plan of the
-// same template in the Programs Days tab. Only items and values are copied: notes and tags are
+// same template in the Programs Days tab. Items, values and planned tags are copied; notes are
 // not. The result is an unsaved draft; Save validates it on the server as any other edit.
 
 import { formatLiteralDate } from './dateUtils';
@@ -54,24 +54,33 @@ function keepEntries(entries, allowed) {
     });
 }
 
-/** An activity's values only: its sets (or flat values for activities without sets). */
-export function copyActivityValues(prescription, definition) {
+/** The tag ids a plan may still hold; every tag when `keepTag` is not given. */
+const keepTags = (tags, keepTag) => (tags || []).filter((tagId) => !keepTag || keepTag(tagId));
+
+/**
+ * An activity's values and planned tags: its sets (or flat values for activities without sets).
+ * A set is kept when it has values or tags. `keepTag(tagId)` filters tags a plan can't hold.
+ */
+export function copyActivityValues(prescription, definition, keepTag = null) {
     if (!prescription || !definition) return null;
     const allowed = new Set(getPrescriptionColumns(definition)
         .map((column) => `${column.metric.id}:${column.split?.id ?? ''}`));
+    const tags = keepTags(prescription.tags, keepTag);
     if (definition.has_sets) {
         const sets = (prescription.sets || [])
-            .map((plannedSet) => keepEntries(plannedSet?.metrics, allowed))
-            .filter((metrics) => metrics.length > 0)
-            .slice(0, MAX_PRESCRIPTION_SETS)
-            .map((metrics) => ({ metrics }));
-        return normalizePrescription({ sets });
+            .map((plannedSet) => ({
+                metrics: keepEntries(plannedSet?.metrics, allowed),
+                tags: keepTags(plannedSet?.tags, keepTag),
+            }))
+            .filter((plannedSet) => plannedSet.metrics.length > 0 || plannedSet.tags.length > 0)
+            .slice(0, MAX_PRESCRIPTION_SETS);
+        return normalizePrescription({ tags, sets });
     }
-    return normalizePrescription({ metrics: keepEntries(prescription.metrics, allowed) });
+    return normalizePrescription({ tags, metrics: keepEntries(prescription.metrics, allowed) });
 }
 
-/** A circuit's rounds and values only, for the circuit's current slots. */
-export function copyCircuitValues(prescription, circuit, activityById = new Map()) {
+/** A circuit's rounds, values and planned tags, for the circuit's current slots. */
+export function copyCircuitValues(prescription, circuit, activityById = new Map(), keepTag = null) {
     if (!prescription || !circuit) return null;
     const allowedBySlot = new Map((circuit.slots || []).map((slot) => {
         const definition = activityById.get(slot.activity_definition_id) || slot.activity || null;
@@ -82,12 +91,24 @@ export function copyCircuitValues(prescription, circuit, activityById = new Map(
         slots: (round?.slots || []).flatMap((slot) => {
             const allowed = allowedBySlot.get(slot?.slot_id);
             if (!allowed) return [];
-            const metrics = keepEntries(slot.metrics, allowed);
-            return metrics.length ? [{ slot_id: slot.slot_id, metrics }] : [];
+            return [{ slot_id: slot.slot_id, metrics: keepEntries(slot.metrics, allowed), tags: keepTags(slot.tags, keepTag) }];
         }),
         notes: null,
+        tags: keepTags(round?.tags, keepTag),
     }));
-    return normalizeCircuitPrescription({ rounds });
+    return normalizeCircuitPrescription({ tags: keepTags(prescription.tags, keepTag), rounds });
+}
+
+/** Every tag id a copied item's plan names: its own, its sets', its rounds' and their members'. */
+function planTagIds(prescription) {
+    return [
+        ...(prescription?.tags || []),
+        ...(prescription?.sets || []).flatMap((plannedSet) => plannedSet?.tags || []),
+        ...(prescription?.rounds || []).flatMap((round) => [
+            ...(round?.tags || []),
+            ...(round?.slots || []).flatMap((slot) => slot?.tags || []),
+        ]),
+    ];
 }
 
 const itemKeysOf = (sections) => new Set((sections || [])
@@ -104,6 +125,8 @@ const itemName = (item, fallback) => item.name || fallback || (item.type === 'ci
  *   its template link; else the target item in the same aligned position lends its key; else the
  *   item is new to the plan (`added_in_plan`). No key is used twice.
  * - Deleted activities and circuits are skipped.
+ * - Planned tags come along. With `tags` (the fractal's tag catalog), tags it doesn't hold or that
+ *   are archived are left out, since Save would refuse them; each is reported once.
  *
  * Returns `{ sections, skipped: [{ name, reason }] }`.
  */
@@ -113,6 +136,7 @@ export function copyPlanSections({
     targetSections,
     activityById = new Map(),
     circuitById = new Map(),
+    tags = null,
     makeKey = newItemKey,
 }) {
     const sourceSections = source?.sections || [];
@@ -129,6 +153,20 @@ export function copyPlanSections({
     const targetNames = new Set((targetSections || []).map((section) => section.name));
     const used = new Set();
     const skipped = [];
+    const tagById = tags ? new Map(tags.map((tag) => [tag.id, tag])) : null;
+    const keepTag = tagById ? (tagId) => Boolean(tagById.get(tagId) && !tagById.get(tagId).archived) : null;
+    const reportedTags = new Set();
+    const reportDroppedTags = (prescription) => {
+        if (!keepTag) return;
+        planTagIds(prescription).forEach((tagId) => {
+            if (keepTag(tagId) || reportedTags.has(tagId)) return;
+            reportedTags.add(tagId);
+            const tag = tagById.get(tagId);
+            skipped.push(tag
+                ? { name: `Tag “${tag.name}”`, reason: 'it is archived' }
+                : { name: 'A tag', reason: 'it was deleted' });
+        });
+    };
 
     sourceSections.forEach((section) => {
         if (targetNames.has(section.name)) return;
@@ -158,9 +196,10 @@ export function copyPlanSections({
         const key = match?.key || makeKey();
         used.add(key);
         const addedInPlan = match ? Boolean(match.base ? match.base.added_in_plan : item.added_in_plan) : true;
+        reportDroppedTags(item.prescription);
         const prescription = isCircuit
-            ? copyCircuitValues(item.prescription, definition, activityById)
-            : copyActivityValues(item.prescription, definition);
+            ? copyCircuitValues(item.prescription, definition, activityById, keepTag)
+            : copyActivityValues(item.prescription, definition, keepTag);
         const next = {
             ...(match?.base || {}),
             type: isCircuit ? 'circuit' : 'activity',

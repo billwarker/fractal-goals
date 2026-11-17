@@ -19,10 +19,21 @@ export function activityIdOf(activity) {
     return activity.activity_id || activity.activity_definition_id;
 }
 
-/** An activity instance's logged values as a prescription value (sets, flat metrics, notes). */
+/** Catalog tag ids of tags put directly on something (a set's inherited tags stay its instance's). */
+const tagIds = (tags) => (tags || []).map((tag) => tag?.id).filter(Boolean);
+
+/** A circuit scope's catalog tag ids (scope tags are rows naming a catalog tag). */
+const scopeTagIds = (tags) => (tags || []).map((tag) => tag?.definition_id).filter(Boolean);
+
+/** An activity instance's logged values as a prescription value (sets, flat metrics, notes, tags). */
 export function loggedActivityValue(activity) {
     return {
-        sets: (activity.sets || []).map((loggedSet) => ({ metrics: loggedSet.metrics, notes: loggedSet.notes })),
+        tags: tagIds(activity.tags),
+        sets: (activity.sets || []).map((loggedSet) => ({
+            metrics: loggedSet.metrics,
+            notes: loggedSet.notes,
+            tags: tagIds(loggedSet.tags),
+        })),
         metrics: activity.metrics || [],
         notes: activity.notes || null,
     };
@@ -51,6 +62,7 @@ export function loggedCircuitRounds(run, slots) {
                 metrics: round.members?.find((member) => member.circuit_run_slot_id === slot.id)?.metrics || [],
             })),
             notes: null,
+            tags: scopeTagIds(round.tags),
         }));
 }
 
@@ -77,7 +89,7 @@ export function loggedSessionPlanSections(session) {
                     type: 'circuit',
                     circuit_definition_id: run.circuit_definition_id,
                     name: run.name,
-                    prescription: { rounds },
+                    prescription: { tags: scopeTagIds(run.tags), rounds },
                 };
             }
             const { activity } = item;

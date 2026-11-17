@@ -8,6 +8,7 @@ import SessionTemplateNameBadge from '../../common/SessionTemplateNameBadge';
 import PlanTagEditor from '../../prescriptions/PlanTagEditor';
 import PrescriptionEditor from '../../prescriptions/PrescriptionEditor';
 import { isCardBackgroundClick, isItemSurfaceClick, shouldScopeOnFocus } from '../../prescriptions/usePlanRowSelection';
+import { useActivityTagCatalog } from '../../../hooks/useActivityTagCatalog';
 import { formatLiteralDate } from '../../../utils/dateUtils';
 import { indexByAlignKey } from '../../../utils/planComparison';
 import { copyPlanSections, formatCopyDate, planCopyEligibility } from '../../../utils/planCopy';
@@ -96,6 +97,8 @@ export default function SessionPlanCard({
         [comparison, templateId],
     );
     const copyState = planCopyEligibility({ entry, comparison, readOnly });
+    // Copy leaves out tags a plan can no longer hold (archived or deleted).
+    const { data: tagCatalog, isSuccess: tagCatalogLoaded } = useActivityTagCatalog(rootId);
     const activityName = (activityId) => activityById.get(activityId)?.name || 'Activity';
     // The day's mutations are shared by every card; only this template's requests count here.
     const isPendingHere = (mutation) => mutation.isPending && mutation.variables?.templateId === templateId;
@@ -151,6 +154,7 @@ export default function SessionPlanCard({
             targetSections: entry.sections,
             activityById,
             circuitById,
+            tags: tagCatalogLoaded ? tagCatalog.tags : null,
         });
         setDraftSections(copied.sections);
         setScope(NO_SCOPE);

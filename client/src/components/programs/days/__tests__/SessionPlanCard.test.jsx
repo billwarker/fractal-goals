@@ -364,6 +364,22 @@ describe('SessionPlanCard copy and comparison', () => {
         expect(within(card).getByRole('status')).toBeEmptyDOMElement();
     });
 
+    it('copies planned tags with the values', () => {
+        const tagged = { ...comparison, kind: 'plan', sections: [{ name: 'Main', items: [{
+            type: 'activity', activity_definition_id: 'bench', name: 'Bench Press', item_key: 'k1',
+            prescription: { tags: ['tag-paused'], sets: [{ ...plannedSet(100, 5), tags: ['tag-top'] }] },
+        }] }] };
+        const { card, mutations } = renderCompared({ comparison: tagged });
+        fireEvent.click(within(card).getByRole('button', { name: '← Copy from Fri, Oct 16' }));
+        fireEvent.click(within(card).getByRole('button', { name: 'Save plan' }));
+        expect(mutations.save.mutate).toHaveBeenCalledWith(expect.objectContaining({
+            sections: [{ name: 'Main', items: [expect.objectContaining({
+                item_key: 'k1',
+                prescription: { schema: 1, tags: ['tag-paused'], sets: [{ metrics: plannedSet(100, 5).metrics, notes: null, tags: ['tag-top'] }] },
+            })] }],
+        }), expect.anything());
+    });
+
     it("says on the button what a copy couldn't bring over", () => {
         const withDeleted = {
             ...comparison,
