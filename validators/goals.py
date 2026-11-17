@@ -15,6 +15,12 @@ from .core import (
     parse_date_string,
 )
 
+# Must match ICON_SHAPES in client/src/utils/goalCharacteristics.js (checked by tests/unit/test_goal_level_icons.py).
+GOAL_LEVEL_ICONS = frozenset({
+    'circle', 'square', 'triangle', 'star', 'hexagon', 'diamond', 'twelve-point-star',
+    'impossible-ring', 'cube-star', 'penrose-tribar', 'impossible-cube',
+})
+
 VALID_GOAL_TYPES = [
     'UltimateGoal', 'LongTermGoal', 'MidTermGoal', 'ShortTermGoal',
     'ImmediateGoal'
@@ -328,7 +334,6 @@ class FractalCreateSchema(BaseModel):
             return None
         if set(v) != set(VALID_ROOT_GOAL_TYPES):
             raise ValueError('level_styles must contain exactly the four root goal types')
-        valid_icons = {'circle', 'square', 'triangle', 'star', 'hexagon', 'diamond', 'twelve-point-star'}
         normalized = {}
         for goal_type, style in v.items():
             if set(style) != {'color', 'secondary_color', 'icon'}:
@@ -338,7 +343,7 @@ class FractalCreateSchema(BaseModel):
             secondary = style['secondary_color']
             if secondary is not None and (not isinstance(secondary, str) or not re.fullmatch(r'#[0-9a-fA-F]{6}', secondary)):
                 raise ValueError('Each secondary color must be null or a six-digit hex color')
-            if style['icon'] not in valid_icons:
+            if style['icon'] not in GOAL_LEVEL_ICONS:
                 raise ValueError('Unsupported goal level icon')
             normalized[goal_type] = {'color': style['color'].lower(), 'secondary_color': secondary.lower() if secondary else None, 'icon': style['icon']}
         return normalized

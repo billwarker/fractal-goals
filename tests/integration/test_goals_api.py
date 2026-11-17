@@ -99,7 +99,32 @@ class TestFractalEndpoints:
             },
         })
         assert response.status_code == 400
-    
+
+    def test_create_fractal_accepts_impossible_figure_icons(self, authed_client, db_session):
+        response = authed_client.post('/api/fractals', json={
+            'name': 'Impossible levels', 'level_styles': {
+                'UltimateGoal': {'color': '#123abc', 'secondary_color': None, 'icon': 'impossible-ring'},
+                'LongTermGoal': {'color': '#234bcd', 'secondary_color': None, 'icon': 'cube-star'},
+                'MidTermGoal': {'color': '#345cde', 'secondary_color': None, 'icon': 'penrose-tribar'},
+                'ShortTermGoal': {'color': '#456def', 'secondary_color': None, 'icon': 'impossible-cube'},
+            },
+        })
+
+        assert response.status_code == 201
+        root = db_session.query(Goal).filter_by(id=response.get_json()['id']).one()
+        assert root.level.icon == 'impossible-ring'
+
+    def test_create_fractal_rejects_unknown_level_icon(self, authed_client):
+        response = authed_client.post('/api/fractals', json={
+            'name': 'Unknown icon', 'level_styles': {
+                'UltimateGoal': {'color': '#123abc', 'secondary_color': None, 'icon': 'penrose-stairs'},
+                'LongTermGoal': {'color': '#234bcd', 'secondary_color': None, 'icon': 'hexagon'},
+                'MidTermGoal': {'color': '#345cde', 'secondary_color': None, 'icon': 'diamond'},
+                'ShortTermGoal': {'color': '#456def', 'secondary_color': None, 'icon': 'circle'},
+            },
+        })
+        assert response.status_code == 400
+
     def test_list_fractals_with_data(self, authed_client, sample_ultimate_goal):
         """Test listing fractals when they exist."""
         response = authed_client.get('/api/fractals')

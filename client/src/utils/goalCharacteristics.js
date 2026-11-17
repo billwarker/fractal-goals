@@ -1,3 +1,5 @@
+import { ILLUSION_SHAPE_OPTIONS } from '../components/atoms/goalIcons/illusionShapes';
+
 /**
  * Goal Characteristics - Shared Constants
  * 
@@ -16,6 +18,7 @@ export const DEADLINE_UNITS = [
     { label: 'Decades', value: 'decades' }
 ];
 
+// Must match GOAL_LEVEL_ICONS in validators/goals.py (checked by tests/unit/test_goal_level_icons.py).
 export const ICON_SHAPES = [
     { label: 'Circle', value: 'circle' },
     { label: 'Square', value: 'square' },
@@ -23,7 +26,8 @@ export const ICON_SHAPES = [
     { label: 'Star', value: 'star' },
     { label: 'Hexagon', value: 'hexagon' },
     { label: 'Diamond', value: 'diamond' },
-    { label: 'Twelve Point Star', value: 'twelve-point-star' }
+    { label: 'Twelve Point Star', value: 'twelve-point-star' },
+    ...ILLUSION_SHAPE_OPTIONS,
 ];
 
 export const getDurationInDays = (value, unit) => {

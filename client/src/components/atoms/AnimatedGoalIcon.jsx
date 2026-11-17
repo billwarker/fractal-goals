@@ -1,5 +1,8 @@
 import React, { useId, useState } from 'react';
 
+import IllusionIconBody from './goalIcons/IllusionIconBody';
+import { getIllusionShape } from './goalIcons/illusionShapes';
+
 /**
  * AnimatedGoalIcon Component
  *
@@ -50,6 +53,32 @@ const AnimatedGoalIcon = ({
     const isSquare = normalizedShape === 'square';
     const isTwelvePointStar = normalizedShape === 'twelvepointstar' || normalizedShape === 'twelve-point-star';
     const [trianglePhase, setTrianglePhase] = useState(0);
+
+    const illusion = getIllusionShape(shape);
+    if (illusion) {
+        // Keyed so switching into (or between) these shapes mounts a fresh <svg> and SMIL clock.
+        return (
+            <svg
+                key={`illusion-${shape}`}
+                width={size}
+                height={size}
+                viewBox="0 0 100 100"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className={className}
+                style={{ display: 'block', pointerEvents: 'none', overflow: 'visible', ...style }}
+            >
+                <IllusionIconBody
+                    shape={illusion}
+                    color={color}
+                    secondaryColor={secondaryColor}
+                    isSmart={isSmart}
+                    animated
+                    uid={uid}
+                />
+            </svg>
+        );
+    }
 
     const RING_LAYERS = 3;
 

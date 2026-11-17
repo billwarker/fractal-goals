@@ -111,7 +111,8 @@ describe('GoalModal', () => {
         const previewButton = screen.getByRole('button', { name: 'Preview SMART goal styling' });
         fireEvent.mouseEnter(previewButton);
         screen.getAllByRole('button', { name: /Choose .* icon/ }).forEach((iconButton) => {
-            expect(iconButton.querySelector('svg style')).toBeInTheDocument();
+            // Classic shapes loop with CSS keyframes; impossible-figure shapes with SMIL.
+            expect(iconButton.querySelector('svg style, svg animate, svg animateTransform')).toBeInTheDocument();
         });
     });
 

@@ -1,5 +1,8 @@
 import React, { useId } from 'react';
 
+import IllusionIconBody from './goalIcons/IllusionIconBody';
+import { getIllusionShape } from './goalIcons/illusionShapes';
+
 /**
  * GoalIcon Component
  * 
@@ -22,6 +25,32 @@ const GoalIcon = ({
 }) => {
     const uid = useId().replace(/:/g, '_');
     const viewBox = "0 0 100 100";
+
+    const illusion = getIllusionShape(shape);
+    if (illusion) {
+        // Keyed so switching into (or between) these shapes mounts a fresh <svg> and SMIL clock.
+        return (
+            <svg
+                key={`illusion-${shape}`}
+                width={size}
+                height={size}
+                viewBox={viewBox}
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className={className}
+                style={{ display: 'block', pointerEvents: 'none', ...style }}
+            >
+                <IllusionIconBody
+                    shape={illusion}
+                    color={color}
+                    secondaryColor={secondaryColor}
+                    isSmart={isSmart}
+                    animated={false}
+                    uid={uid}
+                />
+            </svg>
+        );
+    }
 
     const getPath = (s) => {
         switch (s.toLowerCase()) {
