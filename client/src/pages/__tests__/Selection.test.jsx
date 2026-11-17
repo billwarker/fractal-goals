@@ -189,8 +189,7 @@ describe('Selection', () => {
         const onOpenSettings = vi.fn();
         renderSelection(createQueryClient(), ['/'], { onOpenSettings });
         const settings = await screen.findByRole('button', { name: 'SETTINGS' });
-        const logout = screen.getByRole('button', { name: 'LOGOUT' });
-        expect(settings.nextElementSibling).toBe(logout);
+        expect(settings.nextElementSibling).toBe(screen.getByRole('button', { name: 'LOGOUT' }));
         fireEvent.click(settings);
         expect(onOpenSettings).toHaveBeenCalledTimes(1);
     });
