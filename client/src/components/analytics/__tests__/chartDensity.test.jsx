@@ -54,6 +54,31 @@ describe('applyChartDensity', () => {
 });
 
 describe('deleteViewMessage', () => {
+    it('tints each of two compact value axes with its series colour and narrows them', () => {
+        const twoAxes = {
+            scales: {
+                x: { ticks: { color: 'grey' } },
+                left: { position: 'left', ticks: { color: 'grey' } },
+                right: { position: 'right', ticks: { color: 'grey' } },
+            },
+        };
+        const compact = applyChartDensity(twoAxes, 'compact', { axisColors: { left: 'blue', right: 'green', x: 'red' } });
+        expect(compact.scales.left.ticks.color).toBe('blue');
+        expect(compact.scales.left.border.color).toBe('blue');
+        expect(compact.scales.right.ticks.color).toBe('green');
+        // The x axis carries no series.
+        expect(compact.scales.x.ticks.color).toBe('grey');
+        const fitted = { width: 64 };
+        compact.scales.right.afterFit(fitted);
+        expect(fitted.width).toBe(40);
+    });
+
+    it('leaves a single compact value axis in its own colour and width', () => {
+        const compact = applyChartDensity({ scales: { y: { ticks: { color: 'grey' } } } }, 'compact', { axisColors: { y: 'blue' } });
+        expect(compact.scales.y.ticks.color).toBe('grey');
+        expect(compact.scales.y.afterFit).toBeUndefined();
+    });
+
     it('names the goals a view shows on', () => {
         const view = { name: 'Bench trend' };
         expect(deleteViewMessage(view, [])).toBe('Are you sure you want to delete "Bench trend"?');

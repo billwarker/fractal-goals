@@ -6,6 +6,7 @@ import { activityUsesSets } from '../../../../utils/goalConditions';
 import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditionLines';
 import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
+import CompactSeriesKey from '../../CompactSeriesKey';
 import { GoalMarkerHost } from '../../GoalMarkerLayer';
 import { useAlignedAxis, useAlignedRanges } from '../../alignedAxes/AlignedAxesContext';
 import { valuesOnSlots } from '../../alignedAxes/slots';
@@ -133,21 +134,16 @@ export function MetricTrendsChart({
     const yieldIds = useMemo(() => activityYieldIds(activity), [activity]);
     const chartTheme = useChartThemeDefaults();
     const density = useChartDensity();
-    // Compact charts plot only the first selected metric; the caption says what else there is.
-    const selectedDefs = useMemo(() => getSelectedMetricDefs(metricDefinitions, metrics, yieldIds), [metricDefinitions, metrics, yieldIds]);
-    const shownMetrics = useMemo(() => (
-        density === 'compact' && selectedDefs.length > 1 ? [selectedDefs[0].id] : metrics
-    ), [density, metrics, selectedDefs]);
     const chartData = useMemo(() => buildMetricTrendData({
         instances: activity ? activityInstances[activity.id] || [] : [],
         metricDefinitions,
-        selectedMetrics: shownMetrics,
+        selectedMetrics: metrics,
         setsHandling,
         selectedSplit,
         yieldIds,
         highlightInstanceId,
         colors: chartTheme.seriesColors,
-    }), [activity, activityInstances, chartTheme.seriesColors, highlightInstanceId, metricDefinitions, shownMetrics, selectedSplit, setsHandling, yieldIds]);
+    }), [activity, activityInstances, chartTheme.seriesColors, highlightInstanceId, metricDefinitions, metrics, selectedSplit, setsHandling, yieldIds]);
     const axisPoints = useMemo(() => chartData.instanceIds.map((key, index) => ({
         key, at: chartData.instanceTimes[index], label: chartData.labels[index],
     })), [chartData]);
@@ -188,10 +184,15 @@ export function MetricTrendsChart({
     useActiveChartPoint(ownChartRef, hoverIndex < 0 ? [] : shown.datasets
         .map((dataset, datasetIndex) => ({ datasetIndex, index: hoverIndex, value: dataset.data[hoverIndex] }))
         .filter((element) => element.value != null), { tooltip: density !== 'compact' });
-    const hiddenCount = selectedDefs.length - chartData.selectedMetricDefs.length;
-    const caption = density === 'compact' && chartData.selectedMetricDefs[0]
-        ? `${chartData.selectedMetricDefs[0].name} · ${chartData.labels.length} session${chartData.labels.length === 1 ? '' : 's'}${hiddenCount > 0 ? ` · +${hiddenCount} more` : ''}`
-        : null;
+    // Compact charts hide the legend and axis titles: each axis takes its line's colour, and the
+    // caption keys the lines.
+    const axisColors = Object.fromEntries(chartData.datasets.map((dataset) => [dataset.yAxisID, dataset.borderColor]));
+    const caption = density === 'compact' && chartData.datasets.length ? (
+        <CompactSeriesKey
+            series={chartData.datasets.map((dataset) => ({ key: dataset.metricId, label: dataset.label, color: dataset.borderColor }))}
+            note={`${chartData.labels.length} session${chartData.labels.length === 1 ? '' : 's'}`}
+        />
+    ) : null;
 
     if (!activity) return <EmptyMetricTrends>Select an activity in the filters panel.</EmptyMetricTrends>;
     if (!chartData.datasets.length) return <EmptyMetricTrends />;
@@ -236,7 +237,7 @@ export function MetricTrendsChart({
                             buildYAxis(metric, index, chartTheme, ranges?.[`metric${index + 1}`]),
                         ])),
                     },
-                }, density)}
+                }, density, { axisColors })}
             />
         </GoalMarkerHost>
         </CompactChartFrame>

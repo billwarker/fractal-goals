@@ -11,8 +11,9 @@ vi.mock('react-chartjs-2', () => ({
     Line: (props) => lineChart(props),
 }));
 
-vi.mock('../ChartJSWrapper', () => ({
-    applyChartDensity: (options) => options,
+vi.mock('../ChartJSWrapper', async (importOriginal) => ({
+    // The real density rules, so compact options can be checked.
+    applyChartDensity: (await importOriginal()).applyChartDensity,
     useChartDensity: () => density.current,
     useChartThemeDefaults: () => ({
         textColor: '#ddd',
@@ -33,7 +34,7 @@ describe('MetricTrendsChart', () => {
         density.current = 'full';
     });
 
-    it('plots only the first metric in compact form, with the rest in the caption', () => {
+    it('plots both metrics in compact form, each axis in its line colour, keyed in the caption', () => {
         density.current = 'compact';
         render(
             <MetricTrendsChart
@@ -47,8 +48,15 @@ describe('MetricTrendsChart', () => {
             />
         );
 
-        expect(lineChart.mock.calls.at(-1)[0].data.datasets.map((dataset) => dataset.label)).toEqual(['Weight']);
-        expect(screen.getByText('Weight · 1 session · +1 more')).toBeInTheDocument();
+        const { data, options } = lineChart.mock.calls.at(-1)[0];
+        expect(data.datasets.map((dataset) => dataset.label)).toEqual(['Weight', 'Reps']);
+        const [weight, reps] = data.datasets;
+        expect(options.scales.metric1.ticks.color).toBe(weight.borderColor);
+        expect(options.scales.metric2.ticks.color).toBe(reps.borderColor);
+        expect(options.scales.metric2.position).toBe('right');
+        expect(screen.getByText('Weight')).toBeInTheDocument();
+        expect(screen.getByText('Reps')).toBeInTheDocument();
+        expect(screen.getByText('1 session')).toBeInTheDocument();
     });
 
     it('builds up to two metric line datasets from activity instances', () => {

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 
 import { DISABLED_CHART_ANIMATION, applyChartDensity, useChartThemeDefaults } from '../analytics/ChartJSWrapper';
+import CompactSeriesKey from '../analytics/CompactSeriesKey';
 import { GoalMarkerHost } from '../analytics/GoalMarkerLayer';
 import useActiveChartPoint from '../analytics/useActiveChartPoint';
 import { goalChartMarkers, goalLineAnnotations, isMarkedThreshold } from '../../utils/goalConditionLines';
@@ -133,11 +134,21 @@ function ConditionProgressChart({
                     : { suggestedMax: row.threshold * 1.1 }) : {}),
             }])),
         },
-    }, density);
-    const first = series[0];
-    const caption = compact && first
-        ? `${first.label}${first.threshold != null ? ` · goal ${OPERATOR_SYMBOLS[first.operator] ?? ''} ${formatConditionNumber(first.threshold)}${first.unit ? ` ${first.unit}` : ''}` : ''} · ${points.length} session${points.length === 1 ? '' : 's'}`
-        : null;
+    }, density, { axisColors: Object.fromEntries(series.map((row, index) => [`y${index}`, SERIES_PALETTE[index]])) });
+    // Compact hides the legend and threshold labels: the caption keys each line with its goal.
+    const caption = compact && series.length ? (
+        <CompactSeriesKey
+            series={series.map((row, index) => ({
+                key: row.id,
+                label: row.label,
+                color: SERIES_PALETTE[index],
+                detail: row.threshold != null
+                    ? `· goal ${OPERATOR_SYMBOLS[row.operator] ?? ''} ${formatConditionNumber(row.threshold)}${row.unit ? ` ${row.unit}` : ''}`
+                    : null,
+            }))}
+            note={`${points.length} session${points.length === 1 ? '' : 's'}`}
+        />
+    ) : null;
     return (
         <div className={styles.frame} data-density={density}>
             <div className={styles.chart} data-testid="condition-evidence-chart">
