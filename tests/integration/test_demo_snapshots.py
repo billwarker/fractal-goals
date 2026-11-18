@@ -9,7 +9,7 @@ from blueprints.demo_access import DEMO_ROOT_READ_ENDPOINTS
 from config import config
 from models import (
     ActivityInstance, ActivityInstanceTag, ActivityProgressDefault, ActivityProgressDefaultTag, ActivityTagDefinition, ActivityTagFamily, AppSetting, Base, EventLog, Goal, GoalLevel,
-    Note, Session, User,
+    Note, Program, Session, User,
 )
 from scripts.browser_showcase_seed import SHOWCASE_ROOT_ID, seed_showcase
 from services.demo_account_service import DEMO_ACCOUNT_ROLE, DemoAccountService
@@ -208,6 +208,34 @@ class TestDemoSnapshots:
         assert copied_session.session_start == db_session.get(Session, 'sweep-session-3').session_start
         assert db_session.get(Goal, tour['goal_id']).root_id == snapshot_id
         assert tour['program_id'] and tour['program_id'] != 'sweep-program'
+
+    def test_the_demo_opens_with_the_owners_goals_page_filters(self, client, db_session, showcase):
+        owner = db_session.get(User, 'sweep-admin')
+        owner.preferences = {**owner.preferences, 'flowtree_views': {
+            SOURCE: {'scopedProgramId': 'sweep-program',
+                     'viewSettings': {'hideInactiveGoals': True, 'fadeInactiveBranches': False}},
+            'another-root': {'viewSettings': {'hideCompletedGoals': True}},
+        }}
+        db_session.commit()
+        snapshot_id = _publish(db_session)
+        appearance = _manifest(db_session)['examples'][0]['appearance']
+        view = appearance['flowtree_views'][snapshot_id]
+        assert set(appearance['flowtree_views']) == {snapshot_id}
+        assert view['viewSettings'] == {'hideInactiveGoals': True, 'fadeInactiveBranches': False}
+        copied_program = db_session.get(Program, view['scopedProgramId'])
+        assert copied_program.root_id == snapshot_id
+        session = client.post('/api/public/demo-session').get_json()
+        assert session['appearance'][snapshot_id]['flowtree_views'][snapshot_id] == view
+
+    def test_a_program_scope_that_was_not_copied_is_dropped(self, db_session, showcase):
+        owner = db_session.get(User, 'sweep-admin')
+        owner.preferences = {**owner.preferences, 'flowtree_views': {
+            SOURCE: {'scopedProgramId': 'deleted-program', 'viewSettings': {'hideCompletedGoals': True}},
+        }}
+        db_session.commit()
+        snapshot_id = _publish(db_session)
+        view = _manifest(db_session)['examples'][0]['appearance']['flowtree_views'][snapshot_id]
+        assert view == {'viewSettings': {'hideCompletedGoals': True}}
 
     def test_the_preview_is_the_snapshots_tree_with_only_what_the_flow_tree_draws(self, client, db_session, showcase):
         snapshot_id = _publish(db_session)

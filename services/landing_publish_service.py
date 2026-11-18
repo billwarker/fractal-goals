@@ -172,6 +172,10 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
         if not isinstance(preferences, dict):
             preferences = {}
         levels = self._preview_levels(root)
+        appearance = {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)}
+        flowtree_view = self._flowtree_view(preferences, source.id, result)
+        if flowtree_view:
+            appearance["flowtree_views"] = {root_id: flowtree_view}
         return {
             "root_id": root_id,
             "label": item["label"],
@@ -183,9 +187,23 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
                 "session_id": self._tour_session_id(root_id, result.id_map.get(item["tour"].get("session_id") or "")),
                 "program_id": self._tour_program_id(root_id, result.id_map.get(item["tour"].get("program_id") or "")),
             },
-            "appearance": {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)},
+            "appearance": appearance,
             "preview": {"levels": levels, "tree": self._preview_tree(root_id)},
         }
+
+    @staticmethod
+    def _flowtree_view(preferences: JsonDict, source_root_id: str, result: SnapshotResult) -> JsonDict | None:
+        """The owner's Goals page filters for this fractal, so the demo opens the way they look at it."""
+        views = preferences.get("flowtree_views")
+        view = views.get(source_root_id) if isinstance(views, dict) else None
+        if not isinstance(view, dict):
+            return None
+        view = dict(view)
+        # A program scope follows the program into the snapshot, or is dropped if it wasn't copied.
+        scoped_program_id = view.pop("scopedProgramId", None)
+        if scoped_program_id and result.id_map.get(scoped_program_id):
+            view["scopedProgramId"] = result.id_map[scoped_program_id]
+        return view
 
     def _preview_levels(self, root: Goal) -> list[JsonDict]:
         """The snapshot's effective levels (system, then account, then fractal), as the app merges them."""

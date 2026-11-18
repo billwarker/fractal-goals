@@ -567,6 +567,30 @@ class TestPreferencesEndpoint:
         response = authed_client.patch('/api/auth/preferences', json={'preferences': {'appearance': appearance}})
         assert response.status_code in (400, 422)
 
+    def test_flowtree_views_are_validated_and_merged_per_fractal(self, authed_client):
+        first = authed_client.patch('/api/auth/preferences', json={'preferences': {'flowtree_views': {
+            'root-a': {'scopedProgramId': 'program-1', 'viewSettings': {'hideInactiveGoals': True}},
+        }}})
+        assert first.status_code == 200
+        second = authed_client.patch('/api/auth/preferences', json={'preferences': {'flowtree_views': {
+            'root-b': {'viewSettings': {'hideCompletedGoals': True}},
+        }}})
+        assert second.status_code == 200
+        assert second.get_json()['preferences']['flowtree_views'] == {
+            'root-a': {'scopedProgramId': 'program-1', 'viewSettings': {'hideInactiveGoals': True}},
+            'root-b': {'viewSettings': {'hideCompletedGoals': True}},
+        }
+
+    @pytest.mark.parametrize('views', [
+        'root-a',
+        {'root-a': {'viewSettings': {'hideInactiveGoals': 'yes'}}},
+        {'root-a': {'viewSettings': {'unknownFilter': True}}},
+        {'root-a': {'goalsViewMode': 'tree'}},
+    ])
+    def test_malformed_flowtree_views_are_rejected(self, authed_client, views):
+        response = authed_client.patch('/api/auth/preferences', json={'preferences': {'flowtree_views': views}})
+        assert response.status_code in (400, 422)
+
     def test_onboarding_state_uses_optimistic_revision(self, authed_client):
         initial = authed_client.get('/api/auth/onboarding')
         assert initial.status_code == 200
