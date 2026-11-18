@@ -173,7 +173,7 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
             preferences = {}
         levels = self._preview_levels(root)
         appearance = {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)}
-        flowtree_view = self._flowtree_view(preferences, source.id, result)
+        flowtree_view = self._flowtree_view(preferences, str(source.id), result)
         if flowtree_view:
             appearance["flowtree_views"] = {root_id: flowtree_view}
         return {
