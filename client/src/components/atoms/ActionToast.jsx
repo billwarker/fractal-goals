@@ -10,7 +10,7 @@ import styles from './ActionToast.module.css';
 export function ActionToast({ toastId, visible = true, message, details = [], actionLabel, onAction, onDismiss, tone = 'info' }) {
     const dismiss = onDismiss || (() => toast.dismiss(toastId));
     return (
-        <div className={`${styles.toast} ${styles[tone] || ''} ${visible ? '' : styles.leaving}`} role="status" aria-live="polite">
+        <div className={`${styles.toast} ${details.length === 0 ? styles.single : ''} ${styles[tone] || ''} ${visible ? '' : styles.leaving}`} role="status" aria-live="polite">
             <div className={styles.body}>
                 <p className={styles.message}>{message}</p>
                 {details.length > 0 ? (
@@ -36,9 +36,9 @@ export function ActionToast({ toastId, visible = true, message, details = [], ac
     );
 }
 
-/** Show an action toast; returns its id. */
-export function showActionToast({ duration = 8000, ...props }) {
-    return toast.custom((t) => <ActionToast toastId={t.id} visible={t.visible} {...props} />, { duration });
+/** Show an action toast; returns its id. Passing `id` replaces a toast already showing under it. */
+export function showActionToast({ id, duration = 8000, ...props }) {
+    return toast.custom((t) => <ActionToast toastId={t.id} visible={t.visible} {...props} />, { id, duration });
 }
 
 export default ActionToast;

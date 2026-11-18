@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAuth } from '../contexts/AuthContext';
+import { authApi } from '../utils/api';
 import {
     readLocalStorageValue,
     writeLocalStorageValue,
@@ -7,6 +9,7 @@ import {
 
 const STORAGE_KEY = 'flowtree-view-settings';
 const STORAGE_VERSION = 2;
+const ACCOUNT_SAVE_DELAY_MS = 1000;
 const DEFAULT_VIEW_SETTINGS = Object.freeze({
     fadeInactiveBranches: false,
     hideInactiveGoals: false,
@@ -30,7 +33,52 @@ function normalizeStoredPreferences(rawValue) {
     };
 }
 
-export function useFlowTreePreferences({ rootId, userId, defaultGoalsViewMode }) {
+// The account copy (user.preferences.flowtree_views[rootId]) carries the filters, not the
+// tree/hierarchy toggle, which stays per device. A published demo opens on its owner's copy.
+function toAccountView(viewSettings, scopedProgramId) {
+    return {
+        ...(scopedProgramId ? { scopedProgramId: String(scopedProgramId) } : {}),
+        viewSettings: { ...DEFAULT_VIEW_SETTINGS, ...viewSettings },
+    };
+}
+
+function sameAccountView(left, right) {
+    const normalized = normalizeStoredPreferences(right);
+    if (!normalized) return false;
+    return JSON.stringify(left) === JSON.stringify(toAccountView(normalized.viewSettings, normalized.scopedProgramId));
+}
+
+/**
+ * The account's copy of one fractal's view and a saver for it, for useFlowTreePreferences.
+ * Synced so a published demo opens with these filters; the demo's guest has no account to save to.
+ */
+export function useAccountFlowTreeView(rootId) {
+    const { user, setUser } = useAuth();
+    const accountUserId = user && !user.isDemo ? user.id : null;
+    const saveAccountView = useCallback((viewRootId, view) => {
+        if (!accountUserId) return;
+        authApi.updatePreferences({ preferences: { flowtree_views: { [viewRootId]: view } } })
+            .then((response) => {
+                if (response?.data?.id === accountUserId) setUser?.(response.data);
+            })
+            .catch(() => {
+                // This device keeps the view; the account catches up on the next change.
+            });
+    }, [accountUserId, setUser]);
+    return { accountView: user?.preferences?.flowtree_views?.[rootId] || null, saveAccountView };
+}
+
+/**
+ * Goals page view preferences for one fractal. This device's copy wins; without one, the
+ * account's copy (`accountView`) seeds it. `saveAccountView` receives filter changes.
+ */
+export function useFlowTreePreferences({
+    rootId,
+    userId,
+    defaultGoalsViewMode,
+    accountView = null,
+    saveAccountView = null,
+}) {
     const [goalsViewMode, setGoalsViewMode] = useState(defaultGoalsViewMode);
     const [viewSettings, setViewSettings] = useState(DEFAULT_VIEW_SETTINGS);
     const [scopedProgramId, setScopedProgramId] = useState(null);
@@ -41,6 +89,11 @@ export function useFlowTreePreferences({ rootId, userId, defaultGoalsViewMode })
         [rootId, userId]
     );
     const legacyStorageKey = useMemo(() => rootId ? `${STORAGE_KEY}:${rootId}` : null, [rootId]);
+    // Read when a fractal hydrates, so a saved copy coming back doesn't reset the view.
+    const accountViewRef = useRef(accountView);
+    useEffect(() => {
+        accountViewRef.current = accountView;
+    }, [accountView]);
 
     useEffect(() => {
         shouldPreservePreferencesRef.current = false;
@@ -55,7 +108,9 @@ export function useFlowTreePreferences({ rootId, userId, defaultGoalsViewMode })
 
         try {
             const normalized = normalizeStoredPreferences(
-                readLocalStorageValue(storageKey) || readLocalStorageValue(legacyStorageKey)
+                readLocalStorageValue(storageKey)
+                || readLocalStorageValue(legacyStorageKey)
+                || accountViewRef.current
             );
             if (normalized) {
                 shouldPreservePreferencesRef.current = Boolean(
@@ -83,6 +138,17 @@ export function useFlowTreePreferences({ rootId, userId, defaultGoalsViewMode })
             viewSettings,
         }));
     }, [goalsViewMode, isHydrated, scopedProgramId, storageKey, viewSettings]);
+
+    useEffect(() => {
+        if (!rootId || !isHydrated || !saveAccountView) return undefined;
+        const view = toAccountView(viewSettings, scopedProgramId);
+        if (sameAccountView(view, accountViewRef.current)) return undefined;
+        const timer = setTimeout(() => {
+            accountViewRef.current = view;
+            saveAccountView(rootId, view);
+        }, ACCOUNT_SAVE_DELAY_MS);
+        return () => clearTimeout(timer);
+    }, [isHydrated, rootId, saveAccountView, scopedProgramId, viewSettings]);
 
     return {
         goalsViewMode,

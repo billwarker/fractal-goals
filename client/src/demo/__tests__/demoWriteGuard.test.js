@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_BASE, axios } from '../../utils/api/core';
+import toast from 'react-hot-toast';
 import notify from '../../utils/notify';
 import { DemoReadOnlyError, isQuietAfterBlockedWrite, setDemoMode, shouldBlockDemoRequest } from '../demoMode';
 
@@ -37,10 +38,12 @@ describe('the demo write guard', () => {
         expect(adapter).toHaveBeenCalledTimes(2);
     });
 
-    it('mutes the caller’s failure toast right after a blocked write', async () => {
+    it('mutes the caller’s failure and success toasts right after a blocked write', async () => {
         await expect(axios.post(`${API_BASE}/root/goals`, {})).rejects.toBeInstanceOf(DemoReadOnlyError);
         expect(isQuietAfterBlockedWrite()).toBe(true);
         expect(notify.error('Failed to create goal')).toBeUndefined();
+        notify.success('Goal updated');
+        expect(toast.success).not.toHaveBeenCalled();
         expect(isQuietAfterBlockedWrite(Date.now() + 5000)).toBe(false);
     });
 

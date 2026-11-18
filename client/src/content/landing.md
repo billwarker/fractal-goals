@@ -43,7 +43,7 @@ Want to achieve big goals? Start by making them smaller. Fractal Goals breaks an
 
 ## Footer
 
-**Note:** (c) Fractal Goals. Private beta.
+**Note:** © 2026 Fractal Goals Technology
 
-- [Privacy Policy](https://my.fractalgoals.com/privacy)
-- [Terms of Service](https://my.fractalgoals.com/terms)
+- [Privacy Policy](/privacy)
+- [Terms of Service](/terms)

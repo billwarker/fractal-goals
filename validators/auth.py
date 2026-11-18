@@ -313,6 +313,27 @@ class AppearancePreferenceSchema(BaseModel):
     lightFrom: str = Field('07:00', pattern=r'^([01]\d|2[0-3]):[0-5]\d$')
 
 
+class FlowTreeViewSettingsSchema(BaseModel):
+    """The Goals page tree filters, mirrored by client/src/hooks/useFlowTreePreferences.js."""
+    model_config = ConfigDict(extra='forbid', strict=True)
+
+    fadeInactiveBranches: Optional[bool] = None
+    hideInactiveGoals: Optional[bool] = None
+    hideCompletedGoals: Optional[bool] = None
+    showMetricsOverlay: Optional[bool] = None
+
+
+class FlowTreeViewPreferenceSchema(BaseModel):
+    """One fractal's Goals page filters; a published demo opens on its owner's.
+
+    The tree/hierarchy toggle stays per device, since phones default to the hierarchy.
+    """
+    model_config = ConfigDict(extra='forbid')
+
+    scopedProgramId: Optional[str] = Field(None, max_length=64)
+    viewSettings: FlowTreeViewSettingsSchema = Field(default_factory=FlowTreeViewSettingsSchema)
+
+
 class UserPreferencesUpdateSchema(BaseModel):
     """Schema for updating user preferences."""
     preferences: Dict[str, Any] = Field(...)
@@ -323,6 +344,15 @@ class UserPreferencesUpdateSchema(BaseModel):
         # Other keys stay free-form; appearance is read before first paint, so it must be well formed.
         if 'appearance' in v:
             v = {**v, 'appearance': AppearancePreferenceSchema.model_validate(v['appearance']).model_dump()}
+        # Keyed by root id and merged per fractal (UserService.update_preferences); a demo publish reads them.
+        if 'flowtree_views' in v:
+            views = v['flowtree_views']
+            if not isinstance(views, dict) or len(views) > 200:
+                raise ValueError('flowtree_views must map at most 200 fractal ids to views')
+            v = {**v, 'flowtree_views': {
+                str(root_id)[:64]: FlowTreeViewPreferenceSchema.model_validate(view).model_dump(exclude_none=True)
+                for root_id, view in views.items()
+            }}
         return v
 
 

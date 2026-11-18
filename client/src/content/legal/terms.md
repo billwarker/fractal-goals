@@ -1,11 +1,11 @@
 <!--
-version: 1.0
-effective: 2026-08-25
+version: 1.1
+effective: 2026-11-17
 -->
 
 # Terms of Service
 
-These Terms are a legal agreement between you and **[LEGAL ENTITY NAME]** governing your use
+These Terms are a legal agreement between you and **Fractal Goals Technology** governing your use
 of Fractal Goals. Please read them. By creating an account or using the Service, you agree to
 them.
 
@@ -22,9 +22,9 @@ them.
 
 ### 1.1 Who this agreement is with
 
-These Terms of Service ("Terms") form a binding agreement between you and **[LEGAL ENTITY
-NAME]** ("Fractal Goals", "we", "us", "our"), a company incorporated in Ontario, Canada, at
-[REGISTERED ADDRESS].
+These Terms of Service ("Terms") form a binding agreement between you and **Fractal Goals
+Technology** ("Fractal Goals", "we", "us", "our"), a sole proprietorship registered in Ontario,
+Canada.
 
 "Service" means the Fractal Goals application, its websites at `fractalgoals.com` and
 `my.fractalgoals.com`, and all related features we make available.
@@ -436,7 +436,7 @@ apply to you.
 **This section does not apply if you are a consumer using the Service for personal purposes.**
 
 If you use the Service for business purposes, you agree to indemnify and hold harmless
-[LEGAL ENTITY NAME] and its officers, directors, employees, and agents from any claims,
+Fractal Goals Technology, its owner, and its employees, contractors, and agents from any claims,
 liabilities, damages, losses, and reasonable legal costs arising from your content, your use
 of the Service, your breach of these Terms, or your violation of any law or third-party right.
 
@@ -508,8 +508,8 @@ to the minimum extent necessary, and the rest remains in full force.
 later.
 
 **18.4 Assignment.** You may not assign or transfer these Terms without our written consent.
-We may assign them to an affiliate or in connection with a merger, acquisition, or sale of
-assets, on notice to you. **If we do, we will ensure your data continues to be handled in
+We may assign them to a successor business, including a corporation formed to carry on the
+Service, or in connection with a merger, acquisition, or sale of assets, on notice to you. **If we do, we will ensure your data continues to be handled in
 accordance with our Privacy Policy, and you may delete your account and export your data if
 you object.**
 
@@ -518,8 +518,7 @@ its reasonable control, including natural disasters, war, terrorism, labour disp
 governmental action, and failures of internet or third-party infrastructure.
 
 **18.6 Notices.** We may give notice by email to your registered address or by in-app notice.
-Send notices to us at [support@fractalgoals.com](mailto:support@fractalgoals.com), or by post
-to [LEGAL ENTITY NAME], [REGISTERED ADDRESS].
+Send notices to us at [support@fractalgoals.com](mailto:support@fractalgoals.com).
 
 **18.7 Relationship.** These Terms do not create a partnership, joint venture, agency, or
 employment relationship.
@@ -539,7 +538,6 @@ governs unless applicable law requires otherwise.
 |---|---|
 | **Support and general enquiries** | [support@fractalgoals.com](mailto:support@fractalgoals.com) |
 | **Privacy enquiries** | [privacy@fractalgoals.com](mailto:privacy@fractalgoals.com) |
-| **Postal address** | [LEGAL ENTITY NAME]<br />[REGISTERED ADDRESS] |
 
 ---
 

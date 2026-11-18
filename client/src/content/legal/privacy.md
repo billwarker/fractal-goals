@@ -1,6 +1,6 @@
 <!--
-version: 1.1
-effective: 2026-10-27
+version: 1.2
+effective: 2026-11-17
 -->
 
 # Privacy Policy
@@ -20,12 +20,11 @@ at [privacy@fractalgoals.com](mailto:privacy@fractalgoals.com) and we will expla
 
 ## 1. Who we are
 
-Fractal Goals is operated by **[LEGAL ENTITY NAME]** ("Fractal Goals", "we", "us", "our"),
-a company incorporated in Ontario, Canada.
+Fractal Goals is operated by **Fractal Goals Technology** ("Fractal Goals", "we", "us",
+"our"), a sole proprietorship registered in Ontario, Canada.
 
 | | |
 |---|---|
-| **Registered address** | [REGISTERED ADDRESS] |
 | **Privacy contact** | [privacy@fractalgoals.com](mailto:privacy@fractalgoals.com) |
 | **General support** | [support@fractalgoals.com](mailto:support@fractalgoals.com) |
 
@@ -33,6 +32,12 @@ For the purposes of the UK and EU General Data Protection Regulation ("GDPR"), w
 **data controller** of the personal information described in this policy. For the purposes
 of Canadian privacy law, we are the organization responsible for the personal information
 under our control.
+
+If the business behind Fractal Goals changes form — for example, if it is incorporated, or
+sold or merged with another business — your personal information may be transferred to the
+successor as part of that change. The successor must continue to handle it in accordance with
+this policy, and we will notify you before the change takes effect so you can export your data
+or delete your account if you object.
 
 ---
 
@@ -453,6 +458,5 @@ Settings.
 |---|---|
 | **Privacy enquiries and rights requests** | [privacy@fractalgoals.com](mailto:privacy@fractalgoals.com) |
 | **General support** | [support@fractalgoals.com](mailto:support@fractalgoals.com) |
-| **Postal address** | [LEGAL ENTITY NAME]<br />[REGISTERED ADDRESS] |
 
 We respond to privacy requests within 30 days.

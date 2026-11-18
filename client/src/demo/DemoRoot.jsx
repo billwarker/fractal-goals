@@ -17,7 +17,7 @@ import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/land
 import { getLandingPageHref } from '../utils/marketingHost';
 import DemoGuide from './DemoGuide';
 import DemoSignupModal from './DemoSignupModal';
-import DemoWritePrompt from './DemoWritePrompt';
+import DemoWriteNotice from './DemoWriteNotice';
 import { sortDemoExamples } from './demoExamples';
 import { DEMO_BASE_PATH, setDemoMode } from './demoMode';
 import '../App.css';
@@ -75,7 +75,7 @@ function DemoApp() {
                     <FractalRoutes fallbackPath={firstGoalsPath} />
                 </div>
                 <DemoGuide examples={examples} onSignup={() => setIsSignupOpen(true)} onExit={logout} />
-                <DemoWritePrompt onSignup={() => setIsSignupOpen(true)} />
+                <DemoWriteNotice isSignupOpen={isSignupOpen} />
                 {/* Mounted per opening, so each sign-up starts from a fresh form. */}
                 {isSignupOpen && <DemoSignupModal isOpen onClose={() => setIsSignupOpen(false)} />}
             </div>

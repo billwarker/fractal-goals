@@ -17,6 +17,7 @@ import { getChildType } from '../utils/goalHelpers';
 import { findGoalNodeById, getGoalNodeId } from '../utils/goalNodeModel';
 import { getGoalSearchMatches, getVisibleGoalSearchCandidates } from '../utils/goalTypeToZoomSearch';
 import notify from '../utils/notify';
+import { isDemoReadOnlyError } from '../demo/demoMode';
 import {
     getQueryCharacter,
     isSearchCharacter,
@@ -24,7 +25,7 @@ import {
     shouldIgnoreTypeToZoomKey,
 } from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
-import { useFlowTreePreferences } from '../hooks/useFlowTreePreferences';
+import { useAccountFlowTreeView, useFlowTreePreferences } from '../hooks/useFlowTreePreferences';
 import { removeLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
@@ -64,6 +65,7 @@ function FractalGoals() {
     const navigate = useNavigate();
     const location = useLocation();
     const { user } = useAuth();
+    const accountFlowTreeView = useAccountFlowTreeView(rootId);
     const { timezone } = useTimezone();
     const {
         createGoal,
@@ -99,6 +101,7 @@ function FractalGoals() {
         rootId,
         userId: user?.id,
         defaultGoalsViewMode: getIsMobileViewport() ? 'hierarchy' : 'tree',
+        ...accountFlowTreeView,
     });
     const { programs = EMPTY_ARRAY, isLoading: programsLoading } = usePrograms(rootId, timezone || 'UTC');
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;
@@ -677,6 +680,12 @@ function FractalGoals() {
         setAlertData({ isOpen: true, title, message });
     }, []);
 
+    // A write the demo refused already has its toast; an alert on top would only repeat it.
+    const showFailure = (title, message, err) => {
+        if (isDemoReadOnlyError(err)) return;
+        showAlert(title, message + err.message);
+    };
+
     const handleGoalNameClick = useCallback((nodeDatum) => {
         setViewingGoal(nodeDatum);
         setSidebarMode('goal-details');
@@ -702,7 +711,7 @@ function FractalGoals() {
             setShowGoalModal(false);
             return newGoal;
         } catch (err) {
-            showAlert('Creation Failed', 'Error creating goal: ' + err.message);
+            showFailure('Creation Failed', 'Error creating goal: ', err);
             return null;
         }
     };
@@ -716,7 +725,7 @@ function FractalGoals() {
             const updated = await updateGoal(rootId, String(nodeId), payload);
             setViewingGoal(updated);
         } catch (err) {
-            showAlert('Update Failed', 'Failed to update: ' + err.message);
+            showFailure('Update Failed', 'Failed to update: ', err);
         }
     };
 
@@ -724,7 +733,7 @@ function FractalGoals() {
         try {
             await toggleGoalCompletion(rootId, goalId, !currentStatus, sequenceOptions);
         } catch (err) {
-            showAlert('Update Failed', 'Error updating completion: ' + err.message);
+            showFailure('Update Failed', 'Error updating completion: ', err);
         }
     };
 
@@ -738,7 +747,7 @@ function FractalGoals() {
             setSidebarMode(null);
             setViewingGoal(null);
         } catch (err) {
-            showAlert('Deletion Failed', 'Failed to delete: ' + err.message);
+            showFailure('Deletion Failed', 'Failed to delete: ', err);
         }
     };
 

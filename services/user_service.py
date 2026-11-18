@@ -98,7 +98,14 @@ class UserService:
         new_prefs = data['preferences']
         if isinstance(new_prefs, dict):
             updated_prefs = dict(current_prefs)
+            stored_views = updated_prefs.get('flowtree_views')
             updated_prefs.update(new_prefs)
+            # Each Goals page saves only its own fractal's view, so views merge per root.
+            if 'flowtree_views' in new_prefs:
+                updated_prefs['flowtree_views'] = {
+                    **(stored_views if isinstance(stored_views, dict) else {}),
+                    **new_prefs['flowtree_views'],
+                }
             user.preferences = updated_prefs
             flag_modified(user, 'preferences')
 

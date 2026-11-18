@@ -56,15 +56,17 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
     await expect(page).toHaveURL(new RegExp(`/demo/${DEMO_SPANISH}/notes$`));
     await expect(guide.getByText('Step 8 of 9')).toBeVisible();
 
-    // Saving is refused before the network, with a prompt instead of an error.
+    // Saving is refused before the network, with a toast instead of an error.
     await guide.getByRole('button', { name: 'Minimise the demo guide' }).click();
     await page.goto(`/demo/${DEMO_SHOWCASE}/goals?goal=${demoId('sweep-showcase-root', 'sweep-goal-ii-v-i')}`);
     await page.getByRole('button', { name: 'Edit' }).first().click();
     await page.getByRole('button', { name: /^save/i }).first().click();
-    const prompt = page.getByRole('dialog', { name: 'This is a live demo' });
-    await expect(prompt).toBeVisible();
+    const notice = page.locator('[role="status"]', { hasText: 'Changes aren’t saved in the demo.' });
+    await expect(notice).toHaveCount(1);
+    await expect(page.getByRole('dialog', { name: /live demo|failed/i })).toHaveCount(0);
     await expect(page.locator('[role="status"]', { hasText: /failed/i })).toHaveCount(0);
-    await prompt.getByRole('button', { name: 'Sign up' }).click();
+    await expect(notice.getByRole('button', { name: 'Sign up' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Sign up', exact: true }).click();
 
     // Sign up: the waitlist, or an invite key that hands off to the app's prefilled sign-up.
     const signup = page.getByRole('dialog', { name: 'Build your own tree' });
@@ -94,7 +96,7 @@ test('the demo keeps nothing on the device and leaves cleanly', async ({ page })
     await guide.getByRole('button', { name: 'Switch to light theme' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
     await page.waitForTimeout(500);
-    await expect(page.getByRole('dialog', { name: 'This is a live demo' })).toHaveCount(0);
+    await expect(page.locator('[role="status"]', { hasText: 'Changes aren’t saved in the demo.' })).toHaveCount(0);
     // The account-only parts of the app aren't offered.
     await expect(page.getByRole('button', { name: /settings/i })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /ask ai/i })).toHaveCount(0);
