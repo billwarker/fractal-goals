@@ -656,10 +656,13 @@ function Admin() {
                 </div>
                 <Link to="/" className={styles.homeLink}>Home</Link>
             </header>
-            <div className={styles.tabs}>
+            <div className={styles.tabs} role="tablist" aria-label="Admin sections">
                 {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'live demo', 'invite keys'].map((item) => (
                     <button
                         key={item}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === item}
                         className={tab === item ? styles.activeTab : ''}
                         onClick={() => setTab(item)}
                     >
@@ -668,19 +671,7 @@ function Admin() {
                 ))}
             </div>
             {tab === 'overview' && (
-                <>
-                    <section className={styles.section}>
-                        <div className={styles.summaryGrid}>
-                            {summaryCards.map(([label, value]) => (
-                                <div key={label} className={styles.summaryCard}>
-                                    <span>{label}</span>
-                                    <strong>{value}</strong>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                    <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} />
-                </>
+                <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} accountCards={summaryCards} />
             )}
             {tab === 'users' && (
                 <section className={styles.section}>

@@ -652,7 +652,14 @@ a daily-salted hash (`services/web_telemetry_service.py`); UTM/referrer travel t
 Weekly Active Practitioners (accounts completing a session in an ISO week); Admin → Usage shows it with
 traffic, the conversion funnel and feature use (`services/growth_metrics_service.py`). The BigQuery export
 adds `web_events` and `event_logs.owner_user_id` and deletes erased accounts' warehouse rows
-(`analytics_erasures`). See [Product analytics](planning/product-analytics-tracking-2026-11.md). Admin support access is explicit
+(`analytics_erasures`). Once exported, product and web events older than a 35-day live window are
+flushed from Postgres (`flush_exported` in `services/analytics_export_service.py`; never before they
+reach BigQuery); the retention job keeps the published 180/90-day ceilings, and Admin → Usage shows the
+database against its quota (`DATABASE_STORAGE_QUOTA_MB`) and activity-history size by event type.
+See [Product analytics](planning/product-analytics-tracking-2026-11.md) and
+[Postgres flush](planning/analytics-postgres-flush-2026-11.md). Admin → Overview is split into sub-tabs (Summary, Acquisition, Engagement, Users, Events, System; `?view=`
+keeps the open one) over a single usage query (`components/admin/UsagePanel.jsx`), with compact tables and
+charts from `UsageViews.module.css`; see [Overview sub-tabs](planning/admin-overview-subtabs-2026-11.md). Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
 The Logs page (admin-only route) reads owner-scoped event history; only admins can clear a fractal's

@@ -15,7 +15,7 @@ test('an admin sees each demo’s snapshot and opens the copy visitors explore',
     await expect(page.getByText('Play jazz guitar at a jam session').first()).toBeVisible();
 
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'live demo', exact: true }).click();
+    await page.getByRole('tab', { name: 'live demo', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Live demo' })).toBeVisible();
     await expect(page.getByLabel('Public label').first()).toHaveValue('Jazz guitar');
     await expect(page.getByText(/Snapshot .* · \d+ goals · 15 sessions/)).toBeVisible();

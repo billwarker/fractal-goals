@@ -24,6 +24,7 @@ const STORAGE = {
         total_bytes: 23173504,
         relation_bytes: 11534336,
         other_bytes: 11639168,
+        quota_bytes: 500 * 1024 * 1024,
         relations: [
             {
                 schema: 'public',
@@ -40,6 +41,17 @@ const STORAGE = {
         { table: 'product_events', rows: 120, bytes: 65536, oldest: '2026-06-01T00:00:00Z', newest: '2026-07-07T00:00:00Z' },
         { table: 'event_logs', rows: 900, bytes: null, oldest: null, newest: null },
     ],
+    event_log_payloads: [
+        { event_type: 'session.updated', events: 400, payload_bytes: 2 * 1024 * 1024, description_bytes: 20480 },
+    ],
+};
+const RETENTION = { live_days: 35, product_events_ceiling_days: 180, web_events_ceiling_days: 90 };
+const RECENT_EXPORT = {
+    last_run_at: new Date().toISOString(),
+    last_run_status: 'success',
+    last_success_at: new Date().toISOString(),
+    last_run_flushed: { product_events: 12, web_events: 3 },
+    tables: {},
 };
 
 function renderPanel(overrides = {}) {
@@ -50,7 +62,7 @@ function renderPanel(overrides = {}) {
         <QueryClientProvider client={queryClient}>
             <UsageStoragePanel
                 storage={STORAGE}
-                retention={{ product_events_days: 180 }}
+                retention={RETENTION}
                 exportState={{ last_run_at: null, last_run_status: null, tables: {} }}
                 {...overrides}
             />
@@ -61,15 +73,15 @@ function renderPanel(overrides = {}) {
 describe('UsageStoragePanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        updateUsageRetention.mockResolvedValue({ data: { product_events_days: 90 } });
-        pruneUsage.mockResolvedValue({ data: { deleted: 4, older_than_days: 180 } });
+        updateUsageRetention.mockResolvedValue({ data: { live_days: 60 } });
+        pruneUsage.mockResolvedValue({ data: { deleted: 4, live_days: 35, flushed: { product_events: 4, web_events: 0 } } });
         vi.spyOn(window, 'confirm').mockReturnValue(true);
     });
 
     it('renders table stats with human-readable and missing sizes', () => {
         renderPanel();
 
-        expect(screen.getByText('Database storage breakdown')).toBeInTheDocument();
+        expect(screen.getByText('Database storage')).toBeInTheDocument();
         expect(screen.getByText('public.event_logs')).toBeInTheDocument();
         expect(screen.getByText(/Total database storage: 22.1 MB/)).toBeInTheDocument();
         expect(screen.getByText('product_events')).toBeInTheDocument();
@@ -78,22 +90,48 @@ describe('UsageStoragePanel', () => {
         expect(screen.getByText(/Never exported/)).toBeInTheDocument();
     });
 
-    it('saves retention through the API', async () => {
+    it('shows the database against its quota, warning near the limit', () => {
+        const { rerender } = renderPanel();
+        expect(screen.getByText(/of 500.0 MB database quota \(4%\)/)).toBeInTheDocument();
+        expect(screen.queryByText(/near its storage quota/)).not.toBeInTheDocument();
+
+        rerender(
+            <QueryClientProvider client={new QueryClient()}>
+                <UsageStoragePanel
+                    storage={{ ...STORAGE, database: { ...STORAGE.database, total_bytes: 420 * 1024 * 1024 } }}
+                    retention={RETENTION}
+                    exportState={RECENT_EXPORT}
+                />
+            </QueryClientProvider>,
+        );
+        expect(screen.getByText(/near its storage quota/)).toBeInTheDocument();
+    });
+
+    it('lists activity history sizes by event type', () => {
         renderPanel();
 
-        fireEvent.change(screen.getByLabelText('Telemetry retention (days)'), { target: { value: '90' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save Retention' }));
+        const row = screen.getByRole('row', { name: /session\.updated/ });
+        expect(row).toHaveTextContent('400');
+        expect(row).toHaveTextContent('2.0 MB');
+    });
+
+    it('saves the live window through the API', async () => {
+        renderPanel();
+
+        fireEvent.change(screen.getByLabelText('Keep in Postgres after export (days)'), { target: { value: '60' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save Live Window' }));
 
         await waitFor(() => {
-            expect(updateUsageRetention).toHaveBeenCalledWith({ product_events_days: 90 });
+            expect(updateUsageRetention).toHaveBeenCalledWith({ live_days: 60 });
         });
         expect(notify.success).toHaveBeenCalled();
     });
 
-    it('prunes after confirmation', async () => {
+    it('flushes exported events after confirmation', async () => {
         renderPanel();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Prune Telemetry' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Flush Exported Events' }));
+        expect(window.confirm).toHaveBeenCalledWith(expect.stringMatching(/Only events already in BigQuery are deleted/));
 
         await waitFor(() => {
             expect(pruneUsage).toHaveBeenCalledWith({});
@@ -101,25 +139,28 @@ describe('UsageStoragePanel', () => {
         expect(notify.success).toHaveBeenCalled();
     });
 
-    it('does not prune when the confirmation is dismissed', () => {
+    it('does not flush when the confirmation is dismissed', () => {
         window.confirm.mockReturnValue(false);
         renderPanel();
 
-        fireEvent.click(screen.getByRole('button', { name: 'Prune Telemetry' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Flush Exported Events' }));
 
         expect(pruneUsage).not.toHaveBeenCalled();
     });
 
-    it('shows the last export run when present', () => {
+    it('shows the last export run and what it flushed', () => {
+        renderPanel({ exportState: RECENT_EXPORT });
+
+        expect(screen.getByText(/success\) · flushed product_events 12, web_events 3/)).toBeInTheDocument();
+        expect(screen.queryByText(/Never exported/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/aren't being flushed/)).not.toBeInTheDocument();
+    });
+
+    it('warns when no export has succeeded for two days', () => {
         renderPanel({
-            exportState: {
-                last_run_at: '2026-07-07T08:00:00Z',
-                last_run_status: 'success',
-                tables: { product_events: { last_ts: '2026-07-07T07:55:00Z' } },
-            },
+            exportState: { ...RECENT_EXPORT, last_success_at: '2026-01-01T00:00:00Z' },
         });
 
-        expect(screen.getByText(/success/)).toBeInTheDocument();
-        expect(screen.queryByText(/Never exported/)).not.toBeInTheDocument();
+        expect(screen.getByText(/aren't being flushed/)).toBeInTheDocument();
     });
 });

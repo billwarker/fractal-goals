@@ -154,7 +154,7 @@ describe('Admin', () => {
                 top_pages: [],
                 email_health: [],
                 storage: { tables: [] },
-                retention: { product_events_days: 180 },
+                retention: { live_days: 35, product_events_ceiling_days: 180, web_events_ceiling_days: 90 },
                 export: { last_run_at: null, last_run_status: null, tables: {} },
             },
         });
@@ -401,8 +401,9 @@ describe('Admin', () => {
         renderAdmin();
         await waitFor(() => {
             expect(screen.getByText('Admin')).toBeInTheDocument();
-            expect(screen.getByText('Users')).toBeInTheDocument();
+            expect(screen.getByRole('list', { name: 'Account totals' })).toHaveTextContent('Users');
         });
+        expect(screen.getByRole('tab', { name: 'overview' })).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
         fireEvent.click(screen.getByText('+'));

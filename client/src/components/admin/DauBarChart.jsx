@@ -16,6 +16,9 @@ function DauBarChart({
     unit = 'active user',
     xTitle = 'Date',
     ariaLabel = `Daily active users from ${windowStart} to ${windowEnd}`,
+    height = 220,
+    // Under a heading that already names the series: no axis titles, fewer ticks.
+    compact = false,
 }) {
     const chartTheme = useChartThemeDefaults();
 
@@ -47,29 +50,29 @@ function DauBarChart({
         },
         scales: {
             x: {
-                title: { display: true, text: xTitle, color: chartTheme.textColor },
+                title: { display: !compact, text: xTitle, color: chartTheme.textColor },
                 ticks: {
                     color: chartTheme.textColor,
                     maxRotation: 60,
                     autoSkip: true,
-                    maxTicksLimit: 16,
+                    maxTicksLimit: compact ? 8 : 16,
                 },
                 grid: { display: false },
             },
             y: {
-                title: { display: true, text: seriesLabel, color: chartTheme.textColor },
+                title: { display: !compact, text: seriesLabel, color: chartTheme.textColor },
                 beginAtZero: true,
                 ticks: { color: chartTheme.textColor, precision: 0 },
                 grid: { color: chartTheme.gridColor },
             },
         },
-    }), [chartTheme, seriesLabel, unit, xTitle]);
+    }), [chartTheme, seriesLabel, unit, xTitle, compact]);
 
     return (
         <div
             role="img"
             aria-label={ariaLabel}
-            style={{ height: '220px' }}
+            style={{ height: `${height}px` }}
         >
             <Bar data={chartData} options={options} />
         </div>
