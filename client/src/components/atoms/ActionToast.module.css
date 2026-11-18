@@ -16,8 +16,12 @@
     border-color: color-mix(in srgb, var(--color-brand-warning) 60%, var(--color-border));
 }
 
+/* react-hot-toast holds a dismissed toast while it's hovered: once faded, it can't be reached. */
 .leaving {
     opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.2s, visibility 0s 0.2s;
 }
 
 .body {

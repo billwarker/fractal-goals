@@ -36,9 +36,9 @@ export function ActionToast({ toastId, visible = true, message, details = [], ac
     );
 }
 
-/** Show an action toast; returns its id. */
-export function showActionToast({ duration = 8000, ...props }) {
-    return toast.custom((t) => <ActionToast toastId={t.id} visible={t.visible} {...props} />, { duration });
+/** Show an action toast; returns its id. Passing `id` replaces a toast already showing under it. */
+export function showActionToast({ id, duration = 8000, ...props }) {
+    return toast.custom((t) => <ActionToast toastId={t.id} visible={t.visible} {...props} />, { id, duration });
 }
 
 export default ActionToast;
