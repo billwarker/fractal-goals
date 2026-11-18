@@ -90,6 +90,14 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
 test('the demo keeps nothing on the device and leaves cleanly', async ({ page }) => {
     // A visitor who prefers dark: the theme is theirs, not an account write to refuse.
     await page.addInitScript(() => localStorage.setItem('theme-preference', JSON.stringify({ mode: 'dark', darkFrom: '20:00', lightFrom: '07:00' })));
+    // A Goals view left by an earlier visit would outrank the published one; the demo clears it.
+    const viewKey = `flowtree-view-settings:demo:${DEMO_SHOWCASE}`;
+    await page.goto(`/demo/${DEMO_SHOWCASE}/goals`);
+    await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ version: 2, viewSettings: {} })), viewKey);
+    await page.reload();
+    await expect(page.locator('.react-flow, [aria-label="Mobile goals view"]').first()).toBeVisible();
+    await page.waitForTimeout(500);
+    expect(await page.evaluate((key) => localStorage.getItem(key), viewKey)).toBeNull();
     await page.goto(`/demo/${DEMO_SHOWCASE}/sessions`);
     const guide = page.getByRole('region', { name: 'Demo guide' });
     await expect(guide).toBeVisible();

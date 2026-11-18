@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setDemoMode } from '../../demo/demoMode';
 import { useFlowTreePreferences } from '../useFlowTreePreferences';
 
 const ACCOUNT_VIEW = {
@@ -21,6 +22,7 @@ describe('useFlowTreePreferences', () => {
     });
 
     afterEach(() => {
+        setDemoMode(false);
         vi.useRealTimers();
     });
 
@@ -46,6 +48,28 @@ describe('useFlowTreePreferences', () => {
 
         expect(result.current.viewSettings.hideCompletedGoals).toBe(true);
         expect(result.current.viewSettings.hideInactiveGoals).toBe(false);
+    });
+
+    it('in the demo, opens on the published view whatever an earlier visit left, and keeps no copy', () => {
+        setDemoMode(true);
+        const storageKey = 'flowtree-view-settings:demo:root-1';
+        localStorage.setItem(storageKey, JSON.stringify({
+            version: 2,
+            scopedProgramId: null,
+            viewSettings: { hideInactiveGoals: false, hideCompletedGoals: false },
+        }));
+        const { result } = renderPreferences({ userId: 'demo', accountView: ACCOUNT_VIEW });
+
+        expect(result.current.viewSettings.hideInactiveGoals).toBe(true);
+        expect(result.current.scopedProgramId).toBe('program-1');
+        expect(localStorage.getItem(storageKey)).toBeNull();
+
+        // A visitor's own changes last for the visit only.
+        act(() => {
+            result.current.setViewSettings((current) => ({ ...current, hideCompletedGoals: true }));
+        });
+        expect(result.current.viewSettings.hideCompletedGoals).toBe(true);
+        expect(localStorage.getItem(storageKey)).toBeNull();
     });
 
     it('saves filter changes to the account after a pause', () => {

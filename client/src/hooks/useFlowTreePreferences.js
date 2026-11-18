@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '../contexts/AuthContext';
+import { isDemoMode } from '../demo/demoMode';
 import { authApi } from '../utils/api';
 import {
     readLocalStorageValue,
+    removeLocalStorageValue,
     writeLocalStorageValue,
 } from '../utils/localPreferences';
 
@@ -71,6 +73,8 @@ export function useAccountFlowTreeView(rootId) {
 /**
  * Goals page view preferences for one fractal. This device's copy wins; without one, the
  * account's copy (`accountView`) seeds it. `saveAccountView` receives filter changes.
+ * The demo keeps no device copy: every visit opens on the published view, which a copy
+ * left by an earlier visit (same guest id, same snapshot root ids) would otherwise override.
  */
 export function useFlowTreePreferences({
     rootId,
@@ -107,9 +111,11 @@ export function useFlowTreePreferences({
         }
 
         try {
+            const keepsDeviceCopy = !isDemoMode();
+            // Clears what demo visits wrote before they stopped keeping a copy.
+            if (!keepsDeviceCopy) removeLocalStorageValue(storageKey);
             const normalized = normalizeStoredPreferences(
-                readLocalStorageValue(storageKey)
-                || readLocalStorageValue(legacyStorageKey)
+                (keepsDeviceCopy && (readLocalStorageValue(storageKey) || readLocalStorageValue(legacyStorageKey)))
                 || accountViewRef.current
             );
             if (normalized) {
@@ -130,7 +136,7 @@ export function useFlowTreePreferences({
     }, [defaultGoalsViewMode, legacyStorageKey, storageKey]);
 
     useEffect(() => {
-        if (!storageKey || !isHydrated) return;
+        if (!storageKey || !isHydrated || isDemoMode()) return;
         writeLocalStorageValue(storageKey, JSON.stringify({
             version: STORAGE_VERSION,
             goalsViewMode,
