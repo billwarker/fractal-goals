@@ -105,24 +105,27 @@ After this one-time creation, Cloud Build keeps the job updated.
 
 ## Nightly Scheduler
 
-Create a scheduler service account with permission to run Cloud Run jobs, then
-schedule the execution endpoint:
+`export-analytics-nightly` (Cloud Scheduler, us-east1) runs the job at **08:15 UTC**,
+45 minutes after `data-retention-daily` (07:30 UTC, see [data-retention.md](data-retention.md)),
+so the night's erasures reach BigQuery in the same run. It calls the Cloud Run Admin API
+as `cloud-jobs-scheduler`, which holds `roles/run.invoker` on these two jobs only:
 
 ```bash
-gcloud iam service-accounts create analytics-export-scheduler
-
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:analytics-export-scheduler@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role="roles/run.invoker"
+SA="cloud-jobs-scheduler@$PROJECT_ID.iam.gserviceaccount.com"
+gcloud iam service-accounts create cloud-jobs-scheduler
+gcloud run jobs add-iam-policy-binding export-analytics --region=us-east1 \
+  --member="serviceAccount:$SA" --role="roles/run.invoker"
 
 gcloud scheduler jobs create http export-analytics-nightly \
-  --location=us-east1 \
-  --schedule="15 8 * * *" \
-  --uri="https://us-east1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$PROJECT_ID/jobs/export-analytics:run" \
-  --http-method=POST \
-  --oauth-service-account-email="analytics-export-scheduler@$PROJECT_ID.iam.gserviceaccount.com" \
-  --oauth-token-scope="https://www.googleapis.com/auth/cloud-platform"
+  --location=us-east1 --schedule="15 8 * * *" --time-zone="Etc/UTC" \
+  --uri="https://run.googleapis.com/v2/projects/$PROJECT_ID/locations/us-east1/jobs/export-analytics:run" \
+  --http-method=POST --oauth-service-account-email="$SA" \
+  --oauth-token-scope="https://www.googleapis.com/auth/cloud-platform" \
+  --attempt-deadline=180s --max-retry-attempts=3 --min-backoff=300s --max-backoff=1800s
 ```
+
+Scheduler retries only a failed *start*; the job's own `maxRetries: 3` covers a failed run.
+Admin → Overview → System warns after 48 hours without a successful export.
 
 ## Dedupe and reporting views
 
