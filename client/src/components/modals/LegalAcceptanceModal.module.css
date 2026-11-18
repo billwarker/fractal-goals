@@ -1,13 +1,29 @@
-/* The form only groups body and footer; ModalBody and ModalFooter own spacing. */
+/* Desktop: the review summary on the left, the open document scrolling on the right. */
+.modal {
+    max-width: 1080px;
+}
+
 .form {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
-.content {
+.layout {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    height: min(72vh, 760px);
+    min-height: 0;
+}
+
+.summary {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    padding: var(--spacing-lg);
+    border-right: 1px solid var(--color-border-card);
+    overflow-y: auto;
 }
 
 .intro {
@@ -16,10 +32,77 @@
     line-height: 1.5;
 }
 
-.consent a {
-    color: var(--color-primary);
-    text-decoration: underline;
-    text-underline-offset: 0.15em;
+.documents {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.documentTab {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: var(--border-radius-md);
+    background: transparent;
+    color: var(--color-text-primary);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.documentTab:hover {
+    background: var(--color-bg-hover);
+}
+
+.documentTab[aria-selected='true'] {
+    border-color: var(--color-border-card);
+    background: var(--color-bg-input);
+}
+
+.documentTab:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+.documentTitle {
+    font-weight: var(--font-weight-semibold);
+}
+
+.documentStatus {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.documentStatus.read {
+    color: var(--color-brand-success);
+}
+
+.hint {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+    line-height: 1.5;
+}
+
+.reader {
+    min-height: 0;
+    padding: var(--spacing-lg) var(--spacing-xl);
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+}
+
+.reader:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.readerNext {
+    display: flex;
+    justify-content: center;
+    padding: var(--spacing-md) 0 var(--spacing-sm);
 }
 
 .errorMessage {
@@ -28,4 +111,40 @@
     background: rgba(239, 68, 68, 0.1);
     padding: 10px;
     border-radius: var(--border-radius-sm);
+}
+
+/* Phones: full screen, the summary above and the document filling what's left. */
+@media (max-width: 768px) {
+    /* The layout's own sections carry the padding. */
+    .body {
+        padding: 0;
+    }
+
+    .layout {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        height: auto;
+    }
+
+    .summary {
+        flex: 0 0 auto;
+        padding: 12px;
+        border-right: none;
+        border-bottom: 1px solid var(--color-border-card);
+        overflow: visible;
+    }
+
+    .documents {
+        flex-direction: row;
+    }
+
+    .documentTab {
+        flex: 1;
+    }
+
+    .reader {
+        flex: 1;
+        padding: 12px;
+    }
 }
