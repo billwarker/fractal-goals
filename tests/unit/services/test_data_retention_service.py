@@ -13,6 +13,7 @@ from models import (
     User,
     WebEvent,
 )
+from services.app_settings import TELEMETRY_RETENTION_KEY, set_app_setting
 from services.data_retention_service import DataRetentionService
 
 
@@ -82,3 +83,24 @@ def test_prune_enforces_each_published_live_database_window(db_session):
     }
     assert db_session.query(ProductEvent).count() == 1
     assert db_session.query(BetaSignupRequest).one().email == 'pending@example.com'
+
+
+@pytest.mark.unit
+def test_product_events_keep_the_published_ceiling_whatever_the_live_window(db_session):
+    """The admin live window drives the export's flush; retention only enforces the policy's 180 days."""
+    now = datetime.datetime(2026, 8, 25, 12, 0)
+    user = User(username='ceiling', email='ceiling@example.com')
+    user.set_password('Password123')
+    db_session.add(user)
+    db_session.flush()
+    set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {'live_days': 30})
+    db_session.add_all([
+        ProductEvent(user_id=user.id, event_name='page_view', created_at=now - datetime.timedelta(days=181)),
+        ProductEvent(user_id=user.id, event_name='page_view', created_at=now - datetime.timedelta(days=60)),
+    ])
+    db_session.commit()
+
+    counts = DataRetentionService(db_session).prune(now=now)
+
+    assert counts['product_events'] == 1
+    assert db_session.query(ProductEvent).count() == 1

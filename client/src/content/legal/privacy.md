@@ -318,7 +318,7 @@ required. You can delete them through your browser at any time; doing so signs y
 |---|---|
 | Account and the content you create | For as long as your account exists, then deleted within 30 days of an erasure request |
 | Signed-in usage and reliability events | Up to 180 days |
-| Public website visit events | 90 days |
+| Public website visit events | Up to 90 days |
 | Internal analytics records | 24 months |
 | Activity history within your fractals | For as long as your account exists, or until you clear it |
 | Password reset tokens | Expire after 60 minutes; records purged after 30 days |

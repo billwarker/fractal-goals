@@ -113,10 +113,7 @@ def prune_admin_usage(current_user):
         _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
-        body = request.get_json(silent=True) or {}
-        payload, error, status = AdminUsageService(db_session).prune_product_events(
-            body.get('older_than_days'),
-        )
+        payload, error, status = AdminUsageService(db_session).flush_exported_events()
         if error:
             return jsonify({"error": error}), status
         # Expired offline-sync idempotency records belong to the same housekeeping pass.
@@ -125,7 +122,7 @@ def prune_admin_usage(current_user):
         return jsonify({**(payload or {}), "idempotency_records_deleted": idempotency_deleted}), status
     except SQLAlchemyError:
         db_session.rollback()
-        return internal_error(logger, "Error pruning product events")
+        return internal_error(logger, "Error flushing exported analytics events")
     finally:
         db_session.close()
 

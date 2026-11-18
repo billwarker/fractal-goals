@@ -35,7 +35,12 @@ from services.app_settings import (
 )
 from services.events import Events
 from services.service_types import JsonDict, ServiceResult
-from services.telemetry_service import DEFAULT_RETENTION_DAYS, TelemetryService
+from services.analytics_export_service import (
+    MAX_LIVE_DAYS,
+    MIN_LIVE_DAYS,
+    analytics_live_days,
+    flush_exported,
+)
 from services.demo_account_service import DEMO_ACCOUNT_ROLE
 from services.growth_metrics_service import GrowthMetricsService
 from sqlalchemy.exc import SQLAlchemyError
@@ -45,8 +50,8 @@ logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 365
 DEFAULT_WINDOW_DAYS = 30
 TOP_LIMIT = 20
-MIN_RETENTION_DAYS = 30
-MAX_RETENTION_DAYS = config.PRODUCT_EVENT_RETENTION_DAYS
+# Payload accounting for activity history: the largest event types by stored bytes.
+EVENT_LOG_PAYLOAD_TOP = 10
 
 # Domain activity surfaced as dedicated per-user columns; the full event-type
 # spectrum lives in events_breakdown.
@@ -89,6 +94,8 @@ class AdminUsageService:
             end_date + datetime.timedelta(days=1), datetime.time.min, tzinfo=datetime.timezone.utc,
         )
         now = utc_now()
+        storage = self._storage_stats()
+        oldest = {entry["table"]: entry["oldest"] for entry in storage["tables"]}
 
         return {
             "window": {
@@ -108,7 +115,9 @@ class AdminUsageService:
                 window_start, window_end, start_date, end_date, now,
             ),
             "email_health": self._email_health(window_start, window_end),
-            "storage": self._storage_stats(),
+            "storage": storage,
+            # The oldest event still in Postgres; earlier days of these charts are in BigQuery.
+            "live_since": {"product_events": oldest.get("product_events"), "web_events": oldest.get("web_events")},
             "retention": self._retention_settings(),
             "export": self._export_state(),
         }, None, 200
@@ -136,38 +145,41 @@ class AdminUsageService:
             start_date = end_date - datetime.timedelta(days=MAX_WINDOW_DAYS - 1)
         return start_date, end_date
 
-    def prune_product_events(self, older_than_days=None) -> ServiceResult[JsonDict]:
-        if older_than_days is None:
-            older_than_days = self._retention_settings()["product_events_days"]
-        return TelemetryService(self.db_session).prune(older_than_days)
+    def flush_exported_events(self) -> ServiceResult[JsonDict]:
+        """Run the export's flush now: only rows already in BigQuery leave Postgres."""
+        live_days = analytics_live_days(self.db_session)
+        flushed = flush_exported(self.db_session, live_days=live_days)
+        return {"flushed": flushed, "deleted": sum(flushed.values()), "live_days": live_days}, None, 200
 
     def update_retention(self, payload) -> ServiceResult[JsonDict]:
         try:
-            days = int(payload.get("product_events_days"))
+            days = int(payload.get("live_days"))
         except (TypeError, ValueError):
-            return None, "product_events_days must be an integer", 400
-        days = max(MIN_RETENTION_DAYS, min(MAX_RETENTION_DAYS, days))
-        set_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {"product_events_days": days})
+            return None, "live_days must be an integer", 400
+        days = max(MIN_LIVE_DAYS, min(MAX_LIVE_DAYS, days))
+        set_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {"live_days": days})
         self.db_session.commit()
-        return {"product_events_days": days}, None, 200
+        return {"live_days": days}, None, 200
 
     def _retention_settings(self):
-        stored = get_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {}) or {}
-        days = stored.get("product_events_days", DEFAULT_RETENTION_DAYS)
         return {
-            "product_events_days": max(
-                MIN_RETENTION_DAYS,
-                min(MAX_RETENTION_DAYS, int(days)),
-            )
+            "live_days": analytics_live_days(self.db_session),
+            "product_events_ceiling_days": config.PRODUCT_EVENT_RETENTION_DAYS,
+            "web_events_ceiling_days": config.WEB_EVENT_RETENTION_DAYS,
         }
 
     def _export_state(self):
         stored = get_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, None)
         if not isinstance(stored, dict):
-            return {"last_run_at": None, "last_run_status": None, "tables": {}}
+            return {"last_run_at": None, "last_run_status": None, "last_success_at": None, "tables": {}}
         return {
             "last_run_at": stored.get("last_run_at"),
             "last_run_status": stored.get("last_run_status"),
+            # Runs before the flush existed recorded no success time; their last run stands in.
+            "last_success_at": stored.get("last_success_at") or (
+                stored.get("last_run_at") if stored.get("last_run_status") == "success" else None
+            ),
+            "last_run_flushed": stored.get("last_run_flushed") or {},
             "tables": stored.get("tables", {}),
         }
 
@@ -378,7 +390,38 @@ class AdminUsageService:
                 "bytes": self._table_bytes(table_name),
             })
         database = self._database_storage_breakdown()
-        return {"tables": tables, "database": database}
+        database["quota_bytes"] = config.DATABASE_STORAGE_QUOTA_MB * 1024 * 1024
+        return {"tables": tables, "database": database, "event_log_payloads": self._event_log_payloads()}
+
+    def _event_log_payloads(self):
+        """Stored activity-history bytes by event type, largest first (Postgres only)."""
+        if self.db_session.get_bind().dialect.name != "postgresql":
+            return []
+        try:
+            rows = self.db_session.execute(sa.text("""
+                SELECT
+                    event_type,
+                    count(*) AS events,
+                    COALESCE(sum(pg_column_size(payload)), 0) AS payload_bytes,
+                    COALESCE(sum(pg_column_size(description)), 0) AS description_bytes
+                FROM event_logs
+                GROUP BY event_type
+                ORDER BY COALESCE(sum(pg_column_size(payload)), 0)
+                       + COALESCE(sum(pg_column_size(description)), 0) DESC, event_type
+                LIMIT :top
+            """), {"top": EVENT_LOG_PAYLOAD_TOP}).mappings().all()
+        except SQLAlchemyError:
+            logger.warning("Failed to read activity history payload sizes", exc_info=True)
+            return []
+        return [
+            {
+                "event_type": row["event_type"],
+                "events": int(row["events"]),
+                "payload_bytes": int(row["payload_bytes"]),
+                "description_bytes": int(row["description_bytes"]),
+            }
+            for row in rows
+        ]
 
     def _table_bytes(self, table_name: str):
         """Total on-disk relation size; None when unavailable (non-Postgres)."""

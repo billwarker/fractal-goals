@@ -5,6 +5,8 @@ import uuid
 import pytest
 
 from models import BetaSignupRequest, Goal, ProductEvent, Session, User, WebEvent
+from services.analytics_export_service import flush_exported
+from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, set_app_setting
 from services.growth_metrics_service import GrowthMetricsService
 
 UTC = datetime.timezone.utc
@@ -71,6 +73,21 @@ class TestWeeklyActivePractitioners:
         assert wap['previous']['count'] == 1
         assert len(wap['weeks']) == 8
         assert wap['weeks'][0]['week_start'] == '2026-09-28'
+
+    def test_flushing_exported_events_leaves_the_weekly_history_alone(self, db_session):
+        """WAP reads completed sessions, so clearing analytics out of Postgres can't change it."""
+        ana = _user(db_session, 'ana')
+        six_weeks_ago = NOW - datetime.timedelta(weeks=6)
+        _completed_session(db_session, ana, six_weeks_ago)
+        db_session.add(ProductEvent(id='old-view', user_id=ana.id, event_name='page_view', created_at=six_weeks_ago))
+        db_session.commit()
+        before = _summary(db_session)['wap']
+        set_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {'tables': {'product_events': {
+            'last_ts': six_weeks_ago.isoformat(), 'last_id': 'old-view',
+        }}})
+
+        assert flush_exported(db_session, now=NOW)['product_events'] == 1
+        assert _summary(db_session)['wap'] == before
 
     def test_excludes_demo_admin_deleted_and_unfinished_sessions(self, db_session):
         demo = _user(db_session, 'demo', role='demo')

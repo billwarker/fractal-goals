@@ -7,7 +7,7 @@ import pytest
 import services.analytics_export_service as analytics_export_module
 from models import AnalyticsErasure, EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User, WebEvent
 from services.analytics_export_service import AnalyticsExportService
-from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting
+from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, TELEMETRY_RETENTION_KEY, get_app_setting, set_app_setting
 
 
 class FakeLoadJob:
@@ -476,3 +476,94 @@ class TestAnalyticsExportAttributionAndErasure:
             AnalyticsExportService(db_session, bq, "dataset").run_export(now=_dt(0))
 
         assert db_session.query(AnalyticsErasure).count() == 1
+
+
+def _product_event(db_session, user, event_id, created_at):
+    db_session.add(ProductEvent(id=event_id, user_id=user.id, event_name="page_view", created_at=created_at))
+
+
+def _export_state(db_session, table, last_ts, last_id):
+    set_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {
+        "tables": {table: {"last_ts": analytics_export_module._format_cursor(last_ts), "last_id": last_id}},
+    })
+    db_session.commit()
+
+
+@pytest.mark.unit
+class TestFlushAfterExport:
+    def test_run_flushes_exported_events_past_the_live_window_and_nothing_else(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        root = _root(db_session, user)
+        old = now - datetime.timedelta(days=40)
+        _product_event(db_session, user, "product-old", old)
+        _product_event(db_session, user, "product-live", now - datetime.timedelta(days=10))
+        db_session.add_all([
+            WebEvent(id="web-old", event_name="landing_view", schema_version=1, visitor_day_hash="a" * 64, created_at=old),
+            EventLog(id="event-old", root_id=root.id, event_type="session.completed", timestamp=old),
+            EmailDeliveryEvent(id="email-old", provider="test", template_key="beta_invite", status="sent", created_at=old),
+        ])
+        db_session.commit()
+
+        result = AnalyticsExportService(db_session, FakeBigQueryClient(), "dataset").run_export(now=now)
+
+        assert result["flushed"] == {"product_events": 1, "web_events": 1}
+        assert get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)["last_run_flushed"] == result["flushed"]
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["product-live"]
+        assert db_session.query(WebEvent).count() == 0
+        # Activity history and email records are not analytics: they stay.
+        assert db_session.query(EventLog).count() == 1
+        assert db_session.query(EmailDeliveryEvent).count() == 1
+
+    def test_rows_past_the_watermark_stay_however_old(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "exported", now - datetime.timedelta(days=60))
+        _product_event(db_session, user, "not-exported", now - datetime.timedelta(days=45))
+        db_session.commit()
+        _export_state(db_session, "product_events", now - datetime.timedelta(days=50), "exported")
+
+        assert analytics_export_module.flush_exported(db_session, now=now) == {"product_events": 1, "web_events": 0}
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["not-exported"]
+
+    def test_a_shared_timestamp_flushes_only_up_to_the_watermark_id(self, db_session):
+        now = _dt(0)
+        same = now - datetime.timedelta(days=60)
+        user = _user(db_session)
+        _product_event(db_session, user, "a", same)
+        _product_event(db_session, user, "b", same)
+        db_session.commit()
+        _export_state(db_session, "product_events", same, "a")
+
+        analytics_export_module.flush_exported(db_session, now=now)
+
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["b"]
+
+    def test_a_table_that_never_exported_keeps_everything(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "ancient", now - datetime.timedelta(days=170))
+        db_session.commit()
+
+        assert analytics_export_module.flush_exported(db_session, now=now) == {"product_events": 0, "web_events": 0}
+        assert db_session.query(ProductEvent).count() == 1
+
+    def test_a_failed_load_flushes_nothing_from_that_table(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "old", now - datetime.timedelta(days=40))
+        db_session.commit()
+
+        with pytest.raises(RuntimeError):
+            AnalyticsExportService(
+                db_session, FakeBigQueryClient(fail_tables={"product_events"}), "dataset",
+            ).run_export(now=now)
+
+        assert db_session.query(ProductEvent).count() == 1
+
+    def test_the_live_window_reads_the_admin_setting_and_its_old_name(self, db_session):
+        assert analytics_export_module.analytics_live_days(db_session) == 35
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {"product_events_days": 90})
+        assert analytics_export_module.analytics_live_days(db_session) == 90
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {"live_days": 5})
+        assert analytics_export_module.analytics_live_days(db_session) == 30

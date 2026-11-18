@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from models import EmailDeliveryEvent, EventLog, Goal, ProductEvent, User, utc_now
+from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, TELEMETRY_RETENTION_KEY, set_app_setting
 from tests.conftest import session_headers_for
 
 
@@ -227,8 +228,18 @@ class TestAdminUsageEndpoint:
             for relation in database_storage['relations']
         )
 
-        assert payload['retention'] == {'product_events_days': 180}
-        assert payload['export'] == {'last_run_at': None, 'last_run_status': None, 'tables': {}}
+        assert database_storage['quota_bytes'] == config.DATABASE_STORAGE_QUOTA_MB * 1024 * 1024
+        payloads = {entry['event_type']: entry for entry in payload['storage']['event_log_payloads']}
+        assert payloads['session.created']['events'] == 2
+        assert payload['live_since']['product_events'] == tables['product_events']['oldest']
+        assert payload['live_since']['web_events'] is None
+
+        assert payload['retention'] == {
+            'live_days': 35, 'product_events_ceiling_days': 180, 'web_events_ceiling_days': 90,
+        }
+        assert payload['export'] == {
+            'last_run_at': None, 'last_run_status': None, 'last_success_at': None, 'tables': {},
+        }
 
     def test_login_fallback_counts_active_users_without_telemetry(self, admin_client, db_session, test_user):
         test_user.last_login_at = utc_now() - datetime.timedelta(days=1)
@@ -241,21 +252,34 @@ class TestAdminUsageEndpoint:
         assert payload['active_users']['wau'] >= 1
 
 
+def _mark_exported_through(db_session, created_at, event_id):
+    set_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {
+        'last_run_status': 'success',
+        'tables': {'product_events': {'last_ts': created_at.isoformat() + 'Z', 'last_id': event_id}},
+    })
+    db_session.commit()
+
+
 @pytest.mark.integration
-class TestAdminUsagePrune:
-    def test_prune_deletes_old_events_only(self, admin_client, db_session, seeded_usage_data, test_user):
-        response = admin_client.post(
-            '/api/admin/usage/prune',
-            data=json.dumps({'older_than_days': 180}),
-            content_type='application/json',
-        )
+class TestAdminUsageFlush:
+    def test_flush_removes_only_exported_events_past_the_live_window(self, admin_client, db_session, seeded_usage_data):
+        oldest = db_session.query(ProductEvent).order_by(ProductEvent.created_at).first()
+
+        # Not exported yet: it stays, however old.
+        unexported = admin_client.post('/api/admin/usage/prune', json={})
+        assert unexported.status_code == 200
+        assert json.loads(unexported.data)['deleted'] == 0
+
+        _mark_exported_through(db_session, oldest.created_at, oldest.id)
+        response = admin_client.post('/api/admin/usage/prune', json={})
 
         assert response.status_code == 200
-        assert json.loads(response.data)['deleted'] == 1
-        remaining = db_session.query(ProductEvent).count()
-        assert remaining == 3
+        payload = json.loads(response.data)
+        assert payload['flushed'] == {'product_events': 1, 'web_events': 0}
+        assert payload['live_days'] == 35
+        assert db_session.query(ProductEvent).count() == 3
 
-    def test_prune_requires_admin(self, authed_client):
+    def test_flush_requires_admin(self, authed_client):
         response = authed_client.post('/api/admin/usage/prune', json={})
 
         assert response.status_code == 403
@@ -263,45 +287,33 @@ class TestAdminUsagePrune:
 
 @pytest.mark.integration
 class TestAdminUsageRetention:
-    def test_retention_round_trip_and_prune_default(self, admin_client, db_session, seeded_usage_data):
-        update = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 90}),
-            content_type='application/json',
-        )
+    def test_live_window_round_trip(self, admin_client):
+        update = admin_client.patch('/api/admin/usage/retention', json={'live_days': 90})
         assert update.status_code == 200
-        assert json.loads(update.data)['product_events_days'] == 90
+        assert json.loads(update.data) == {'live_days': 90}
 
         summary = admin_client.get('/api/admin/usage?days=7')
-        assert json.loads(summary.data)['retention'] == {'product_events_days': 90}
+        assert json.loads(summary.data)['retention']['live_days'] == 90
 
-        # Prune with an empty body must use the stored retention (90 days),
-        # which still deletes the 200-day-old seeded event.
-        prune = admin_client.post('/api/admin/usage/prune', json={})
-        assert prune.status_code == 200
-        payload = json.loads(prune.data)
-        assert payload['deleted'] == 1
-        assert payload['older_than_days'] == 90
+    def test_the_setting_saved_before_the_flush_still_counts(self, admin_client, db_session):
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {'product_events_days': 120})
+        db_session.commit()
 
-    def test_retention_values_are_clamped(self, admin_client):
-        low = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 1}),
-            content_type='application/json',
-        )
-        assert json.loads(low.data)['product_events_days'] == 30
+        summary = admin_client.get('/api/admin/usage?days=7')
 
-        high = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 5000}),
-            content_type='application/json',
-        )
-        assert json.loads(high.data)['product_events_days'] == 180
+        assert json.loads(summary.data)['retention']['live_days'] == 120
+
+    def test_live_window_values_are_clamped(self, admin_client):
+        low = admin_client.patch('/api/admin/usage/retention', json={'live_days': 1})
+        assert json.loads(low.data)['live_days'] == 30
+
+        high = admin_client.patch('/api/admin/usage/retention', json={'live_days': 5000})
+        assert json.loads(high.data)['live_days'] == 180
 
     def test_retention_requires_admin(self, authed_client):
         response = authed_client.patch(
             '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 90}),
+            data=json.dumps({'live_days': 90}),
             content_type='application/json',
         )
         assert response.status_code == 403

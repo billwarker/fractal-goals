@@ -7,14 +7,11 @@ usage. ``services/tracking_plan.json`` is the contract: unknown names are droppe
 and so is any property it doesn't list or whose value has the wrong type.
 """
 import datetime
-import logging
 
 import models
 from models import ProductEvent, utc_now
 from services.service_types import JsonDict, ServiceResult
 from services.tracking_plan import APP_SURFACE, clean_props, event_for
-
-logger = logging.getLogger(__name__)
 
 # Account preference (user.preferences) that turns usage analytics off: the Privacy
 # Policy's right to object. Absent means on.
@@ -22,7 +19,6 @@ USAGE_ANALYTICS_PREFERENCE = "usage_analytics"
 
 MAX_BATCH_SIZE = 20
 MAX_PATH_LENGTH = 255
-DEFAULT_RETENTION_DAYS = 180
 
 
 def _parse_client_ts(raw):
@@ -88,13 +84,3 @@ class TelemetryService:
         if accepted:
             self.db_session.commit()
         return {"accepted": accepted, "rejected": rejected}, None, 202
-
-    def prune(self, older_than_days: int = DEFAULT_RETENTION_DAYS) -> ServiceResult[JsonDict]:
-        older_than_days = max(int(older_than_days), 30)
-        cutoff = utc_now() - datetime.timedelta(days=older_than_days)
-        deleted = self.db_session.query(ProductEvent).filter(
-            ProductEvent.created_at < cutoff,
-        ).delete(synchronize_session=False)
-        self.db_session.commit()
-        logger.info("Pruned %s product events older than %s days", deleted, older_than_days)
-        return {"deleted": int(deleted), "older_than_days": older_than_days}, None, 200

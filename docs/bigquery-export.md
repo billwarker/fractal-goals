@@ -43,6 +43,26 @@ than ten minutes are deferred so thread-delayed event writes are not skipped.
 A crash after a BigQuery load but before the watermark commit can duplicate one
 batch; use the dedupe views below for downstream queries.
 
+**Flush after export.** BigQuery is where analytics history lives; Postgres keeps
+only a live window for the admin dashboard. After `product_events` or `web_events`
+loads, the run deletes that table's Postgres rows that are both older than the live
+window (default 35 days, `ANALYTICS_LIVE_DAYS`; Admin → Usage → "Keep in Postgres after
+export") and at or behind its watermark `(created_at, id)`. A row is never deleted
+before it is in BigQuery, a failed load flushes nothing, and a table that has never
+exported keeps everything. The run reports the counts as `flushed` (and in
+`last_run_flushed`); Admin → Usage → "Flush Exported Events" runs the same flush.
+`event_logs` and the email tables are never flushed: activity history is product data
+kept for the life of the account, and the email records keep their published 24 months.
+If the export stops, `scripts/run_data_retention.py` still enforces the published
+ceilings (180 days for product events, 90 for website events), and the admin storage
+panel warns after 48 hours without a successful run.
+
+Postgres reuses the space deleted rows free rather than returning it, so the database
+size levels off after the first large flush instead of dropping. To reclaim it at
+once, run `VACUUM FULL product_events, web_events;` from the Supabase SQL editor at a
+quiet time (it locks both tables while it runs). Admin → Usage shows the total against
+`DATABASE_STORAGE_QUOTA_MB` (default 500, the Supabase free tier).
+
 ## One-Time Setup
 
 Important: the next deploy will fail at the `Update Analytics Export Job` step

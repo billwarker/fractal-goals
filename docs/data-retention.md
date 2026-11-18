@@ -16,6 +16,13 @@ The job enforces:
 - account erasure after the 30-day grace period;
 - product-event deletion after 180 days;
 - public-site (`web_events`) deletion after 90 days;
+
+(These two are the published ceilings. While the nightly BigQuery export runs, it keeps
+far less in Postgres: it flushes exported events older than the 35-day live window. See
+[BigQuery export](bigquery-export.md#exported-data).)
+
+The job also enforces:
+
 - password-reset record deletion after 30 days;
 - delivery, webhook, and administrative-audit deletion after 730 days;
 - invited or dismissed beta-request deletion after 365 days.

@@ -219,8 +219,8 @@ class AdminUserForcePasswordChangeSchema(BaseModel):
 
 
 class AdminUsageRetentionSchema(BaseModel):
-    """Retention policy for admin telemetry (product_events)."""
-    product_events_days: int = Field(..., ge=1, le=100000)
+    """Days of exported product and web events Postgres keeps (clamped to 30–180)."""
+    live_days: int = Field(..., ge=1, le=100000)
 
 
 class AdminTierQuotaUpdateSchema(BaseModel):

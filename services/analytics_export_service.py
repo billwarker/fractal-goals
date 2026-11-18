@@ -11,10 +11,11 @@ import datetime
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import sqlalchemy as sa
 
+from config import config
 from models import (
     AnalyticsErasure,
     EmailDeliveryEvent,
@@ -27,7 +28,12 @@ from models import (
     format_utc,
     utc_now,
 )
-from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
+from services.app_settings import (
+    ANALYTICS_EXPORT_STATE_KEY,
+    TELEMETRY_RETENTION_KEY,
+    get_app_setting,
+    set_app_setting,
+)
 from google.api_core.exceptions import GoogleAPIError, NotFound
 
 logger = logging.getLogger(__name__)
@@ -52,6 +58,8 @@ class IncrementalTableSpec:
     schema: tuple[tuple[str, str], ...]
     # Loads what a batch's serializer needs in one query (e.g. owners), never per row.
     batch_context: Optional[Callable[[object, list], dict]] = None
+    # Postgres keeps only the live window of these once they are in BigQuery.
+    flush_after_export: bool = False
 
 
 def _format_dt(value):
@@ -321,6 +329,7 @@ INCREMENTAL_TABLES = (
         ProductEvent.created_at,
         _serialize_product_event,
         PRODUCT_EVENTS_SCHEMA,
+        flush_after_export=True,
     ),
     IncrementalTableSpec(
         "event_logs",
@@ -336,6 +345,7 @@ INCREMENTAL_TABLES = (
         WebEvent.created_at,
         _serialize_web_event,
         WEB_EVENTS_SCHEMA,
+        flush_after_export=True,
     ),
     IncrementalTableSpec(
         "email_delivery_events",
@@ -352,6 +362,57 @@ INCREMENTAL_TABLES = (
         EMAIL_WEBHOOK_EVENTS_SCHEMA,
     ),
 )
+
+
+MIN_LIVE_DAYS = 30
+MAX_LIVE_DAYS = config.PRODUCT_EVENT_RETENTION_DAYS
+
+
+def analytics_live_days(db_session) -> int:
+    """Days of exported analytics Postgres keeps for the admin dashboard (admin-set)."""
+    stored = get_app_setting(db_session, TELEMETRY_RETENTION_KEY, {}) or {}
+    if not isinstance(stored, dict):
+        stored = {}
+    # `product_events_days` is the setting's name before the flush existed.
+    raw = stored.get("live_days", stored.get("product_events_days", config.ANALYTICS_LIVE_DAYS))
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        days = config.ANALYTICS_LIVE_DAYS
+    return max(MIN_LIVE_DAYS, min(MAX_LIVE_DAYS, days))
+
+
+def _flush_table(db_session, spec: IncrementalTableSpec, table_state, live_cutoff) -> int:
+    """Delete rows older than the live window that the export has already loaded."""
+    cursor_ts = _parse_dt(table_state.get("last_ts"))
+    cursor_id = table_state.get("last_id")
+    if cursor_ts is None or not cursor_id:
+        return 0
+    model: Any = spec.model
+    column: Any = spec.cursor_column
+    exported = sa.or_(column < cursor_ts, sa.and_(column == cursor_ts, model.id <= cursor_id))
+    result = db_session.execute(sa.delete(model).where(column < _db_datetime(live_cutoff), exported))
+    return int(result.rowcount or 0)
+
+
+def flush_exported(db_session, now=None, live_days=None) -> dict[str, int]:
+    """Clear exported analytics older than the live window out of Postgres.
+
+    Only rows at or behind each table's export watermark go, so nothing leaves
+    Postgres before it is in BigQuery, and a table that never exported keeps everything.
+    """
+    now = now or utc_now()
+    live_days = analytics_live_days(db_session) if live_days is None else live_days
+    live_cutoff = now - datetime.timedelta(days=live_days)
+    state = get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {}) or {}
+    tables = state.get("tables", {}) if isinstance(state, dict) else {}
+    counts = {
+        spec.table: _flush_table(db_session, spec, tables.get(spec.table, {}), live_cutoff)
+        for spec in INCREMENTAL_TABLES
+        if spec.flush_after_export
+    }
+    db_session.commit()
+    return counts
 
 
 # Append-only warehouse tables and the column holding an account id.
@@ -381,8 +442,10 @@ class AnalyticsExportService:
     def run_export(self, now=None):
         now = now or utc_now()
         cutoff = now - EXPORT_LAG
+        live_cutoff = now - datetime.timedelta(days=analytics_live_days(self.db_session))
         state = self._state()
         run_counts = {}
+        flushed = {}
         self._emit(
             f"Analytics export starting dataset={self.dataset} "
             f"batch_size={self.batch_size} cutoff={_format_dt(cutoff)}"
@@ -393,7 +456,12 @@ class AnalyticsExportService:
                 self._emit(f"Exporting incremental table {spec.table}")
                 run_counts[spec.table] = self._export_incremental_table(spec, state, cutoff)
                 self._prune_warehouse_table(spec.table, spec.cursor_column.key)
-                self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]}")
+                if spec.flush_after_export:
+                    flushed[spec.table] = _flush_table(
+                        self.db_session, spec, state["tables"][spec.table], live_cutoff,
+                    )
+                    self.db_session.commit()
+                self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]} flushed={flushed.get(spec.table, 0)}")
 
             run_counts["erasures"] = self._apply_erasures()
             self._emit("Exporting users dimension")
@@ -402,15 +470,18 @@ class AnalyticsExportService:
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "success"
             state["last_run_rows"] = run_counts
+            state["last_run_flushed"] = flushed
+            state["last_success_at"] = _format_dt(now)
             state.pop("failed_table", None)
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
             self._emit(f"Analytics export completed rows={run_counts}")
-            return {"status": "success", "rows": run_counts, "state": state}
+            return {"status": "success", "rows": run_counts, "flushed": flushed, "state": state}
         except Exception as exc:
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "failed"
             state["last_run_rows"] = run_counts
+            state["last_run_flushed"] = flushed
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
             self._emit(f"Analytics export failed after rows={run_counts}: {exc}")

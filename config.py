@@ -136,6 +136,11 @@ class Config:
     EMAIL_EVENT_RETENTION_DAYS = 730
     ADMIN_AUDIT_RETENTION_DAYS = 730
     BETA_SIGNUP_CLOSED_RETENTION_DAYS = 365
+    # Once the nightly export has loaded them, product and web events older than this
+    # leave Postgres (admin-adjustable); the retention ceilings above still apply.
+    ANALYTICS_LIVE_DAYS = 35
+    # The managed database's storage allowance (Supabase free tier: 500 MB).
+    DATABASE_STORAGE_QUOTA_MB = int(os.getenv('DATABASE_STORAGE_QUOTA_MB', '500'))
 
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
