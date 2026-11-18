@@ -8,7 +8,6 @@ import FlowTreeOptionsPane from '../components/flowTree/FlowTreeOptionsPane';
 import { useGoals } from '../contexts/GoalsContext';
 import { useDebug } from '../contexts/DebugContext';
 import { useAuth } from '../contexts/AuthContext';
-import { authApi } from '../utils/api';
 import { applySequenceDraft, buildTreeMaps, getLineagePath, getSequencingScope } from '../components/flowTree/flowTreeTreeUtils';
 import { useActivities as useActivitiesQuery, useActivityGroups } from '../hooks/useActivityQueries';
 import { useFractalTree } from '../hooks/useGoalQueries';
@@ -26,7 +25,7 @@ import {
     shouldIgnoreTypeToZoomKey,
 } from '../utils/typeToZoomInput';
 import { usePrograms } from '../hooks/useProgramQueries';
-import { useFlowTreePreferences } from '../hooks/useFlowTreePreferences';
+import { useAccountFlowTreeView, useFlowTreePreferences } from '../hooks/useFlowTreePreferences';
 import { removeLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { FEATURE_FLAGS, isFeatureEnabled, useFeatureFlags } from '../hooks/useFeatureFlags';
@@ -65,19 +64,8 @@ function FractalGoals() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-    const { user, setUser } = useAuth();
-    // Synced so a published demo opens with these filters; the demo's guest has no account.
-    const accountUserId = user && !user.isDemo ? user.id : null;
-    const saveAccountView = useCallback((viewRootId, view) => {
-        if (!accountUserId) return;
-        authApi.updatePreferences({ preferences: { flowtree_views: { [viewRootId]: view } } })
-            .then((response) => {
-                if (response?.data?.id === accountUserId) setUser?.(response.data);
-            })
-            .catch(() => {
-                // This device keeps the view; the account catches up on the next change.
-            });
-    }, [accountUserId, setUser]);
+    const { user } = useAuth();
+    const accountFlowTreeView = useAccountFlowTreeView(rootId);
     const { timezone } = useTimezone();
     const {
         createGoal,
@@ -113,8 +101,7 @@ function FractalGoals() {
         rootId,
         userId: user?.id,
         defaultGoalsViewMode: getIsMobileViewport() ? 'hierarchy' : 'tree',
-        accountView: user?.preferences?.flowtree_views?.[rootId] || null,
-        saveAccountView,
+        ...accountFlowTreeView,
     });
     const { programs = EMPTY_ARRAY, isLoading: programsLoading } = usePrograms(rootId, timezone || 'UTC');
     const loading = goalsLoading || activitiesLoading || activityGroupsLoading || evidenceLoading;

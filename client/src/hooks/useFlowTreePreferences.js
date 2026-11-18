@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAuth } from '../contexts/AuthContext';
+import { authApi } from '../utils/api';
 import {
     readLocalStorageValue,
     writeLocalStorageValue,
@@ -44,6 +46,26 @@ function sameAccountView(left, right) {
     const normalized = normalizeStoredPreferences(right);
     if (!normalized) return false;
     return JSON.stringify(left) === JSON.stringify(toAccountView(normalized.viewSettings, normalized.scopedProgramId));
+}
+
+/**
+ * The account's copy of one fractal's view and a saver for it, for useFlowTreePreferences.
+ * Synced so a published demo opens with these filters; the demo's guest has no account to save to.
+ */
+export function useAccountFlowTreeView(rootId) {
+    const { user, setUser } = useAuth();
+    const accountUserId = user && !user.isDemo ? user.id : null;
+    const saveAccountView = useCallback((viewRootId, view) => {
+        if (!accountUserId) return;
+        authApi.updatePreferences({ preferences: { flowtree_views: { [viewRootId]: view } } })
+            .then((response) => {
+                if (response?.data?.id === accountUserId) setUser?.(response.data);
+            })
+            .catch(() => {
+                // This device keeps the view; the account catches up on the next change.
+            });
+    }, [accountUserId, setUser]);
+    return { accountView: user?.preferences?.flowtree_views?.[rootId] || null, saveAccountView };
 }
 
 /**
