@@ -12,6 +12,8 @@ import { globalApi, publicApi } from '../utils/api';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import { demoIconProps, demoRootName, sortDemoExamples } from '../demo/demoExamples';
 import { getAppHref } from '../utils/marketingHost';
+import { trackPublicEvent } from '../utils/publicTelemetry';
+import { withAttribution } from '../utils/visitAttribution';
 import styles from './Landing.module.css';
 
 // The tree preview (and React Flow with it) loads only where it is shown: on desktop.
@@ -74,7 +76,12 @@ function Landing() {
     // Wake the API while the visitor reads, so the demo opens on a warm server.
     useEffect(() => {
         globalApi.probeHealth().catch(() => {});
+        trackPublicEvent('landing_view');
     }, []);
+    const openWaitlist = () => {
+        trackPublicEvent('waitlist_opened', { source: 'landing' });
+        setIsWaitlistOpen(true);
+    };
     const warmDemo = () => {
         if (warmedRef.current) return;
         warmedRef.current = true;
@@ -130,7 +137,7 @@ function Landing() {
                                         <li key={example.id}>
                                             <a
                                                 className={styles.example}
-                                                href={demoHref(example.id)}
+                                                href={withAttribution(demoHref(example.id))}
                                                 aria-label={`${example.label}: ${example.root}. Open the live demo`}
                                                 onMouseEnter={preview}
                                                 onFocus={preview}
@@ -152,7 +159,7 @@ function Landing() {
                         <button
                             type="button"
                             className={hasDemo ? styles.waitlistLink : styles.waitlistButton}
-                            onClick={() => setIsWaitlistOpen(true)}
+                            onClick={openWaitlist}
                         >
                             {hasDemo ? landingContent.demo.waitlistLabel : landingContent.betaForm.submitLabel}
                         </button>
@@ -164,7 +171,7 @@ function Landing() {
                             <Suspense fallback={null}>
                                 <LandingTreePreview
                                     example={treeExample}
-                                    goalHref={(goalId) => demoGoalHref(treeExample.id, goalId)}
+                                    goalHref={(goalId) => withAttribution(demoGoalHref(treeExample.id, goalId))}
                                     onOpen={warmDemo}
                                 />
                             </Suspense>
@@ -180,7 +187,7 @@ function Landing() {
                 </nav>
             </footer>
 
-            {isWaitlistOpen && <DemoSignupModal isOpen onClose={() => setIsWaitlistOpen(false)} />}
+            {isWaitlistOpen && <DemoSignupModal isOpen source="landing" onClose={() => setIsWaitlistOpen(false)} />}
         </main>
     );
 }

@@ -9,7 +9,9 @@ from services.ops_log import log_ops_event
 from services.public_service import PublicService
 from services.demo_access_service import DemoAccessService
 from services.email_service import EmailService, EmailWebhookVerificationError
-from validators import BetaSignupRequestSchema, validate_request
+from services.telemetry_service import privacy_signal_present
+from services.web_telemetry_service import WebTelemetryService
+from validators import BetaSignupRequestSchema, PublicTelemetryEventsSchema, validate_request
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +73,32 @@ def create_beta_signup(validated_data):
     except SQLAlchemyError:
         db_session.rollback()
         return internal_error(logger, "Error creating beta signup request")
+    finally:
+        db_session.close()
+
+
+@public_bp.route('/telemetry', methods=['POST'])
+@limiter.limit("30 per minute")
+@validate_request(PublicTelemetryEventsSchema)
+def record_public_telemetry(validated_data):
+    """Anonymous landing, demo and waitlist events (services/web_telemetry_service.py)."""
+    if privacy_signal_present(request.headers):
+        return jsonify({"accepted": 0, "rejected": []}), 202
+    db_session = get_db_session()
+    try:
+        payload, error, status = WebTelemetryService(db_session).record_events(
+            validated_data['events'],
+            validated_data.get('context'),
+            client_ip=request.remote_addr or '',
+            user_agent=request.headers.get('User-Agent', ''),
+            host=request.host,
+        )
+        if error:
+            return jsonify({"error": error}), status
+        return jsonify(payload), status
+    except SQLAlchemyError:
+        db_session.rollback()
+        return internal_error(logger, "Error recording public telemetry")
     finally:
         db_session.close()
 

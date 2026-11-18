@@ -11,6 +11,7 @@ from models import (
     PasswordResetToken,
     ProductEvent,
     User,
+    WebEvent,
 )
 from services.data_retention_service import DataRetentionService
 
@@ -28,6 +29,11 @@ def test_prune_enforces_each_published_live_database_window(db_session):
     db_session.add_all([
         ProductEvent(user_id=user.id, event_name='page_view', created_at=old),
         ProductEvent(user_id=user.id, event_name='page_view', created_at=recent),
+        # Public site events keep 90 days: the 91st day goes, the 89th stays.
+        WebEvent(event_name='landing_view', schema_version=1, visitor_day_hash='a' * 64,
+                 created_at=now - datetime.timedelta(days=91)),
+        WebEvent(event_name='landing_view', schema_version=1, visitor_day_hash='b' * 64,
+                 created_at=now - datetime.timedelta(days=89)),
         PasswordResetToken(
             user_id=user.id,
             token_hash='a' * 64,
@@ -61,6 +67,7 @@ def test_prune_enforces_each_published_live_database_window(db_session):
 
     assert counts == {
         'product_events': 1,
+        'web_events': 1,
         'password_reset_tokens': 1,
         'email_delivery_events': 1,
         'email_webhook_events': 1,

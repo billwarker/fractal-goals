@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from config import config
 from models import (
+    AnalyticsErasure,
     ActivityDefinition,
     ActivityGroup,
     ActivityInstance,
@@ -136,6 +137,30 @@ def test_admin_can_create_and_revoke_invite_key(admin_client):
 
 
 @pytest.mark.integration
+def test_signup_without_a_waitlist_request_is_attributed_to_the_invite(client, admin_client, db_session):
+    invite_response = admin_client.post(
+        '/api/admin/invite-keys',
+        data=json.dumps({'label': 'Direct', 'email': 'direct@example.com'}),
+        content_type='application/json',
+    )
+    response = client.post(
+        '/api/auth/signup',
+        data=json.dumps({
+            'username': 'direct',
+            'email': 'direct@example.com',
+            'password': 'Password123',
+            'invite_key': json.loads(invite_response.data)['key'],
+            'accepted_terms': True,
+            'terms_version': config.TERMS_VERSION,
+            'privacy_version': config.PRIVACY_VERSION,
+        }),
+        content_type='application/json',
+    )
+
+    assert response.status_code == 201
+    assert db_session.query(User).filter_by(username='direct').one().acquisition_source == 'invite'
+
+
 def test_signup_requires_and_consumes_invite_key(client, admin_client):
     missing_response = client.post(
         '/api/auth/signup',
@@ -310,6 +335,8 @@ def test_admin_can_hard_delete_user_and_owned_roots(admin_client, db_session, te
     db_session.expire_all()
     assert db_session.get(User, user_id) is None
     assert db_session.get(Goal, root_id) is None
+    # Queued so the next analytics export deletes the account's warehouse rows.
+    assert db_session.get(AnalyticsErasure, user_id) is not None
 
 
 @pytest.fixture
@@ -1267,6 +1294,8 @@ def test_beta_signup_invite_key_is_bound_to_signup_email(admin_client, client, d
     assert correct_email_response.status_code == 201
     created_user = db_session.query(User).filter_by(username='right-email').one()
     assert created_user.email == target.email
+    # Where the waitlist request came from follows the person onto their account.
+    assert created_user.acquisition_source == target.source
 
 
 @pytest.mark.integration

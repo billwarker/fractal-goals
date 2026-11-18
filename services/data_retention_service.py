@@ -18,6 +18,7 @@ from models import (
     EmailWebhookEvent,
     PasswordResetToken,
     ProductEvent,
+    WebEvent,
     utc_now,
 )
 from services.app_settings import TELEMETRY_RETENTION_KEY, get_app_setting
@@ -47,6 +48,7 @@ class DataRetentionService:
         )
         cutoffs = {
             "product_events": now - datetime.timedelta(days=product_event_days),
+            "web_events": now - datetime.timedelta(days=config.WEB_EVENT_RETENTION_DAYS),
             "password_reset_tokens": now - datetime.timedelta(days=config.PASSWORD_RESET_RECORD_RETENTION_DAYS),
             "email_events": now - datetime.timedelta(days=config.EMAIL_EVENT_RETENTION_DAYS),
             "admin_audits": now - datetime.timedelta(days=config.ADMIN_AUDIT_RETENTION_DAYS),
@@ -57,6 +59,7 @@ class DataRetentionService:
 
         counts = {
             "product_events": self._delete(ProductEvent, ProductEvent.created_at < cutoffs["product_events"]),
+            "web_events": self._delete(WebEvent, WebEvent.created_at < cutoffs["web_events"]),
             "password_reset_tokens": self._delete(
                 PasswordResetToken,
                 PasswordResetToken.created_at < cutoffs["password_reset_tokens"],

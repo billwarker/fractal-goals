@@ -7,6 +7,7 @@ import DateRangeFilter from '../common/DateRangeFilter';
 import LoadingState from '../common/LoadingState';
 import DauBarChart from './DauBarChart';
 import EventsBreakdownTable from './EventsBreakdownTable';
+import GrowthPanel from './GrowthPanel';
 import UsageStoragePanel from './UsageStoragePanel';
 import styles from '../../pages/Admin.module.css';
 
@@ -51,6 +52,9 @@ export default function UsagePanel({ enabled }) {
 
             {data && (
                 <>
+                    <GrowthPanel growth={data.growth} windowStart={data.window?.start} windowEnd={data.window?.end} />
+
+                    <h3>Signed-in usage</h3>
                     <div className={styles.summaryGrid}>
                         <div className={styles.summaryCard}>
                             <span>Active last 7 days</span>

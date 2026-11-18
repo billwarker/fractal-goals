@@ -129,3 +129,57 @@ describe('telemetry queue', () => {
         expect(__telemetryTestHooks.getQueue().length).toBeLessThanOrEqual(40);
     });
 });
+
+describe('telemetry context and privacy signals', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        recordEvents.mockResolvedValue({ data: { accepted: 1, rejected: [] } });
+        __telemetryTestHooks.reset();
+        online.value = true;
+    });
+
+    afterEach(() => {
+        __telemetryTestHooks.reset();
+        vi.unstubAllGlobals();
+    });
+
+    it('sends the visit and app version once per batch', async () => {
+        setTelemetryEnabled(true);
+        trackEvent('settings_opened');
+        trackEvent('onboarding_started');
+
+        await __telemetryTestHooks.flush();
+
+        const [payload, options] = recordEvents.mock.calls[0];
+        expect(payload.context.visit_id).toMatch(/^[0-9a-f-]{36}$/);
+        expect(payload.context.app_version).toBeTruthy();
+        expect(payload.events.every((event) => !('visit_id' in event))).toBe(true);
+        expect(options).toEqual({ keepalive: false });
+    });
+
+    it('keeps one visit while events keep coming and starts a new one after 30 idle minutes', () => {
+        const start = 1_000_000;
+        const first = __telemetryTestHooks.currentVisitId(start);
+        expect(__telemetryTestHooks.currentVisitId(start + 29 * 60 * 1000)).toBe(first);
+        expect(__telemetryTestHooks.currentVisitId(start + 29 * 60 * 1000 + 30 * 60 * 1000)).toBe(first);
+        expect(__telemetryTestHooks.currentVisitId(start + 120 * 60 * 1000)).not.toBe(first);
+    });
+
+    it('sends the last events with keepalive when the page goes away', async () => {
+        setTelemetryEnabled(true);
+        trackEvent('settings_opened');
+
+        window.dispatchEvent(new Event('pagehide'));
+        await Promise.resolve();
+
+        expect(recordEvents).toHaveBeenCalledWith(expect.objectContaining({ events: expect.any(Array) }), { keepalive: true });
+    });
+
+    it('stays off while the browser sends Global Privacy Control', () => {
+        vi.stubGlobal('navigator', { ...navigator, globalPrivacyControl: true });
+        setTelemetryEnabled(true);
+        trackEvent('settings_opened');
+
+        expect(__telemetryTestHooks.getQueue()).toHaveLength(0);
+    });
+});

@@ -23,6 +23,7 @@ from models import (
     Goal,
     ProductEvent,
     User,
+    WebEvent,
     format_utc,
     utc_now,
 )
@@ -36,6 +37,7 @@ from services.events import Events
 from services.service_types import JsonDict, ServiceResult
 from services.telemetry_service import DEFAULT_RETENTION_DAYS, TelemetryService
 from services.demo_account_service import DEMO_ACCOUNT_ROLE
+from services.growth_metrics_service import GrowthMetricsService
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
@@ -57,6 +59,7 @@ PER_USER_DOMAIN_COUNTS = {
 # from request input.
 STORAGE_STAT_TABLES = (
     ("product_events", ProductEvent, ProductEvent.created_at),
+    ("web_events", WebEvent, WebEvent.created_at),
     ("event_logs", EventLog, EventLog.timestamp),
     ("email_delivery_events", EmailDeliveryEvent, EmailDeliveryEvent.created_at),
 )
@@ -101,6 +104,9 @@ class AdminUsageService:
             "events_breakdown": self._events_breakdown(window_start, window_end),
             "top_events": self._top_events(window_start, window_end),
             "top_pages": self._top_pages(window_start, window_end),
+            "growth": GrowthMetricsService(self.db_session).summary(
+                window_start, window_end, start_date, end_date, now,
+            ),
             "email_health": self._email_health(window_start, window_end),
             "storage": self._storage_stats(),
             "retention": self._retention_settings(),

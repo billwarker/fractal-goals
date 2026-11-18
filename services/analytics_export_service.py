@@ -11,13 +11,24 @@ import datetime
 import json
 import logging
 from dataclasses import dataclass
-from typing import Callable
+from typing import Callable, Optional
 
 import sqlalchemy as sa
 
-from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, ProductEvent, User, format_utc, utc_now
+from models import (
+    AnalyticsErasure,
+    EmailDeliveryEvent,
+    EmailWebhookEvent,
+    EventLog,
+    Goal,
+    ProductEvent,
+    User,
+    WebEvent,
+    format_utc,
+    utc_now,
+)
 from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
-from google.api_core.exceptions import GoogleAPIError
+from google.api_core.exceptions import GoogleAPIError, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +48,10 @@ class IncrementalTableSpec:
     table: str
     model: object
     cursor_column: object
-    serializer: Callable[[object], dict]
+    serializer: Callable[..., dict]  # (row, batch context) -> warehouse row
     schema: tuple[tuple[str, str], ...]
+    # Loads what a batch's serializer needs in one query (e.g. owners), never per row.
+    batch_context: Optional[Callable[[object, list], dict]] = None
 
 
 def _format_dt(value):
@@ -96,6 +109,24 @@ PRODUCT_EVENTS_SCHEMA = (
     ("properties_json", "STRING"),
     ("client_ts", "TIMESTAMP"),
     ("created_at", "TIMESTAMP"),
+    ("schema_version", "INTEGER"),
+    ("visit_id", "STRING"),
+    ("surface", "STRING"),
+    ("app_version", "STRING"),
+)
+
+WEB_EVENTS_SCHEMA = (
+    ("id", "STRING"),
+    ("event_name", "STRING"),
+    ("schema_version", "INTEGER"),
+    ("path", "STRING"),
+    ("properties_json", "STRING"),
+    ("visitor_day_hash", "STRING"),
+    ("referrer_host", "STRING"),
+    ("utm_source", "STRING"),
+    ("utm_medium", "STRING"),
+    ("utm_campaign", "STRING"),
+    ("created_at", "TIMESTAMP"),
 )
 
 EVENT_LOGS_SCHEMA = (
@@ -108,6 +139,7 @@ EVENT_LOGS_SCHEMA = (
     ("payload_json", "STRING"),
     ("source", "STRING"),
     ("timestamp", "TIMESTAMP"),
+    ("owner_user_id", "STRING"),
 )
 
 EMAIL_DELIVERY_EVENTS_SCHEMA = (
@@ -148,6 +180,7 @@ USERS_SCHEMA = (
     ("membership_tier", "STRING"),
     ("created_at", "TIMESTAMP"),
     ("last_login_at", "TIMESTAMP"),
+    ("acquisition_source", "STRING"),
 )
 
 
@@ -160,10 +193,15 @@ ANALYTICS_RETENTION_DAYS = 730
 def _load_job_config(write_disposition, schema):
     if bigquery is None:
         return {"write_disposition": write_disposition, "schema": list(schema)}
+    # Appends may add the columns a newer schema lists to a table created before them.
+    schema_updates = (
+        [bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION] if write_disposition == "WRITE_APPEND" else None
+    )
     return bigquery.LoadJobConfig(
         write_disposition=write_disposition,
         create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
         schema=[bigquery.SchemaField(name, field_type) for name, field_type in schema],
+        schema_update_options=schema_updates,
     )
 
 
@@ -171,7 +209,7 @@ def _table_ref(dataset: str, table: str) -> str:
     return f"{dataset}.{table}"
 
 
-def _serialize_product_event(row: ProductEvent) -> dict:
+def _serialize_product_event(row: ProductEvent, context=None) -> dict:
     return {
         "id": row.id,
         "user_id": row.user_id,
@@ -181,10 +219,37 @@ def _serialize_product_event(row: ProductEvent) -> dict:
         "properties_json": _json_value(row.properties),
         "client_ts": _format_dt(row.client_ts),
         "created_at": _format_dt(row.created_at),
+        "schema_version": row.schema_version,
+        "visit_id": row.visit_id,
+        "surface": row.surface,
+        "app_version": row.app_version,
     }
 
 
-def _serialize_event_log(row: EventLog) -> dict:
+def _serialize_web_event(row: WebEvent, context=None) -> dict:
+    return {
+        "id": row.id,
+        "event_name": row.event_name,
+        "schema_version": row.schema_version,
+        "path": row.path,
+        "properties_json": _json_value(row.properties),
+        "visitor_day_hash": row.visitor_day_hash,
+        "referrer_host": row.referrer_host,
+        "utm_source": row.utm_source,
+        "utm_medium": row.utm_medium,
+        "utm_campaign": row.utm_campaign,
+        "created_at": _format_dt(row.created_at),
+    }
+
+
+def _event_log_owners(db_session, rows) -> dict:
+    """Each root's owner, so warehouse activity history is attributable to an account."""
+    root_ids = {row.root_id for row in rows}
+    owners = db_session.query(Goal.id, Goal.owner_id).filter(Goal.id.in_(root_ids)).all()
+    return {"owners": {root_id: owner_id for root_id, owner_id in owners}}
+
+
+def _serialize_event_log(row: EventLog, context=None) -> dict:
     return {
         "id": row.id,
         "root_id": row.root_id,
@@ -198,10 +263,11 @@ def _serialize_event_log(row: EventLog) -> dict:
         "payload_json": None,
         "source": row.source,
         "timestamp": _format_dt(row.timestamp),
+        "owner_user_id": (context or {}).get("owners", {}).get(row.root_id),
     }
 
 
-def _serialize_email_delivery_event(row: EmailDeliveryEvent) -> dict:
+def _serialize_email_delivery_event(row: EmailDeliveryEvent, context=None) -> dict:
     return {
         "id": row.id,
         "provider": row.provider,
@@ -222,7 +288,7 @@ def _serialize_email_delivery_event(row: EmailDeliveryEvent) -> dict:
     }
 
 
-def _serialize_email_webhook_event(row: EmailWebhookEvent) -> dict:
+def _serialize_email_webhook_event(row: EmailWebhookEvent, context=None) -> dict:
     return {
         "id": row.id,
         "provider": row.provider,
@@ -244,6 +310,7 @@ def _serialize_user(row: User) -> dict:
         "membership_tier": row.membership_tier,
         "created_at": _format_dt(row.created_at),
         "last_login_at": _format_dt(row.last_login_at),
+        "acquisition_source": row.acquisition_source,
     }
 
 
@@ -261,6 +328,14 @@ INCREMENTAL_TABLES = (
         EventLog.timestamp,
         _serialize_event_log,
         EVENT_LOGS_SCHEMA,
+        _event_log_owners,
+    ),
+    IncrementalTableSpec(
+        "web_events",
+        WebEvent,
+        WebEvent.created_at,
+        _serialize_web_event,
+        WEB_EVENTS_SCHEMA,
     ),
     IncrementalTableSpec(
         "email_delivery_events",
@@ -276,6 +351,14 @@ INCREMENTAL_TABLES = (
         _serialize_email_webhook_event,
         EMAIL_WEBHOOK_EVENTS_SCHEMA,
     ),
+)
+
+
+# Append-only warehouse tables and the column holding an account id.
+ERASURE_COLUMNS = (
+    ("product_events", "user_id"),
+    ("event_logs", "owner_user_id"),
+    ("email_delivery_events", "recipient_user_id"),
 )
 
 
@@ -312,6 +395,7 @@ class AnalyticsExportService:
                 self._prune_warehouse_table(spec.table, spec.cursor_column.key)
                 self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]}")
 
+            run_counts["erasures"] = self._apply_erasures()
             self._emit("Exporting users dimension")
             run_counts["users"] = self._export_users()
             self._emit(f"Finished users: rows={run_counts['users']}")
@@ -349,7 +433,8 @@ class AnalyticsExportService:
                 break
 
             self._assert_batch_advances_cursor(spec, table_state, rows)
-            payload = [spec.serializer(row) for row in rows]
+            context = spec.batch_context(self.db_session, rows) if spec.batch_context else {}
+            payload = [spec.serializer(row, context) for row in rows]
             self._emit(
                 f"Loading {len(payload)} rows to {spec.table} "
                 f"first_id={rows[0].id} last_id={rows[-1].id}"
@@ -393,6 +478,41 @@ class AnalyticsExportService:
                 f"Analytics export cursor failed to advance for {spec.table}: "
                 f"cursor={cursor_tuple} first_row={first_tuple}"
             )
+
+    def _apply_erasures(self):
+        """Delete permanently deleted accounts' rows from the warehouse, then forget the ids.
+
+        The users dimension is rewritten every run; these are the append-only tables that
+        still hold the id. A failed delete raises, leaving the queue for the next run.
+        """
+        user_ids = [row.user_id for row in self.db_session.query(AnalyticsErasure.user_id).all()]
+        if not user_ids:
+            return 0
+        if bigquery is not None:
+            for table, column in ERASURE_COLUMNS:
+                # Rows written before a table had the column hold no id, so there is nothing to erase there.
+                if not self._warehouse_column_exists(table, column):
+                    continue
+                job = self.bq_client.query(
+                    f"DELETE FROM `{_table_ref(self.dataset, table)}` WHERE `{column}` IN UNNEST(@user_ids)",
+                    job_config=bigquery.QueryJobConfig(query_parameters=[
+                        bigquery.ArrayQueryParameter("user_ids", "STRING", user_ids),
+                    ]),
+                )
+                job.result()
+        self.db_session.query(AnalyticsErasure).filter(
+            AnalyticsErasure.user_id.in_(user_ids),
+        ).delete(synchronize_session=False)
+        self.db_session.commit()
+        self._emit(f"Erased warehouse rows for {len(user_ids)} deleted accounts")
+        return len(user_ids)
+
+    def _warehouse_column_exists(self, table, column):
+        try:
+            bq_table = self.bq_client.get_table(_table_ref(self.dataset, table))
+        except NotFound:
+            return False
+        return any(getattr(field, "name", None) == column for field in (getattr(bq_table, "schema", None) or ()))
 
     def _export_users(self):
         rows = self.db_session.query(User).order_by(User.id.asc()).all()

@@ -111,6 +111,8 @@ class BetaSignupRequestSchema(BaseModel):
     email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     use_case: Optional[str] = Field(None, min_length=2, max_length=280)
     note: Optional[str] = Field(None, max_length=1000)
+    # Where the visitor came from ('utm:<source>', 'demo', 'landing'); kept on first request.
+    source: Optional[str] = Field(None, max_length=80, pattern=r'^[a-z0-9_.:-]+$')
 
     @field_validator('name', 'use_case')
     @classmethod

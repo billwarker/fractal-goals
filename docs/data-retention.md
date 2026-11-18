@@ -15,6 +15,7 @@ The job enforces:
 
 - account erasure after the 30-day grace period;
 - product-event deletion after 180 days;
+- public-site (`web_events`) deletion after 90 days;
 - password-reset record deletion after 30 days;
 - delivery, webhook, and administrative-audit deletion after 730 days;
 - invited or dismissed beta-request deletion after 365 days.

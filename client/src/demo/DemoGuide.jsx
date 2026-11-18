@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import GoalIcon from '../components/atoms/GoalIcon';
 import ThemeToggleButton from '../components/common/ThemeToggleButton';
 import { readLocalStorageValue, writeLocalStorageValue } from '../utils/localPreferences';
+import { trackPublicEvent } from '../utils/publicTelemetry';
 import { demoIconProps, demoRootName } from './demoExamples';
 import { buildTourSteps } from './demoTour';
 import Spotlight from './Spotlight';
@@ -20,6 +21,7 @@ const readStep = () => {
 /**
  * The demo's walkthrough: the onboarding card, repurposed. It steps through the real app
  * on the chosen example, switches examples in place, and keeps sign-up one tap away.
+ * `onSignup(source)` says which button asked: `demo_tour_end` (the last step) or `demo_guide`.
  */
 export default function DemoGuide({ examples, onSignup, onExit }) {
     const location = useLocation();
@@ -34,9 +36,19 @@ export default function DemoGuide({ examples, onSignup, onExit }) {
     const activeExample = examples.find((example) => example.root_id === rootId) || examples[0] || null;
     const steps = useMemo(() => buildTourSteps(activeExample), [activeExample]);
     const step = steps[Math.min(stepIndex, steps.length - 1)];
+    const tourCompleted = useRef(false);
+    const reachedLastStep = steps.length > 0 && stepIndex >= steps.length - 1;
 
     useEffect(() => writeLocalStorageValue(STEP_KEY, String(stepIndex)), [stepIndex]);
     useEffect(() => writeLocalStorageValue(COLLAPSED_KEY, String(collapsed)), [collapsed]);
+
+    // Once per demo visit: the tour reached its last step.
+    useEffect(() => {
+        if (!reachedLastStep || tourCompleted.current || !activeExample) return;
+        tourCompleted.current = true;
+        const position = examples.indexOf(activeExample);
+        trackPublicEvent('demo_tour_completed', { example_position: position >= 0 ? position : null });
+    }, [activeExample, examples, reachedLastStep]);
 
     // `?tour=1` (from the landing page) starts at the top; drop it so a reload resumes instead.
     useEffect(() => {
@@ -86,7 +98,7 @@ export default function DemoGuide({ examples, onSignup, onExit }) {
                     <span className={styles.eyebrow}>Live demo</span>
                     <span className={styles.pillStep}>{step.title}</span>
                 </button>
-                <button type="button" className={styles.signupSmall} onClick={onSignup}>Sign up</button>
+                <button type="button" className={styles.signupSmall} onClick={() => onSignup('demo_guide')}>Sign up</button>
             </div>,
             document.body,
         );
@@ -144,7 +156,7 @@ export default function DemoGuide({ examples, onSignup, onExit }) {
                             Back
                         </button>
                         {isLast ? (
-                            <button type="button" className={styles.primary} onClick={onSignup}>Sign up</button>
+                            <button type="button" className={styles.primary} onClick={() => onSignup('demo_tour_end')}>Sign up</button>
                         ) : (
                             <button type="button" className={styles.primary} onClick={() => goTo(stepIndex + 1)}>Next</button>
                         )}
@@ -153,7 +165,7 @@ export default function DemoGuide({ examples, onSignup, onExit }) {
 
                 <footer className={styles.footer}>
                     {!isLast && (
-                        <button type="button" className={styles.link} onClick={onSignup}>Sign up to build your own</button>
+                        <button type="button" className={styles.link} onClick={() => onSignup('demo_guide')}>Sign up to build your own</button>
                     )}
                     <button type="button" className={styles.link} onClick={onExit}>Exit demo</button>
                 </footer>

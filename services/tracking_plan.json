@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "prop_types": {
+    "int": "A whole number between min and max.",
+    "bool": "true or false.",
+    "enum": "One of the listed values.",
+    "code": "A program identifier (letters, digits, _ . : -; at most 64 characters), never text a person typed."
+  },
+  "events": [
+    {
+      "name": "page_view",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "A page in the app was opened. The address is de-identified in the browser.",
+      "props": {}
+    },
+    {
+      "name": "settings_opened",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "Settings was opened.",
+      "props": {}
+    },
+    {
+      "name": "onboarding_started",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "The Getting Started checklist was shown for the first time.",
+      "props": {}
+    },
+    {
+      "name": "onboarding_step_completed",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "A Getting Started step was completed.",
+      "props": {"step_id": {"type": "code"}}
+    },
+    {
+      "name": "onboarding_completed",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "Every Getting Started step was completed.",
+      "props": {}
+    },
+    {
+      "name": "onboarding_dismissed",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "usage",
+      "description": "The Getting Started checklist was dismissed.",
+      "props": {}
+    },
+    {
+      "name": "offline_sync_drained",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "Changes saved on the device finished syncing.",
+      "props": {
+        "ops": {"type": "int", "min": 0, "max": 100000},
+        "max_age_s": {"type": "int", "min": 0, "max": 31536000},
+        "retries": {"type": "int", "min": 0, "max": 100000}
+      }
+    },
+    {
+      "name": "offline_op_rejected",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "The server refused a change saved on the device.",
+      "props": {
+        "kind": {"type": "code"},
+        "status": {"type": "int", "min": 0, "max": 999, "nullable": true},
+        "code": {"type": "code", "nullable": true}
+      }
+    },
+    {
+      "name": "offline_boot",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "The app started without a connection, and how long until it reconnected.",
+      "props": {"offline_seconds": {"type": "int", "min": 0, "max": 31536000}}
+    },
+    {
+      "name": "offline_detected",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "The app lost its connection to the server, and why it decided so.",
+      "props": {"reason": {"type": "enum", "values": ["browser", "timeout", "network_error"], "nullable": true}}
+    },
+    {
+      "name": "offline_ops_expired",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "Changes that could not sync were discarded after 7 days.",
+      "props": {"count": {"type": "int", "min": 0, "max": 100000}}
+    },
+    {
+      "name": "offline_drain_error",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "Syncing hit a storage error and will retry.",
+      "props": {"name": {"type": "code"}, "failures": {"type": "int", "min": 0, "max": 100000}}
+    },
+    {
+      "name": "offline_hydrate_error",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "Loading changes saved on the device failed and will retry.",
+      "props": {"name": {"type": "code"}, "failures": {"type": "int", "min": 0, "max": 100000}}
+    },
+    {
+      "name": "offline_watchdog_flush",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "A stuck sync was restarted.",
+      "props": {"pending": {"type": "int", "min": 0, "max": 100000}}
+    },
+    {
+      "name": "offline_store_volatile",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "The device's storage was unavailable, so changes are kept in memory.",
+      "props": {"name": {"type": "code"}}
+    },
+    {
+      "name": "offline_store_reopened",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "The device's storage came back and held changes were moved into it.",
+      "props": {"moved": {"type": "int", "min": 0, "max": 100000}}
+    },
+    {
+      "name": "offline_submit_failed",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "A change could not be saved on the device.",
+      "props": {"kind": {"type": "code"}, "name": {"type": "code"}}
+    },
+    {
+      "name": "offline_lock_reclaimed",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "One browser tab took over syncing from another that stopped answering.",
+      "props": {"reason": {"type": "enum", "values": ["lease", "no_answer"]}}
+    },
+    {
+      "name": "offline_queue_stalled",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "A change has waited minutes to sync while online, and why.",
+      "props": {
+        "reason": {"type": "enum", "values": ["auth", "volatile", "retrying", "other_tab", "sending"]},
+        "status": {"type": "int", "min": 0, "max": 999, "nullable": true},
+        "age_s": {"type": "int", "min": 0, "max": 31536000}
+      }
+    },
+    {
+      "name": "offline_auth_paused",
+      "schema_version": 1,
+      "surface": "app",
+      "category": "reliability",
+      "description": "Syncing paused until the person signs in again.",
+      "props": {"kind": {"type": "code"}, "status": {"type": "int", "min": 0, "max": 999, "nullable": true}}
+    },
+    {
+      "name": "landing_view",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "The landing page was opened.",
+      "props": {}
+    },
+    {
+      "name": "demo_started",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "The live demo was opened, on which example (by its position) and whether through the tour.",
+      "props": {
+        "example_position": {"type": "int", "min": 0, "max": 50, "nullable": true},
+        "from_tour": {"type": "bool"}
+      }
+    },
+    {
+      "name": "demo_tour_completed",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "The demo tour reached its last step.",
+      "props": {"example_position": {"type": "int", "min": 0, "max": 50, "nullable": true}}
+    },
+    {
+      "name": "demo_write_blocked",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "A visitor tried to save a change in the read-only demo.",
+      "props": {"method": {"type": "enum", "values": ["post", "put", "patch", "delete"]}}
+    },
+    {
+      "name": "waitlist_opened",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "The waitlist form was opened, and from where.",
+      "props": {"source": {"type": "enum", "values": ["landing", "demo_guide", "demo_tour_end"]}}
+    },
+    {
+      "name": "waitlist_submitted",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "The waitlist form was sent, from where, and whether it was a new request.",
+      "props": {
+        "source": {"type": "enum", "values": ["landing", "demo_guide", "demo_tour_end"]},
+        "created": {"type": "bool"}
+      }
+    },
+    {
+      "name": "invite_link_opened",
+      "schema_version": 1,
+      "surface": "public",
+      "category": "public",
+      "description": "A visitor went on to sign up with an invite key.",
+      "props": {"source": {"type": "enum", "values": ["landing", "demo_guide", "demo_tour_end"]}}
+    }
+  ]
+}

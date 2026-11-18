@@ -212,7 +212,7 @@ class TestAdminUsageEndpoint:
 
         tables = {entry['table']: entry for entry in payload['storage']['tables']}
         assert set(tables) == {
-            'product_events', 'event_logs', 'email_delivery_events', 'email_webhook_events',
+            'product_events', 'web_events', 'event_logs', 'email_delivery_events', 'email_webhook_events',
         }
         assert tables['product_events']['rows'] == 4
         assert tables['event_logs']['rows'] == 3

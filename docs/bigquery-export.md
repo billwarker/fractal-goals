@@ -6,15 +6,20 @@ environment on each deploy, but it does not execute the job.
 
 ## Exported Data
 
-- `product_events`: incremental append by `(created_at, id)`.
-- `event_logs`: incremental append by `(timestamp, id)`.
+- `product_events`: incremental append by `(created_at, id)`, with the batch context
+  (`schema_version`, `visit_id`, `surface`, `app_version`).
+- `event_logs`: incremental append by `(timestamp, id)`. Payloads and descriptions are
+  never exported; `owner_user_id` (the fractal owner, loaded once per batch) makes the
+  structural event attributable to an account.
+- `web_events`: incremental append by `(created_at, id)`. Anonymous public-site events
+  (landing, demo, waitlist): no user, IP or user agent; `visitor_day_hash` changes daily.
 - `email_delivery_events`: incremental append by `(created_at, id)`.
 - `email_webhook_events`: incremental append by `(created_at, id)`.
 - `users`: full dimension refresh with `WRITE_TRUNCATE`.
 
 The users dimension includes only account analytics fields: `id`, `username`,
-`email`, `role`, `is_active`, `membership_tier`, `created_at`, and
-`last_login_at`. It intentionally excludes password hashes, preferences, quota
+`email`, `role`, `is_active`, `membership_tier`, `created_at`, `last_login_at`,
+and `acquisition_source` (the waitlist source copied at sign-up, or `invite`). It intentionally excludes password hashes, preferences, quota
 overrides, and other private account internals. The export job does not export
 Supabase platform metadata, auth schema internals, storage metadata, Postgres
 catalogs, or database storage-inspection rows.
@@ -22,6 +27,15 @@ catalogs, or database storage-inspection rows.
 Every BigQuery load includes an explicit schema and uses `CREATE_IF_NEEDED`, so
 first-run backfills create `event_logs` and the other analytics tables even
 when the dataset starts empty.
+
+Append loads allow field addition, so a column added to an export schema (as above)
+is added to the existing BigQuery table on its next load.
+
+**Erasure.** Permanently deleting an account queues its id in `analytics_erasures`.
+Each run deletes that id's rows from `product_events` (`user_id`), `event_logs`
+(`owner_user_id`) and `email_delivery_events` (`recipient_user_id`), then clears the
+queue; a failed delete fails the run and leaves the queue for the next one. Tables
+created before a column existed are skipped for it: their older rows never held the id.
 
 Incremental table watermarks live in `app_settings.analytics_export_state` and
 are advanced only after the matching BigQuery load job succeeds. Rows newer
@@ -154,3 +168,55 @@ views above, then rerun the export.
 
 The Admin overview usage panel shows the last export status and per-table
 watermark from `app_settings.analytics_export_state`.
+
+## Reporting views
+
+The Admin overview's "Acquisition & engagement" card answers the headline questions from
+Postgres over a bounded window (`services/growth_metrics_service.py`). For longer history
+or slicing, create these views (after the dedupe views) and point Looker Studio at them.
+They use the same definitions as the admin card.
+
+```sql
+-- Weekly Active Practitioners: accounts completing at least one session in an ISO week.
+-- Session completion is the `session.completed` event; demo and admin accounts excluded.
+CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.wap_weekly` AS
+SELECT DATE_TRUNC(DATE(e.timestamp), ISOWEEK) AS week_start,
+       COUNT(DISTINCT e.owner_user_id) AS practitioners
+FROM `PROJECT_ID.fractal_analytics.event_logs_deduped` e
+JOIN `PROJECT_ID.fractal_analytics.users` u ON u.id = e.owner_user_id
+WHERE e.event_type = 'session.completed' AND u.role NOT IN ('demo', 'admin')
+GROUP BY week_start;
+
+-- Public-site visitors and funnel steps per day (visitors are counted per day).
+CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.public_funnel_daily` AS
+SELECT DATE(created_at) AS day,
+       COUNT(DISTINCT visitor_day_hash) AS visitors,
+       COUNT(DISTINCT IF(event_name = 'demo_started', visitor_day_hash, NULL)) AS demo_visitors,
+       COUNT(DISTINCT IF(event_name = 'demo_tour_completed', visitor_day_hash, NULL)) AS tour_completers,
+       COUNT(DISTINCT IF(event_name = 'waitlist_submitted', visitor_day_hash, NULL)) AS waitlist_submitters
+FROM `PROJECT_ID.fractal_analytics.web_events`
+GROUP BY day;
+
+-- Sign-ups by acquisition source and week, with how many practised in their first 7 days.
+CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.signups_by_source` AS
+SELECT DATE_TRUNC(DATE(u.created_at), ISOWEEK) AS signup_week,
+       COALESCE(u.acquisition_source, 'unknown') AS source,
+       COUNT(DISTINCT u.id) AS signups,
+       COUNT(DISTINCT IF(e.timestamp < TIMESTAMP_ADD(u.created_at, INTERVAL 7 DAY), u.id, NULL)) AS activated
+FROM `PROJECT_ID.fractal_analytics.users` u
+LEFT JOIN `PROJECT_ID.fractal_analytics.event_logs_deduped` e
+  ON e.owner_user_id = u.id AND e.event_type = 'session.completed'
+WHERE u.role NOT IN ('demo', 'admin')
+GROUP BY signup_week, source;
+
+-- Weekly retention by sign-up cohort: practising weeks since sign-up.
+CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.retention_weekly` AS
+SELECT DATE_TRUNC(DATE(u.created_at), ISOWEEK) AS cohort_week,
+       DATE_DIFF(DATE_TRUNC(DATE(e.timestamp), ISOWEEK), DATE_TRUNC(DATE(u.created_at), ISOWEEK), WEEK) AS weeks_since_signup,
+       COUNT(DISTINCT u.id) AS practitioners
+FROM `PROJECT_ID.fractal_analytics.users` u
+JOIN `PROJECT_ID.fractal_analytics.event_logs_deduped` e
+  ON e.owner_user_id = u.id AND e.event_type = 'session.completed'
+WHERE u.role NOT IN ('demo', 'admin')
+GROUP BY cohort_week, weeks_since_signup;
+```

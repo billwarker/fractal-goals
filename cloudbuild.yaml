@@ -40,6 +40,7 @@ steps:
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:$BUILD_ID',
       '-t', '$_REGION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/fractal-frontend:latest',
       '--build-arg', 'VITE_API_URL=/api',
+      '--build-arg', 'VITE_APP_VERSION=$BUILD_ID',
       '--build-arg', 'VITE_LANDING_EXAMPLES_STATIC_URL=https://storage.googleapis.com/$PROJECT_ID-landing-public-$PROJECT_NUMBER/landing-examples.json',
       'client'
     ]

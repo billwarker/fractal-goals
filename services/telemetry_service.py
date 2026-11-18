@@ -3,50 +3,25 @@
 Records curated frontend usage events (page views + key feature surfaces)
 into ``product_events``. Domain actions (goal created, session completed, ...)
 already live in ``event_logs``; telemetry intentionally tracks only UI surface
-usage, so the event-name allowlist below is the cardinality contract for the
-admin usage dashboard.
+usage. ``services/tracking_plan.json`` is the contract: unknown names are dropped,
+and so is any property it doesn't list or whose value has the wrong type.
 """
 import datetime
-import json
 import logging
 
+import models
 from models import ProductEvent, utc_now
 from services.service_types import JsonDict, ServiceResult
+from services.tracking_plan import APP_SURFACE, clean_props, event_for
 
 logger = logging.getLogger(__name__)
 
-# Server-side allowlist: unknown names are dropped, never stored.
-# page_view covers all route-level surfaces (goals, sessions, analytics, ...)
-# via normalized paths; only non-route UI surfaces get their own event name.
-# Domain actions (goal/session created, ...) already live in event_logs.
-ALLOWED_EVENTS = frozenset({
-    "page_view",
-    "settings_opened",
-    "onboarding_started",
-    "onboarding_step_completed",
-    "onboarding_completed",
-    "onboarding_dismissed",
-    # Offline sync health: counts, ages, and error codes only, never content.
-    "offline_sync_drained",
-    "offline_op_rejected",
-    "offline_boot",
-    "offline_detected",
-    "offline_ops_expired",
-    # Each one means a wedge was caught and recovered; any of them is worth a look.
-    "offline_drain_error",
-    "offline_hydrate_error",
-    "offline_watchdog_flush",
-    "offline_store_volatile",
-    "offline_store_reopened",
-    "offline_submit_failed",
-    "offline_lock_reclaimed",
-    "offline_queue_stalled",
-    "offline_auth_paused",
-})
+# Account preference (user.preferences) that turns usage analytics off: the Privacy
+# Policy's right to object. Absent means on.
+USAGE_ANALYTICS_PREFERENCE = "usage_analytics"
 
 MAX_BATCH_SIZE = 20
 MAX_PATH_LENGTH = 255
-MAX_PROPERTIES_BYTES = 1024
 DEFAULT_RETENTION_DAYS = 180
 
 
@@ -62,43 +37,57 @@ def _parse_client_ts(raw):
     return parsed
 
 
+def usage_analytics_enabled(user) -> bool:
+    preferences = models._safe_load_json(getattr(user, "preferences", None), {})
+    return not (isinstance(preferences, dict) and preferences.get(USAGE_ANALYTICS_PREFERENCE) is False)
+
+
+def privacy_signal_present(headers) -> bool:
+    """Global Privacy Control or Do Not Track sent with the request."""
+    return headers.get("Sec-GPC") == "1" or headers.get("DNT") == "1"
+
+
 class TelemetryService:
     def __init__(self, db_session):
         self.db_session = db_session
 
-    def record_events(self, user_id: str, events) -> ServiceResult[JsonDict]:
+    def record_events(self, user_id: str, events, context=None) -> ServiceResult[JsonDict]:
+        context = context or {}
         accepted = 0
+        rejected = []
         for raw_event in list(events)[:MAX_BATCH_SIZE]:
             name = raw_event.get("name")
-            if name not in ALLOWED_EVENTS:
+            event = event_for(name, APP_SURFACE)
+            if event is None:
+                rejected.append({"name": str(name)[:80], "reason": "unknown_event"})
                 continue
 
             path = raw_event.get("path")
             if path:
                 path = str(path)[:MAX_PATH_LENGTH]
 
-            properties = raw_event.get("props")
-            if properties is not None:
-                try:
-                    if len(json.dumps(properties)) > MAX_PROPERTIES_BYTES:
-                        properties = None
-                except (TypeError, ValueError):
-                    properties = None
+            properties, dropped = clean_props(event, raw_event.get("props"))
+            if dropped:
+                rejected.append({"name": event.name, "reason": "invalid_props", "props": dropped})
 
             self.db_session.add(ProductEvent(
                 user_id=user_id,
-                event_name=name,
+                event_name=event.name,
+                schema_version=event.schema_version,
                 path=path,
                 root_id=raw_event.get("root_id") or None,
                 properties=properties,
                 client_ts=_parse_client_ts(raw_event.get("ts")),
+                visit_id=context.get("visit_id"),
+                surface=APP_SURFACE,
+                app_version=context.get("app_version"),
                 created_at=utc_now(),
             ))
             accepted += 1
 
         if accepted:
             self.db_session.commit()
-        return {"accepted": accepted}, None, 202
+        return {"accepted": accepted, "rejected": rejected}, None, 202
 
     def prune(self, older_than_days: int = DEFAULT_RETENTION_DAYS) -> ServiceResult[JsonDict]:
         older_than_days = max(int(older_than_days), 30)
