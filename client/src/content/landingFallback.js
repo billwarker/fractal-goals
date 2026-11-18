@@ -12,10 +12,10 @@ export const fallbackContent = {
         ],
     },
     footer: {
-        note: '(c) Fractal Goals. Private beta.',
+        note: '© 2026 Fractal Goals Technology',
         links: [
-            { label: 'Privacy Policy', href: 'https://my.fractalgoals.com/privacy' },
-            { label: 'Terms of Service', href: 'https://my.fractalgoals.com/terms' },
+            { label: 'Privacy Policy', href: '/privacy' },
+            { label: 'Terms of Service', href: '/terms' },
         ],
     },
     hero: {
