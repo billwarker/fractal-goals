@@ -13,7 +13,7 @@ def admin_user(db_session):
         username="logsadmin",
         email="logsadmin@example.com",
         role="admin",
-        terms_accepted_version="1.0",
+        terms_accepted_version=config.TERMS_VERSION,
         privacy_accepted_version=config.PRIVACY_VERSION,
     )
     user.set_password("Password123")
@@ -246,7 +246,7 @@ class TestLogActivityApi:
         stranger = User(
             username="logsstranger",
             email="logsstranger@example.com",
-            terms_accepted_version="1.0",
+            terms_accepted_version=config.TERMS_VERSION,
             privacy_accepted_version=config.PRIVACY_VERSION,
         )
         stranger.set_password("Password123")

@@ -55,7 +55,7 @@ class TestSignupEndpoint:
             'password': 'Securepassword123',
             'invite_key': invite_key,
             'accepted_terms': True,
-            'terms_version': '1.0',
+            'terms_version': config.TERMS_VERSION,
             'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
@@ -82,7 +82,7 @@ class TestSignupEndpoint:
             'password': 'Securepassword123',
             'invite_key': invite_key,
             'accepted_terms': True,
-            'terms_version': '1.0',
+            'terms_version': config.TERMS_VERSION,
             'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
@@ -119,7 +119,7 @@ class TestSignupEndpoint:
             'password': 'Securepassword123',
             'invite_key': invite_key,
             'accepted_terms': True,
-            'terms_version': '1.0',
+            'terms_version': config.TERMS_VERSION,
             'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
@@ -139,7 +139,7 @@ class TestSignupEndpoint:
             'password': 'Securepassword123',
             'invite_key': 'fg_invite_invalid_email',
             'accepted_terms': True,
-            'terms_version': '1.0',
+            'terms_version': config.TERMS_VERSION,
             'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(
@@ -158,7 +158,7 @@ class TestSignupEndpoint:
             'password': 'short',  # Less than 8 characters
             'invite_key': 'fg_invite_short_password',
             'accepted_terms': True,
-            'terms_version': '1.0',
+            'terms_version': config.TERMS_VERSION,
             'privacy_version': config.PRIVACY_VERSION,
         }
         response = client.post(

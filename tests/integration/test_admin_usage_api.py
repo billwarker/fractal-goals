@@ -20,7 +20,7 @@ def admin_user(db_session):
         username='usageadmin',
         email='usageadmin@example.com',
         role='admin',
-        terms_accepted_version='1.0',
+        terms_accepted_version=config.TERMS_VERSION,
         privacy_accepted_version=config.PRIVACY_VERSION,
     )
     user.set_password('Password123')

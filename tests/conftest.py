@@ -272,7 +272,7 @@ def test_user(db_session):
         id=str(uuid.uuid4()),
         username="testuser",
         email="test@example.com",
-        terms_accepted_version="1.0",
+        terms_accepted_version=config.TERMS_VERSION,
         terms_accepted_at=datetime.now(timezone.utc),
         privacy_accepted_version=config.PRIVACY_VERSION,
         privacy_accepted_at=datetime.now(timezone.utc),
