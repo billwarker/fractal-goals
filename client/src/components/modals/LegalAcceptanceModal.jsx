@@ -9,8 +9,8 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
-import { Text } from '../atoms/Typography';
-import styles from './AuthModal.module.css';
+import Checkbox from '../atoms/Checkbox';
+import styles from './LegalAcceptanceModal.module.css';
 
 /** Blocking review for accounts with missing or outdated legal acceptance. */
 function LegalAcceptanceModal() {
@@ -44,7 +44,7 @@ function LegalAcceptanceModal() {
         <Modal
             isOpen
             onClose={() => {}}
-            title="REVIEW REQUIRED"
+            title="Review Our Updated Terms"
             size="md"
             showCloseButton={false}
             closeOnEsc={false}
@@ -52,33 +52,48 @@ function LegalAcceptanceModal() {
         >
             <form onSubmit={handleSubmit} className={styles.form}>
                 <ModalBody>
-                    <Text size="sm" color="muted" style={{ marginBottom: '12px' }}>
-                        Review the current legal documents before continuing to use Fractal Goals.
-                    </Text>
-                    <label className={styles.consent}>
-                        <span>
-                            <input
-                                type="checkbox"
-                                checked={accepted}
-                                onChange={(event) => setAccepted(event.target.checked)}
-                            />
-                            {' '}I am at least 16 and accept the{' '}
-                            <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
-                            {' '}and{' '}
-                            <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
-                        </span>
-                    </label>
-                    {error && <div className={styles.errorMessage}>{error}</div>}
+                    <div className={styles.content}>
+                        <p className={styles.intro}>
+                            We have updated our Terms of Service and Privacy Policy. Please review
+                            and accept them to keep using Fractal Goals.
+                        </p>
+                        <Checkbox
+                            checked={accepted}
+                            onChange={(event) => setAccepted(event.target.checked)}
+                            className={styles.consent}
+                            label={(
+                                <span>
+                                    I am 16 or older and I agree to the{' '}
+                                    <a
+                                        href="/terms"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(event) => event.stopPropagation()}
+                                    >
+                                        Terms of Service
+                                    </a>
+                                    {' '}and{' '}
+                                    <a
+                                        href="/privacy"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(event) => event.stopPropagation()}
+                                    >
+                                        Privacy Policy
+                                    </a>.
+                                </span>
+                            )}
+                        />
+                        {error && <div className={styles.errorMessage} role="alert">{error}</div>}
+                    </div>
                 </ModalBody>
                 <ModalFooter>
-                    <div className={styles.actions}>
-                        <Button type="button" variant="secondary" onClick={logout} disabled={isSubmitting}>
-                            Log Out
-                        </Button>
-                        <Button type="submit" disabled={!accepted || isSubmitting}>
-                            {isSubmitting ? 'Saving...' : 'Accept and Continue'}
-                        </Button>
-                    </div>
+                    <Button type="button" variant="secondary" onClick={logout} disabled={isSubmitting}>
+                        Log Out
+                    </Button>
+                    <Button type="submit" disabled={!accepted || isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Accept and Continue'}
+                    </Button>
                 </ModalFooter>
             </form>
         </Modal>
