@@ -63,9 +63,10 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
     await page.getByRole('button', { name: /^save/i }).first().click();
     const notice = page.locator('[role="status"]', { hasText: 'Changes aren’t saved in the demo.' });
     await expect(notice).toHaveCount(1);
-    await expect(page.getByRole('dialog', { name: 'This is a live demo' })).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: /live demo|failed/i })).toHaveCount(0);
     await expect(page.locator('[role="status"]', { hasText: /failed/i })).toHaveCount(0);
-    await notice.getByRole('button', { name: 'Sign up' }).click();
+    await expect(notice.getByRole('button', { name: 'Sign up' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Sign up', exact: true }).click();
 
     // Sign up: the waitlist, or an invite key that hands off to the app's prefilled sign-up.
     const signup = page.getByRole('dialog', { name: 'Build your own tree' });

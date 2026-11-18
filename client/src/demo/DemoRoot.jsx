@@ -75,7 +75,7 @@ function DemoApp() {
                     <FractalRoutes fallbackPath={firstGoalsPath} />
                 </div>
                 <DemoGuide examples={examples} onSignup={() => setIsSignupOpen(true)} onExit={logout} />
-                <DemoWriteNotice onSignup={() => setIsSignupOpen(true)} isSignupOpen={isSignupOpen} />
+                <DemoWriteNotice isSignupOpen={isSignupOpen} />
                 {/* Mounted per opening, so each sign-up starts from a fresh form. */}
                 {isSignupOpen && <DemoSignupModal isOpen onClose={() => setIsSignupOpen(false)} />}
             </div>

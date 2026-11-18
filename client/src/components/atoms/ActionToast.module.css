@@ -12,6 +12,11 @@
     transition: opacity 0.2s;
 }
 
+/* One line of text: the action and close button sit level with it. */
+.single {
+    align-items: center;
+}
+
 .warning {
     border-color: color-mix(in srgb, var(--color-brand-warning) 60%, var(--color-border));
 }
