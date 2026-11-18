@@ -637,7 +637,34 @@ circuit lifecycle. Detailed behavior is covered by the circuit component and ser
 ### SaaS and operations
 
 Auth, quotas, admin tooling, feature flags, telemetry, email delivery, landing publication,
-data export, and account deletion form the account boundary. Admin support access is explicit
+data export, and account deletion form the account boundary.
+
+Product analytics is first-party. `services/tracking_plan.json` is the one list of events and their
+typed properties (int/bool/enum/code; never free text): the server drops anything else, privacy.md
+§2.3 must list exactly its events (`tests/unit/services/test_tracking_plan.py`), and every client call
+site must name a planned event (`utils/__tests__/trackingPlan.test.js`). Signed-in events
+(`utils/telemetry.js` → `product_events`) carry an in-memory visit id and app version and stop for
+Global Privacy Control, Do Not Track or Settings → General → Privacy (`preferences.usage_analytics`,
+also enforced on the server). Landing, demo and waitlist events (`utils/publicTelemetry.js` →
+`POST /api/public/telemetry` → `web_events`) are anonymous: nothing on the device, visitors counted by
+a daily-salted hash (`services/web_telemetry_service.py`); UTM/referrer travel to the demo in its links
+(`utils/visitAttribution.js`) and onto the waitlist request and then `users.acquisition_source`. The KPI is
+Weekly Active Practitioners (accounts completing a session in an ISO week); Admin → Usage shows it with
+traffic, the conversion funnel and feature use (`services/growth_metrics_service.py`). The BigQuery export
+adds `web_events` and `event_logs.owner_user_id` and deletes erased accounts' warehouse rows
+(`analytics_erasures`). Once exported, product and web events older than a 35-day live window are
+flushed from Postgres (`flush_exported` in `services/analytics_export_service.py`; never before they
+reach BigQuery); the retention job keeps the published 180/90-day ceilings, and Admin → Usage shows the
+database against its quota (`DATABASE_STORAGE_QUOTA_MB`) and activity-history size by event type.
+See [Product analytics](planning/product-analytics-tracking-2026-11.md) and
+[Postgres flush](planning/analytics-postgres-flush-2026-11.md). Admin → Overview is split into sub-tabs (Summary, Acquisition, Engagement, Users, Events, System; `?view=`
+keeps the open one) over a single usage query (`components/admin/UsagePanel.jsx`), with compact tables and
+charts from `UsageViews.module.css`; see [Overview sub-tabs](planning/admin-overview-subtabs-2026-11.md).
+System loads storage from its own `GET /api/admin/usage/storage` and warns when the export or retention
+job has no success in 48 hours (`data_retention_state` / `analytics_export_state`). The export job applies
+the BigQuery dedupe and reporting views in `services/analytics_views.sql` after each run. The funnel splits
+into a public stage (independent counts) and a cohort stage (the window's sign-ups), rating steps only
+within a stage. See [Audit fixes](planning/analytics-audit-fixes-2026-11.md). Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
 The Logs page (admin-only route) reads owner-scoped event history; only admins can clear a fractal's

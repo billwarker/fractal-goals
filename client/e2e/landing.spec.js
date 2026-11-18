@@ -96,7 +96,7 @@ test('the landing is one hero that leads into the live demo or the waitlist', as
     await dialog.getByLabel('Email').fill(`visitor-${testInfo.project.name}@example.com`);
     await dialog.getByRole('button', { name: 'Join the waitlist' }).click();
     await expect(dialog.getByRole('status')).toContainText('a link that sets up your account');
-    expect(signup).toEqual({ email: `visitor-${testInfo.project.name}@example.com` });
+    expect(signup).toEqual({ email: `visitor-${testInfo.project.name}@example.com`, source: 'landing' });
     await dialog.getByRole('button', { name: 'Keep exploring' }).click();
 
     // The theme toggle flips the whole page.

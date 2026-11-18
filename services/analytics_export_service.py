@@ -10,14 +10,33 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import re
+from pathlib import Path
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable, Optional
 
 import sqlalchemy as sa
 
-from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, ProductEvent, User, format_utc, utc_now
-from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting, set_app_setting
-from google.api_core.exceptions import GoogleAPIError
+from config import config
+from models import (
+    AnalyticsErasure,
+    EmailDeliveryEvent,
+    EmailWebhookEvent,
+    EventLog,
+    Goal,
+    ProductEvent,
+    User,
+    WebEvent,
+    format_utc,
+    utc_now,
+)
+from services.app_settings import (
+    ANALYTICS_EXPORT_STATE_KEY,
+    TELEMETRY_RETENTION_KEY,
+    get_app_setting,
+    set_app_setting,
+)
+from google.api_core.exceptions import GoogleAPIError, NotFound
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +56,12 @@ class IncrementalTableSpec:
     table: str
     model: object
     cursor_column: object
-    serializer: Callable[[object], dict]
+    serializer: Callable[..., dict]  # (row, batch context) -> warehouse row
     schema: tuple[tuple[str, str], ...]
+    # Loads what a batch's serializer needs in one query (e.g. owners), never per row.
+    batch_context: Optional[Callable[[object, list], dict]] = None
+    # Postgres keeps only the live window of these once they are in BigQuery.
+    flush_after_export: bool = False
 
 
 def _format_dt(value):
@@ -96,6 +119,24 @@ PRODUCT_EVENTS_SCHEMA = (
     ("properties_json", "STRING"),
     ("client_ts", "TIMESTAMP"),
     ("created_at", "TIMESTAMP"),
+    ("schema_version", "INTEGER"),
+    ("visit_id", "STRING"),
+    ("surface", "STRING"),
+    ("app_version", "STRING"),
+)
+
+WEB_EVENTS_SCHEMA = (
+    ("id", "STRING"),
+    ("event_name", "STRING"),
+    ("schema_version", "INTEGER"),
+    ("path", "STRING"),
+    ("properties_json", "STRING"),
+    ("visitor_day_hash", "STRING"),
+    ("referrer_host", "STRING"),
+    ("utm_source", "STRING"),
+    ("utm_medium", "STRING"),
+    ("utm_campaign", "STRING"),
+    ("created_at", "TIMESTAMP"),
 )
 
 EVENT_LOGS_SCHEMA = (
@@ -108,6 +149,7 @@ EVENT_LOGS_SCHEMA = (
     ("payload_json", "STRING"),
     ("source", "STRING"),
     ("timestamp", "TIMESTAMP"),
+    ("owner_user_id", "STRING"),
 )
 
 EMAIL_DELIVERY_EVENTS_SCHEMA = (
@@ -148,6 +190,7 @@ USERS_SCHEMA = (
     ("membership_tier", "STRING"),
     ("created_at", "TIMESTAMP"),
     ("last_login_at", "TIMESTAMP"),
+    ("acquisition_source", "STRING"),
 )
 
 
@@ -160,10 +203,15 @@ ANALYTICS_RETENTION_DAYS = 730
 def _load_job_config(write_disposition, schema):
     if bigquery is None:
         return {"write_disposition": write_disposition, "schema": list(schema)}
+    # Appends may add the columns a newer schema lists to a table created before them.
+    schema_updates = (
+        [bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION] if write_disposition == "WRITE_APPEND" else None
+    )
     return bigquery.LoadJobConfig(
         write_disposition=write_disposition,
         create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
         schema=[bigquery.SchemaField(name, field_type) for name, field_type in schema],
+        schema_update_options=schema_updates,
     )
 
 
@@ -171,7 +219,7 @@ def _table_ref(dataset: str, table: str) -> str:
     return f"{dataset}.{table}"
 
 
-def _serialize_product_event(row: ProductEvent) -> dict:
+def _serialize_product_event(row: ProductEvent, context=None) -> dict:
     return {
         "id": row.id,
         "user_id": row.user_id,
@@ -181,10 +229,37 @@ def _serialize_product_event(row: ProductEvent) -> dict:
         "properties_json": _json_value(row.properties),
         "client_ts": _format_dt(row.client_ts),
         "created_at": _format_dt(row.created_at),
+        "schema_version": row.schema_version,
+        "visit_id": row.visit_id,
+        "surface": row.surface,
+        "app_version": row.app_version,
     }
 
 
-def _serialize_event_log(row: EventLog) -> dict:
+def _serialize_web_event(row: WebEvent, context=None) -> dict:
+    return {
+        "id": row.id,
+        "event_name": row.event_name,
+        "schema_version": row.schema_version,
+        "path": row.path,
+        "properties_json": _json_value(row.properties),
+        "visitor_day_hash": row.visitor_day_hash,
+        "referrer_host": row.referrer_host,
+        "utm_source": row.utm_source,
+        "utm_medium": row.utm_medium,
+        "utm_campaign": row.utm_campaign,
+        "created_at": _format_dt(row.created_at),
+    }
+
+
+def _event_log_owners(db_session, rows) -> dict:
+    """Each root's owner, so warehouse activity history is attributable to an account."""
+    root_ids = {row.root_id for row in rows}
+    owners = db_session.query(Goal.id, Goal.owner_id).filter(Goal.id.in_(root_ids)).all()
+    return {"owners": {root_id: owner_id for root_id, owner_id in owners}}
+
+
+def _serialize_event_log(row: EventLog, context=None) -> dict:
     return {
         "id": row.id,
         "root_id": row.root_id,
@@ -198,10 +273,11 @@ def _serialize_event_log(row: EventLog) -> dict:
         "payload_json": None,
         "source": row.source,
         "timestamp": _format_dt(row.timestamp),
+        "owner_user_id": (context or {}).get("owners", {}).get(row.root_id),
     }
 
 
-def _serialize_email_delivery_event(row: EmailDeliveryEvent) -> dict:
+def _serialize_email_delivery_event(row: EmailDeliveryEvent, context=None) -> dict:
     return {
         "id": row.id,
         "provider": row.provider,
@@ -222,7 +298,7 @@ def _serialize_email_delivery_event(row: EmailDeliveryEvent) -> dict:
     }
 
 
-def _serialize_email_webhook_event(row: EmailWebhookEvent) -> dict:
+def _serialize_email_webhook_event(row: EmailWebhookEvent, context=None) -> dict:
     return {
         "id": row.id,
         "provider": row.provider,
@@ -244,6 +320,7 @@ def _serialize_user(row: User) -> dict:
         "membership_tier": row.membership_tier,
         "created_at": _format_dt(row.created_at),
         "last_login_at": _format_dt(row.last_login_at),
+        "acquisition_source": row.acquisition_source,
     }
 
 
@@ -254,6 +331,7 @@ INCREMENTAL_TABLES = (
         ProductEvent.created_at,
         _serialize_product_event,
         PRODUCT_EVENTS_SCHEMA,
+        flush_after_export=True,
     ),
     IncrementalTableSpec(
         "event_logs",
@@ -261,6 +339,15 @@ INCREMENTAL_TABLES = (
         EventLog.timestamp,
         _serialize_event_log,
         EVENT_LOGS_SCHEMA,
+        _event_log_owners,
+    ),
+    IncrementalTableSpec(
+        "web_events",
+        WebEvent,
+        WebEvent.created_at,
+        _serialize_web_event,
+        WEB_EVENTS_SCHEMA,
+        flush_after_export=True,
     ),
     IncrementalTableSpec(
         "email_delivery_events",
@@ -276,6 +363,75 @@ INCREMENTAL_TABLES = (
         _serialize_email_webhook_event,
         EMAIL_WEBHOOK_EVENTS_SCHEMA,
     ),
+)
+
+
+MIN_LIVE_DAYS = 30
+MAX_LIVE_DAYS = config.PRODUCT_EVENT_RETENTION_DAYS
+
+
+def analytics_live_days(db_session) -> int:
+    """Days of exported analytics Postgres keeps for the admin dashboard (admin-set)."""
+    stored = get_app_setting(db_session, TELEMETRY_RETENTION_KEY, {}) or {}
+    if not isinstance(stored, dict):
+        stored = {}
+    # `product_events_days` is the setting's name before the flush existed.
+    raw = stored.get("live_days", stored.get("product_events_days", config.ANALYTICS_LIVE_DAYS))
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        days = config.ANALYTICS_LIVE_DAYS
+    return max(MIN_LIVE_DAYS, min(MAX_LIVE_DAYS, days))
+
+
+def _flush_table(db_session, spec: IncrementalTableSpec, table_state, live_cutoff) -> int:
+    """Delete rows older than the live window that the export has already loaded."""
+    cursor_ts = _parse_dt(table_state.get("last_ts"))
+    cursor_id = table_state.get("last_id")
+    if cursor_ts is None or not cursor_id:
+        return 0
+    model: Any = spec.model
+    column: Any = spec.cursor_column
+    exported = sa.or_(column < cursor_ts, sa.and_(column == cursor_ts, model.id <= cursor_id))
+    result = db_session.execute(sa.delete(model).where(column < _db_datetime(live_cutoff), exported))
+    return int(result.rowcount or 0)
+
+
+def flush_exported(db_session, now=None, live_days=None) -> dict[str, int]:
+    """Clear exported analytics older than the live window out of Postgres.
+
+    Only rows at or behind each table's export watermark go, so nothing leaves
+    Postgres before it is in BigQuery, and a table that never exported keeps everything.
+    """
+    now = now or utc_now()
+    live_days = analytics_live_days(db_session) if live_days is None else live_days
+    live_cutoff = now - datetime.timedelta(days=live_days)
+    state = get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {}) or {}
+    tables = state.get("tables", {}) if isinstance(state, dict) else {}
+    counts = {
+        spec.table: _flush_table(db_session, spec, tables.get(spec.table, {}), live_cutoff)
+        for spec in INCREMENTAL_TABLES
+        if spec.flush_after_export
+    }
+    db_session.commit()
+    return counts
+
+
+VIEWS_SQL_PATH = Path(__file__).with_name("analytics_views.sql")
+STATEMENT_END = re.compile(r";[ \t]*$", re.MULTILINE)
+
+
+def reporting_view_statements(dataset: str) -> list[str]:
+    """The dedupe and reporting views, as CREATE OR REPLACE VIEW statements for `dataset`."""
+    sql = VIEWS_SQL_PATH.read_text(encoding="utf-8").replace("{dataset}", dataset)
+    return [chunk.strip() for chunk in STATEMENT_END.split(sql) if "CREATE OR REPLACE VIEW" in chunk]
+
+
+# Append-only warehouse tables and the column holding an account id.
+ERASURE_COLUMNS = (
+    ("product_events", "user_id"),
+    ("event_logs", "owner_user_id"),
+    ("email_delivery_events", "recipient_user_id"),
 )
 
 
@@ -298,8 +454,10 @@ class AnalyticsExportService:
     def run_export(self, now=None):
         now = now or utc_now()
         cutoff = now - EXPORT_LAG
+        live_cutoff = now - datetime.timedelta(days=analytics_live_days(self.db_session))
         state = self._state()
         run_counts = {}
+        flushed = {}
         self._emit(
             f"Analytics export starting dataset={self.dataset} "
             f"batch_size={self.batch_size} cutoff={_format_dt(cutoff)}"
@@ -310,23 +468,37 @@ class AnalyticsExportService:
                 self._emit(f"Exporting incremental table {spec.table}")
                 run_counts[spec.table] = self._export_incremental_table(spec, state, cutoff)
                 self._prune_warehouse_table(spec.table, spec.cursor_column.key)
-                self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]}")
+                if spec.flush_after_export:
+                    flushed[spec.table] = _flush_table(
+                        self.db_session, spec, state["tables"][spec.table], live_cutoff,
+                    )
+                    self.db_session.commit()
+                self._emit(f"Finished {spec.table}: rows={run_counts[spec.table]} flushed={flushed.get(spec.table, 0)}")
 
+            run_counts["erasures"] = self._apply_erasures()
             self._emit("Exporting users dimension")
             run_counts["users"] = self._export_users()
             self._emit(f"Finished users: rows={run_counts['users']}")
+            views_error = self._apply_reporting_views()
+            if views_error:
+                state["views_error"] = views_error
+            else:
+                state.pop("views_error", None)
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "success"
             state["last_run_rows"] = run_counts
+            state["last_run_flushed"] = flushed
+            state["last_success_at"] = _format_dt(now)
             state.pop("failed_table", None)
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
             self._emit(f"Analytics export completed rows={run_counts}")
-            return {"status": "success", "rows": run_counts, "state": state}
+            return {"status": "success", "rows": run_counts, "flushed": flushed, "state": state}
         except Exception as exc:
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "failed"
             state["last_run_rows"] = run_counts
+            state["last_run_flushed"] = flushed
             set_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, state)
             self.db_session.commit()
             self._emit(f"Analytics export failed after rows={run_counts}: {exc}")
@@ -349,7 +521,8 @@ class AnalyticsExportService:
                 break
 
             self._assert_batch_advances_cursor(spec, table_state, rows)
-            payload = [spec.serializer(row) for row in rows]
+            context = spec.batch_context(self.db_session, rows) if spec.batch_context else {}
+            payload = [spec.serializer(row, context) for row in rows]
             self._emit(
                 f"Loading {len(payload)} rows to {spec.table} "
                 f"first_id={rows[0].id} last_id={rows[-1].id}"
@@ -393,6 +566,55 @@ class AnalyticsExportService:
                 f"Analytics export cursor failed to advance for {spec.table}: "
                 f"cursor={cursor_tuple} first_row={first_tuple}"
             )
+
+    def _apply_erasures(self):
+        """Delete permanently deleted accounts' rows from the warehouse, then forget the ids.
+
+        The users dimension is rewritten every run; these are the append-only tables that
+        still hold the id. A failed delete raises, leaving the queue for the next run.
+        """
+        user_ids = [row.user_id for row in self.db_session.query(AnalyticsErasure.user_id).all()]
+        if not user_ids:
+            return 0
+        if bigquery is not None:
+            for table, column in ERASURE_COLUMNS:
+                # Rows written before a table had the column hold no id, so there is nothing to erase there.
+                if not self._warehouse_column_exists(table, column):
+                    continue
+                job = self.bq_client.query(
+                    f"DELETE FROM `{_table_ref(self.dataset, table)}` WHERE `{column}` IN UNNEST(@user_ids)",
+                    job_config=bigquery.QueryJobConfig(query_parameters=[
+                        bigquery.ArrayQueryParameter("user_ids", "STRING", user_ids),
+                    ]),
+                )
+                job.result()
+        self.db_session.query(AnalyticsErasure).filter(
+            AnalyticsErasure.user_id.in_(user_ids),
+        ).delete(synchronize_session=False)
+        self.db_session.commit()
+        self._emit(f"Erased warehouse rows for {len(user_ids)} deleted accounts")
+        return len(user_ids)
+
+    def _apply_reporting_views(self):
+        """Keep the warehouse views current. The data is already loaded, so a failed view is
+        reported (in the run log and `views_error`) rather than failing the run."""
+        for statement in reporting_view_statements(self.dataset):
+            try:
+                self.bq_client.query(statement).result()
+            except GoogleAPIError as exc:
+                first_line = statement.splitlines()[0]
+                self._emit(f"Reporting view failed: {first_line}: {exc}")
+                logger.warning("Reporting view failed: %s", first_line, exc_info=True)
+                return f"{first_line}: {exc}"[:500]
+        self._emit("Reporting views applied")
+        return None
+
+    def _warehouse_column_exists(self, table, column):
+        try:
+            bq_table = self.bq_client.get_table(_table_ref(self.dataset, table))
+        except NotFound:
+            return False
+        return any(getattr(field, "name", None) == column for field in (getattr(bq_table, "schema", None) or ()))
 
     def _export_users(self):
         rows = self.db_session.query(User).order_by(User.id.asc()).all()

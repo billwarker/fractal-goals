@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, useLocation } from 'react-router-dom';
 import ApplicationProviders from '../ApplicationProviders';
@@ -15,6 +15,8 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { installConnectivity } from '../offline/connectivity';
 import { fetchLandingExamples, LANDING_EXAMPLES_STALE_TIME } from '../utils/landingPrefetch';
 import { getLandingPageHref } from '../utils/marketingHost';
+import { trackPublicEvent } from '../utils/publicTelemetry';
+import { getVisitAttribution } from '../utils/visitAttribution';
 import DemoGuide from './DemoGuide';
 import DemoSignupModal from './DemoSignupModal';
 import DemoWriteNotice from './DemoWriteNotice';
@@ -26,13 +28,19 @@ import '../app-shell-and-session.css';
 // Before anything renders: the API layer refuses writes from here on.
 setDemoMode(true);
 installConnectivity();
+// Read before the guide tidies the address: whether the landing page's tour link opened
+// the demo, and the campaign it handed on (utils/visitAttribution.js).
+const OPENED_FROM_TOUR = new URLSearchParams(window.location.search).get('tour') === '1';
+getVisitAttribution();
 
 const noop = () => {};
 
 function DemoApp() {
     const location = useLocation();
     const { loading, demoError, logout } = useAuth();
-    const [isSignupOpen, setIsSignupOpen] = useState(false);
+    const [signupSource, setSignupSource] = useState(null);
+    const isSignupOpen = signupSource !== null;
+    const startTracked = useRef(false);
     const [navHeight, setNavHeight] = useState(60);
     usePageTitle('Live demo');
 
@@ -47,6 +55,22 @@ function DemoApp() {
     useEffect(() => {
         document.documentElement.style.setProperty('--app-nav-height', `${navHeight}px`);
     }, [navHeight]);
+
+    const demoReady = !loading && !demoError && examples.length > 0;
+    useEffect(() => {
+        if (!demoReady || startTracked.current) return;
+        startTracked.current = true;
+        const position = examples.findIndex((example) => example.root_id === location.pathname.split('/')[1]);
+        trackPublicEvent('demo_started', {
+            example_position: position >= 0 ? position : null,
+            from_tour: OPENED_FROM_TOUR,
+        });
+    }, [demoReady, examples, location.pathname]);
+
+    const openSignup = (source) => {
+        trackPublicEvent('waitlist_opened', { source });
+        setSignupSource(source);
+    };
 
     if (loading || examplesQuery.isPending) {
         return <LoadingState variant="page" label="Opening the demo…" />;
@@ -74,10 +98,10 @@ function DemoApp() {
                 <div className="content-container">
                     <FractalRoutes fallbackPath={firstGoalsPath} />
                 </div>
-                <DemoGuide examples={examples} onSignup={() => setIsSignupOpen(true)} onExit={logout} />
+                <DemoGuide examples={examples} onSignup={openSignup} onExit={logout} />
                 <DemoWriteNotice isSignupOpen={isSignupOpen} />
                 {/* Mounted per opening, so each sign-up starts from a fresh form. */}
-                {isSignupOpen && <DemoSignupModal isOpen onClose={() => setIsSignupOpen(false)} />}
+                {isSignupOpen && <DemoSignupModal isOpen source={signupSource} onClose={() => setSignupSource(null)} />}
             </div>
         </HeaderProvider>
     );

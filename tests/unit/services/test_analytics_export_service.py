@@ -3,11 +3,12 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from google.api_core.exceptions import BadRequest
 
 import services.analytics_export_service as analytics_export_module
-from models import EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User
+from models import AnalyticsErasure, EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User, WebEvent
 from services.analytics_export_service import AnalyticsExportService
-from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, get_app_setting
+from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, TELEMETRY_RETENTION_KEY, get_app_setting, set_app_setting
 
 
 class FakeLoadJob:
@@ -29,18 +30,24 @@ class FakeBigQueryClient:
         self.tables = {}
         self.table_updates = []
         self.queries = []
+        self.query_configs = []
 
     def get_table(self, table_ref):
         return self.tables.setdefault(table_ref, SimpleNamespace(
-            table_ref=table_ref, time_partitioning=SimpleNamespace(expiration_ms=None),
+            table_ref=table_ref, time_partitioning=SimpleNamespace(expiration_ms=None), schema=[],
         ))
+
+    def with_columns(self, table_ref, *columns):
+        self.get_table(table_ref).schema = [SimpleNamespace(name=column) for column in columns]
+        return self
 
     def update_table(self, table, fields):
         self.table_updates.append((table.table_ref, list(fields)))
         return table
 
-    def query(self, sql):
+    def query(self, sql, job_config=None):
         self.queries.append(sql)
+        self.query_configs.append(job_config)
         return FakeLoadJob()
 
     def load_table_from_json(self, rows, table_ref, job_config=None):
@@ -185,8 +192,10 @@ class TestAnalyticsExportService:
         assert result["rows"] == {
             "product_events": 1,
             "event_logs": 1,
+            "web_events": 0,
             "email_delivery_events": 1,
             "email_webhook_events": 1,
+            "erasures": 0,
             "users": 1,
         }
         assert [(load["table"], load["write_disposition"]) for load in bq.loads] == [
@@ -374,3 +383,214 @@ class TestAnalyticsExportService:
         assert event_load["rows"][0]["description"] is None
         assert event_load["rows"][0]["payload_json"] is None
         assert webhook_load["rows"][0]["payload_json"] == '{"delivered":true}'
+
+
+@pytest.mark.unit
+class TestAnalyticsExportAttributionAndErasure:
+    def test_event_logs_carry_the_root_owner_without_payloads(self, db_session):
+        now = _dt(0)
+        user, root = _seed_export_rows(db_session, now=now)
+        bq = FakeBigQueryClient()
+
+        AnalyticsExportService(db_session, bq, "dataset").run_export(now=now)
+
+        event_load = next(load for load in bq.loads if load["table"] == "event_logs")
+        assert event_load["rows"][0]["owner_user_id"] == user.id
+        assert event_load["rows"][0]["payload_json"] is None
+        assert ("owner_user_id", "STRING") in event_load["schema"]
+
+    def test_product_events_carry_context_and_web_events_export(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        db_session.add_all([
+            ProductEvent(
+                id="product-ctx", user_id=user.id, event_name="page_view", schema_version=1,
+                visit_id="0f8fad5b-d9cb-469f-a165-70867728950e", surface="app", app_version="abc123",
+                created_at=now - datetime.timedelta(hours=1),
+            ),
+            WebEvent(
+                id="web-1", event_name="landing_view", schema_version=1, path="/",
+                visitor_day_hash="a" * 64, referrer_host="news.example.com", utm_source="newsletter",
+                created_at=now - datetime.timedelta(hours=1),
+            ),
+        ])
+        db_session.commit()
+        bq = FakeBigQueryClient()
+
+        result = AnalyticsExportService(db_session, bq, "dataset").run_export(now=now)
+
+        product_row = next(load for load in bq.loads if load["table"] == "product_events")["rows"][0]
+        assert (product_row["visit_id"], product_row["surface"], product_row["app_version"]) == (
+            "0f8fad5b-d9cb-469f-a165-70867728950e", "app", "abc123",
+        )
+        web_row = next(load for load in bq.loads if load["table"] == "web_events")["rows"][0]
+        assert result["rows"]["web_events"] == 1
+        assert web_row["utm_source"] == "newsletter"
+        assert "ip" not in web_row and "user_agent" not in web_row
+
+    def test_erasures_delete_warehouse_rows_then_clear_the_queue(self, db_session, monkeypatch):
+        pytest.importorskip("google.cloud.bigquery")
+        db_session.add(AnalyticsErasure(user_id="gone-user"))
+        db_session.commit()
+        bq = FakeBigQueryClient()
+        for table, column in analytics_export_module.ERASURE_COLUMNS:
+            bq.with_columns(f"dataset.{table}", column)
+
+        result = AnalyticsExportService(db_session, bq, "dataset").run_export(now=_dt(0))
+
+        deletes = [sql for sql in bq.queries if "IN UNNEST(@user_ids)" in sql]
+        assert deletes == [
+            "DELETE FROM `dataset.product_events` WHERE `user_id` IN UNNEST(@user_ids)",
+            "DELETE FROM `dataset.event_logs` WHERE `owner_user_id` IN UNNEST(@user_ids)",
+            "DELETE FROM `dataset.email_delivery_events` WHERE `recipient_user_id` IN UNNEST(@user_ids)",
+        ]
+        params = [config for config in bq.query_configs if config is not None]
+        assert all(config.query_parameters[0].values == ["gone-user"] for config in params)
+        assert result["rows"]["erasures"] == 1
+        assert db_session.query(AnalyticsErasure).count() == 0
+
+    def test_erasure_skips_tables_that_predate_the_id_column(self, db_session):
+        pytest.importorskip("google.cloud.bigquery")
+        db_session.add(AnalyticsErasure(user_id="gone-user"))
+        db_session.commit()
+        bq = FakeBigQueryClient().with_columns("dataset.product_events", "user_id")
+
+        AnalyticsExportService(db_session, bq, "dataset").run_export(now=_dt(0))
+
+        deletes = [sql for sql in bq.queries if "IN UNNEST(@user_ids)" in sql]
+        assert deletes == ["DELETE FROM `dataset.product_events` WHERE `user_id` IN UNNEST(@user_ids)"]
+        assert db_session.query(AnalyticsErasure).count() == 0
+
+    def test_failed_erasure_delete_keeps_the_queue(self, db_session):
+        pytest.importorskip("google.cloud.bigquery")
+        db_session.add(AnalyticsErasure(user_id="gone-user"))
+        db_session.commit()
+
+        class FailingDeletes(FakeBigQueryClient):
+            def query(self, sql, job_config=None):
+                if "IN UNNEST" in sql:
+                    return FakeLoadJob(should_fail=True)
+                return super().query(sql, job_config)
+
+        bq = FailingDeletes().with_columns("dataset.product_events", "user_id")
+        with pytest.raises(RuntimeError):
+            AnalyticsExportService(db_session, bq, "dataset").run_export(now=_dt(0))
+
+        assert db_session.query(AnalyticsErasure).count() == 1
+
+
+def _product_event(db_session, user, event_id, created_at):
+    db_session.add(ProductEvent(id=event_id, user_id=user.id, event_name="page_view", created_at=created_at))
+
+
+def _export_state(db_session, table, last_ts, last_id):
+    set_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {
+        "tables": {table: {"last_ts": analytics_export_module._format_cursor(last_ts), "last_id": last_id}},
+    })
+    db_session.commit()
+
+
+@pytest.mark.unit
+class TestFlushAfterExport:
+    def test_run_flushes_exported_events_past_the_live_window_and_nothing_else(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        root = _root(db_session, user)
+        old = now - datetime.timedelta(days=40)
+        _product_event(db_session, user, "product-old", old)
+        _product_event(db_session, user, "product-live", now - datetime.timedelta(days=10))
+        db_session.add_all([
+            WebEvent(id="web-old", event_name="landing_view", schema_version=1, visitor_day_hash="a" * 64, created_at=old),
+            EventLog(id="event-old", root_id=root.id, event_type="session.completed", timestamp=old),
+            EmailDeliveryEvent(id="email-old", provider="test", template_key="beta_invite", status="sent", created_at=old),
+        ])
+        db_session.commit()
+
+        result = AnalyticsExportService(db_session, FakeBigQueryClient(), "dataset").run_export(now=now)
+
+        assert result["flushed"] == {"product_events": 1, "web_events": 1}
+        assert get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)["last_run_flushed"] == result["flushed"]
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["product-live"]
+        assert db_session.query(WebEvent).count() == 0
+        # Activity history and email records are not analytics: they stay.
+        assert db_session.query(EventLog).count() == 1
+        assert db_session.query(EmailDeliveryEvent).count() == 1
+
+    def test_rows_past_the_watermark_stay_however_old(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "exported", now - datetime.timedelta(days=60))
+        _product_event(db_session, user, "not-exported", now - datetime.timedelta(days=45))
+        db_session.commit()
+        _export_state(db_session, "product_events", now - datetime.timedelta(days=50), "exported")
+
+        assert analytics_export_module.flush_exported(db_session, now=now) == {"product_events": 1, "web_events": 0}
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["not-exported"]
+
+    def test_a_shared_timestamp_flushes_only_up_to_the_watermark_id(self, db_session):
+        now = _dt(0)
+        same = now - datetime.timedelta(days=60)
+        user = _user(db_session)
+        _product_event(db_session, user, "a", same)
+        _product_event(db_session, user, "b", same)
+        db_session.commit()
+        _export_state(db_session, "product_events", same, "a")
+
+        analytics_export_module.flush_exported(db_session, now=now)
+
+        assert [row.id for row in db_session.query(ProductEvent).all()] == ["b"]
+
+    def test_a_table_that_never_exported_keeps_everything(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "ancient", now - datetime.timedelta(days=170))
+        db_session.commit()
+
+        assert analytics_export_module.flush_exported(db_session, now=now) == {"product_events": 0, "web_events": 0}
+        assert db_session.query(ProductEvent).count() == 1
+
+    def test_a_failed_load_flushes_nothing_from_that_table(self, db_session):
+        now = _dt(0)
+        user = _user(db_session)
+        _product_event(db_session, user, "old", now - datetime.timedelta(days=40))
+        db_session.commit()
+
+        with pytest.raises(RuntimeError):
+            AnalyticsExportService(
+                db_session, FakeBigQueryClient(fail_tables={"product_events"}), "dataset",
+            ).run_export(now=now)
+
+        assert db_session.query(ProductEvent).count() == 1
+
+    def test_the_live_window_reads_the_admin_setting_and_its_old_name(self, db_session):
+        assert analytics_export_module.analytics_live_days(db_session) == 35
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {"product_events_days": 90})
+        assert analytics_export_module.analytics_live_days(db_session) == 90
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {"live_days": 5})
+        assert analytics_export_module.analytics_live_days(db_session) == 30
+
+
+@pytest.mark.unit
+class TestReportingViews:
+    def test_a_successful_run_applies_every_view_to_the_dataset(self, db_session):
+        bq = FakeBigQueryClient()
+
+        AnalyticsExportService(db_session, bq, "project.dataset").run_export(now=_dt(0))
+
+        views = [sql for sql in bq.queries if "CREATE OR REPLACE VIEW" in sql]
+        assert len(views) == len(analytics_export_module.reporting_view_statements("project.dataset")) == 8
+        assert "`project.dataset.wap_weekly`" in "".join(views)
+        assert not any("{dataset}" in sql or "PROJECT_ID" in sql for sql in views)
+        assert "views_error" not in get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)
+
+    def test_a_failed_view_is_reported_without_failing_the_run(self, db_session):
+        class ViewFailingClient(FakeBigQueryClient):
+            def query(self, sql, job_config=None):
+                if "CREATE OR REPLACE VIEW" in sql:
+                    raise BadRequest("Not found: Table users_deduped")
+                return super().query(sql, job_config)
+
+        result = AnalyticsExportService(db_session, ViewFailingClient(), "dataset").run_export(now=_dt(0))
+
+        assert result["status"] == "success"
+        assert "Not found" in get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)["views_error"]

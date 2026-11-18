@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import Admin from '../Admin';
@@ -154,7 +154,7 @@ describe('Admin', () => {
                 top_pages: [],
                 email_health: [],
                 storage: { tables: [] },
-                retention: { product_events_days: 180 },
+                retention: { live_days: 35, product_events_ceiling_days: 180, web_events_ceiling_days: 90 },
                 export: { last_run_at: null, last_run_status: null, tables: {} },
             },
         });
@@ -397,12 +397,25 @@ describe('Admin', () => {
         updateBetaSignupStatus.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
         sendBetaSignupInvite.mockResolvedValue({ data: { request: { id: 'signup-1', status: 'invited' } } });
     });
+    it('shows account totals as unknown, not zero, until the summary arrives', async () => {
+        let resolveSummary;
+        getSummary.mockReturnValue(new Promise((resolve) => { resolveSummary = resolve; }));
+        renderAdmin();
+
+        const totals = await screen.findByRole('list', { name: 'Account totals' });
+        expect(within(totals).getAllByText('–')).toHaveLength(6);
+
+        resolveSummary({ data: { total_users: 4, active_users: 3, total_fractals: 2, total_sessions: 9, storage_bytes: 2048, invite_keys: { available: 1 } } });
+        await waitFor(() => expect(within(screen.getByRole('list', { name: 'Account totals' })).getByText('9')).toBeInTheDocument());
+    });
+
     it('renders user entity metrics, storage, and invite key creation', async () => {
         renderAdmin();
         await waitFor(() => {
             expect(screen.getByText('Admin')).toBeInTheDocument();
-            expect(screen.getByText('Users')).toBeInTheDocument();
+            expect(screen.getByRole('list', { name: 'Account totals' })).toHaveTextContent('Users');
         });
+        expect(screen.getByRole('tab', { name: 'overview' })).toHaveAttribute('aria-selected', 'true');
         fireEvent.click(screen.getByText('users'));
         await waitFor(() => expect(screen.getByText('tester')).toBeInTheDocument());
         fireEvent.click(screen.getByText('+'));

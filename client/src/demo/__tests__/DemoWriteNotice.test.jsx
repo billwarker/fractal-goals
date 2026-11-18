@@ -8,6 +8,8 @@ import { DEMO_WRITE_BLOCKED_EVENT } from '../demoMode';
 
 vi.mock('react-hot-toast', () => ({ default: { dismiss: vi.fn() } }));
 vi.mock('../../components/atoms/ActionToast', () => ({ showActionToast: vi.fn() }));
+const { trackPublicEvent } = vi.hoisted(() => ({ trackPublicEvent: vi.fn() }));
+vi.mock('../../utils/publicTelemetry', () => ({ trackPublicEvent }));
 
 const blockWrite = () => act(() => {
     window.dispatchEvent(new CustomEvent(DEMO_WRITE_BLOCKED_EVENT));
@@ -50,5 +52,25 @@ describe('DemoWriteNotice', () => {
         unmount();
         blockWrite();
         expect(showActionToast).not.toHaveBeenCalled();
+    });
+    it('records one blocked-write event per burst, with only the method', () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
+        render(<DemoWriteNotice />);
+
+        act(() => {
+            window.dispatchEvent(new CustomEvent(DEMO_WRITE_BLOCKED_EVENT, { detail: { method: 'PATCH', url: '/api/x/goals/1' } }));
+            window.dispatchEvent(new CustomEvent(DEMO_WRITE_BLOCKED_EVENT, { detail: { method: 'post', url: '/api/x' } }));
+        });
+        vi.setSystemTime(new Date('2030-01-01T00:00:05Z'));
+        act(() => {
+            window.dispatchEvent(new CustomEvent(DEMO_WRITE_BLOCKED_EVENT, { detail: { method: 'delete' } }));
+        });
+
+        expect(trackPublicEvent.mock.calls).toEqual([
+            ['demo_write_blocked', { method: 'patch' }],
+            ['demo_write_blocked', { method: 'delete' }],
+        ]);
+        vi.useRealTimers();
     });
 });

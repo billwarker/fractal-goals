@@ -15,6 +15,7 @@ from account_tiers import (
 from models import (
     ActivityDefinition,
     AdminAuditEvent,
+    AnalyticsErasure,
     ActivityDurationStats,
     ActivityGroup,
     ActivityInstance,
@@ -470,6 +471,8 @@ class AdminService(_AdminBetaSignupsMixin):
             SignupInviteKey.assigned_email == user.email
         ).update({"assigned_email": None}, synchronize_session=False)
         self.db_session.execute(delete(GoalLevel).where(GoalLevel.owner_id == user_id))
+        # The warehouse keeps copies keyed by this id; the next export deletes them.
+        self.db_session.merge(AnalyticsErasure(user_id=user_id))
         self.db_session.delete(user)
         self.db_session.commit()
         return {"message": "User hard deleted", "user_id": user_id, "deleted_root_count": len(root_ids)}, None, 200

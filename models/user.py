@@ -40,6 +40,9 @@ class User(Base):
     terms_accepted_at = Column(DateTime, nullable=True)
     privacy_accepted_version = Column(String(16), nullable=True)
     privacy_accepted_at = Column(DateTime, nullable=True)
+    # First-party attribution: the waitlist request's source (a code such as
+    # 'utm:newsletter' or 'demo'), copied at sign-up; 'invite' without one.
+    acquisition_source = Column(String(80), nullable=True)
 
     # Erasure request. Set when a user asks for deletion; a scheduled job
     # performs the hard delete once the 30-day grace window elapses, so an

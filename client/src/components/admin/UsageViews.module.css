@@ -1,0 +1,227 @@
+/* Admin → Overview views: compact KPI strips, two-column grids and dense tables. */
+
+.view {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.subheading {
+    margin: 4px 0 0;
+    font-size: var(--font-size-base);
+}
+
+.sectionHeader {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 4px 12px;
+}
+
+.note {
+    margin: 0;
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.kpiStrip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.kpiCard {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card);
+}
+
+.kpiCard span {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.kpiCard strong {
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xl);
+    font-variant-numeric: tabular-nums;
+}
+
+.kpiCard small {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.viewGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.viewGrid > * {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.tableScroll {
+    max-height: 420px;
+    overflow: auto;
+    border-radius: var(--border-radius-md);
+}
+
+.compactTable {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-card-alt);
+    font-size: var(--font-size-sm);
+}
+
+.compactTable th,
+.compactTable td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.compactTable th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-bg-card-hover);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.compactTable .stageRow th {
+    position: static;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+.compactTable tbody tr:hover {
+    background: color-mix(in srgb, var(--color-brand-primary) 6%, transparent);
+}
+
+.compactTable tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.compactTable .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.sortButton {
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+}
+
+.sortButton:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.funnelCount {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.funnelCount span {
+    min-width: 3ch;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.bar {
+    flex: 1;
+    min-width: 60px;
+    height: 8px;
+    appearance: none;
+    border: none;
+    border-radius: 4px;
+    background: var(--color-bg-input);
+    overflow: hidden;
+}
+
+.bar::-webkit-progress-bar {
+    background: var(--color-bg-input);
+}
+
+.bar::-webkit-progress-value {
+    background: var(--color-brand-primary);
+}
+
+.bar::-moz-progress-bar {
+    background: var(--color-brand-primary);
+}
+
+.linkButton {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-brand-primary);
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.linkButton:hover {
+    text-decoration: underline;
+}
+
+.linkButton:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+.search {
+    width: min(100%, 280px);
+    padding: 6px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius-md);
+    background: var(--color-bg-input);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-sm);
+}
+
+/* Six sections don't fit a phone's width: the row scrolls instead of squeezing labels. */
+.overviewTabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.overviewTabs > button {
+    flex: 1 0 auto;
+    white-space: nowrap;
+}

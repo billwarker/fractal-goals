@@ -1,6 +1,6 @@
 <!--
-version: 1.2
-effective: 2026-11-17
+version: 1.3
+effective: 2026-11-18
 -->
 
 # Privacy Policy
@@ -90,25 +90,55 @@ from your cloud storage; only an explicit delete you confirm in the app moves a 
 provider's trash.
 An account export includes media references and metadata, rather than the original file bytes.
 
-### 2.3 Product usage information
+### 2.3 Usage information
 
 To understand which parts of the Service are used and where people get stuck, we record a
-deliberately narrow set of usage events. **We record only these six event types and nothing
-else:**
+deliberately narrow set of events. **We record only the event types listed here and nothing
+else.** Anything not on these lists is rejected by our servers rather than stored, and so is
+any detail attached to an event that we have not listed for it. Those details are only
+numbers, yes/no values, or labels chosen by our software; never text you typed.
+
+**While you are signed in**, usage events:
 
 `page_view` · `settings_opened` · `onboarding_started` ·
 `onboarding_step_completed` · `onboarding_completed` · `onboarding_dismissed`
 
-Anything not on this list is rejected by our servers rather than stored. Two further
-safeguards apply:
+and reliability events, which tell us when saving changes on your device or syncing them has
+gone wrong (counts, waiting times, and error codes; never the change itself):
+
+`offline_sync_drained` · `offline_op_rejected` · `offline_boot` · `offline_detected` ·
+`offline_ops_expired` · `offline_drain_error` · `offline_hydrate_error` ·
+`offline_watchdog_flush` · `offline_store_volatile` · `offline_store_reopened` ·
+`offline_submit_failed` · `offline_lock_reclaimed` · `offline_queue_stalled` ·
+`offline_auth_paused`
+
+Each signed-in event also records the version of the app and a random visit number that
+groups the events of one visit; it is held only in the open page, never stored on your device.
+
+**When you visit our public website, the live demo, or the waitlist form**, anonymous visit
+events:
+
+`landing_view` · `demo_started` · `demo_tour_completed` · `demo_write_blocked` ·
+`waitlist_opened` · `waitlist_submitted` · `invite_link_opened`
+
+These are not linked to an account, and nothing is stored on your device for them. To count
+how many different people visit each day, our server combines your IP address and browser
+type with a random value that we replace and discard every day, and keeps only the
+scrambled result. The IP address and browser type themselves are not stored, and the result
+cannot be matched with another day's visits. We also keep the name of the website that
+linked to us (not the full address) and any campaign labels in the link (`utm_source`,
+`utm_medium`, `utm_campaign`). If you join the waitlist, its record keeps where you came from
+(for example, the campaign label or "demo"), and so does your account if you later sign up.
+
+Further safeguards:
 
 - **Page addresses are de-identified in your browser before they are sent to us.** Identifiers
   in a page address are replaced with generic placeholders, so we can see that a goals page
   was viewed without recording which goal it was.
-- **We honour the Do Not Track browser setting.** If your browser sends a Do Not Track signal,
-  no usage events are collected from you at all.
-
-Usage events are only collected while you are signed in.
+- **We honour Global Privacy Control and Do Not Track.** If your browser sends either signal,
+  no events are collected from you at all.
+- **You can turn usage events off** in **Settings → General → Privacy**. While it is off,
+  our servers store none of your signed-in events.
 
 ### 2.4 Activity history within your account
 
@@ -158,7 +188,7 @@ useful plain summary regardless of where you live.
 | Authenticating you and keeping your account secure | Account information, security metadata | Performance of a contract; legitimate interests |
 | Preventing abuse, fraud, and automated attacks | Security metadata, transient infrastructure logs | Legitimate interests |
 | Sending transactional and security emails | Email address, delivery records | Performance of a contract; legitimate interests |
-| Understanding product usage to improve the Service | Product usage information | Legitimate interests |
+| Understanding product usage to improve the Service | Usage information (signed-in and public website events) | Legitimate interests |
 | Managing private beta access | Beta signup information | Consent; legitimate interests |
 | Meeting legal obligations | As required | Legal obligation |
 
@@ -244,8 +274,9 @@ used in aggregate. We are disclosing this specifically because it involves your 
 details leaving the main application database.
 
 **What is copied:** your account identifier, username, email address, role, account status,
-membership tier, account creation date, and last sign-in date; together with product usage
-events, activity history, and email delivery records.
+membership tier, account creation date, and last sign-in date; together with usage events,
+the anonymous public website events, activity history (the type and time of each action,
+without its content), and email delivery records.
 
 **What is not copied:** your goals, sessions, notes, metrics, targets, or programs. **The
 content you create is not exported to the analytics warehouse.**
@@ -254,7 +285,9 @@ content you create is not exported to the analytics warehouse.**
 features go unused. It is used only by us, only in aggregate, and **never sold, shared with
 advertisers, or used to build profiles for marketing.**
 
-**Retention:** analytics records are automatically deleted after **24 months**.
+**Retention:** analytics records are automatically deleted after **24 months**. When an
+account is permanently deleted, its records are removed from the warehouse at the next daily
+copy.
 
 ---
 
@@ -284,8 +317,9 @@ required. You can delete them through your browser at any time; doing so signs y
 | Information | Retention period |
 |---|---|
 | Account and the content you create | For as long as your account exists, then deleted within 30 days of an erasure request |
-| Product usage events | Up to 180 days |
-| Internal analytics records | 24 months |
+| Signed-in usage and reliability events | Up to 180 days in our live database (usually 35) |
+| Public website visit events | Up to 90 days in our live database (usually 35) |
+| Internal analytics records | 24 months, including the analytics copy of the usage and website events above (website events carry no identifier) |
 | Activity history within your fractals | For as long as your account exists, or until you clear it |
 | Password reset tokens | Expire after 60 minutes; records purged after 30 days |
 | Email delivery and notification records | 24 months |
@@ -321,6 +355,9 @@ machine-readable export of your core account content. For a broader access reque
 operational records, email us using the address below.
 
 **Correction.** Update your username, email, and preferences directly in **Settings → Account**.
+
+**Objection to product analytics.** Turn off **Settings → General → Privacy → Share usage
+analytics**, or have your browser send Global Privacy Control. For anything else, email us.
 
 **Erasure.** Go to **Settings → Account → Delete my account**. Your account remains accessible
 during a 30-day grace period and is then scheduled for permanent deletion. You can cancel in

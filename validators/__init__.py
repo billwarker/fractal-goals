@@ -158,6 +158,7 @@ from .programs import (
     VALID_DAYS_OF_WEEK,
 )
 from .telemetry import (
+    PublicTelemetryEventsSchema,
     TelemetryEventSchema,
     TelemetryEventsSchema,
 )
@@ -285,6 +286,7 @@ __all__ = [
     "SessionUpdateSchema",
     "SessionUpdateRequestSchema",
     "SplitDefinitionSchema",
+    "PublicTelemetryEventsSchema",
     "TelemetryEventSchema",
     "TelemetryEventsSchema",
     "TimerActivityInstanceManualUpdateSchema",

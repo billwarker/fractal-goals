@@ -149,6 +149,7 @@ class AuthService:
             terms_accepted_at=accepted_at,
             privacy_accepted_version=config.PRIVACY_VERSION,
             privacy_accepted_at=accepted_at,
+            acquisition_source=(beta_signup.source if beta_signup else None) or 'invite',
         )
         new_user.set_password(data['password'])
 

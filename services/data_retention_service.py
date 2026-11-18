@@ -18,9 +18,11 @@ from models import (
     EmailWebhookEvent,
     PasswordResetToken,
     ProductEvent,
+    WebEvent,
+    format_utc,
     utc_now,
 )
-from services.app_settings import TELEMETRY_RETENTION_KEY, get_app_setting
+from services.app_settings import DATA_RETENTION_STATE_KEY, get_app_setting, set_app_setting
 
 
 class DataRetentionService:
@@ -29,24 +31,11 @@ class DataRetentionService:
 
     def prune(self, now=None) -> dict[str, int]:
         now = now or utc_now()
-        product_event_setting = get_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {}) or {}
-        if not isinstance(product_event_setting, dict):
-            product_event_setting = {}
-        try:
-            configured_product_event_days = int(
-                product_event_setting.get("product_events_days", config.PRODUCT_EVENT_RETENTION_DAYS)
-            )
-        except (TypeError, ValueError):
-            configured_product_event_days = config.PRODUCT_EVENT_RETENTION_DAYS
-        product_event_days = max(
-            30,
-            min(
-                config.PRODUCT_EVENT_RETENTION_DAYS,
-                configured_product_event_days,
-            ),
-        )
         cutoffs = {
-            "product_events": now - datetime.timedelta(days=product_event_days),
+            # The published ceilings. The export job keeps Postgres far smaller while it
+            # runs (services/analytics_export_service.flush_exported); this holds if it stops.
+            "product_events": now - datetime.timedelta(days=config.PRODUCT_EVENT_RETENTION_DAYS),
+            "web_events": now - datetime.timedelta(days=config.WEB_EVENT_RETENTION_DAYS),
             "password_reset_tokens": now - datetime.timedelta(days=config.PASSWORD_RESET_RECORD_RETENTION_DAYS),
             "email_events": now - datetime.timedelta(days=config.EMAIL_EVENT_RETENTION_DAYS),
             "admin_audits": now - datetime.timedelta(days=config.ADMIN_AUDIT_RETENTION_DAYS),
@@ -57,6 +46,7 @@ class DataRetentionService:
 
         counts = {
             "product_events": self._delete(ProductEvent, ProductEvent.created_at < cutoffs["product_events"]),
+            "web_events": self._delete(WebEvent, WebEvent.created_at < cutoffs["web_events"]),
             "password_reset_tokens": self._delete(
                 PasswordResetToken,
                 PasswordResetToken.created_at < cutoffs["password_reset_tokens"],
@@ -114,3 +104,19 @@ class DataRetentionService:
     def _delete(self, model, *conditions) -> int:
         result = self.db_session.execute(delete(model).where(*conditions))
         return int(result.rowcount or 0)
+
+
+def record_retention_run(db_session, *, succeeded: bool, counts=None, now=None) -> dict:
+    """Note the run in app_settings, so Admin can show when retention last succeeded."""
+    now = now or utc_now()
+    state = get_app_setting(db_session, DATA_RETENTION_STATE_KEY, {}) or {}
+    if not isinstance(state, dict):
+        state = {}
+    state["last_run_at"] = format_utc(now)
+    state["last_run_status"] = "success" if succeeded else "failed"
+    if succeeded:
+        state["last_success_at"] = format_utc(now)
+        state["last_run_counts"] = counts or {}
+    set_app_setting(db_session, DATA_RETENTION_STATE_KEY, state)
+    db_session.commit()
+    return state

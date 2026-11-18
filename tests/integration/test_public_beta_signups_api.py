@@ -166,3 +166,23 @@ def test_resend_webhook_route_rejects_bad_signature(client, monkeypatch):
 
     assert response.status_code == 400
     assert response.get_json()['error'] == 'Invalid webhook signature'
+
+
+def test_beta_signup_keeps_the_first_source(client, db_session):
+    first = client.post('/api/public/beta-signups', json={'email': 'src@test.example', 'source': 'utm:newsletter'})
+    again = client.post('/api/public/beta-signups', json={'email': 'src@test.example', 'source': 'demo'})
+
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert db_session.query(BetaSignupRequest).filter_by(email='src@test.example').one().source == 'utm:newsletter'
+
+
+def test_beta_signup_without_a_source_defaults_to_the_landing_page(client, db_session):
+    client.post('/api/public/beta-signups', json={'email': 'nosrc@test.example'})
+
+    assert db_session.query(BetaSignupRequest).filter_by(email='nosrc@test.example').one().source == 'landing_page'
+
+
+def test_beta_signup_source_must_be_a_code(client):
+    response = client.post('/api/public/beta-signups', json={'email': 'bad@test.example', 'source': 'My Campaign'})
+
+    assert response.status_code == 400

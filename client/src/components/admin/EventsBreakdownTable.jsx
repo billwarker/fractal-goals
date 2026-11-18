@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 import styles from '../../pages/Admin.module.css';
+import viewStyles from './UsageViews.module.css';
 
 /**
  * Full domain-event breakdown for the admin usage dashboard: every event type
@@ -50,29 +51,31 @@ function EventsBreakdownTable({ events = [] }) {
                     onChange={(event) => setSearch(event.target.value)}
                 />
             </div>
-            <table className={styles.table}>
-                <thead>
-                    <tr>
-                        <th>Event</th>
-                        <th>Domain</th>
-                        <th>Count</th>
-                        <th>Users</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {visibleEvents.map((event) => (
-                        <tr key={event.event_type}>
-                            <td>{event.event_type}</td>
-                            <td>{event.domain}</td>
-                            <td>{event.count}</td>
-                            <td>{event.users}</td>
+            <div className={viewStyles.tableScroll}>
+                <table className={viewStyles.compactTable}>
+                    <thead>
+                        <tr>
+                            <th>Event</th>
+                            <th>Domain</th>
+                            <th className={viewStyles.num}>Count</th>
+                            <th className={viewStyles.num}>Users</th>
                         </tr>
-                    ))}
-                    {visibleEvents.length === 0 && (
-                        <tr><td colSpan={4}>No domain events in this window.</td></tr>
-                    )}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {visibleEvents.map((event) => (
+                            <tr key={event.event_type}>
+                                <td>{event.event_type}</td>
+                                <td>{event.domain}</td>
+                                <td className={viewStyles.num}>{event.count}</td>
+                                <td className={viewStyles.num}>{event.users}</td>
+                            </tr>
+                        ))}
+                        {visibleEvents.length === 0 && (
+                            <tr><td colSpan={4}>No domain events in this window.</td></tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
         </>
     );
 }

@@ -4,6 +4,8 @@ import ModalBody from '../components/atoms/ModalBody';
 import landingContent from '../content/landingContent';
 import { publicApi } from '../utils/api';
 import { getAppHref } from '../utils/marketingHost';
+import { trackPublicEvent } from '../utils/publicTelemetry';
+import { waitlistSource } from '../utils/visitAttribution';
 import styles from './DemoSignupModal.module.css';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,7 +18,11 @@ export function inviteSignupHref(inviteKey, email, appHref = getAppHref()) {
     return `${appHref}?${params.toString()}`;
 }
 
-export default function DemoSignupModal({ isOpen, onClose }) {
+/**
+ * `source` says where it was opened (`landing`, `demo_guide`, `demo_tour_end`): it tags the
+ * public telemetry, and the request records the campaign or site that brought the visitor.
+ */
+export default function DemoSignupModal({ isOpen, onClose, source = 'landing' }) {
     const copy = landingContent.betaForm;
     const [mode, setMode] = useState('waitlist');
     const [email, setEmail] = useState('');
@@ -37,8 +43,10 @@ export default function DemoSignupModal({ isOpen, onClose }) {
             const trimmedGoal = goal.trim();
             const response = await publicApi.createBetaSignup({
                 email: email.trim(),
+                source: waitlistSource(source === 'landing' ? 'landing' : 'demo'),
                 ...(trimmedGoal ? { use_case: trimmedGoal } : {}),
             });
+            trackPublicEvent('waitlist_submitted', { source, created: Boolean(response.data?.created) });
             setStatus({
                 state: 'success',
                 message: response.data?.created ? copy.successCreatedMessage : copy.successUpdatedMessage,
@@ -51,6 +59,7 @@ export default function DemoSignupModal({ isOpen, onClose }) {
     const submitInvite = (event) => {
         event.preventDefault();
         if (!inviteKey.trim()) return;
+        trackPublicEvent('invite_link_opened', { source });
         window.location.assign(inviteSignupHref(inviteKey, email));
     };
 

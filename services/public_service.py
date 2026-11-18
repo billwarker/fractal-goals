@@ -29,7 +29,8 @@ class PublicService:
         created = request is None
 
         if request is None:
-            request = BetaSignupRequest(email=email, source="landing_page")
+            # First touch wins: a later resubmission never rewrites where they came from.
+            request = BetaSignupRequest(email=email, source=data.get("source") or "landing_page")
             self.db_session.add(request)
 
         # Optional fields: only overwrite when the caller actually provides a

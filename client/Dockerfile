@@ -18,7 +18,10 @@ COPY . .
 # VITE_API_URL must be available at build time
 ARG VITE_API_URL
 ARG VITE_LANDING_EXAMPLES_STATIC_URL
+# Recorded with usage events, so a change in behaviour can be tied to a release.
+ARG VITE_APP_VERSION=dev
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_APP_VERSION=$VITE_APP_VERSION
 ENV VITE_LANDING_EXAMPLES_STATIC_URL=$VITE_LANDING_EXAMPLES_STATIC_URL
 RUN npm run build
 

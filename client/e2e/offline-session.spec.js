@@ -385,17 +385,21 @@ test('the offline kill switch removes the service worker on the next load', asyn
         }
     });
     await page.reload();
+    // The kill switch unregisters, clears the caches, then reloads: the worker can be gone
+    // while the caches and the reload are still to come, so wait for both in one check.
     await expect.poll(
         async () => {
             try {
-                return await page.evaluate(async () => (await navigator.serviceWorker.getRegistrations()).length);
+                return await page.evaluate(async () => ({
+                    registrations: (await navigator.serviceWorker.getRegistrations()).length,
+                    workboxCaches: (await caches.keys()).filter((key) => key.startsWith('workbox-')),
+                }));
             } catch (error) {
                 // Disabling the worker intentionally triggers a second navigation.
-                if (error.message.includes('Execution context was destroyed')) return -1;
+                if (error.message.includes('Execution context was destroyed')) return null;
                 throw error;
             }
         },
         { timeout: 15_000 },
-    ).toBe(0);
-    expect(await page.evaluate(async () => (await caches.keys()).filter((key) => key.startsWith('workbox-')))).toEqual([]);
+    ).toEqual({ registrations: 0, workboxCaches: [] });
 });

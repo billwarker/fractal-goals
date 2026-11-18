@@ -1,0 +1,42 @@
+.quota {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.quota p {
+    margin: 0;
+}
+
+.bar {
+    width: 100%;
+    height: 10px;
+    appearance: none;
+    border: none;
+    border-radius: 5px;
+    background: var(--color-bg-input);
+    overflow: hidden;
+}
+
+.bar::-webkit-progress-bar {
+    background: var(--color-bg-input);
+}
+
+.bar::-webkit-progress-value {
+    background: var(--color-brand-primary);
+}
+
+.bar::-moz-progress-bar {
+    background: var(--color-brand-primary);
+}
+
+.warning {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border: 1px solid color-mix(in srgb, var(--color-brand-warning) 45%, var(--color-border));
+    border-radius: var(--border-radius-md);
+    background: color-mix(in srgb, var(--color-brand-warning) 8%, var(--color-bg-card));
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+}

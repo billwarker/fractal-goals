@@ -23,19 +23,27 @@ from models import (
     Goal,
     ProductEvent,
     User,
+    WebEvent,
     format_utc,
     utc_now,
 )
 from services.app_settings import (
     ANALYTICS_EXPORT_STATE_KEY,
+    DATA_RETENTION_STATE_KEY,
     TELEMETRY_RETENTION_KEY,
     get_app_setting,
     set_app_setting,
 )
 from services.events import Events
 from services.service_types import JsonDict, ServiceResult
-from services.telemetry_service import DEFAULT_RETENTION_DAYS, TelemetryService
+from services.analytics_export_service import (
+    MAX_LIVE_DAYS,
+    MIN_LIVE_DAYS,
+    analytics_live_days,
+    flush_exported,
+)
 from services.demo_account_service import DEMO_ACCOUNT_ROLE
+from services.growth_metrics_service import EXCLUDED_ROLES, GrowthMetricsService, oldest_event, series_start
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
@@ -43,8 +51,8 @@ logger = logging.getLogger(__name__)
 MAX_WINDOW_DAYS = 365
 DEFAULT_WINDOW_DAYS = 30
 TOP_LIMIT = 20
-MIN_RETENTION_DAYS = 30
-MAX_RETENTION_DAYS = config.PRODUCT_EVENT_RETENTION_DAYS
+# Payload accounting for activity history: the largest event types by stored bytes.
+EVENT_LOG_PAYLOAD_TOP = 10
 
 # Domain activity surfaced as dedicated per-user columns; the full event-type
 # spectrum lives in events_breakdown.
@@ -57,6 +65,7 @@ PER_USER_DOMAIN_COUNTS = {
 # from request input.
 STORAGE_STAT_TABLES = (
     ("product_events", ProductEvent, ProductEvent.created_at),
+    ("web_events", WebEvent, WebEvent.created_at),
     ("event_logs", EventLog, EventLog.timestamp),
     ("email_delivery_events", EmailDeliveryEvent, EmailDeliveryEvent.created_at),
 )
@@ -86,6 +95,7 @@ class AdminUsageService:
             end_date + datetime.timedelta(days=1), datetime.time.min, tzinfo=datetime.timezone.utc,
         )
         now = utc_now()
+        self._oldest_product_event = oldest_event(self.db_session, ProductEvent.created_at)
 
         return {
             "window": {
@@ -101,11 +111,36 @@ class AdminUsageService:
             "events_breakdown": self._events_breakdown(window_start, window_end),
             "top_events": self._top_events(window_start, window_end),
             "top_pages": self._top_pages(window_start, window_end),
+            "growth": GrowthMetricsService(self.db_session).summary(
+                window_start, window_end, start_date, end_date, now,
+            ),
             "email_health": self._email_health(window_start, window_end),
+            # The oldest event still in Postgres: the DAU and visitor series start there,
+            # and earlier days are in BigQuery.
+            "live_since": {
+                "product_events": format_utc(self._oldest_product_event),
+                "web_events": format_utc(oldest_event(self.db_session, WebEvent.created_at)),
+            },
+        }, None, 200
+
+    def storage_summary(self) -> ServiceResult[JsonDict]:
+        """Admin → Overview → System: storage, the live window, and the scheduled jobs' health."""
+        export = self._export_state()
+        return {
             "storage": self._storage_stats(),
             "retention": self._retention_settings(),
-            "export": self._export_state(),
+            "export": export,
+            "jobs": {
+                "export": {"last_run_at": export["last_run_at"], "last_success_at": export["last_success_at"]},
+                "retention": self._retention_job_state(),
+            },
         }, None, 200
+
+    def _retention_job_state(self):
+        stored = get_app_setting(self.db_session, DATA_RETENTION_STATE_KEY, None)
+        if not isinstance(stored, dict):
+            return {"last_run_at": None, "last_success_at": None}
+        return {"last_run_at": stored.get("last_run_at"), "last_success_at": stored.get("last_success_at")}
 
     def _resolve_window(self, start, end, days):
         start_date = _parse_iso_date(start)
@@ -130,38 +165,41 @@ class AdminUsageService:
             start_date = end_date - datetime.timedelta(days=MAX_WINDOW_DAYS - 1)
         return start_date, end_date
 
-    def prune_product_events(self, older_than_days=None) -> ServiceResult[JsonDict]:
-        if older_than_days is None:
-            older_than_days = self._retention_settings()["product_events_days"]
-        return TelemetryService(self.db_session).prune(older_than_days)
+    def flush_exported_events(self) -> ServiceResult[JsonDict]:
+        """Run the export's flush now: only rows already in BigQuery leave Postgres."""
+        live_days = analytics_live_days(self.db_session)
+        flushed = flush_exported(self.db_session, live_days=live_days)
+        return {"flushed": flushed, "deleted": sum(flushed.values()), "live_days": live_days}, None, 200
 
     def update_retention(self, payload) -> ServiceResult[JsonDict]:
         try:
-            days = int(payload.get("product_events_days"))
+            days = int(payload.get("live_days"))
         except (TypeError, ValueError):
-            return None, "product_events_days must be an integer", 400
-        days = max(MIN_RETENTION_DAYS, min(MAX_RETENTION_DAYS, days))
-        set_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {"product_events_days": days})
+            return None, "live_days must be an integer", 400
+        days = max(MIN_LIVE_DAYS, min(MAX_LIVE_DAYS, days))
+        set_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {"live_days": days})
         self.db_session.commit()
-        return {"product_events_days": days}, None, 200
+        return {"live_days": days}, None, 200
 
     def _retention_settings(self):
-        stored = get_app_setting(self.db_session, TELEMETRY_RETENTION_KEY, {}) or {}
-        days = stored.get("product_events_days", DEFAULT_RETENTION_DAYS)
         return {
-            "product_events_days": max(
-                MIN_RETENTION_DAYS,
-                min(MAX_RETENTION_DAYS, int(days)),
-            )
+            "live_days": analytics_live_days(self.db_session),
+            "product_events_ceiling_days": config.PRODUCT_EVENT_RETENTION_DAYS,
+            "web_events_ceiling_days": config.WEB_EVENT_RETENTION_DAYS,
         }
 
     def _export_state(self):
         stored = get_app_setting(self.db_session, ANALYTICS_EXPORT_STATE_KEY, None)
         if not isinstance(stored, dict):
-            return {"last_run_at": None, "last_run_status": None, "tables": {}}
+            return {"last_run_at": None, "last_run_status": None, "last_success_at": None, "tables": {}}
         return {
             "last_run_at": stored.get("last_run_at"),
             "last_run_status": stored.get("last_run_status"),
+            # Runs before the flush existed recorded no success time; their last run stands in.
+            "last_success_at": stored.get("last_success_at") or (
+                stored.get("last_run_at") if stored.get("last_run_status") == "success" else None
+            ),
+            "last_run_flushed": stored.get("last_run_flushed") or {},
             "tables": stored.get("tables", {}),
         }
 
@@ -177,7 +215,7 @@ class AdminUsageService:
         counts_by_day = {str(row.day): int(row.users) for row in daily_rows}
 
         dau = []
-        cursor = start_date
+        cursor = series_start(start_date, getattr(self, "_oldest_product_event", None))
         while cursor <= end_date:
             key = cursor.isoformat()
             dau.append({"date": key, "count": counts_by_day.get(key, 0)})
@@ -213,6 +251,8 @@ class AdminUsageService:
             signup_day.label("day"),
             func.count(User.id).label("count"),
         ).filter(
+            # The funnel's definition: demo and admin accounts aren't sign-ups.
+            User.role.notin_(EXCLUDED_ROLES),
             User.created_at >= window_start,
             User.created_at < window_end,
         ).group_by(signup_day).order_by(signup_day).all()
@@ -372,17 +412,51 @@ class AdminUsageService:
                 "bytes": self._table_bytes(table_name),
             })
         database = self._database_storage_breakdown()
-        return {"tables": tables, "database": database}
+        database["quota_bytes"] = config.DATABASE_STORAGE_QUOTA_MB * 1024 * 1024
+        return {"tables": tables, "database": database, "event_log_payloads": self._event_log_payloads()}
+
+    def _event_log_payloads(self):
+        """Stored activity-history bytes by event type, largest first (Postgres only)."""
+        if self.db_session.get_bind().dialect.name != "postgresql":
+            return []
+        try:
+            with self.db_session.begin_nested():
+                rows = self.db_session.execute(sa.text("""
+                    SELECT
+                        event_type,
+                        count(*) AS events,
+                        COALESCE(sum(pg_column_size(payload)), 0) AS payload_bytes,
+                        COALESCE(sum(pg_column_size(description)), 0) AS description_bytes
+                    FROM event_logs
+                    GROUP BY event_type
+                    ORDER BY COALESCE(sum(pg_column_size(payload)), 0)
+                           + COALESCE(sum(pg_column_size(description)), 0) DESC, event_type
+                    LIMIT :top
+                """), {"top": EVENT_LOG_PAYLOAD_TOP}).mappings().all()
+        except SQLAlchemyError:
+            logger.warning("Failed to read activity history payload sizes", exc_info=True)
+            return []
+        return [
+            {
+                "event_type": row["event_type"],
+                "events": int(row["events"]),
+                "payload_bytes": int(row["payload_bytes"]),
+                "description_bytes": int(row["description_bytes"]),
+            }
+            for row in rows
+        ]
 
     def _table_bytes(self, table_name: str):
         """Total on-disk relation size; None when unavailable (non-Postgres)."""
         try:
             if self.db_session.get_bind().dialect.name != "postgresql":
                 return None
-            result = self.db_session.execute(
-                sa.text("SELECT pg_total_relation_size(CAST(:table_name AS regclass))"),
-                {"table_name": table_name},
-            ).scalar()
+            # A savepoint: a failed read rolls back alone instead of aborting the request.
+            with self.db_session.begin_nested():
+                result = self.db_session.execute(
+                    sa.text("SELECT pg_total_relation_size(CAST(:table_name AS regclass))"),
+                    {"table_name": table_name},
+                ).scalar()
             return int(result) if result is not None else None
         except SQLAlchemyError:
             logger.warning("Failed to read relation size for %s", table_name, exc_info=True)
@@ -394,29 +468,30 @@ class AdminUsageService:
             return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
 
         try:
-            total_bytes = int(self.db_session.execute(
-                sa.text("SELECT pg_database_size(current_database())"),
-            ).scalar() or 0)
-            rows = self.db_session.execute(sa.text("""
-                SELECT
-                    n.nspname AS schema,
-                    c.relname AS table_name,
-                    GREATEST(c.reltuples::bigint, 0) AS estimated_rows,
-                    pg_total_relation_size(c.oid) AS total_bytes,
-                    pg_relation_size(c.oid) AS table_bytes,
-                    pg_indexes_size(c.oid) AS index_bytes,
-                    GREATEST(
-                        pg_total_relation_size(c.oid)
-                        - pg_relation_size(c.oid)
-                        - pg_indexes_size(c.oid),
-                        0
-                    ) AS toast_bytes
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind IN ('r', 'p', 'm')
-                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-                ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
-            """)).mappings().all()
+            with self.db_session.begin_nested():
+                total_bytes = int(self.db_session.execute(
+                    sa.text("SELECT pg_database_size(current_database())"),
+                ).scalar() or 0)
+                rows = self.db_session.execute(sa.text("""
+                    SELECT
+                        n.nspname AS schema,
+                        c.relname AS table_name,
+                        GREATEST(c.reltuples::bigint, 0) AS estimated_rows,
+                        pg_total_relation_size(c.oid) AS total_bytes,
+                        pg_relation_size(c.oid) AS table_bytes,
+                        pg_indexes_size(c.oid) AS index_bytes,
+                        GREATEST(
+                            pg_total_relation_size(c.oid)
+                            - pg_relation_size(c.oid)
+                            - pg_indexes_size(c.oid),
+                            0
+                        ) AS toast_bytes
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind IN ('r', 'p', 'm')
+                      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
+                """)).mappings().all()
         except SQLAlchemyError:
             logger.warning("Failed to read database storage breakdown", exc_info=True)
             return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}

@@ -1,166 +1,117 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 
 import { adminApi } from '../../utils/api';
 import { presetToRange } from '../../utils/dateRange';
 import DateRangeFilter from '../common/DateRangeFilter';
 import LoadingState from '../common/LoadingState';
-import DauBarChart from './DauBarChart';
+import ViewToggleTabs from '../common/ViewToggleTabs';
+import AcquisitionView from './AcquisitionView';
+import EngagementView from './EngagementView';
 import EventsBreakdownTable from './EventsBreakdownTable';
-import UsageStoragePanel from './UsageStoragePanel';
+import UsageSummaryView from './UsageSummaryView';
+import UsageSystemView from './UsageSystemView';
+import UsageUsersView from './UsageUsersView';
 import styles from '../../pages/Admin.module.css';
+import viewStyles from './UsageViews.module.css';
 
 const USAGE_PRESETS = ['7d', '30d', '90d', '6m', '1y', 'custom'];
 
-const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : 'Never');
+export const OVERVIEW_VIEWS = [
+    { value: 'summary', label: 'Summary' },
+    { value: 'acquisition', label: 'Acquisition' },
+    { value: 'engagement', label: 'Engagement' },
+    { value: 'people', label: 'People' },
+    { value: 'events', label: 'Events' },
+    { value: 'system', label: 'System' },
+];
+const VIEW_PARAM = 'view';
 
-export default function UsagePanel({ enabled }) {
+const GROWTH_VIEWS = new Set(['acquisition', 'engagement']);
+
+function OverviewView({ view, data, accountCards, onOpen }) {
+    if (GROWTH_VIEWS.has(view) && !data.growth) return <p className={viewStyles.note}>No acquisition or engagement data yet.</p>;
+    if (view === 'acquisition') {
+        return (
+            <AcquisitionView
+                growth={data.growth}
+                windowStart={data.window?.start}
+                windowEnd={data.window?.end}
+                webLiveSince={data.live_since?.web_events}
+            />
+        );
+    }
+    if (view === 'engagement') return <EngagementView data={data} />;
+    if (view === 'people') return <UsageUsersView perUser={data.per_user || []} />;
+    if (view === 'events') {
+        return (
+            <div className={viewStyles.view}>
+                <EventsBreakdownTable events={data.events_breakdown || []} />
+            </div>
+        );
+    }
+    if (view === 'system') return <UsageSystemView data={data} />;
+    return <UsageSummaryView data={data} accountCards={accountCards} onOpen={onOpen} />;
+}
+
+/**
+ * Admin → Overview: one usage query for the selected range, reviewed one area at a time.
+ * The area is kept in `?view=` so a reload or a shared link reopens it.
+ */
+export default function UsagePanel({ enabled, accountCards = [] }) {
     const [dateRange, setDateRange] = useState(() => presetToRange('30d'));
+    const [searchParams, setSearchParams] = useSearchParams();
+    const requested = searchParams.get(VIEW_PARAM);
+    const view = OVERVIEW_VIEWS.some((item) => item.value === requested) ? requested : 'summary';
 
-    const usageQueryKey = ['admin', 'usage', dateRange.start, dateRange.end];
+    const openView = (next) => setSearchParams((params) => {
+        const updated = new URLSearchParams(params);
+        if (next === 'summary') updated.delete(VIEW_PARAM);
+        else updated.set(VIEW_PARAM, next);
+        return updated;
+    }, { replace: true });
+
     const usageQuery = useQuery({
-        queryKey: usageQueryKey,
+        queryKey: ['admin', 'usage', dateRange.start, dateRange.end],
         queryFn: async () => (await adminApi.getUsage({
             ...(dateRange.start ? { start: dateRange.start } : {}),
             ...(dateRange.end ? { end: dateRange.end } : {}),
         })).data,
         enabled,
     });
-
     const data = usageQuery.data;
-    const dau = data?.active_users?.dau || [];
-    const perUser = data?.per_user || [];
-    const topPages = data?.top_pages || [];
-    const topEvents = data?.top_events || [];
-    const emailHealth = data?.email_health || [];
 
     return (
         <section className={styles.section}>
-            <DateRangeFilter
-                value={dateRange}
-                onChange={setDateRange}
-                presets={USAGE_PRESETS}
-                classNames={{
-                    chipGroup: styles.betaStatusFilters,
-                    chipActive: styles.activeTab,
-                }}
-            />
+            <div className={viewStyles.view}>
+                <DateRangeFilter
+                    value={dateRange}
+                    onChange={setDateRange}
+                    presets={USAGE_PRESETS}
+                    classNames={{
+                        chipGroup: styles.betaStatusFilters,
+                        chipActive: styles.activeTab,
+                    }}
+                />
+                <ViewToggleTabs
+                    items={OVERVIEW_VIEWS}
+                    value={view}
+                    onChange={openView}
+                    ariaLabel="Overview sections"
+                    className={viewStyles.overviewTabs}
+                    idPrefix="overview"
+                />
 
-            {usageQuery.isLoading && <LoadingState label="Loading usage data…" />}
-            {usageQuery.isError && <p>Failed to load usage data.</p>}
+                {usageQuery.isLoading && <LoadingState label="Loading usage data…" />}
+                {usageQuery.isError && <p>Failed to load usage data.</p>}
 
-            {data && (
-                <>
-                    <div className={styles.summaryGrid}>
-                        <div className={styles.summaryCard}>
-                            <span>Active last 7 days</span>
-                            <strong>{data.active_users?.wau ?? 0}</strong>
-                        </div>
-                        <div className={styles.summaryCard}>
-                            <span>Active last 30 days</span>
-                            <strong>{data.active_users?.mau ?? 0}</strong>
-                        </div>
-                        <div className={styles.summaryCard}>
-                            <span>Signups in window</span>
-                            <strong>{(data.signups_by_day || []).reduce((total, day) => total + day.count, 0)}</strong>
-                        </div>
-                        <div className={styles.summaryCard}>
-                            <span>Page views in window</span>
-                            <strong>{topEvents.find((event) => event.event_name === 'page_view')?.count ?? 0}</strong>
-                        </div>
+                {data && (
+                    <div role="tabpanel" id={`overview-panel-${view}`} aria-labelledby={`overview-tab-${view}`}>
+                        <OverviewView view={view} data={data} accountCards={accountCards} onOpen={openView} />
                     </div>
-
-                    <h3>Daily active users</h3>
-                    <DauBarChart
-                        dau={dau}
-                        windowStart={data.window?.start}
-                        windowEnd={data.window?.end}
-                    />
-
-                    <h3>Users</h3>
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Last Seen</th>
-                                <th>Last Login</th>
-                                <th>Page Views</th>
-                                <th>Sessions Created</th>
-                                <th>Goals Created</th>
-                                <th>Total Events</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {perUser.map((entry) => (
-                                <tr key={entry.user_id}>
-                                    <td>{entry.username} ({entry.email})</td>
-                                    <td>{formatDateTime(entry.last_seen)}</td>
-                                    <td>{formatDateTime(entry.last_login_at)}</td>
-                                    <td>{entry.page_views}</td>
-                                    <td>{entry.sessions_created}</td>
-                                    <td>{entry.goals_created}</td>
-                                    <td>{entry.total_events}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-
-                    <h3>Domain events</h3>
-                    <EventsBreakdownTable events={data.events_breakdown || []} />
-
-                    <h3>Top pages</h3>
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>Path</th>
-                                <th>Views</th>
-                                <th>Users</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {topPages.map((page) => (
-                                <tr key={page.path}>
-                                    <td>{page.path}</td>
-                                    <td>{page.count}</td>
-                                    <td>{page.users}</td>
-                                </tr>
-                            ))}
-                            {topPages.length === 0 && (
-                                <tr><td colSpan={3}>No page views recorded yet.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-
-                    <h3>Email delivery</h3>
-                    <table className={styles.table}>
-                        <thead>
-                            <tr>
-                                <th>Template</th>
-                                <th>Status</th>
-                                <th>Count</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {emailHealth.map((row) => (
-                                <tr key={`${row.template_key}-${row.status}`}>
-                                    <td>{row.template_key}</td>
-                                    <td>{row.status}</td>
-                                    <td>{row.count}</td>
-                                </tr>
-                            ))}
-                            {emailHealth.length === 0 && (
-                                <tr><td colSpan={3}>No email activity in this window.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-
-                    <UsageStoragePanel
-                        storage={data.storage}
-                        retention={data.retention}
-                        exportState={data.export}
-                    />
-                </>
-            )}
+                )}
+            </div>
         </section>
     );
 }

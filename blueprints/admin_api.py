@@ -63,26 +63,39 @@ def get_admin_summary(current_user):
         db_session.close()
 
 
-@admin_bp.route('/usage', methods=['GET'])
-@token_required
-def get_admin_usage(current_user):
+def _usage_read(current_user, read, failure_message):
+    """Admin-only usage reads share one database boundary."""
     db_session = get_db_session()
     try:
         _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
-        payload, error, status = AdminUsageService(db_session).usage_summary(
-            start=request.args.get('start'),
-            end=request.args.get('end'),
-            days=request.args.get('days'),
-        )
+        payload, error, status = read(AdminUsageService(db_session))
         if error:
             return jsonify({"error": error}), status
         return jsonify(payload), status
     except SQLAlchemyError:
-        return internal_error(logger, "Error fetching admin usage summary")
+        return internal_error(logger, failure_message)
     finally:
         db_session.close()
+
+
+@admin_bp.route('/usage', methods=['GET'])
+@token_required
+def get_admin_usage(current_user):
+    return _usage_read(current_user, lambda service: service.usage_summary(
+        start=request.args.get('start'),
+        end=request.args.get('end'),
+        days=request.args.get('days'),
+    ), "Error fetching admin usage summary")
+
+
+@admin_bp.route('/usage/storage', methods=['GET'])
+@token_required
+def get_admin_usage_storage(current_user):
+    return _usage_read(
+        current_user, lambda service: service.storage_summary(), "Error fetching admin storage summary",
+    )
 
 
 @admin_bp.route('/usage/retention', methods=['PATCH'])
@@ -113,10 +126,7 @@ def prune_admin_usage(current_user):
         _, response = _admin_service_or_response(current_user, db_session)
         if response:
             return response
-        body = request.get_json(silent=True) or {}
-        payload, error, status = AdminUsageService(db_session).prune_product_events(
-            body.get('older_than_days'),
-        )
+        payload, error, status = AdminUsageService(db_session).flush_exported_events()
         if error:
             return jsonify({"error": error}), status
         # Expired offline-sync idempotency records belong to the same housekeeping pass.
@@ -125,7 +135,7 @@ def prune_admin_usage(current_user):
         return jsonify({**(payload or {}), "idempotency_records_deleted": idempotency_deleted}), status
     except SQLAlchemyError:
         db_session.rollback()
-        return internal_error(logger, "Error pruning product events")
+        return internal_error(logger, "Error flushing exported analytics events")
     finally:
         db_session.close()
 

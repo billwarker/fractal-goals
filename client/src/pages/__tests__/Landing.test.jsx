@@ -117,7 +117,7 @@ describe('Landing', () => {
         const dialog = await screen.findByRole('dialog');
         fireEvent.change(within(dialog).getByLabelText(landingContent.betaForm.emailLabel), { target: { value: 'will@example.com' } });
         fireEvent.click(within(dialog).getByRole('button', { name: landingContent.betaForm.submitLabel }));
-        await waitFor(() => expect(createBetaSignup).toHaveBeenCalledWith({ email: 'will@example.com' }));
+        await waitFor(() => expect(createBetaSignup).toHaveBeenCalledWith({ email: 'will@example.com', source: 'landing' }));
         expect(await within(dialog).findByText(landingContent.betaForm.successCreatedMessage)).toBeInTheDocument();
     });
 

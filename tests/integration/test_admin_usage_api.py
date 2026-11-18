@@ -6,6 +6,7 @@ import uuid
 import pytest
 
 from models import EmailDeliveryEvent, EventLog, Goal, ProductEvent, User, utc_now
+from services.app_settings import ANALYTICS_EXPORT_STATE_KEY, TELEMETRY_RETENTION_KEY, set_app_setting
 from tests.conftest import session_headers_for
 
 
@@ -205,14 +206,17 @@ class TestAdminUsageEndpoint:
         assert per_user[test_user.id]['total_events'] == 3
 
     def test_storage_retention_and_export_state_present(self, admin_client, seeded_usage_data):
-        response = admin_client.get('/api/admin/usage?days=30')
+        usage = json.loads(admin_client.get('/api/admin/usage?days=30').data)
+        response = admin_client.get('/api/admin/usage/storage')
 
         assert response.status_code == 200
         payload = json.loads(response.data)
+        # The full storage scan is the System tab's own request, not every overview load.
+        assert 'storage' not in usage and 'retention' not in usage
 
         tables = {entry['table']: entry for entry in payload['storage']['tables']}
         assert set(tables) == {
-            'product_events', 'event_logs', 'email_delivery_events', 'email_webhook_events',
+            'product_events', 'web_events', 'event_logs', 'email_delivery_events', 'email_webhook_events',
         }
         assert tables['product_events']['rows'] == 4
         assert tables['event_logs']['rows'] == 3
@@ -227,8 +231,61 @@ class TestAdminUsageEndpoint:
             for relation in database_storage['relations']
         )
 
-        assert payload['retention'] == {'product_events_days': 180}
-        assert payload['export'] == {'last_run_at': None, 'last_run_status': None, 'tables': {}}
+        assert database_storage['quota_bytes'] == config.DATABASE_STORAGE_QUOTA_MB * 1024 * 1024
+        payloads = {entry['event_type']: entry for entry in payload['storage']['event_log_payloads']}
+        assert payloads['session.created']['events'] == 2
+        assert usage['live_since']['product_events'] == tables['product_events']['oldest']
+        assert usage['live_since']['web_events'] is None
+
+        assert payload['retention'] == {
+            'live_days': 35, 'product_events_ceiling_days': 180, 'web_events_ceiling_days': 90,
+        }
+        assert payload['export'] == {
+            'last_run_at': None, 'last_run_status': None, 'last_success_at': None, 'tables': {},
+        }
+        assert payload['jobs'] == {
+            'export': {'last_run_at': None, 'last_success_at': None},
+            'retention': {'last_run_at': None, 'last_success_at': None},
+        }
+
+    def test_storage_requires_admin(self, authed_client):
+        assert authed_client.get('/api/admin/usage/storage').status_code == 403
+
+    def test_a_failed_storage_read_leaves_the_rest_of_the_request_working(self, admin_client, monkeypatch):
+        import services.admin_usage_service as admin_usage_module
+
+        # Postgres rejects the LIMIT, failing the payload query inside its savepoint.
+        monkeypatch.setattr(admin_usage_module, 'EVENT_LOG_PAYLOAD_TOP', 'not-a-number')
+        response = admin_client.get('/api/admin/usage/storage')
+
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['storage']['event_log_payloads'] == []
+        # Without the savepoint the aborted transaction would fail every query after it.
+        assert payload['retention']['live_days'] == 35
+        assert payload['storage']['database']['quota_bytes'] > 0
+
+    def test_sign_ups_leave_out_demo_and_admin_accounts(self, admin_client, db_session, test_user):
+        for role in ('demo', 'admin'):
+            account = User(username=f'{role}-account', email=f'{role}-account@example.com', role=role)
+            account.set_password('Password123')
+            db_session.add(account)
+        db_session.commit()
+
+        payload = json.loads(admin_client.get('/api/admin/usage?days=7').data)
+
+        signups = sum(day['count'] for day in payload['signups_by_day'])
+        funnel = {step['key']: step['count'] for step in payload['growth']['funnel']}
+        assert signups == funnel['signed_up']
+
+    def test_daily_users_start_at_the_oldest_event_postgres_holds(self, admin_client, db_session, test_user):
+        db_session.add(ProductEvent(user_id=test_user.id, event_name='page_view',
+                                    created_at=utc_now() - datetime.timedelta(days=3)))
+        db_session.commit()
+
+        dau = json.loads(admin_client.get('/api/admin/usage?days=90').data)['active_users']['dau']
+
+        assert len(dau) == 4
 
     def test_login_fallback_counts_active_users_without_telemetry(self, admin_client, db_session, test_user):
         test_user.last_login_at = utc_now() - datetime.timedelta(days=1)
@@ -241,21 +298,34 @@ class TestAdminUsageEndpoint:
         assert payload['active_users']['wau'] >= 1
 
 
+def _mark_exported_through(db_session, created_at, event_id):
+    set_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY, {
+        'last_run_status': 'success',
+        'tables': {'product_events': {'last_ts': created_at.isoformat() + 'Z', 'last_id': event_id}},
+    })
+    db_session.commit()
+
+
 @pytest.mark.integration
-class TestAdminUsagePrune:
-    def test_prune_deletes_old_events_only(self, admin_client, db_session, seeded_usage_data, test_user):
-        response = admin_client.post(
-            '/api/admin/usage/prune',
-            data=json.dumps({'older_than_days': 180}),
-            content_type='application/json',
-        )
+class TestAdminUsageFlush:
+    def test_flush_removes_only_exported_events_past_the_live_window(self, admin_client, db_session, seeded_usage_data):
+        oldest = db_session.query(ProductEvent).order_by(ProductEvent.created_at).first()
+
+        # Not exported yet: it stays, however old.
+        unexported = admin_client.post('/api/admin/usage/prune', json={})
+        assert unexported.status_code == 200
+        assert json.loads(unexported.data)['deleted'] == 0
+
+        _mark_exported_through(db_session, oldest.created_at, oldest.id)
+        response = admin_client.post('/api/admin/usage/prune', json={})
 
         assert response.status_code == 200
-        assert json.loads(response.data)['deleted'] == 1
-        remaining = db_session.query(ProductEvent).count()
-        assert remaining == 3
+        payload = json.loads(response.data)
+        assert payload['flushed'] == {'product_events': 1, 'web_events': 0}
+        assert payload['live_days'] == 35
+        assert db_session.query(ProductEvent).count() == 3
 
-    def test_prune_requires_admin(self, authed_client):
+    def test_flush_requires_admin(self, authed_client):
         response = authed_client.post('/api/admin/usage/prune', json={})
 
         assert response.status_code == 403
@@ -263,45 +333,33 @@ class TestAdminUsagePrune:
 
 @pytest.mark.integration
 class TestAdminUsageRetention:
-    def test_retention_round_trip_and_prune_default(self, admin_client, db_session, seeded_usage_data):
-        update = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 90}),
-            content_type='application/json',
-        )
+    def test_live_window_round_trip(self, admin_client):
+        update = admin_client.patch('/api/admin/usage/retention', json={'live_days': 90})
         assert update.status_code == 200
-        assert json.loads(update.data)['product_events_days'] == 90
+        assert json.loads(update.data) == {'live_days': 90}
 
-        summary = admin_client.get('/api/admin/usage?days=7')
-        assert json.loads(summary.data)['retention'] == {'product_events_days': 90}
+        storage = admin_client.get('/api/admin/usage/storage')
+        assert json.loads(storage.data)['retention']['live_days'] == 90
 
-        # Prune with an empty body must use the stored retention (90 days),
-        # which still deletes the 200-day-old seeded event.
-        prune = admin_client.post('/api/admin/usage/prune', json={})
-        assert prune.status_code == 200
-        payload = json.loads(prune.data)
-        assert payload['deleted'] == 1
-        assert payload['older_than_days'] == 90
+    def test_the_setting_saved_before_the_flush_still_counts(self, admin_client, db_session):
+        set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {'product_events_days': 120})
+        db_session.commit()
 
-    def test_retention_values_are_clamped(self, admin_client):
-        low = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 1}),
-            content_type='application/json',
-        )
-        assert json.loads(low.data)['product_events_days'] == 30
+        storage = admin_client.get('/api/admin/usage/storage')
 
-        high = admin_client.patch(
-            '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 5000}),
-            content_type='application/json',
-        )
-        assert json.loads(high.data)['product_events_days'] == 180
+        assert json.loads(storage.data)['retention']['live_days'] == 120
+
+    def test_live_window_values_are_clamped(self, admin_client):
+        low = admin_client.patch('/api/admin/usage/retention', json={'live_days': 1})
+        assert json.loads(low.data)['live_days'] == 30
+
+        high = admin_client.patch('/api/admin/usage/retention', json={'live_days': 5000})
+        assert json.loads(high.data)['live_days'] == 180
 
     def test_retention_requires_admin(self, authed_client):
         response = authed_client.patch(
             '/api/admin/usage/retention',
-            data=json.dumps({'product_events_days': 90}),
+            data=json.dumps({'live_days': 90}),
             content_type='application/json',
         )
         assert response.status_code == 403

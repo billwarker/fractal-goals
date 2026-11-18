@@ -129,12 +129,18 @@ class Config:
     # Canonical legal-document versions. The API, not the browser, decides
     # which versions are acceptable consent evidence.
     TERMS_VERSION = '1.1'
-    PRIVACY_VERSION = '1.2'
+    PRIVACY_VERSION = '1.3'
     PRODUCT_EVENT_RETENTION_DAYS = 180
+    WEB_EVENT_RETENTION_DAYS = 90
     PASSWORD_RESET_RECORD_RETENTION_DAYS = 30
     EMAIL_EVENT_RETENTION_DAYS = 730
     ADMIN_AUDIT_RETENTION_DAYS = 730
     BETA_SIGNUP_CLOSED_RETENTION_DAYS = 365
+    # Once the nightly export has loaded them, product and web events older than this
+    # leave Postgres (admin-adjustable); the retention ceilings above still apply.
+    ANALYTICS_LIVE_DAYS = 35
+    # The managed database's storage allowance (Supabase free tier: 500 MB).
+    DATABASE_STORAGE_QUOTA_MB = int(os.getenv('DATABASE_STORAGE_QUOTA_MB', '500'))
 
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

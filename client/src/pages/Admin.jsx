@@ -635,16 +635,19 @@ function Admin() {
         adminActionMutation.mutate({ action, targetUserId: selectedUser.id, data });
     };
     const summaryCards = useMemo(() => {
-        const summary = summaryQuery.data || {};
+        const summary = summaryQuery.data;
+        // Until the summary arrives (or if it fails) a total is unknown, not zero.
+        const placeholder = summaryQuery.isError ? 'unavailable' : '–';
+        const value = (raw, format = (number) => number) => (summary ? format(raw ?? 0) : placeholder);
         return [
-            ['Users', summary.total_users || 0],
-            ['Active Users', summary.active_users || 0],
-            ['Fractals', summary.total_fractals || 0],
-            ['Sessions', summary.total_sessions || 0],
-            ['DB Storage', formatBytes(summary.storage_bytes || 0)],
-            ['Invite Keys', summary.invite_keys?.available || 0],
+            ['Users', value(summary?.total_users)],
+            ['Active Users', value(summary?.active_users)],
+            ['Fractals', value(summary?.total_fractals)],
+            ['Sessions', value(summary?.total_sessions)],
+            ['DB Storage', value(summary?.storage_bytes, formatBytes)],
+            ['Invite Keys', value(summary?.invite_keys?.available)],
         ];
-    }, [summaryQuery.data]);
+    }, [summaryQuery.data, summaryQuery.isError]);
     if (loading) return <LoadingState variant="page" label="Loading admin overview…" />;
     if (!user?.is_admin) return <Navigate to="/" replace />;
     return (
@@ -656,10 +659,13 @@ function Admin() {
                 </div>
                 <Link to="/" className={styles.homeLink}>Home</Link>
             </header>
-            <div className={styles.tabs}>
+            <div className={styles.tabs} role="tablist" aria-label="Admin sections">
                 {['overview', 'users', 'beta signups', 'tier quotas', 'feature flags', 'live demo', 'invite keys'].map((item) => (
                     <button
                         key={item}
+                        type="button"
+                        role="tab"
+                        aria-selected={tab === item}
                         className={tab === item ? styles.activeTab : ''}
                         onClick={() => setTab(item)}
                     >
@@ -668,19 +674,7 @@ function Admin() {
                 ))}
             </div>
             {tab === 'overview' && (
-                <>
-                    <section className={styles.section}>
-                        <div className={styles.summaryGrid}>
-                            {summaryCards.map(([label, value]) => (
-                                <div key={label} className={styles.summaryCard}>
-                                    <span>{label}</span>
-                                    <strong>{value}</strong>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                    <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} />
-                </>
+                <UsagePanel enabled={Boolean(user?.is_admin) && tab === 'overview'} accountCards={summaryCards} />
             )}
             {tab === 'users' && (
                 <section className={styles.section}>
