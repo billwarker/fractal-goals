@@ -112,6 +112,15 @@
     white-space: nowrap;
 }
 
+.compactTable .stageRow th {
+    position: static;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
 .compactTable tbody tr:hover {
     background: color-mix(in srgb, var(--color-brand-primary) 6%, transparent);
 }

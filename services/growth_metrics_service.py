@@ -45,6 +45,16 @@ def _utc_midnight(day: datetime.date) -> datetime.datetime:
     return datetime.datetime.combine(day, datetime.time.min, tzinfo=datetime.timezone.utc)
 
 
+def oldest_event(db_session, column):
+    """The oldest row still in a flushed table (product_events, web_events), or None."""
+    return db_session.query(func.min(column)).scalar()
+
+
+def series_start(start_date: datetime.date, oldest) -> datetime.date:
+    """Daily series from a flushed table start at its oldest day, not months of empty bars."""
+    return max(start_date, oldest.date()) if oldest is not None else start_date
+
+
 class GrowthMetricsService:
     def __init__(self, db_session):
         self.db_session = db_session
@@ -78,7 +88,7 @@ class GrowthMetricsService:
             event_day, func.count(func.distinct(WebEvent.visitor_day_hash)),
         ).filter(*in_window).group_by(event_day).all())
         visitors_by_day = []
-        cursor = start_date
+        cursor = series_start(start_date, oldest_event(self.db_session, WebEvent.created_at))
         while cursor <= end_date:
             visitors_by_day.append({"date": cursor.isoformat(), "count": int(daily.get(cursor, 0))})
             cursor += datetime.timedelta(days=1)
@@ -110,7 +120,7 @@ class GrowthMetricsService:
             User.created_at < window_end,
         ).subquery()
         first_fractal = self.db_session.query(func.count(func.distinct(signups.c.id))).join(
-            Goal, sa.and_(Goal.owner_id == signups.c.id, Goal.root_id == Goal.id),
+            Goal, sa.and_(Goal.owner_id == signups.c.id, Goal.root_id == Goal.id, Goal.deleted_at.is_(None)),
         ).scalar()
         # Activation: a completed session within the first week of the account.
         activated = self.db_session.query(func.count(func.distinct(signups.c.id))).join(
@@ -124,25 +134,27 @@ class GrowthMetricsService:
         def count(query):
             return int(query.scalar() or 0)
 
+        # Steps before sign-up are counted on their own; from sign-up on, each step follows
+        # the window's sign-ups, so only rates within a stage are conversion rates.
         return [
-            {"key": "visitors", "label": "Visitors", "count": self._visitor_days(window_start, window_end)},
-            {"key": "demo", "label": "Opened the demo",
+            {"key": "visitors", "label": "Visitors", "stage": "public", "count": self._visitor_days(window_start, window_end)},
+            {"key": "demo", "label": "Opened the demo", "stage": "public",
              "count": self._visitor_days(window_start, window_end, "demo_started")},
-            {"key": "waitlist", "label": "Joined the waitlist", "count": count(
+            {"key": "waitlist", "label": "Joined the waitlist", "stage": "public", "count": count(
                 self.db_session.query(func.count(BetaSignupRequest.id)).filter(
                     BetaSignupRequest.created_at >= window_start, BetaSignupRequest.created_at < window_end,
                 ),
             )},
-            {"key": "invited", "label": "Invited", "count": count(
+            {"key": "invited", "label": "Invited", "stage": "public", "count": count(
                 self.db_session.query(func.count(BetaSignupRequest.id)).filter(
                     BetaSignupRequest.invited_at >= window_start, BetaSignupRequest.invited_at < window_end,
                 ),
             )},
-            {"key": "signed_up", "label": "Signed up", "count": count(
+            {"key": "signed_up", "label": "Signed up", "stage": "cohort", "count": count(
                 self.db_session.query(func.count()).select_from(signups),
             )},
-            {"key": "first_fractal", "label": "Created a fractal", "count": int(first_fractal or 0)},
-            {"key": "activated", "label": f"Completed a session within {ACTIVATION_DAYS} days",
+            {"key": "first_fractal", "label": "Created a fractal", "stage": "cohort", "count": int(first_fractal or 0)},
+            {"key": "activated", "label": f"Completed a session within {ACTIVATION_DAYS} days", "stage": "cohort",
              "count": int(activated or 0)},
         ]
 

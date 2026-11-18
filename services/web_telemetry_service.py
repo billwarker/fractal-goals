@@ -24,7 +24,11 @@ MAX_PATH_LENGTH = 255
 UTM_PATTERN = re.compile(r"[^a-z0-9_.:-]+")
 UUID_SEGMENT = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 # Crawlers and link previews are not visitors.
-BOT_USER_AGENT = re.compile(r"bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse", re.IGNORECASE)
+# Link previewers are named: a bare "preview" also matches ordinary browsers' build tags.
+BOT_USER_AGENT = re.compile(
+    r"bot|crawl|spider|slurp|bingpreview|skypeuripreview|whatsapp|embedly|facebookexternalhit|lighthouse",
+    re.IGNORECASE,
+)
 
 
 def normalize_utm(value) -> str | None:

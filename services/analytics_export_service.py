@@ -10,6 +10,8 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+import re
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
@@ -415,6 +417,16 @@ def flush_exported(db_session, now=None, live_days=None) -> dict[str, int]:
     return counts
 
 
+VIEWS_SQL_PATH = Path(__file__).with_name("analytics_views.sql")
+STATEMENT_END = re.compile(r";[ \t]*$", re.MULTILINE)
+
+
+def reporting_view_statements(dataset: str) -> list[str]:
+    """The dedupe and reporting views, as CREATE OR REPLACE VIEW statements for `dataset`."""
+    sql = VIEWS_SQL_PATH.read_text(encoding="utf-8").replace("{dataset}", dataset)
+    return [chunk.strip() for chunk in STATEMENT_END.split(sql) if "CREATE OR REPLACE VIEW" in chunk]
+
+
 # Append-only warehouse tables and the column holding an account id.
 ERASURE_COLUMNS = (
     ("product_events", "user_id"),
@@ -467,6 +479,11 @@ class AnalyticsExportService:
             self._emit("Exporting users dimension")
             run_counts["users"] = self._export_users()
             self._emit(f"Finished users: rows={run_counts['users']}")
+            views_error = self._apply_reporting_views()
+            if views_error:
+                state["views_error"] = views_error
+            else:
+                state.pop("views_error", None)
             state["last_run_at"] = _format_dt(now)
             state["last_run_status"] = "success"
             state["last_run_rows"] = run_counts
@@ -577,6 +594,20 @@ class AnalyticsExportService:
         self.db_session.commit()
         self._emit(f"Erased warehouse rows for {len(user_ids)} deleted accounts")
         return len(user_ids)
+
+    def _apply_reporting_views(self):
+        """Keep the warehouse views current. The data is already loaded, so a failed view is
+        reported (in the run log and `views_error`) rather than failing the run."""
+        for statement in reporting_view_statements(self.dataset):
+            try:
+                self.bq_client.query(statement).result()
+            except GoogleAPIError as exc:
+                first_line = statement.splitlines()[0]
+                self._emit(f"Reporting view failed: {first_line}: {exc}")
+                logger.warning("Reporting view failed: %s", first_line, exc_info=True)
+                return f"{first_line}: {exc}"[:500]
+        self._emit("Reporting views applied")
+        return None
 
     def _warehouse_column_exists(self, table, column):
         try:

@@ -14,6 +14,7 @@ from models import AppSetting
 # Keys owned by the admin usage/telemetry surface.
 TELEMETRY_RETENTION_KEY = "telemetry_retention"
 ANALYTICS_EXPORT_STATE_KEY = "analytics_export_state"
+DATA_RETENTION_STATE_KEY = "data_retention_state"
 
 
 def get_app_setting(db_session, key: str, default=None):

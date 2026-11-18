@@ -66,9 +66,18 @@ export function NamedCounts({ title, rows, empty }) {
     );
 }
 
-/** Visitor → activated steps with the rate from the previous step and from visitors. */
+const STAGE_LABELS = {
+    public: 'Before sign-up · each step counted on its own',
+    cohort: 'After sign-up · following the window’s sign-ups',
+};
+
+/**
+ * Visitor → activated steps in two stages. Steps before sign-up are independent counts and
+ * the later steps follow one cohort, so a rate is shown only within a stage.
+ */
 export function FunnelTable({ funnel }) {
-    const first = funnel[0]?.count || 0;
+    const visitors = funnel[0]?.count || 0;
+    const stages = Object.keys(STAGE_LABELS).filter((stage) => funnel.some((step) => step.stage === stage));
     return (
         <table className={styles.compactTable}>
             <thead>
@@ -79,21 +88,30 @@ export function FunnelTable({ funnel }) {
                     <th className={styles.num}>From visitors</th>
                 </tr>
             </thead>
-            <tbody>
-                {funnel.map((step, index) => (
-                    <tr key={step.key}>
-                        <td>{step.label}</td>
-                        <td>
-                            <div className={styles.funnelCount}>
-                                <span>{step.count}</span>
-                                <progress className={styles.bar} value={step.count} max={Math.max(first, step.count, 1)} aria-hidden="true" />
-                            </div>
-                        </td>
-                        <td className={styles.num}>{index === 0 ? '' : percent(step.count, funnel[index - 1].count)}</td>
-                        <td className={styles.num}>{index === 0 ? '' : percent(step.count, first)}</td>
-                    </tr>
-                ))}
-            </tbody>
+            {stages.map((stage) => {
+                const steps = funnel.filter((step) => step.stage === stage);
+                const max = Math.max(1, ...steps.map((step) => step.count));
+                return (
+                    <tbody key={stage}>
+                        <tr className={styles.stageRow}>
+                            <th scope="rowgroup" colSpan={4}>{STAGE_LABELS[stage]}</th>
+                        </tr>
+                        {steps.map((step, index) => (
+                            <tr key={step.key}>
+                                <td>{step.label}</td>
+                                <td>
+                                    <div className={styles.funnelCount}>
+                                        <span>{step.count}</span>
+                                        <progress className={styles.bar} value={step.count} max={max} aria-hidden="true" />
+                                    </div>
+                                </td>
+                                <td className={styles.num}>{index === 0 ? '' : percent(step.count, steps[index - 1].count)}</td>
+                                <td className={styles.num}>{stage === 'public' && step.key !== 'visitors' ? percent(step.count, visitors) : ''}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                );
+            })}
         </table>
     );
 }

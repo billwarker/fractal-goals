@@ -9,7 +9,6 @@ import panelStyles from './UsageStoragePanel.module.css';
 import viewStyles from './UsageViews.module.css';
 
 const QUOTA_WARNING_SHARE = 0.8;
-const STALE_EXPORT_MS = 48 * 60 * 60 * 1000;
 
 const formatBytes = (bytes) => {
     if (bytes === null || bytes === undefined) return 'n/a';
@@ -43,11 +42,6 @@ function QuotaGauge({ totalBytes, quotaBytes }) {
             </p>
         </div>
     );
-}
-
-function exportIsStale(exportState) {
-    const lastSuccess = exportState?.last_success_at;
-    return !lastSuccess || Date.now() - new Date(lastSuccess).getTime() > STALE_EXPORT_MS;
 }
 
 /**
@@ -166,12 +160,6 @@ function UsageStoragePanel({ storage, retention, exportState }) {
                 BigQuery. Whatever happens to the export, nothing is kept past {retention?.product_events_ceiling_days ?? 180} days
                 (product) or {retention?.web_events_ceiling_days ?? 90} days (website).
             </p>
-            {exportIsStale(exportState) && (
-                <p className={panelStyles.warning} role="status">
-                    No successful BigQuery export in the last 48 hours, so events aren&apos;t being flushed and will build up
-                    in Postgres until one succeeds.
-                </p>
-            )}
             <div className={styles.userCreator}>
                 <label htmlFor="analytics-live-days">Keep in Postgres after export (days)</label>
                 <input

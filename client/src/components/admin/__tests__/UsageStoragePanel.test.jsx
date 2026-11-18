@@ -153,14 +153,5 @@ describe('UsageStoragePanel', () => {
 
         expect(screen.getByText(/success\) · flushed product_events 12, web_events 3/)).toBeInTheDocument();
         expect(screen.queryByText(/Never exported/)).not.toBeInTheDocument();
-        expect(screen.queryByText(/aren't being flushed/)).not.toBeInTheDocument();
-    });
-
-    it('warns when no export has succeeded for two days', () => {
-        renderPanel({
-            exportState: { ...RECENT_EXPORT, last_success_at: '2026-01-01T00:00:00Z' },
-        });
-
-        expect(screen.getByText(/aren't being flushed/)).toBeInTheDocument();
     });
 });

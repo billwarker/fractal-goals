@@ -206,10 +206,13 @@ class TestAdminUsageEndpoint:
         assert per_user[test_user.id]['total_events'] == 3
 
     def test_storage_retention_and_export_state_present(self, admin_client, seeded_usage_data):
-        response = admin_client.get('/api/admin/usage?days=30')
+        usage = json.loads(admin_client.get('/api/admin/usage?days=30').data)
+        response = admin_client.get('/api/admin/usage/storage')
 
         assert response.status_code == 200
         payload = json.loads(response.data)
+        # The full storage scan is the System tab's own request, not every overview load.
+        assert 'storage' not in usage and 'retention' not in usage
 
         tables = {entry['table']: entry for entry in payload['storage']['tables']}
         assert set(tables) == {
@@ -231,8 +234,8 @@ class TestAdminUsageEndpoint:
         assert database_storage['quota_bytes'] == config.DATABASE_STORAGE_QUOTA_MB * 1024 * 1024
         payloads = {entry['event_type']: entry for entry in payload['storage']['event_log_payloads']}
         assert payloads['session.created']['events'] == 2
-        assert payload['live_since']['product_events'] == tables['product_events']['oldest']
-        assert payload['live_since']['web_events'] is None
+        assert usage['live_since']['product_events'] == tables['product_events']['oldest']
+        assert usage['live_since']['web_events'] is None
 
         assert payload['retention'] == {
             'live_days': 35, 'product_events_ceiling_days': 180, 'web_events_ceiling_days': 90,
@@ -240,6 +243,49 @@ class TestAdminUsageEndpoint:
         assert payload['export'] == {
             'last_run_at': None, 'last_run_status': None, 'last_success_at': None, 'tables': {},
         }
+        assert payload['jobs'] == {
+            'export': {'last_run_at': None, 'last_success_at': None},
+            'retention': {'last_run_at': None, 'last_success_at': None},
+        }
+
+    def test_storage_requires_admin(self, authed_client):
+        assert authed_client.get('/api/admin/usage/storage').status_code == 403
+
+    def test_a_failed_storage_read_leaves_the_rest_of_the_request_working(self, admin_client, monkeypatch):
+        import services.admin_usage_service as admin_usage_module
+
+        # Postgres rejects the LIMIT, failing the payload query inside its savepoint.
+        monkeypatch.setattr(admin_usage_module, 'EVENT_LOG_PAYLOAD_TOP', 'not-a-number')
+        response = admin_client.get('/api/admin/usage/storage')
+
+        assert response.status_code == 200
+        payload = json.loads(response.data)
+        assert payload['storage']['event_log_payloads'] == []
+        # Without the savepoint the aborted transaction would fail every query after it.
+        assert payload['retention']['live_days'] == 35
+        assert payload['storage']['database']['quota_bytes'] > 0
+
+    def test_sign_ups_leave_out_demo_and_admin_accounts(self, admin_client, db_session, test_user):
+        for role in ('demo', 'admin'):
+            account = User(username=f'{role}-account', email=f'{role}-account@example.com', role=role)
+            account.set_password('Password123')
+            db_session.add(account)
+        db_session.commit()
+
+        payload = json.loads(admin_client.get('/api/admin/usage?days=7').data)
+
+        signups = sum(day['count'] for day in payload['signups_by_day'])
+        funnel = {step['key']: step['count'] for step in payload['growth']['funnel']}
+        assert signups == funnel['signed_up']
+
+    def test_daily_users_start_at_the_oldest_event_postgres_holds(self, admin_client, db_session, test_user):
+        db_session.add(ProductEvent(user_id=test_user.id, event_name='page_view',
+                                    created_at=utc_now() - datetime.timedelta(days=3)))
+        db_session.commit()
+
+        dau = json.loads(admin_client.get('/api/admin/usage?days=90').data)['active_users']['dau']
+
+        assert len(dau) == 4
 
     def test_login_fallback_counts_active_users_without_telemetry(self, admin_client, db_session, test_user):
         test_user.last_login_at = utc_now() - datetime.timedelta(days=1)
@@ -292,16 +338,16 @@ class TestAdminUsageRetention:
         assert update.status_code == 200
         assert json.loads(update.data) == {'live_days': 90}
 
-        summary = admin_client.get('/api/admin/usage?days=7')
-        assert json.loads(summary.data)['retention']['live_days'] == 90
+        storage = admin_client.get('/api/admin/usage/storage')
+        assert json.loads(storage.data)['retention']['live_days'] == 90
 
     def test_the_setting_saved_before_the_flush_still_counts(self, admin_client, db_session):
         set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {'product_events_days': 120})
         db_session.commit()
 
-        summary = admin_client.get('/api/admin/usage?days=7')
+        storage = admin_client.get('/api/admin/usage/storage')
 
-        assert json.loads(summary.data)['retention']['live_days'] == 120
+        assert json.loads(storage.data)['retention']['live_days'] == 120
 
     def test_live_window_values_are_clamped(self, admin_client):
         low = admin_client.patch('/api/admin/usage/retention', json={'live_days': 1})

@@ -13,8 +13,8 @@ from models import (
     User,
     WebEvent,
 )
-from services.app_settings import TELEMETRY_RETENTION_KEY, set_app_setting
-from services.data_retention_service import DataRetentionService
+from services.app_settings import DATA_RETENTION_STATE_KEY, TELEMETRY_RETENTION_KEY, get_app_setting, set_app_setting
+from services.data_retention_service import DataRetentionService, record_retention_run
 
 
 @pytest.mark.unit
@@ -104,3 +104,16 @@ def test_product_events_keep_the_published_ceiling_whatever_the_live_window(db_s
 
     assert counts['product_events'] == 1
     assert db_session.query(ProductEvent).count() == 1
+
+
+@pytest.mark.unit
+def test_each_run_is_recorded_and_only_a_success_moves_last_success(db_session):
+    first = datetime.datetime(2026, 8, 25, 3, 0, tzinfo=datetime.timezone.utc)
+    record_retention_run(db_session, succeeded=True, counts={'product_events': 2}, now=first)
+    record_retention_run(db_session, succeeded=False, now=first + datetime.timedelta(days=1))
+
+    state = get_app_setting(db_session, DATA_RETENTION_STATE_KEY)
+    assert state['last_run_status'] == 'failed'
+    assert state['last_run_at'].startswith('2026-08-26')
+    assert state['last_success_at'].startswith('2026-08-25')
+    assert state['last_run_counts'] == {'product_events': 2}

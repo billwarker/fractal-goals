@@ -163,11 +163,19 @@ Shipped as planned, with these deliberate differences:
   the ePrivacy storage rule and §7 ("exactly two cookies, no banner") stay true.
 - **Feature adoption** comes from `page_view` route segments among the week's practitioners; no new
   in-app usage events were needed (domain facts already reach the warehouse via `event_logs.owner_user_id`).
-- **Reporting views** are documented SQL in `docs/bigquery-export.md` rather than applied by the export
-  job, so the export never issues DDL.
+- **Reporting views** live in `services/analytics_views.sql`; the export job applies them after each
+  successful run (added by the audit fixes, `planning/analytics-audit-fixes-2026-11.md`).
 - **Activation** (a completed session within 7 days of sign-up) was added to the funnel.
 - **App version** comes from `VITE_APP_VERSION` (Cloud Build passes `$BUILD_ID`).
 
-**Rollout note:** privacy.md is now 1.3 (effective 2026-11-18). §16 promises notice *before* a material
-change takes effect; the version bump makes every signed-in user re-accept through the review modal. Deploy
-when you're ready for that, and consider waiting a few days after the notice before relying on the data.
+## Before deploying
+
+1. **Cloud Scheduler triggers** exist for `export-analytics` (nightly, `docs/bigquery-export.md`) and
+   `data-retention` (daily, `docs/data-retention.md`). Admin → Overview → System warns within 48 hours
+   if either never runs, but creating them is a one-time manual step.
+2. **BigQuery dataset and IAM** (`docs/bigquery-export.md` → One-Time Setup), since the export job now
+   also creates views (`roles/bigquery.dataEditor` on the dataset covers it).
+3. **Notice before the change (§16).** privacy.md is now 1.3 (effective 2026-11-18): announce it to
+   current users first, then deploy. Consider waiting a few days after the notice before relying on the data.
+4. **Re-acceptance.** The version bump makes every signed-in user re-accept through the review modal on
+   their next visit.

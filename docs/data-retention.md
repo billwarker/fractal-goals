@@ -27,5 +27,10 @@ The job also enforces:
 - delivery, webhook, and administrative-audit deletion after 730 days;
 - invited or dismissed beta-request deletion after 365 days.
 
+Each run is recorded in `app_settings.data_retention_state` (`last_run_at`,
+`last_success_at`, counts). Admin → Overview → System warns when this job, or the
+analytics export, has no success in 48 hours, which is how a missing Scheduler
+trigger shows itself.
+
 Any failed phase makes the job exit non-zero. Configure Scheduler failure
 notifications or a log-based alert so missed enforcement is visible.

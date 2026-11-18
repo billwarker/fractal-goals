@@ -22,7 +22,7 @@ export const OVERVIEW_VIEWS = [
     { value: 'summary', label: 'Summary' },
     { value: 'acquisition', label: 'Acquisition' },
     { value: 'engagement', label: 'Engagement' },
-    { value: 'users', label: 'Users' },
+    { value: 'people', label: 'People' },
     { value: 'events', label: 'Events' },
     { value: 'system', label: 'System' },
 ];
@@ -43,7 +43,7 @@ function OverviewView({ view, data, accountCards, onOpen }) {
         );
     }
     if (view === 'engagement') return <EngagementView data={data} />;
-    if (view === 'users') return <UsageUsersView perUser={data.per_user || []} />;
+    if (view === 'people') return <UsageUsersView perUser={data.per_user || []} />;
     if (view === 'events') {
         return (
             <div className={viewStyles.view}>
@@ -100,13 +100,14 @@ export default function UsagePanel({ enabled, accountCards = [] }) {
                     onChange={openView}
                     ariaLabel="Overview sections"
                     className={viewStyles.overviewTabs}
+                    idPrefix="overview"
                 />
 
                 {usageQuery.isLoading && <LoadingState label="Loading usage data…" />}
                 {usageQuery.isError && <p>Failed to load usage data.</p>}
 
                 {data && (
-                    <div role="tabpanel" aria-label={OVERVIEW_VIEWS.find((item) => item.value === view).label}>
+                    <div role="tabpanel" id={`overview-panel-${view}`} aria-labelledby={`overview-tab-${view}`}>
                         <OverviewView view={view} data={data} accountCards={accountCards} onOpen={openView} />
                     </div>
                 )}

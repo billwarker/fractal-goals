@@ -11,7 +11,7 @@ function LiveSinceNote({ liveSince, windowStart }) {
     if (!since || !windowStart || since <= windowStart) return null;
     return (
         <p className={styles.muted}>
-            Postgres holds these events from {since}; earlier days, if any, are in BigQuery (fractal_analytics).
+            Charts start {since}, the oldest day Postgres holds; earlier days, if any, are in BigQuery (fractal_analytics).
         </p>
     );
 }

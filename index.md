@@ -659,7 +659,12 @@ database against its quota (`DATABASE_STORAGE_QUOTA_MB`) and activity-history si
 See [Product analytics](planning/product-analytics-tracking-2026-11.md) and
 [Postgres flush](planning/analytics-postgres-flush-2026-11.md). Admin → Overview is split into sub-tabs (Summary, Acquisition, Engagement, Users, Events, System; `?view=`
 keeps the open one) over a single usage query (`components/admin/UsagePanel.jsx`), with compact tables and
-charts from `UsageViews.module.css`; see [Overview sub-tabs](planning/admin-overview-subtabs-2026-11.md). Admin support access is explicit
+charts from `UsageViews.module.css`; see [Overview sub-tabs](planning/admin-overview-subtabs-2026-11.md).
+System loads storage from its own `GET /api/admin/usage/storage` and warns when the export or retention
+job has no success in 48 hours (`data_retention_state` / `analytics_export_state`). The export job applies
+the BigQuery dedupe and reporting views in `services/analytics_views.sql` after each run. The funnel splits
+into a public stage (independent counts) and a cohort stage (the window's sign-ups), rating steps only
+within a stage. See [Audit fixes](planning/analytics-audit-fixes-2026-11.md). Admin support access is explicit
 and scoped; it is not unrestricted impersonation. Operational event history is retained for
 admin analytics and export according to the documented retention controls.
 The Logs page (admin-only route) reads owner-scoped event history; only admins can clear a fractal's

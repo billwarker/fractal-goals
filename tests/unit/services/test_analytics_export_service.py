@@ -3,6 +3,7 @@ import uuid
 from types import SimpleNamespace
 
 import pytest
+from google.api_core.exceptions import BadRequest
 
 import services.analytics_export_service as analytics_export_module
 from models import AnalyticsErasure, EmailDeliveryEvent, EmailWebhookEvent, EventLog, Goal, ProductEvent, User, WebEvent
@@ -567,3 +568,29 @@ class TestFlushAfterExport:
         assert analytics_export_module.analytics_live_days(db_session) == 90
         set_app_setting(db_session, TELEMETRY_RETENTION_KEY, {"live_days": 5})
         assert analytics_export_module.analytics_live_days(db_session) == 30
+
+
+@pytest.mark.unit
+class TestReportingViews:
+    def test_a_successful_run_applies_every_view_to_the_dataset(self, db_session):
+        bq = FakeBigQueryClient()
+
+        AnalyticsExportService(db_session, bq, "project.dataset").run_export(now=_dt(0))
+
+        views = [sql for sql in bq.queries if "CREATE OR REPLACE VIEW" in sql]
+        assert len(views) == len(analytics_export_module.reporting_view_statements("project.dataset")) == 8
+        assert "`project.dataset.wap_weekly`" in "".join(views)
+        assert not any("{dataset}" in sql or "PROJECT_ID" in sql for sql in views)
+        assert "views_error" not in get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)
+
+    def test_a_failed_view_is_reported_without_failing_the_run(self, db_session):
+        class ViewFailingClient(FakeBigQueryClient):
+            def query(self, sql, job_config=None):
+                if "CREATE OR REPLACE VIEW" in sql:
+                    raise BadRequest("Not found: Table users_deduped")
+                return super().query(sql, job_config)
+
+        result = AnalyticsExportService(db_session, ViewFailingClient(), "dataset").run_export(now=_dt(0))
+
+        assert result["status"] == "success"
+        assert "Not found" in get_app_setting(db_session, ANALYTICS_EXPORT_STATE_KEY)["views_error"]

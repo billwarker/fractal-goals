@@ -19,8 +19,10 @@ from models import (
     PasswordResetToken,
     ProductEvent,
     WebEvent,
+    format_utc,
     utc_now,
 )
+from services.app_settings import DATA_RETENTION_STATE_KEY, get_app_setting, set_app_setting
 
 
 class DataRetentionService:
@@ -102,3 +104,19 @@ class DataRetentionService:
     def _delete(self, model, *conditions) -> int:
         result = self.db_session.execute(delete(model).where(*conditions))
         return int(result.rowcount or 0)
+
+
+def record_retention_run(db_session, *, succeeded: bool, counts=None, now=None) -> dict:
+    """Note the run in app_settings, so Admin can show when retention last succeeded."""
+    now = now or utc_now()
+    state = get_app_setting(db_session, DATA_RETENTION_STATE_KEY, {}) or {}
+    if not isinstance(state, dict):
+        state = {}
+    state["last_run_at"] = format_utc(now)
+    state["last_run_status"] = "success" if succeeded else "failed"
+    if succeeded:
+        state["last_success_at"] = format_utc(now)
+        state["last_run_counts"] = counts or {}
+    set_app_setting(db_session, DATA_RETENTION_STATE_KEY, state)
+    db_session.commit()
+    return state

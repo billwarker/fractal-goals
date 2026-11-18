@@ -13,7 +13,7 @@ function growthKpis({ traffic, funnel, wap }) {
         { label: 'Weekly active practitioners', value: wap.current.count, detail: weekChange(wap.current.count, wap.previous.count) },
         { label: 'Practising this week', value: percent(wap.current.count, wap.current.accounts), detail: `of ${wap.current.accounts} accounts` },
         { label: 'Visitors in window', value: traffic.visitor_days, detail: `${traffic.demo_starts} demo starts` },
-        { label: 'Visitor → sign-up', value: percent(signedUp, first), detail: `${signedUp} signed up` },
+        { label: 'Sign-ups per visitor', value: percent(signedUp, first), detail: `${signedUp} signed up` },
     ];
 }
 

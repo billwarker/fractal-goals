@@ -124,46 +124,19 @@ gcloud scheduler jobs create http export-analytics-nightly \
   --oauth-token-scope="https://www.googleapis.com/auth/cloud-platform"
 ```
 
-## Dedupe Views
+## Dedupe and reporting views
 
-Create views for downstream analysis so a rare post-load/pre-watermark crash
-does not double-count append-table batches:
+The export job keeps the warehouse views current: after each successful run it applies
+every `CREATE OR REPLACE VIEW` in [`services/analytics_views.sql`](../services/analytics_views.sql)
+to the export dataset. A failed view is logged and recorded as `views_error` in
+`app_settings.analytics_export_state`; it doesn't fail the run, since the data is loaded.
 
-```sql
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.product_events_deduped` AS
-SELECT * EXCEPT(row_number)
-FROM (
-  SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY created_at DESC) AS row_number
-  FROM `PROJECT_ID.fractal_analytics.product_events`
-)
-WHERE row_number = 1;
-
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.event_logs_deduped` AS
-SELECT * EXCEPT(row_number)
-FROM (
-  SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY timestamp DESC) AS row_number
-  FROM `PROJECT_ID.fractal_analytics.event_logs`
-)
-WHERE row_number = 1;
-
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.email_delivery_events_deduped` AS
-SELECT * EXCEPT(row_number)
-FROM (
-  SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY created_at DESC) AS row_number
-  FROM `PROJECT_ID.fractal_analytics.email_delivery_events`
-)
-WHERE row_number = 1;
-
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.email_webhook_events_deduped` AS
-SELECT * EXCEPT(row_number)
-FROM (
-  SELECT *, ROW_NUMBER() OVER (PARTITION BY id ORDER BY created_at DESC) AS row_number
-  FROM `PROJECT_ID.fractal_analytics.email_webhook_events`
-)
-WHERE row_number = 1;
-```
-
-Replace `PROJECT_ID` with the actual Google Cloud project id.
+- **Dedupe views** (`*_deduped`): a rare post-load, pre-watermark crash can load one batch
+  twice, so query these rather than the raw append tables.
+- **Reporting views**: `wap_weekly`, `public_funnel_daily`, `signups_by_source` and
+  `retention_weekly`, using the Admin overview's definitions
+  (`services/growth_metrics_service.py`). Point Looker Studio at them for history the
+  Postgres live window no longer holds.
 
 ## First Run
 
@@ -188,55 +161,3 @@ views above, then rerun the export.
 
 The Admin overview usage panel shows the last export status and per-table
 watermark from `app_settings.analytics_export_state`.
-
-## Reporting views
-
-The Admin overview's "Acquisition & engagement" card answers the headline questions from
-Postgres over a bounded window (`services/growth_metrics_service.py`). For longer history
-or slicing, create these views (after the dedupe views) and point Looker Studio at them.
-They use the same definitions as the admin card.
-
-```sql
--- Weekly Active Practitioners: accounts completing at least one session in an ISO week.
--- Session completion is the `session.completed` event; demo and admin accounts excluded.
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.wap_weekly` AS
-SELECT DATE_TRUNC(DATE(e.timestamp), ISOWEEK) AS week_start,
-       COUNT(DISTINCT e.owner_user_id) AS practitioners
-FROM `PROJECT_ID.fractal_analytics.event_logs_deduped` e
-JOIN `PROJECT_ID.fractal_analytics.users` u ON u.id = e.owner_user_id
-WHERE e.event_type = 'session.completed' AND u.role NOT IN ('demo', 'admin')
-GROUP BY week_start;
-
--- Public-site visitors and funnel steps per day (visitors are counted per day).
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.public_funnel_daily` AS
-SELECT DATE(created_at) AS day,
-       COUNT(DISTINCT visitor_day_hash) AS visitors,
-       COUNT(DISTINCT IF(event_name = 'demo_started', visitor_day_hash, NULL)) AS demo_visitors,
-       COUNT(DISTINCT IF(event_name = 'demo_tour_completed', visitor_day_hash, NULL)) AS tour_completers,
-       COUNT(DISTINCT IF(event_name = 'waitlist_submitted', visitor_day_hash, NULL)) AS waitlist_submitters
-FROM `PROJECT_ID.fractal_analytics.web_events`
-GROUP BY day;
-
--- Sign-ups by acquisition source and week, with how many practised in their first 7 days.
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.signups_by_source` AS
-SELECT DATE_TRUNC(DATE(u.created_at), ISOWEEK) AS signup_week,
-       COALESCE(u.acquisition_source, 'unknown') AS source,
-       COUNT(DISTINCT u.id) AS signups,
-       COUNT(DISTINCT IF(e.timestamp < TIMESTAMP_ADD(u.created_at, INTERVAL 7 DAY), u.id, NULL)) AS activated
-FROM `PROJECT_ID.fractal_analytics.users` u
-LEFT JOIN `PROJECT_ID.fractal_analytics.event_logs_deduped` e
-  ON e.owner_user_id = u.id AND e.event_type = 'session.completed'
-WHERE u.role NOT IN ('demo', 'admin')
-GROUP BY signup_week, source;
-
--- Weekly retention by sign-up cohort: practising weeks since sign-up.
-CREATE OR REPLACE VIEW `PROJECT_ID.fractal_analytics.retention_weekly` AS
-SELECT DATE_TRUNC(DATE(u.created_at), ISOWEEK) AS cohort_week,
-       DATE_DIFF(DATE_TRUNC(DATE(e.timestamp), ISOWEEK), DATE_TRUNC(DATE(u.created_at), ISOWEEK), WEEK) AS weeks_since_signup,
-       COUNT(DISTINCT u.id) AS practitioners
-FROM `PROJECT_ID.fractal_analytics.users` u
-JOIN `PROJECT_ID.fractal_analytics.event_logs_deduped` e
-  ON e.owner_user_id = u.id AND e.event_type = 'session.completed'
-WHERE u.role NOT IN ('demo', 'admin')
-GROUP BY cohort_week, weeks_since_signup;
-```

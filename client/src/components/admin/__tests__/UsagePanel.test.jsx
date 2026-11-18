@@ -5,8 +5,9 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 
 import UsagePanel from '../UsagePanel';
 
-const { getUsage, barChart } = vi.hoisted(() => ({
+const { getUsage, getUsageStorage, barChart } = vi.hoisted(() => ({
     getUsage: vi.fn(),
+    getUsageStorage: vi.fn(),
     barChart: vi.fn(),
 }));
 
@@ -31,6 +32,7 @@ vi.mock('../../analytics/ChartJSWrapper', () => ({
 vi.mock('../../../utils/api', () => ({
     adminApi: {
         getUsage: (...args) => getUsage(...args),
+        getUsageStorage: (...args) => getUsageStorage(...args),
         pruneUsage: vi.fn(),
         updateUsageRetention: vi.fn(),
     },
@@ -139,6 +141,12 @@ describe('UsagePanel', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getUsage.mockResolvedValue({ data: USAGE_FIXTURE });
+        getUsageStorage.mockResolvedValue({ data: {
+            storage: USAGE_FIXTURE.storage,
+            retention: USAGE_FIXTURE.retention,
+            export: USAGE_FIXTURE.export,
+            jobs: { export: { last_run_at: null, last_success_at: null }, retention: { last_run_at: null, last_success_at: null } },
+        } });
     });
 
     it('fetches with the default 30-day start/end range', async () => {
@@ -179,22 +187,26 @@ describe('UsagePanel', () => {
 
     it('shows one area per tab, from a single request', async () => {
         renderPanel();
-        await screen.findByRole('tab', { name: 'Users' });
+        await screen.findByRole('tab', { name: 'People' });
 
-        openTab('Users');
+        openTab('People');
         expect(screen.getByText('will (will@example.com)')).toBeInTheDocument();
         expect(screen.getByText('21')).toBeInTheDocument();
         openTab('Events');
         expect(screen.getByText('session.created')).toBeInTheDocument();
         expect(screen.getByText('note.created')).toBeInTheDocument();
         expect(screen.queryByText('will (will@example.com)')).not.toBeInTheDocument();
+        expect(getUsageStorage).not.toHaveBeenCalled();
         openTab('System');
         expect(screen.getByText('beta_invite')).toBeInTheDocument();
-        expect(screen.getByText('public.event_logs')).toBeInTheDocument();
+        // Storage scans the database, so only the System tab asks for it.
+        expect(await screen.findByText('public.event_logs')).toBeInTheDocument();
         expect(screen.getByText('product_events')).toBeInTheDocument();
         expect(screen.getByText(/Never exported/)).toBeInTheDocument();
+        expect(screen.getByText(/Data retention \(daily\) hasn’t succeeded/)).toBeInTheDocument();
 
         expect(getUsage).toHaveBeenCalledTimes(1);
+        expect(getUsageStorage).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the open tab in the URL and reopens it from there', async () => {
@@ -207,6 +219,17 @@ describe('UsagePanel', () => {
         expect(screen.getByTestId('location')).toBeEmptyDOMElement();
     });
 
+    it('labels the open panel by its tab and moves between tabs with the arrow keys', async () => {
+        renderPanel();
+        const summary = await screen.findByRole('tab', { name: 'Summary' });
+
+        expect(await screen.findByRole('tabpanel', { name: 'Summary' })).toHaveAttribute('id', 'overview-panel-summary');
+        fireEvent.keyDown(summary, { key: 'ArrowRight' });
+
+        expect(screen.getByRole('tabpanel', { name: 'Acquisition' })).toBeInTheDocument();
+        expect(screen.getByTestId('location')).toHaveTextContent('?view=acquisition');
+    });
+
     it('falls back to Summary for an unknown view', async () => {
         renderPanel({ path: '/admin?view=nonsense' });
 
@@ -217,7 +240,7 @@ describe('UsagePanel', () => {
         getUsage.mockResolvedValue({ data: { ...USAGE_FIXTURE, live_since: { product_events: '2026-06-20T00:00:00Z', web_events: null } } });
         renderPanel({ path: '/admin?view=engagement' });
 
-        expect(await screen.findByText(/Postgres holds these events from 2026-06-20/)).toBeInTheDocument();
+        expect(await screen.findByText(/Charts start 2026-06-20/)).toBeInTheDocument();
     });
 
     it('refetches when a different preset range is selected', async () => {

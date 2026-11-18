@@ -140,6 +140,15 @@ class TestFunnelAndTraffic:
         funnel = {step['key']: step['count'] for step in summary['funnel']}
         assert (funnel['visitors'], funnel['demo']) == (3, 1)
 
+    def test_visitors_per_day_start_at_the_oldest_day_postgres_holds(self, db_session):
+        _web(db_session, 'landing_view', 'a', datetime.datetime(2026, 11, 10, 9, 0))
+        db_session.commit()
+
+        days = [day['date'] for day in _summary(db_session)['traffic']['visitors_by_day']]
+
+        assert days[0] == '2026-11-10'
+        assert days[-1] == '2026-11-18'
+
     def test_conversion_steps_after_the_waitlist(self, db_session):
         db_session.add_all([
             BetaSignupRequest(email='w1@example.com', created_at=datetime.datetime(2026, 11, 5)),
@@ -163,6 +172,26 @@ class TestFunnelAndTraffic:
         assert funnel['signed_up'] == 3
         assert funnel['first_fractal'] == 2
         assert funnel['activated'] == 1
+
+
+    def test_steps_say_which_are_counted_alone_and_which_follow_the_cohort(self, db_session):
+        stages = [(step['key'], step['stage']) for step in _summary(db_session)['funnel']]
+
+        assert stages == [
+            ('visitors', 'public'), ('demo', 'public'), ('waitlist', 'public'), ('invited', 'public'),
+            ('signed_up', 'cohort'), ('first_fractal', 'cohort'), ('activated', 'cohort'),
+        ]
+
+    def test_a_deleted_fractal_is_not_a_first_fractal(self, db_session):
+        owner = _user(db_session, 'quitter', created_at=datetime.datetime(2026, 11, 8, tzinfo=UTC))
+        root = _root(db_session, owner)
+        root.deleted_at = datetime.datetime(2026, 11, 9)
+        db_session.commit()
+
+        funnel = {step['key']: step['count'] for step in _summary(db_session)['funnel']}
+
+        assert funnel['signed_up'] == 1
+        assert funnel['first_fractal'] == 0
 
 
 @pytest.mark.integration

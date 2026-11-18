@@ -22,7 +22,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from services.data_retention_service import DataRetentionService  # noqa: E402
+from services.data_retention_service import DataRetentionService, record_retention_run  # noqa: E402
 from services.user_service import UserService  # noqa: E402
 
 
@@ -42,6 +42,7 @@ def main():
     db_session = Session()
 
     failed = False
+    counts = None
     try:
         # Erasures first: a deleted account's events should not be pruned
         # separately when the cascade removes them anyway.
@@ -65,6 +66,14 @@ def main():
             db_session.rollback()
             print(f"Retention prune failed: {exc}", file=sys.stderr)
             failed = True
+
+        # The admin System tab warns when this hasn't succeeded for two days, so a
+        # missing Scheduler trigger shows up instead of passing silently.
+        try:
+            record_retention_run(db_session, succeeded=not failed, counts=counts if not failed else None)
+        except Exception as exc:
+            db_session.rollback()
+            print(f"Recording the retention run failed: {exc}", file=sys.stderr)
 
         return 1 if failed else 0
     finally:

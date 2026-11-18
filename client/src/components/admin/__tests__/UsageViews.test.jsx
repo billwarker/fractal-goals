@@ -34,13 +34,13 @@ const GROWTH = {
         top_campaigns: [],
     },
     funnel: [
-        { key: 'visitors', label: 'Visitors', count: 200 },
-        { key: 'demo', label: 'Opened the demo', count: 50 },
-        { key: 'waitlist', label: 'Joined the waitlist', count: 10 },
-        { key: 'invited', label: 'Invited', count: 8 },
-        { key: 'signed_up', label: 'Signed up', count: 4 },
-        { key: 'first_fractal', label: 'Created a fractal', count: 3 },
-        { key: 'activated', label: 'Completed a session within 7 days', count: 2 },
+        { key: 'visitors', label: 'Visitors', stage: 'public', count: 200 },
+        { key: 'demo', label: 'Opened the demo', stage: 'public', count: 50 },
+        { key: 'waitlist', label: 'Joined the waitlist', stage: 'public', count: 10 },
+        { key: 'invited', label: 'Invited', stage: 'public', count: 8 },
+        { key: 'signed_up', label: 'Signed up', stage: 'cohort', count: 4 },
+        { key: 'first_fractal', label: 'Created a fractal', stage: 'cohort', count: 3 },
+        { key: 'activated', label: 'Completed a session within 7 days', stage: 'cohort', count: 2 },
     ],
     wap: { current: weeks[7], previous: weeks[6], weeks },
     feature_adoption: {
@@ -69,7 +69,7 @@ describe('UsageSummaryView', () => {
         expect(within(kpi('Weekly active practitioners')).getByText('7')).toBeInTheDocument();
         expect(within(kpi('Weekly active practitioners')).getByText('▲ 1 vs last week')).toBeInTheDocument();
         expect(within(kpi('Practising this week')).getByText('70%')).toBeInTheDocument();
-        expect(within(kpi('Visitor → sign-up')).getByText('2%')).toBeInTheDocument();
+        expect(within(kpi('Sign-ups per visitor')).getByText('2%')).toBeInTheDocument();
         expect(within(kpi('Signups in window')).getByText('3')).toBeInTheDocument();
         expect(within(kpi('Page views in window')).getByText('120')).toBeInTheDocument();
     });
@@ -78,7 +78,8 @@ describe('UsageSummaryView', () => {
         const onOpen = vi.fn();
         render(<UsageSummaryView data={DATA} onOpen={onOpen} accountCards={[['Fractals', 4]]} />);
 
-        expect(screen.getAllByRole('row')).toHaveLength(1 + 4);
+        // The header, the stage heading, and the four steps before sign-up.
+        expect(screen.getAllByRole('row')).toHaveLength(1 + 1 + 4);
         expect(screen.queryByRole('row', { name: /^Signed up/ })).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Open Acquisition →' }));
         fireEvent.click(screen.getByRole('button', { name: 'Open Engagement →' }));
@@ -99,11 +100,17 @@ describe('AcquisitionView', () => {
         <AcquisitionView growth={GROWTH} windowStart="2026-10-20" windowEnd="2026-11-18" {...props} />,
     );
 
-    it('shows each conversion step with its rate from the previous step and from visitors', () => {
+    const cells = (name) => within(screen.getByRole('row', { name })).getAllByRole('cell').map((cell) => cell.textContent);
+
+    it('rates steps only within their stage, since the stages count different people', () => {
         renderView();
 
-        const signedUp = screen.getByRole('row', { name: /^Signed up/ });
-        expect(within(signedUp).getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['Signed up', '4', '50%', '2%']);
+        expect(screen.getByRole('rowheader', { name: /Before sign-up/ })).toBeInTheDocument();
+        expect(screen.getByRole('rowheader', { name: /After sign-up/ })).toBeInTheDocument();
+        expect(cells(/^Invited/)).toEqual(['Invited', '8', '80%', '4%']);
+        // Sign-up opens the cohort stage: no rate from "Invited", nor from visitors.
+        expect(cells(/^Signed up/)).toEqual(['Signed up', '4', '', '']);
+        expect(cells(/^Created a fractal/)).toEqual(['Created a fractal', '3', '75%', '']);
     });
 
     it('charts visitors in a compact chart and lists their sources', () => {
@@ -122,7 +129,7 @@ describe('AcquisitionView', () => {
         expect(screen.queryByText(/are in BigQuery/)).not.toBeInTheDocument();
 
         rerender(<AcquisitionView growth={GROWTH} windowStart="2026-10-20" windowEnd="2026-11-18" webLiveSince="2026-11-01T03:00:00Z" />);
-        expect(screen.getByText(/Postgres holds these events from 2026-11-01/)).toBeInTheDocument();
+        expect(screen.getByText(/Charts start 2026-11-01/)).toBeInTheDocument();
     });
 });
 
@@ -139,7 +146,7 @@ describe('EngagementView', () => {
     it('notes when daily users reach back past what Postgres holds', () => {
         render(<EngagementView data={{ ...DATA, live_since: { product_events: '2026-11-01T00:00:00Z' } }} />);
 
-        expect(screen.getByText(/Postgres holds these events from 2026-11-01/)).toBeInTheDocument();
+        expect(screen.getByText(/Charts start 2026-11-01/)).toBeInTheDocument();
     });
 });
 

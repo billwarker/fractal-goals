@@ -94,6 +94,19 @@ class TestPublicTelemetryEndpoint:
         assert response.status_code == 202
         assert db_session.query(WebEvent).count() == 0
 
+    def test_browsers_whose_user_agent_says_preview_still_count(self, client, db_session):
+        response = _post(client, {'context': {'path': '/'}, 'events': [{'name': 'landing_view'}]},
+                         headers={'User-Agent': f'{BROWSER} Preview'})
+
+        assert response.status_code == 202
+        assert db_session.query(WebEvent).count() == 1
+
+    @pytest.mark.parametrize('agent', ['Mozilla/5.0 (compatible; BingPreview/1.0b)', 'WhatsApp/2.23.20.0'])
+    def test_link_previewers_are_not_visitors(self, client, db_session, agent):
+        _post(client, {'context': {'path': '/'}, 'events': [{'name': 'landing_view'}]}, headers={'User-Agent': agent})
+
+        assert db_session.query(WebEvent).count() == 0
+
     def test_needs_no_csrf_or_auth_and_bounds_batch_size(self, client):
         response = _post(client, {'events': [{'name': 'landing_view'}] * 11})
 

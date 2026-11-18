@@ -29,6 +29,7 @@ from models import (
 )
 from services.app_settings import (
     ANALYTICS_EXPORT_STATE_KEY,
+    DATA_RETENTION_STATE_KEY,
     TELEMETRY_RETENTION_KEY,
     get_app_setting,
     set_app_setting,
@@ -42,7 +43,7 @@ from services.analytics_export_service import (
     flush_exported,
 )
 from services.demo_account_service import DEMO_ACCOUNT_ROLE
-from services.growth_metrics_service import GrowthMetricsService
+from services.growth_metrics_service import EXCLUDED_ROLES, GrowthMetricsService, oldest_event, series_start
 from sqlalchemy.exc import SQLAlchemyError
 
 logger = logging.getLogger(__name__)
@@ -94,8 +95,7 @@ class AdminUsageService:
             end_date + datetime.timedelta(days=1), datetime.time.min, tzinfo=datetime.timezone.utc,
         )
         now = utc_now()
-        storage = self._storage_stats()
-        oldest = {entry["table"]: entry["oldest"] for entry in storage["tables"]}
+        self._oldest_product_event = oldest_event(self.db_session, ProductEvent.created_at)
 
         return {
             "window": {
@@ -115,12 +115,32 @@ class AdminUsageService:
                 window_start, window_end, start_date, end_date, now,
             ),
             "email_health": self._email_health(window_start, window_end),
-            "storage": storage,
-            # The oldest event still in Postgres; earlier days of these charts are in BigQuery.
-            "live_since": {"product_events": oldest.get("product_events"), "web_events": oldest.get("web_events")},
-            "retention": self._retention_settings(),
-            "export": self._export_state(),
+            # The oldest event still in Postgres: the DAU and visitor series start there,
+            # and earlier days are in BigQuery.
+            "live_since": {
+                "product_events": format_utc(self._oldest_product_event),
+                "web_events": format_utc(oldest_event(self.db_session, WebEvent.created_at)),
+            },
         }, None, 200
+
+    def storage_summary(self) -> ServiceResult[JsonDict]:
+        """Admin → Overview → System: storage, the live window, and the scheduled jobs' health."""
+        export = self._export_state()
+        return {
+            "storage": self._storage_stats(),
+            "retention": self._retention_settings(),
+            "export": export,
+            "jobs": {
+                "export": {"last_run_at": export["last_run_at"], "last_success_at": export["last_success_at"]},
+                "retention": self._retention_job_state(),
+            },
+        }, None, 200
+
+    def _retention_job_state(self):
+        stored = get_app_setting(self.db_session, DATA_RETENTION_STATE_KEY, None)
+        if not isinstance(stored, dict):
+            return {"last_run_at": None, "last_success_at": None}
+        return {"last_run_at": stored.get("last_run_at"), "last_success_at": stored.get("last_success_at")}
 
     def _resolve_window(self, start, end, days):
         start_date = _parse_iso_date(start)
@@ -195,7 +215,7 @@ class AdminUsageService:
         counts_by_day = {str(row.day): int(row.users) for row in daily_rows}
 
         dau = []
-        cursor = start_date
+        cursor = series_start(start_date, getattr(self, "_oldest_product_event", None))
         while cursor <= end_date:
             key = cursor.isoformat()
             dau.append({"date": key, "count": counts_by_day.get(key, 0)})
@@ -231,6 +251,8 @@ class AdminUsageService:
             signup_day.label("day"),
             func.count(User.id).label("count"),
         ).filter(
+            # The funnel's definition: demo and admin accounts aren't sign-ups.
+            User.role.notin_(EXCLUDED_ROLES),
             User.created_at >= window_start,
             User.created_at < window_end,
         ).group_by(signup_day).order_by(signup_day).all()
@@ -398,18 +420,19 @@ class AdminUsageService:
         if self.db_session.get_bind().dialect.name != "postgresql":
             return []
         try:
-            rows = self.db_session.execute(sa.text("""
-                SELECT
-                    event_type,
-                    count(*) AS events,
-                    COALESCE(sum(pg_column_size(payload)), 0) AS payload_bytes,
-                    COALESCE(sum(pg_column_size(description)), 0) AS description_bytes
-                FROM event_logs
-                GROUP BY event_type
-                ORDER BY COALESCE(sum(pg_column_size(payload)), 0)
-                       + COALESCE(sum(pg_column_size(description)), 0) DESC, event_type
-                LIMIT :top
-            """), {"top": EVENT_LOG_PAYLOAD_TOP}).mappings().all()
+            with self.db_session.begin_nested():
+                rows = self.db_session.execute(sa.text("""
+                    SELECT
+                        event_type,
+                        count(*) AS events,
+                        COALESCE(sum(pg_column_size(payload)), 0) AS payload_bytes,
+                        COALESCE(sum(pg_column_size(description)), 0) AS description_bytes
+                    FROM event_logs
+                    GROUP BY event_type
+                    ORDER BY COALESCE(sum(pg_column_size(payload)), 0)
+                           + COALESCE(sum(pg_column_size(description)), 0) DESC, event_type
+                    LIMIT :top
+                """), {"top": EVENT_LOG_PAYLOAD_TOP}).mappings().all()
         except SQLAlchemyError:
             logger.warning("Failed to read activity history payload sizes", exc_info=True)
             return []
@@ -428,10 +451,12 @@ class AdminUsageService:
         try:
             if self.db_session.get_bind().dialect.name != "postgresql":
                 return None
-            result = self.db_session.execute(
-                sa.text("SELECT pg_total_relation_size(CAST(:table_name AS regclass))"),
-                {"table_name": table_name},
-            ).scalar()
+            # A savepoint: a failed read rolls back alone instead of aborting the request.
+            with self.db_session.begin_nested():
+                result = self.db_session.execute(
+                    sa.text("SELECT pg_total_relation_size(CAST(:table_name AS regclass))"),
+                    {"table_name": table_name},
+                ).scalar()
             return int(result) if result is not None else None
         except SQLAlchemyError:
             logger.warning("Failed to read relation size for %s", table_name, exc_info=True)
@@ -443,29 +468,30 @@ class AdminUsageService:
             return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
 
         try:
-            total_bytes = int(self.db_session.execute(
-                sa.text("SELECT pg_database_size(current_database())"),
-            ).scalar() or 0)
-            rows = self.db_session.execute(sa.text("""
-                SELECT
-                    n.nspname AS schema,
-                    c.relname AS table_name,
-                    GREATEST(c.reltuples::bigint, 0) AS estimated_rows,
-                    pg_total_relation_size(c.oid) AS total_bytes,
-                    pg_relation_size(c.oid) AS table_bytes,
-                    pg_indexes_size(c.oid) AS index_bytes,
-                    GREATEST(
-                        pg_total_relation_size(c.oid)
-                        - pg_relation_size(c.oid)
-                        - pg_indexes_size(c.oid),
-                        0
-                    ) AS toast_bytes
-                FROM pg_class c
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE c.relkind IN ('r', 'p', 'm')
-                  AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-                ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
-            """)).mappings().all()
+            with self.db_session.begin_nested():
+                total_bytes = int(self.db_session.execute(
+                    sa.text("SELECT pg_database_size(current_database())"),
+                ).scalar() or 0)
+                rows = self.db_session.execute(sa.text("""
+                    SELECT
+                        n.nspname AS schema,
+                        c.relname AS table_name,
+                        GREATEST(c.reltuples::bigint, 0) AS estimated_rows,
+                        pg_total_relation_size(c.oid) AS total_bytes,
+                        pg_relation_size(c.oid) AS table_bytes,
+                        pg_indexes_size(c.oid) AS index_bytes,
+                        GREATEST(
+                            pg_total_relation_size(c.oid)
+                            - pg_relation_size(c.oid)
+                            - pg_indexes_size(c.oid),
+                            0
+                        ) AS toast_bytes
+                    FROM pg_class c
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE c.relkind IN ('r', 'p', 'm')
+                      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+                    ORDER BY pg_total_relation_size(c.oid) DESC, n.nspname, c.relname
+                """)).mappings().all()
         except SQLAlchemyError:
             logger.warning("Failed to read database storage breakdown", exc_info=True)
             return {"total_bytes": None, "relation_bytes": None, "other_bytes": None, "relations": []}
