@@ -22,6 +22,8 @@ from services.goal_level_service import GoalLevelService
 from services.goal_service import GoalService
 from services.demo_snapshot_service import DemoSnapshotService, SnapshotResult, snapshot_root_id
 from services.ops_log import log_ops_event
+from services.program_scope import resolve_program_scope
+from services.session_service import SessionService
 from services.serializers import format_utc, serialize_goal
 from services._serialize_common import calculate_smart_status
 from services.service_types import JsonDict, ServiceResult
@@ -174,8 +176,10 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
         levels = self._preview_levels(root)
         appearance = {key: preferences[key] for key in LANDING_EXAMPLE_APPEARANCE_KEYS if preferences.get(key)}
         flowtree_view = self._flowtree_view(preferences, str(source.id), result)
+        preview = {"levels": levels, "tree": self._preview_tree(root_id)}
         if flowtree_view:
             appearance["flowtree_views"] = {root_id: flowtree_view}
+            preview.update(self._preview_view_inputs(root, flowtree_view))
         return {
             "root_id": root_id,
             "label": item["label"],
@@ -188,7 +192,7 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
                 "program_id": self._tour_program_id(root_id, result.id_map.get(item["tour"].get("program_id") or "")),
             },
             "appearance": appearance,
-            "preview": {"levels": levels, "tree": self._preview_tree(root_id)},
+            "preview": preview,
         }
 
     @staticmethod
@@ -204,6 +208,25 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
         if scoped_program_id and result.id_map.get(scoped_program_id):
             view["scopedProgramId"] = result.id_map[scoped_program_id]
         return view
+
+    def _preview_view_inputs(self, root: Goal, flowtree_view: JsonDict) -> JsonDict:
+        """What the landing's tree needs to apply the published filters as the Goals page does:
+        the snapshot's goals active as of publishing, and the scoped program's dates and scope."""
+        inputs: JsonDict = {}
+        evidence, _, _ = SessionService(self.db_session).get_recent_evidence_goal_ids(root.id, root.owner_id)
+        if evidence:
+            inputs["evidence_goal_ids"] = sorted(evidence.get("goal_ids") or [])
+        program_id = flowtree_view.get("scopedProgramId")
+        program = self.db_session.get(Program, program_id) if program_id else None
+        if program and program.root_id == root.id:
+            inputs["program"] = {
+                "id": program.id,
+                "name": program.name,
+                "start_date": format_utc(program.start_date),
+                "end_date": format_utc(program.end_date),
+                "scope_goal_ids": sorted(resolve_program_scope(self.db_session, root.id, program.id).goal_ids),
+            }
+        return inputs
 
     def _preview_levels(self, root: Goal) -> list[JsonDict]:
         """The snapshot's effective levels (system, then account, then fractal), as the app merges them."""

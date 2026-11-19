@@ -9,7 +9,7 @@ from blueprints.demo_access import DEMO_ROOT_READ_ENDPOINTS
 from config import config
 from models import (
     ActivityInstance, ActivityInstanceTag, ActivityProgressDefault, ActivityProgressDefaultTag, ActivityTagDefinition, ActivityTagFamily, AppSetting, Base, EventLog, Goal, GoalLevel,
-    Note, Program, Session, User,
+    Note, Program, Session, User, program_goals,
 )
 from scripts.browser_showcase_seed import SHOWCASE_ROOT_ID, seed_showcase
 from services.demo_account_service import DEMO_ACCOUNT_ROLE, DemoAccountService
@@ -216,6 +216,11 @@ class TestDemoSnapshots:
                      'viewSettings': {'hideInactiveGoals': True, 'fadeInactiveBranches': False}},
             'another-root': {'viewSettings': {'hideCompletedGoals': True}},
         }}
+        # A program scoped to one branch, so the preview has a scope to carry.
+        branch = db_session.query(Goal).filter(
+            Goal.parent_id == SOURCE, Goal.deleted_at.is_(None),
+        ).order_by(Goal.id).first()
+        db_session.execute(program_goals.insert().values(program_id='sweep-program', goal_id=branch.id))
         db_session.commit()
         snapshot_id = _publish(db_session)
         appearance = _manifest(db_session)['examples'][0]['appearance']
@@ -227,6 +232,15 @@ class TestDemoSnapshots:
         session = client.post('/api/public/demo-session').get_json()
         assert session['appearance'][snapshot_id]['flowtree_views'][snapshot_id] == view
 
+        # The landing's tree gets what it needs to apply the same filters before the demo opens.
+        preview = _manifest(db_session)['examples'][0]['preview']
+        snapshot_goal_ids = {goal.id for goal in db_session.query(Goal).filter(Goal.root_id == snapshot_id)}
+        assert set(preview['evidence_goal_ids']) <= snapshot_goal_ids
+        program = preview['program']
+        assert program['id'] == view['scopedProgramId'] and program['name'] == copied_program.name
+        assert program['start_date'] and program['end_date']
+        assert program['scope_goal_ids'] and set(program['scope_goal_ids']) <= snapshot_goal_ids
+
     def test_a_program_scope_that_was_not_copied_is_dropped(self, db_session, showcase):
         owner = db_session.get(User, 'sweep-admin')
         owner.preferences = {**owner.preferences, 'flowtree_views': {
@@ -234,8 +248,10 @@ class TestDemoSnapshots:
         }}
         db_session.commit()
         snapshot_id = _publish(db_session)
-        view = _manifest(db_session)['examples'][0]['appearance']['flowtree_views'][snapshot_id]
+        example = _manifest(db_session)['examples'][0]
+        view = example['appearance']['flowtree_views'][snapshot_id]
         assert view == {'viewSettings': {'hideCompletedGoals': True}}
+        assert 'program' not in example['preview']
 
     def test_the_preview_is_the_snapshots_tree_with_only_what_the_flow_tree_draws(self, client, db_session, showcase):
         snapshot_id = _publish(db_session)
