@@ -224,7 +224,7 @@ class LandingPublishService(_LandingSettingsMixin, _LandingStaticSnapshotMixin):
                 "name": program.name,
                 "start_date": format_utc(program.start_date),
                 "end_date": format_utc(program.end_date),
-                "scope_goal_ids": sorted(resolve_program_scope(self.db_session, root.id, program.id).goal_ids),
+                "scope_goal_ids": sorted(resolve_program_scope(self.db_session, str(root.id), str(program.id)).goal_ids),
             }
         return inputs
 
