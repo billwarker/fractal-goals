@@ -1,6 +1,9 @@
-import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import FlowTree from '../../FlowTree';
 import { GoalLevelsProvider } from '../../contexts/GoalLevelsContext';
+import { getISOYMDInTimezone } from '../../utils/dateUtils';
+import { getActivePrograms } from '../../utils/programGoalWindow';
+import { buildProgramRenderScopeGoalIds, getProgramMetricScopeGoalIds } from '../../utils/programScope';
 import styles from './LandingTreePreview.module.css';
 
 // The landing's background grid (Landing.module.css: 20px cells, lines at each multiple).
@@ -45,6 +48,31 @@ function useGridFrame(panelRef) {
 }
 
 /**
+ * The Goals page filters the example was published with, so the preview shows the tree the
+ * demo opens on: the same view settings, active goals and program scope (FractalGoals.jsx).
+ * The metrics overlay stays off; the preview carries no session metrics.
+ */
+export function getPreviewView(example, today = getISOYMDInTimezone(new Date())) {
+    const { tree, evidence_goal_ids: evidenceGoalIds, program } = example.preview;
+    const published = example.appearance?.flowtree_views?.[example.id];
+    if (!published) return {};
+    const viewSettings = { ...published.viewSettings, showMetricsOverlay: false };
+    // Published before the preview carried activity, the inactive filters have nothing to go on.
+    if (!evidenceGoalIds) Object.assign(viewSettings, { hideInactiveGoals: false, fadeInactiveBranches: false });
+    const activeProgram = program && String(program.id) === String(published.scopedProgramId)
+        ? getActivePrograms([program], today)[0]
+        : null;
+    return {
+        viewSettings,
+        evidenceGoalIds: evidenceGoalIds ? new Set(evidenceGoalIds.map(String)) : null,
+        allowedGoalIds: activeProgram
+            ? buildProgramRenderScopeGoalIds(tree, getProgramMetricScopeGoalIds(activeProgram, tree))
+            : null,
+        scopedProgramName: activeProgram?.name || null,
+    };
+}
+
+/**
  * A demo example's goal tree, drawn by the app's own flow tree from the published preview
  * (services/landing_publish_service.py). Visitors can pan and zoom it; clicking a goal opens
  * the live demo on that goal.
@@ -53,6 +81,7 @@ export default function LandingTreePreview({ example, goalHref, onOpen }) {
     const { tree, levels } = example.preview;
     const panelRef = useRef(null);
     const frame = useGridFrame(panelRef);
+    const view = useMemo(() => getPreviewView(example), [example]);
     const openGoal = useCallback((node) => {
         onOpen?.();
         window.location.assign(goalHref(node.id));
@@ -67,7 +96,7 @@ export default function LandingTreePreview({ example, goalHref, onOpen }) {
             >
                 <GoalLevelsProvider seedLevels={levels} seedAppearance={example.appearance}>
                     {/* Keyed so switching examples fades the new tree in from its own fit. */}
-                    <FlowTree key={example.id} treeData={tree} onNodeClick={openGoal} />
+                    <FlowTree key={example.id} treeData={tree} onNodeClick={openGoal} {...view} />
                 </GoalLevelsProvider>
                 <span className={styles.frame} aria-hidden="true" />
             </div>
