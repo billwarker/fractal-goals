@@ -39,6 +39,31 @@ describe('useSessionsPageFilters', () => {
         act(() => result.current.resetFilters());
         expect(result.current.hasActiveFilters).toBe(false);
     });
+
+    it('narrows the list to a selected heatmap day while the heatmap keeps the whole range', () => {
+        const { result } = renderHook(() => ({
+            ...useSessionsPageFilters('UTC'),
+            params: useSearchParams()[0],
+        }), {
+            wrapper: ({ children }) => (
+                <MemoryRouter initialEntries={['/sessions?range_preset=custom&range_start=2026-08-01&range_end=2026-08-31']}>
+                    {children}
+                </MemoryRouter>
+            ),
+        });
+        act(() => result.current.updateFilters({ day: '2026-08-14' }));
+        expect(result.current.params.get('day')).toBe('2026-08-14');
+        expect(result.current.hasActiveFilters).toBe(true);
+        expect(result.current.apiFilters).toMatchObject({ range_start: '2026-08-14', range_end: '2026-08-14' });
+        expect(result.current.heatmapApiFilters).toMatchObject({ range_start: '2026-08-01', range_end: '2026-08-31' });
+
+        act(() => result.current.updateFilters({ sortOrder: 'asc' }));
+        expect(result.current.filters.day).toBe('2026-08-14');
+
+        act(() => result.current.updateFilters({ rangePreset: '30d' }));
+        expect(result.current.filters.day).toBeNull();
+        expect(result.current.params.has('day')).toBe(false);
+    });
 });
 
 describe('describeSessionRange', () => {

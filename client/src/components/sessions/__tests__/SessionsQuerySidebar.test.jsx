@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import SessionsQuerySidebar from '../SessionsQuerySidebar';
@@ -22,5 +22,17 @@ describe('SessionsQuerySidebar header', () => {
         render(<SessionsQuerySidebar filters={value} visibleSessionsCount={visible} totalSessionsCount={total}
             onUpdateFilters={vi.fn()} onResetFilters={vi.fn()} />);
         expect(screen.getByText(expected)).toBeInTheDocument();
+    });
+});
+
+describe('SessionsQuerySidebar selected day', () => {
+    it('names the selected day and clears it', () => {
+        const onUpdateFilters = vi.fn();
+        render(<SessionsQuerySidebar filters={{ ...filters, day: '2026-08-14' }} visibleSessionsCount={2}
+            totalSessionsCount={2} onUpdateFilters={onUpdateFilters} onResetFilters={vi.fn()} />);
+        expect(screen.getByText('2 sessions · Aug 14, 2026')).toBeInTheDocument();
+        expect(screen.getByText('Showing Aug 14, 2026')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Show all days' }));
+        expect(onUpdateFilters).toHaveBeenCalledWith({ day: null });
     });
 });
