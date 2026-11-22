@@ -27,6 +27,7 @@ export function describeSessionRange({ rangePreset, rangeStart, rangeEnd } = {})
 
 const SESSION_HEATMAP_MODES = ['count', 'duration'];
 const SESSION_DURATION_OPERATORS = ['gt', 'lt'];
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const DEFAULT_FILTERS = {
     sortBy: 'session_start',
@@ -39,6 +40,7 @@ const DEFAULT_FILTERS = {
     durationMinutes: '',
     activityIds: [],
     goalIds: [],
+    day: null,
 };
 
 function parseCsvParam(value) {
@@ -123,6 +125,7 @@ export function useSessionsPageFilters(timezone) {
         const durationMinutes = searchParams.get('duration_minutes') || DEFAULT_FILTERS.durationMinutes;
         const activityIds = parseCsvParam(searchParams.get('activity_ids'));
         const goalIds = parseCsvParam(searchParams.get('goal_ids'));
+        const day = DAY.test(searchParams.get('day') || '') ? searchParams.get('day') : null;
 
         let rangeStart = searchParams.get('range_start') || '';
         let rangeEnd = searchParams.get('range_end') || '';
@@ -150,14 +153,16 @@ export function useSessionsPageFilters(timezone) {
             durationMinutes,
             activityIds,
             goalIds,
+            day,
         };
     }, [searchParams, timezone]);
 
+    // A selected heatmap day narrows the list to that day; the heatmap keeps the whole range.
     const apiFilters = useMemo(() => ({
         sort_by: filters.sortBy,
         sort_order: filters.sortOrder,
-        range_start: filters.rangeStart || undefined,
-        range_end: filters.rangeEnd || undefined,
+        range_start: filters.day || filters.rangeStart || undefined,
+        range_end: filters.day || filters.rangeEnd || undefined,
         duration_operator: filters.durationMinutes ? filters.durationOperator : undefined,
         duration_minutes: filters.durationMinutes || undefined,
         timezone: timezone || 'UTC',
@@ -167,8 +172,10 @@ export function useSessionsPageFilters(timezone) {
 
     const heatmapApiFilters = useMemo(() => ({
         ...apiFilters,
+        range_start: filters.rangeStart || undefined,
+        range_end: filters.rangeEnd || undefined,
         heatmap_metric: filters.heatmapMode,
-    }), [apiFilters, filters.heatmapMode]);
+    }), [apiFilters, filters.rangeStart, filters.rangeEnd, filters.heatmapMode]);
 
     const updateFilters = useCallback((updates) => {
         const nextFilters = {
@@ -178,6 +185,12 @@ export function useSessionsPageFilters(timezone) {
 
         if (updates.rangeStart !== undefined || updates.rangeEnd !== undefined) {
             nextFilters.rangePreset = 'custom';
+        }
+        // A new range can leave the selected day outside it, so the day selection resets with it.
+        if (updates.day === undefined && (
+            updates.rangePreset !== undefined || updates.rangeStart !== undefined || updates.rangeEnd !== undefined
+        )) {
+            nextFilters.day = null;
         }
 
         const nextParams = new URLSearchParams(searchParams);
@@ -248,6 +261,12 @@ export function useSessionsPageFilters(timezone) {
             nextParams.delete('goal_ids');
         }
 
+        if (nextFilters.day) {
+            nextParams.set('day', nextFilters.day);
+        } else {
+            nextParams.delete('day');
+        }
+
         setSearchParams(nextParams, { replace: true });
     }, [filters, searchParams, setSearchParams]);
 
@@ -262,6 +281,7 @@ export function useSessionsPageFilters(timezone) {
         || filters.durationMinutes !== DEFAULT_FILTERS.durationMinutes
         || filters.activityIds.length > 0
         || filters.goalIds.length > 0
+        || Boolean(filters.day)
     ), [filters]);
 
     return {

@@ -4,6 +4,7 @@ import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import FilterPickerField from '../common/FilterPickerField';
 import { ActivityFilterPicker, GoalFilterModal } from '../common/FilterPickerModals';
 import { describeSessionRange } from '../../hooks/useSessionsPageFilters';
+import { formatLiteralDate } from '../../utils/dateUtils';
 import SessionCalendarHeatmap from './SessionCalendarHeatmap';
 import './SessionsQuerySidebar.css';
 
@@ -60,7 +61,7 @@ function SessionsQuerySidebar({
         <div className="sessions-query-sidebar">
             <SidePaneHeader
                 title="Filters"
-                subtitle={`${sessionCountLabel(visibleSessionsCount, totalSessionsCount)} · ${describeSessionRange(filters)}`}
+                subtitle={`${sessionCountLabel(visibleSessionsCount, totalSessionsCount)} · ${filters.day ? formatLiteralDate(filters.day) : describeSessionRange(filters)}`}
                 actions={(
                     <>
                     <SidePaneHeaderButton
@@ -97,9 +98,19 @@ function SessionsQuerySidebar({
                             <span>Heat by Session Duration</span>
                         </label>
                     </div>
+                    {filters.day && (
+                        <div className="sessions-query-selected-day">
+                            <span>Showing {formatLiteralDate(filters.day)}</span>
+                            <button type="button" onClick={() => onUpdateFilters?.({ day: null })}>
+                                Show all days
+                            </button>
+                        </div>
+                    )}
                     <SessionCalendarHeatmap
                         heatmap={heatmap}
                         isLoading={isHeatmapLoading}
+                        selectedDay={filters.day}
+                        onSelectDay={(day) => onUpdateFilters?.({ day })}
                     />
                 </section>
 
