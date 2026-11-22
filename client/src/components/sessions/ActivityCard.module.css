@@ -128,18 +128,18 @@
     padding-top: 2px;
 }
 
+/* A set's splits always sit side by side, sharing the row equally: a narrow split wraps its
+   metrics rather than dropping below the others. */
 .metricsGroup {
     display: flex;
     gap: 12px;
-    flex-wrap: wrap;
     flex: 1;
     min-width: 0;
 }
 
-/* Splits share the row equally, each taking a line of its own once it would be too narrow. */
 .splitGroup {
     flex: 1 1 0;
-    min-width: 140px;
+    min-width: 0;
     background: var(--color-bg-secondary);
     padding: 6px 8px;
     border-radius: 3px;
