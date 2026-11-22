@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { createAutoSaveQueue } from '../utils/autoSaveQueue';
+import { getSectionItems } from './sessionItemMutationUtils';
 
-function arraysEqual(left = [], right = []) {
-    if (left === right) return true;
-    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
-        return false;
-    }
-    for (let index = 0; index < left.length; index += 1) {
-        if (left[index] !== right[index]) return false;
-    }
-    return true;
-}
+/** What a section item is: an activity instance or a circuit run, by id. */
+const itemIdentity = (item) => `${item?.type}:${item?.activity_instance_id ?? item?.circuit_run_id ?? ''}`;
 
+/** Sections match when their names and items (activities and circuits, in order) do. */
 function areSessionSectionsEqual(left = [], right = []) {
     if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
         return false;
@@ -23,13 +17,17 @@ function areSessionSectionsEqual(left = [], right = []) {
         const rightSection = right[index] || {};
 
         if (leftSection.name !== rightSection.name) return false;
-        if (!arraysEqual(leftSection.activity_ids || [], rightSection.activity_ids || [])) return false;
+        const leftItems = getSectionItems(leftSection);
+        const rightItems = getSectionItems(rightSection);
+        if (leftItems.length !== rightItems.length) return false;
+        if (!leftItems.every((item, itemIndex) => itemIdentity(item) === itemIdentity(rightItems[itemIndex]))) return false;
     }
 
     return true;
 }
 
-function areSessionDataEqual(left, right) {
+// Whether the server's copy has caught up with the draft, so the draft can go.
+export function areSessionDataEqual(left, right) {
     if (left === right) return true;
     if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
 
