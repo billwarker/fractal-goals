@@ -133,9 +133,13 @@
     gap: 12px;
     flex-wrap: wrap;
     flex: 1;
+    min-width: 0;
 }
 
+/* Splits share the row equally, each taking a line of its own once it would be too narrow. */
 .splitGroup {
+    flex: 1 1 0;
+    min-width: 140px;
     background: var(--color-bg-secondary);
     padding: 6px 8px;
     border-radius: 3px;
