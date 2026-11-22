@@ -128,10 +128,13 @@
     padding-top: 2px;
 }
 
+/* A set's splits always sit side by side, sharing the row equally. Each metric stays on one
+   line, so the card widens to fit them (on mobile, where the card can't, a metric wraps). */
 .metricsGroup {
-    display: flex;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
     gap: 12px;
-    flex-wrap: wrap;
     flex: 1;
 }
 
@@ -153,6 +156,10 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
+}
+
+.splitMetricsList .metricItem {
+    white-space: nowrap;
 }
 
 /* Name, value and unit read as one phrase: a metric that doesn't fit takes its own line,
@@ -253,6 +260,10 @@
     .metricsGroup {
         width: 100%;
         gap: 8px;
+    }
+
+    .splitMetricsList .metricItem {
+        white-space: normal;
     }
 
     .singleMetricsContainer {

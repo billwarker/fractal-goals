@@ -14,23 +14,27 @@
 /*
  * Sections share the row in proportion to their stack count, so every stack
  * ends up roughly the same width. Below the minimum, the row scrolls instead.
- * min-width = stacks + gaps between them + 12px padding and 1px border per side.
+ * Each row of the section holds the stacks' minimum (stacks + the gaps between
+ * them), so the section is at least that wide, or wider when a card's content
+ * (side-by-side splits) needs more.
  */
 .sectionColumn {
     --stack-min-width: 300px;
     --stack-gap: 8px;
     flex: var(--stack-count, 1) 0 0;
-    min-width: calc(
-        var(--stack-count, 1) * var(--stack-min-width)
-        + (var(--stack-count, 1) - 1) * var(--stack-gap)
-        + 26px
-    );
     background: var(--color-bg-card-alt);
     padding: 12px;
     border-radius: 6px;
     border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
+}
+
+.sectionColumn > * {
+    min-width: calc(
+        var(--stack-count, 1) * var(--stack-min-width)
+        + (var(--stack-count, 1) - 1) * var(--stack-gap)
+    );
 }
 
 .sectionHeader {
@@ -54,12 +58,16 @@
     gap: var(--stack-gap);
 }
 
+/* A stack is never narrower than its minimum, or its widest card's content. */
 .itemStack {
     flex: 1 1 0;
-    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+
+.itemStack > * {
+    min-width: var(--stack-min-width);
 }
 
 @media (max-width: 768px) {
@@ -70,6 +78,9 @@
 
     .sectionColumn {
         flex: none;
+    }
+
+    .sectionColumn > * {
         min-width: 0;
     }
 
@@ -81,5 +92,9 @@
     .itemStack {
         flex: none;
         width: auto;
+    }
+
+    .itemStack > * {
+        min-width: 0;
     }
 }

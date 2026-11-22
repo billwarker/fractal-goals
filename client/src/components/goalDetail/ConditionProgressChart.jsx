@@ -13,10 +13,20 @@ import styles from './ConditionProgressChart.module.css';
 
 const SERIES_PALETTE = ['#3b82f6', '#22c55e'];
 
-/** A line for each threshold no goal marker stands on (the marker brings its own guide line). */
+/**
+ * A line for each threshold. Where a goal marker stands on it (the marker brings its own guide
+ * line) the line is invisible, there only so the axis still reaches the marker.
+ */
 function thresholdAnnotations(series, chartTheme, markers) {
     return Object.fromEntries(series.flatMap((row, index) => (
-        row.threshold == null || isMarkedThreshold(markers, `y${index}`, row.threshold) ? [] : [[`threshold-${row.id}`, {
+        row.threshold == null ? [] : isMarkedThreshold(markers, `y${index}`, row.threshold) ? [[`threshold-${row.id}`, {
+            type: 'line',
+            yMin: row.threshold,
+            yMax: row.threshold,
+            yScaleID: `y${index}`,
+            borderColor: 'transparent',
+            borderWidth: 0,
+        }]] : [[`threshold-${row.id}`, {
             type: 'line',
             yMin: row.threshold,
             yMax: row.threshold,

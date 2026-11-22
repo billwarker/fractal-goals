@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 
 const lineChart = vi.fn(() => <div data-testid="line" />);
 vi.mock('react-chartjs-2', () => ({ Line: (props) => lineChart(props) }));
+vi.mock('../../analytics/GoalMarkerLayer', () => ({ GoalMarkerHost: ({ children }) => children }));
 
 import ConditionProgressChart from '../ConditionProgressChart';
 
@@ -33,5 +34,19 @@ describe('ConditionProgressChart compact', () => {
         const { data, options } = lineChart.mock.calls.at(-1)[0];
         expect(options.scales.y0.ticks.color).toBe(data.datasets[0].borderColor);
         expect(options.scales.y1.ticks.color).toBe(data.datasets[1].borderColor);
+    });
+});
+
+describe('ConditionProgressChart goal marker', () => {
+    it('keeps the axis reaching a threshold its goal marker stands on, below every value', () => {
+        const lowReps = { ...condition, rules: [{ metric_definition_id: 'reps', operator: '>=', value: 2 }, condition.rules[0]] };
+        const goalLines = [{ goal_id: 'goal', goal_name: 'Bench', completed: false, condition: lowReps }];
+        render(
+            <ConditionProgressChart condition={lowReps} instances={instances} activity={activity} density="compact" goalLines={goalLines} goalId="goal" />,
+        );
+        const { annotations } = lineChart.mock.calls.at(-1)[0].options.plugins.annotation;
+        expect(annotations['threshold-reps']).toMatchObject({ yScaleID: 'y0', yMin: 2, yMax: 2, borderColor: 'transparent' });
+        expect(annotations['threshold-reps'].label).toBeUndefined();
+        expect(annotations['threshold-weight']).toMatchObject({ yScaleID: 'y1', yMin: 225, borderDash: [6, 4] });
     });
 });
