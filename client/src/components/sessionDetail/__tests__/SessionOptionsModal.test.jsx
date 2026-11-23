@@ -1,25 +1,15 @@
 import React from 'react';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import { renderWithProviders } from '../../../test/test-utils';
 import SessionOptionsModal from '../SessionOptionsModal';
 
+// Rendered without app providers: the modal needs none, and AuthProvider's on-mount
+// user fetch could otherwise log after the file's worker has torn down.
 describe('SessionOptionsModal', () => {
-    beforeEach(() => {
-        Object.defineProperty(window, 'localStorage', {
-            value: {
-                getItem: vi.fn(() => null),
-                setItem: vi.fn(),
-                removeItem: vi.fn(),
-            },
-            configurable: true,
-        });
-    });
-
     it('prefills the template name and submits it', async () => {
         const onCreateTemplate = vi.fn().mockResolvedValue({});
 
-        renderWithProviders(
+        render(
             <SessionOptionsModal
                 isOpen
                 onClose={vi.fn()}
@@ -45,7 +35,7 @@ describe('SessionOptionsModal', () => {
     it('runs the duplicate action', () => {
         const onDuplicateSession = vi.fn();
 
-        renderWithProviders(
+        render(
             <SessionOptionsModal
                 isOpen
                 onClose={vi.fn()}
@@ -66,7 +56,7 @@ describe('SessionOptionsModal', () => {
         { isCompleted: false, isPaused: true, canDuplicateSession: false },
         { isCompleted: true, isPaused: false, canDuplicateSession: false },
     ])('hides duplication when unavailable: %j', (state) => {
-        renderWithProviders(
+        render(
             <SessionOptionsModal isOpen onClose={vi.fn()} {...state} />
         );
         expect(screen.queryByText('Duplicate Session')).not.toBeInTheDocument();
@@ -78,7 +68,7 @@ describe('SessionOptionsModal', () => {
         const onPauseResume = vi.fn();
         const onDelete = vi.fn();
 
-        renderWithProviders(
+        render(
             <SessionOptionsModal
                 isOpen
                 onClose={vi.fn()}
