@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "generate:og-image": "node scripts/generate-og-image.mjs",
+    "brand:assets": "node scripts/build-brand-assets.mjs",
     "check:responsive": "node scripts/responsive-audit.mjs",
     "check:maintainability": "node scripts/maintainability-audit.mjs",
     "lint": "eslint . --max-warnings=0",

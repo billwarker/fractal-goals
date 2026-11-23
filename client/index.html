@@ -7,7 +7,10 @@
   <meta name="fg-landing-examples-static-url" content="%VITE_LANDING_EXAMPLES_STATIC_URL%" />
   <!-- Theme, async fonts, and landing preload; external so the CSP forbids inline script. -->
   <script src="/boot/shell.js"></script>
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=3" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png?v=3" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=3" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Fractal Goals - Break big goals into work you can do today</title>
 
@@ -121,14 +124,8 @@
       font-weight: 800;
       text-transform: uppercase;
     }
-    .landing-boot-mark {
-      box-sizing: border-box;
-      width: 38px;
-      height: 38px;
-      padding: 2px;
-      color: var(--boot-brand);
-    }
-    .landing-boot-mark-detail { fill: var(--boot-bg); }
+    /* The logo, as src/components/atoms/BrandMark.jsx draws it (src/brand/logoGeometry.js). */
+    .landing-boot-mark { width: 30px; height: 30px; }
     .landing-boot-tools { display: flex; align-items: center; gap: 12px; color: var(--boot-text-2); font-weight: 700; }
     .landing-boot-toggle { width: 40px; height: 40px; box-sizing: border-box; border: 1px solid var(--boot-border); border-radius: 50%; }
     .landing-boot-hero {
@@ -236,8 +233,8 @@
   <main id="landing-boot-shell" class="landing-boot-shell" aria-label="Loading Fractal Goals" aria-busy="true">
       <header class="landing-boot-header">
         <span class="landing-boot-brand">
-          <svg class="landing-boot-mark" viewBox="0 0 100 100" aria-hidden="true">
-            <g class="landing-boot-mark-detail" stroke="currentColor" stroke-width="5">
+          <svg class="landing-boot-mark" viewBox="5.604 5.604 88.792 88.792" aria-hidden="true">
+            <g fill="#000000" stroke="#b8311d" stroke-width="5">
               <rect x="20" y="20" width="60" height="60" />
               <rect x="20" y="20" width="60" height="60" transform="rotate(30 50 50)" />
               <rect x="20" y="20" width="60" height="60" transform="rotate(60 50 50)" />

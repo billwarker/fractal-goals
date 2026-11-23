@@ -59,6 +59,12 @@ mirrored before first paint by `public/boot/shell.js` (shared fixture `tests/fix
 lives per device in `theme-preference` and syncs to `user.preferences.appearance`. User-chosen goal colours
 are stored once and adapted for the light theme by `utils/themeColors.js` inside `GoalLevelsContext`.
 
+Brand: the logo is the twelve-point star in red on black, defined once in `brand/logoGeometry.js`.
+`atoms/BrandMark` draws it in the app (Landing header), and `npm run brand:assets` writes the favicon,
+apple-touch, PWA and OAuth-console icons from it into `public/` (committed). `index.html`'s boot shell
+and `scripts/og-cover.svg` repeat the shapes; `brand/__tests__/brandAssets.test.js` keeps them all equal.
+Static files are cached as immutable, so a changed icon needs a new `?v=` in `index.html` and the manifest.
+
 Loading: every loading state is `components/common/LoadingState`, always the spinner (variants `page` /
 `section` / `inline`, `error` + `onRetry`). It stays invisible for 200 ms, then shows; after 4 s it
 says "Still loading…", or that the server may be waking up while `offline/serverWarmth.js` sees reads
