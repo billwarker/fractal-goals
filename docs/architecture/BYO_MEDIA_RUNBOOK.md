@@ -35,6 +35,29 @@ Media elements do not use Axios bearer interceptors. Verify cookie-authenticated
 the actual frontend origin rather than assuming an API token in JavaScript authenticates an
 `img` or `video` request. Deploy the frontend image and backend migration together.
 
+### Production registration (Fractal Goals)
+
+| | Google Drive | Dropbox |
+|---|---|---|
+| Console | Google Cloud project `fractal-goals` (number `195572181270`) → Google Auth Platform | Dropbox App Console |
+| App name | Fractal Goals | Fractal Goals (scoped access, **App folder**; the folder is `Apps/Fractal Goals`, matching `DROPBOX_APP_FOLDER`) |
+| Redirect URIs | `https://my.fractalgoals.com/api/storage/google_drive/callback`, `http://localhost:5173/api/storage/google_drive/callback` | `https://my.fractalgoals.com/api/storage/dropbox/callback`, `http://localhost:5173/api/storage/dropbox/callback` |
+| Scopes | `drive.file` only (non-sensitive: brand verification, no security assessment) | `account_info.read`, `files.metadata.read`, `files.content.read`, `files.content.write` |
+| Logo | `client/public/brand/logo-120.png` | `client/public/brand/logo-64.png`, `logo-256.png` |
+| Home / privacy / terms | `https://fractalgoals.com`, `/privacy`, `/terms` | same |
+| Secrets | `GOOGLE_DRIVE_CLIENT_ID`, `GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_PICKER_API_KEY` | `DROPBOX_CLIENT_ID`, `DROPBOX_CLIENT_SECRET` |
+
+`cloudbuild.yaml` deploys every one of these secrets (`tests/integration/test_deploy_gates.py` checks
+it), so each must exist in Secret Manager, readable by `fractal-runtime@`, before a deploy; a missing
+one fails the backend deploy step before traffic moves. The logos are generated with the rest of the
+brand assets (`npm run brand:assets` in `client/`).
+
+Google requires the privacy policy to state that use of Google user data follows the Google API
+Services User Data Policy, including the Limited Use requirements; Privacy Policy 1.4 (§2.2,
+"Optional connected media storage") does. Brand verification was submitted on 2026-11-22.
+Dropbox's app stays in Development (up to 500 linked users) until it is approved for Production;
+apply once 50 users have linked.
+
 ### Google Drive setup
 
 1. Create/configure a Google Cloud project, enable Google Drive API and Google Picker API,
@@ -104,6 +127,28 @@ editing a cloud file concurrently with a read can race its metadata check. Keep 
 originals unchanged and create distinct files for new evidence. A changed source requires
 choosing a new provider file. Reconnecting a different account is rejected while references
 to the original account remain; account switching/multiple accounts per provider is not supported.
+
+## Acceptance record
+
+Real-provider runs of the matrix above. Local runs use `http://localhost:5173` with the development
+apps; the production row is the post-deploy smoke. Result: ✅ pass, ❌ fail (link the fix), ➖ not run.
+
+| Case | Google Drive | Dropbox |
+|---|---|---|
+| Connect, cancel consent, reconnect | ➖ | ➖ |
+| Choose an existing file (Picker / app folder) | ➖ | ➖ |
+| Upload from device: picture, ~50 MB video, M4A, MP3, WAV | ➖ | ➖ |
+| Interrupted upload resumes | ➖ | ➖ |
+| Attach to a note and a goal description; save, reload | ➖ | ➖ |
+| Play and seek (200 / 206 / 416), video poster | ➖ | ➖ |
+| Open original, rename, move to trash (removed from every note) | ➖ | ➖ |
+| Missing or replaced original refused | ➖ | ➖ |
+| Disconnect; revoke at provider → Reconnect shown with count | ➖ | ➖ |
+| Second account: other user's and other fractal's media refused | ➖ | ➖ |
+| Blocked third-party cookies (callback still lands) | ➖ | ➖ |
+| iOS Safari: Voice Memo M4A, video poster, OGG fallback link | ➖ | ➖ |
+| Desktop Chromium playback | ➖ | ➖ |
+| Production smoke after deploy (one file round trip) | ➖ | ➖ |
 
 ## Connection lifecycle and the OAuth return
 
