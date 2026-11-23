@@ -129,7 +129,7 @@ class Config:
     # Canonical legal-document versions. The API, not the browser, decides
     # which versions are acceptable consent evidence.
     TERMS_VERSION = '1.1'
-    PRIVACY_VERSION = '1.3'
+    PRIVACY_VERSION = '1.4'
     PRODUCT_EVENT_RETENTION_DAYS = 180
     WEB_EVENT_RETENTION_DAYS = 90
     PASSWORD_RESET_RECORD_RETENTION_DAYS = 30
