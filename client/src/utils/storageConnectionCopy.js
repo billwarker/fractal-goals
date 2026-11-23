@@ -3,12 +3,12 @@ export const STORAGE_PROVIDERS = {
     google_drive: {
         label: 'Google Drive',
         scope: 'Fractal Goals can open only files you pick or upload through Fractal Goals.',
-        destination: 'Uploads go to a “Fractal Goals” folder in your Drive.',
+        uploadFolder: 'My Drive › Fractal Goals',
     },
     dropbox: {
         label: 'Dropbox',
         scope: 'Fractal Goals can open only the Apps/Fractal Goals folder.',
-        destination: 'Uploads go to Apps/Fractal Goals in your Dropbox.',
+        uploadFolder: 'Apps › Fractal Goals',
     },
 };
 
