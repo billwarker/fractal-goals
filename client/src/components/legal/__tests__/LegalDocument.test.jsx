@@ -7,8 +7,8 @@ import { PRIVACY_VERSION, TERMS_VERSION } from '../../../content/legal/legalVers
 
 describe('legal documents', () => {
   it('parses version and effective date from the markdown header', () => {
-    expect(PRIVACY_DOCUMENT.version).toBe('1.3');
-    expect(PRIVACY_DOCUMENT.effective).toBe('2026-11-18');
+    expect(PRIVACY_DOCUMENT.version).toBe('1.4');
+    expect(PRIVACY_DOCUMENT.effective).toBe('2026-11-22');
     expect(TERMS_DOCUMENT.version).toBe('1.1');
   });
 
@@ -23,7 +23,7 @@ describe('legal documents', () => {
     expect(screen.getByRole('heading', { level: 1, name: /Privacy Policy/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Information we collect/i })).toBeInTheDocument();
     expect(screen.getAllByRole('table').length).toBeGreaterThan(3);
-    expect(screen.getByText(/Version 1.3 . Effective November 18, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Version 1.4 . Effective November 22, 2026/)).toBeInTheDocument();
   });
 
   it('renders the terms with the key liability sections', () => {

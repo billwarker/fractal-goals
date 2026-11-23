@@ -217,6 +217,28 @@ def test_cloudbuild_smoke_steps_read_the_description_their_describe_step_writes(
         assert order.index(f"Deploy {service}") < order.index(f"Describe {service} Candidate") < order.index(f"Smoke {service} Candidate")
 
 
+def _deploy_flag(args, flag):
+    return dict(pair.split("=", 1) for pair in args[args.index(flag) + 1].split(","))
+
+
+def test_cloudbuild_backend_carries_both_storage_providers():
+    _, _, steps = _cloudbuild_steps()
+    deploy = steps["Deploy Backend"]["args"]
+
+    # A provider missing here reports "unavailable" in production without any error.
+    secrets = _deploy_flag(deploy, "--set-secrets")
+    for name in (
+        "STORAGE_ENCRYPTION_KEYS", "GOOGLE_DRIVE_CLIENT_ID", "GOOGLE_DRIVE_CLIENT_SECRET",
+        "GOOGLE_PICKER_API_KEY", "DROPBOX_CLIENT_ID", "DROPBOX_CLIENT_SECRET",
+    ):
+        assert secrets.get(name) == f"{name}:latest", name
+    env = _deploy_flag(deploy, "--set-env-vars")
+    assert env["APP_BASE_URL"] == "https://my.fractalgoals.com"
+    assert env["GOOGLE_PICKER_APP_ID"]
+    # Links to originals open Apps/<this folder>; it must match the Dropbox app's name.
+    assert env["DROPBOX_APP_FOLDER"] == "Fractal Goals"
+
+
 def test_cloudbuild_shell_variables_are_escaped_from_substitution():
     import re
 

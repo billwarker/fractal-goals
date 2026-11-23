@@ -4,6 +4,7 @@ import { useStorageConnections } from '../../hooks/useStorageConnections';
 import { STORAGE_PROVIDERS, providerLabel } from '../../utils/storageConnectionCopy';
 import Badge from '../atoms/Badge';
 import Button from '../atoms/Button';
+import StorageProviderIcon from '../atoms/StorageProviderIcon';
 import LoadingState from '../common/LoadingState';
 import SettingsSection from './SettingsSection';
 import styles from './StorageConnectionsPanel.module.css';
@@ -31,13 +32,22 @@ function ProviderCard({ item, busy, onConnect, onDisconnect }) {
     const count = item.attachment_count || 0;
     const titleId = `storage-${item.provider}-title`;
     const [statusLabel, statusVariant] = STATUS_BADGES[item.status] || [item.status, 'neutral'];
-    const connectedOn = item.connected_at ? new Date(item.connected_at).toLocaleDateString() : null;
+    const connectedOn = item.connected_at
+        ? new Date(item.connected_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+        : null;
+    const showAccount = item.account_label && ['active', 'reconnect_required'].includes(item.status);
 
     return (
         <article className={styles.card} aria-labelledby={titleId} data-status={item.status}>
             <header className={styles.cardHeader}>
-                <h4 id={titleId}>{label}</h4>
-                <Badge variant={statusVariant} size="sm">{statusLabel}</Badge>
+                <StorageProviderIcon provider={item.provider} size={28} className={styles.providerIcon} />
+                <div className={styles.identity}>
+                    <div className={styles.titleRow}>
+                        <h4 id={titleId}>{label}</h4>
+                        <Badge variant={statusVariant} size="sm">{statusLabel}</Badge>
+                    </div>
+                    {showAccount && <p className={styles.account} title={item.account_label}>{item.account_label}</p>}
+                </div>
             </header>
 
             {item.status === 'unavailable' && (
@@ -47,11 +57,10 @@ function ProviderCard({ item, busy, onConnect, onDisconnect }) {
             {item.status === 'active' && (
                 <>
                     <dl className={styles.details}>
-                        <div><dt>Account</dt><dd>{item.account_label}</dd></div>
-                        {connectedOn && <div><dt>Connected since</dt><dd>{connectedOn}</dd></div>}
+                        <div><dt>Uploads to</dt><dd>{copy.uploadFolder}</dd></div>
+                        {connectedOn && <div><dt>Since</dt><dd>{connectedOn}</dd></div>}
                         <div><dt>Used by</dt><dd>{attachmentsText(count)}</dd></div>
                     </dl>
-                    <p className={styles.muted}>{copy.destination}</p>
                     {confirming ? (
                         <div className={styles.confirm} role="group" aria-label={`Confirm disconnecting ${label}`}>
                             <p>
@@ -174,6 +183,7 @@ export default function StorageConnectionsPanel() {
                                 <input type="radio" name="storage-upload-destination" value={item.provider}
                                     checked={uploadDestination === item.provider} disabled={isSavingDestination}
                                     onChange={() => handleDestination(item.provider)} />
+                                <StorageProviderIcon provider={item.provider} size={20} />
                                 <span>
                                     <strong>{providerLabel(item.provider)}</strong>
                                     <span className={styles.muted}>{item.account_label}</span>

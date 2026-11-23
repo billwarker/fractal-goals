@@ -37,10 +37,19 @@ export default defineConfig(({ mode }) => {
           display: 'standalone',
           background_color: '#121419',
           theme_color: '#121419',
-          icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
+          // Generated from src/brand/logoGeometry.js by `npm run brand:assets`. nginx caches static
+          // files as immutable, so a changed icon needs a new URL (bump ?v= here and in index.html).
+          icons: [
+            { src: '/favicon.svg?v=3', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,svg,woff,woff2,ico}'],
+          // Tab and home-screen icons (manifest icons are added automatically); og-cover.png and the
+          // OAuth logos in brand/ are never needed offline.
+          globPatterns: ['**/*.{js,css,html,svg,woff,woff2,ico}', 'favicon-*.png', 'apple-touch-icon.png'],
           // Pages never needed mid-workout are fetched on demand, then kept by the runtime route below.
           globIgnores: [
             '**/assets/Admin-*',

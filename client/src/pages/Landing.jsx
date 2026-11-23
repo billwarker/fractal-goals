@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import BrandMark from '../components/atoms/BrandMark';
 import GoalIcon from '../components/atoms/GoalIcon';
 import ThemeToggleButton from '../components/common/ThemeToggleButton';
 import LandingExampleIcon from '../components/landing/LandingExampleIcon';
@@ -104,7 +105,7 @@ function Landing() {
         <main className={`${styles.page} ${showsPreviewColumn ? styles.pageWithPreview : ''}`} data-landing-ready-surface>
             <header className={styles.header}>
                 <a className={styles.brand} href="/" aria-label={landingContent.header.brand}>
-                    <GoalIcon shape="twelvePointStar" color="var(--color-brand-primary)" secondaryColor="var(--color-bg-input)" isSmart size={34} />
+                    <BrandMark size={30} />
                     <span>{landingContent.header.brand}</span>
                 </a>
                 <div className={styles.headerTools}>

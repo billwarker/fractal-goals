@@ -1,6 +1,6 @@
 <!--
-version: 1.3
-effective: 2026-11-18
+version: 1.4
+effective: 2026-11-22
 -->
 
 # Privacy Policy
@@ -89,6 +89,13 @@ Removing an attachment, a note or a goal, or deleting your account, does not del
 from your cloud storage; only an explicit delete you confirm in the app moves a file to your
 provider's trash.
 An account export includes media references and metadata, rather than the original file bytes.
+
+Fractal Goals' use and transfer to any other app of information received from Google APIs will
+adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy),
+including the Limited Use requirements. We use Google Drive data only to show, attach, upload,
+rename and trash the files you choose. We do not sell it, use it for advertising, or use it to
+train AI or machine-learning models, and no person reads it unless you ask us to, it is needed for
+security or to comply with the law, or it has been aggregated and anonymised.
 
 ### 2.3 Usage information
 
