@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """List goals that link more than one live activity group (read-only).
 
-Migration a7c9e1b3d5f7 makes one live group per goal a database invariant and refuses to run
-while any goal holds several. Run this first, keep one group on each listed goal (Goal details →
-Activities), then apply the migration. Prints Markdown, or JSON with --json. Exits 1 when
-conflicts exist so it can gate a deploy.
+Goals may link several groups (migration 68b47064d279). Downgrading past it restores the
+one-group index of a7c9e1b3d5f7, which refuses to apply while any goal holds several. Run this
+first, keep one group on each listed goal (Goal details → Activities), then downgrade. Prints
+Markdown, or JSON with --json. Exits 1 when conflicts exist so it can gate the downgrade.
 """
 
 import argparse

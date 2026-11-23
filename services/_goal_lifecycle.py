@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from models import COMPLETION_CONDITION_CHILDREN, COMPLETION_CONDITION_MANUAL, Goal, GoalCompletionCondition, activity_goal_associations, get_goal_by_id, validate_root_goal
 from services.association_reconciliation import append_goal_association_event
-from services.goal_activity_group_links import set_goal_activity_group
+from services.goal_activity_group_links import set_goal_activity_groups
 from services.goal_type_utils import get_canonical_goal_type
 from services.events import event_bus, Event, Events
 from services.goal_domain_rules import goal_requires_smart_validation
@@ -157,9 +157,13 @@ class _GoalLifecycleMixin:
                 action="associated",
             )
 
-        # Copy the activity group (a goal has at most one live group).
-        for group in (source.associated_activity_groups or [])[:1]:
-            set_goal_activity_group(self.db_session, root_id, new_goal, group, current_group_id=None)
+        # Copy the activity groups.
+        source_groups = source.associated_activity_groups or []
+        if source_groups:
+            set_goal_activity_groups(
+                self.db_session, root_id, new_goal, {group.id for group in source_groups},
+                names={group.id: group.name for group in source_groups},
+            )
 
         self.db_session.commit()
         self.db_session.refresh(new_goal)

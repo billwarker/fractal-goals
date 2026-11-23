@@ -433,6 +433,8 @@ function GoalDetailModalRenderSurface({
                     onCloseSelector={() => setViewState('goal')}
                     goalType={goalType}
                     headerColor="var(--color-text-primary)"
+                    goalColor={displayGoalColor}
+                    goalTextColor={displayTextColor}
                     onClose={handleClose}
                     onSave={!isEditing ? persistAssociations : undefined}
                     onRefreshAssociations={refreshAssociations}
@@ -470,6 +472,8 @@ function GoalDetailModalRenderSurface({
                     readOnly
                     inheritParentActivities={inheritParentActivities}
                     dividerColor={displayGoalColor}
+                    goalColor={displayGoalColor}
+                    goalTextColor={displayTextColor}
                 />
             </Suspense>
         );
@@ -502,6 +506,8 @@ function GoalDetailModalRenderSurface({
                     inheritParentActivities={inheritParentActivities}
                     setInheritParentActivities={setInheritParentActivities}
                     dividerColor={displayGoalColor}
+                    goalColor={displayGoalColor}
+                    goalTextColor={displayTextColor}
                     onCreateActivity={handleCreateActivityFromActivities}
                     onCopyActivity={handleCopyActivityFromActivities}
                 />

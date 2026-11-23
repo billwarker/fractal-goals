@@ -318,8 +318,6 @@ class ActivityGroupCreateSchema(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0)
     parent_id: Optional[str] = None
     goal_ids: Optional[list[str]] = None
-    # A goal has one activity group; true moves goals that already use another one.
-    replace_goal_groups: bool = False
     
     @field_validator('name')
     @classmethod
@@ -334,7 +332,6 @@ class ActivityGroupUpdateSchema(BaseModel):
     sort_order: Optional[int] = Field(None, ge=0)
     parent_id: Optional[str] = None
     goal_ids: Optional[list[str]] = None
-    replace_goal_groups: bool = False
 
 
 class MetricDefinitionSchema(BaseModel):
@@ -477,8 +474,7 @@ class ActivityGoalsSetSchema(BaseModel):
 
 
 class ActivityGroupGoalsSetSchema(ActivityGoalsSetSchema):
-    """Goals for an activity group; `replace` moves goals that already use another group."""
-    replace: bool = False
+    """Goals for an activity group (each goal keeps its other groups)."""
 
 
 class GroupReorderSchema(BaseModel):

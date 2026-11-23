@@ -146,9 +146,9 @@ class ActivityService:
     def reorder_activity_groups(self, root_id, current_user_id, group_ids) -> ServiceResult[JsonDict]:
         return ActivityGroupService(self.db_session).reorder_activity_groups(root_id, current_user_id, group_ids)
 
-    def set_activity_group_goals(self, root_id, group_id, current_user_id, goal_ids, *, replace=False) -> ServiceResult:
+    def set_activity_group_goals(self, root_id, group_id, current_user_id, goal_ids) -> ServiceResult:
         return ActivityGroupService(self.db_session).set_activity_group_goals(
-            root_id, group_id, current_user_id, goal_ids, replace=replace,
+            root_id, group_id, current_user_id, goal_ids,
         )
 
     def set_activity_goals(self, root_id, activity_id, current_user_id, goal_ids) -> ServiceResult[ActivityDefinition]:
@@ -198,14 +198,13 @@ class ActivityService:
         )
 
     def link_goal_activity_group(
-        self, root_id, goal_id, group_id, current_user_id, *, replace=False,
+        self, root_id, goal_id, group_id, current_user_id,
     ) -> ServiceResult[JsonDict]:
         return self._activity_association_service().link_goal_activity_group(
             root_id,
             goal_id,
             group_id,
             current_user_id,
-            replace=replace,
         )
 
     def unlink_goal_activity_group(self, root_id, goal_id, group_id, current_user_id) -> ServiceResult[JsonDict]:

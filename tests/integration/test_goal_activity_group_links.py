@@ -1,11 +1,10 @@
-"""A goal links at most one live activity group, through every write path."""
+"""A goal links any number of live activity groups, through every write path."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 import models
 from models import (
@@ -28,7 +27,7 @@ def make_group(db_session, root, name):
 def live_groups(db_session, goal_id):
     table = goal_activity_group_associations
     db_session.expire_all()
-    return list(db_session.execute(
+    return set(db_session.execute(
         select(table.c.activity_group_id).where(table.c.goal_id == goal_id, table.c.deleted_at.is_(None))
     ).scalars())
 
@@ -43,40 +42,34 @@ def groups(db_session, sample_goal_hierarchy, sample_activity_group):
     return root, sample_goal_hierarchy['short_term'], sample_activity_group, make_group(db_session, root, 'Cardio')
 
 
-def test_link_is_idempotent_and_a_second_group_conflicts_until_replaced(authed_client, db_session, groups):
+def test_links_add_groups_idempotently(authed_client, db_session, groups):
     root, goal, first, second = groups
     assert link(authed_client, root, goal, first).status_code == 201
     again = link(authed_client, root, goal, first)
     assert again.status_code == 200 and again.get_json()['message'] == 'Group already linked'
 
-    conflict = link(authed_client, root, goal, second)
-    assert conflict.status_code == 409
-    body = conflict.get_json()
-    assert body['code'] == 'goal_activity_group_taken'
-    assert body['current_group'] == {'id': first.id, 'name': first.name}
-    assert live_groups(db_session, goal.id) == [first.id]
-
-    replaced = link(authed_client, root, goal, second, replace=True)
-    assert replaced.status_code == 200
-    assert replaced.get_json()['previous_group_id'] == first.id
-    assert live_groups(db_session, goal.id) == [second.id]
+    added = link(authed_client, root, goal, second)
+    assert added.status_code == 201
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
+    # An older client's `replace` flag no longer removes anything.
+    assert link(authed_client, root, goal, first, replace=True).status_code == 200
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
     events = [row.event_type for row in db_session.query(EventLog).filter(
         EventLog.entity_type == 'activity_group', EventLog.root_id == root.id,
-    ).order_by(EventLog.timestamp, EventLog.event_type)]
+    )]
     assert events.count('activity_group.associated') == 2
-    assert events.count('activity_group.disassociated') == 1
+    assert events.count('activity_group.disassociated') == 0
 
 
-def test_unlink_then_unlink_again_and_wrong_group(authed_client, db_session, groups):
+def test_unlink_removes_only_that_group(authed_client, db_session, groups):
     root, goal, first, second = groups
     link(authed_client, root, goal, first)
     url = f'/api/{root.id}/goals/{goal.id}/activity-groups'
     assert authed_client.delete(f'{url}/{second.id}').status_code == 404
+    link(authed_client, root, goal, second)
     assert authed_client.delete(f'{url}/{first.id}').status_code == 200
     assert authed_client.delete(f'{url}/{first.id}').status_code == 404
-    assert live_groups(db_session, goal.id) == []
-    # Removing the only group frees the goal for another one without `replace`.
-    assert link(authed_client, root, goal, second).status_code == 201
+    assert live_groups(db_session, goal.id) == {second.id}
 
 
 def test_deleted_or_foreign_records_are_not_linkable(authed_client, db_session, groups):
@@ -103,95 +96,79 @@ def test_soft_deleted_row_is_not_already_linked(authed_client, db_session, group
     db_session.commit()
     response = link(authed_client, root, goal, first)
     assert response.status_code == 201
-    assert live_groups(db_session, goal.id) == [first.id]
+    assert live_groups(db_session, goal.id) == {first.id}
 
 
-def test_batch_accepts_zero_or_one_real_group_and_rejects_two(authed_client, db_session, groups):
+def test_batch_sets_exactly_the_real_groups_it_names(authed_client, db_session, groups):
     root, goal, first, second = groups
     url = f'/api/{root.id}/goals/{goal.id}/associations/batch'
-    assert authed_client.put(url, json={'activity_ids': [], 'group_ids': [first.id, str(uuid4())]}).status_code == 200
-    assert live_groups(db_session, goal.id) == [first.id]
-    # The batch states the full association set, so one group replaces the previous one.
+    response = authed_client.put(url, json={'activity_ids': [], 'group_ids': [first.id, second.id, str(uuid4())]})
+    assert response.status_code == 200
+    assert sorted(response.get_json()['group_ids']) == sorted([first.id, second.id])
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
     assert authed_client.put(url, json={'activity_ids': [], 'group_ids': [second.id]}).status_code == 200
-    assert live_groups(db_session, goal.id) == [second.id]
-    rejected = authed_client.put(url, json={'activity_ids': [], 'group_ids': [first.id, second.id]})
-    assert rejected.status_code == 422
-    assert rejected.get_json()['code'] == 'goal_activity_group_single'
-    assert live_groups(db_session, goal.id) == [second.id]
+    assert live_groups(db_session, goal.id) == {second.id}
     assert authed_client.put(url, json={'activity_ids': [], 'group_ids': []}).status_code == 200
-    assert live_groups(db_session, goal.id) == []
+    assert live_groups(db_session, goal.id) == set()
 
 
-def test_group_side_set_lists_conflicts_and_moves_with_replace(authed_client, db_session, groups, sample_goal_hierarchy):
+def test_group_side_set_keeps_each_goals_other_groups(authed_client, db_session, groups, sample_goal_hierarchy):
     root, goal, first, second = groups
     other = sample_goal_hierarchy['mid_term']
     link(authed_client, root, goal, first)
     url = f'/api/{root.id}/activity-groups/{second.id}/goals'
-    conflict = authed_client.post(url, json={'goal_ids': [goal.id, other.id]})
-    assert conflict.status_code == 409
-    assert conflict.get_json()['conflicts'] == [{
-        'goal_id': goal.id, 'goal_name': goal.name, 'current_group': {'id': first.id, 'name': first.name},
-    }]
-    assert live_groups(db_session, other.id) == []  # Nothing partially applied.
-    moved = authed_client.post(url, json={'goal_ids': [goal.id, other.id], 'replace': True})
-    assert moved.status_code == 200
-    assert live_groups(db_session, goal.id) == [second.id]
-    assert live_groups(db_session, other.id) == [second.id]
-    # Dropping a goal from the group's list unlinks only that goal.
+    assert authed_client.post(url, json={'goal_ids': [goal.id, other.id]}).status_code == 200
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
+    assert live_groups(db_session, other.id) == {second.id}
+    # Dropping a goal from the group's list unlinks only this group from that goal.
     assert authed_client.post(url, json={'goal_ids': [other.id]}).status_code == 200
-    assert live_groups(db_session, goal.id) == []
-    assert live_groups(db_session, other.id) == [second.id]
+    assert live_groups(db_session, goal.id) == {first.id}
+    assert live_groups(db_session, other.id) == {second.id}
 
 
-def test_group_update_payload_respects_the_invariant(authed_client, db_session, groups):
+def test_group_update_payload_adds_the_group_to_goals(authed_client, db_session, groups):
     root, goal, first, second = groups
     link(authed_client, root, goal, first)
     url = f'/api/{root.id}/activity-groups/{second.id}'
-    assert authed_client.put(url, json={'goal_ids': [goal.id]}).status_code == 409
-    assert authed_client.put(url, json={'goal_ids': [goal.id], 'replace_goal_groups': True}).status_code == 200
-    assert live_groups(db_session, goal.id) == [second.id]
+    assert authed_client.put(url, json={'goal_ids': [goal.id]}).status_code == 200
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
 
 
-def test_copy_goal_copies_its_one_group(authed_client, db_session, groups):
-    root, goal, first, _ = groups
+def test_copy_goal_copies_every_group(authed_client, db_session, groups):
+    root, goal, first, second = groups
     link(authed_client, root, goal, first)
+    link(authed_client, root, goal, second)
     response = authed_client.post(f'/api/{root.id}/goals/{goal.id}/copy')
     assert response.status_code in (200, 201)
     copy_id = response.get_json()['id']
-    assert live_groups(db_session, copy_id) == [first.id]
-    assert response.get_json()['activity_group_id'] == first.id
+    assert live_groups(db_session, copy_id) == {first.id, second.id}
 
 
-def test_serializer_exposes_the_canonical_group_and_ignores_deleted_groups(authed_client, db_session, groups):
-    root, goal, first, _ = groups
+def test_serializer_lists_every_live_group(authed_client, db_session, groups):
+    root, goal, first, second = groups
     link(authed_client, root, goal, first)
+    link(authed_client, root, goal, second)
     tree = authed_client.get(f'/api/{root.id}/goals/{goal.id}').get_json()
-    assert tree['activity_group_id'] == first.id
-    assert tree['attributes']['associated_activity_group_ids'] == [first.id]
+    assert 'activity_group_id' not in tree
+    assert sorted(tree['attributes']['associated_activity_group_ids']) == sorted([first.id, second.id])
     first.deleted_at = datetime.now(timezone.utc)
     db_session.commit()
     tree = authed_client.get(f'/api/{root.id}/goals/{goal.id}').get_json()
-    assert tree['activity_group_id'] is None
-    assert tree['attributes']['associated_activity_group_ids'] == []
+    assert tree['attributes']['associated_activity_group_ids'] == [second.id]
 
 
-def test_database_rejects_a_second_live_row_but_allows_soft_deleted(db_session, groups):
+def test_database_allows_several_live_rows(db_session, groups):
     _, goal, first, second = groups
     table = goal_activity_group_associations
-    db_session.execute(table.insert().values(goal_id=goal.id, activity_group_id=first.id))
-    db_session.execute(table.insert().values(
-        goal_id=goal.id, activity_group_id=second.id, deleted_at=datetime.now(timezone.utc),
-    ))
+    db_session.execute(table.insert(), [
+        {'goal_id': goal.id, 'activity_group_id': first.id},
+        {'goal_id': goal.id, 'activity_group_id': second.id},
+    ])
     db_session.commit()
-    with pytest.raises(IntegrityError):
-        db_session.execute(table.update().where(
-            table.c.goal_id == goal.id, table.c.activity_group_id == second.id,
-        ).values(deleted_at=None))
-        db_session.flush()
-    db_session.rollback()
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
 
 
-def test_concurrent_links_to_different_groups_leave_one(app, db_session, groups):
+def test_concurrent_links_to_different_groups_keep_both(app, db_session, groups):
     root, goal, first, second = groups
 
     def attempt(group_id):
@@ -205,9 +182,9 @@ def test_concurrent_links_to_different_groups_leave_one(app, db_session, groups)
             session.close()
 
     with ThreadPoolExecutor(max_workers=2) as pool:
-        statuses = sorted(pool.map(attempt, [first.id, second.id]))
-    assert statuses == [201, 409]
-    assert len(live_groups(db_session, goal.id)) == 1
+        statuses = list(pool.map(attempt, [first.id, second.id]))
+    assert statuses == [201, 201]
+    assert live_groups(db_session, goal.id) == {first.id, second.id}
 
 
 def test_group_link_changes_reconcile_activity_threshold_goals(authed_client, db_session, groups, sample_activity_definition):
@@ -237,7 +214,10 @@ def test_group_link_changes_reconcile_activity_threshold_goals(authed_client, db
     assert completed() is False
     assert link(authed_client, root, goal, first).status_code == 201  # The definition's own group.
     assert completed() is True
-    assert link(authed_client, root, goal, second, replace=True).status_code == 200
+    # Another group leaves the evidence in place; unlinking the definition's group removes it.
+    assert link(authed_client, root, goal, second).status_code == 201
+    assert completed() is True
+    assert authed_client.delete(f'/api/{root.id}/goals/{goal.id}/activity-groups/{first.id}').status_code == 200
     assert completed() is False
 
 
@@ -362,14 +342,14 @@ def test_instance_linked_activities_query_count_is_constant(authed_client, db_se
 def _migration_module():
     import importlib.util
     from pathlib import Path
-    path = Path(__file__).resolve().parents[2] / 'migrations/versions/a7c9e1b3d5f7_one_activity_group_per_goal.py'
-    spec = importlib.util.spec_from_file_location('one_group_migration', path)
+    path = Path(__file__).resolve().parents[2] / 'migrations/versions/68b47064d279_many_activity_groups_per_goal.py'
+    spec = importlib.util.spec_from_file_location('many_groups_migration', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-def test_migration_is_reversible_and_aborts_on_multi_group_goals(db_session, groups):
+def test_migration_is_reversible_and_downgrade_aborts_on_multi_group_goals(db_session, groups):
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
     from sqlalchemy import inspect
@@ -377,21 +357,26 @@ def test_migration_is_reversible_and_aborts_on_multi_group_goals(db_session, gro
     module = _migration_module()
     _, goal, first, second = groups
     table = goal_activity_group_associations
+
+    def index_names(connection):
+        return {i['name'] for i in inspect(connection).get_indexes(table.name)}
+
     with db_session.get_bind().connect() as connection:
         transaction = connection.begin()
         try:
             with Operations.context(MigrationContext.configure(connection)):
-                module.downgrade()
-                assert module.INDEX_NAME not in {i['name'] for i in inspect(connection).get_indexes(table.name)}
+                assert module.INDEX_NAME not in index_names(connection)
                 connection.execute(table.insert(), [
                     {'goal_id': goal.id, 'activity_group_id': first.id},
                     {'goal_id': goal.id, 'activity_group_id': second.id},
                 ])
                 with pytest.raises(RuntimeError, match=r'1 goal\(s\) link more than one activity group'):
-                    module.upgrade()
+                    module.downgrade()
                 connection.execute(table.delete().where(table.c.activity_group_id == second.id))
-                module.upgrade()
+                module.downgrade()
                 index = next(i for i in inspect(connection).get_indexes(table.name) if i['name'] == module.INDEX_NAME)
                 assert index['unique'] and index['column_names'] == ['goal_id']
+                module.upgrade()
+                assert module.INDEX_NAME not in index_names(connection)
         finally:
             transaction.rollback()

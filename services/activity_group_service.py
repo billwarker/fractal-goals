@@ -12,15 +12,11 @@ from models import (
 from services._completion_context import _emit_pending_events
 from services.events import Event, Events, event_bus
 from services.goal_activity_group_links import (
-    GoalActivityGroupError,
     current_group_ids,
-    flush_group_links,
     goals_using_group,
-    group_names,
     lock_root,
     reconcile_group_link_conditions,
-    set_goal_activity_group,
-    taken_error,
+    set_goal_activity_groups,
 )
 from services.payload_normalizers import normalize_activity_payload, normalize_id_list
 from services.service_types import JsonDict, ServiceResult
@@ -101,10 +97,10 @@ class ActivityGroupService:
             return None, ("Fractal not found or access denied", 404)
         return root, None
 
-    def _replace_group_goal_associations(self, group, root_id, goal_ids, *, replace=False) -> set[str]:
+    def _replace_group_goal_associations(self, group, root_id, goal_ids) -> set[str]:
         """Make `goal_ids` exactly the live goals using `group`; returns the goals that changed.
 
-        Goals already using another group raise 409 `goal_activity_group_taken` unless `replace`.
+        Only links to `group` move: each goal keeps its other groups.
         """
         lock_root(self.db_session, root_id)
         goal_ids = normalize_id_list(goal_ids)
@@ -116,35 +112,21 @@ class ActivityGroupService:
                 Goal.deleted_at.is_(None),
             ).all()
         }
-        desired_ids = [goal_id for goal_id in goal_ids if goal_id in goals]
-        current = current_group_ids(self.db_session, list(goals))
-        conflicts = [
-            goal_id for goal_id in desired_ids if current.get(goal_id) not in (None, group.id)
-        ]
-        names = group_names(self.db_session, {current[goal_id] for goal_id in conflicts})
-        if conflicts and not replace:
-            raise taken_error([{
-                'goal_id': goal_id,
-                'goal_name': goals[goal_id].name,
-                'current_group': {'id': current[goal_id], 'name': names.get(current[goal_id], 'Unknown')},
-            } for goal_id in conflicts])
-
-        changed = set()
-        for goal_id in desired_ids:
-            change = set_goal_activity_group(
-                self.db_session, root_id, goals[goal_id], group,
-                replace=True, current_group_id=current.get(goal_id), names=names,
+        desired_ids = {goal_id for goal_id in goal_ids if goal_id in goals}
+        to_link = desired_ids - linked_ids
+        to_unlink = (linked_ids & set(goals)) - desired_ids
+        current = current_group_ids(self.db_session, to_link | to_unlink)
+        names = {group.id: group.name}
+        for goal_id in sorted(to_link):
+            set_goal_activity_groups(
+                self.db_session, root_id, goals[goal_id], current.get(goal_id, set()) | {group.id}, names=names,
             )
-            if change.changed:
-                changed.add(goal_id)
-        for goal_id in sorted((linked_ids & set(goals)) - set(desired_ids)):
-            set_goal_activity_group(
-                self.db_session, root_id, goals[goal_id], None,
-                current_group_id=group.id, names={group.id: group.name},
+        for goal_id in sorted(to_unlink):
+            set_goal_activity_groups(
+                self.db_session, root_id, goals[goal_id], current.get(goal_id, set()) - {group.id}, names=names,
             )
-            changed.add(goal_id)
-        flush_group_links(self.db_session)
-        return changed
+        self.db_session.flush()
+        return to_link | to_unlink
 
     def _get_active_group(self, root_id, group_id) -> ActivityGroup | None:
         return self.db_session.query(ActivityGroup).filter(
@@ -227,13 +209,7 @@ class ActivityGroupService:
         goal_ids = data.get('goal_ids', [])
         pending_events = []
         if goal_ids:
-            try:
-                changed = self._replace_group_goal_associations(
-                    new_group, root_id, goal_ids, replace=bool(data.get('replace_goal_groups')),
-                )
-            except GoalActivityGroupError as conflict:
-                self.db_session.rollback()
-                return None, conflict.payload(), conflict.status
+            changed = self._replace_group_goal_associations(new_group, root_id, goal_ids)
             reconcile_group_link_conditions(self.db_session, root_id, changed, pending_events)
 
         self.db_session.commit()
@@ -256,7 +232,6 @@ class ActivityGroupService:
 
     def update_activity_group(self, root_id, group_id, current_user_id, data) -> ServiceResult[ActivityGroup]:
         data = normalize_activity_payload(data, partial=True)
-        replace_goal_groups = bool(data.pop('replace_goal_groups', False))
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
             return None, *error
@@ -279,13 +254,7 @@ class ActivityGroupService:
 
         pending_events = []
         if 'goal_ids' in data:
-            try:
-                changed = self._replace_group_goal_associations(
-                    group, root_id, data.get('goal_ids', []), replace=replace_goal_groups,
-                )
-            except GoalActivityGroupError as conflict:
-                self.db_session.rollback()
-                return None, conflict.payload(), conflict.status
+            changed = self._replace_group_goal_associations(group, root_id, data.get('goal_ids', []))
             reconcile_group_link_conditions(self.db_session, root_id, changed, pending_events)
 
         self.db_session.commit()
@@ -358,7 +327,7 @@ class ActivityGroupService:
         return {"message": "Groups reordered"}, None, 200
 
     def set_activity_group_goals(
-        self, root_id, group_id, current_user_id, goal_ids, *, replace=False,
+        self, root_id, group_id, current_user_id, goal_ids,
     ) -> ServiceResult[ActivityGroup]:
         _, error = self._validate_owned_root(root_id, current_user_id)
         if error:
@@ -368,11 +337,7 @@ class ActivityGroupService:
         if not group:
             return None, "Activity group not found", 404
 
-        try:
-            changed = self._replace_group_goal_associations(group, root_id, goal_ids, replace=replace)
-        except GoalActivityGroupError as conflict:
-            self.db_session.rollback()
-            return None, conflict.payload(), conflict.status
+        changed = self._replace_group_goal_associations(group, root_id, goal_ids)
         pending_events = []
         reconcile_group_link_conditions(self.db_session, root_id, changed, pending_events)
         self.db_session.commit()

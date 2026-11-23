@@ -20,7 +20,7 @@ function ActivityBuilderDialog({
     activityGroups,
     currentFractal,
     initialSelectedGoalIds,
-    initialGroup,
+    scopeGroups,
 }) {
     const [draftName, setDraftName] = useState(editingActivity?.name || '');
 
@@ -53,14 +53,14 @@ function ActivityBuilderDialog({
                 getGoalIcon={getGoalIcon}
                 onNameChange={setDraftName}
                 initialSelectedGoalIds={initialSelectedGoalIds}
-                initialGroup={initialGroup}
+                scopeGroups={scopeGroups}
             />
         </Modal>
     );
 }
 
 function ActivityBuilder({
-    isOpen, onClose, editingActivity, rootId, onSave, initialSelectedGoalIds = [], initialGroup = null,
+    isOpen, onClose, editingActivity, rootId, onSave, initialSelectedGoalIds = [], scopeGroups = null,
 }) {
     const { createActivity, updateActivity } = useActivities();
     const { getGoalColor, getGoalIcon } = useGoalLevels();
@@ -83,7 +83,7 @@ function ActivityBuilder({
             activityGroups={activityGroups}
             currentFractal={currentFractal}
             initialSelectedGoalIds={initialSelectedGoalIds}
-            initialGroup={initialGroup}
+            scopeGroups={scopeGroups}
         />
     );
 }

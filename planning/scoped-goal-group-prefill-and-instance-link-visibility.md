@@ -1,5 +1,8 @@
 # Scoped-goal QoL: group prefill, one group per goal, one-off-linked activities, linked-goal icons
 
+> **Superseded in part (2026-11-23):** the one-group-per-goal rule was reversed by
+> [many-activity-groups-per-goal.md](many-activity-groups-per-goal.md); goals now link any number of groups.
+
 ## Context
 
 Session Detail lets you scope the activity picker to a goal (via its icon in the hierarchy) and link one activity instance to that goal (via the goal-icon button in the card header). This plan makes four changes:

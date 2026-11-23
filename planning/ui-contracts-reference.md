@@ -351,14 +351,16 @@ the meta line under it shows the activity group breadcrumb, then the linked goal
 picker also offers definitions whose instances were linked to that goal or a descendant, from any
 session (`GET …/goals/<id>/instance-linked-activities`, unioned with this session's linked instances
 so offline links show at once); those not otherwise associated carry a plain "One-off link" chip.
-Creating a definition while scoped also preselects the scoped goal's activity group, named under the
-Activity Group field ("From <goal>'s activity group") until the user picks another; a copy keeps its
-own group, and a deleted seeded group reads as no group.
+Creating a definition while scoped to a goal with one activity group preselects that group, named under
+the Activity Group field ("From <goal>'s activity group") until the user picks another; a copy keeps its
+own group, and a deleted seeded group reads as no group. A goal with several groups preselects none: its
+groups lead the dropdown under a "From <goal>" heading, followed by "All groups".
 
-A goal has at most one activity group. The goal-detail picker holds one group at a time, and choosing
-a different group asks "Replace Activity Group?" before unlinking the old one and its linked
-activities. The group editor's goal list reports goals already in another group and offers to move
-them or to keep their groups (linking only the free goals).
+A goal links any number of activity groups, and each link is independent. In Goal detail → Activities
+every shown group (linked, or present through inherited activities) carries a mini switch in the goal's
+level colour: on links that group directly, off unlinks it and the activities it brought; subgroups of a
+linked group show none. The picker holds several groups, and the group editor's goal list adds or
+removes only that group. Linking never asks for confirmation.
 
 ## Plan editors and planned-value hints
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
@@ -10,8 +10,6 @@ import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { logError } from '../../utils/logger';
-import { getGoalGroupConflicts } from '../../utils/goalActivityGroupErrors';
-import ConfirmationModal from '../ConfirmationModal';
 
 function flattenGoals(node, goals = [], parentId = null) {
     if (!node) return goals;
@@ -141,9 +139,6 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    // Goals that already use another group: moving them needs confirmation (one group per goal).
-    const [pendingMove, setPendingMove] = useState(null);
-    const resolvingMoveRef = useRef(false);
 
     // UI State for Goal Selector
     const [showGoalSelector, setShowGoalSelector] = useState(false);
@@ -190,37 +185,9 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
         notify.error(message);
     };
 
-    const saveGoals = async (group, goalIds, options = {}) => {
-        try {
-            const updatedGroup = await setActivityGroupGoals(rootId, group.id, goalIds, options);
-            finish(updatedGroup?.id ? updatedGroup : { ...group, associated_goal_ids: goalIds });
-        } catch (err) {
-            const conflicts = getGoalGroupConflicts(err);
-            if (conflicts.length === 0) throw err;
-            setPendingMove({ group, goalIds, conflicts });
-        }
-    };
-
-    // ConfirmationModal calls onConfirm then onClose: resolve the first answer only.
-    const resolvePendingMove = async (moveGoals) => {
-        const move = pendingMove;
-        if (!move || resolvingMoveRef.current) return;
-        resolvingMoveRef.current = true;
-        setPendingMove(null);
-        const conflictIds = new Set(move.conflicts.map((conflict) => conflict.goal_id));
-        setLoading(true);
-        try {
-            await saveGoals(
-                move.group,
-                moveGoals ? move.goalIds : move.goalIds.filter((goalId) => !conflictIds.has(goalId)),
-                { replace: moveGoals },
-            );
-        } catch (err) {
-            fail(err);
-        } finally {
-            resolvingMoveRef.current = false;
-            setLoading(false);
-        }
+    const saveGoals = async (group, goalIds) => {
+        const updatedGroup = await setActivityGroupGoals(rootId, group.id, goalIds);
+        finish(updatedGroup?.id ? updatedGroup : { ...group, associated_goal_ids: goalIds });
     };
 
     // Build breadcrumb path using shared utility
@@ -365,17 +332,6 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                 onSave={setSelectedGoalIds}
                 groupName={name.trim()}
                 modalLayer={modalLayer}
-            />
-            <ConfirmationModal
-                isOpen={Boolean(pendingMove)}
-                onClose={() => resolvePendingMove(false)}
-                onConfirm={() => resolvePendingMove(true)}
-                title="Move goals to this group?"
-                message={pendingMove ? `A goal has one activity group. ${pendingMove.conflicts.map((conflict) => (
-                    `“${conflict.goal_name}” uses “${conflict.current_group?.name || 'another group'}”`
-                )).join('; ')}. Move ${pendingMove.conflicts.length === 1 ? 'it' : 'them'} here?` : ''}
-                confirmText={pendingMove?.conflicts.length === 1 ? 'Move Goal' : 'Move Goals'}
-                cancelText="Keep Their Groups"
             />
         </Modal>
     );

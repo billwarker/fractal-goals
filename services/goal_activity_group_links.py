@@ -1,15 +1,13 @@
-"""Canonical writes for a goal's activity group: at most one live group per goal.
+"""Canonical writes for a goal's activity groups: a goal links any number of live groups.
 
 Every goal↔group write (goal detail link/unlink, the batch association editor, the group-side
-goal editor, goal copy) goes through `set_goal_activity_group`, which the partial unique index
-`uq_goal_activity_group_associations_one_active` backs. Callers own the commit and emit the
-returned pending events after it.
+goal editor, goal copy) goes through `set_goal_activity_groups`. Links are independent: adding one
+group never removes another. Callers hold `lock_root`, own the commit, and emit the returned
+pending events after it.
 """
-from dataclasses import dataclass, field
-from types import EllipsisType
+from dataclasses import dataclass
 
 from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
 
 from models import (
     COMPLETION_CONDITION_ACTIVITY_THRESHOLD,
@@ -19,34 +17,16 @@ from models import (
 )
 from services.association_reconciliation import append_goal_association_event, reconcile_association_rows
 
-GROUP_TAKEN = 'goal_activity_group_taken'
-GROUP_SINGLE = 'goal_activity_group_single'
-
-
-@dataclass
-class GoalActivityGroupError(Exception):
-    message: str
-    status: int
-    code: str | None = None
-    details: dict = field(default_factory=dict)
-
-    def payload(self) -> dict:
-        body = {'error': self.message}
-        if self.code:
-            body['code'] = self.code
-        body.update(self.details)
-        return body
-
 
 @dataclass(frozen=True)
 class GroupLinkChange:
     goal_id: str
-    previous_group_id: str | None
-    group_id: str | None
+    added_ids: frozenset
+    removed_ids: frozenset
 
     @property
     def changed(self) -> bool:
-        return self.previous_group_id != self.group_id
+        return bool(self.added_ids or self.removed_ids)
 
 
 def lock_root(db_session, root_id):
@@ -62,17 +42,20 @@ def live_group(db_session, root_id, group_id) -> ActivityGroup | None:
     ).first()
 
 
-def current_group_ids(db_session, goal_ids) -> dict[str, str]:
-    """{goal_id: live group id} for the goals that hold one."""
+def current_group_ids(db_session, goal_ids) -> dict[str, set[str]]:
+    """{goal_id: live group ids} for the goals that hold any."""
     if not goal_ids:
         return {}
     table = goal_activity_group_associations
-    return dict(db_session.execute(
+    result: dict[str, set[str]] = {}
+    for goal_id, group_id in db_session.execute(
         select(table.c.goal_id, table.c.activity_group_id).where(
             table.c.goal_id.in_(list(goal_ids)),
             table.c.deleted_at.is_(None),
         )
-    ).all())
+    ).all():
+        result.setdefault(goal_id, set()).add(group_id)
+    return result
 
 
 def goals_using_group(db_session, group_id) -> set[str]:
@@ -91,72 +74,27 @@ def group_names(db_session, group_ids) -> dict[str, str]:
     ).all())
 
 
-def taken_error(conflicts) -> GoalActivityGroupError:
-    if len(conflicts) == 1:
-        conflict = conflicts[0]
-        message = (
-            f"{conflict['goal_name']} already uses the activity group "
-            f"{conflict['current_group']['name']}. A goal can have one activity group; replace it instead."
-        )
-    else:
-        message = f"{len(conflicts)} goals already use another activity group. A goal can have one activity group."
-    return GoalActivityGroupError(message, 409, GROUP_TAKEN, {
-        'conflicts': conflicts,
-        **({'current_group': conflicts[0]['current_group']} if len(conflicts) == 1 else {}),
-    })
+def set_goal_activity_groups(db_session, root_id, goal, group_ids, *, names=None) -> GroupLinkChange:
+    """Make `group_ids` exactly the goal's live activity groups, recording a history event per change.
 
-
-def set_goal_activity_group(
-    db_session, root_id, goal, group, *, replace=False,
-    current_group_id: str | None | EllipsisType = ..., names=None,
-) -> GroupLinkChange:
-    """Make `group` (or no group, for None) the goal's one live activity group.
-
-    A different existing group raises 409 `goal_activity_group_taken` unless `replace`.
-    The caller has validated `goal` and `group` as live rows of `root_id` and holds `lock_root`;
-    callers that already read the goal's group pass it as `current_group_id` (None: no group).
+    The caller has validated the groups as live rows of `root_id` and holds `lock_root`.
+    To add or remove one group, pass the goal's `current_group_ids` with it added or removed.
     """
-    previous = current_group_ids(db_session, [goal.id]).get(goal.id) if current_group_id is ... else current_group_id
-    target = group.id if group is not None else None
-    if previous == target:
-        return GroupLinkChange(goal.id, previous, target)
-    if previous and target and not replace:
-        names = names or group_names(db_session, [previous])
-        raise taken_error([{
-            'goal_id': goal.id,
-            'goal_name': goal.name,
-            'current_group': {'id': previous, 'name': names.get(previous, 'Unknown')},
-        }])
-
     table = goal_activity_group_associations
     delta = reconcile_association_rows(
-        db_session, table, table.c.goal_id, goal.id, table.c.activity_group_id,
-        {target} if target else set(),
+        db_session, table, table.c.goal_id, goal.id, table.c.activity_group_id, set(group_ids),
     )
-    names = {**(names or {}), **group_names(db_session, delta.removed_ids - set(names or {}))}
-    if group is not None:
-        names[group.id] = group.name
-    for action, changed_ids in (('disassociated', delta.removed_ids), ('associated', delta.added_ids)):
-        for changed_id in sorted(changed_ids):
+    changed_ids = delta.added_ids | delta.removed_ids
+    names = {**(names or {})}
+    names.update(group_names(db_session, changed_ids - set(names)))
+    for action, ids in (('disassociated', delta.removed_ids), ('associated', delta.added_ids)):
+        for changed_id in sorted(ids):
             append_goal_association_event(
                 db_session, root_id=root_id, goal_id=goal.id, association_kind='activity_group',
                 association_id=changed_id, association_name=names.get(changed_id, 'Unknown'),
                 action=action, occurred_at=delta.occurred_at,
             )
-    return GroupLinkChange(goal.id, previous, target)
-
-
-def flush_group_links(db_session):
-    """Flush, mapping a concurrent writer's unique-index violation to the domain conflict."""
-    try:
-        db_session.flush()
-    except IntegrityError as error:
-        db_session.rollback()
-        if 'uq_goal_activity_group_associations_one_active' not in str(error.orig):
-            raise
-        raise GoalActivityGroupError(
-            'This goal was just given another activity group. Reload and try again.', 409, GROUP_TAKEN,
-        ) from error
+    return GroupLinkChange(goal.id, frozenset(delta.added_ids), frozenset(delta.removed_ids))
 
 
 def reconcile_group_link_conditions(db_session, root_id, goal_ids, pending_events, *, trigger='activity_group_link_changed'):

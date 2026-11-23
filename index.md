@@ -243,14 +243,14 @@ reconciles affected goal conditions in the same transaction. The additive `activ
 on soft removal/restoration and cascades hard deletion. Canonical instance serialization exposes
 only direct links as `associated_goal_ids`, projected with instance reads rather than per-row queries.
 
-A goal links at most one live activity group (partial unique index
-`uq_goal_activity_group_associations_one_active`; migration `a7c9e1b3d5f7` refuses to run while any goal
-holds several, listed by `scripts/report_multi_group_goals.py`). Every goal↔group write goes through
-`services/goal_activity_group_links.py`, which locks the root, returns 409 `goal_activity_group_taken`
-(with the current group or a `conflicts` list) unless `replace`, rejects a batch naming two real groups
-(422 `goal_activity_group_single`), and reconciles affected activity-threshold goals and ancestors in
-the same transaction. Goal payloads carry the canonical top-level `activity_group_id`
-(`getGoalNodeActivityGroupId`); association relationships ignore removed link rows and deleted groups.
+A goal links any number of live activity groups (migration `68b47064d279` dropped the one-group index;
+its downgrade refuses while any goal holds several, listed by `scripts/report_multi_group_goals.py`).
+Every goal↔group write goes through `set_goal_activity_groups` in `services/goal_activity_group_links.py`,
+which records a history event per added or removed group; callers lock the root, and links are
+independent (linking is idempotent, unlinking removes one group, the group-side goal list touches only
+that group). Affected activity-threshold goals and ancestors are reconciled in the same transaction.
+Goal payloads list groups in `attributes.associated_activity_group_ids` (`getGoalNodeActivityGroupIds`);
+association relationships ignore removed link rows and deleted groups.
 Goal↔group routes live in `blueprints/goal_activity_groups_api.py`.
 
 Session Detail exposes reversible one-off links on actual activity instances (including circuit

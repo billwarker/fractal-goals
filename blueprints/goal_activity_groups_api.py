@@ -1,8 +1,8 @@
-"""HTTP boundary for a goal's activity sources: its one activity group, the batch association
+"""HTTP boundary for a goal's activity sources: its activity groups, the batch association
 editor, and definitions credited through one-off instance links."""
 import logging
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from sqlalchemy.exc import SQLAlchemyError
 
 from blueprints.api_utils import error_body, get_db_session, internal_error
@@ -74,13 +74,10 @@ def set_goal_associations_batch(current_user, root_id, goal_id, validated_data):
 @goal_activity_groups_bp.route('/<root_id>/goals/<goal_id>/activity-groups/<group_id>', methods=['POST'])
 @token_required
 def link_goal_activity_group(current_user, root_id, goal_id, group_id):
-    """Make an activity group the goal's group (includes all current and future activities).
+    """Link an activity group to the goal (all its current and future activities count).
 
-    A goal has one activity group. Another existing group returns 409
-    `goal_activity_group_taken` with `current_group` unless `replace` is true (body or query).
+    Idempotent: 201 when linked, 200 when already linked. The goal's other groups are untouched.
     """
-    body = request.get_json(silent=True) or {}
-    replace = body.get('replace') is True or request.args.get('replace', '').lower() == 'true'
     session = get_db_session()
     try:
         service = ActivityService(session)
@@ -89,7 +86,6 @@ def link_goal_activity_group(current_user, root_id, goal_id, group_id):
             goal_id,
             group_id,
             current_user.id,
-            replace=replace,
         )
         if error:
             return jsonify(error_body(error)), status

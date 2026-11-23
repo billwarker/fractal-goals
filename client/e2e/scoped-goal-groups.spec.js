@@ -31,10 +31,13 @@ test("scoped creation joins the goal's group; one-off links show on cards and in
         return { session, songs, scales };
     }, { root, token });
 
-    // A goal has one activity group: a second one is refused until replaced.
-    const second = await page.request.post(`/api/${root}/goals/${root}/activity-groups/${scales.id}`, { headers: auth });
-    expect(second.status()).toBe(409);
-    expect((await second.json()).code).toBe('goal_activity_group_taken');
+    // A goal links several activity groups: a second one is added alongside the first.
+    const groupsUrl = `/api/${root}/goals/${root}/activity-groups`;
+    expect((await page.request.post(`${groupsUrl}/${scales.id}`, { headers: auth })).status()).toBe(201);
+    const linkedGroups = await (await page.request.get(groupsUrl, { headers: auth })).json();
+    expect(linkedGroups.map((group) => group.id).sort()).toEqual([songs.id, scales.id].sort());
+    // Back to one group, which the scoped builder prefills below.
+    expect((await page.request.delete(`${groupsUrl}/${scales.id}`, { headers: auth })).status()).toBe(200);
 
     const openScope = async () => {
         if (suffix === 'mobile') await page.getByRole('button', { name: 'Details', exact: true }).click();

@@ -47,13 +47,9 @@ describe('toggleGroupSelection', () => {
         expect([...removed.activityIds]).toEqual(['x']);
     });
 
-    it('keeps one group in single mode, dropping the previous group and its activities', () => {
-        const result = toggleGroupSelection({
-            groupIds: ['a'], activityIds: ['a1', 'a2', 'x'], groupId: 'b', getActivityIdsForGroup, single: true,
-        });
-        expect([...result.groupIds]).toEqual(['b']);
-        expect([...result.activityIds].sort()).toEqual(['b1', 'x']);
-        const multiple = toggleGroupSelection({ groupIds: ['a'], activityIds: [], groupId: 'b', getActivityIdsForGroup });
-        expect([...multiple.groupIds].sort()).toEqual(['a', 'b']);
+    it('holds several groups at once', () => {
+        const result = toggleGroupSelection({ groupIds: ['a'], activityIds: ['a1', 'a2'], groupId: 'b', getActivityIdsForGroup });
+        expect([...result.groupIds].sort()).toEqual(['a', 'b']);
+        expect([...result.activityIds].sort()).toEqual(['a1', 'a2', 'b1']);
     });
 });
