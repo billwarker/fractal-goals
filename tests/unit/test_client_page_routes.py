@@ -39,3 +39,25 @@ def test_canonical_client_routes_serve_the_spa(path, tmp_path, monkeypatch):
     assert b'<div id="root">' in response.data
     assert b'name="viewport"' in response.data
     assert app.test_client().get("/api/unknown").status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/favicon.svg",
+        "/favicon-16.png",
+        "/favicon-32.png",
+        "/apple-touch-icon.png",
+        "/icons/icon-192.png",
+        "/icons/icon-maskable-512.png",
+        "/workbox-2ff6bd68.js",
+    ],
+)
+def test_precached_app_shell_files_are_served(path, tmp_path, monkeypatch):
+    # The service worker never installs if any precached URL fails to load.
+    (tmp_path / "icons").mkdir()
+    (tmp_path / path.lstrip("/")).write_bytes(b"x")
+    monkeypatch.setattr("blueprints.pages.CLIENT_BUILD_DIR", str(tmp_path))
+    app = Flask(__name__)
+    app.register_blueprint(pages_bp)
+    assert app.test_client().get(path).status_code == 200

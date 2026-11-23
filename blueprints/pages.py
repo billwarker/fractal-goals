@@ -147,6 +147,9 @@ def serve_service_worker_files():
 
 @pages_bp.route('/workbox-<name>')
 @pages_bp.route('/favicon.svg')
+@pages_bp.route('/favicon-<name>.png')
+@pages_bp.route('/apple-touch-icon.png')
+@pages_bp.route('/icons/<name>')
 def serve_app_shell_files(name=None):
     return send_from_directory(CLIENT_BUILD_DIR, request.path.lstrip('/'))
 
