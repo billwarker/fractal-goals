@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
@@ -8,8 +9,10 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { logError } from '../../utils/logger';
+import { isSMART } from '../../utils/smartHelpers';
 
 function flattenGoals(node, goals = [], parentId = null) {
     if (!node) return goals;
@@ -22,11 +25,56 @@ function flattenGoals(node, goals = [], parentId = null) {
         parent_id: parentId,
         childrenIds: children.map((child) => child.id || child.attributes?.id).filter(Boolean),
         completed: Boolean(node.completed || node.attributes?.completed),
+        isSmart: isSMART(node),
     });
     if (children.length > 0) {
         children.forEach((child) => flattenGoals(child, goals, nodeId));
     }
     return goals;
+}
+
+function LinkedGoalList({ goals, unlistedCount }) {
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    return (
+        <ul
+            aria-label="Linked goals"
+            style={{ listStyle: 'none', margin: '0 0 5px', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '6px' }}
+        >
+            {goals.map((goal) => {
+                const level = goal.completed ? 'Completed' : goal.type;
+                return (
+                    <li
+                        key={goal.id}
+                        title={goal.completed ? `${goal.name} (complete)` : goal.name}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: '100%',
+                            padding: '4px 10px 4px 6px', borderRadius: '999px',
+                            border: '1px solid var(--color-border)', background: 'var(--color-bg-input)',
+                            fontSize: '13px', color: 'var(--color-text-primary)',
+                        }}
+                    >
+                        <span style={{ display: 'inline-flex', flexShrink: 0 }}>
+                            <GoalIcon
+                                shape={getGoalIcon(goal.type)}
+                                color={getGoalColor(level)}
+                                secondaryColor={getGoalSecondaryColor(level)}
+                                isSmart={goal.isSmart}
+                                size={16}
+                            />
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {goal.name}
+                        </span>
+                    </li>
+                );
+            })}
+            {unlistedCount > 0 && (
+                <li style={{ alignSelf: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    {goals.length > 0 ? '+' : ''}{unlistedCount} {unlistedCount === 1 ? 'goal' : 'goals'}
+                </li>
+            )}
+        </ul>
+    );
 }
 
 function getGroupDepth(groupId, activityGroups) {
@@ -144,6 +192,12 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
     const [showGoalSelector, setShowGoalSelector] = useState(false);
 
     const allGoals = useMemo(() => flattenGoals(currentFractal), [currentFractal]);
+    // Tree order; ids the tree doesn't know (still loading, or out of scope) are only counted.
+    const linkedGoals = useMemo(() => {
+        const selected = new Set(selectedGoalIds);
+        return allGoals.filter((goal) => selected.has(goal.id));
+    }, [allGoals, selectedGoalIds]);
+    const unlistedGoalCount = selectedGoalIds.length - linkedGoals.length;
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -299,11 +353,13 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                                 </button>
                             </div>
 
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                                {selectedGoalIds.length === 0
-                                    ? 'No linked goals'
-                                    : `${selectedGoalIds.length} linked ${selectedGoalIds.length === 1 ? 'goal' : 'goals'}`}
-                            </div>
+                            {selectedGoalIds.length === 0 ? (
+                                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
+                                    No linked goals
+                                </div>
+                            ) : (
+                                <LinkedGoalList goals={linkedGoals} unlistedCount={unlistedGoalCount} />
+                            )}
 
                             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                                 All activities in this group will be linked to these goals.
