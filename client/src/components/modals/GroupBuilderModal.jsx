@@ -1,5 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useActivities } from '../../contexts/ActivitiesContext';
+import { useGoalLevels } from '../../contexts/GoalLevelsContext';
 import { useFractalTree } from '../../hooks/useGoalQueries';
 import useIsMobile from '../../hooks/useIsMobile';
 import notify from '../../utils/notify';
@@ -8,10 +9,10 @@ import Modal from '../atoms/Modal';
 import ModalBody from '../atoms/ModalBody';
 import ModalFooter from '../atoms/ModalFooter';
 import Button from '../atoms/Button';
+import GoalIcon from '../atoms/GoalIcon';
 import GoalHierarchySelector from '../goals/GoalHierarchySelector';
 import { logError } from '../../utils/logger';
-import { getGoalGroupConflicts } from '../../utils/goalActivityGroupErrors';
-import ConfirmationModal from '../ConfirmationModal';
+import { isSMART } from '../../utils/smartHelpers';
 
 function flattenGoals(node, goals = [], parentId = null) {
     if (!node) return goals;
@@ -24,11 +25,56 @@ function flattenGoals(node, goals = [], parentId = null) {
         parent_id: parentId,
         childrenIds: children.map((child) => child.id || child.attributes?.id).filter(Boolean),
         completed: Boolean(node.completed || node.attributes?.completed),
+        isSmart: isSMART(node),
     });
     if (children.length > 0) {
         children.forEach((child) => flattenGoals(child, goals, nodeId));
     }
     return goals;
+}
+
+function LinkedGoalList({ goals, unlistedCount }) {
+    const { getGoalColor, getGoalSecondaryColor, getGoalIcon } = useGoalLevels();
+    return (
+        <ul
+            aria-label="Linked goals"
+            style={{ listStyle: 'none', margin: '0 0 5px', padding: 0, display: 'flex', flexWrap: 'wrap', gap: '6px' }}
+        >
+            {goals.map((goal) => {
+                const level = goal.completed ? 'Completed' : goal.type;
+                return (
+                    <li
+                        key={goal.id}
+                        title={goal.completed ? `${goal.name} (complete)` : goal.name}
+                        style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '6px', maxWidth: '100%',
+                            padding: '4px 10px 4px 6px', borderRadius: '999px',
+                            border: '1px solid var(--color-border)', background: 'var(--color-bg-input)',
+                            fontSize: '13px', color: 'var(--color-text-primary)',
+                        }}
+                    >
+                        <span style={{ display: 'inline-flex', flexShrink: 0 }}>
+                            <GoalIcon
+                                shape={getGoalIcon(goal.type)}
+                                color={getGoalColor(level)}
+                                secondaryColor={getGoalSecondaryColor(level)}
+                                isSmart={goal.isSmart}
+                                size={16}
+                            />
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {goal.name}
+                        </span>
+                    </li>
+                );
+            })}
+            {unlistedCount > 0 && (
+                <li style={{ alignSelf: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                    {goals.length > 0 ? '+' : ''}{unlistedCount} {unlistedCount === 1 ? 'goal' : 'goals'}
+                </li>
+            )}
+        </ul>
+    );
 }
 
 function getGroupDepth(groupId, activityGroups) {
@@ -141,14 +187,17 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    // Goals that already use another group: moving them needs confirmation (one group per goal).
-    const [pendingMove, setPendingMove] = useState(null);
-    const resolvingMoveRef = useRef(false);
 
     // UI State for Goal Selector
     const [showGoalSelector, setShowGoalSelector] = useState(false);
 
     const allGoals = useMemo(() => flattenGoals(currentFractal), [currentFractal]);
+    // Tree order; ids the tree doesn't know (still loading, or out of scope) are only counted.
+    const linkedGoals = useMemo(() => {
+        const selected = new Set(selectedGoalIds);
+        return allGoals.filter((goal) => selected.has(goal.id));
+    }, [allGoals, selectedGoalIds]);
+    const unlistedGoalCount = selectedGoalIds.length - linkedGoals.length;
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (loading) return;
@@ -190,37 +239,9 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
         notify.error(message);
     };
 
-    const saveGoals = async (group, goalIds, options = {}) => {
-        try {
-            const updatedGroup = await setActivityGroupGoals(rootId, group.id, goalIds, options);
-            finish(updatedGroup?.id ? updatedGroup : { ...group, associated_goal_ids: goalIds });
-        } catch (err) {
-            const conflicts = getGoalGroupConflicts(err);
-            if (conflicts.length === 0) throw err;
-            setPendingMove({ group, goalIds, conflicts });
-        }
-    };
-
-    // ConfirmationModal calls onConfirm then onClose: resolve the first answer only.
-    const resolvePendingMove = async (moveGoals) => {
-        const move = pendingMove;
-        if (!move || resolvingMoveRef.current) return;
-        resolvingMoveRef.current = true;
-        setPendingMove(null);
-        const conflictIds = new Set(move.conflicts.map((conflict) => conflict.goal_id));
-        setLoading(true);
-        try {
-            await saveGoals(
-                move.group,
-                moveGoals ? move.goalIds : move.goalIds.filter((goalId) => !conflictIds.has(goalId)),
-                { replace: moveGoals },
-            );
-        } catch (err) {
-            fail(err);
-        } finally {
-            resolvingMoveRef.current = false;
-            setLoading(false);
-        }
+    const saveGoals = async (group, goalIds) => {
+        const updatedGroup = await setActivityGroupGoals(rootId, group.id, goalIds);
+        finish(updatedGroup?.id ? updatedGroup : { ...group, associated_goal_ids: goalIds });
     };
 
     // Build breadcrumb path using shared utility
@@ -332,11 +353,13 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                                 </button>
                             </div>
 
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
-                                {selectedGoalIds.length === 0
-                                    ? 'No linked goals'
-                                    : `${selectedGoalIds.length} linked ${selectedGoalIds.length === 1 ? 'goal' : 'goals'}`}
-                            </div>
+                            {selectedGoalIds.length === 0 ? (
+                                <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '5px' }}>
+                                    No linked goals
+                                </div>
+                            ) : (
+                                <LinkedGoalList goals={linkedGoals} unlistedCount={unlistedGoalCount} />
+                            )}
 
                             <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                                 All activities in this group will be linked to these goals.
@@ -365,17 +388,6 @@ function GroupBuilderModalInner({ onClose, editingGroup, rootId, activityGroups,
                 onSave={setSelectedGoalIds}
                 groupName={name.trim()}
                 modalLayer={modalLayer}
-            />
-            <ConfirmationModal
-                isOpen={Boolean(pendingMove)}
-                onClose={() => resolvePendingMove(false)}
-                onConfirm={() => resolvePendingMove(true)}
-                title="Move goals to this group?"
-                message={pendingMove ? `A goal has one activity group. ${pendingMove.conflicts.map((conflict) => (
-                    `“${conflict.goal_name}” uses “${conflict.current_group?.name || 'another group'}”`
-                )).join('; ')}. Move ${pendingMove.conflicts.length === 1 ? 'it' : 'them'} here?` : ''}
-                confirmText={pendingMove?.conflicts.length === 1 ? 'Move Goal' : 'Move Goals'}
-                cancelText="Keep Their Groups"
             />
         </Modal>
     );

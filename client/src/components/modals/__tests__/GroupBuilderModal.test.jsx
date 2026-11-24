@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 import GroupBuilderModal from '../GroupBuilderModal';
 
@@ -98,7 +98,7 @@ describe('GroupBuilderModal', () => {
                 description: '',
                 parent_id: null,
             });
-            expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child'], {});
+            expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child']);
         });
         expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
             id: 'group-1',
@@ -107,39 +107,24 @@ describe('GroupBuilderModal', () => {
         expect(onClose).toHaveBeenCalled();
     });
 
-    describe('goals that already use another group', () => {
+    it('saves goals that already have other groups without asking', async () => {
+        mockSetActivityGroupGoals.mockResolvedValueOnce({ id: 'group-1' });
+        const onClose = vi.fn();
         const editingGroup = { id: 'group-1', name: 'Pull', description: '', parent_id: null, associated_goal_ids: ['goal-child', 'goal-root'] };
-        const takenError = () => Object.assign(new Error('taken'), {
-            response: { status: 409, data: {
-                code: 'goal_activity_group_taken',
-                conflicts: [{ goal_id: 'goal-child', goal_name: 'Strict Handstand Push Up', current_group: { id: 'g-2', name: 'Push' } }],
-            } },
-        });
-        const renderEditing = () => {
-            const onSave = vi.fn();
-            const onClose = vi.fn();
-            render(<GroupBuilderModal isOpen onClose={onClose} editingGroup={editingGroup} rootId="root-1" activityGroups={[]} onSave={onSave} />);
-            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-            return { onSave, onClose };
-        };
+        render(<GroupBuilderModal isOpen onClose={onClose} editingGroup={editingGroup} rootId="root-1" activityGroups={[]} onSave={vi.fn()} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(onClose).toHaveBeenCalled());
+        expect(mockSetActivityGroupGoals).toHaveBeenCalledTimes(1);
+        expect(mockSetActivityGroupGoals).toHaveBeenCalledWith('root-1', 'group-1', ['goal-child', 'goal-root']);
+        expect(screen.queryByRole('dialog', { name: /Move goals/ })).not.toBeInTheDocument();
+    });
 
-        it('asks to move them and retries with replace', async () => {
-            mockSetActivityGroupGoals.mockRejectedValueOnce(takenError()).mockResolvedValueOnce({ id: 'group-1' });
-            const { onClose } = renderEditing();
-            expect(await screen.findByText(/“Strict Handstand Push Up” uses “Push”/)).toBeInTheDocument();
-            fireEvent.click(screen.getByRole('button', { name: 'Move Goal' }));
-            await waitFor(() => expect(onClose).toHaveBeenCalled());
-            expect(mockSetActivityGroupGoals).toHaveBeenCalledTimes(2);
-            expect(mockSetActivityGroupGoals).toHaveBeenLastCalledWith('root-1', 'group-1', ['goal-child', 'goal-root'], { replace: true });
-        });
-
-        it('links only the free goals when the user keeps their groups', async () => {
-            mockSetActivityGroupGoals.mockRejectedValueOnce(takenError()).mockResolvedValueOnce({ id: 'group-1' });
-            const { onClose } = renderEditing();
-            fireEvent.click(await screen.findByRole('button', { name: 'Keep Their Groups' }));
-            await waitFor(() => expect(onClose).toHaveBeenCalled());
-            expect(mockSetActivityGroupGoals).toHaveBeenCalledTimes(2);
-            expect(mockSetActivityGroupGoals).toHaveBeenLastCalledWith('root-1', 'group-1', ['goal-root'], { replace: false });
-        });
+    it('lists linked goals by name with their level icons, in tree order', () => {
+        const editingGroup = { id: 'group-1', name: 'Pull', description: '', parent_id: null, associated_goal_ids: ['goal-child', 'goal-root', 'goal-gone'] };
+        render(<GroupBuilderModal isOpen onClose={vi.fn()} editingGroup={editingGroup} rootId="root-1" activityGroups={[]} onSave={vi.fn()} />);
+        const items = within(screen.getByRole('list', { name: 'Linked goals' })).getAllByRole('listitem');
+        expect(items.map((item) => item.textContent)).toEqual(['Become Elite', 'Strict Handstand Push Up', '+1 goal']);
+        expect(items[0].querySelector('svg')).not.toBeNull();
+        expect(screen.queryByText('3 linked goals')).not.toBeInTheDocument();
     });
 });

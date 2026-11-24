@@ -29,7 +29,7 @@ vi.mock('../../contexts/GoalLevelsContext', () => ({
     useGoalLevels: () => ({ getGoalColor: () => '#22d3ee', getGoalIcon: () => 'circle' }),
 }));
 
-const scopedGroup = { id: 'group-songs', goalName: 'Head Over Heels' };
+const scopedGroup = { ids: ['group-songs'], goalName: 'Head Over Heels' };
 const renderBuilder = (props) => render(
     <ActivityBuilder isOpen onClose={vi.fn()} rootId="root-1" onSave={vi.fn()} initialSelectedGoalIds={['goal-1']} {...props} />,
 );
@@ -46,7 +46,7 @@ describe('ActivityBuilder scoped activity group', () => {
     });
 
     it("prefills a blank create with the scoped goal's group and says where it came from", async () => {
-        renderBuilder({ editingActivity: null, initialGroup: scopedGroup });
+        renderBuilder({ editingActivity: null, scopeGroups: scopedGroup });
         expect(groupSelect()).toHaveValue('group-songs');
         expect(screen.getByText("From Head Over Heels's activity group")).toBeInTheDocument();
         submitCreate();
@@ -56,7 +56,7 @@ describe('ActivityBuilder scoped activity group', () => {
     });
 
     it('drops the hint once the user picks another group, and keeps their choice', async () => {
-        renderBuilder({ editingActivity: null, initialGroup: scopedGroup });
+        renderBuilder({ editingActivity: null, scopeGroups: scopedGroup });
         fireEvent.change(groupSelect(), { target: { value: 'group-scales' } });
         expect(screen.queryByText("From Head Over Heels's activity group")).not.toBeInTheDocument();
         submitCreate();
@@ -66,7 +66,7 @@ describe('ActivityBuilder scoped activity group', () => {
     });
 
     it('falls back to no group when the scoped group no longer exists', async () => {
-        renderBuilder({ editingActivity: null, initialGroup: { id: 'group-gone', goalName: 'Head Over Heels' } });
+        renderBuilder({ editingActivity: null, scopeGroups: { ids: ['group-gone'], goalName: 'Head Over Heels' } });
         expect(groupSelect()).toHaveValue('');
         expect(screen.queryByText(/activity group$/)).not.toBeInTheDocument();
         submitCreate();
@@ -78,21 +78,44 @@ describe('ActivityBuilder scoped activity group', () => {
     it('keeps a copied definition in its own group', () => {
         renderBuilder({
             editingActivity: { _builderKey: 'copy', name: 'Copy of Scales', group_id: 'group-scales' },
-            initialGroup: scopedGroup,
+            scopeGroups: scopedGroup,
         });
         expect(groupSelect()).toHaveValue('group-scales');
         expect(screen.queryByText("From Head Over Heels's activity group")).not.toBeInTheDocument();
     });
 
     it('uses the scoped group for an id-less draft without a group', () => {
-        renderBuilder({ editingActivity: { _builderKey: 'draft', name: 'Riff', group_id: null }, initialGroup: scopedGroup });
+        renderBuilder({ editingActivity: { _builderKey: 'draft', name: 'Riff', group_id: null }, scopeGroups: scopedGroup });
         expect(groupSelect()).toHaveValue('group-songs');
+    });
+
+    it("lists a goal's several groups first without choosing one", async () => {
+        renderBuilder({
+            editingActivity: null,
+            scopeGroups: { ids: ['group-songs', 'group-scales'], goalName: 'Head Over Heels' },
+        });
+        expect(groupSelect()).toHaveValue('');
+        expect(screen.queryByText("From Head Over Heels's activity group")).not.toBeInTheDocument();
+        const [scoped, rest] = groupSelect().querySelectorAll('optgroup');
+        expect(scoped).toHaveAttribute('label', 'From Head Over Heels');
+        expect([...scoped.querySelectorAll('option')].map((option) => option.value)).toEqual(['group-songs', 'group-scales']);
+        expect(rest).toHaveAttribute('label', 'All groups');
+        fireEvent.change(groupSelect(), { target: { value: 'group-scales' } });
+        submitCreate();
+        await waitFor(() => expect(mockCreateActivity).toHaveBeenCalledWith('root-1', expect.objectContaining({
+            group_id: 'group-scales',
+        })));
+    });
+
+    it('lists groups without headings for a goal with one group', () => {
+        renderBuilder({ editingActivity: null, scopeGroups: scopedGroup });
+        expect(groupSelect().querySelectorAll('optgroup')).toHaveLength(0);
     });
 
     it('never applies the scoped group when editing an existing definition', () => {
         renderBuilder({
             editingActivity: { id: 'existing', name: 'Practice', group_id: null, metric_definitions: [] },
-            initialGroup: scopedGroup,
+            scopeGroups: scopedGroup,
         });
         expect(groupSelect()).toHaveValue('');
     });

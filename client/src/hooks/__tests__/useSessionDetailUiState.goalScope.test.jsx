@@ -37,34 +37,36 @@ describe('scoped activity builder defaults', () => {
     });
 });
 
-describe('scoped activity builder group', () => {
-    const withGroup = { id: 'goal-g', name: 'Head Over Heels', activity_group_id: 'group-1' };
+describe('scoped activity builder groups', () => {
+    const withGroup = { id: 'goal-g', name: 'Head Over Heels', attributes: { associated_activity_group_ids: ['group-1'] } };
 
-    it("seeds the scoped goal's group for create and copy drafts", () => {
+    it("offers the scoped goal's groups for create and copy drafts", () => {
         const { result } = renderHook(() => useSessionDetailUiState(options));
         act(() => result.current.handleToggleGoalScope(withGroup));
         act(() => result.current.handleOpenActivityBuilder(0));
-        expect(result.current.builderInitialGroup).toEqual({ id: 'group-1', goalName: 'Head Over Heels' });
+        expect(result.current.builderScopeGroups).toEqual({ ids: ['group-1'], goalName: 'Head Over Heels' });
         act(() => result.current.handleOpenActivityBuilder(0, { _builderKey: 'copy', group_id: 'other' }));
-        expect(result.current.builderInitialGroup).toEqual({ id: 'group-1', goalName: 'Head Over Heels' });
+        expect(result.current.builderScopeGroups).toEqual({ ids: ['group-1'], goalName: 'Head Over Heels' });
     });
 
-    it('reads legacy goal payloads that only list group ids', () => {
+    it('passes every group of a goal that has several', () => {
         const { result } = renderHook(() => useSessionDetailUiState(options));
-        act(() => result.current.handleToggleGoalScope({ id: 'goal-l', name: 'Legacy', attributes: { associated_activity_group_ids: ['group-2'] } }));
+        act(() => result.current.handleToggleGoalScope({
+            id: 'goal-m', name: 'Songs', attributes: { associated_activity_group_ids: ['group-1', 'group-2'] },
+        }));
         act(() => result.current.handleOpenActivityBuilder(0));
-        expect(result.current.builderInitialGroup).toEqual({ id: 'group-2', goalName: 'Legacy' });
+        expect(result.current.builderScopeGroups).toEqual({ ids: ['group-1', 'group-2'], goalName: 'Songs' });
     });
 
-    it('has no group when editing, unscoped, or the scoped goal has none', () => {
+    it('has no groups when editing, unscoped, or the scoped goal has none', () => {
         const { result } = renderHook(() => useSessionDetailUiState(options));
         act(() => result.current.handleOpenActivityBuilder(0));
-        expect(result.current.builderInitialGroup).toBeNull();
+        expect(result.current.builderScopeGroups).toBeNull();
         act(() => result.current.handleToggleGoalScope(withGroup));
         act(() => result.current.handleOpenActivityBuilder(0, { id: 'definition' }, { mode: 'edit' }));
-        expect(result.current.builderInitialGroup).toBeNull();
+        expect(result.current.builderScopeGroups).toBeNull();
         act(() => result.current.handleToggleGoalScope(first));
         act(() => result.current.handleOpenActivityBuilder(0));
-        expect(result.current.builderInitialGroup).toBeNull();
+        expect(result.current.builderScopeGroups).toBeNull();
     });
 });

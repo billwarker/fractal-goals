@@ -79,11 +79,6 @@ goal_activity_group_associations = Table(
     Column('deleted_at', DateTime, nullable=True),
     # Reverse lookup; the composite primary key leads with the other column.
     sa.Index('ix_goal_activity_group_associations_activity_group_id', 'activity_group_id'),
-    # A goal links at most one live activity group (services/goal_activity_group_links.py).
-    sa.Index(
-        'uq_goal_activity_group_associations_one_active', 'goal_id',
-        unique=True, postgresql_where=sa.text('deleted_at IS NULL'),
-    ),
 )
 
 # Junction table for linking Session Templates to Goals
@@ -269,7 +264,7 @@ class Goal(Base):
         back_populates="associated_goals",
         viewonly=True
     )
-    # At most one live group (uq_goal_activity_group_associations_one_active); a list for loaders.
+    # Live groups only; a goal links any number of them.
     associated_activity_groups = relationship(
         "ActivityGroup",
         secondary=goal_activity_group_associations,

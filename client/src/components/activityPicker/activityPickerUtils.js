@@ -7,23 +7,16 @@ export function toSelectionSet(value) {
     return new Set(Array.isArray(value) ? value.filter(Boolean) : []);
 }
 
-/**
- * Toggle a whole group: its activities join or leave with it. `single` keeps one group chosen,
- * dropping any other group and the activities it brought.
- */
-export function toggleGroupSelection({ groupIds, activityIds, groupId, getActivityIdsForGroup, single = false }) {
+/** Toggle a whole group: its activities join or leave with it. */
+export function toggleGroupSelection({ groupIds, activityIds, groupId, getActivityIdsForGroup }) {
     const nextGroupIds = new Set(groupIds);
     const nextActivityIds = new Set(activityIds);
     const removing = nextGroupIds.has(groupId);
-    const dropped = removing ? [groupId] : (single ? [...nextGroupIds] : []);
-    dropped.forEach((droppedId) => {
-        nextGroupIds.delete(droppedId);
-        getActivityIdsForGroup(droppedId).forEach((activityId) => nextActivityIds.delete(activityId));
-    });
-    if (!removing) {
-        nextGroupIds.add(groupId);
-        getActivityIdsForGroup(groupId).forEach((activityId) => nextActivityIds.add(activityId));
-    }
+    if (removing) nextGroupIds.delete(groupId);
+    else nextGroupIds.add(groupId);
+    getActivityIdsForGroup(groupId).forEach((activityId) => (
+        removing ? nextActivityIds.delete(activityId) : nextActivityIds.add(activityId)
+    ));
     return { groupIds: nextGroupIds, activityIds: nextActivityIds };
 }
 

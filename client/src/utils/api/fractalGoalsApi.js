@@ -56,9 +56,9 @@ export const fractalGoalsApi = {
             params: { include_children: includeChildren, timezone, ...(date ? { date } : {}), ...(view === 'entries' ? { view, metric, limit, ...(cursor ? { cursor } : {}) } : {}) },
         }),
     getGoalMetrics: (goalId) => axios.get(`${API_BASE}/goals/${goalId}/metrics`),
-    // A goal has one activity group: another one returns 409 goal_activity_group_taken unless `replace`.
-    linkGoalActivityGroup: (rootId, goalId, groupId, { replace = false } = {}) =>
-        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`, replace ? { replace: true } : undefined),
+    // Adds the group alongside the goal's others; linking it again is a no-op.
+    linkGoalActivityGroup: (rootId, goalId, groupId) =>
+        axios.post(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     unlinkGoalActivityGroup: (rootId, goalId, groupId) =>
         axios.delete(`${API_BASE}/${rootId}/goals/${goalId}/activity-groups/${groupId}`),
     setGoalAssociationsBatch: (rootId, goalId, data) =>

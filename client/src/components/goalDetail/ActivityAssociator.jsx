@@ -69,6 +69,8 @@ const ActivityAssociator = ({
     onAssociationFlowChange,
     registerPickerFooterActions,
     dividerColor,
+    goalColor,
+    goalTextColor,
     onCopyActivity,
     readOnly = false,
 }) => {
@@ -87,8 +89,6 @@ const ActivityAssociator = ({
     const [newGroupParentId, setNewGroupParentId] = useState('');
     const [isCreatingGroup, setIsCreatingGroup] = useState(false);
     const [pendingActivityRemoval, setPendingActivityRemoval] = useState(null);
-    // A goal has one activity group; choosing another asks before replacing it.
-    const [pendingGroupReplacement, setPendingGroupReplacement] = useState(null);
     const wasDiscoveryActiveRef = useRef(false);
     const linkedGroupIds = useMemo(
         () => new Set((associatedActivityGroups || []).map(g => g.id)),
@@ -186,27 +186,17 @@ const ActivityAssociator = ({
         return activities.filter((activity) => !activity?.from_linked_group || !subtreeIds.has(activity.group_id));
     }, [getGroupSubtreeIds]);
 
-    /** Make `group` the goal's one activity group, replacing (and unlinking the activities of) any other. */
-    const applyGroupSelection = useCallback(async (group, activities = associatedActivitiesRef.current || []) => {
-        const currentGroup = (associatedGroupsRef.current || [])[0] || null;
-        const nextActivities = currentGroup && currentGroup.id !== group.id
-            ? withoutGroupLinkedActivities(activities, currentGroup.id)
-            : activities;
-        const finalGroups = [group];
+    /** Link `groups` to the goal alongside its other groups. */
+    const linkGroups = useCallback(async (groups, activities = associatedActivitiesRef.current || []) => {
+        const currentGroups = associatedGroupsRef.current || [];
+        const currentIds = new Set(currentGroups.map((group) => group.id));
+        const finalGroups = [...currentGroups, ...groups.filter((group) => !currentIds.has(group.id))];
         setAssociatedActivityGroups?.(finalGroups);
         associatedGroupsRef.current = finalGroups;
-        setAssociatedActivities(nextActivities);
-        associatedActivitiesRef.current = nextActivities;
-        if (onSave) await onSave(nextActivities, finalGroups);
-    }, [onSave, setAssociatedActivities, setAssociatedActivityGroups, withoutGroupLinkedActivities]);
-
-    const handleConfirmGroupReplacement = async () => {
-        const replacement = pendingGroupReplacement;
-        setPendingGroupReplacement(null);
-        if (!replacement) return;
-        await applyGroupSelection(replacement.toGroup, replacement.activities);
-        notify.success(`Replaced "${replacement.fromGroup.name}" with "${replacement.toGroup.name}"`);
-    };
+        setAssociatedActivities(activities);
+        associatedActivitiesRef.current = activities;
+        if (onSave) await onSave(activities, finalGroups);
+    }, [onSave, setAssociatedActivities, setAssociatedActivityGroups]);
 
     const handleConfirmActivitySelection = useCallback(async (selectedActivitiesArg, selectedGroupsArg) => {
         // Fallback to state if arguments are not provided (though ActivitySearchWidget should provide them)
@@ -226,27 +216,14 @@ const ActivityAssociator = ({
         setTempSelectedGroups([]);
         setIsDiscoveryActive(false);
 
-        const nextGroup = finalSelectedGroups
+        const currentGroupIds = new Set(latestGroups.map((group) => group.id));
+        const newGroups = finalSelectedGroups
             .map(id => activityGroups.find(g => g.id === id))
-            .find(Boolean);
-        const currentGroup = latestGroups[0] || null;
-        if (nextGroup && currentGroup && currentGroup.id !== nextGroup.id) {
-            // Picked activities persist now; the group (and what it brought) waits for confirmation.
-            const nextGroupIds = getGroupSubtreeIds(nextGroup.id);
-            const latestIds = new Set(latestActivities.map((activity) => activity.id));
-            const withoutNextGroup = unique.filter((activity) => latestIds.has(activity.id) || !nextGroupIds.has(activity.group_id));
-            setAssociatedActivities(withoutNextGroup);
-            associatedActivitiesRef.current = withoutNextGroup;
-            if (onSave) await onSave(withoutNextGroup, latestGroups);
-            setPendingGroupReplacement({ fromGroup: currentGroup, toGroup: nextGroup, activities: unique });
-            const addedCount = withoutNextGroup.length - latestActivities.length;
-            if (addedCount > 0) notify.success(`Added ${addedCount} activit${addedCount === 1 ? 'y' : 'ies'}`);
-            return;
-        }
+            .filter((group) => group && !currentGroupIds.has(group.id));
         setAssociatedActivities(unique);
         associatedActivitiesRef.current = unique;
-        if (nextGroup && nextGroup.id !== currentGroup?.id) {
-            await applyGroupSelection(nextGroup, unique);
+        if (newGroups.length > 0) {
+            await linkGroups(newGroups, unique);
         } else if (onSave) {
             // PERSIST if onSave is provided (View Mode persistence)
             await onSave(unique, latestGroups);
@@ -254,13 +231,13 @@ const ActivityAssociator = ({
 
         const parts = [];
         if (newActivities.length > 0) parts.push(`${newActivities.length} activit${newActivities.length === 1 ? 'y' : 'ies'}`);
-        if (nextGroup && nextGroup.id !== currentGroup?.id) parts.push(`the group "${nextGroup.name}"`);
+        if (newGroups.length === 1) parts.push(`the group "${newGroups[0].name}"`);
+        if (newGroups.length > 1) parts.push(`${newGroups.length} groups`);
         if (parts.length > 0) notify.success(`Added ${parts.join(' and ')}`);
     }, [
         activityDefinitions,
         activityGroups,
-        applyGroupSelection,
-        getGroupSubtreeIds,
+        linkGroups,
         onSave,
         setAssociatedActivities,
         tempSelectedActivities,
@@ -376,12 +353,7 @@ const ActivityAssociator = ({
 
             // Link the new group to this goal (create mode buffers it until the goal is saved).
             if (result && result.id) {
-                const currentGroup = (associatedGroupsRef.current || [])[0] || null;
-                if (currentGroup && currentGroup.id !== result.id) {
-                    setPendingGroupReplacement({ fromGroup: currentGroup, toGroup: result });
-                } else {
-                    await applyGroupSelection(result);
-                }
+                await linkGroups([result]);
             }
 
             if (setActivityGroups && result) {
@@ -497,6 +469,16 @@ const ActivityAssociator = ({
         return false;
     };
 
+    const handleLinkGroup = async (group) => {
+        const nextGroup = (activityGroups || []).find((candidate) => candidate.id === group?.id);
+        if (!nextGroup) return;
+
+        if ((associatedGroupsRef.current || []).some((linked) => linked.id === nextGroup.id)) return;
+
+        await linkGroups([nextGroup]);
+        notify.success(`Linked activity group "${nextGroup.name}"`);
+    };
+
     const handleUnlinkGroup = async (group) => {
         if (!group?.id) return;
 
@@ -553,30 +535,10 @@ const ActivityAssociator = ({
             style={{
                 '--activity-associator-accent': headerColor || 'var(--color-text-primary)',
                 '--activity-associator-divider': dividerColor || headerColor || 'var(--color-text-primary)',
+                '--activity-associator-goal': goalColor || 'var(--color-brand-primary)',
+                '--activity-associator-goal-text': goalTextColor || 'var(--color-text-inverse)',
             }}
         >
-            <Modal
-                isOpen={!readOnly && !!pendingGroupReplacement}
-                onClose={() => setPendingGroupReplacement(null)}
-                title="Replace Activity Group?"
-                size="sm"
-                showCloseButton={true}
-            >
-                <p className={styles.removeModalText}>
-                    A goal has one activity group. Replace “{pendingGroupReplacement?.fromGroup?.name}” with
-                    “{pendingGroupReplacement?.toGroup?.name}”? Activities from “{pendingGroupReplacement?.fromGroup?.name}”
-                    stop counting toward this goal unless they are linked on their own.
-                </p>
-                <div className={styles.removeModalActions}>
-                    <Button variant="secondary" onClick={() => setPendingGroupReplacement(null)}>
-                        Keep Current Group
-                    </Button>
-                    <Button variant="primary" onClick={handleConfirmGroupReplacement}>
-                        Replace Group
-                    </Button>
-                </div>
-            </Modal>
-
             <Modal
                 isOpen={!readOnly && !!pendingActivityRemoval}
                 onClose={() => setPendingActivityRemoval(null)}
@@ -702,7 +664,6 @@ const ActivityAssociator = ({
                         selectionMode="multiple"
                         allowActivitySelection
                         allowGroupSelection={true}
-                        singleGroupSelection
                         allowCreateActivity={Boolean(onCreateActivity)}
                         allowCopyActivity={Boolean(onCopyActivity)}
                         allowCreateGroup
@@ -746,6 +707,7 @@ const ActivityAssociator = ({
                                 associatedActivityGroups={associatedActivityGroups}
                                 collapsedGroups={collapsedGroups}
                                 onToggleCollapse={toggleGroupCollapse}
+                                onLinkGroup={handleLinkGroup}
                                 onUnlinkGroup={handleUnlinkGroup}
                                 renderActivityCard={renderActivityCard}
                                 readOnly={readOnly}

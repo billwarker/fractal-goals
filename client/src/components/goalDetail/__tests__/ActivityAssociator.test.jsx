@@ -279,7 +279,7 @@ describe('ActivityAssociator', () => {
         expect(screen.getByRole('button', { name: '+' })).toBeInTheDocument();
     });
 
-    describe('one activity group per goal', () => {
+    describe('several activity groups per goal', () => {
         const groups = [
             { id: 'group-a', name: 'Songs', parent_id: null, sort_order: 1 },
             { id: 'group-b', name: 'Scales', parent_id: null, sort_order: 2 },
@@ -289,6 +289,7 @@ describe('ActivityAssociator', () => {
             { id: 'scale-1', name: 'Major Scale', group_id: 'group-b' },
         ];
         const linkedSong = { id: 'song-1', name: 'Head Over Heels', group_id: 'group-a', from_linked_group: true };
+        const savedGroupIds = (onSave) => onSave.mock.calls.at(-1)[1].map((group) => group.id);
 
         const chooseGroup = async (name) => {
             fireEvent.click(screen.getByRole('button', { name: '+ Associate Activities' }));
@@ -300,7 +301,7 @@ describe('ActivityAssociator', () => {
             fireEvent.click(screen.getByRole('button', { name: /Add Selected/ }));
         };
 
-        it('asks before replacing the current group and unlinks its activities on confirm', async () => {
+        it('adds a picked group alongside the current one without asking', async () => {
             const onSave = vi.fn(() => Promise.resolve());
             render(
                 <ActivityAssociatorHarness
@@ -312,39 +313,12 @@ describe('ActivityAssociator', () => {
                 />
             );
             await chooseGroup('Scales');
-
-            expect(await screen.findByRole('heading', { name: 'Replace Activity Group?' })).toBeInTheDocument();
-            // Picked activities persist at once; the group is still the old one.
-            expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[0]]);
-
-            expect(onSave.mock.calls.at(-1)[0].map((activity) => activity.id)).toEqual(['song-1']);
-
-            fireEvent.click(screen.getByRole('button', { name: 'Replace Group' }));
-            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
-            const [savedActivities] = onSave.mock.calls.at(-1);
-            expect(savedActivities.map((activity) => activity.id)).toEqual(['scale-1']);
+            await waitFor(() => expect(savedGroupIds(onSave)).toEqual(['group-a', 'group-b']));
+            expect(onSave.mock.calls.at(-1)[0].map((activity) => activity.id)).toContain('song-1');
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         });
 
-        it('keeps the current group when the replacement is declined', async () => {
-            const onSave = vi.fn(() => Promise.resolve());
-            render(
-                <ActivityAssociatorHarness
-                    initialActivities={[linkedSong]}
-                    initialGroups={[groups[0]]}
-                    activityDefinitions={definitions}
-                    activityGroups={groups}
-                    onSave={onSave}
-                />
-            );
-            await chooseGroup('Scales');
-            fireEvent.click(await screen.findByRole('button', { name: 'Keep Current Group' }));
-            await waitFor(() => expect(screen.queryByRole('heading', { name: 'Replace Activity Group?' })).not.toBeInTheDocument());
-            expect(onSave.mock.calls.every(([, savedGroups]) => savedGroups.length === 1 && savedGroups[0].id === 'group-a')).toBe(true);
-            // The declined group's activities were never linked on their own.
-            expect(onSave.mock.calls.every(([savedActivities]) => !savedActivities.some((activity) => activity.id === 'scale-1'))).toBe(true);
-        });
-
-        it('lets the picker hold one group at a time', async () => {
+        it('lets the picker hold several groups at once', async () => {
             const onSave = vi.fn(() => Promise.resolve());
             render(
                 <ActivityAssociatorHarness
@@ -359,26 +333,70 @@ describe('ActivityAssociator', () => {
             const [songs, scales] = screen.getAllByRole('button', { name: 'Link Group' });
             fireEvent.click(songs);
             fireEvent.click(scales);
-            expect(screen.getAllByRole('button', { name: /Linked/ })).toHaveLength(1);
+            expect(screen.getAllByRole('button', { name: /Linked/ })).toHaveLength(2);
             fireEvent.click(screen.getByRole('button', { name: /Add Selected/ }));
-            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
-            const [savedActivities] = onSave.mock.calls.at(-1);
-            expect(savedActivities.map((activity) => activity.id)).toEqual(['scale-1']);
+            await waitFor(() => expect(savedGroupIds(onSave)).toEqual(['group-a', 'group-b']));
         });
 
-        it('links a first group without asking', async () => {
-            const onSave = vi.fn(() => Promise.resolve());
-            render(
-                <ActivityAssociatorHarness
-                    initialActivities={[]}
-                    activityDefinitions={definitions}
-                    activityGroups={groups}
-                    onSave={onSave}
-                />
-            );
-            await chooseGroup('Scales');
-            await waitFor(() => expect(onSave).toHaveBeenLastCalledWith(expect.any(Array), [groups[1]]));
-            expect(screen.queryByRole('heading', { name: 'Replace Activity Group?' })).not.toBeInTheDocument();
+        describe('group link switch', () => {
+            const inheritedScale = {
+                id: 'scale-1',
+                name: 'Major Scale',
+                group_id: 'group-b',
+                has_direct_association: false,
+                inherited_from_children: true,
+            };
+            const groupSwitch = (name) => screen.getByRole('switch', { name: `Link group "${name}" to this goal` });
+
+            it('links a group the goal only inherits directly to the goal', async () => {
+                const onSave = vi.fn(() => Promise.resolve());
+                render(
+                    <ActivityAssociatorHarness
+                        initialActivities={[inheritedScale]}
+                        activityDefinitions={definitions}
+                        activityGroups={groups}
+                        onSave={onSave}
+                    />
+                );
+                expect(groupSwitch('Scales')).toHaveAttribute('aria-checked', 'false');
+
+                fireEvent.click(groupSwitch('Scales'));
+                await waitFor(() => expect(onSave).toHaveBeenLastCalledWith([inheritedScale], [groups[1]]));
+                expect(groupSwitch('Scales')).toHaveAttribute('aria-checked', 'true');
+            });
+
+            it('adds a second group without asking', async () => {
+                const onSave = vi.fn(() => Promise.resolve());
+                render(
+                    <ActivityAssociatorHarness
+                        initialActivities={[linkedSong, inheritedScale]}
+                        initialGroups={[groups[0]]}
+                        activityDefinitions={definitions}
+                        activityGroups={groups}
+                        onSave={onSave}
+                    />
+                );
+                fireEvent.click(groupSwitch('Scales'));
+                await waitFor(() => expect(onSave).toHaveBeenLastCalledWith([linkedSong, inheritedScale], groups));
+                expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+                expect(groupSwitch('Songs')).toHaveAttribute('aria-checked', 'true');
+                expect(groupSwitch('Scales')).toHaveAttribute('aria-checked', 'true');
+            });
+
+            it('unlinks only the group switched off', async () => {
+                const onSave = vi.fn(() => Promise.resolve());
+                render(
+                    <ActivityAssociatorHarness
+                        initialActivities={[linkedSong]}
+                        initialGroups={groups}
+                        activityDefinitions={definitions}
+                        activityGroups={groups}
+                        onSave={onSave}
+                    />
+                );
+                fireEvent.click(groupSwitch('Songs'));
+                await waitFor(() => expect(onSave).toHaveBeenLastCalledWith([], [groups[1]]));
+            });
         });
     });
 });

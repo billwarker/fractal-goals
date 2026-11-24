@@ -35,9 +35,12 @@ function ActivityBuilderForm({
     getGoalColor,
     getGoalIcon,
     onNameChange,
-    initialSelectedGoalIds = [], initialGroup = null, nestedModalLayer = 'default',
+    initialSelectedGoalIds = [], scopeGroups = null, nestedModalLayer = 'default',
 }) {
-    const initialState = getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds, initialGroup?.id);
+    const scopeGroupIds = scopeGroups?.ids || [];
+    const initialState = getInitialActivityBuilderState(
+        editingActivity, initialSelectedGoalIds, scopeGroupIds.length === 1 ? String(scopeGroupIds[0]) : null,
+    );
     const [error, setError] = useState(null);
     const [creating, setCreating] = useState(false);
     const [pendingSubmission, setPendingSubmission] = useState(null);
@@ -52,7 +55,7 @@ function ActivityBuilderForm({
     const [hasMetrics, setHasMetrics] = useState(initialState.hasMetrics);
     const [hasSplits, setHasSplits] = useState(initialState.hasSplits);
     const [splits, setSplits] = useState(initialState.splits);
-    const { groupId, scopeGoalName, setGroupId } = useActivityGroupChoice(initialState.groupId, initialGroup, activityGroups);
+    const { groupId, scopeGoalName, setGroupId } = useActivityGroupChoice(initialState.groupId, scopeGroups, activityGroups);
     const [selectedGoalIds, setSelectedGoalIds] = useState(initialState.selectedGoalIds);
     const [trackProgress, setTrackProgress] = useState(initialState.trackProgress);
     const [deltaDisplayMode, setDeltaDisplayMode] = useState(initialState.deltaDisplayMode);
@@ -309,6 +312,7 @@ function ActivityBuilderForm({
                         activityGroups={activityGroups}
                         groupId={groupId}
                         scopeGoalName={scopeGoalName}
+                        scopeGroups={scopeGroups}
                         onChange={handleGroupChange}
                     />
 

@@ -30,8 +30,6 @@ function ActivityPicker({
     initialBrowseGroupId = null,
     allowActivitySelection = true,
     allowGroupSelection = false,
-    // Choosing a group replaces any other chosen group (a goal has one activity group).
-    singleGroupSelection = false,
     allowCreateActivity = false,
     allowCopyActivity = false,
     allowCreateGroup = false,
@@ -144,7 +142,6 @@ function ActivityPicker({
             activityIds: pendingActivityIds,
             groupId: group.id,
             getActivityIdsForGroup: model.getActivityIdsForGroup,
-            single: singleGroupSelection,
         });
 
         setPendingGroupIds(nextGroupIds);

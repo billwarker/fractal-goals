@@ -19,7 +19,7 @@ function SessionDetailModals({
     showBuilder,
     builderActivity,
     builderInitialGoalIds = [],
-    builderInitialGroup = null,
+    builderScopeGroups = null,
     onCloseBuilder,
     onActivityCreated,
     selectedGoal,
@@ -66,7 +66,7 @@ function SessionDetailModals({
                         onClose={onCloseBuilder}
                         editingActivity={builderActivity}
                         initialSelectedGoalIds={builderInitialGoalIds}
-                        initialGroup={builderInitialGroup}
+                        scopeGroups={builderScopeGroups}
                         rootId={rootId}
                         onSave={onActivityCreated}
                     />

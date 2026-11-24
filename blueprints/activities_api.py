@@ -600,11 +600,7 @@ def reorder_activity_groups(current_user, root_id, validated_data):
 @token_required
 @validate_request(ActivityGroupGoalsSetSchema)
 def set_activity_group_goals(current_user, root_id, group_id, validated_data):
-    """Set goals associated with an activity group (replaces existing associations).
-
-    A goal has one activity group: goals already using another one return 409
-    `goal_activity_group_taken` with `conflicts`, unless `replace` moves them.
-    """
+    """Set the goals linked to an activity group; each goal keeps its other groups."""
     session = get_db_session()
     try:
         service = ActivityService(session)
@@ -613,7 +609,6 @@ def set_activity_group_goals(current_user, root_id, group_id, validated_data):
             group_id,
             current_user.id,
             validated_data['goal_ids'],
-            replace=validated_data.get('replace', False),
         )
         if error:
             return jsonify(error_body(error)), status

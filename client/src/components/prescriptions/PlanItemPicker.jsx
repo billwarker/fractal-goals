@@ -6,7 +6,7 @@ import { useCircuitDefinitionMutations } from '../../hooks/useCircuitQueries';
 import useScopedSessionActivityOptions from '../../hooks/useScopedSessionActivityOptions';
 import { prepareActivityDefinitionCopy, prepareActivityDefinitionDraft } from '../../utils/activityBuilder';
 import { prepareCircuitDefinitionCopy, prepareCircuitDefinitionDraft } from '../../utils/circuitDefinition';
-import { getGoalNodeActivityGroupId } from '../../utils/goalNodeModel';
+import { getGoalNodeActivityGroupIds } from '../../utils/goalNodeModel';
 import { lazyWithRetry } from '../../utils/lazyWithRetry';
 import styles from './PlanItem.module.css';
 
@@ -47,9 +47,9 @@ export default function PlanItemPicker({
     );
     const scopedGoalId = activityGoalScope?.goal?.id;
     const initialGoalIds = scopedGoalId ? [String(scopedGoalId)] : (defaultGoalIds || []).map(String);
-    const scopedGroupId = getGoalNodeActivityGroupId(activityGoalScope?.goal);
-    const initialGroup = scopedGroupId
-        ? { id: String(scopedGroupId), goalName: activityGoalScope.goal.name }
+    const scopedGroupIds = getGoalNodeActivityGroupIds(activityGoalScope?.goal);
+    const scopeGroups = scopedGroupIds.length > 0
+        ? { ids: scopedGroupIds, goalName: activityGoalScope.goal.name }
         : null;
 
     const close = () => setOpen(false);
@@ -112,7 +112,7 @@ export default function PlanItemPicker({
                         rootId={rootId}
                         editingActivity={activityBuilder.draft}
                         initialSelectedGoalIds={initialGoalIds}
-                        initialGroup={initialGroup}
+                        scopeGroups={scopeGroups}
                         onClose={() => setActivityBuilder(null)}
                         onSave={(created) => { if (created?.id) onAdd(created); }}
                     />

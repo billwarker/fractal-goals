@@ -134,7 +134,7 @@ function getBlankActivityBuilderState(initialSelectedGoalIds = [], initialGroupI
 }
 
 /**
- * `initialGroupId` (the scoped goal's group) seeds blank creates and id-less seeds without a group
+ * `initialGroupId` (the scoped goal's only group) seeds blank creates and id-less seeds without a group
  * of their own; a copy keeps its group, and editing an existing definition never applies it.
  */
 export function getInitialActivityBuilderState(editingActivity, initialSelectedGoalIds = [], initialGroupId = null) {

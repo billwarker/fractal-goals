@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { getGoalNodeActivityGroupId } from '../utils/goalNodeModel';
+import { getGoalNodeActivityGroupIds } from '../utils/goalNodeModel';
 
 export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivity, setSidePaneMode }) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [showBuilder, setShowBuilder] = useState(false);
     const [builderActivity, setBuilderActivity] = useState(null);
     const [builderInitialGoalIds, setBuilderInitialGoalIds] = useState([]);
-    const [builderInitialGroup, setBuilderInitialGroup] = useState(null);
+    const [builderScopeGroups, setBuilderScopeGroups] = useState(null);
     const [sectionForNewActivity, setSectionForNewActivity] = useState(null);
     const [selectedGoal, setSelectedGoal] = useState(null);
     const [selectedActivity, setSelectedActivity] = useState(null);
@@ -47,9 +47,9 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         setBuilderActivity(activityDefinition);
         const seedFromScope = !editingExistingDefinition && Boolean(scopedGoal?.id);
         setBuilderInitialGoalIds(seedFromScope ? [String(scopedGoal.id)] : []);
-        // New definitions join the scoped goal's activity group (a goal has at most one).
-        const scopedGroupId = seedFromScope ? getGoalNodeActivityGroupId(scopedGoal) : null;
-        setBuilderInitialGroup(scopedGroupId ? { id: String(scopedGroupId), goalName: scopedGoal.name } : null);
+        // New definitions offer the scoped goal's activity groups (and join it when it has one).
+        const scopedGroupIds = seedFromScope ? getGoalNodeActivityGroupIds(scopedGoal) : [];
+        setBuilderScopeGroups(scopedGroupIds.length > 0 ? { ids: scopedGroupIds, goalName: scopedGoal.name } : null);
         setShowBuilder(true);
     };
 
@@ -95,7 +95,7 @@ export function useSessionDetailUiState({ rootId, sessionId, isMobile, addActivi
         showBuilder,
         builderActivity,
         builderInitialGoalIds,
-        builderInitialGroup,
+        builderScopeGroups,
         selectedGoal,
         setSelectedGoal,
         selectedActivity,

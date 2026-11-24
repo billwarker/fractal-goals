@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     findGoalNodeById,
-    getGoalNodeActivityGroupId,
+    getGoalNodeActivityGroupIds,
     flattenGoalTree,
     flattenSessionGoalsViewGoals,
     getGoalNodeCategory,
@@ -153,15 +153,15 @@ describe('goalNodeModel', () => {
     });
 });
 
-describe('getGoalNodeActivityGroupId', () => {
-    it('prefers the canonical field, including an explicit null', () => {
-        expect(getGoalNodeActivityGroupId({ activity_group_id: 'g1', attributes: { associated_activity_group_ids: ['g2'] } })).toBe('g1');
-        expect(getGoalNodeActivityGroupId({ activity_group_id: null, attributes: { associated_activity_group_ids: ['g2'] } })).toBeNull();
+describe('getGoalNodeActivityGroupIds', () => {
+    it('lists every group id as strings', () => {
+        expect(getGoalNodeActivityGroupIds({ attributes: { associated_activity_group_ids: ['g1', 2] } })).toEqual(['g1', '2']);
+        expect(getGoalNodeActivityGroupIds({ associated_activity_group_ids: ['g3'] })).toEqual(['g3']);
     });
 
-    it('falls back to the legacy id list, else null', () => {
-        expect(getGoalNodeActivityGroupId({ attributes: { associated_activity_group_ids: ['g2'] } })).toBe('g2');
-        expect(getGoalNodeActivityGroupId({ attributes: { associated_activity_group_ids: [] } })).toBeNull();
-        expect(getGoalNodeActivityGroupId(null)).toBeNull();
+    it('is empty without groups or a goal', () => {
+        expect(getGoalNodeActivityGroupIds({ attributes: { associated_activity_group_ids: [] } })).toEqual([]);
+        expect(getGoalNodeActivityGroupIds({ attributes: {} })).toEqual([]);
+        expect(getGoalNodeActivityGroupIds(null)).toEqual([]);
     });
 });

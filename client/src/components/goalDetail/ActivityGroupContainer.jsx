@@ -1,5 +1,6 @@
 import React from 'react';
 
+import Switch from '../atoms/Switch';
 import styles from './ActivityAssociator.module.css';
 
 const ActivityGroupContainer = ({
@@ -7,7 +8,9 @@ const ActivityGroupContainer = ({
     associatedActivityGroups,
     collapsedGroups,
     isNested = false,
+    linkedAncestorName = null,
     onToggleCollapse,
+    onLinkGroup,
     onUnlinkGroup,
     renderActivityCard,
     readOnly = false,
@@ -31,23 +34,23 @@ const ActivityGroupContainer = ({
                     </span>
                 </div>
                 <div className={styles.groupHeaderActions}>
-                    {isLinked && (
-                        <>
-                            <span className={styles.groupBadge}>Linked</span>
-                            {!readOnly && (
-                                <button
-                                    type="button"
-                                    className={styles.groupUnlinkBtn}
-                                    onClick={(event) => {
-                                        event.stopPropagation();
-                                        onUnlinkGroup(group);
-                                    }}
-                                    title={`Unlink group "${group.name}"`}
-                                >
-                                    Unlink
-                                </button>
-                            )}
-                        </>
+                    {(isLinked || (!readOnly && !linkedAncestorName)) && (
+                        <label
+                            className={styles.groupLinkToggle}
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <span className={`${styles.groupBadge} ${isLinked ? '' : styles.groupBadgeOff}`}>
+                                {isLinked ? 'Linked' : 'Unlinked'}
+                            </span>
+                            <Switch
+                                checked={isLinked}
+                                disabled={readOnly}
+                                className={styles.groupSwitch}
+                                onChange={(checked) => (checked ? onLinkGroup(group) : onUnlinkGroup(group))}
+                                aria-label={`Link group "${group.name}" to this goal`}
+                                title={readOnly ? undefined : `${isLinked ? 'Unlink' : 'Link'} group "${group.name}"`}
+                            />
+                        </label>
                     )}
                 </div>
             </div>
@@ -63,7 +66,9 @@ const ActivityGroupContainer = ({
                                     associatedActivityGroups={associatedActivityGroups}
                                     collapsedGroups={collapsedGroups}
                                     isNested={true}
+                                    linkedAncestorName={isLinked ? group.name : linkedAncestorName}
                                     onToggleCollapse={onToggleCollapse}
+                                    onLinkGroup={onLinkGroup}
                                     onUnlinkGroup={onUnlinkGroup}
                                     renderActivityCard={renderActivityCard}
                                     readOnly={readOnly}

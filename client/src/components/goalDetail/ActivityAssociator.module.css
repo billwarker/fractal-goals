@@ -329,21 +329,54 @@
     color: var(--color-text-primary);
 }
 
-.groupUnlinkBtn {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text-secondary);
+.groupLinkToggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     cursor: pointer;
-    line-height: 1.2;
-    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
 }
 
-.groupUnlinkBtn:hover {
-    border-color: var(--color-brand-danger);
-    color: var(--color-brand-danger);
+/* The atom's off track has no border in dark mode; outline it so it reads against the card. */
+.groupHeaderActions .groupSwitch[aria-checked='false'] {
+    border-color: var(--color-text-muted);
+}
+
+.groupHeaderActions .groupSwitch[aria-checked='true'] {
+    border-color: var(--activity-associator-goal);
+    background: var(--activity-associator-goal);
+}
+
+.groupHeaderActions .groupSwitch[aria-checked='true'] > span {
+    background: var(--activity-associator-goal-text);
+}
+
+/* A mini switch on precise pointers; touch keeps the atom's thumb-sized default. */
+@media (pointer: fine) {
+    .groupHeaderActions .groupSwitch {
+        width: 26px;
+        height: 14px;
+    }
+
+    .groupHeaderActions .groupSwitch > span {
+        top: 1px;
+        left: 1px;
+        width: 10px;
+        height: 10px;
+    }
+
+    .groupHeaderActions .groupSwitch[aria-checked='true'] > span {
+        transform: translateX(12px);
+    }
+}
+
+.groupBadge {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    line-height: 1.2;
+}
+
+.groupBadgeOff {
+    color: var(--color-text-muted);
 }
 
 .groupCount {

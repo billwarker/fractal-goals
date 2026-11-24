@@ -2,7 +2,6 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { formatError, withNotify } from '../utils/mutationNotify';
-import { isGoalGroupTaken } from '../utils/goalActivityGroupErrors';
 import { queryKeys } from '../hooks/queryKeys';
 import { logError } from '../utils/logger';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
@@ -135,10 +134,10 @@ export function ActivitiesProvider({ children }) {
     ), [queryClient]);
 
     const setActivityGroupGoals = useMemo(() => withNotify(
-        async (rootId, groupId, goalIds, options = {}) => {
-            const res = await fractalApi.setActivityGroupGoals(rootId, groupId, goalIds, options);
+        async (rootId, groupId, goalIds) => {
+            const res = await fractalApi.setActivityGroupGoals(rootId, groupId, goalIds);
             const updated = res.data;
-            // Goals may have moved between groups: their payloads and catalogs change.
+            // The goals' payloads and catalogs change with their groups.
             await Promise.all([
                 queryKeys.fractalTree(rootId), queryKeys.goalActivitiesRoot(rootId), queryKeys.goalActivityGroupsRoot(rootId),
             ].map((queryKey) => queryClient.invalidateQueries({ queryKey })));
@@ -156,10 +155,9 @@ export function ActivitiesProvider({ children }) {
         },
         {
             success: null,
-            // Goals already in another group are the caller's to confirm, not an error toast.
-            error: (err) => (isGoalGroupTaken(err) ? null : `Failed to update group goals: ${formatError(err)}`),
+            error: (err) => `Failed to update group goals: ${formatError(err)}`,
             onError: (err) => {
-                if (!isGoalGroupTaken(err)) logError('Failed to set activity group goals:', err);
+                logError('Failed to set activity group goals:', err);
             },
         },
     ), [queryClient]);
