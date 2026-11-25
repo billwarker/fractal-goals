@@ -5,7 +5,9 @@ import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { queryKeys } from '../hooks/queryKeys';
 import { invalidateNotesAfterDelete, invalidateOnboardingProgress } from '../utils/queryInvalidation';
-import { applyCreatedGoal } from '../utils/goalTreeCache';
+import { applyCreatedGoal, getGoalId, mergeGoalRecord, replaceGoalInList, replaceGoalInTree } from '../utils/goalTreeCache';
+import { useOutbox } from '../offline/OutboxContext';
+import { loadRecordOps, shouldQueueRecord } from '../offline/recordQueue';
 
 const GoalsContext = createContext();
 
@@ -14,48 +16,9 @@ function formatGoalTypeLabel(type) {
     return type.replace(/Goal$/, ' Goal').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
 }
 
-function getGoalId(goal) {
-    return goal?.id || goal?.attributes?.id || null;
-}
-
-function mergeGoalRecord(existing, updated) {
-    return {
-        ...existing,
-        ...updated,
-        attributes: {
-            ...(existing?.attributes || {}),
-            ...(updated?.attributes || {}),
-        },
-    };
-}
-
-function replaceGoalInTree(node, updatedGoal) {
-    const updatedGoalId = getGoalId(updatedGoal);
-    if (!node || !updatedGoalId) return node;
-
-    const children = Array.isArray(node.children)
-        ? node.children.map((child) => replaceGoalInTree(child, updatedGoal))
-        : node.children;
-
-    if (String(getGoalId(node)) === String(updatedGoalId)) {
-        return mergeGoalRecord({ ...node, children }, updatedGoal);
-    }
-
-    return children !== node.children ? { ...node, children } : node;
-}
-
-function replaceGoalInList(list, updatedGoal) {
-    const updatedGoalId = getGoalId(updatedGoal);
-    if (!Array.isArray(list) || !updatedGoalId) return list;
-    return list.map((goal) => (
-        String(getGoalId(goal)) === String(updatedGoalId)
-            ? mergeGoalRecord(goal, updatedGoal)
-            : goal
-    ));
-}
-
 export function GoalsProvider({ children }) {
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
 
     // 2. Mutations
     const createGoalMutation = useMutation({
@@ -148,8 +111,12 @@ export function GoalsProvider({ children }) {
     const value = React.useMemo(() => ({
         activeRootId,
         setActiveRootId,
-        createGoal: (rootId, goalData) => createGoalMutation.mutateAsync({ rootId, goalData }),
-        updateGoal: (rootId, goalId, updates) => updateGoalMutation.mutateAsync({ rootId, goalId, updates }),
+        createGoal: (rootId, goalData) => (shouldQueueRecord(outbox, rootId)
+            ? loadRecordOps().then((ops) => ops.queueGoalCreate(outbox, rootId, goalData))
+            : createGoalMutation.mutateAsync({ rootId, goalData })),
+        updateGoal: (rootId, goalId, updates) => (shouldQueueRecord(outbox, rootId)
+            ? loadRecordOps().then((ops) => ops.queueGoalUpdate(outbox, queryClient, rootId, goalId, updates))
+            : updateGoalMutation.mutateAsync({ rootId, goalId, updates })),
         deleteGoal: (rootId, goalId, { beginNext = true } = {}) => deleteGoalMutation.mutateAsync({ rootId, goalId, beginNext }),
         toggleGoalCompletion: (rootId, goalId, completed, sequenceOptions = null) => toggleGoalCompletionMutation.mutateAsync({ rootId, goalId, completed, sequenceOptions }),
     }), [
@@ -157,6 +124,8 @@ export function GoalsProvider({ children }) {
         createGoalMutation,
         updateGoalMutation,
         deleteGoalMutation,
+        outbox,
+        queryClient,
         toggleGoalCompletionMutation,
     ]);
 

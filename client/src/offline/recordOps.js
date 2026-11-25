@@ -1,0 +1,113 @@
+// Queues writes to goals and notes when there is no signal. Online they go straight to the server.
+
+import { queryKeys } from '../hooks/queryKeys';
+import { findGoalInTree, mergeGoalRecord } from '../utils/goalTreeCache';
+import { RECORD_OP } from './opKinds';
+import { defaultId as createId } from './outboxTransport';
+import { recordScope } from './recordQueue';
+import { buildPlaceholderNote, nowIso } from './sessionOps';
+
+// Mirrors the server's MERGE_FIELDS for goals (services/sync_merge_service.py).
+const GOAL_MERGE_FIELDS = ['name', 'description', 'deadline'];
+
+function buildPlaceholderGoal(id, rootId, data) {
+    return {
+        id,
+        name: data.name,
+        type: data.type,
+        description: data.description || '',
+        deadline: data.deadline || null,
+        started_at: data.started_at || null,
+        completed: false,
+        paused: false,
+        completion_condition: data.completion_condition || 'manual',
+        condition: null,
+        children: [],
+        attributes: {
+            id,
+            type: data.type,
+            parent_id: data.parent_id,
+            root_id: rootId,
+            associated_activity_ids: [],
+            associated_activity_group_ids: [],
+        },
+        _pendingSync: true,
+    };
+}
+
+export async function queueGoalCreate(outbox, rootId, data) {
+    const id = createId();
+    const placeholder = buildPlaceholderGoal(id, rootId, data);
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.GOAL_CREATE,
+        method: 'post',
+        url: `/${rootId}/goals`,
+        body: { ...data, id },
+        creates: [id],
+        meta: { rootId, goalId: id, placeholder },
+    });
+    return placeholder;
+}
+
+export async function queueGoalUpdate(outbox, queryClient, rootId, goalId, updates) {
+    const current = findGoalInTree(queryClient.getQueryData(queryKeys.fractalTree(rootId)), goalId) || { id: goalId };
+    const base = Object.fromEntries(
+        GOAL_MERGE_FIELDS.filter((field) => field in updates && field in current).map((field) => [field, current[field]]),
+    );
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.GOAL_UPDATE,
+        method: 'put',
+        url: `/${rootId}/goals/${goalId}`,
+        body: { ...updates, _base: base, _edited_at: nowIso() },
+        entityIds: [goalId],
+        meta: { rootId, goalId, updates },
+    });
+    return mergeGoalRecord(current, updates);
+}
+
+export async function queueNoteCreate(outbox, rootId, data) {
+    const id = createId();
+    const note = buildPlaceholderNote({ id, data: { ...data, root_id: rootId } });
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.NOTE_CREATE,
+        method: 'post',
+        url: `/${rootId}/notes`,
+        body: { ...data, id },
+        creates: [id],
+        meta: { rootId, goalId: data.goal_id || data.context_id, note },
+    });
+    return { data: note };
+}
+
+export async function queueNoteUpdate(outbox, rootId, note, content) {
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.NOTE_UPDATE,
+        method: 'put',
+        url: `/${rootId}/notes/${note.id}`,
+        body: {
+            content,
+            ...(note.content === undefined ? {} : { _base: { content: note.content } }),
+            _edited_at: nowIso(),
+        },
+        entityIds: [note.id],
+        meta: { rootId, noteId: note.id, content },
+    });
+    return { data: { ...note, content } };
+}
+
+export async function queueNoteDelete(outbox, rootId, note) {
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.NOTE_DELETE,
+        method: 'delete',
+        url: `/${rootId}/notes/${note.id}`,
+        entityIds: [note.id],
+        supersedes: [note.id],
+        meta: { rootId, noteId: note.id },
+    });
+    return { data: null };
+}

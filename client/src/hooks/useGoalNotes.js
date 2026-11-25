@@ -6,6 +6,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fractalNotesApi } from '../utils/api/fractalNotesApi';
 import notify from '../utils/notify';
+import { useOutbox } from '../offline/OutboxContext';
+import { loadRecordOps, shouldQueueRecord } from '../offline/recordQueue';
 import { queryKeys } from './queryKeys';
 
 export function useGoalNotes(
@@ -18,6 +20,7 @@ export function useGoalNotes(
     } = {}
 ) {
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
     const filters = {
         includeDescendants,
         includeGoalNotes,
@@ -74,13 +77,23 @@ export function useGoalNotes(
         onError: () => notify.error('Failed to change the pin'),
     });
 
+    const queued = () => shouldQueueRecord(outbox, rootId);
+
     return {
         notes,
         isLoading,
         error,
-        createNote: (data) => createNoteMutation.mutateAsync(data),
-        updateNote: (noteId, content) => updateNoteMutation.mutateAsync({ noteId, content }),
-        deleteNote: (note) => deleteNoteMutation.mutateAsync(note),
+        createNote: (data) => (queued()
+            ? loadRecordOps().then((ops) => ops.queueNoteCreate(outbox, rootId, data))
+            : createNoteMutation.mutateAsync(data)),
+        updateNote: (noteId, content) => (queued()
+            ? loadRecordOps().then((ops) => ops.queueNoteUpdate(
+                outbox, rootId, notes.find((note) => note.id === noteId) || { id: noteId }, content,
+            ))
+            : updateNoteMutation.mutateAsync({ noteId, content })),
+        deleteNote: (note) => (queued()
+            ? loadRecordOps().then((ops) => ops.queueNoteDelete(outbox, rootId, note))
+            : deleteNoteMutation.mutateAsync(note)),
         deleteGoalCompletionNotes: () => deleteGoalCompletionNotesMutation.mutateAsync(),
         // Pin an activity or session note to its next time (or undo it).
         setCarryForward: (noteId, on) => carryForwardMutation.mutateAsync({ noteId, on }),

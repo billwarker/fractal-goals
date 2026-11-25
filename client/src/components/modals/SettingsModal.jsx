@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { Suspense, lazy, useRef, useState } from 'react';
 
 import { useGoals } from '../../contexts/GoalsContext';
 import { useOptionalOnboarding } from '../../contexts/OnboardingContext';
@@ -15,6 +15,8 @@ import SettingsSection from '../settings/SettingsSection';
 import { useVisibleSettingsSections } from '../settings/settingsSections';
 import StorageConnectionsPanel from '../settings/StorageConnectionsPanel';
 import styles from './SettingsModal.module.css';
+
+const SyncConflictsPanel = lazy(() => import('../settings/SyncConflictsPanel'));
 
 const PANEL_ID = 'settings-panel';
 const tabId = (id) => `settings-tab-${id}`;
@@ -38,6 +40,8 @@ function SectionContent({ id }) {
             return <AccountSettings />;
         case 'ai-connections':
             return <AgentConnectionsPanel enabled={isFeatureEnabled(flags, FEATURE_FLAGS.aiAgentConnectors)} />;
+        case 'sync':
+            return <Suspense fallback={null}><SyncConflictsPanel /></Suspense>;
         case 'storage':
             return <StorageConnectionsPanel />;
         case 'getting-started':

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { useOutbox, useOutboxStatus } from '../../offline/OutboxContext';
-import { SESSION_OP } from '../../offline/opKinds';
+import { RECORD_OP, SESSION_OP } from '../../offline/opKinds';
 import { STALLED_AFTER_MS, describeQueueForSupport } from '../../offline/outboxQueue';
 import { REJECTED_TTL_MS } from '../../offline/outboxReview';
 import notify from '../../utils/notify';
@@ -41,6 +41,11 @@ export function describeOp(op) {
         case SESSION_OP.PROGRESS_COMPARISON: return 'Progress comparison';
         case SESSION_OP.PROGRESS_CHART: return 'Progress chart';
         case SESSION_OP.INSTANCE_GOAL_LINK: return op.meta?.remove ? 'Removed goal link' : 'Linked goal';
+        case RECORD_OP.GOAL_CREATE: return name ? `New goal: ${name}` : 'New goal';
+        case RECORD_OP.GOAL_UPDATE: return 'Edited goal';
+        case RECORD_OP.NOTE_CREATE: return name ? `Note: “${name}”` : 'New note';
+        case RECORD_OP.NOTE_UPDATE: return 'Edited note';
+        case RECORD_OP.NOTE_DELETE: return 'Deleted note';
         case SESSION_OP.QUICK_COMPLETE: return 'Completed quick session';
         default: return 'Change';
     }

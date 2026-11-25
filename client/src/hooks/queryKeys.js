@@ -6,6 +6,8 @@ export const queryKeys = {
     aiRuns: (rootId = null) => ['ai-agent', 'runs', rootId],
     aiChangeCursor: (rootId) => ['ai-agent', 'changes', rootId],
     aiEmbeddedProviders: () => ['ai-agent', 'embedded-providers'],
+    signedInDevices: () => ['account', 'devices'],
+    syncConflicts: () => ['account', 'sync-conflicts'],
     storageConnections: () => ['storage', 'connections'],
     aiEmbeddedConversations: (rootId) => ['ai-agent', 'embedded-conversations', rootId],
     aiEmbeddedConversation: (conversationId) => ['ai-agent', 'embedded-conversation', conversationId],

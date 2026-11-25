@@ -93,11 +93,25 @@ class SyncMergeService:
         rows = self.db_session.query(SyncConflict).filter(
             SyncConflict.owner_id == user_id, SyncConflict.resolved_at.is_(None),
         ).order_by(SyncConflict.created_at.desc(), SyncConflict.id).limit(100).all()
+        names = self._entity_names(rows)
         return {'conflicts': [{
             'id': row.id, 'root_id': row.root_id, 'type': row.entity_type, 'entity_id': row.entity_id,
-            'field': row.field, 'kept_value': row.kept_value, 'lost_value': row.lost_value,
+            'entity_name': names.get((row.entity_type, row.entity_id)), 'field': row.field, 'kept_value': row.kept_value, 'lost_value': row.lost_value,
             'created_at': format_utc(row.created_at),
         } for row in rows]}
+
+    def _entity_names(self, rows):
+        """Names of the entities that still exist; a note has none."""
+        wanted: dict[str, set] = {}
+        for row in rows:
+            wanted.setdefault(row.entity_type, set()).add(row.entity_id)
+        names = {}
+        for entity_type, ids in wanted.items():
+            model, fields = MERGE_FIELDS[entity_type]
+            if 'name' in fields:
+                found = self.db_session.query(model.id, model.name).filter(model.id.in_(ids))
+                names.update({(entity_type, entity_id): name for entity_id, name in found})
+        return names
 
     def resolve(self, user_id, conflict_id) -> ServiceResult[JsonDict]:
         """Mark it dealt with. Restoring the other value is an ordinary edit."""

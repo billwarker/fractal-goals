@@ -239,13 +239,14 @@ class _GoalCrudMixin:
         parent_id = data.get('parent_id')
         parent_goal = None
         if parent_id:
+            # Locked: its row version moves below, so a second device's create waits instead of failing.
             parent_goal = self.db_session.query(Goal).options(
                 selectinload(Goal.level)
             ).filter_by(
                 id=parent_id,
                 root_id=root_id,
                 deleted_at=None,
-            ).first()
+            ).with_for_update(of=Goal).populate_existing().first()
             if not parent_goal:
                 return None, "Parent goal not found in this fractal.", 400
             parent_capacity_error = self._validate_parent_capacity(

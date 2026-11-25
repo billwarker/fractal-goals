@@ -43,6 +43,72 @@ export function insertGoalIntoTree(node, goal) {
     return inserted ? next : node;
 }
 
+export const getGoalId = goalIdOf;
+
+/**
+ * @param {any} existing
+ * @param {any} updated
+ */
+export function mergeGoalRecord(existing, updated) {
+    return {
+        ...existing,
+        ...updated,
+        attributes: {
+            ...(existing?.attributes || {}),
+            ...(updated?.attributes || {}),
+        },
+    };
+}
+
+/**
+ * @param {any} node
+ * @param {any} updatedGoal
+ * @returns {any}
+ */
+export function replaceGoalInTree(node, updatedGoal) {
+    const updatedGoalId = goalIdOf(updatedGoal);
+    if (!node || !updatedGoalId) return node;
+
+    const children = Array.isArray(node.children)
+        ? node.children.map((/** @type {any} */ child) => replaceGoalInTree(child, updatedGoal))
+        : node.children;
+
+    if (String(goalIdOf(node)) === String(updatedGoalId)) {
+        return mergeGoalRecord({ ...node, children }, updatedGoal);
+    }
+
+    return children !== node.children ? { ...node, children } : node;
+}
+
+/**
+ * @param {any} list
+ * @param {any} updatedGoal
+ */
+export function replaceGoalInList(list, updatedGoal) {
+    const updatedGoalId = goalIdOf(updatedGoal);
+    if (!Array.isArray(list) || !updatedGoalId) return list;
+    return list.map((goal) => (
+        String(goalIdOf(goal)) === String(updatedGoalId)
+            ? mergeGoalRecord(goal, updatedGoal)
+            : goal
+    ));
+}
+
+/**
+ * @param {any} node
+ * @param {string} goalId
+ * @returns {any}
+ */
+export function findGoalInTree(node, goalId) {
+    if (!node) return null;
+    if (String(goalIdOf(node)) === String(goalId)) return node;
+    for (const child of Array.isArray(node.children) ? node.children : []) {
+        const found = findGoalInTree(child, goalId);
+        if (found) return found;
+    }
+    return null;
+}
+
 /**
  * Read models a new goal changes: every goal tree and list, session and plan goal views,
  * program scope and metrics, goal analytics, and the flow tree's evidence overlays.

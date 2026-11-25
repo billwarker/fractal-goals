@@ -1,4 +1,5 @@
 """Writes a device makes offline: its own ids, safe retries, and clashing edits."""
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 import time
 import uuid
@@ -119,6 +120,7 @@ def test_the_later_edit_wins_and_the_other_is_kept_aside(client, db_session, tes
     assert root.description == kept
     [conflict] = _conflicts(client, test_user)
     assert (conflict['field'], conflict['kept_value'], conflict['lost_value']) == ('description', kept, lost)
+    assert conflict['entity_name'] == 'Root'
     resolved = client.post(f"/api/sync/conflicts/{conflict['id']}/resolve", headers=session_headers_for(test_user))
     assert resolved.status_code == 200
     assert _conflicts(client, test_user) == []
@@ -189,3 +191,15 @@ def test_changes_name_the_instance_that_made_them(client, test_user, root):
     origins = [change['origin'] for change in body['changes'] if change['type'] == 'activity_group']
     assert origins == [instance, None]
     assert 'data' not in body['changes'][0]
+
+
+def test_two_devices_create_under_one_parent_at_once(app, test_user, root):
+    headers, root_id = session_headers_for(test_user), root.id
+
+    def create(number):
+        return app.test_client().post(f'/api/{root_id}/goals', headers=headers, json={
+            'name': f'Child {number}', 'type': 'LongTermGoal', 'parent_id': root_id,
+        }).status_code
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        assert set(pool.map(create, range(12))) == {201}

@@ -709,7 +709,10 @@ Deleting a fractal reports only its root: clients drop everything under it. The 
 Offline writes are the ordinary routes: `token_required` makes every keyed fractal write idempotent, creates
 take the device's `id` (`@accepts_client_id`, `services/client_ids.new_id`), and updates marked `@merges`
 take `_base`/`_edited_at` and merge field by field; a lost value is kept in `sync_conflicts`. Open web pages
-poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`). After a restore, run
+poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`).
+Offline, the web shows every screen opened on the device (`offline/queryPersistence.js`, one record per query,
+bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goal and goal-note
+writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync. After a restore, run
 `reset_sync_epoch`. Plan: `planning/native-apple-apps-2026-11.md`.
 
 Rate limits key on the real client: `request_identity.py` trusts `X-Forwarded-For` only for

@@ -8,6 +8,7 @@ import { getClockOffsetMs, getOfflineReason, isOnline, subscribeConnectivity } f
 import { createIndexedDbStore } from './indexedDbStore';
 import { createOutbox } from './outbox';
 
+export { registerRecordOpHandlers } from './recordOpHandlers';
 export { registerSessionOpHandlers } from './sessionOpHandlers';
 export { startChangeListener } from '../sync/changeListener';
 export { restoreQueryCache, startQueryPersistence } from './queryPersistence';
@@ -17,18 +18,28 @@ const OUTBOX_REQUEST_TIMEOUT_MS = 15000;
 
 /** Shift a queued action time by this device's measured clock error, so the server sees true time. */
 export function correctActionTime(body, offsetMs = getClockOffsetMs()) {
-    if (!offsetMs || !body?.occurred_at) return body;
-    const corrected = Date.parse(body.occurred_at) + offsetMs;
-    return Number.isNaN(corrected) ? body : { ...body, occurred_at: new Date(corrected).toISOString() };
+    if (!offsetMs || !body) return body;
+    return ['occurred_at', '_edited_at'].reduce((result, field) => {
+        const corrected = Date.parse(result[field]) + offsetMs;
+        return Number.isNaN(corrected) ? result : { ...result, [field]: new Date(corrected).toISOString() };
+    }, body);
 }
 
+/** A create the server already holds (its answer was lost longer ago than it remembers retries). */
+const isAlreadyCreated = (error) => error?.response?.status === 409
+    && error.response.data?.code === 'client_id_taken' && error.response.data.already_created;
+
 export function sendOutboxOp(op) {
-    return axios.request({
+    const sent = axios.request({
         method: op.method,
         url: `${API_BASE}${op.url}`,
         data: op.body ?? undefined,
         headers: { 'Idempotency-Key': op.idempotencyKey },
         timeout: OUTBOX_REQUEST_TIMEOUT_MS,
+    });
+    return sent.catch((error) => {
+        if (isAlreadyCreated(error)) return { data: null };
+        throw error;
     });
 }
 

@@ -7,6 +7,7 @@ import Button from '../atoms/Button';
 import GoalIcon from '../atoms/GoalIcon';
 import Input from '../atoms/Input';
 import LoadingState from '../common/LoadingState';
+import DeviceList from './DeviceList';
 import SettingsSection, { SettingsRow } from './SettingsSection';
 import styles from './AccountSettings.module.css';
 
@@ -180,6 +181,7 @@ function AccountSettings() {
             </SettingsSection>
 
             <SettingsSection title="Signed-in devices">
+                <DeviceList />
                 <SettingsRow
                     label="Sign out everywhere"
                     description="Ends every session, including this one."

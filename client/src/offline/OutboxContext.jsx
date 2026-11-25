@@ -58,6 +58,7 @@ export function OutboxProvider({ children }) {
     useEffect(() => {
         if (!outbox || !engine) return undefined;
         const unregisterHandlers = engine.registerSessionOpHandlers(outbox, queryClient);
+        const unregisterRecords = engine.registerRecordOpHandlers(outbox, queryClient);
         const unsubscribe = subscribeConnectivity((online) => {
             if (online) void outbox.flush();
         });
@@ -76,6 +77,7 @@ export function OutboxProvider({ children }) {
         void outbox.flush();
         return () => {
             unregisterHandlers();
+            unregisterRecords();
             unsubscribe();
             stopTrackingOffline();
             window.removeEventListener('auth:token_refreshed', handleRefreshed);
