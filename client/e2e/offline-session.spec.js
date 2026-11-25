@@ -407,3 +407,101 @@ test('the offline kill switch removes the service worker on the next load', asyn
         { timeout: 15_000 },
     ).toEqual({ registrations: 0, workboxCaches: [] });
 });
+
+test('a session started from a template with no signal is logged, completed and kept as the device showed it', async ({ page, context }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'The same on every viewport.');
+    test.setTimeout(120_000);
+    const errors = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    const token = await openSignedIn(page);
+    const root = `browser-offline-root-${testInfo.project.name}`;
+    const headers = { Authorization: `Bearer ${token}` };
+    const post = async (path, data) => {
+        const response = await page.request.post(`/api/${root}/${path}`, { headers, data });
+        expect(response.ok(), `${path}: ${await response.text()}`).toBeTruthy();
+        return response.json();
+    };
+    const suffix = Date.now();
+    const activity = await post('activities', { name: `Template drill ${suffix}`, has_metrics: false });
+    const template = await post('session-templates', {
+        name: `Offline template ${suffix}`,
+        template_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_id: activity.id, name: activity.name }] }] },
+    });
+
+    await page.goto(`/${root}/create-session?source=template`);
+    await expect(page.getByText(template.name).first()).toBeVisible();
+    // The app's own files are kept from the second visit on.
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+    await expect(page.getByText(template.name).first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1500);
+
+    await context.setOffline(true);
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible();
+    await page.getByText(template.name).first().click();
+    await page.getByRole('button', { name: /(start|create) session/i }).first().click();
+    await expect(page).toHaveURL(/\/session\/[0-9a-f-]{36}/);
+    await expect(page.getByText(activity.name).first()).toBeVisible();
+    const sessionId = page.url().split('/session/')[1];
+    await page.getByTitle('Start timer').first().click();
+    await page.waitForTimeout(1500);
+    await page.getByTitle('Complete activity').first().click();
+    await expect(page.getByRole('status').filter({ hasText: 'saved on this device' })).toContainText('3 changes');
+
+    await context.setOffline(false);
+    await expect(page.getByRole('status').filter({ hasText: 'All changes synced' })).toBeVisible({ timeout: 30_000 });
+    const session = await (await page.request.get(`/api/${root}/sessions/${sessionId}`, { headers })).json();
+    expect(session.template_id).toBe(template.id);
+    expect(session.activity_instances).toHaveLength(1);
+    expect(session.activity_instances[0].completed).toBe(true);
+    await expect(page.getByText(activity.name).first()).toBeVisible();
+    expect(errors).toEqual([]);
+    await page.request.delete(`/api/${root}/sessions/${sessionId}`, { headers });
+});
+
+test('a session started offline waits for one started elsewhere, and both are kept', async ({ page, context, playwright, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'The same on every viewport.');
+    test.setTimeout(120_000);
+    const token = await openSignedIn(page);
+    const root = `browser-offline-edits-root-${testInfo.project.name}`;
+    const other = await playwright.request.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${token}` } });
+    const post = async (path, data) => {
+        const response = await other.post(`/api/${root}/${path}`, { data });
+        expect(response.ok(), `${path}: ${await response.text()}`).toBeTruthy();
+        return response.json();
+    };
+    const activity = await post('activities', { name: `Both drill ${Date.now()}`, has_metrics: false });
+    const template = await post('session-templates', {
+        name: `Both template ${Date.now()}`,
+        template_data: { sections: [{ name: 'Main', items: [{ type: 'activity', activity_id: activity.id, name: activity.name }] }] },
+    });
+    await page.goto(`/${root}/create-session?source=template`);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+    await expect(page.getByText(template.name).first()).toBeVisible();
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1500);
+
+    await context.setOffline(true);
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible();
+    await page.getByText(template.name).first().click();
+    await page.getByRole('button', { name: /(start|create) session/i }).first().click();
+    await expect(page.getByText(activity.name).first()).toBeVisible();
+    const mine = page.url().split('/session/')[1];
+    const theirs = await post('sessions', { name: 'On the Mac', template_id: template.id });
+
+    await context.setOffline(false);
+    const waiting = page.getByRole('status').filter({ hasText: 'is still in progress' });
+    await expect(waiting).toContainText('On the Mac', { timeout: 30_000 });
+    await expect(page.getByText(activity.name).first()).toBeVisible();
+    await waiting.getByRole('button', { name: 'Finish it' }).click();
+    await expect.poll(async () => (await other.get(`/api/${root}/sessions/${mine}`)).ok(), { timeout: 30_000 }).toBe(true);
+    expect((await (await other.get(`/api/${root}/sessions/${theirs.id}`)).json()).completed).toBe(true);
+    await expect(page.getByText(activity.name).first()).toBeVisible();
+    await other.delete(`/api/${root}/sessions/${mine}`);
+    await other.delete(`/api/${root}/sessions/${theirs.id}`);
+    await other.dispose();
+});

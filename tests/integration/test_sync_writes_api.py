@@ -249,3 +249,41 @@ def test_a_stale_template_edit_is_refused_not_merged(client, test_user, root):
     assert save('Mac', template['revision']).status_code == 200
     assert client.put(url, json={'name': 'Renamed', 'expected_revision': 1}, headers=headers).status_code == 200
     assert save('Older app').status_code == 200
+
+
+def test_a_session_started_offline_keeps_every_id_its_device_chose(client, db_session, test_user, root):
+    from models import ActivitySet, CircuitRun
+    from services import circuit_ids
+    headers = session_headers_for(test_user)
+
+    def make(path, body):
+        response = client.post(f'/api/{root.id}/{path}', json=body, headers=headers)
+        assert response.status_code in (200, 201), response.get_json()
+        return response.get_json()
+    press = make('activities', {'name': 'Press', 'has_sets': True, 'has_metrics': False})
+    jump = make('activities', {'name': 'Jump', 'has_sets': False, 'has_metrics': False})
+    circuit = make('circuits', {'name': 'Finisher', 'slots': [{'activity_definition_id': press['id']},
+                                                             {'activity_definition_id': jump['id']}]})
+    template = make('session-templates', {'name': 'T', 'template_data': {'sections': [{'name': 'Main', 'items': [
+        {'type': 'activity', 'activity_id': press['id'], 'item_key': 'press-item', 'name': 'Press',
+         'prescription': {'schema': 1, 'sets': [{'metrics': []}, {'metrics': []}]}},
+        {'type': 'circuit', 'circuit_definition_id': circuit['id'], 'item_key': 'circuit-item'},
+    ]}]}})
+    session_id, instance_id, run_id = _id(), _id(), _id()
+    body = {
+        'id': session_id, 'name': 'T', 'template_id': template['id'], 'session_start': '2026-11-20T10:00:00Z',
+        'session_data': {'template_id': template['id'], 'sections': [{'name': 'Main', 'items': [
+            {'type': 'activity', 'activity_definition_id': press['id'], 'item_key': 'press-item', 'instance_id': instance_id},
+            {'type': 'circuit', 'circuit_definition_id': circuit['id'], 'item_key': 'circuit-item', 'circuit_run_id': run_id},
+        ]}]},
+    }
+    session = make('sessions', body)
+    assert session['id'] == session_id
+    items = session['attributes']['session_data']['sections'][0]['items']
+    assert [item.get('activity_instance_id') or item.get('circuit_run_id') for item in items] == [instance_id, run_id]
+    planned = db_session.query(ActivitySet.id).filter_by(activity_instance_id=instance_id).order_by(ActivitySet.sort_order)
+    assert [row.id for row in planned] == [circuit_ids.planned_set_id(instance_id, index) for index in range(2)]
+    run = db_session.get(CircuitRun, run_id)
+    assert [item.id for item in run.rounds] == [circuit_ids.initial_round_id(run_id, 1)]
+    again = client.post(f'/api/{root.id}/sessions', json=body, headers=headers)
+    assert (again.status_code, again.get_json()['already_created']) == (409, True)

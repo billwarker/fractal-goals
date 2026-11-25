@@ -34,7 +34,7 @@ def _parse_date(value):
         return None
 
 
-def _feed_load_options():
+def feed_load_options():
     """Only what the occurrence evaluator and ribbons read; no serializer graph."""
     day_load = selectinload(Program.days)
     return [
@@ -67,7 +67,7 @@ class ProgramCalendarFeedService:
         if (end - start).days + 1 > MAX_CALENDAR_FEED_DAYS:
             return None, f"Calendar range cannot exceed {MAX_CALENDAR_FEED_DAYS} days", 400
 
-        programs = self.db_session.query(Program).options(*_feed_load_options()).filter(
+        programs = self.db_session.query(Program).options(*feed_load_options()).filter(
             Program.root_id == root_id,
             Program.start_date < datetime.combine(end + timedelta(days=1), datetime.min.time()),
             Program.end_date >= datetime.combine(start, datetime.min.time()),

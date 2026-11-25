@@ -78,6 +78,28 @@ class ResolvedConflict(Payload):
 # Field definitions built at run time are beyond its static signature.
 create_model: Any = pydantic.create_model
 
+class Reminder(Payload):
+    id: str
+    kind: Literal['goal_review', 'program_day', 'open_session']
+    root_id: str
+    root_name: str
+    entity_id: str
+    title: str
+    date: str
+    path: str
+    overdue: bool
+    program_id: Optional[str] = None
+    started_at: Optional[str] = None
+
+
+class Reminders(Payload):
+    generated_at: str
+    today: str
+    horizon_days: int
+    preferences: dict[str, bool]
+    reminders: list[Reminder]
+
+
 # Synced entities whose payload is a serializer's; the others go out as their own columns.
 SERIALIZED = {
     'goal': Goal, 'session': Session, 'note': Note, 'program': Program, 'template': SessionTemplate,
@@ -143,6 +165,7 @@ def response_models():
         'auth.get_me': User,
         'sync.snapshot': snapshot,
         'sync.changes': feed,
+        'reminders.upcoming': Reminders,
         'sync.cursor': SyncCursor,
         'sync.conflicts': SyncConflicts,
         'sync.resolve_conflict': ResolvedConflict,

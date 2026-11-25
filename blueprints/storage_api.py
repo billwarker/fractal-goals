@@ -62,7 +62,10 @@ def list_connections(current_user):
 @token_required
 @limiter.limit('10 per minute')
 def connect(current_user, provider):
-    result = execute(lambda db: StorageConnectionService(db).start(current_user.id, provider))
+    native = (request.get_json(silent=True) or {}).get('native') is True
+    result = execute(lambda db: StorageConnectionService(db).start(current_user.id, provider, native=native))
+    if native:
+        return jsonify(result)
     state = parse_qs(urlsplit(result['url']).query)['state'][0]
     response = jsonify(result)
     response.set_cookie(authorization_cookie(provider), state, max_age=600, httponly=True,
@@ -81,6 +84,10 @@ CALLBACK_RESULTS = {
     'storage_permissions': 'permissions', 'storage_unconfigured': 'unavailable',
     'storage_unavailable': 'unavailable', 'storage_throttled': 'unavailable',
 }
+
+
+# What a native app's consent window hands back to it. Nothing but the app that began it can use the code.
+NATIVE_CALLBACK = 'fractalgoals://storage/connected'
 
 
 def callback_result(provider, state):
@@ -104,12 +111,33 @@ def callback_result(provider, state):
 def callback(provider):
     if provider not in PROVIDERS:
         raise StorageError('Unknown storage provider', 404)
-    result = callback_result(provider, request.args.get('state', ''))
+    state = request.args.get('state', '')
+    if execute(lambda db: StorageConnectionService(db).is_native(provider, state)):
+        answer = {'provider': provider, 'state': state}
+        answer.update({'result': 'cancelled'} if request.args.get('error') else {'code': request.args.get('code', '')})
+        return redirect(f'{NATIVE_CALLBACK}?{urlencode(answer)}', code=303)
+    result = callback_result(provider, state)
     query = urlencode({'provider': provider, 'result': result})
     response = redirect(f'{config.APP_BASE_URL.rstrip("/")}/storage/connected?{query}', code=303)
     response.delete_cookie(authorization_cookie(provider), path='/', secure=config.AUTH_COOKIE_SECURE,
                            httponly=True, samesite='Lax')
     return response
+
+
+@storage_bp.post('/storage/<provider>/complete')
+@token_required
+@limiter.limit('10 per minute')
+def complete_native(current_user, provider):
+    data = body()
+    try:
+        execute(lambda db: StorageConnectionService(db).complete_native(
+            current_user.id, provider, data.get('state'), data.get('code'),
+        ))
+    except StorageError as error:
+        if error.code == 'storage_error' and error.status == 400:
+            return jsonify({'result': 'expired'})
+        return jsonify({'result': CALLBACK_RESULTS.get(error.code, 'failed')})
+    return jsonify({'result': 'connected'})
 
 
 @storage_bp.delete('/storage/<provider>/connection')

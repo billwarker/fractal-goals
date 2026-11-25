@@ -569,7 +569,9 @@ drops it from every note (`MediaService.rename`/`delete_from_storage`). Connecti
 `status` (`active | reconnect_required | disconnected`); a revoked refresh grant becomes
 `reconnect_required`. Settings → Cloud Storage (`components/settings/StorageConnectionsPanel.jsx`)
 owns connect, reconnect and disconnect through `hooks/useStorageConnections.js`; provider OAuth returns
-to `/storage/connected`, which reports an allowlisted result to open tabs and closes. Session-note attachment
+to `/storage/connected`, which reports an allowlisted result to open tabs and closes; a native app's returns to the
+app, which finishes it signed in (`/storage/<provider>/complete`). Only `invalid_grant` ends a connection, and the
+retention job keeps quiet ones alive. Session-note attachment
 writes use the existing outbox; media bytes are online-only. Public landing publication strips
 private attachment data, and exports omit credentials. Integrations remain unavailable without
 provider configuration. Setup and real-account release gates:
@@ -724,6 +726,9 @@ Offline, the web shows every screen opened on the device (`offline/queryPersiste
 bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goals, goal notes,
 new activities and templates in the outbox, one queue per fractal; a change waits for any change, in any queue,
 that creates an id it mentions. Template saves carry `expected_revision`; a stale one is 409 `template_changed`. Clashes are reviewed in Settings → Sync.
+A session can be started from a template offline (`offline/sessionStart.js`): the device picks or derives every id the
+server would. It waits, unrefused, while another session is in progress.
+`GET /api/reminders/upcoming` (`services/reminder_service.py`) is what apps schedule notifications from.
 Set and value saves send the list they began from, so another device's sets survive (`merge_activity_sets`).
 Merge rules are pinned by `tests/fixtures/sync_merge_cases.json`, and `tests/integration/test_sync_two_devices.py`
 runs simulated devices with seeded faults against the real API. After a restore, run

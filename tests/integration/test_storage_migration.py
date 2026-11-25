@@ -6,6 +6,8 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import inspect, text
 
+from models.sync import sync_trigger_statements
+
 
 def load_migration(filename):
     path = Path(__file__).resolve().parents[2] / 'migrations/versions' / filename
@@ -22,6 +24,7 @@ STORAGE_DEPENDENTS = (
     'f3a5c7e9b1d4_storage_connection_status.py',
     'a6c8e0b2d4f7_storage_upload_default.py',
     'c9e1a3b5d7f2_goal_attachments.py',  # goal_attachments references media_assets.
+    'f6a1c3e8d402_native_storage_consent.py',
 )
 
 
@@ -47,6 +50,9 @@ def test_storage_migration_preserves_existing_notes(db_session, sample_ultimate_
             for dependent in dependents:  # Leave the schema at head.
                 dependent.upgrade()
             assert 'goal_attachments' in inspect(connection).get_table_names()
+        for table in ('note_attachments', 'goal_attachments'):
+            for statement in sync_trigger_statements(table):
+                connection.exec_driver_sql(statement)
 
 
 def test_connection_status_migration_backfills_and_reverses(db_session, test_user):

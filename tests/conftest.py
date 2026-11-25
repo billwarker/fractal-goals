@@ -50,6 +50,7 @@ from blueprints.analytics_api import analytics_bp
 from blueprints.logs_api import logs_api
 from blueprints.auth_api import auth_bp
 from blueprints.device_auth_api import device_auth_bp
+from blueprints.reminders_api import reminders_bp
 from blueprints.sync_api import sync_bp
 from blueprints.client_version import register_client_version
 from blueprints.admin_api import admin_bp
@@ -159,6 +160,7 @@ def app(test_database_engine, test_database_reset_sql, monkeypatch):
     test_app.register_blueprint(auth_bp)
     test_app.register_blueprint(device_auth_bp)
     test_app.register_blueprint(sync_bp)
+    test_app.register_blueprint(reminders_bp)
     register_client_version(test_app)
     test_app.register_blueprint(admin_bp)
     test_app.register_blueprint(goal_levels_bp)

@@ -40,6 +40,9 @@ import '../App.css';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { getISOYMDInTimezone } from '../utils/dateUtils';
 import { useCreateSessionAutoSelection, useCreateSessionProgramContext } from '../hooks/useCreateSessionProgramContext';
+import { useOutbox } from '../offline/OutboxContext';
+import { loadSessionStart } from '../offline/recordQueue';
+import { useIsOnline } from '../offline/useIsOnline';
 
 const SESSION_SOURCES = new Set(['program', 'template', 'quick']);
 
@@ -68,6 +71,8 @@ function CreateSession() {
     const queryClient = useQueryClient();
     const { user } = useAuth();
     const isMobile = useIsMobile();
+    const outbox = useOutbox();
+    const startsOffline = !useIsOnline() && Boolean(outbox);
     const { timezone } = useTimezone();
     const todayISO = useMemo(
         () => getISOYMDInTimezone(new Date(), timezone || 'UTC'),
@@ -203,6 +208,24 @@ function CreateSession() {
         setSessionSource('program');
     };
 
+    // Where starting leads: fetched now, so it opens at once, and with no signal.
+    useEffect(() => {
+        import('./SessionDetail').catch(() => {});
+    }, []);
+
+    const startOffline = async (template, payload) => {
+        const unavailable = (reason) => {
+            notify.error(reason);
+            return null;
+        };
+        if (payload.program_session_plan_id) {
+            return unavailable('That saved plan needs a connection. Choose the template to start without it.');
+        }
+        const { startSessionOffline } = await loadSessionStart();
+        const session = await startSessionOffline(outbox, queryClient, { rootId, userId: user.id, template, payload });
+        return session || unavailable('Part of this template hasn’t been opened on this device, so it needs a connection.');
+    };
+
     const createSessionFromTemplate = async (template) => {
         if (!template) {
             notify.error('Please select a template or program day');
@@ -218,8 +241,10 @@ function CreateSession() {
                 manualGoalIds,
                 planChoice.payload,
             );
-            const response = await fractalApi.createSession(rootId, sessionData);
-            const createdSession = response.data;
+            const createdSession = startsOffline
+                ? await startOffline(template, sessionData)
+                : (await fractalApi.createSession(rootId, sessionData)).data;
+            if (!createdSession) return null;
 
             updateCreatedSessionCaches(queryClient, rootId, createdSession);
             navigate(`/${rootId}/session/${createdSession.id}`);
@@ -368,7 +393,7 @@ function CreateSession() {
                 creating={creating}
                 onCreateSession={handleCreateSession}
                 // Wait for the goal scope and the dated plans, or the session starts without its plan.
-                ready={!selectedTemplate || (scopePreviewQuery.isSuccess && !planChoice.loading)}
+                ready={!selectedTemplate || startsOffline || (scopePreviewQuery.isSuccess && !planChoice.loading)}
                 {...placementProps}
             />
         );

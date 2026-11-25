@@ -232,7 +232,7 @@ def test_pruned_and_restored_logs_send_devices_to_a_snapshot(client, db_session,
 def test_triggers_exist_on_every_synced_table(db_session):
     names = set(db_session.execute(text("SELECT tgname FROM pg_trigger WHERE tgname LIKE 'sync\\_%'")).scalars())
     expected = {f'sync_{op}_{table}' for table in synced_tables() for op in ('ins', 'upd', 'del')}
-    assert expected <= names
+    assert expected - names == set()
     assert inspect(models.get_engine()).has_table('sync_changes')
 
 

@@ -4,6 +4,7 @@ import { useOutbox, useOutboxStatus } from '../../offline/OutboxContext';
 import { RECORD_OP, SESSION_OP } from '../../offline/opKinds';
 import { STALLED_AFTER_MS, describeQueueForSupport } from '../../offline/outboxQueue';
 import { REJECTED_TTL_MS } from '../../offline/outboxReview';
+import { fractalApi } from '../../utils/api';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
 import { copyText } from '../../platform';
@@ -17,6 +18,7 @@ const CIRCUIT_LABELS = { startRun: 'Started circuit', completeRun: 'Completed ci
 export function describeOp(op) {
     const name = op.meta?.placeholder?.name || op.meta?.note?.content?.slice(0, 40);
     switch (op.kind) {
+        case SESSION_OP.START: return op.meta?.session?.name ? `Started ${op.meta.session.name}` : 'Started session';
         case SESSION_OP.INSTANCE_UPDATE: return 'Activity values';
         case SESSION_OP.ACTIVITY_ADD: return name ? `Added ${name}` : 'Added activity';
         case SESSION_OP.ACTIVITY_REMOVE: return 'Removed activity';
@@ -85,6 +87,16 @@ async function copyDiagnostics(outbox) {
     }
 }
 
+/** Both sessions are kept: the other ends now, and the one waiting here syncs after it. */
+async function finishOther({ id, rootId }, outbox) {
+    try {
+        await fractalApi.updateSession(rootId, id, { completed: true });
+        await outbox.retryNow();
+    } catch {
+        notify.error("Couldn't finish the other session. Please try again.");
+    }
+}
+
 /** The current time, ticking each second while `active`. */
 function useNow(active) {
     const [now, setNow] = useState(() => Date.now());
@@ -128,6 +140,7 @@ export default function SessionSyncIndicator({
     let label = null;
     let detail = null;
     let offerRetryNow = false;
+    let finishSession = null;
     const changes = plural(status.pendingCount, 'change');
     const stalled = Boolean(status.oldestPendingAt) && now - status.oldestPendingAt > STALLED_AFTER_MS;
     if (status.rejected.length > 0) {
@@ -146,6 +159,10 @@ export default function SessionSyncIndicator({
     } else if (status.pendingCount > 0 && status.volatile) {
         tone = 'warning';
         label = `${changes} saved in this tab only · keep it open`;
+    } else if (status.pendingCount > 0 && status.lastError?.activeSession) {
+        tone = 'warning';
+        label = `Waiting: “${status.lastError.activeSession.name || 'another session'}” is still in progress`;
+        finishSession = status.lastError.activeSession;
     } else if (status.pendingCount > 0 && status.retryAt > now) {
         tone = stalled ? 'warning' : 'muted';
         label = `Retrying ${changes} in ${Math.max(1, Math.ceil((status.retryAt - now) / 1000))} s`;
@@ -200,6 +217,11 @@ export default function SessionSyncIndicator({
                 <span className={styles.dot} aria-hidden="true" />
                 <span>{label}</span>
                 {detail && <span className={styles.detail}>· {detail}</span>}
+                {finishSession && (
+                    <button type="button" className={styles.reviewToggle} onClick={() => void finishOther(finishSession, outbox)}>
+                        Finish it
+                    </button>
+                )}
                 {offerRetryNow && (
                     <button type="button" className={styles.reviewToggle} onClick={() => void outbox.retryNow()}>
                         Retry now

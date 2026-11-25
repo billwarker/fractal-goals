@@ -66,6 +66,18 @@
       "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
       "arg": 3,
       "expected": "e7d9bef0-9ea4-58c3-acdc-d0f22437befa"
+    },
+    {
+      "fn": "planned_set_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 0,
+      "expected": "73b46c85-2545-5205-b0ce-e302b5e58fa4"
+    },
+    {
+      "fn": "planned_set_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 2,
+      "expected": "4281fe06-5bcf-536f-a1b5-16f440a06f62"
     }
   ]
 }

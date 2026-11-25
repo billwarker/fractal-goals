@@ -19,6 +19,7 @@ export const RECORD_OP = Object.freeze({
 });
 
 export const SESSION_OP = Object.freeze({
+    START: 'session.start',
     INSTANCE_UPDATE: 'session.instance.update',
     ACTIVITY_ADD: 'session.activity.add',
     ACTIVITY_REMOVE: 'session.activity.remove',

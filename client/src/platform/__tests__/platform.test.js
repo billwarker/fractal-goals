@@ -58,13 +58,18 @@ describe('in a shell', () => {
         expect(isLandingPreviewPath('/landing-preview', 'localhost')).toBe(false);
     });
 
-    it('hands consent and outside links to the system browser', async () => {
+    it('asks for consent in a system window, and reads what it ended on', async () => {
+        const invoke = vi.fn(async () => 'fractalgoals://storage/connected?provider=dropbox&state=s&code=c');
+        const { openConsent } = await load(shell(invoke));
+        await expect(openConsent(async () => 'https://provider.test')).resolves.toEqual({ provider: 'dropbox', state: 's', code: 'c' });
+        expect(invoke).toHaveBeenCalledWith('authorize', { url: 'https://provider.test', callbackScheme: 'fractalgoals' });
+        invoke.mockResolvedValue(null);
+        await expect(openConsent(async () => 'https://provider.test')).resolves.toEqual({ result: 'cancelled' });
+    });
+
+    it('hands outside links to the system browser', async () => {
         const invoke = vi.fn(async () => undefined);
-        const { installExternalLinks, openConsent } = await load(shell(invoke));
-        const getUrl = vi.fn();
-        await openConsent(getUrl);
-        expect(getUrl).not.toHaveBeenCalled();
-        expect(invoke).toHaveBeenLastCalledWith('open_external', { url: 'https://my.test/?settings=storage' });
+        const { installExternalLinks } = await load(shell(invoke));
 
         const stop = installExternalLinks();
         document.body.onclick = (event) => event.stopPropagation(); // as a dialog does
@@ -85,6 +90,26 @@ describe('in a shell', () => {
         expect(invoke).not.toHaveBeenCalled();
         stop();
         document.body.onclick = null;
+    });
+
+    it.each([
+        ['https://my.test/r/goals?goal=g', '/r/goals?goal=g'],
+        ['fractalgoals://r/session/s', '/r/session/s'],
+        ['fractalgoals://', '/'],
+        ['https://evil.test/r/goals', null],
+        ['http://my.test/r/goals', null],
+        ['https://my.test/api/x', null],
+        ['javascript:alert(1)', null],
+        ['nonsense', null],
+    ])('opens %s as %s', async (link, path) => {
+        let pass;
+        const stop = vi.fn();
+        const { installAppLinks } = await load({ ...shell(), onOpenLink: (open) => { pass = open; return stop; } });
+        const navigate = vi.fn();
+        expect(installAppLinks(navigate)).toBe(stop);
+        pass(link);
+        if (path) expect(navigate).toHaveBeenCalledWith(path);
+        else expect(navigate).not.toHaveBeenCalled();
     });
 
     it('saves files through the system, and reports a cancel', async () => {

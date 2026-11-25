@@ -10,6 +10,7 @@ import { createOutbox } from './outbox';
 
 // Loaded with the engine, so that queueing needs no fetch once there is no signal.
 export * as recordOps from './recordOps';
+export * as sessionStart from './sessionStart';
 export { registerRecordOpHandlers } from './recordOpHandlers';
 export { registerSessionOpHandlers } from './sessionOpHandlers';
 export { startChangeListener } from '../sync/changeListener';

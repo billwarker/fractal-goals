@@ -11,4 +11,5 @@ export function shouldQueueRecord(outbox, rootId) {
 }
 
 /** The engine (loaded whenever there is an outbox) imports this too, so it resolves offline. */
+export const loadSessionStart = () => import('./sessionStart');
 export const loadRecordOps = () => import('./recordOps');

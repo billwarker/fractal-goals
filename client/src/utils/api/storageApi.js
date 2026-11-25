@@ -3,7 +3,10 @@ import { API_BASE, axios } from './core';
 export const storageApi = {
     mediaToken: () => axios.post(`${API_BASE}/auth/media-token`),
     connections: () => axios.get(`${API_BASE}/storage/connections`),
-    connect: (provider) => axios.post(`${API_BASE}/storage/${provider}/connect`),
+    connect: (provider, { native = false } = {}) => axios.post(
+        `${API_BASE}/storage/${provider}/connect`, native ? { native: true } : undefined,
+    ),
+    complete: (provider, data) => axios.post(`${API_BASE}/storage/${provider}/complete`, data),
     disconnect: (provider) => axios.delete(`${API_BASE}/storage/${provider}/connection`),
     setUploadDestination: (provider) => axios.put(`${API_BASE}/storage/upload-destination`, { provider }),
     picker: () => axios.post(`${API_BASE}/storage/google_drive/picker`),

@@ -40,6 +40,7 @@ import AgentChangeSubscription from './components/agent/AgentChangeSubscription'
 import GoalChangeAnnouncer from './components/goals/GoalChangeAnnouncer';
 import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicator';
 import OfflineSignInScreen from './offline/OfflineSignInScreen';
+import { installAppLinks } from './platform';
 import { isUpdateRequired, subscribeUpdateRequired } from './platform/updateRequired';
 import { useIsOnline } from './offline/useIsOnline';
 
@@ -87,6 +88,8 @@ function App() {
         && !showLegalPage
         && !redirectDeprecatedLandingRoute
         && !STANDALONE_PATHS.has(location.pathname);
+
+    useEffect(() => installAppLinks(navigate), [navigate]);
 
     // `?settings=<tab>` deep-links into Settings (e.g. from the cloud storage return page).
     // Each navigation has its own key, so the same link can open Settings again later.

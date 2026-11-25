@@ -77,7 +77,7 @@ class StorageConnectionService:
         self.db.commit()
         return {'upload_destination': provider}
 
-    def start(self, user_id, provider):
+    def start(self, user_id, provider, *, native=False):
         provider_config(provider)
         user = self.db.get(User, user_id)
         if not user or not bool(user.is_active) or user.erasure_requested_at is not None:
@@ -88,10 +88,47 @@ class StorageConnectionService:
         state, verifier = secrets.token_urlsafe(32), secrets.token_urlsafe(64)
         challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
         self.db.add(StorageAuthorization(state_hash=hashlib.sha256(state.encode()).hexdigest(),
-                                         user_id=user_id, provider=provider, verifier=seal(verifier),
+                                         user_id=user_id, provider=provider, verifier=seal(verifier), native=native,
                                          expires_at=now + timedelta(minutes=10)))
         self.db.commit()
         return {'url': provider_api.authorization_url(provider, self.redirect_uri(provider), state, challenge)}
+
+    def is_native(self, provider, state):
+        """Whether this consent began in a native app, which must finish it itself."""
+        return isinstance(state, str) and self.db.query(StorageAuthorization.native).filter_by(
+            state_hash=hashlib.sha256(state.encode()).hexdigest(), provider=provider, native=True,
+        ).first() is not None
+
+    def complete_native(self, user_id, provider, state, code):
+        """Only the account that began it: another person's consent can't be taken into it, or theirs into another's."""
+        owned = isinstance(state, str) and self.db.query(StorageAuthorization.state_hash).filter_by(
+            state_hash=hashlib.sha256(state.encode()).hexdigest(), provider=provider, native=True, user_id=user_id,
+        ).first() is not None
+        if not owned:
+            raise StorageError('Storage authorization expired. Connect again.')
+        self.callback(provider, state, code)
+
+    def keep_alive(self, *, idle_days=30, limit=200):
+        """Use each quiet connection's grant, so the provider never expires it for lack of use.
+
+        Google drops a refresh token unused for six months. A provider that is down, or says no for
+        any reason but a revoked grant, leaves the connection as it is.
+        """
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=idle_days)
+        rows = self.db.query(StorageConnection.id, StorageConnection.user_id).filter(
+            StorageConnection.status == 'active', StorageConnection.updated_at < cutoff,
+        ).order_by(StorageConnection.updated_at).limit(limit).all()
+        self.db.commit()
+        counts = {'kept': 0, 'failed': 0}
+        for connection_id, user_id in rows:
+            try:
+                self.access_token(connection_id, user_id)
+                counts['kept'] += 1
+            except StorageError as error:
+                self.db.rollback()
+                logger.warning('Storage keep-alive failed code=%s', error.code)
+                counts['failed'] += 1
+        return counts
 
     def callback(self, provider, state, code):
         if not isinstance(state, str) or not 20 <= len(state) <= 200 or not isinstance(code, str) or not 1 <= len(code) <= 4096:

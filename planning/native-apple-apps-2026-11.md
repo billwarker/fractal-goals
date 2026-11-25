@@ -10,14 +10,17 @@
 > | Phase S.3 offline writes: safe retries on every fractal write, field merging, conflict records | Built; Settings → Sync shows conflicts |
 > | Web: open pages refresh on another device's changes | Built (`client/src/sync/changeListener.js`) |
 > | Phase 0.1 OpenAPI | Built: `docs/api/openapi.json` lists every API route; what the apps read (sync, sign-in, goals, sessions, notes, programs, templates, activities) is fully described and checked against every response in the test suite; other responses are listed untyped. CI refuses a breaking change |
-> | Phase 0.5 in-app storage consent, app links, reminders | Not started |
+> | Phase 0.5 in-app storage consent | Built (`POST /api/storage/<provider>/complete`; the shell's `authorize` command) |
+> | Phase 0.5 app links | Built; the association file is absent until `APPLE_APP_ID` is set |
+> | Phase 0.5 reminders | Built as a read (`GET /api/reminders/upcoming`); notifications, and the Settings switches for `preferences.reminders`, come with the first app that shows them |
 > | Phase S conformance fixtures and two-device chaos suite | Built against the real server (`tests/fixtures/sync_merge_cases.json`, `tests/integration/test_sync_two_devices.py`); the Swift engine runs the same cases later |
 > | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
 > | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
+> | Phase W start a session offline | Built: templates and program days. A saved dated plan needs signal. If another session is in progress when it syncs it waits, and the sync indicator offers to finish the other |
 > | Phase W platform seam | Built (`client/src/platform/`): the shell injects `__FRACTAL_SHELL__`; `e2e/native-shell.spec.js` runs the same build as a pretend Mac shell. Private media loads with a one-hour read-only media token; an outdated build shows an update screen and keeps its queue. Not done: the Drive picker, opening an attachment's original without a browser sign-in, in-shell storage consent |
 > | Phase W offline: new activities, new templates, template edits | Built. A template edit made against an older revision is refused for review, online too |
 > | Phase W WebKit test project | Built (`webkit` in `playwright.config.js`); offline reloads are skipped there, which Playwright's WebKit can't do |
-> | Phase W browsers in the device list | Not started |
+> | Phase W browsers in the device list | Deferred: browser sessions are stateless tokens, and making each a revocable record changes sign-in for everyone and adds a lookup to every request. "Sign out everywhere" covers them |
 > | Phases M, I | Not started. M needs Rust; I needs full Xcode and an Apple Developer account |
 >
 > **Design changes while building:**
@@ -47,6 +50,8 @@
 > - A queued change waits for any change, in any queue, that creates an id it mentions.
 > - Set and value lists in a session merge: a save sends the list it began from (`base_sets`, `base_metrics`), so sets
 >   logged on two devices are all kept. The same set edited on both keeps the last to arrive.
+> - A native consent is finished by the signed-in app, never by the callback, so nobody's storage can be joined to
+>   another account; `keep_alive` uses quiet grants so providers don't expire them.
 > - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
 > - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
 > - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.

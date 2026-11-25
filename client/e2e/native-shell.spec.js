@@ -5,7 +5,7 @@ import { BROWSER_USER, apiToken } from './support/session.js';
 // The same build in a pretend Mac shell: no cookies, a secret store, and the real device sign-in.
 test.use({ storageState: { cookies: [], origins: [] } });
 
-async function openShell(page, baseURL) {
+async function openShell(page, baseURL, deviceName = 'Other Mac') {
     const secrets = new Map();
     const calls = [];
     await page.exposeFunction('__shellInvoke', (command, args = {}) => {
@@ -15,12 +15,12 @@ async function openShell(page, baseURL) {
         if (command === 'secret_delete') secrets.delete(args.key);
         return null;
     });
-    await page.addInitScript((apiUrl) => {
+    await page.addInitScript(([apiUrl, name]) => {
         globalThis.__FRACTAL_SHELL__ = {
-            platform: 'macos', build: 1, apiUrl, appUrl: 'https://my.fractalgoals.com', deviceName: 'Test Mac',
+            platform: 'macos', build: 1, apiUrl, appUrl: 'https://my.fractalgoals.com', deviceName: name,
             invoke: (command, args) => globalThis.__shellInvoke(command, args),
         };
-    }, `${baseURL}/api`);
+    }, [`${baseURL}/api`, deviceName]);
     return { secrets, calls };
 }
 
@@ -40,7 +40,8 @@ test('a shell signs in as a device, stays signed in, works, and signs out', asyn
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    const { secrets } = await openShell(page, baseURL);
+    const deviceName = `Test Mac ${testInfo.project.name} ${Date.now()}`;
+    const { secrets } = await openShell(page, baseURL, deviceName);
     await signIn(page);
     const first = secrets.get('refresh-token');
     expect(first).toBeTruthy();
@@ -59,11 +60,11 @@ test('a shell signs in as a device, stays signed in, works, and signs out', asyn
     expect(saved).toBe(0);
     const headers = { Authorization: `Bearer ${apiToken()}` };
     const { devices } = await (await page.request.get('/api/auth/devices', { headers })).json();
-    expect(devices.map(({ name }) => name)).toContain('Test Mac');
+    expect(devices.map(({ name }) => name)).toContain(deviceName);
 
     await page.waitForLoadState('networkidle');
     // Signed out from elsewhere, the app asks to sign in again.
-    const mine = devices.find(({ name }) => name === 'Test Mac');
+    const mine = devices.find(({ name }) => name === deviceName);
     expect((await page.request.delete(`/api/auth/devices/${mine.id}`, { headers })).ok()).toBe(true);
     await page.goto('/');
     await expect(page.getByText('LOG IN', { exact: true })).toBeVisible();

@@ -46,3 +46,7 @@ def activity_metric_id(activity_id: str, index: int) -> str:
 
 def activity_split_id(activity_id: str, index: int) -> str:
     return _derive(activity_id, f"split:{index}")
+
+
+def planned_set_id(instance_id: str, index: int) -> str:
+    return _derive(instance_id, f"planned-set:{index}")

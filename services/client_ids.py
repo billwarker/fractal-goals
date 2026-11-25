@@ -24,3 +24,24 @@ def new_id(model) -> str:
         _client_id.set(None)
         return chosen[1]
     return str(uuid.uuid4())
+
+
+def is_uuid(value) -> bool:
+    try:
+        return isinstance(value, str) and str(uuid.UUID(value)) == value.lower()
+    except ValueError:
+        return False
+
+
+def keep_device_ids(sections, device_sections):
+    """The plan's items, under the ids the device that started the session already shows them by."""
+    ids = {
+        item['item_key']: {key: item[key] for key in ('instance_id', 'circuit_run_id') if item.get(key)}
+        for section in device_sections or [] if isinstance(section, dict)
+        for item in section.get('items') or [] if isinstance(item, dict) and item.get('item_key')
+    }
+    for section in sections or []:
+        for item in section.get('items') or []:
+            if isinstance(item, dict) and item.get('item_key') in ids:
+                item.update(ids[item['item_key']])
+    return sections

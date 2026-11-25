@@ -10017,6 +10017,127 @@
     "title": "QuickSessionSetSchema",
     "type": "object"
    },
+   "Reminder": {
+    "properties": {
+     "date": {
+      "title": "Date",
+      "type": "string"
+     },
+     "entity_id": {
+      "title": "Entity Id",
+      "type": "string"
+     },
+     "id": {
+      "title": "Id",
+      "type": "string"
+     },
+     "kind": {
+      "enum": [
+       "goal_review",
+       "program_day",
+       "open_session"
+      ],
+      "title": "Kind",
+      "type": "string"
+     },
+     "overdue": {
+      "title": "Overdue",
+      "type": "boolean"
+     },
+     "path": {
+      "title": "Path",
+      "type": "string"
+     },
+     "program_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Program Id"
+     },
+     "root_id": {
+      "title": "Root Id",
+      "type": "string"
+     },
+     "root_name": {
+      "title": "Root Name",
+      "type": "string"
+     },
+     "started_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "default": null,
+      "title": "Started At"
+     },
+     "title": {
+      "title": "Title",
+      "type": "string"
+     }
+    },
+    "required": [
+     "id",
+     "kind",
+     "root_id",
+     "root_name",
+     "entity_id",
+     "title",
+     "date",
+     "path",
+     "overdue"
+    ],
+    "title": "Reminder",
+    "type": "object"
+   },
+   "Reminders": {
+    "properties": {
+     "generated_at": {
+      "title": "Generated At",
+      "type": "string"
+     },
+     "horizon_days": {
+      "title": "Horizon Days",
+      "type": "integer"
+     },
+     "preferences": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "title": "Preferences",
+      "type": "object"
+     },
+     "reminders": {
+      "items": {
+       "$ref": "#/components/schemas/Reminder"
+      },
+      "title": "Reminders",
+      "type": "array"
+     },
+     "today": {
+      "title": "Today",
+      "type": "string"
+     }
+    },
+    "required": [
+     "generated_at",
+     "today",
+     "horizon_days",
+     "preferences",
+     "reminders"
+    ],
+    "title": "Reminders",
+    "type": "object"
+   },
    "ResolvedConflict": {
     "properties": {
      "id": {
@@ -16035,6 +16156,41 @@
     ]
    }
   },
+  "/api/reminders/upcoming": {
+   "get": {
+    "operationId": "reminders_upcoming",
+    "responses": {
+     "2XX": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Reminders"
+        }
+       }
+      },
+      "description": "Success"
+     },
+     "default": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Error"
+     }
+    },
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
+    "tags": [
+     "reminders"
+    ]
+   }
+  },
   "/api/roots/{root_id}/dashboards": {
    "get": {
     "operationId": "dashboards_api_get_dashboards",
@@ -16781,6 +16937,44 @@
       "description": "Error"
      }
     },
+    "tags": [
+     "storage"
+    ]
+   }
+  },
+  "/api/storage/{provider}/complete": {
+   "post": {
+    "operationId": "storage_complete_native",
+    "parameters": [
+     {
+      "in": "path",
+      "name": "provider",
+      "required": true,
+      "schema": {
+       "type": "string"
+      }
+     }
+    ],
+    "responses": {
+     "2XX": {
+      "description": "Success"
+     },
+     "default": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Error"
+        }
+       }
+      },
+      "description": "Error"
+     }
+    },
+    "security": [
+     {
+      "bearer": []
+     }
+    ],
     "tags": [
      "storage"
     ]

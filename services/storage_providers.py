@@ -23,7 +23,7 @@ def call(method, url, **kwargs):
     if response.status_code == 403 and forbidden:
         response.close()
         raise StorageError(forbidden, 403, 'storage_forbidden')
-    if response.status_code in (401, 403):
+    if response.status_code in (401, 403) and response.status_code not in accepted:
         response.close()
         raise StorageError('Reconnect storage or check the file permissions', 409, 'storage_reconnect')
     if response.status_code == 429:
@@ -64,17 +64,19 @@ def token_request(provider, **fields):
     client_id, secret = provider_config(provider)
     url = 'https://oauth2.googleapis.com/token' if provider == 'google_drive' else 'https://api.dropboxapi.com/oauth2/token'
     with call('POST', url, data={'client_id': client_id, 'client_secret': secret, **fields},
-              accepted_statuses=(200, 400)) as response:
+              accepted_statuses=(200, 400, 401, 403)) as response:
         try:
             payload = response.json()
         except ValueError as exc:
             raise StorageError('Invalid response from storage provider', 502) from exc
         if not isinstance(payload, dict):
             raise StorageError('Invalid response from storage provider', 502)
-        if response.status_code == 400:
+        if response.status_code != 200:
             # Only the standard error code is read; provider descriptions are never surfaced.
             if payload.get('error') == 'invalid_grant':
                 raise StorageError('Access expired or was removed. Reconnect your storage account.', 409, 'storage_reconnect')
+            # Anything else (a rotated client secret, say) is ours to fix, and must never cost the user
+            # their connection.
             raise StorageError('Storage provider rejected the request', 502)
         return payload
 

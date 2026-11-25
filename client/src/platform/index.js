@@ -10,7 +10,9 @@
  * @property {string} appUrl The web app, for pages the shell hands to the browser.
  * @property {string} deviceName Shown in Settings → Account.
  * @property {(command: string, args?: object) => Promise<any>} invoke Commands: `secret_get`, `secret_set`,
- *     `secret_delete` ({ key, value }), `open_external` ({ url }), `save_file` ({ name, content }).
+ *     `secret_delete` ({ key, value }), `open_external` ({ url }), `save_file` ({ name, content }),
+ *     `authorize` ({ url, callbackScheme }) resolving to the final address, or null if closed.
+ * @property {(open: (link: string) => void) => () => void} [onOpenLink] Passes on each link, the launching one first.
  */
 
 /** @type {NativeShell | null} */
@@ -36,14 +38,14 @@ export function openExternal(url) {
 
 /**
  * Open a provider's consent page. Call synchronously from a click: browsers block later windows.
+ * In a shell, resolves to what the provider answered; in a browser, its window reports by itself.
  * @param {() => Promise<string>} getUrl
  */
 export async function openConsent(getUrl) {
     if (shell) {
-        // The server ties consent to the browser that began it, so it begins there. The account is
-        // connected everywhere, and Settings refetches when the app is next focused.
-        await openExternal('/?settings=storage');
-        return;
+        // A system sign-in window, which closes itself and hands back the address it ended on.
+        const ended = await shell.invoke('authorize', { url: await getUrl(), callbackScheme: 'fractalgoals' });
+        return ended ? Object.fromEntries(new URL(ended).searchParams) : { result: 'cancelled' };
     }
     const popup = window.open('about:blank', '_blank');
     if (!popup) throw new Error('Allow the connection window to open, then try again.');
@@ -54,6 +56,7 @@ export async function openConsent(getUrl) {
         popup.close();
         throw failure;
     }
+    return null;
 }
 
 /** Returns false when the user cancelled. */
@@ -75,6 +78,32 @@ export const canCopyText = () => Boolean(globalThis.navigator?.clipboard?.writeT
 export async function copyText(text) {
     if (!canCopyText()) throw new Error('Copying is not available here.');
     await navigator.clipboard.writeText(text);
+}
+
+/**
+ * The app path a link leads to, or null when it isn't one of ours. Shells pass on both
+ * `https://my.fractalgoals.com/...` and `fractalgoals://...`.
+ */
+export function appPathFromLink(link) {
+    let url;
+    try {
+        url = new URL(link);
+    } catch {
+        return null;
+    }
+    if (url.protocol === 'fractalgoals:') return `/${url.host}${url.pathname}${url.search}`.replace(/\/$/, '') || '/';
+    const ours = shell ? new URL(shell.appUrl).host : window.location.host;
+    if (url.protocol !== 'https:' || url.host !== ours || url.pathname.startsWith('/api/')) return null;
+    return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Opens links the system hands the app, the one that launched it included. Returns a stop function. */
+export function installAppLinks(navigate) {
+    if (!shell?.onOpenLink) return () => {};
+    return shell.onOpenLink((link) => {
+        const path = appPathFromLink(link);
+        if (path) navigate(path);
+    });
 }
 
 /** In a shell, links that would open a tab open the system browser. Returns a stop function. */

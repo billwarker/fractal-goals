@@ -3,6 +3,7 @@ import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { isQuickSession } from '../utils/sessionRuntime';
 import { isLandedData } from './landedData';
+import { showStartedSession } from './startedSession';
 import { SESSION_OP } from './opKinds';
 import {
     applySessionCompletion,
@@ -64,6 +65,7 @@ function addInstances(queryClient, meta) {
 }
 
 const OPTIMISTIC = {
+    [SESSION_OP.START]: showStartedSession,
     [SESSION_OP.INSTANCE_UPDATE]: (queryClient, op) => {
         patchInstanceById(queryClient, op.meta, op.meta.instanceId, op.meta.updates);
     },

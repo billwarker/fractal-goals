@@ -53,6 +53,7 @@ from blueprints.logs_api import logs_api
 from blueprints.feature_flags_api import feature_flags_bp
 from blueprints.auth_api import auth_bp
 from blueprints.device_auth_api import device_auth_bp
+from blueprints.reminders_api import reminders_bp
 from blueprints.sync_api import sync_bp
 from blueprints.client_version import register_client_version
 from blueprints.admin_api import admin_bp
@@ -222,6 +223,7 @@ app.register_blueprint(feature_flags_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(device_auth_bp)
 app.register_blueprint(sync_bp)
+app.register_blueprint(reminders_bp)
 register_client_version(app)
 app.register_blueprint(admin_bp)
 app.register_blueprint(public_bp)

@@ -37,3 +37,4 @@ export const roundMemberSetId = (roundId, runSlotId) => uuidv5(roundId, `set:${r
 export const roundMemberInstanceId = (roundId, runSlotId) => uuidv5(roundId, `instance:${runSlotId}`);
 export const activityMetricId = (activityId, index) => uuidv5(activityId, `metric:${index}`);
 export const activitySplitId = (activityId, index) => uuidv5(activityId, `split:${index}`);
+export const plannedSetId = (instanceId, index) => uuidv5(instanceId, `planned-set:${index}`);

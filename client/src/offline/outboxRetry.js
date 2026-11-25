@@ -1,7 +1,8 @@
-import { countsTowardGivingUp, retryAfterMs } from './outboxTransport';
+import { countsTowardGivingUp, isWaitingForSession, retryAfterMs } from './outboxTransport';
 
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 60000;
+const SESSION_WAIT_MS = 30000;
 // A change the server keeps failing (not one waiting for signal) goes to review
 // after this, so it can't hold up its session's later changes for long. Both limits must
 // pass, because a short outage must never cost changes.
@@ -18,7 +19,7 @@ function backoff(attempts, random) {
 /** After a failed send: give up (`giveUp`), or when to try next and what to record on the op. */
 export function planRetry(op, error, verdict, now, random) {
     // Only a failure the server answered starts the clock; offline waits forever.
-    const answered = Boolean(error?.response) && verdict !== 'auth';
+    const answered = Boolean(error?.response) && verdict !== 'auth' && !isWaitingForSession(error);
     const serverFailures = (op.serverFailures || 0) + (countsTowardGivingUp(error) ? 1 : 0);
     const firstServerFailureAt = op.firstServerFailureAt || (answered ? now : null);
     const failingFor = answered ? now - firstServerFailureAt : 0;
@@ -31,7 +32,9 @@ export function planRetry(op, error, verdict, now, random) {
     const attempts = (op.attempts || 0) + 1;
     return {
         giveUp: false,
-        nextAttemptAt: now + Math.max(backoff(attempts, random), retryAfterMs(error, now)),
+        nextAttemptAt: now + Math.max(
+            isWaitingForSession(error) ? SESSION_WAIT_MS : backoff(attempts, random), retryAfterMs(error, now),
+        ),
         fields: { attempts, serverFailures, firstServerFailureAt },
     };
 }

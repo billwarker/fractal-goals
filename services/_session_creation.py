@@ -45,7 +45,8 @@ from services.prescriptions import (
     snapshot_prescription,
 )
 from services._session_lifecycle_common import _parse_iso_datetime_strict
-from services.client_ids import new_id
+from services.circuit_ids import planned_set_id
+from services.client_ids import is_uuid, keep_device_ids, new_id
 
 
 # A create_session phase returns None to continue, or (message, status) to stop.
@@ -353,7 +354,7 @@ class _SessionCreationMixin:
             return str(exc), 400
         if draft.program_day_id and plan.program_day_id != draft.program_day_id:
             return "That plan belongs to a different program day", 400
-        sections = plan_sections_for_session(plan)
+        sections = keep_device_ids(plan_sections_for_session(plan), draft.session_data.get('sections'))
         draft.session_data['sections'] = sections
         draft.session_data['program_session_plan'] = {
             'id': plan.id,
@@ -378,7 +379,8 @@ class _SessionCreationMixin:
                     circuit_definition_id = exercise.get('circuit_definition_id')
                     if circuit_definition_id:
                         local_circuit_items.append(
-                            (section_index, item_index, circuit_definition_id, exercise.get('item_key')),
+                            (section_index, item_index, circuit_definition_id, exercise.get('item_key'),
+                             exercise.get('circuit_run_id')),
                         )
                     continue
                 activity_id = self._extract_activity_definition_id(exercise)
@@ -532,6 +534,7 @@ class _SessionCreationMixin:
         if definition.has_sets:
             instance.sets = [
                 ActivitySet(
+                    id=planned_set_id(instance.id, index) if is_uuid(instance.id) else str(uuid.uuid4()),
                     sort_order=index,
                     status='planned',
                     tags=load_planned_tags(self.db_session, draft.root_id, planned_set.get('tags')),
@@ -562,7 +565,7 @@ class _SessionCreationMixin:
         from sqlalchemy.orm.attributes import flag_modified
         flag_modified(new_session, 'attributes')
         circuit_service = CircuitService(self.db_session)
-        for section_index, item_index, circuit_definition_id, item_key in circuit_items:
+        for section_index, item_index, circuit_definition_id, item_key, run_id in circuit_items:
             # Planned rounds and values come from the authoritative template or plan only.
             source = draft.prescriptions_by_item_key.get(item_key)
             prescription = snapshot_prescription(source[1]) if source and source[0] == circuit_definition_id else None
@@ -573,6 +576,8 @@ class _SessionCreationMixin:
                     'section_index': section_index,
                     'item_index': item_index,
                     'prescription': prescription,
+                    # Started offline: the device already shows this run, and its ids derive from it.
+                    **({'id': run_id} if is_uuid(run_id) else {}),
                 },
                 commit=False,
                 emit=False,
