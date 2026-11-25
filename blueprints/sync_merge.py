@@ -27,7 +27,7 @@ def merges(entity_type, id_argument):
             dropped = SyncMergeService(db).merge(
                 current_user.id, kwargs['root_id'], entity_type, kwargs[id_argument], body, base, edited_at,
             )
-            if dropped and not body:
+            if not body and (dropped or base):
                 db.commit()
                 return jsonify({'code': 'sync_superseded', 'superseded_fields': dropped}), 200
             return handler(current_user, *args, **kwargs)

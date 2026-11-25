@@ -8,12 +8,13 @@ vi.mock('../connectivity', () => ({ isOnline: () => online.value }));
 vi.mock('../../utils/api/syncApi', () => ({ syncApi: { getConflicts } }));
 vi.mock('../../utils/notify', () => ({ default: { warning, error: vi.fn() } }));
 
+import { buildConditionPayload, conditionToDraft } from '../../utils/goalConditions';
 import { queryKeys } from '../../hooks/queryKeys';
 import { createMemoryStore } from '../memoryStore';
 import { createOutbox } from '../outbox';
 import { registerRecordOpHandlers } from '../recordOpHandlers';
 import {
-    queueGoalCreate, queueGoalUpdate, queueNoteCreate, queueNoteDelete, queueNoteUpdate,
+    changedGoalFields, queueGoalCreate, queueGoalUpdate, queueNoteCreate, queueNoteDelete, queueNoteUpdate,
 } from '../recordOps';
 import { shouldQueueRecord } from '../recordQueue';
 
@@ -74,6 +75,40 @@ describe('offline goal and note writes', () => {
         expect(sent.map((op) => op.body._base)).toEqual([{ name: 'Old' }, { name: 'A' }]);
         expect(Date.parse(sent[0].body._edited_at)).not.toBeNaN();
         expect(sent[0].body.track_activities).toBe(false);
+    });
+
+    it('queues only what the form really changed', async () => {
+        const condition = {
+            id: 'c', activity_definition_id: 'a', kind: 'consistency', measure: 'sets', min_sets: 1, required_count: 3,
+            rules: [], tag_ids: [], tag_match: 'contains', set_aggregate: 'each', consecutive: false, name: null,
+        };
+        const goal = {
+            id: 'g1', name: 'Old', description: 'D', deadline: '2026-12-01T00:00:00Z', started_at: '2026-01-01T09:00:00Z',
+            completion_condition: 'activity_threshold', condition,
+            attributes: { track_activities: true, inherit_parent_activities: false },
+        };
+        const form = {
+            name: 'Old', description: 'D', deadline: '2026-12-01', started_at: '2026-01-01',
+            track_activities: true, inherit_parent_activities: false,
+            completion_condition: 'activity_threshold', condition: buildConditionPayload(conditionToDraft(condition)),
+            review_cadence_value: null, review_cadence_unit: null, review_disabled: false,
+            attachments: [{ asset_id: 'm1', alt_text: '' }],
+        };
+        const saved = [{ asset_id: 'm1' }];
+        expect(changedGoalFields(goal, form, saved)).toEqual({});
+        expect(changedGoalFields(goal, { ...form, name: 'New' }, saved)).toEqual({ name: 'New' });
+        expect(changedGoalFields(goal, { ...form, deadline: null }, saved)).toEqual({ deadline: null });
+        // A pair travels together.
+        expect(changedGoalFields(goal, { ...form, review_cadence_value: 2, review_cadence_unit: null }, saved))
+            .toEqual({ review_cadence_value: 2, review_cadence_unit: null });
+        expect(Object.keys(changedGoalFields(goal, { ...form, completion_condition: 'manual', condition: undefined }, saved)).sort())
+            .toEqual(['completion_condition', 'condition']);
+        expect(changedGoalFields(goal, { ...form, attachments: [] }, saved)).toEqual({ attachments: [] });
+    });
+
+    it('queues nothing when nothing changed', async () => {
+        await queueGoalUpdate(outbox, queryClient, ROOT, 'g1', { name: 'Old', description: 'D' });
+        expect(outbox.hasPending()).toBe(false);
     });
 
     it('keeps queued changes on top of server data that arrives first', async () => {

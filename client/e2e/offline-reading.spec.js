@@ -23,6 +23,17 @@ test('screens opened before losing signal are readable after an offline restart'
     await page.goto(`/${root}/notes`);
     await expect(page.getByText(noteText).first()).toBeVisible();
     await page.evaluate(() => navigator.serviceWorker.ready);
+    // Stored once the sync engine has loaded, which a full page load here could otherwise beat.
+    await expect.poll(() => page.evaluate(() => new Promise((resolve) => {
+        const open = indexedDB.open('fractal-offline-kv');
+        open.onsuccess = () => {
+            const keys = open.result.transaction('kv').objectStore('kv').getAllKeys();
+            keys.onsuccess = () => {
+                open.result.close();
+                resolve(keys.result.some((key) => String(key).includes('all-notes') && !String(key).includes('heatmap')));
+            };
+        };
+    }))).toBe(true);
     await page.goto(`/${root}/goals`);
     await expect(page.getByText(goalName).first()).toBeVisible();
     await page.reload();
@@ -36,6 +47,31 @@ test('screens opened before losing signal are readable after an offline restart'
     await page.goto(`/${root}/notes`);
     await expect(page.getByText(noteText).first()).toBeVisible({ timeout: 20_000 });
     expect(errors).toEqual([]);
+});
+
+test('a delete tried offline fails at once and is never sent later', async ({ page, context }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The same on every viewport.');
+    test.setTimeout(60_000);
+    await openOrigin(page);
+    const root = 'browser-offline-root-desktop';
+    const headers = { Authorization: `Bearer ${apiToken()}` };
+    const name = `Keep me ${Date.now()}`;
+    const goal = await (await page.request.post(`/api/${root}/goals`, {
+        headers, data: { name, type: 'LongTermGoal', parent_id: root },
+    })).json();
+    await page.goto(`/${root}/goals?goal=${goal.id}`);
+    await page.getByRole('button', { name: 'Options', exact: true }).click();
+    await page.getByRole('button', { name: /Delete Goal/ }).click();
+    await context.setOffline(true);
+    await expect(page.getByRole('status').filter({ hasText: 'Offline' })).toBeVisible();
+    await page.getByRole('button', { name: /Delete Goal/ }).click();
+    await expect(page.getByText(/Failed to delete/).first()).toBeVisible();
+    const deletes = [];
+    page.on('request', (request) => request.method() === 'DELETE' && deletes.push(request.url()));
+    await context.setOffline(false);
+    await page.waitForTimeout(5000);
+    expect(deletes).toEqual([]);
+    expect((await page.request.get(`/api/${root}/goals/${goal.id}`, { headers })).ok()).toBe(true);
 });
 
 test('a goal edited offline survives a restart, and merges with another device’s edit', async ({ page, context, playwright, baseURL }, testInfo) => {

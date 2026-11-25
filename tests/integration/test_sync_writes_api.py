@@ -203,3 +203,13 @@ def test_two_devices_create_under_one_parent_at_once(app, test_user, root):
 
     with ThreadPoolExecutor(max_workers=6) as pool:
         assert set(pool.map(create, range(12))) == {201}
+
+
+def test_an_unchanged_field_resent_with_an_edit_is_not_an_edit(client, db_session, test_user, root):
+    _edit(client, test_user, root, description='From Mac')
+    response = _edit(client, test_user, root, name='Phone', description='Original',
+                     _base={'name': 'Root', 'description': 'Original'}, _edited_at=_at(60))
+    assert response.status_code == 200
+    db_session.refresh(root)
+    assert (root.name, root.description) == ('Phone', 'From Mac')
+    assert _conflicts(client, test_user) == []

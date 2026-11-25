@@ -5,11 +5,17 @@ simply updated. Otherwise two edits clash: the later one is kept, by when the us
 other is recorded so it can be restored.
 """
 import datetime
+import re
+
+from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from models import Goal, Note, Program, Session, SessionTemplate, ActivityDefinition
 from models import SyncConflict, SyncFieldEdit, format_utc, utc_now
 from services.occurred_at import utc_now_naive
 from services.service_types import JsonDict, ServiceResult
+
+_BARE_DATE = re.compile(r'\d{4}-\d{2}-\d{2}')
 
 # Only free-standing values. Everything structural keeps its own version checks and 409s.
 MERGE_FIELDS = {
@@ -27,7 +33,14 @@ def _plain(value):
 
 
 def _same(left, right) -> bool:
-    return (left or None) == (right or None)
+    """Equal as the user sees them: empty is empty, and a bare date is that day's midnight."""
+    left, right = left or None, right or None
+    if left == right:
+        return True
+    if not isinstance(left, str) or not isinstance(right, str):
+        return False
+    short, full = sorted((left, right), key=len)
+    return bool(_BARE_DATE.fullmatch(short)) and full.startswith(f'{short}T00:00:00')
 
 
 def _naive(value):
@@ -60,14 +73,22 @@ class SyncMergeService:
             return []
         now = utc_now_naive()
         edited_at = min(edited_at or now, now)
+        held = base or {}
         dropped = []
         for name in fields:
             if name not in body:
                 continue
             current, incoming = _plain(getattr(row, name)), body[name]
-            clock = self.db_session.get(SyncFieldEdit, (entity_type, entity_id, name))
-            clash = base is not None and name in base and not _same(current, base[name]) and not _same(current, incoming)
-            if clash:
+            based = name in held
+            if based and _same(incoming, held[name]):
+                # Sent along unchanged (a form sends every field), so not an edit.
+                if not _same(current, incoming):
+                    body.pop(name)
+                continue
+            clock = self.db_session.get(
+                SyncFieldEdit, (entity_type, entity_id, name), populate_existing=True,
+            )
+            if based and not _same(current, held[name]) and not _same(current, incoming):
                 # An edit that never recorded its time (an agent's, say) counts as made at the last update.
                 server_edited_at = clock.edited_at if clock else _naive(row.updated_at) or now
                 keep_incoming = edited_at >= server_edited_at
@@ -81,13 +102,17 @@ class SyncMergeService:
                     body.pop(name)
                     dropped.append(name)
                     continue
-            if clock is None:
-                self.db_session.add(SyncFieldEdit(
-                    entity_type=entity_type, entity_id=entity_id, field=name, owner_id=user_id, edited_at=edited_at,
-                ))
-            else:
-                clock.edited_at = max(clock.edited_at, edited_at)
+            self._record_edit(user_id, entity_type, entity_id, name, edited_at)
         return dropped
+
+    def _record_edit(self, user_id, entity_type, entity_id, field, edited_at):
+        insert = pg_insert(SyncFieldEdit).values(
+            entity_type=entity_type, entity_id=entity_id, field=field, owner_id=user_id, edited_at=edited_at,
+        )
+        self.db_session.execute(insert.on_conflict_do_update(
+            index_elements=['entity_type', 'entity_id', 'field'],
+            set_={'edited_at': func.greatest(SyncFieldEdit.edited_at, insert.excluded.edited_at)},
+        ))
 
     def list_conflicts(self, user_id) -> JsonDict:
         rows = self.db_session.query(SyncConflict).filter(

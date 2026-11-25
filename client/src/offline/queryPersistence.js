@@ -151,29 +151,32 @@ function saveRecord(userId, query) {
 
 /** Keep the persisted copy current while offline sync is on. Returns a stop function. */
 export function startQueryPersistence(queryClient, userId) {
-    const changed = new Map();
     const startedAt = clears;
-    let timer = null;
-    const write = () => {
-        timer = null;
-        changed.forEach((query) => {
-            if (clears === startedAt && shouldPersistQuery(query)) saveRecord(userId, query);
-        });
-        changed.clear();
+    const waiting = new Map();
+    const writtenAt = new Map();
+    const write = (query) => {
+        waiting.delete(query.queryHash);
+        writtenAt.set(query.queryHash, Date.now());
+        if (clears === startedAt && shouldPersistQuery(query)) saveRecord(userId, query);
     };
+    // Each query at once, then at most once a second: a write begun as the page closes may not finish.
     const note = (query) => {
-        changed.set(query.queryHash, query);
-        timer ??= setTimeout(write, WRITE_THROTTLE_MS);
+        if (waiting.has(query.queryHash)) return;
+        const delay = Math.max(0, (writtenAt.get(query.queryHash) ?? 0) + WRITE_THROTTLE_MS - Date.now());
+        waiting.set(query.queryHash, { query, timer: setTimeout(() => write(query), delay) });
     };
+    // The first screen can load before the engine that calls this.
+    queryClient.getQueryCache().getAll().filter(shouldPersistQuery).forEach(note);
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
         if (event?.type === 'updated' && event.action?.type === 'success' && isPersistedPrefix(event.query.queryKey?.[0])) {
             note(event.query);
         }
     });
     const flush = () => {
-        if (!timer) return;
-        clearTimeout(timer);
-        write();
+        waiting.forEach(({ query, timer }) => {
+            clearTimeout(timer);
+            write(query);
+        });
     };
     const flushOnHide = () => {
         if (document.visibilityState === 'hidden') flush();

@@ -701,7 +701,7 @@ again only while its replacement is unused; any other reuse signs the device out
 device tokens. Builds below `MIN_SUPPORTED_BUILDS` get 426 `client_update_required`
 (`blueprints/client_version.py`).
 
-Device sync reads a change log. Statement triggers (`models/sync.py`, frozen in migration `d4c8a1f6e2b9`)
+Device sync reads a change log. Statement triggers (`models/sync.py`, frozen in migration `e5d9b2a7f3c8`)
 record which entity each write touched, keyed by transaction id; `services/sync_feed_service.py` serves
 `GET /api/sync/snapshot` and `/api/sync/changes`, never past the oldest running transaction. Every
 fractal-reachable table must be an entity, a child or excluded there (`tests/integration/test_sync_feed_api.py`).
@@ -712,7 +712,9 @@ take `_base`/`_edited_at` and merge field by field; a lost value is kept in `syn
 poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`).
 Offline, the web shows every screen opened on the device (`offline/queryPersistence.js`, one record per query,
 bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goal and goal-note
-writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync. After a restore, run
+writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync.
+Merge rules are pinned by `tests/fixtures/sync_merge_cases.json`, and `tests/integration/test_sync_two_devices.py`
+runs simulated devices with seeded faults against the real API. After a restore, run
 `reset_sync_epoch`. Plan: `planning/native-apple-apps-2026-11.md`.
 
 Rate limits key on the real client: `request_identity.py` trusts `X-Forwarded-For` only for

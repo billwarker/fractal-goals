@@ -169,41 +169,54 @@ SYNC_EXCLUDED = {
 }
 
 
-def _owner_select(entity, source):
-    """(owner, entity id, root) for changed entity rows aliased ``e``."""
+_LOG = """
+        INSERT INTO public.sync_changes (owner_id, xid, entity_type, entity_id, root_id, origin)
+        SELECT {owner}, pg_current_xact_id()::text::bigint, '{entity}', e.id, e.root_id,
+            left(NULLIF(current_setting('app.sync_origin', true), ''), 36)
+        FROM {source}
+        ON CONFLICT DO NOTHING;"""
+_USER = "JOIN public.users u ON u.id = {owner} AND u.role <> 'demo'"
+
+
+def _entity_statements(entity, transition):
+    """Log the changed rows of an entity's own table, which a delete leaves only in ``transition``."""
+    own = _LOG.format(owner='e.owner_id', entity=entity, source=f"{transition} e {_USER.format(owner='e.owner_id')}{{}}")
     if entity == 'goal_level':
-        return f"SELECT e.owner_id, e.id, e.root_id FROM {source} WHERE e.owner_id IS NOT NULL"
+        yield own.format('')
+        return
+    # One fractal at a time. A child of a root that is itself being deleted has no root left to find.
+    yield f"""
+        FOR v_root, v_owner IN
+            SELECT r.id, r.owner_id FROM public.goals r {_USER.format(owner='r.owner_id')}
+            WHERE r.id = ANY(ARRAY(SELECT DISTINCT root_id FROM {transition}))
+        LOOP{_LOG.format(owner='v_owner', entity=entity, source=f'{transition} e WHERE e.root_id = v_root')}
+        END LOOP;"""
     if entity == 'goal':
-        # A child of a root that is itself being deleted has no root left; the root's own row covers it.
-        return (
-            f"SELECT r.owner_id, e.id, e.root_id FROM {source} JOIN public.goals r ON r.id = e.root_id "
-            f"UNION SELECT e.owner_id, e.id, e.root_id FROM {source} "
-            "WHERE e.id = e.root_id AND e.owner_id IS NOT NULL"
-        )
-    return f"SELECT r.owner_id, e.id, e.root_id FROM {source} JOIN public.goals r ON r.id = e.root_id"
+        # The deleted root's own row covers its children.
+        yield own.format(' WHERE e.id = e.root_id')
 
 
-def _changed_selects(table, transition):
-    for entity, entity_table in SYNC_ENTITIES.items():
-        if entity_table == table:
-            yield entity, _owner_select(entity, f'{transition} e')
-    for entity, path in SYNC_CHILDREN.get(table, ()):
-        value = f'c.{path[0]}'
-        source = f'{transition} c'
-        for index, (hop_table, column) in enumerate(path[1:]):
-            source += f' JOIN public.{hop_table} h{index} ON h{index}.id = {value}'
-            value = f'h{index}.{column}'
-        yield entity, _owner_select(entity, f'{source} JOIN public.{SYNC_ENTITIES[entity]} e ON e.id = {value}')
+def _child_statements(entity, path, transition):
+    """Log the entities that own changed child rows, in distinct ids and one key lookup per hop."""
+    yield f"""
+        v_ids := ARRAY(SELECT DISTINCT {path[0]} FROM {transition} WHERE {path[0]} IS NOT NULL);"""
+    for table, column in path[1:]:
+        yield f"""
+        v_ids := ARRAY(SELECT DISTINCT {column} FROM public.{table} WHERE id = ANY(v_ids) AND {column} IS NOT NULL);"""
+    yield _LOG.format(owner='r.owner_id', entity=entity, source=(
+        f"public.{SYNC_ENTITIES[entity]} e JOIN public.goals r ON r.id = e.root_id {_USER.format(owner='r.owner_id')} "
+        'WHERE e.id = ANY(v_ids)'
+    ))
 
 
 def _log_statements(table, transition):
-    return '\n'.join(f"""
-        INSERT INTO public.sync_changes (owner_id, xid, entity_type, entity_id, root_id, origin)
-        SELECT DISTINCT s.owner_id, pg_current_xact_id()::text::bigint, '{entity}', s.id, s.root_id,
-            left(NULLIF(current_setting('app.sync_origin', true), ''), 36)
-        FROM ({select}) AS s(owner_id, id, root_id)
-        JOIN public.users u ON u.id = s.owner_id AND u.role <> 'demo'
-        ON CONFLICT DO NOTHING;""" for entity, select in _changed_selects(table, transition))
+    statements = []
+    for entity, entity_table in SYNC_ENTITIES.items():
+        if entity_table == table:
+            statements.extend(_entity_statements(entity, transition))
+    for entity, path in SYNC_CHILDREN.get(table, ()):
+        statements.extend(_child_statements(entity, path, transition))
+    return ''.join(statements)
 
 
 def synced_tables():
@@ -211,11 +224,19 @@ def synced_tables():
 
 
 def sync_trigger_statements(table):
-    """DDL that logs every insert, update and delete on ``table``, once per statement."""
+    """DDL that logs every insert, update and delete on ``table``, once per statement.
+
+    A connection would otherwise plan these once, perhaps while the tables are nearly empty, and keep
+    join orders that scan whole tables later. Lookups by id array, planned each time, can't go wrong that way.
+    """
     function = f'sync_log_{table}'
     yield f"""
 CREATE OR REPLACE FUNCTION public.{function}() RETURNS trigger
-LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
+LANGUAGE plpgsql SET search_path = pg_catalog, public SET plan_cache_mode = force_custom_plan AS $$
+DECLARE
+    v_ids text[];
+    v_root text;
+    v_owner text;
 BEGIN
     IF TG_OP <> 'INSERT' THEN {_log_statements(table, 'old_rows')}
     END IF;

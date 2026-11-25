@@ -18,6 +18,9 @@ const queryClient = new QueryClient({
             // Serve cached data while offline instead of parking queries in a paused state.
             networkMode: 'offlineFirst',
         },
+        // Fail now rather than hold a write in memory and send it, perhaps a delete, whenever signal
+        // returns. Writes that can wait are queued on the device (src/offline).
+        mutations: { networkMode: 'always' },
     },
 });
 

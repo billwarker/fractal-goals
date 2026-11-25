@@ -4,6 +4,7 @@ import {
 } from '../utils/goalTreeCache';
 import notify from '../utils/notify';
 import { syncApi } from '../utils/api/syncApi';
+import { isLandedData } from './landedData';
 import { RECORD_OP } from './opKinds';
 import { recordScope } from './recordQueue';
 
@@ -75,13 +76,9 @@ export function registerRecordOpHandlers(outbox, queryClient) {
         onReject: (_op, error) => notify.error(`A change couldn't be saved: ${error?.message || 'the server rejected it'}`),
     }));
 
-    // Data that lands while changes are queued must not hide them: the server's, or this device's
-    // stored copy, which can be restored after the queue has loaded.
+    // Data that lands while changes are queued must not hide them.
     const unsubscribeCache = queryClient.getQueryCache().subscribe((event) => {
-        const landed = (event?.type === 'updated' && event.action?.type === 'success' && !event.action.manual)
-            || (event?.type === 'updated' && event.action?.type === 'setState')
-            || (event?.type === 'added' && event.query.state.data !== undefined);
-        if (!landed) return;
+        if (!isLandedData(event)) return;
         const [prefix, rootId] = event.query.queryKey || [];
         if (RECORD_PREFIXES.has(prefix) && outbox.hasPending(recordScope(rootId))) reapply(recordScope(rootId));
     });

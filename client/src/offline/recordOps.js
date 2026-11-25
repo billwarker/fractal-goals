@@ -1,6 +1,9 @@
 // Queues writes to goals and notes when there is no signal. Online they go straight to the server.
 
 import { queryKeys } from '../hooks/queryKeys';
+import {
+    buildConditionPayload, conditionToDraft, getGoalCompletionCondition, getGoalCondition,
+} from '../utils/goalConditions';
 import { findGoalInTree, mergeGoalRecord } from '../utils/goalTreeCache';
 import { RECORD_OP } from './opKinds';
 import { defaultId as createId } from './outboxTransport';
@@ -35,6 +38,44 @@ function buildPlaceholderGoal(id, rootId, data) {
     };
 }
 
+const goalValue = (goal, field) => goal[field] ?? goal.attributes?.[field] ?? null;
+const day = (value) => (typeof value === 'string' ? value.slice(0, 10) : value);
+const isSame = (left, right) => JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+
+/**
+ * What an edit really changes. The goal form sends every field; queued whole, it would later undo
+ * another device's change to a field this edit never touched.
+ */
+export function changedGoalFields(goal, updates, savedAttachments = null) {
+    const draft = getGoalCondition(goal) ? buildConditionPayload(conditionToDraft(getGoalCondition(goal))) : null;
+    const unchanged = {
+        name: (value) => isSame(value, goalValue(goal, 'name')),
+        description: (value) => isSame(value || '', goalValue(goal, 'description') || ''),
+        deadline: (value) => isSame(day(value), day(goalValue(goal, 'deadline'))),
+        started_at: (value) => isSame(day(value), day(goalValue(goal, 'started_at'))),
+        completion_condition: (value) => isSame(value, getGoalCompletionCondition(goal)),
+        condition: (value) => isSame(value, draft),
+        review_cadence_value: (value) => isSame(value, goalValue(goal, 'review_cadence_value')),
+        review_cadence_unit: (value) => isSame(value, goalValue(goal, 'review_cadence_unit')),
+        review_disabled: (value) => isSame(value, goalValue(goal, 'review_disabled') ?? false),
+        attachments: (value) => savedAttachments !== null && isSame(
+            value.map((item) => item.asset_id), savedAttachments.map((item) => item.asset_id),
+        ),
+    };
+    const entries = Object.entries(updates).filter(([field, value]) => (
+        unchanged[field] ? !unchanged[field](value) : !isSame(value, goalValue(goal, field))
+    ));
+    const changed = Object.fromEntries(entries);
+    // These belong together: the server reads each pair as one setting.
+    [['completion_condition', 'condition'], ['review_cadence_value', 'review_cadence_unit']].forEach((pair) => {
+        if (!pair.some((field) => field in changed)) return;
+        pair.filter((field) => field in updates).forEach((field) => {
+            changed[field] = updates[field];
+        });
+    });
+    return changed;
+}
+
 export async function queueGoalCreate(outbox, rootId, data) {
     const id = createId();
     const placeholder = buildPlaceholderGoal(id, rootId, data);
@@ -52,19 +93,23 @@ export async function queueGoalCreate(outbox, rootId, data) {
 
 export async function queueGoalUpdate(outbox, queryClient, rootId, goalId, updates) {
     const current = findGoalInTree(queryClient.getQueryData(queryKeys.fractalTree(rootId)), goalId) || { id: goalId };
+    const changes = changedGoalFields(
+        current, updates, queryClient.getQueryData(queryKeys.goalAttachments(rootId, goalId)) ?? null,
+    );
+    if (Object.keys(changes).length === 0) return current;
     const base = Object.fromEntries(
-        GOAL_MERGE_FIELDS.filter((field) => field in updates && field in current).map((field) => [field, current[field]]),
+        GOAL_MERGE_FIELDS.filter((field) => field in changes && field in current).map((field) => [field, current[field]]),
     );
     await outbox.submit({
         scope: recordScope(rootId),
         kind: RECORD_OP.GOAL_UPDATE,
         method: 'put',
         url: `/${rootId}/goals/${goalId}`,
-        body: { ...updates, _base: base, _edited_at: nowIso() },
+        body: { ...changes, _base: base, _edited_at: nowIso() },
         entityIds: [goalId],
-        meta: { rootId, goalId, updates },
+        meta: { rootId, goalId, updates: changes },
     });
-    return mergeGoalRecord(current, updates);
+    return mergeGoalRecord(current, changes);
 }
 
 export async function queueNoteCreate(outbox, rootId, data) {

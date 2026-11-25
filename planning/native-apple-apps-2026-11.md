@@ -10,7 +10,7 @@
 > | Phase S.3 offline writes: safe retries on every fractal write, field merging, conflict records | Built; Settings → Sync shows conflicts |
 > | Web: open pages refresh on another device's changes | Built (`client/src/sync/changeListener.js`) |
 > | Phase 0.1 OpenAPI, 0.5 OAuth/links/reminders | Not started |
-> | Phase S conformance fixtures and two-device chaos suite | Not started |
+> | Phase S conformance fixtures and two-device chaos suite | Built against the real server (`tests/fixtures/sync_merge_cases.json`, `tests/integration/test_sync_two_devices.py`); the Swift engine runs the same cases later |
 > | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
 > | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
 > | Phase W platform seam, browsers in the device list | Not started |
@@ -28,6 +28,11 @@
 > - The web keeps read results, not a mirror of records: server-computed views can't be rebuilt on the device,
 >   so each screen opened is stored as it was (400 reads, 25M characters, 30 days; sessions first).
 >   A screen never opened on that device isn't readable offline. The iPhone still needs the record mirror.
+> - Deleting stays online-only (a delete cascades to children another device may have added), and so does completing a
+>   goal until the server accepts the time it was done. Offline, both fail at once; a browser test holds that.
+> - The log's triggers look rows up by id array and plan each time (migration `e5d9b2a7f3c8`): with plain joins a
+>   stale plan scanned whole tables.
+> - Edits send only the fields that changed; a field resent unchanged is never an edit.
 > - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
 > - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
 > - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.

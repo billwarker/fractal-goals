@@ -108,7 +108,7 @@ def test_every_path_follows_a_real_foreign_key():
 
 
 def test_migration_triggers_match_the_models():
-    migration = importlib.import_module('migrations.versions.d4c8a1f6e2b9_device_sessions_and_sync_log')
+    migration = importlib.import_module('migrations.versions.e5d9b2a7f3c8_sync_log_plans')
     assert migration.synced_tables() == synced_tables()
     for table in synced_tables():
         assert list(migration.sync_trigger_statements(table)) == list(sync_trigger_statements(table))

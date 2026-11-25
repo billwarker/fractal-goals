@@ -10,6 +10,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ["ENV"] = "testing"
 os.environ["FLASK_DEBUG"] = "false"
 os.environ["SENTRY_DSN"] = ""
+# libpq's Kerberos lookup crashes forked workers on macOS.
+os.environ["PGGSSENCMODE"] = "disable"
 os.environ["RATELIMIT_ENABLED"] = "false"
 # Gunicorn serves the parallel browsers from BROWSER_SERVER_WORKERS processes (see serve());
 # each gets its own pool, sized so all of them stay well under PostgreSQL's 100 connections.

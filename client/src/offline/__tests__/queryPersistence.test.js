@@ -140,6 +140,30 @@ describe('query persistence', () => {
         expect(kv.size).toBe(0);
     });
 
+    it('keeps what loaded before it started', async () => {
+        const source = new QueryClient();
+        source.setQueryData(['all-notes', 'root-1'], { name: 'First screen' });
+        startQueryPersistence(source, 'user-1')();
+        await Promise.resolve();
+        expect(persistedNames()).toEqual(['First screen']);
+    });
+
+    it('writes each query at once, then at most once a second', async () => {
+        vi.useFakeTimers();
+        const source = new QueryClient();
+        const stop = startQueryPersistence(source, 'user-1');
+        source.setQueryData(sessionKey, { name: 'First' });
+        await vi.advanceTimersByTimeAsync(0);
+        expect(persistedNames()).toEqual(['First']);
+        source.setQueryData(sessionKey, { name: 'Second' });
+        source.setQueryData(['all-notes', 'root-1'], { name: 'Another' });
+        await vi.advanceTimersByTimeAsync(500);
+        expect(persistedNames()).toEqual(['First', 'Another']);
+        await vi.advanceTimersByTimeAsync(500);
+        expect(persistedNames()).toEqual(['Second', 'Another']);
+        stop();
+    });
+
     it('skips a single oversized read', async () => {
         await persist('user-1', [[['all-notes', 'root-1'], 'x'.repeat(MAX_RECORD_CHARS)], [sessionKey, { name: 'Small' }]]);
         expect(persistedNames()).toEqual(['Small']);
