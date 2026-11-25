@@ -1,0 +1,95 @@
+// The one place the app meets what it runs in: a browser, or a native shell around the same build.
+// The shell injects `__FRACTAL_SHELL__` before any script runs. Everything else asks here, and the
+// maintainability audit rejects these browser calls elsewhere.
+
+/**
+ * @typedef {object} NativeShell What a shell must provide.
+ * @property {'macos'} platform
+ * @property {number} build Compared with the server's minimum supported build.
+ * @property {string} apiUrl The server's API, on another origin than the app's own.
+ * @property {string} appUrl The web app, for pages the shell hands to the browser.
+ * @property {string} deviceName Shown in Settings → Account.
+ * @property {(command: string, args?: object) => Promise<any>} invoke Commands: `secret_get`, `secret_set`,
+ *     `secret_delete` ({ key, value }), `open_external` ({ url }), `save_file` ({ name, content }).
+ */
+
+/** @type {NativeShell | null} */
+const shell = globalThis.__FRACTAL_SHELL__ ?? null;
+
+export const isNative = shell !== null;
+export const apiBase = shell?.apiUrl ?? (import.meta.env.VITE_API_URL || 'http://localhost:8001/api');
+/** Sent with every request, so the server can tell an outdated build to update. */
+export const clientHeaders = shell ? { 'X-Client-Platform': shell.platform, 'X-Client-Build': String(shell.build) } : {};
+/** Browsers stay signed in with a cookie; native apps with a refresh token in the system's secret store. */
+export const usesCookies = !isNative;
+/** A native app carries its own files, so nothing needs caching to start offline. */
+export const usesServiceWorker = !isNative;
+
+export const getShell = () => shell;
+
+/** Hand a page to the system browser. */
+export function openExternal(url) {
+    if (shell) return shell.invoke('open_external', { url: new URL(url, shell.appUrl).href });
+    window.open(url, '_blank', 'noopener');
+    return Promise.resolve();
+}
+
+/**
+ * Open a provider's consent page. Call synchronously from a click: browsers block later windows.
+ * @param {() => Promise<string>} getUrl
+ */
+export async function openConsent(getUrl) {
+    if (shell) {
+        // The server ties consent to the browser that began it, so it begins there. The account is
+        // connected everywhere, and Settings refetches when the app is next focused.
+        await openExternal('/?settings=storage');
+        return;
+    }
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) throw new Error('Allow the connection window to open, then try again.');
+    popup.opener = null;
+    try {
+        popup.location.href = await getUrl();
+    } catch (failure) {
+        popup.close();
+        throw failure;
+    }
+}
+
+/** Returns false when the user cancelled. */
+export async function saveFile({ name, content, type }) {
+    if (shell) return (await shell.invoke('save_file', { name, content })) !== false;
+    const url = URL.createObjectURL(new Blob([content], { type }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    return true;
+}
+
+export const canCopyText = () => Boolean(globalThis.navigator?.clipboard?.writeText);
+
+export async function copyText(text) {
+    if (!canCopyText()) throw new Error('Copying is not available here.');
+    await navigator.clipboard.writeText(text);
+}
+
+/** In a shell, links that would open a tab open the system browser. Returns a stop function. */
+export function installExternalLinks() {
+    if (!shell) return () => {};
+    const handle = (event) => {
+        const link = event.target?.closest?.('a[href]');
+        if (!link || event.defaultPrevented) return;
+        const url = new URL(link.getAttribute('href'), window.location.href);
+        const leaves = url.origin !== window.location.origin;
+        if (!leaves && link.target !== '_blank') return;
+        event.preventDefault();
+        void openExternal(leaves ? url.href : `${url.pathname}${url.search}${url.hash}`);
+    };
+    // On the way down: dialogs stop clicks on the way up.
+    document.addEventListener('click', handle, true);
+    return () => document.removeEventListener('click', handle, true);
+}

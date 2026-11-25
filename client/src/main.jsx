@@ -5,6 +5,7 @@ import { isPublicLandingLocation } from './utils/marketingHost';
 import { dismissLandingBootShell } from './utils/landingBootHandoff';
 import { dismissAppBootShell, handoffAppBootShell } from './utils/appBootHandoff';
 import { maybePrefetchLandingExamples } from './utils/landingPrefetch';
+import { installExternalLinks } from './platform';
 import { isDemoLocation } from './demo/demoMode';
 import './index.css';
 
@@ -27,6 +28,8 @@ const queryClient = new QueryClient({
 const isPublicLanding = isPublicLandingLocation();
 // The live demo: the real app, read-only, on the published examples (src/demo/).
 const isDemo = !isPublicLanding && isDemoLocation();
+
+installExternalLinks();
 
 // Preserve the HTML-parse snapshot head start while the route-specific React
 // bundle downloads. The query uses the same key in Landing, so it deduplicates.

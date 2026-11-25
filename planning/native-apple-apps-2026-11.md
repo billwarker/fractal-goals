@@ -13,7 +13,8 @@
 > | Phase S conformance fixtures and two-device chaos suite | Built against the real server (`tests/fixtures/sync_merge_cases.json`, `tests/integration/test_sync_two_devices.py`); the Swift engine runs the same cases later |
 > | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
 > | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
-> | Phase W platform seam, browsers in the device list | Not started |
+> | Phase W platform seam | Built (`client/src/platform/`): the shell injects `__FRACTAL_SHELL__`; `e2e/native-shell.spec.js` runs the same build as a pretend Mac shell. Not done in it: private media (`<img>` can't send a bearer token), the Drive picker, the 426 update screen, in-shell storage consent |
+> | Phase W browsers in the device list, WebKit test project | Not started |
 > | Phases M, I | Not started. M needs Rust; I needs full Xcode and an Apple Developer account |
 >
 > **Design changes while building:**
@@ -33,6 +34,8 @@
 > - The log's triggers look rows up by id array and plan each time (migration `e5d9b2a7f3c8`): with plain joins a
 >   stale plan scanned whole tables.
 > - Edits send only the fields that changed; a field resent unchanged is never an edit.
+> - The Mac app keeps its data in the web view's IndexedDB, the same code as the web, rather than SQLite.
+> - There is no capabilities list yet: it starts with the first Mac-only feature in Phase M.
 > - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
 > - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
 > - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.

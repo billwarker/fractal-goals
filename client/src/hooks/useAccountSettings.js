@@ -6,6 +6,7 @@ import { authApi, globalApi, setAccessToken } from '../utils/api';
 import { formatError } from '../utils/mutationNotify';
 import notify from '../utils/notify';
 import { buildQuotaRows, toggleQuotaRootId } from '../components/modals/settingsModalUtils';
+import { saveFile } from '../platform';
 
 export function useAccountSettings(activeTab) {
     const { user, setUser, signOutEverywhere } = useAuth();
@@ -129,15 +130,12 @@ export function useAccountSettings(activeTab) {
         try {
             const res = await authApi.exportAccountData({ password: exportPassword });
             // Turn the JSON response into a file download without a round trip.
-            const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `fractal-goals-export-${new Date().toISOString().slice(0, 10)}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            const saved = await saveFile({
+                name: `fractal-goals-export-${new Date().toISOString().slice(0, 10)}.json`,
+                content: JSON.stringify(res.data, null, 2),
+                type: 'application/json',
+            });
+            if (!saved) return;
 
             setExportPassword('');
             notify.success('Your data export has been downloaded.');

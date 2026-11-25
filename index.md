@@ -710,6 +710,8 @@ Offline writes are the ordinary routes: `token_required` makes every keyed fract
 take the device's `id` (`@accepts_client_id`, `services/client_ids.new_id`), and updates marked `@merges`
 take `_base`/`_edited_at` and merge field by field; a lost value is kept in `sync_conflicts`. Open web pages
 poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`).
+What differs between a browser and a native shell is asked of `client/src/platform/` (sign-in, files, outside
+links, API address); the maintainability audit rejects those browser calls elsewhere.
 Offline, the web shows every screen opened on the device (`offline/queryPersistence.js`, one record per query,
 bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goal and goal-note
 writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync.

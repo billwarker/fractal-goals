@@ -1,9 +1,13 @@
+import { isNative } from '../platform';
+
 // The public marketing site (landing page at "/") is served on the apex
 // domains; "my." and local dev keep the authenticated app at "/".
 export const LANDING_PREVIEW_PATH = '/landing-preview';
 
 export const isLocalDevHost = (hostname = (typeof window === 'undefined' ? '' : window.location.hostname)) => {
     const normalized = String(hostname || '').toLowerCase();
+    // A native shell serves its own files from a host of that name.
+    if (isNative) return false;
     return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '0.0.0.0' || normalized === '::1';
 };
 

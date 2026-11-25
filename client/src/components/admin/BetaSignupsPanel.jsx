@@ -5,6 +5,7 @@ import { adminApi } from '../../utils/api';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import LoadingState from '../common/LoadingState';
+import { copyText, saveFile } from '../../platform';
 import styles from '../../pages/Admin.module.css';
 
 const ADMIN_BETA_SIGNUPS_KEY = ['admin', 'beta-signups'];
@@ -61,7 +62,7 @@ export default function BetaSignupsPanel({ enabled }) {
             return;
         }
         try {
-            await navigator.clipboard?.writeText(emails);
+            await copyText(emails);
             notify.success(`Copied ${requests.length} email${requests.length === 1 ? '' : 's'}`);
         } catch {
             notify.error('Could not copy to clipboard');
@@ -74,14 +75,7 @@ export default function BetaSignupsPanel({ enabled }) {
                 ...(statusFilter ? { status: statusFilter } : {}),
                 ...(search ? { q: search } : {}),
             });
-            const url = URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = 'beta-signups.csv';
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
+            await saveFile({ name: 'beta-signups.csv', content: response.data, type: 'text/csv' });
         } catch (error) {
             notify.error(`Failed to export CSV: ${formatError(error)}`);
         }
@@ -161,7 +155,7 @@ export default function BetaSignupsPanel({ enabled }) {
                                     >
                                         Send invite
                                     </button>
-                                    <button onClick={() => navigator.clipboard?.writeText(request.email)}>Copy email</button>
+                                    <button onClick={() => { copyText(request.email).catch(() => {}); }}>Copy email</button>
                                 </td>
                             </tr>
                         ))}

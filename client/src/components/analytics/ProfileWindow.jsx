@@ -42,6 +42,7 @@ import ChartTitle from './ChartTitle';
 import ChartTitleEditor from './ChartTitleEditor';
 import pageGridSnap from './pageGridSnap';
 import axisExtension from './axisExtension';
+import { canCopyText, copyText } from '../../platform';
 
 // Panels on the Analytics page draw their charts on its grid (see applyChartDensity's 'expanded').
 ChartJS.register(pageGridSnap, axisExtension, alignedCrosshair);
@@ -270,8 +271,8 @@ function ProfileWindow({
 
     const handleCopyQuery = async (event) => {
         event.stopPropagation();
-        if (!queryExplanation?.sql || typeof navigator === 'undefined' || !navigator.clipboard?.writeText) return;
-        await navigator.clipboard.writeText(`${queryExplanation.sql}\n\n-- Metadata\n${JSON.stringify(queryExplanation.metadata, null, 2)}`);
+        if (!queryExplanation?.sql || !canCopyText()) return;
+        await copyText(`${queryExplanation.sql}\n\n-- Metadata\n${JSON.stringify(queryExplanation.metadata, null, 2)}`);
     };
 
     const handleOpenQueryConsole = (event) => {

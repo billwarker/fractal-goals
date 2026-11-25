@@ -14,6 +14,7 @@ import { adminApi } from '../utils/api';
 import notify from '../utils/notify';
 import { formatError } from '../utils/mutationNotify';
 import LoadingState from '../components/common/LoadingState';
+import { copyText } from '../platform';
 import styles from './Admin.module.css';
 const ADMIN_USERS_KEY = ['admin', 'users'];
 const ADMIN_SUMMARY_KEY = ['admin', 'summary'];
@@ -377,7 +378,7 @@ function UserActionsModal({ user, isOpen, onClose, onAction, isPending, generate
                                 {generatedPassword && (
                                     <div className={styles.generatedKey}>
                                         <span>Temporary password: {generatedPassword}</span>
-                                        <button onClick={() => navigator.clipboard?.writeText(generatedPassword)}>Copy</button>
+                                        <button onClick={() => { copyText(generatedPassword).catch(() => {}); }}>Copy</button>
                                     </div>
                                 )}
                             </section>
@@ -715,7 +716,7 @@ function Admin() {
                     {createdPassword && (
                         <div className={styles.generatedKey}>
                             <span>Temporary password: {createdPassword}</span>
-                            <button onClick={() => navigator.clipboard?.writeText(createdPassword)}>Copy</button>
+                            <button onClick={() => { copyText(createdPassword).catch(() => {}); }}>Copy</button>
                         </div>
                     )}
                     <table className={styles.table}>
@@ -783,7 +784,7 @@ function Admin() {
                     {newKey && (
                         <div className={styles.generatedKey}>
                             <span>{newKey}</span>
-                            <button onClick={() => navigator.clipboard?.writeText(newKey)}>Copy</button>
+                            <button onClick={() => { copyText(newKey).catch(() => {}); }}>Copy</button>
                         </div>
                     )}
                     <table className={styles.table}>

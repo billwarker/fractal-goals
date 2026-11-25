@@ -6,6 +6,7 @@ import { STALLED_AFTER_MS, describeQueueForSupport } from '../../offline/outboxQ
 import { REJECTED_TTL_MS } from '../../offline/outboxReview';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
+import { copyText } from '../../platform';
 import styles from './SessionSyncIndicator.module.css';
 
 const SYNCED_VISIBLE_MS = 2500;
@@ -74,7 +75,7 @@ export function describeRetryReason(error) {
 
 async function copyDiagnostics(outbox) {
     try {
-        await navigator.clipboard.writeText(JSON.stringify(describeQueueForSupport(outbox.getSnapshot(), Date.now()), null, 2));
+        await copyText(JSON.stringify(describeQueueForSupport(outbox.getSnapshot(), Date.now()), null, 2));
         notify.success('Sync details copied');
     } catch {
         notify.error("Couldn't copy the sync details");

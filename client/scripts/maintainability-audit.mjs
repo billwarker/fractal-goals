@@ -224,6 +224,16 @@ const LOADING_STATE_OWNERS = new Set([
   'src/components/common/RouteFallback.jsx',
 ]);
 const AD_HOC_LOADING = /<(?:div|p|span|li|section)\b[^>]*>\s*Loading\b|className=["'][^"']*\bloading-spinner\b/;
+// What differs between a browser and a native shell is asked of src/platform, never tested for elsewhere.
+const PLATFORM_CALLS = /\bwindow\.open\(|\bURL\.createObjectURL\(|\bnavigator\.clipboard\b|\bnew Notification\(|__TAURI|__FRACTAL_SHELL__/;
+const auditPlatformCalls = (file, content) => {
+  if (file.startsWith('src/platform/') || isTestFile(file) || !/\.jsx?$/.test(file)) return;
+  const match = content.match(PLATFORM_CALLS);
+  if (match) {
+    console.error(`[maintainability-audit] ${file} uses ${match[0]} directly. Add it to src/platform instead.`);
+    hasFailure = true;
+  }
+};
 const auditLoadingStates = (file, content) => {
   if (!file.endsWith('.jsx') || isTestFile(file) || LOADING_STATE_OWNERS.has(file)) return;
   const match = content.match(AD_HOC_LOADING);
@@ -455,6 +465,7 @@ for (const file of sourceFiles) {
   auditImportOrder(relativePath, content);
   auditFileSize(relativePath, content);
   auditLoadingStates(relativePath, content);
+  auditPlatformCalls(relativePath, content);
   inlineStyleCount += auditInlineStyles(relativePath, content);
   rawCloseGlyphCount += countRawCloseGlyphs(content);
   rawButtonClassDriftCount += countRawButtonClassDrift(content);
