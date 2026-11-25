@@ -183,6 +183,99 @@ def test_devices_converge_and_lose_nothing(client, db_session, test_user, root, 
         assert kept or (goal_id, field, value) in set_aside or (goal_id, field, value) in seen_as_base, (goal_id, field, value)
 
 
+@pytest.fixture
+def logged(client, db_session, test_user, root):
+    """An activity with one set, as both devices have it."""
+    from models import ActivityDefinition, ActivityInstance, ActivitySet, MetricDefinition, MetricValue, Session
+    ids = {name: str(uuid.uuid4()) for name in ('activity', 'reps', 'kg', 'session', 'instance', 'first')}
+    db_session.add_all([
+        ActivityDefinition(id=ids['activity'], root_id=root.id, name='Press', has_sets=True, has_metrics=True),
+        Session(id=ids['session'], root_id=root.id, owner_id=test_user.id, name='S'),
+    ])
+    db_session.flush()
+    db_session.add_all([
+        MetricDefinition(id=ids['reps'], activity_id=ids['activity'], root_id=root.id, name='Reps', unit='reps'),
+        MetricDefinition(id=ids['kg'], activity_id=ids['activity'], root_id=root.id, name='Weight', unit='kg'),
+        ActivityInstance(id=ids['instance'], root_id=root.id, session_id=ids['session'],
+                         activity_definition_id=ids['activity']),
+    ])
+    db_session.flush()
+    db_session.add(ActivitySet(id=ids['first'], activity_instance_id=ids['instance'], sort_order=0, status='completed'))
+    db_session.flush()
+    db_session.add(MetricValue(activity_instance_id=ids['instance'], activity_set_id=ids['first'],
+                               metric_definition_id=ids['reps'], value=5))
+    db_session.commit()
+    return ids
+
+
+def _set(ids, set_id, reps):
+    return {'id': set_id, 'status': 'completed', 'metrics': [{'metric_id': ids['reps'], 'value': reps}]}
+
+
+def _save_sets(client, user, root, ids, sets, base):
+    response = client.put(f"/api/{root.id}/activity-instances/{ids['instance']}", headers=session_headers_for(user), json={
+        'session_id': ids['session'], 'activity_definition_id': ids['activity'], 'sets': sets,
+        **({} if base is None else {'base_sets': base}),
+    })
+    assert response.status_code == 200, response.get_json()
+    return {row['id']: row['metrics'][0]['value'] for row in response.get_json()['sets']}
+
+
+def test_sets_logged_on_two_devices_are_all_kept(client, test_user, root, logged):
+    base = [_set(logged, logged['first'], 5)]
+    mac, phone = str(uuid.uuid4()), str(uuid.uuid4())
+    _save_sets(client, test_user, root, logged, [*base, _set(logged, mac, 6)], base)
+    result = _save_sets(client, test_user, root, logged, [*base, _set(logged, phone, 7)], base)
+    assert result == {logged['first']: 5, mac: 6, phone: 7}
+
+
+def test_a_set_left_alone_keeps_the_other_devices_edit(client, test_user, root, logged):
+    base = [_set(logged, logged['first'], 5)]
+    _save_sets(client, test_user, root, logged, [_set(logged, logged['first'], 9)], base)
+    added = str(uuid.uuid4())
+    assert _save_sets(client, test_user, root, logged, [*base, _set(logged, added, 7)], base) == {
+        logged['first']: 9, added: 7,
+    }
+
+
+def test_removing_a_set_still_removes_it(client, test_user, root, logged):
+    base = [_set(logged, logged['first'], 5)]
+    theirs = str(uuid.uuid4())
+    _save_sets(client, test_user, root, logged, [*base, _set(logged, theirs, 6)], base)
+    assert _save_sets(client, test_user, root, logged, [], base) == {theirs: 6}
+
+
+def test_a_set_removed_elsewhere_comes_back_rather_than_losing_work(client, test_user, root, logged):
+    base = [_set(logged, logged['first'], 5)]
+    _save_sets(client, test_user, root, logged, [], base)
+    assert _save_sets(client, test_user, root, logged, base, base) == {logged['first']: 5}
+
+
+def test_sets_can_be_reordered_and_older_apps_still_replace(client, test_user, root, logged):
+    second = str(uuid.uuid4())
+    first = _set(logged, logged['first'], 5)
+    _save_sets(client, test_user, root, logged, [first, _set(logged, second, 6)], [first])
+    both = [first, _set(logged, second, 6)]
+    assert list(_save_sets(client, test_user, root, logged, both[::-1], both)) == [second, logged['first']]
+    assert _save_sets(client, test_user, root, logged, [first], None) == {logged['first']: 5}
+
+
+def test_values_entered_on_two_devices_are_both_kept(client, test_user, root, logged):
+    url = f"/api/{root.id}/sessions/{logged['session']}/activities/{logged['instance']}/metrics"
+    reps, kg = ({'metric_id': logged[name], 'value': 1.0} for name in ('reps', 'kg'))
+
+    def save(metrics, base):
+        body = client.put(url, headers=session_headers_for(test_user), json={'metrics': metrics, 'base_metrics': base})
+        assert body.status_code == 200, body.get_json()
+        return {row['metric_id']: row['value'] for row in body.get_json()['metric_values']}
+    save([reps], [])
+    assert save([kg], []) == {logged['reps']: 1, logged['kg']: 1}
+    # Changed on one, untouched on the other; then cleared by a device that had seen it.
+    save([{**reps, 'value': 8.0}, kg], [reps, kg])
+    assert save([reps, {**kg, 'value': 3.0}], [reps, kg]) == {logged['reps']: 8, logged['kg']: 3}
+    assert save([{**kg, 'value': 3.0}], [{**reps, 'value': 8.0}, {**kg, 'value': 3.0}]) == {logged['kg']: 3}
+
+
 def test_edits_arriving_at_once_are_all_kept_or_set_aside(app, db_session, test_user, root):
     headers, root_id = session_headers_for(test_user), root.id
     edits = [f'edit {number}' for number in range(16)]

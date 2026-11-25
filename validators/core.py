@@ -107,6 +107,7 @@ def validate_request(schema_class, *, allow_empty_json: bool = False):
                     "details": errors
                 }), 400
                 
+        setattr(wrapper, 'request_model', schema_class)
         return wrapper
     return decorator
 

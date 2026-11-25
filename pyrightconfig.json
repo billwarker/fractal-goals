@@ -2,6 +2,7 @@
   "include": [
     "services",
     "blueprints",
+    "contracts",
     "models",
     "validators",
     "app.py",

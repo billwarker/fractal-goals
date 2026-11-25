@@ -7,8 +7,10 @@ import {
     buildInstanceUpdateRequest,
     buildPlaceholderInstance,
     findRunningInstance,
+    instanceBase,
     instanceCoalesceKey,
     nowIso,
+    withSetIds,
 } from '../offline/sessionOps';
 import notify from '../utils/notify';
 import { queryKeys } from './queryKeys';
@@ -79,14 +81,21 @@ export function useOfflineSessionWrites({
             return outbox.submit(op);
         };
 
-        const updateInstance = async (instanceId, updates) => {
+        const updateInstance = async (instanceId, requested) => {
             const instance = findInstance(instanceId);
             if (!instance) return undefined;
+            const updates = withSetIds(requested);
+            const coalesceKey = instanceCoalesceKey(instanceId, updates);
+            // A save that replaces an unsent one still began from what that one began from.
+            const replaced = outbox.pendingOps(sessionId).find((op) => (
+                op.coalesceKey === coalesceKey && !(op.sendingUntil > Date.now())
+            ));
+            const request = buildInstanceUpdateRequest({ rootId, sessionId, instance, updates });
             await enqueue(
                 SESSION_OP.INSTANCE_UPDATE,
-                buildInstanceUpdateRequest({ rootId, sessionId, instance, updates }),
+                { ...request, body: { ...request.body, ...instanceBase(instance, updates, replaced?.body) } },
                 { instanceId, updates },
-                { coalesceKey: instanceCoalesceKey(instanceId, updates), entityIds: [instanceId] },
+                { coalesceKey, entityIds: [instanceId] },
             );
             return undefined;
         };

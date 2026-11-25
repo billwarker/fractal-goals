@@ -9,7 +9,8 @@
 > | Phase S.1 change log, S.2 `snapshot` and `changes` | Built |
 > | Phase S.3 offline writes: safe retries on every fractal write, field merging, conflict records | Built; Settings → Sync shows conflicts |
 > | Web: open pages refresh on another device's changes | Built (`client/src/sync/changeListener.js`) |
-> | Phase 0.1 OpenAPI, 0.5 OAuth/links/reminders | Not started |
+> | Phase 0.1 OpenAPI | Built: `docs/api/openapi.json` lists every API route; what the apps read (sync, sign-in, goals, sessions, notes, programs, templates, activities) is fully described and checked against every response in the test suite; other responses are listed untyped. CI refuses a breaking change |
+> | Phase 0.5 in-app storage consent, app links, reminders | Not started |
 > | Phase S conformance fixtures and two-device chaos suite | Built against the real server (`tests/fixtures/sync_merge_cases.json`, `tests/integration/test_sync_two_devices.py`); the Swift engine runs the same cases later |
 > | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
 > | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
@@ -44,6 +45,8 @@
 > - Programs stay online-only offline: their calendar rules can refuse a change, and one refused days later
 >   is worse than one refused now. Activity edits (not creates) too: their metrics can't be merged.
 > - A queued change waits for any change, in any queue, that creates an id it mentions.
+> - Set and value lists in a session merge: a save sends the list it began from (`base_sets`, `base_metrics`), so sets
+>   logged on two devices are all kept. The same set edited on both keeps the last to arrive.
 > - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
 > - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
 > - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.

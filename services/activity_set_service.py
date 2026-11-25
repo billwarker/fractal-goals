@@ -35,6 +35,68 @@ def _metric_key(raw_metric: dict):
     )
 
 
+def _clear_moved_positions(db_session, existing_by_id, raw_sets):
+    """Positions are unique per activity, so rows that move are parked before any takes its new place."""
+    wanted = {row.get("id"): index for index, row in enumerate(raw_sets) if isinstance(row, dict)}
+    moved = [row for set_id, row in existing_by_id.items() if wanted.get(set_id) != row.sort_order]
+    if not moved:
+        return
+    top = max([len(raw_sets), *(row.sort_order for row in existing_by_id.values())]) + 1
+    for offset, row in enumerate(moved):
+        row.sort_order = top + offset
+    db_session.flush()
+
+
+def _set_content(raw_set):
+    """What a set records, to tell an edited set from one sent along unchanged."""
+    metrics = {}
+    for metric in raw_set.get("metrics") or []:
+        value = metric.get("value") if isinstance(metric, dict) else None
+        if value is None or (isinstance(value, str) and not value.strip()):
+            continue
+        try:
+            metrics[_metric_key(metric)] = float(value)
+        except (TypeError, ValueError):
+            metrics[_metric_key(metric)] = value
+    notes = raw_set.get("notes")
+    return (
+        _normalize_status(raw_set), raw_set.get("duration_seconds") or None,
+        notes if isinstance(notes, str) and notes.strip() else None, metrics,
+    )
+
+
+def merge_activity_sets(instance, raw_sets, base_sets):
+    """Carry another device's sets into this device's list.
+
+    ``base_sets`` is the list this device last had from the server. A set it never saw stays, after
+    its own; a set it didn't touch keeps what the server has. A set it removed is still removed, and
+    one it kept but another device removed comes back: work is never dropped by a guess.
+    """
+    valid = all(isinstance(row, dict) and row.get("id") for row in [*raw_sets, *base_sets])
+    if not valid:
+        return raw_sets  # An id-less set can't be told from another device's.
+    base_by_id = {row["id"]: row for row in base_sets}
+    current_by_id = {row.id: row for row in (instance.sets or [])}
+    sent = {row["id"] for row in raw_sets}
+
+    def stored(row):
+        return {
+            "id": row.id, "status": row.status, "duration_seconds": row.duration_seconds, "notes": row.notes,
+            "metrics": [
+                {"metric_id": value.metric_definition_id, "split_id": value.split_definition_id, "value": value.value}
+                for value in (row.metric_values or [])
+            ],
+        }
+
+    merged = []
+    for raw_set in raw_sets:
+        base, current = base_by_id.get(raw_set["id"]), current_by_id.get(raw_set["id"])
+        untouched = base is not None and _set_content(base) == _set_content(raw_set)
+        merged.append(stored(current) if untouched and current is not None else raw_set)
+    theirs = [row for set_id, row in current_by_id.items() if set_id not in sent and set_id not in base_by_id]
+    return [*merged, *(stored(row) for row in sorted(theirs, key=lambda row: row.sort_order))]
+
+
 def replace_activity_sets(db_session, instance, raw_sets: Iterable[dict] | None) -> list[ActivitySet]:
     """Synchronize stable normalized set rows and their metric values.
 
@@ -61,6 +123,7 @@ def replace_activity_sets(db_session, instance, raw_sets: Iterable[dict] | None)
         )
     }
     existing_by_id = {row.id: row for row in (instance.sets or [])}
+    _clear_moved_positions(db_session, existing_by_id, raw_sets)
     retained_ids = set()
     normalized_rows = []
 

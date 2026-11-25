@@ -128,8 +128,18 @@ jobs:
 
       - name: Syntax and Maintainability
         run: |
-          python -m compileall -q blueprints services models validators app.py config.py
+          python -m compileall -q blueprints services models validators contracts app.py config.py
           python scripts/check_backend_maintainability.py
+
+      - name: API changes don't break installed apps
+        # Compares with the branch this merges into; apps in use were built against that document.
+        run: |
+          git fetch --quiet --depth=1 origin "${{ github.base_ref || 'main' }}"
+          if git show FETCH_HEAD:docs/api/openapi.json > /tmp/openapi-base.json 2>/dev/null; then
+            python scripts/generate_openapi.py --check-against /tmp/openapi-base.json
+          else
+            echo "No published document on the base branch yet"
+          fi
 
       - name: Static type check (baseline ratchet)
         # pyrightconfig.json names the local fractal-goals-venv; point that name at

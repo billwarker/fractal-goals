@@ -592,6 +592,7 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
             instance_id,
             current_user.id,
             validated_data.get('metrics', []),
+            base_metrics=validated_data.get('base_metrics'),
         )
         if error:
             if isinstance(error, dict):

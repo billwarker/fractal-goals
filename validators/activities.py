@@ -272,6 +272,8 @@ class TimerActivityInstanceManualUpdateSchema(BaseModel):
     completed: Optional[bool] = None
     notes: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     sets: Optional[List[Dict[str, Any]]] = None
+    # The sets as this device last had them, so another device's survive (merge_activity_sets).
+    base_sets: Optional[List[Dict[str, Any]]] = None
     target_duration_seconds: Optional[int] = None
 
     @field_validator('target_duration_seconds')
@@ -301,6 +303,8 @@ class MetricValueSchema(BaseModel):
 class ActivityMetricsUpdateSchema(BaseModel):
     """Schema for updating activity metrics."""
     metrics: List[MetricValueSchema] = Field(default_factory=list)
+    # As this device last had them: what it didn't touch is left as it is.
+    base_metrics: Optional[List[MetricValueSchema]] = None
 
 
 class ActivityReorderSchema(BaseModel):

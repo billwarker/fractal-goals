@@ -354,13 +354,14 @@ class SessionService:
             current_user_id,
         )
 
-    def update_activity_metrics(self, root_id, session_id, instance_id, current_user_id, metric_data_list) -> ServiceResult[JsonDict]:
+    def update_activity_metrics(self, root_id, session_id, instance_id, current_user_id, metric_data_list, *, base_metrics=None) -> ServiceResult[JsonDict]:
         return self._session_activity_service().update_activity_metrics(
             root_id,
             session_id,
             instance_id,
             current_user_id,
             metric_data_list,
+            base_metrics=base_metrics,
         )
 
     def duplicate_session(self, root_id, session_id, current_user_id) -> ServiceResult[JsonDict]:
