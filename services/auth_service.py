@@ -8,7 +8,7 @@ import jwt
 
 from account_tiers import DEFAULT_ACCOUNT_TIER
 from config import config
-from models import BetaSignupRequest, EmailDeliveryEvent, PasswordResetToken, User, utc_now
+from models import BetaSignupRequest, EmailDeliveryEvent, PasswordResetToken, User, UserDevice, utc_now
 from services.account_flags import clear_force_password_change, revoke_user_sessions
 from services.email_service import EmailSendError, EmailService
 from services.ops_log import log_ops_event
@@ -36,6 +36,7 @@ class AuthService:
         remember_me: bool = False,
         auth_time: int | None = None,
         issued_at: datetime.datetime | None = None,
+        device_id: str | None = None,
     ) -> str:
         """Issue a session token bound to the user's current session version.
 
@@ -43,6 +44,10 @@ class AuthService:
         through refreshes so a session cannot outlive SESSION_MAX_LIFETIME_DAYS.
         """
         now = issued_at or datetime.datetime.now(datetime.timezone.utc)
+        lifetime = datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS)
+        if device_id:
+            # Device sessions renew with their own refresh token, so their access token is short.
+            lifetime = datetime.timedelta(minutes=config.DEVICE_ACCESS_TOKEN_MINUTES)
         return jwt.encode({
             'aud': SESSION_TOKEN_AUDIENCE,
             'user_id': user.id,
@@ -50,7 +55,8 @@ class AuthService:
             'remember_me': bool(remember_me),
             'iat': now,
             'auth_time': int(now.timestamp()) if auth_time is None else int(auth_time),
-            'exp': now + datetime.timedelta(hours=config.JWT_EXPIRATION_HOURS),
+            'exp': now + lifetime,
+            **({'did': device_id} if device_id else {}),
         }, config.JWT_SECRET_KEY, algorithm="HS256")
 
     @staticmethod
@@ -66,6 +72,10 @@ class AuthService:
     @staticmethod
     def _session_is_current(user: User, claims: JsonDict) -> bool:
         return claims.get('sv') == (user.session_version or 0)
+
+    def _device_is_active(self, device_id, user_id) -> bool:
+        device = self.db_session.get(UserDevice, device_id)
+        return device is not None and device.user_id == user_id and device.revoked_at is None
 
     def _find_user_for_login(self, username_or_email: str):
         return self.db_session.query(User).filter(
@@ -103,6 +113,8 @@ class AuthService:
         if not current_user.is_active:
             return None, 'User account is suspended', 403
         if not self._session_is_current(current_user, data):
+            return None, 'Session has been revoked', 401
+        if data.get('did') and not self._device_is_active(data['did'], current_user.id):
             return None, 'Session has been revoked', 401
 
         logger.debug("Resolved auth token for user_id=%s", current_user.id)
@@ -296,12 +308,19 @@ class AuthService:
         if not user:
             return None, 'User not found', 404
         try:
-            remember_me = bool(self._decode_session_token(previous_token, verify_exp=False).get('remember_me'))
+            claims = self._decode_session_token(previous_token, verify_exp=False)
         except jwt.InvalidTokenError:
-            remember_me = False
+            claims = {}
+        remember_me = bool(claims.get('remember_me'))
+        device_id = claims.get('did')
+        if device_id and self._device_is_active(device_id, user_id):
+            device = self.db_session.get(UserDevice, device_id)
+            device.session_version = user.session_version
+            self.db_session.commit()
         return {
-            'token': self.issue_token(user, remember_me=remember_me),
+            'token': self.issue_token(user, remember_me=remember_me, device_id=device_id),
             'remember_me': remember_me,
+            'device_session': bool(device_id),
         }, None, 200
 
     def revoke_all_sessions(self, user_id: str) -> ServiceResult[JsonDict]:
@@ -342,6 +361,9 @@ class AuthService:
     def refresh_token(self, token: str) -> ServiceResult[JsonDict]:
         try:
             data = self._decode_session_token(token, verify_exp=False)
+            if data.get('did'):
+                # Only the device's rotating refresh token renews it (services/device_auth_service.py).
+                return None, 'Invalid token', 401
             now = datetime.datetime.now(datetime.timezone.utc)
             exp_time = datetime.datetime.fromtimestamp(data['exp'], tz=datetime.timezone.utc)
             refresh_window = datetime.timedelta(days=config.JWT_REFRESH_WINDOW_DAYS)

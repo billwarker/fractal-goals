@@ -4,6 +4,7 @@ from models import FractalMetricDefinition, Goal, MetricDefinition, validate_roo
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, ServiceResult
+from services.client_ids import new_id
 
 
 ALLOWED_PROGRESS_AGGREGATIONS = {'last', 'sum', 'max', 'yield'}
@@ -210,6 +211,7 @@ class ActivityMetricService:
             return None, storage_error, storage_status
 
         metric = FractalMetricDefinition(
+            id=new_id(FractalMetricDefinition),
             root_id=root_id,
             name=name,
             unit=unit,

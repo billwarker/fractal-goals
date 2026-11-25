@@ -36,6 +36,8 @@ from services.serializers import (
 from extensions import limiter
 from services.goal_analytics_service import GoalAnalyticsService
 from services.goal_deadline_rules import warnings_for_goal
+from blueprints.client_ids import accepts_client_id
+from blueprints.sync_merge import merges
 from services.goal_service import (
     GoalService,
 )
@@ -287,6 +289,7 @@ def get_all_fractals(current_user):
 
 @goals_bp.route('/fractals', methods=['POST'])
 @token_required
+@accepts_client_id(Goal)
 @validate_request(FractalCreateSchema)
 @limiter.limit("5 per minute")
 def create_fractal(current_user, validated_data):
@@ -372,6 +375,7 @@ def get_active_goals_for_selection(current_user, root_id):
 
 @goals_bp.route('/<root_id>/goals', methods=['POST'])
 @token_required
+@accepts_client_id(Goal)
 @validate_request(GoalCreateSchema)
 def create_fractal_goal(current_user, root_id, validated_data):
     """Create a new goal within a fractal."""
@@ -437,6 +441,7 @@ def delete_fractal_goal(current_user, root_id, goal_id):
 
 @goals_bp.route('/<root_id>/goals/<goal_id>', methods=['PUT'])
 @token_required
+@merges('goal', 'goal_id')
 @validate_request(GoalUpdateSchema)
 def update_fractal_goal(current_user, root_id, goal_id, validated_data):
     """Update a goal within a fractal."""

@@ -6,6 +6,9 @@ import { DemoReadOnlyError, isDemoMode, reportBlockedDemoWrite, shouldBlockDemoR
 
 export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
 
+// Names this tab in the server's change log, so it can tell its own writes from other devices'.
+export const CLIENT_INSTANCE = globalThis.crypto?.randomUUID?.() ?? `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
 axios.defaults.withCredentials = true;
 axios.defaults.timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
@@ -133,6 +136,9 @@ axios.interceptors.request.use(async (config) => {
     const isPublicRequest = String(config.url || '').includes('/public/');
     if (accessToken && !isPublicRequest && !config._skipAuth && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
+    }
+    if (!isPublicRequest && MUTATING_METHODS.has(String(config.method || 'get').toLowerCase())) {
+        setHeader(config, 'X-Client-Instance', CLIENT_INSTANCE);
     }
     if (String(config.url || '').includes('/auth/refresh') && !getHeader(config.headers, CSRF_HEADER_NAME)) {
         const csrfToken = readCookie(CSRF_COOKIE_NAME);

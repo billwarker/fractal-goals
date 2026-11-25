@@ -45,6 +45,7 @@ from services.prescriptions import (
     snapshot_prescription,
 )
 from services._session_lifecycle_common import _parse_iso_datetime_strict
+from services.client_ids import new_id
 
 
 # A create_session phase returns None to continue, or (message, status) to stop.
@@ -149,7 +150,7 @@ class _SessionCreationMixin:
             return None, "Invalid datetime format. Use ISO-8601 (e.g. 2026-02-18T15:30:00Z)", 400
 
         new_session = Session(
-            **({'id': data['id']} if data.get('id') else {}),
+            id=data.get('id') or new_id(Session),
             name=data.get('name', 'Untitled Session'),
             description=data.get('description', ''),
             owner_id=current_user_id,

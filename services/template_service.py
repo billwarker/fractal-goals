@@ -16,6 +16,7 @@ from services.session_structure import build_template_data_from_session
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.service_types import JsonList, ServiceResult
 from validators import validate_session_template_data
+from services.client_ids import new_id
 
 
 STARTER_TEMPLATE_NAME = "Simple Empty Template"
@@ -180,7 +181,7 @@ class TemplateService:
             return None, storage_error, storage_status
 
         new_template = SessionTemplate(
-            id=str(uuid.uuid4()),
+            id=new_id(SessionTemplate),
             name=data['name'],
             description=data.get('description', ''),
             root_id=root_id,

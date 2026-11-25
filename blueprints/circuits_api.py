@@ -8,6 +8,8 @@ from blueprints.api_utils import get_db_session, internal_error
 from blueprints.auth_api import token_required
 from blueprints.idempotency import idempotent
 from services.circuit_service import CircuitService
+from blueprints.client_ids import accepts_client_id
+from models import CircuitDefinition
 from validators import (
     CircuitDefinitionCreateSchema,
     CircuitDefinitionUpdateSchema,
@@ -71,6 +73,7 @@ def list_circuits(current_user, root_id):
 
 @circuits_bp.route("/<root_id>/circuits", methods=["POST"])
 @token_required
+@accepts_client_id(CircuitDefinition)
 def create_circuit(current_user, root_id):
     data, error = _validated(CircuitDefinitionCreateSchema)
     if error:

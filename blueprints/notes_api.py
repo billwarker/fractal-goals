@@ -18,6 +18,7 @@ from services.note_service import NoteService
 from services.serializers import serialize_note_display
 from services.oembed_service import get_instagram_oembed
 from validators import NoteCreateRequestSchema, NoteUpdateSchema, validate_request
+from blueprints.sync_merge import merges
 
 logger = logging.getLogger(__name__)
 
@@ -216,6 +217,7 @@ def create_note(current_user, root_id, validated_data):
 @notes_bp.route('/<root_id>/notes/<note_id>', methods=['PUT'])
 @token_required
 @idempotent
+@merges('note', 'note_id')
 @validate_request(NoteUpdateSchema)
 def update_note(current_user, root_id, note_id, validated_data):
     db_session, note_service = _with_note_service()

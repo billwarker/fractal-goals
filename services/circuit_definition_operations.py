@@ -7,6 +7,7 @@ from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.serializers import format_utc, serialize_circuit_definition
 from services.work_interval_service import utc_now_naive
+from services.client_ids import new_id
 
 
 class CircuitDefinitionOperations:
@@ -104,7 +105,7 @@ class CircuitDefinitionOperations:
         )
         if storage_error:
             return None, storage_error, storage_status
-        definition = CircuitDefinition(root_id=root_id, **fields)
+        definition = CircuitDefinition(id=new_id(CircuitDefinition), root_id=root_id, **fields)
         self.db_session.add(definition)
         self.db_session.flush()
         for index, slot in enumerate(slots):

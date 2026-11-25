@@ -9,6 +9,7 @@ import { createIndexedDbStore } from './indexedDbStore';
 import { createOutbox } from './outbox';
 
 export { registerSessionOpHandlers } from './sessionOpHandlers';
+export { startChangeListener } from '../sync/changeListener';
 export { restoreQueryCache, startQueryPersistence } from './queryPersistence';
 
 // Dead connections should be noticed quickly, but a busy server must not read as one.

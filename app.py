@@ -52,6 +52,9 @@ from blueprints.analytics_api import analytics_bp
 from blueprints.logs_api import logs_api
 from blueprints.feature_flags_api import feature_flags_bp
 from blueprints.auth_api import auth_bp
+from blueprints.device_auth_api import device_auth_bp
+from blueprints.sync_api import sync_bp
+from blueprints.client_version import register_client_version
 from blueprints.admin_api import admin_bp
 from blueprints.public_api import public_bp
 from blueprints.pages import pages_bp
@@ -161,7 +164,7 @@ CORS(app, resources={
     r"/api/.*": {
         "origins": config.CORS_ORIGINS,
         "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME, "Idempotency-Key", "Upload-Offset"],
+        "allow_headers": ["Content-Type", "Authorization", config.CSRF_HEADER_NAME, "Idempotency-Key", "Upload-Offset", "X-Client-Platform", "X-Client-Build", "X-Client-Instance"],
         "expose_headers": [config.CSRF_HEADER_NAME],
         "supports_credentials": True
     }
@@ -217,6 +220,9 @@ app.register_blueprint(analytics_bp)
 app.register_blueprint(logs_api)
 app.register_blueprint(feature_flags_bp)
 app.register_blueprint(auth_bp)
+app.register_blueprint(device_auth_bp)
+app.register_blueprint(sync_bp)
+register_client_version(app)
 app.register_blueprint(admin_bp)
 app.register_blueprint(public_bp)
 # Static assets and SPA route shells do not consume API rate-limit capacity.

@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import (
     ActivityDefinition,
     MetricDefinition,
+    ActivityGroup, FractalMetricDefinition, ActivityTagDefinition, ActivityTagFamily,
 )
 from validators import (
     validate_request,
@@ -41,6 +42,8 @@ from blueprints.goal_activity_groups_api import goal_activity_groups_bp
 from services.activity_tag_assignment_service import ActivityTagAssignmentService
 from services.activity_tag_catalog_service import ActivityTagCatalogService
 from services.activity_tag_family_service import ActivityTagFamilyService
+from blueprints.client_ids import accepts_client_id
+from blueprints.sync_merge import merges
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +128,7 @@ def list_activity_tag_catalog(current_user, root_id):
 
 @activities_bp.route('/<root_id>/activity-tags', methods=['POST'])
 @token_required
+@accepts_client_id(ActivityTagDefinition)
 @validate_request(ActivityTagCatalogCreateSchema)
 def create_activity_tag_catalog_item(current_user, root_id, validated_data):
     session = get_db_session()
@@ -371,6 +375,7 @@ def reorder_activity_tags(current_user, root_id, validated_data):
 
 @activities_bp.route('/<root_id>/activity-tag-families', methods=['POST'])
 @token_required
+@accepts_client_id(ActivityTagFamily)
 @validate_request(ActivityTagFamilyCreateSchema)
 def create_activity_tag_family(current_user, root_id, validated_data):
     session = get_db_session()
@@ -445,6 +450,7 @@ def get_fractal_metrics(current_user, root_id):
 
 @activities_bp.route('/<root_id>/fractal-metrics', methods=['POST'])
 @token_required
+@accepts_client_id(FractalMetricDefinition)
 @validate_request(FractalMetricCreateSchema)
 def create_fractal_metric(current_user, root_id, validated_data):
     session = get_db_session()
@@ -519,6 +525,7 @@ def get_activity_groups(current_user, root_id):
 
 @activities_bp.route('/<root_id>/activity-groups', methods=['POST'])
 @token_required
+@accepts_client_id(ActivityGroup)
 @validate_request(ActivityGroupCreateSchema)
 def create_activity_group(current_user, root_id, validated_data):
     """Create a new activity group."""
@@ -651,6 +658,7 @@ def get_activities(current_user, root_id):
 
 @activities_bp.route('/<root_id>/activities', methods=['POST'])
 @token_required
+@accepts_client_id(ActivityDefinition)
 def create_activity(current_user, root_id):
     """Create a new activity definition with metrics."""
     session = get_db_session()
@@ -675,6 +683,7 @@ def create_activity(current_user, root_id):
 
 @activities_bp.route('/<root_id>/activities/<activity_id>', methods=['PUT'])
 @token_required
+@merges('activity', 'activity_id')
 def update_activity(current_user, root_id, activity_id):
     """Update an activity definition and its metrics."""
     session = get_db_session()

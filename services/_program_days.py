@@ -37,6 +37,7 @@ from services.program_day_occurrences import (
 )
 from services.program_status_override_queries import load_program_status_overrides
 from services.program_focus import assert_day_goals_valid, resolve_focus_scopes
+from services.client_ids import new_id
 from services.program_calendar_invariants import (
     assert_dates_within_program,
     assert_single_program_day_per_date,
@@ -102,7 +103,7 @@ class _ProgramDaysMixin(_ProgramMixinBase):
             ProgramDay.program_id == program_id,
         ).scalar() or 0
         day = ProgramDay(
-            id=str(uuid.uuid4()),
+            id=new_id(ProgramDay),
             program_id=program_id,
             day_number=last_number + 1,
             name=data.get('name'),

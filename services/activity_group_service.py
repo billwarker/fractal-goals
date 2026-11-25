@@ -20,6 +20,7 @@ from services.goal_activity_group_links import (
 )
 from services.payload_normalizers import normalize_activity_payload, normalize_id_list
 from services.service_types import JsonDict, ServiceResult
+from services.client_ids import new_id
 
 
 def validate_activity_group_parent(db_session, root_id, group_id, parent_id):
@@ -197,6 +198,7 @@ class ActivityGroupService:
         new_order = (max_order or 0) + 1
 
         new_group = ActivityGroup(
+            id=new_id(ActivityGroup),
             root_id=root_id,
             name=data['name'],
             description=data.get('description', ''),

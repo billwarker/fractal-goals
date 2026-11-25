@@ -19,6 +19,7 @@ from services.payload_normalizers import (
 )
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
+from services.client_ids import new_id
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +223,7 @@ class ActivityService:
         
         # Create Activity
         new_activity = ActivityDefinition(
+            id=new_id(ActivityDefinition),
             root_id=root_id,
             name=activity_name,
             description=data.get('description', ''),

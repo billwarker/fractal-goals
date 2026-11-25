@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 from models import AdminAuditEvent, User, validate_root_goal
 from blueprints.api_utils import get_db_session, internal_error
+from blueprints.idempotency import IDEMPOTENCY_HEADER, idempotent
 from extensions import limiter
 from config import config
 import logging
@@ -132,10 +133,23 @@ def _validate_csrf_for_cookie_auth():
         return False
     return hmac.compare_digest(cookie_token, header_token)
 
+def _is_replayable_write(handler) -> bool:
+    """Every write inside a fractal may be retried by a device; media streams have their own protocol."""
+    return (
+        _is_mutating_request()
+        and not getattr(handler, 'is_idempotent', False)
+        and request.blueprint != 'storage'
+        and (request.endpoint == 'goals.create_fractal' or 'root_id' in (request.view_args or {}))
+    )
+
+
 def token_required(f):
     """Decorator to protect routes with JWT authentication."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        handler = f
+        if request.headers.get(IDEMPOTENCY_HEADER) and _is_replayable_write(f):
+            handler = idempotent(f)
         # Let CORS preflight requests pass through auth checks.
         # The real request (GET/POST/...) will still require a valid token.
         if request.method == 'OPTIONS':
@@ -234,7 +248,7 @@ def token_required(f):
                 current_user.id = admin_user_id
             g.current_user = current_user
             authentication_complete = True
-            return f(current_user, *args, **kwargs)
+            return handler(current_user, *args, **kwargs)
         except SQLAlchemyError:
             if authentication_complete:
                 raise
@@ -528,10 +542,11 @@ def update_password(current_user, validated_data):
         session, error, session_status = AuthService(db_session).reissue_current_session(
             current_user.id, previous_token,
         )
-        if error:
+        if error or session is None:
             return jsonify({'error': error}), session_status
         response = jsonify({**payload, **session})
-        _set_auth_cookie(response, session['token'], remember_me=session['remember_me'])
+        if not session['device_session']:
+            _set_auth_cookie(response, session['token'], remember_me=session['remember_me'])
         return response, status
     except SQLAlchemyError:
         db_session.rollback()

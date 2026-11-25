@@ -38,6 +38,8 @@ from .calendar_period import CalendarPeriod, CALENDAR_PERIOD_KINDS
 from .common import AnalyticsDashboard, AnalyticsQueryProfile, AppSetting, GoalAnalyticsView, Note, NoteFilter, EventLog, PageSurfaceLayout
 from .product_event import AnalyticsErasure, ProductEvent, WebEvent
 from .idempotency import IdempotencyRecord
+from .device import DEVICE_PLATFORMS, DeviceRefreshToken, UserDevice
+from .sync import SyncChange, SyncConflict, SyncFieldEdit
 from .storage import StorageConnection, StorageAuthorization, MediaAsset, NoteAttachment, GoalAttachment, StorageUpload
 from .agent import (
     AgentOAuthClient, AgentGrant, AgentAuthorizationCode, AgentCredential,

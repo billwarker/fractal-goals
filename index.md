@@ -695,6 +695,23 @@ time. Password change/reset, admin resets, suspension, and "Sign out of all devi
 the version, revoking every outstanding token; a password change reissues one for the acting
 device. Refresh cannot extend a session past `SESSION_MAX_LIFETIME_DAYS`.
 
+Native apps sign in per device (`services/device_auth_service.py`, `blueprints/device_auth_api.py`): a
+short access token carrying `did`, and a rotating refresh token kept as hashes. A superseded token works
+again only while its replacement is unused; any other reuse signs the device out. `/auth/refresh` refuses
+device tokens. Builds below `MIN_SUPPORTED_BUILDS` get 426 `client_update_required`
+(`blueprints/client_version.py`).
+
+Device sync reads a change log. Statement triggers (`models/sync.py`, frozen in migration `d4c8a1f6e2b9`)
+record which entity each write touched, keyed by transaction id; `services/sync_feed_service.py` serves
+`GET /api/sync/snapshot` and `/api/sync/changes`, never past the oldest running transaction. Every
+fractal-reachable table must be an entity, a child or excluded there (`tests/integration/test_sync_feed_api.py`).
+Deleting a fractal reports only its root: clients drop everything under it. The demo account isn't logged.
+Offline writes are the ordinary routes: `token_required` makes every keyed fractal write idempotent, creates
+take the device's `id` (`@accepts_client_id`, `services/client_ids.new_id`), and updates marked `@merges`
+take `_base`/`_edited_at` and merge field by field; a lost value is kept in `sync_conflicts`. Open web pages
+poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`). After a restore, run
+`reset_sync_epoch`. Plan: `planning/native-apple-apps-2026-11.md`.
+
 Rate limits key on the real client: `request_identity.py` trusts `X-Forwarded-For` only for
 requests attested by the nginx frontend's `TRUSTED_PROXY_SECRET`, at `TRUSTED_PROXY_HOPS`.
 Production refuses to start without both. Uncaught database and application errors return the

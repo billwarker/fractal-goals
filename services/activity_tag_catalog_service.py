@@ -26,6 +26,7 @@ from services.activity_tags import canonical_tag_name, name_taken_details, norma
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.tag_reference_rewrites import rewrite_planned_tags
+from services.client_ids import new_id
 
 USAGE_KEYS = ("instances", "sets", "circuit_scopes")
 
@@ -253,6 +254,7 @@ class ActivityTagCatalogService:
         if error:
             return None, error, status
         definition = ActivityTagDefinition(
+            id=new_id(ActivityTagDefinition),
             root_id=root_id,
             name=name,
             color=data.get("color"),

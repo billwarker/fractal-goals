@@ -83,6 +83,14 @@ export function OutboxProvider({ children }) {
         };
     }, [engine, outbox, queryClient]);
 
+    useEffect(() => {
+        if (!outbox || !engine) return undefined;
+        return engine.startChangeListener({
+            queryClient,
+            hasPendingWrites: () => outbox.pendingOps().length > 0,
+        });
+    }, [engine, outbox, queryClient]);
+
     return (
         <OutboxContext.Provider value={outbox}>
             {children}

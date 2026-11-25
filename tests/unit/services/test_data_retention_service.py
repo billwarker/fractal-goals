@@ -80,6 +80,10 @@ def test_prune_enforces_each_published_live_database_window(db_session):
         'agent_grants': 0,
         'agent_oauth_clients': 0,
         'agent_embedded_conversations': 0,
+        'user_devices': 0,
+        'device_refresh_tokens': 0,
+        'sync_field_edits': 0,
+        'sync_changes': 0,
     }
     assert db_session.query(ProductEvent).count() == 1
     assert db_session.query(BetaSignupRequest).one().email == 'pending@example.com'

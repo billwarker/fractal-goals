@@ -3,7 +3,6 @@
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
-import uuid
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -18,6 +17,7 @@ from services.service_types import JsonDict, ServiceResult
 from services.storage_common import StorageError
 
 from services._goal_service_common import resolve_level_id, session_goal_insert_values
+from services.client_ids import new_id
 
 
 
@@ -101,6 +101,7 @@ class _GoalCrudMixin:
 
         with self.db_session.begin_nested():
             new_goal = Goal(
+                id=new_id(Goal),
                 level_id=level_id,
                 name=data['name'],
                 description=data.get('description', ''),
@@ -268,7 +269,7 @@ class _GoalCrudMixin:
 
         with self.db_session.begin_nested():
             new_goal = Goal(
-                id=str(uuid.uuid4()),
+                id=new_id(Goal),
                 name=data['name'],
                 description=data.get('description', ''),
                 level_id=level_id,

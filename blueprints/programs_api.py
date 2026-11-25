@@ -4,7 +4,6 @@ import logging
 import time
 import models
 from sqlalchemy.exc import SQLAlchemyError
-from models import get_session
 from validators import (
     ProgramCreateSchema,
     ProgramUpdateSchema,
@@ -30,6 +29,9 @@ from services.program_metrics_service import ProgramMetricsService
 from services.program_day_read_model_service import ProgramDayReadModelService
 from services.program_calendar_feed_service import ProgramCalendarFeedService
 from services.session_filters import resolve_timezone
+from blueprints.client_ids import accepts_client_id
+from models import get_session, Program, ProgramDay, ProgramBlock
+from blueprints.sync_merge import merges
 
 logger = logging.getLogger(__name__)
 
@@ -307,6 +309,7 @@ def get_program_metrics_comparison(current_user, root_id):
 
 @programs_bp.route('/<root_id>/programs', methods=['POST'])
 @token_required
+@accepts_client_id(Program)
 @validate_request(ProgramCreateSchema)
 def create_program(current_user, root_id, validated_data):
     """Create a new training program if owned by user."""
@@ -328,6 +331,7 @@ def create_program(current_user, root_id, validated_data):
 
 @programs_bp.route('/<root_id>/programs/<program_id>', methods=['PUT'])
 @token_required
+@merges('program', 'program_id')
 @validate_request(ProgramUpdateSchema)
 def update_program(current_user, root_id, program_id, validated_data):
     """Update a training program if owned by user."""
@@ -393,6 +397,7 @@ def get_program_session_count(current_user, root_id, program_id):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/blocks', methods=['POST'])
 @token_required
+@accepts_client_id(ProgramBlock)
 @validate_request(ProgramBlockSchema)
 def create_block(current_user, root_id, program_id, validated_data):
     """Create a new program block."""
@@ -472,6 +477,7 @@ def _program_day_write(log_message, write, respond):
 
 @programs_bp.route('/<root_id>/programs/<program_id>/days', methods=['POST'])
 @token_required
+@accepts_client_id(ProgramDay)
 @validate_request(ProgramDayCreateSchema)
 def create_program_day(current_user, root_id, program_id, validated_data):
     """Create a program day; its weekdays repeat across the whole program."""
