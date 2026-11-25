@@ -256,6 +256,8 @@ describe('GoalDetailModal smoke coverage', () => {
             conditionDraft: null,
             setConditionDraft: vi.fn(),
             resetForm: mockResetForm,
+        startingValues: { name: 'Before', description: 'Focus on leverage work' },
+        values: { name: 'Deep Work', description: 'Focus on leverage work' },
             errors: {},
             validateForm: vi.fn(() => true),
         });
@@ -765,10 +767,8 @@ describe('GoalDetailModal smoke coverage', () => {
         fireEvent.click(screen.getByText('save goal'));
 
         await waitFor(() => {
-            expect(onUpdate).toHaveBeenCalledWith('goal-1', expect.objectContaining({
-                name: 'Deep Work',
-                description: 'Focus on leverage work',
-            }));
+            // Only what changed, with what it held when the edit began.
+            expect(onUpdate).toHaveBeenCalledWith('goal-1', { name: 'Deep Work', _base: { name: 'Before' } });
             expect(mockNotify.success).toHaveBeenCalledWith('Goal updated');
             expect(screen.getByText('view:Deep Work')).toBeInTheDocument();
         }, { timeout: 5000 });

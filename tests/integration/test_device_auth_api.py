@@ -154,3 +154,54 @@ def test_old_builds_are_told_to_update(app, monkeypatch, platform, build, status
         'X-Client-Platform': platform, 'X-Client-Build': build,
     })
     assert response.status_code == status
+
+
+def _media(client, session):
+    return client.post('/api/auth/media-token', headers=_bearer(session)).get_json()['media_token']
+
+
+def _media_status(client, token, path='content', **query):
+    return client.get(f'/api/some-root/media/some-asset/{path}', query_string={'media_token': token, **query}).status_code
+
+
+def test_media_token_opens_media_routes_only(app, account):
+    client = _cookieless(app)
+    session = _sign_in(client, account).get_json()
+    token = _media(client, session)
+    # Past authentication: the fractal does not exist.
+    assert _media_status(client, token) == 404
+    assert _media_status(client, token, 'thumbnail') == 404
+    assert _media_status(client, token, 'usage') == 401
+    assert client.get('/api/auth/me', query_string={'media_token': token}).status_code == 401
+    assert client.get('/api/auth/me', headers={'Authorization': f'Bearer {token}'}).status_code == 401
+    assert client.post('/api/auth/refresh', headers={'Authorization': f'Bearer {token}'}).status_code == 401
+    # A session token is not a media token.
+    assert _media_status(client, session['access_token']) == 401
+
+
+def test_media_token_ends_with_its_device(app, account):
+    client = _cookieless(app)
+    phone, mac = (_sign_in(client, account).get_json() for _ in range(2))
+    token = _media(client, phone)
+    client.delete(f"/api/auth/devices/{phone['device']['id']}", headers=_bearer(mac))
+    assert _media_status(client, token) == 401
+
+
+def test_media_token_ends_with_the_accounts_sessions(app, account):
+    client = _cookieless(app)
+    session = _sign_in(client, account).get_json()
+    token = _media(client, session)
+    client.post('/api/auth/sessions/revoke', headers=_bearer(session))
+    assert _media_status(client, token) == 401
+
+
+def test_media_token_never_acts_for_another_account(app, account, db_session):
+    account.role = 'admin'
+    db_session.commit()
+    client = _cookieless(app)
+    token = _media(client, _sign_in(client, account).get_json())
+    assert _media_status(client, token, admin_user_id='someone', admin_mode='read_only') == 404
+
+
+def test_media_token_needs_a_session(app):
+    assert _cookieless(app).post('/api/auth/media-token').status_code == 401

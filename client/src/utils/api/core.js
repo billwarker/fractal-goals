@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { apiBase, clientHeaders, usesCookies } from '../../platform';
+import { reportUpdateRequired } from '../../platform/updateRequired';
 import { isPublicLandingLocation } from '../marketingHost';
 import { isNetworkError } from '../networkErrors';
 import { publishGoalChangesFromResponse } from '../goalChanges';
@@ -217,6 +218,8 @@ axios.interceptors.response.use(
             clearAccessToken();
             dispatchSessionExpired({ reason: 'csrf_expired' });
         }
+
+        if (error.response?.data?.code === 'client_update_required') reportUpdateRequired();
 
         if (isDemoMode()) {
             if (error.response?.status === 401 && originalRequest && !originalRequest._retry && demoReauthenticate) {

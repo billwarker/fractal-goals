@@ -1,6 +1,6 @@
 import { NavigationHeader } from './components/layout/NavigationHeader';
 export { NavigationHeader } from './components/layout/NavigationHeader';
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useSyncExternalStore } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { HeaderProvider } from './contexts/HeaderContext';
 import { useAuth } from './contexts/AuthContext';
@@ -17,6 +17,7 @@ import Selection from './pages/Selection';
 // Lazy load non-critical pages
 const Landing = lazyWithRetry(() => import('./pages/Landing'), 'pages/Landing');
 const Admin = lazyWithRetry(() => import('./pages/Admin'), 'pages/Admin');
+const UpdateRequiredScreen = lazyWithRetry(() => import('./platform/UpdateRequiredScreen'), 'platform/UpdateRequiredScreen');
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
 const StorageConnected = lazyWithRetry(() => import('./pages/StorageConnected'), 'pages/StorageConnected');
@@ -39,6 +40,7 @@ import AgentChangeSubscription from './components/agent/AgentChangeSubscription'
 import GoalChangeAnnouncer from './components/goals/GoalChangeAnnouncer';
 import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicator';
 import OfflineSignInScreen from './offline/OfflineSignInScreen';
+import { isUpdateRequired, subscribeUpdateRequired } from './platform/updateRequired';
 import { useIsOnline } from './offline/useIsOnline';
 
 export { RequireAdmin } from './FractalRoutes';
@@ -53,6 +55,7 @@ function App() {
     const location = useLocation();
     const { user, isAuthenticated, loading: authLoading } = useAuth();
     const online = useIsOnline();
+    const updateRequired = useSyncExternalStore(subscribeUpdateRequired, isUpdateRequired);
     const mustChangePassword = Boolean(isAuthenticated && user?.must_change_password);
     const legalAcceptanceRequired = Boolean(isAuthenticated && user?.legal_acceptance_required);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -233,7 +236,9 @@ function App() {
                             Admin {adminMode === 'read_only' ? 'read-only' : 'read-write'} access
                         </div>
                     )}
-                    {!isAuthenticated && !authLoading && !online && !showLandingPage && !showLegalPage ? (
+                    {updateRequired ? (
+                        <Suspense fallback={<RouteFallback />}><UpdateRequiredScreen /></Suspense>
+                    ) : !isAuthenticated && !authLoading && !online && !showLandingPage && !showLegalPage ? (
                         <OfflineSignInScreen />
                     ) : redirectDeprecatedLandingRoute ? (
                         <Navigate to="/" replace />

@@ -8,6 +8,7 @@ export const queryKeys = {
     aiEmbeddedProviders: () => ['ai-agent', 'embedded-providers'],
     signedInDevices: () => ['account', 'devices'],
     syncConflicts: () => ['account', 'sync-conflicts'],
+    mediaToken: () => ['account', 'media-token'],
     storageConnections: () => ['storage', 'connections'],
     aiEmbeddedConversations: (rootId) => ['ai-agent', 'embedded-conversations', rootId],
     aiEmbeddedConversation: (conversationId) => ['ai-agent', 'embedded-conversation', conversationId],

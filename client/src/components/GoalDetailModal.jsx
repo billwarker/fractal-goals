@@ -21,6 +21,7 @@ import { buildLiveSmartGoal, getParentGoalInfo } from './goals/goalDetailUtils';
 import GoalDetailModalRenderSurface from './goalDetail/GoalDetailModalRenderSurface';
 import { GOAL_DETAIL_NAVIGATION_EVENT } from '../utils/navigationEvents';
 import { logError } from '../utils/logger';
+import { goalFormChanges } from '../utils/goalFormPayload';
 /**
  * GoalDetailModal Component
  * 
@@ -103,7 +104,7 @@ function GoalDetailModal({
         trackActivities,
         reviewCadence, setReviewCadence,
         reviewsOn, setReviewsOn,
-        resetForm,
+        resetForm, values, startingValues,
         errors, validateForm
     } = useGoalForm(goal, mode, initialCompletion);
     // In create mode, compute all valid child types for the parent.
@@ -324,20 +325,14 @@ function GoalDetailModal({
             inherit_parent_activities: inheritParentActivities,
             track_activities: trackActivities,
             ...completionFields,
-        } : {
-            name,
-            description,
-            deadline: deadline || null,
-            inherit_parent_activities: inheritParentActivities,
-            track_activities: trackActivities,
-            ...completionFields,
-            ...(levelConfig.uses_reviews ? {
-                review_cadence_value: reviewCadence?.value ?? null,
-                review_cadence_unit: reviewCadence?.unit ?? null,
-                review_disabled: !reviewsOn,
-            } : {}),
             ...(descriptionMedia.loaded ? { attachments: descriptionMedia.draft.payload() } : {}),
-        };
+        } : goalFormChanges({
+            values,
+            startingValues,
+            usesReviews: Boolean(levelConfig.uses_reviews),
+            attachments: descriptionMedia.loaded ? descriptionMedia.draft.payload() : null,
+            savedAttachments: descriptionMedia.saved,
+        });
 
         if (mode === 'create') {
             try {
@@ -366,7 +361,8 @@ function GoalDetailModal({
                 notify.error('Failed to create goal: ' + (err.response?.data?.error || err.message));
             }
         } else {
-            await onUpdate?.(goalId, payload);
+            if (payload) await onUpdate?.(goalId, payload);
+            resetForm();
             void descriptionMedia.refresh();
 
             // Persist activity and group associations

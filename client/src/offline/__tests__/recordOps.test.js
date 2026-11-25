@@ -106,6 +106,13 @@ describe('offline goal and note writes', () => {
         expect(changedGoalFields(goal, { ...form, attachments: [] }, saved)).toEqual({ attachments: [] });
     });
 
+    it('uses what the form started from, and never sends that as a field', async () => {
+        await queueGoalUpdate(outbox, queryClient, ROOT, 'g1', { name: 'Mine', _base: { name: 'When I started' } });
+        await reconnect();
+        expect(sent[0].body).toMatchObject({ name: 'Mine', _base: { name: 'When I started' } });
+        expect(queryClient.getQueryData(treeKey).children[0]).not.toHaveProperty('_base');
+    });
+
     it('queues nothing when nothing changed', async () => {
         await queueGoalUpdate(outbox, queryClient, ROOT, 'g1', { name: 'Old', description: 'D' });
         expect(outbox.hasPending()).toBe(false);

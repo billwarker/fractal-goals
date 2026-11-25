@@ -2,8 +2,9 @@
 from flask import Blueprint, jsonify
 
 from blueprints.api_utils import get_db_session
-from blueprints.auth_api import token_required
+from blueprints.auth_api import _get_request_token, token_required
 from extensions import limiter
+from services.auth_service import MEDIA_TOKEN_TTL, AuthService
 from services.device_auth_service import DeviceAuthService
 from validators import DeviceRefreshSchema, DeviceSignInSchema, validate_request
 
@@ -47,6 +48,18 @@ def sign_out(validated_data):
         return jsonify({'message': 'Signed out'})
     finally:
         db.close()
+
+
+@device_auth_bp.post('/media-token')
+@token_required
+@limiter.limit('30 per minute')
+def media_token(current_user):
+    """For native apps, whose images and players can't send their bearer token."""
+    token, _ = _get_request_token()
+    return jsonify({
+        'media_token': AuthService.issue_media_token(current_user, token or ''),
+        'expires_in': int(MEDIA_TOKEN_TTL.total_seconds()),
+    })
 
 
 @device_auth_bp.get('/devices')

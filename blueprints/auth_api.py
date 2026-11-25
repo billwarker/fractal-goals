@@ -12,7 +12,7 @@ from validators import (
 )
 from services.account_flags import must_change_password
 from services.serializers import serialize_user
-from services.auth_service import AuthService
+from services.auth_service import MEDIA_TOKEN_AUDIENCE, SESSION_TOKEN_AUDIENCE, AuthService
 from services.user_service import UserService
 from services.data_export_service import DataExportService
 from services.demo_access_service import DemoAccessService
@@ -112,7 +112,13 @@ def _clear_auth_cookie(response):
     return response
 
 
+MEDIA_TOKEN_ENDPOINTS = frozenset({'storage.content', 'storage.media_thumbnail'})
+
+
 def _get_request_token():
+    media_token = request.args.get('media_token')
+    if media_token and request.method == 'GET' and request.endpoint in MEDIA_TOKEN_ENDPOINTS:
+        return media_token, 'media'
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         return auth_header.split(" ", 1)[1], 'bearer'
@@ -175,7 +181,8 @@ def token_required(f):
                 return f(owner, *args, **kwargs)
 
             service = AuthService(db_session)
-            current_user, error, status = service.get_current_user_for_token(token)
+            audience = MEDIA_TOKEN_AUDIENCE if token_source == 'media' else SESSION_TOKEN_AUDIENCE
+            current_user, error, status = service.get_current_user_for_token(token, audience=audience)
             if error:
                 return jsonify({'error': error}), status
             # Enforced on the authenticated account before the admin-support
@@ -202,7 +209,7 @@ def token_required(f):
                     'code': 'legal_acceptance_required',
                 }), 403
             root_id = kwargs.get('root_id')
-            admin_user_id = request.args.get('admin_user_id')
+            admin_user_id = request.args.get('admin_user_id') if token_source != 'media' else None
             admin_mode = request.args.get('admin_mode')
             is_user_wide_analytics_route = request.path.startswith('/api/analytics')
             if (root_id or is_user_wide_analytics_route) and admin_user_id and admin_mode:

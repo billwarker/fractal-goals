@@ -37,7 +37,8 @@ const isAuthFailure = (error) => (
 export function classifyFailure(error) {
     const status = error?.response?.status;
     if (!error?.response) return 'retry';
-    if (status === 401) return 'auth';
+    // Waits, however long, for this installed app to be updated.
+    if (status === 401 || error.response.data?.code === 'client_update_required') return 'auth';
     if (TRANSIENT_STATUSES.has(status) || status >= 500 || isInFlightClaim(error)) return 'retry';
     if (isAuthFailure(error)) return 'auth';
     return 'reject';

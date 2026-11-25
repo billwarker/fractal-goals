@@ -50,7 +50,9 @@ export function useGoalNotes(
     });
 
     const updateNoteMutation = useMutation({
-        mutationFn: ({ noteId, content }) => fractalNotesApi.updateNote(rootId, noteId, { content }),
+        mutationFn: ({ noteId, content, base }) => fractalNotesApi.updateNote(rootId, noteId, {
+            content, ...(base === undefined ? {} : { _base: { content: base } }),
+        }),
         onSuccess: () => { invalidate(); },
         onError: () => notify.error('Failed to update note'),
     });
@@ -90,7 +92,9 @@ export function useGoalNotes(
             ? loadRecordOps().then((ops) => ops.queueNoteUpdate(
                 outbox, rootId, notes.find((note) => note.id === noteId) || { id: noteId }, content,
             ))
-            : updateNoteMutation.mutateAsync({ noteId, content })),
+            : updateNoteMutation.mutateAsync({
+                noteId, content, base: notes.find((note) => note.id === noteId)?.content,
+            })),
         deleteNote: (note) => (queued()
             ? loadRecordOps().then((ops) => ops.queueNoteDelete(outbox, rootId, note))
             : deleteNoteMutation.mutateAsync(note)),

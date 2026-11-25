@@ -158,7 +158,8 @@ def test_losing_note_text_is_recoverable(client, db_session, test_user, root):
     client.put(url, json={'content': 'Mac text'}, headers=headers)
     response = client.put(url, json={'content': 'Phone text', '_base': {'content': 'Original'}, '_edited_at': _at(-5)},
                           headers=headers)
-    assert response.get_json() == {'code': 'sync_superseded', 'superseded_fields': ['content']}
+    assert response.status_code == 200
+    assert response.get_json()['content'] == 'Mac text'
     assert _conflicts(client, test_user)[0]['lost_value'] == 'Phone text'
 
 

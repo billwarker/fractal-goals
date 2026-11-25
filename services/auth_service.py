@@ -23,6 +23,9 @@ from sqlalchemy.exc import SQLAlchemyError
 logger = logging.getLogger(__name__)
 
 SESSION_TOKEN_AUDIENCE = "fractal:session"
+# Lets an <img> or <video> load one user's media where no cookie can: read-only, media routes only.
+MEDIA_TOKEN_AUDIENCE = "fractal:media"
+MEDIA_TOKEN_TTL = datetime.timedelta(hours=1)
 
 
 class AuthService:
@@ -60,12 +63,29 @@ class AuthService:
         }, config.JWT_SECRET_KEY, algorithm="HS256")
 
     @staticmethod
-    def _decode_session_token(token: str, *, verify_exp: bool = True) -> JsonDict:
+    def issue_media_token(user: User, session_token: str) -> str:
+        """Bound to the session that asked: revoking its device or the account's sessions ends it too."""
+        claims = AuthService._decode_session_token(session_token, verify_exp=False)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return jwt.encode({
+            'aud': MEDIA_TOKEN_AUDIENCE,
+            'user_id': user.id,
+            'sv': claims['sv'],
+            'auth_time': claims['auth_time'],
+            'iat': now,
+            'exp': now + MEDIA_TOKEN_TTL,
+            **({'did': claims['did']} if claims.get('did') else {}),
+        }, config.JWT_SECRET_KEY, algorithm="HS256")
+
+    @staticmethod
+    def _decode_session_token(
+        token: str, *, verify_exp: bool = True, audience: str = SESSION_TOKEN_AUDIENCE,
+    ) -> JsonDict:
         return jwt.decode(
             token,
             config.JWT_SECRET_KEY,
             algorithms=["HS256"],
-            audience=SESSION_TOKEN_AUDIENCE,
+            audience=audience,
             options={"verify_exp": verify_exp, "require": ["exp", "user_id", "sv", "auth_time"]},
         )
 
@@ -99,9 +119,11 @@ class AuthService:
             return value.replace(tzinfo=datetime.timezone.utc)
         return value.astimezone(datetime.timezone.utc)
 
-    def get_current_user_for_token(self, token: str) -> ServiceResult[User]:
+    def get_current_user_for_token(
+        self, token: str, *, audience: str = SESSION_TOKEN_AUDIENCE,
+    ) -> ServiceResult[User]:
         try:
-            data = self._decode_session_token(token)
+            data = self._decode_session_token(token, audience=audience)
         except jwt.ExpiredSignatureError:
             return None, 'Token has expired', 401
         except jwt.InvalidTokenError:

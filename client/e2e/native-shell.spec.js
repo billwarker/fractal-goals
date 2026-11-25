@@ -69,6 +69,17 @@ test('a shell signs in as a device, stays signed in, works, and signs out', asyn
     expect(errors).toEqual([]);
 });
 
+test('an outdated shell is told to update', async ({ page, baseURL }, testInfo) => {
+    test.skip(testInfo.project.name === 'mobile', 'The Mac app is a desktop layout.');
+    await openShell(page, baseURL);
+    await page.route('**/api/**', (route) => {
+        expect(route.request().headers()).toMatchObject({ 'x-client-platform': 'macos', 'x-client-build': '1' });
+        return route.fulfill({ status: 426, json: { error: 'Update required', code: 'client_update_required' } });
+    });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Update Fractal Goals' })).toBeVisible();
+});
+
 test('a shell opens outside links in the system browser', async ({ page, baseURL }, testInfo) => {
     test.skip(testInfo.project.name === 'mobile', 'The Mac app is a desktop layout.');
     const { calls } = await openShell(page, baseURL);

@@ -712,6 +712,9 @@ take `_base`/`_edited_at` and merge field by field; a lost value is kept in `syn
 poll the feed (`client/src/sync/changeListener.js`) and skip their own echo (`X-Client-Instance`).
 What differs between a browser and a native shell is asked of `client/src/platform/` (sign-in, files, outside
 links, API address); the maintainability audit rejects those browser calls elsewhere.
+Native apps load private media with a one-hour media token (`POST /api/auth/media-token`), accepted only by the
+media content and thumbnail routes. The goal form (`utils/goalFormPayload.js`) sends only changed fields with
+their `_base`.
 Offline, the web shows every screen opened on the device (`offline/queryPersistence.js`, one record per query,
 bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goal and goal-note
 writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync.

@@ -91,14 +91,14 @@ export async function queueGoalCreate(outbox, rootId, data) {
     return placeholder;
 }
 
-export async function queueGoalUpdate(outbox, queryClient, rootId, goalId, updates) {
+export async function queueGoalUpdate(outbox, queryClient, rootId, goalId, { _base: startedFrom, ...updates }) {
     const current = findGoalInTree(queryClient.getQueryData(queryKeys.fractalTree(rootId)), goalId) || { id: goalId };
     const changes = changedGoalFields(
         current, updates, queryClient.getQueryData(queryKeys.goalAttachments(rootId, goalId)) ?? null,
     );
     if (Object.keys(changes).length === 0) return current;
     const base = Object.fromEntries(
-        GOAL_MERGE_FIELDS.filter((field) => field in changes && field in current).map((field) => [field, current[field]]),
+        GOAL_MERGE_FIELDS.filter((field) => field in changes && field in current).map((field) => [field, startedFrom?.[field] ?? current[field]]),
     );
     await outbox.submit({
         scope: recordScope(rootId),
