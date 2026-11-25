@@ -52,7 +52,7 @@ describe('ActivityTrendsChart', () => {
         ]);
     });
 
-    it('draws one measure on one axis: time in hours, or times done', () => {
+    it('draws one measure on one axis: time in hours, or times done', async () => {
         const instances = {
             a1: [
                 { id: 'i1', completed: true, session_date: '2026-04-20T10:00:00', duration_seconds: 1800 },
@@ -60,7 +60,7 @@ describe('ActivityTrendsChart', () => {
             ],
         };
         render(<ActivityTrendsChart measure="duration" activityInstances={instances} />);
-        expect(screen.getByText('Activity Trends Chart')).toBeInTheDocument();
+        expect(await screen.findByText('Activity Trends Chart')).toBeInTheDocument();
         const { data, options } = barChart.mock.calls.at(-1)[0];
         expect(data.labels).toEqual(['Apr 20', 'Apr 21']);
         expect(data.datasets).toEqual([expect.objectContaining({ label: 'Activity time', data: [0.5, 1] })]);
@@ -77,7 +77,7 @@ describe('ActivityTrendsChart', () => {
         expect(activityTrendMeasure({ measure: 'duration', metrics: ['instances'] })).toBe('duration');
     });
 
-    it('stacks groups that can’t overlap and sets overlapping ones side by side, totalling each instance once', () => {
+    it('stacks groups that can’t overlap and sets overlapping ones side by side, totalling each instance once', async () => {
         const instances = {
             a1: [
                 { id: 'i1', completed: true, session_id: 's1', session_date: '2026-04-20T10:00:00', duration_seconds: 60, tags: [{ id: 't1', name: 'Heavy' }, { id: 't2', name: 'Paused' }] },
@@ -90,10 +90,10 @@ describe('ActivityTrendsChart', () => {
             sessionsById: new Map([['s1', { id: 's1', template_id: 'up', template_name: 'Upper' }], ['s2', { id: 's2' }]]),
         };
         render(<ActivityTrendsChart activityInstances={instances} groupBy={{ dimension: 'template' }} lookups={lookups} />);
+        expect(await screen.findByRole('list', { name: 'Session template' })).toBeInTheDocument();
         let { data, options } = barChart.mock.calls.at(-1)[0];
         expect(data.datasets.map((dataset) => [dataset.label, dataset.data])).toEqual([['No template', [1]], ['Upper', [1]]]);
         expect(options.scales.y.stacked).toBe(true);
-        expect(screen.getByRole('list', { name: 'Session template' })).toBeInTheDocument();
 
         render(<ActivityTrendsChart activityInstances={instances} groupBy={{ dimension: 'tag' }} lookups={lookups} overlap />);
         ({ data, options } = barChart.mock.calls.at(-1)[0]);

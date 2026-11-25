@@ -246,6 +246,17 @@ class TemplateService:
         if error or template is None:
             return None, error, status
 
+        expected = data.pop('expected_revision', None)
+        if expected is not None and 'template_data' in data:
+            self.db_session.refresh(template, with_for_update=True)
+            unchanged = _load_template_data(template.template_data) == data['template_data']
+            if (template.revision or 1) != expected and not unchanged:
+                self.db_session.rollback()
+                return None, {
+                    'error': 'This template was changed on another device. Open it again to see the latest version.',
+                    'code': 'template_changed',
+                }, 409
+
         if 'name' in data:
             template.name = data['name']
         if 'description' in data:

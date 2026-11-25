@@ -8,6 +8,8 @@ import { getClockOffsetMs, getOfflineReason, isOnline, subscribeConnectivity } f
 import { createIndexedDbStore } from './indexedDbStore';
 import { createOutbox } from './outbox';
 
+// Loaded with the engine, so that queueing needs no fetch once there is no signal.
+export * as recordOps from './recordOps';
 export { registerRecordOpHandlers } from './recordOpHandlers';
 export { registerSessionOpHandlers } from './sessionOpHandlers';
 export { startChangeListener } from '../sync/changeListener';

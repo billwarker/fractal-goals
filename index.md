@@ -716,8 +716,9 @@ Native apps load private media with a one-hour media token (`POST /api/auth/medi
 media content and thumbnail routes. The goal form (`utils/goalFormPayload.js`) sends only changed fields with
 their `_base`.
 Offline, the web shows every screen opened on the device (`offline/queryPersistence.js`, one record per query,
-bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goal and goal-note
-writes in the outbox, one queue per fractal. Clashes are reviewed in Settings → Sync.
+bounded; reads outside sessions are dropped by a new build), and `offline/recordQueue.js` queues goals, goal notes,
+new activities and templates in the outbox, one queue per fractal; a change waits for any change, in any queue,
+that creates an id it mentions. Template saves carry `expected_revision`; a stale one is 409 `template_changed`. Clashes are reviewed in Settings → Sync.
 Merge rules are pinned by `tests/fixtures/sync_merge_cases.json`, and `tests/integration/test_sync_two_devices.py`
 runs simulated devices with seeded faults against the real API. After a restore, run
 `reset_sync_epoch`. Plan: `planning/native-apple-apps-2026-11.md`.

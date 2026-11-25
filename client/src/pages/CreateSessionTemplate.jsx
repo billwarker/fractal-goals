@@ -19,6 +19,9 @@ import { getTemplateSortTimestamp } from '../utils/durationStats';
 import styles from './CreateSessionTemplate.module.css';
 import { logError } from '../utils/logger';
 import { buildTemplateActivityCatalogue } from '../components/modals/templateBuilderItems';
+import { useOutbox } from '../offline/OutboxContext';
+import { loadRecordOps, shouldQueueRecord } from '../offline/recordQueue';
+import { formatError } from '../utils/mutationNotify';
 
 function readStoredSort(rootId) {
     try {
@@ -48,6 +51,7 @@ function CreateSessionTemplate() {
     const { rootId } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
 
     const [error, setError] = useState(null);
 
@@ -79,9 +83,16 @@ function CreateSessionTemplate() {
     );
 
     const saveTemplateMutation = useMutation({
-        mutationFn: async ({ payload, templateId }) => {
+        mutationFn: async ({ payload, templateId, revision }) => {
+            const updates = revision ? { ...payload, expected_revision: revision } : payload;
+            if (shouldQueueRecord(outbox, rootId)) {
+                const ops = await loadRecordOps();
+                if (templateId) await ops.queueTemplateUpdate(outbox, rootId, templateId, updates);
+                else await ops.queueTemplateCreate(outbox, rootId, payload);
+                return templateId ? 'updated' : 'created';
+            }
             if (templateId) {
-                await fractalApi.updateSessionTemplate(rootId, templateId, payload);
+                await fractalApi.updateSessionTemplate(rootId, templateId, updates);
                 return 'updated';
             }
 
@@ -156,11 +167,11 @@ function CreateSessionTemplate() {
 
     const handleBuilderSave = async (payload, templateId) => {
         try {
-            await saveTemplateMutation.mutateAsync({ payload, templateId });
+            await saveTemplateMutation.mutateAsync({ payload, templateId, revision: editingTemplate?.revision });
         } catch (err) {
             logError("Failed to save template", err);
             setError('Failed to save template');
-            notify.error('Failed to save template: ' + err.message);
+            notify.error(`Failed to save template: ${formatError(err)}`);
         }
     };
 

@@ -44,6 +44,9 @@ export function describeOp(op) {
         case SESSION_OP.INSTANCE_GOAL_LINK: return op.meta?.remove ? 'Removed goal link' : 'Linked goal';
         case RECORD_OP.GOAL_CREATE: return name ? `New goal: ${name}` : 'New goal';
         case RECORD_OP.GOAL_UPDATE: return 'Edited goal';
+        case RECORD_OP.ACTIVITY_CREATE: return name ? `New activity: ${name}` : 'New activity';
+        case RECORD_OP.TEMPLATE_CREATE: return name ? `New template: ${name}` : 'New template';
+        case RECORD_OP.TEMPLATE_UPDATE: return 'Edited template';
         case RECORD_OP.NOTE_CREATE: return name ? `Note: “${name}”` : 'New note';
         case RECORD_OP.NOTE_UPDATE: return 'Edited note';
         case RECORD_OP.NOTE_DELETE: return 'Deleted note';

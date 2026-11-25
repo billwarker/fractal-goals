@@ -30,6 +30,13 @@ const workflowProjects = [
         ...signedIn,
         use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium', storageState: BROWSER_USER_STATE },
     },
+    // The Mac app's engine, and Safari's: signing in, sync and working with no signal.
+    {
+        name: 'webkit',
+        ...signedIn,
+        testMatch: /(native-shell|device-sync|offline-.*|progress-on-save|quick-session-completion|notes-page)\.spec\.js/,
+        use: { ...devices['Desktop Safari'], storageState: BROWSER_USER_STATE },
+    },
     // Program calendars at 22:00 New York time, when the local day is behind UTC.
     {
         name: 'desktop-late',

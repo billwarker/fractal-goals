@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { activityYieldIds, YIELD_METRIC_ID } from './MetricTrends';
+import { activityYieldIds, YIELD_METRIC_ID } from './yieldMetric';
 import { MetricChipsField, MetricSelectField, SetsHandlingField } from './ActivityMetricFields';
 
 export default function ActivityMetricControls({ context }) {

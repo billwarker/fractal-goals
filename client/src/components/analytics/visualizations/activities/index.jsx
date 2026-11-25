@@ -8,13 +8,12 @@ import useGroupLookups from '../shared/useGroupLookups';
 import ActivityMetricControls from './ActivityMetricControls';
 import { ACTIVITY_TOTALS_VISUALIZATION } from './ActivityTotals';
 import { ACTIVITY_TREND_GROUPS, activityTrendMeasure, ActivityTrendsChart, ActivityTrendsControls } from './ActivityTrends';
-import { MetricProgressChart } from './MetricProgress';
-import { MetricTrendsChart } from './MetricTrends';
 import styles from '../../ProfileWindow.module.css';
 
 const ActivityGroupMixChart = lazyChart(() => import('../../AnalyticsExtraCharts').then((module) => ({ default: module.ActivityGroupMixChart })));
 
-
+const MetricProgressChart = lazyChart(() => import('./MetricProgress').then((module) => ({ default: module.MetricProgressChart })));
+const MetricTrendsChart = lazyChart(() => import('./MetricTrends').then((module) => ({ default: module.MetricTrendsChart })));
 const ScatterPlot = lazyChart(() => import('../../ScatterPlot'));
 
 const SCATTER_GROUPS = ['tag', 'template', 'programDay'];

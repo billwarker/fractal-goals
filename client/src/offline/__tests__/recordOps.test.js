@@ -10,11 +10,13 @@ vi.mock('../../utils/notify', () => ({ default: { warning, error: vi.fn() } }));
 
 import { buildConditionPayload, conditionToDraft } from '../../utils/goalConditions';
 import { queryKeys } from '../../hooks/queryKeys';
+import { activityMetricId } from '../circuitIds';
 import { createMemoryStore } from '../memoryStore';
 import { createOutbox } from '../outbox';
 import { registerRecordOpHandlers } from '../recordOpHandlers';
 import {
-    changedGoalFields, queueGoalCreate, queueGoalUpdate, queueNoteCreate, queueNoteDelete, queueNoteUpdate,
+    changedGoalFields, queueActivityCreate, queueGoalCreate, queueGoalUpdate, queueNoteCreate, queueNoteDelete, queueNoteUpdate,
+    queueTemplateCreate, queueTemplateUpdate,
 } from '../recordOps';
 import { shouldQueueRecord } from '../recordQueue';
 
@@ -143,6 +145,30 @@ describe('offline goal and note writes', () => {
         // The note that was created and deleted offline never reaches the server.
         expect(sent.map((op) => op.method)).toEqual(['put']);
         expect(sent[0].body._base).toEqual({ content: 'First' });
+    });
+
+    it('makes an activity that can be logged at once', async () => {
+        queryClient.setQueryData(queryKeys.activities(ROOT), []);
+        const activity = await queueActivityCreate(outbox, ROOT, {
+            name: 'Press', metrics: [{ name: 'Reps', unit: 'reps' }, { name: '', unit: 'kg' }, { name: 'Weight', unit: 'kg' }],
+        });
+        expect(activity.metric_definitions.map(({ name }) => name)).toEqual(['Reps', 'Weight']);
+        expect(activity.metric_definitions[1].id).toBe(await activityMetricId(activity.id, 1));
+        expect(queryClient.getQueryData(queryKeys.activities(ROOT))).toEqual([activity]);
+        await reconnect();
+        expect(sent[0]).toMatchObject({ url: '/root/activities', body: { id: activity.id, name: 'Press' } });
+    });
+
+    it('keeps the latest of several template saves, against the revision they began from', async () => {
+        queryClient.setQueryData(queryKeys.sessionTemplates(ROOT), [{ id: 't1', name: 'Old', revision: 4 }]);
+        await queueTemplateUpdate(outbox, ROOT, 't1', { name: 'A', template_data: { sections: [1] }, expected_revision: 4 });
+        await queueTemplateUpdate(outbox, ROOT, 't1', { name: 'B', template_data: { sections: [2] }, expected_revision: 4 });
+        expect(queryClient.getQueryData(queryKeys.sessionTemplates(ROOT))[0]).toMatchObject({ name: 'B', revision: 4 });
+        const made = await queueTemplateCreate(outbox, ROOT, { name: 'New', template_data: {} });
+        expect(queryClient.getQueryData(queryKeys.sessionTemplates(ROOT)).map(({ id }) => id)).toEqual(['t1', made.id]);
+        await reconnect();
+        expect(sent.map((op) => op.body.name)).toEqual(['B', 'New']);
+        expect(sent[0].body).toMatchObject({ expected_revision: 4, template_data: { sections: [2] } });
     });
 
     it('queues until what was queued has been sent', async () => {

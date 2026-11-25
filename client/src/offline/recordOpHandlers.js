@@ -8,12 +8,17 @@ import { isLandedData } from './landedData';
 import { RECORD_OP } from './opKinds';
 import { recordScope } from './recordQueue';
 
-const RECORD_PREFIXES = new Set(['fractalTree', 'goals-tree', 'goals', 'goalsForSelection', 'goal-notes']);
+const RECORD_PREFIXES = new Set(['activities', 'session-templates', 'fractalTree', 'goals-tree', 'goals', 'goalsForSelection', 'goal-notes']);
 
 const patchTrees = (queryClient, rootId, patch) => {
     [queryKeys.fractalTree(rootId), queryKeys.goalsTree(rootId)].forEach((queryKey) => {
         queryClient.setQueryData(queryKey, (tree) => (tree ? patch(tree) : tree));
     });
+};
+
+const appendOnce = (queryClient, queryKey, record) => {
+    queryClient.setQueryData(queryKey, (list) => (Array.isArray(list) && !list.some(({ id }) => id === record.id)
+        ? [...list, record] : list));
 };
 
 const patchNoteLists = (queryClient, queryKey, patch) => {
@@ -30,6 +35,17 @@ const OPTIMISTIC = {
         [queryKeys.goals(meta.rootId), queryKeys.goalsForSelection(meta.rootId)].forEach((queryKey) => {
             queryClient.setQueryData(queryKey, (list) => replaceGoalInList(list, updated));
         });
+    },
+    [RECORD_OP.ACTIVITY_CREATE]: (queryClient, { meta }) => {
+        appendOnce(queryClient, queryKeys.activities(meta.rootId), meta.placeholder);
+    },
+    [RECORD_OP.TEMPLATE_CREATE]: (queryClient, { meta }) => {
+        appendOnce(queryClient, queryKeys.sessionTemplates(meta.rootId), meta.placeholder);
+    },
+    [RECORD_OP.TEMPLATE_UPDATE]: (queryClient, { meta }) => {
+        const { expected_revision: _revision, ...updates } = meta.updates;
+        queryClient.setQueryData(queryKeys.sessionTemplates(meta.rootId), (list) => (Array.isArray(list)
+            ? list.map((template) => (template.id === meta.templateId ? { ...template, ...updates } : template)) : list));
     },
     [RECORD_OP.NOTE_CREATE]: (queryClient, { meta }) => {
         patchNoteLists(queryClient, ['goal-notes', meta.rootId, meta.goalId], (notes) => (
@@ -65,7 +81,10 @@ export function registerRecordOpHandlers(outbox, queryClient) {
 
     const refresh = (rootId) => {
         void refreshGoalReadModels(queryClient, queryKeys, rootId);
-        void queryClient.invalidateQueries({ queryKey: queryKeys.goalNotesRoot(rootId) });
+        [
+            queryKeys.goalNotesRoot(rootId), queryKeys.activities(rootId), queryKeys.sessionTemplates(rootId),
+            queryKeys.fractalMetrics(rootId),
+        ].forEach((queryKey) => void queryClient.invalidateQueries({ queryKey }));
         void queryClient.invalidateQueries({ queryKey: queryKeys.allNotesRoot(rootId) });
         // Losing the notice only: the conflict stays listed in Settings.
         announceConflicts().catch(() => {});

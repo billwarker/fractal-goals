@@ -53,6 +53,7 @@ test('a shell signs in as a device, stays signed in, works, and signs out', asyn
 
     // Reads and writes work with the bearer token alone.
     const root = 'browser-offline-root-desktop';
+    await page.waitForLoadState('networkidle'); // WebKit reports imports a navigation interrupts as errors
     await page.goto(`/${root}/goals`);
     const saved = await page.evaluate(() => navigator.serviceWorker.getRegistrations().then((found) => found.length));
     expect(saved).toBe(0);
@@ -60,6 +61,7 @@ test('a shell signs in as a device, stays signed in, works, and signs out', asyn
     const { devices } = await (await page.request.get('/api/auth/devices', { headers })).json();
     expect(devices.map(({ name }) => name)).toContain('Test Mac');
 
+    await page.waitForLoadState('networkidle');
     // Signed out from elsewhere, the app asks to sign in again.
     const mine = devices.find(({ name }) => name === 'Test Mac');
     expect((await page.request.delete(`/api/auth/devices/${mine.id}`, { headers })).ok()).toBe(true);

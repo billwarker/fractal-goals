@@ -2,9 +2,12 @@ import React, { useMemo } from 'react';
 
 import { GROUP_DIMENSION_LABELS, sessionGroups } from '../../../../utils/analyticsGroupBy';
 import { bucketRows, groupedBucketRows, localDayKey } from '../../../../utils/chartGrain';
-import BucketBarChart, { MeasureControl } from '../shared/BucketBarChart';
+import lazyChart from '../../lazyChart';
 import GrainControl from '../shared/GrainControl';
 import GroupByControl from '../shared/GroupByControl';
+import MeasureControl from '../shared/MeasureControl';
+
+const BucketBarChart = lazyChart(() => import('../shared/BucketBarChart'));
 
 export const SESSION_TREND_GROUPS = ['template', 'programDay'];
 

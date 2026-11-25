@@ -343,7 +343,7 @@ def main():
             db.add(user)
             # New accounts with no fractals, one per workflow project, for the first run
             # (e2e/onboarding.spec.js creates a fractal, so projects can't share one).
-            for project in ("desktop", "mobile"):
+            for project in ("desktop", "mobile", "webkit"):
                 new_user = User(
                     id=f"new-user-{project}",
                     username=f"new_user_{project}",
@@ -388,7 +388,7 @@ def main():
             # Keep production quota enforcement active without exhausting its free-tier default.
             db.add(AppSetting(key="tier_default_limits", value={"free": {"programs": 50, "sessions": 1000, "goals": 1000, "activities": 1000, "metrics": 1000}}))
             # desktop-late reruns the program specs at a late-evening clock (playwright.config.js).
-            for suffix in ("desktop", "mobile", "desktop-late"):
+            for suffix in ("desktop", "mobile", "desktop-late", "webkit"):
                 root_id = f"browser-root-{suffix}"
                 db.add(
                     Goal(
@@ -559,7 +559,7 @@ def main():
                     db.add(Goal(id=spec_root, root_id=spec_root, owner_id=user.id,
                                 level_id=ultimate_level.id, name=f"Browser {label} {suffix}"))
             db.commit()
-            for suffix in ("desktop", "mobile"):
+            for suffix in ("desktop", "mobile", "webkit"):
                 _seed_embedded_proposal(db, suffix, user)
             db.commit()
             seed_showcase(db, now, config)

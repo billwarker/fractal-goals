@@ -3,9 +3,9 @@ import { expect, test } from '@playwright/test';
 import { apiToken } from './support/session.js';
 
 test('an open page shows what another device just created', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'The listener is the same on every viewport.');
+    test.skip(testInfo.project.name === 'mobile', 'The listener is the same on every viewport.');
     test.setTimeout(60_000);
-    const root = 'browser-offline-root-desktop';
+    const root = `browser-offline-root-${testInfo.project.name}`;
     const positioned = page.waitForResponse((response) => response.url().includes('/api/sync/cursor') && response.ok());
     await page.goto(`/${root}/goals`);
     await positioned;
@@ -20,9 +20,9 @@ test('an open page shows what another device just created', async ({ page }, tes
 });
 
 test('an edit being typed survives another device saving the same goal, and both are kept', async ({ page }, testInfo) => {
-    test.skip(testInfo.project.name !== 'desktop', 'The same on every viewport.');
+    test.skip(testInfo.project.name === 'mobile', 'The same on every viewport.');
     test.setTimeout(90_000);
-    const root = 'browser-offline-root-desktop';
+    const root = `browser-offline-root-${testInfo.project.name}`;
     const headers = { Authorization: `Bearer ${apiToken()}` };
     const suffix = Date.now();
     const goal = await (await page.request.post(`/api/${root}/goals`, {

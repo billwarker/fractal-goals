@@ -10,8 +10,6 @@ import ChartLegendPanel from '../../../series/ChartLegendPanel';
 import { ROW_BAR_MARKS } from '../../shared/barMarks';
 import layout from '../../shared/BucketBarChart.module.css';
 
-export const ACTIVITY_TOTALS_GROUPS = ['activityGroup', 'tag', 'template', 'programDay'];
-
 function isCompletedActivityInstance(instance) {
     const completed = instance?.completed ?? instance?.attributes?.completed;
     if (typeof completed === 'boolean') return completed;

@@ -38,3 +38,11 @@ def round_member_set_id(round_id: str, run_slot_id_value: str) -> str:
 
 def round_member_instance_id(round_id: str, run_slot_id_value: str) -> str:
     return _derive(round_id, f"instance:{run_slot_id_value}")
+
+
+def activity_metric_id(activity_id: str, index: int) -> str:
+    return _derive(activity_id, f"metric:{index}")
+
+
+def activity_split_id(activity_id: str, index: int) -> str:
+    return _derive(activity_id, f"split:{index}")

@@ -4,7 +4,7 @@ import { Line } from 'react-chartjs-2';
 import EmptyState from '../../../common/EmptyState';
 import { activityUsesSets } from '../../../../utils/goalConditions';
 import { goalLineAnnotations, goalMarkers } from '../../../../utils/goalConditionLines';
-import { aggregateMetric, aggregateYield, yieldMetricIds } from '../../../../utils/setAggregation';
+import { aggregateMetric, aggregateYield } from '../../../../utils/setAggregation';
 import CompactChartFrame from '../../CompactChartFrame';
 import CompactSeriesKey from '../../CompactSeriesKey';
 import { GoalMarkerHost } from '../../GoalMarkerLayer';
@@ -12,6 +12,7 @@ import { useAlignedAxis, useAlignedRanges } from '../../alignedAxes/AlignedAxesC
 import { valuesOnSlots } from '../../alignedAxes/slots';
 import { applyChartDensity, DISABLED_CHART_ANIMATION, useChartDensity, useChartThemeDefaults } from '../../ChartJSWrapper';
 import useActiveChartPoint from '../../useActiveChartPoint';
+import { YIELD_METRIC_ID, activityYieldIds } from './yieldMetric';
 
 function getInstanceDate(instance) {
     const value = instance?.session_date || instance?.time_start || instance?.created_at;
@@ -25,14 +26,7 @@ function formatInstanceLabel(instance, index) {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-/** The pseudo-metric for the activity's yield (the product of its multiplicative metrics). */
-export const YIELD_METRIC_ID = 'yield';
 const YIELD_METRIC = { id: YIELD_METRIC_ID, name: 'Yield', unit: '', higher_is_better: true };
-
-/** The activity's yield metric ids: from the payload when present, else derived like the server. */
-export function activityYieldIds(activity) {
-    return activity?.yield_metric_ids || yieldMetricIds(activity);
-}
 
 /** One plotted value per instance: a metric's top set or average, or the yield (top, average, total). */
 function resolveValue(instance, metric, setsHandling, selectedSplit, yieldIds) {

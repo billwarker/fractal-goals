@@ -14,7 +14,9 @@
 > | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
 > | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
 > | Phase W platform seam | Built (`client/src/platform/`): the shell injects `__FRACTAL_SHELL__`; `e2e/native-shell.spec.js` runs the same build as a pretend Mac shell. Private media loads with a one-hour read-only media token; an outdated build shows an update screen and keeps its queue. Not done: the Drive picker, opening an attachment's original without a browser sign-in, in-shell storage consent |
-> | Phase W browsers in the device list, WebKit test project | Not started |
+> | Phase W offline: new activities, new templates, template edits | Built. A template edit made against an older revision is refused for review, online too |
+> | Phase W WebKit test project | Built (`webkit` in `playwright.config.js`); offline reloads are skipped there, which Playwright's WebKit can't do |
+> | Phase W browsers in the device list | Not started |
 > | Phases M, I | Not started. M needs Rust; I needs full Xcode and an Apple Developer account |
 >
 > **Design changes while building:**
@@ -39,6 +41,9 @@
 > - Online edits merge too: the goal form sends only what changed and what it held when the edit began, and stays
 >   on that version while another device's changes arrive.
 > - There is no capabilities list yet: it starts with the first Mac-only feature in Phase M.
+> - Programs stay online-only offline: their calendar rules can refuse a change, and one refused days later
+>   is worse than one refused now. Activity edits (not creates) too: their metrics can't be merged.
+> - A queued change waits for any change, in any queue, that creates an id it mentions.
 > - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
 > - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
 > - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.

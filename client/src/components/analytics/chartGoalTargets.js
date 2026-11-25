@@ -12,7 +12,8 @@ import {
 } from '../../utils/chartGoalPrefill';
 import { conditionLine } from '../../utils/goalConditionSeries';
 import { activeMetricDefinitions } from '../../utils/goalConditions';
-import { activityYieldIds, buildMetricTrendData, getSelectedMetricDefs, YIELD_METRIC_ID } from './visualizations/activities/MetricTrends';
+import { buildMetricTrendData, getSelectedMetricDefs } from './visualizations/activities/MetricTrends';
+import { YIELD_METRIC_ID, activityYieldIds } from './visualizations/activities/yieldMetric';
 
 export const GOAL_CHART_IDS = new Set(['metricTrends', 'metricProgress', 'scatterPlot', 'activityFrequency', 'activityTrends']);
 

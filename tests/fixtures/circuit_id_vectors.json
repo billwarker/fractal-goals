@@ -42,6 +42,30 @@
       "parent": "9b2d4f60-1a3c-4e5f-8a7b-2c3d4e5f6a7b",
       "arg": "a0b1c2d3-0000-4000-8000-000000000001",
       "expected": "81ffb8d0-829c-566f-949d-7fdc4088d998"
+    },
+    {
+      "fn": "activity_metric_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 0,
+      "expected": "8a07e836-0d1c-5cf9-9365-acc1204ecd49"
+    },
+    {
+      "fn": "activity_metric_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 3,
+      "expected": "bab4507d-7448-5339-929b-fa4a530e7190"
+    },
+    {
+      "fn": "activity_split_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 0,
+      "expected": "967f0401-b13c-5cc8-90d8-b9cfce35498e"
+    },
+    {
+      "fn": "activity_split_id",
+      "parent": "3f1c2a9e-7b44-4c1e-9d2a-6f0b8e5a1c77",
+      "arg": 3,
+      "expected": "e7d9bef0-9ea4-58c3-acdc-d0f22437befa"
     }
   ]
 }

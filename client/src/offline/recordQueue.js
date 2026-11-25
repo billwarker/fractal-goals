@@ -10,5 +10,5 @@ export function shouldQueueRecord(outbox, rootId) {
     return Boolean(outbox) && (!isOnline() || outbox.hasPending(recordScope(rootId)));
 }
 
-/** The engine has loaded whenever there is an outbox, and carries this, so it resolves offline. */
+/** The engine (loaded whenever there is an outbox) imports this too, so it resolves offline. */
 export const loadRecordOps = () => import('./recordOps');

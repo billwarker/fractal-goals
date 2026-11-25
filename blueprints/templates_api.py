@@ -7,7 +7,7 @@ from validators import (
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema, SessionTemplateFromSessionSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
+from blueprints.api_utils import error_body, get_db_session, parse_optional_pagination, internal_error
 from services.serializers import serialize_session_template
 from services.template_service import TemplateService
 from blueprints.client_ids import accepts_client_id
@@ -120,7 +120,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
         service = TemplateService(session)
         template, error, status = service.update_template(root_id, template_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error_body(error)), status
         return jsonify(serialize_session_template(template)), status
         
     except SQLAlchemyError:

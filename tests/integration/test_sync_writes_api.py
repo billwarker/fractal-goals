@@ -214,3 +214,38 @@ def test_an_unchanged_field_resent_with_an_edit_is_not_an_edit(client, db_sessio
     db_session.refresh(root)
     assert (root.name, root.description) == ('Phone', 'From Mac')
     assert _conflicts(client, test_user) == []
+
+
+def test_an_offline_activitys_metrics_have_the_ids_its_device_expects(client, test_user, root):
+    from services.circuit_ids import activity_metric_id, activity_split_id
+    activity_id = _id()
+    response = client.post(f'/api/{root.id}/activities', headers=session_headers_for(test_user), json={
+        'id': activity_id, 'name': 'Press', 'has_metrics': True, 'has_splits': True,
+        'metrics': [{'name': 'Reps', 'unit': 'reps'}, {'name': 'Weight', 'unit': 'kg'}],
+        'splits': [{'name': 'Left'}, {'name': 'Right'}],
+    })
+    assert response.status_code in (200, 201), response.get_json()
+    body = response.get_json()
+    assert {m['name']: m['id'] for m in body['metric_definitions']} == {
+        'Reps': activity_metric_id(activity_id, 0), 'Weight': activity_metric_id(activity_id, 1),
+    }
+    assert {s['id'] for s in body['split_definitions']} == {activity_split_id(activity_id, i) for i in range(2)}
+
+
+def test_a_stale_template_edit_is_refused_not_merged(client, test_user, root):
+    headers = session_headers_for(test_user)
+    sections = lambda name: {'sections': [{'name': name, 'activities': []}]}
+    template = client.post(f'/api/{root.id}/session-templates', headers=headers,
+                           json={'name': 'T', 'template_data': sections('A')}).get_json()
+    url = f"/api/{root.id}/session-templates/{template['id']}"
+
+    def save(name, revision=None):
+        body = {'template_data': sections(name), **({'expected_revision': revision} if revision else {})}
+        return client.put(url, json=body, headers=headers)
+    assert save('Mac', template['revision']).get_json()['revision'] == template['revision'] + 1
+    stale = save('Phone', template['revision'])
+    assert (stale.status_code, stale.get_json()['code']) == (409, 'template_changed')
+    # The same content again is not a clash, and other fields are never blocked.
+    assert save('Mac', template['revision']).status_code == 200
+    assert client.put(url, json={'name': 'Renamed', 'expected_revision': 1}, headers=headers).status_code == 200
+    assert save('Older app').status_code == 200

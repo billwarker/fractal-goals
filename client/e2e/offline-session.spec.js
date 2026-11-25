@@ -9,7 +9,8 @@ async function openSignedIn(page) {
     return apiToken();
 }
 
-test('an open session keeps working with no signal, survives a reload, and syncs on reconnect', async ({ page, context }, testInfo) => {
+test('an open session keeps working with no signal, survives a reload, and syncs on reconnect', async ({ page, context, browserName }, testInfo) => {
+    test.skip(browserName === 'webkit', 'Playwright’s WebKit cannot reload a page offline through a service worker.');
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -102,7 +103,8 @@ test('a quick session completed with no signal is kept on the device and syncs o
     expect(errors).toEqual([]);
 });
 
-test('a circuit and an extra round added with no signal sync with the ids the phone showed', async ({ page, context }, testInfo) => {
+test('a circuit and an extra round added with no signal sync with the ids the phone showed', async ({ page, context, browserName }, testInfo) => {
+    test.skip(browserName === 'webkit', 'Playwright’s WebKit cannot reload a page offline through a service worker.');
     test.setTimeout(90_000);
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
@@ -168,7 +170,8 @@ test('a circuit and an extra round added with no signal sync with the ids the ph
     await page.request.delete(`/api/${root}/sessions/${session.id}`, { headers });
 });
 
-test('signed out with no signal, the app says so and recovers when the connection returns', async ({ page, context }) => {
+test('signed out with no signal, the app says so and recovers when the connection returns', async ({ page, context, browserName }) => {
+    test.skip(browserName === 'webkit', 'Playwright’s WebKit cannot reload a page offline through a service worker.');
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await openSignedIn(page);
@@ -366,7 +369,8 @@ test('a change the server is failing says when it will retry, and Retry now send
     await cleanup();
 });
 
-test('the offline kill switch removes the service worker on the next load', async ({ page }) => {
+test('the offline kill switch removes the service worker on the next load', async ({ page, browserName }) => {
+    test.skip(browserName === 'webkit', 'Playwright’s WebKit cannot reload a page offline through a service worker.');
     await openSignedIn(page);
     // The service worker registers from the app itself.
     await page.goto('/');

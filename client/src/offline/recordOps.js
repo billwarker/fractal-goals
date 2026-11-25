@@ -5,6 +5,7 @@ import {
     buildConditionPayload, conditionToDraft, getGoalCompletionCondition, getGoalCondition,
 } from '../utils/goalConditions';
 import { findGoalInTree, mergeGoalRecord } from '../utils/goalTreeCache';
+import { activityMetricId, activitySplitId } from './circuitIds';
 import { RECORD_OP } from './opKinds';
 import { defaultId as createId } from './outboxTransport';
 import { recordScope } from './recordQueue';
@@ -155,4 +156,85 @@ export async function queueNoteDelete(outbox, rootId, note) {
         meta: { rootId, noteId: note.id },
     });
     return { data: null };
+}
+
+/** An activity made offline can be logged at once: its metrics and splits have the ids the server will give them. */
+export async function queueActivityCreate(outbox, rootId, data) {
+    const id = createId();
+    const metrics = (data.metrics || []).filter((metric) => metric.name && metric.unit);
+    const splits = (data.splits || []).filter((split) => split.name);
+    const placeholder = {
+        id,
+        name: data.name,
+        description: data.description || '',
+        group_id: data.group_id || null,
+        has_sets: Boolean(data.has_sets),
+        has_metrics: data.has_metrics ?? true,
+        metrics_multiplicative: Boolean(data.metrics_multiplicative),
+        has_splits: Boolean(data.has_splits),
+        track_progress: data.track_progress ?? null,
+        progress_aggregation: data.progress_aggregation ?? null,
+        delta_display_mode: data.delta_display_mode ?? null,
+        created_at: nowIso(),
+        metric_definitions: await Promise.all(metrics.map(async (metric, index) => ({
+            input_type: 'number',
+            precision: 2,
+            is_active: true,
+            is_multiplicative: true,
+            track_progress: true,
+            ...metric,
+            id: await activityMetricId(id, index),
+        }))),
+        split_definitions: await Promise.all(splits.map(async (split, index) => ({
+            ...split, order: index, id: await activitySplitId(id, index),
+        }))),
+        associated_goal_ids: data.goal_ids || [],
+        associated_goals: [],
+        _pendingSync: true,
+    };
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.ACTIVITY_CREATE,
+        method: 'post',
+        url: `/${rootId}/activities`,
+        body: { ...data, id },
+        creates: [id],
+        meta: { rootId, placeholder },
+    });
+    return placeholder;
+}
+
+export async function queueTemplateCreate(outbox, rootId, data) {
+    const id = createId();
+    const at = nowIso();
+    const placeholder = {
+        id, root_id: rootId, revision: 1, is_archived: false, archived_at: null, is_effectively_active: true,
+        is_used_in_active_program: false, created_at: at, updated_at: at, stats: {}, goals: [], description: '',
+        ...data, _pendingSync: true,
+    };
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.TEMPLATE_CREATE,
+        method: 'post',
+        url: `/${rootId}/session-templates`,
+        body: { ...data, id },
+        creates: [id],
+        meta: { rootId, placeholder },
+    });
+    return placeholder;
+}
+
+/** `expected_revision` makes the server refuse this, for review, if another device changed the content meanwhile. */
+export async function queueTemplateUpdate(outbox, rootId, templateId, updates) {
+    await outbox.submit({
+        scope: recordScope(rootId),
+        kind: RECORD_OP.TEMPLATE_UPDATE,
+        method: 'put',
+        url: `/${rootId}/session-templates/${templateId}`,
+        body: { ...updates, _edited_at: nowIso() },
+        // A newer save replaces an unsent one: both were made against the same revision.
+        coalesceKey: `template:${templateId}`,
+        entityIds: [templateId],
+        meta: { rootId, templateId, updates },
+    });
 }
