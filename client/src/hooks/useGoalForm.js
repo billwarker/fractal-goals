@@ -53,10 +53,17 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
         description: () => null,
         deadline: () => null,
     }), []);
-    const formKey = `${mode}:${goal?.attributes?.id || goal?.id || 'new-goal'}:${getGoalNodeRevision(goal)}`;
+    const formId = `${mode}:${goal?.attributes?.id || goal?.id || 'new-goal'}`;
+    const latestKey = `${formId}:${getGoalNodeRevision(goal)}`;
+    // From the first edit until it is saved or dropped, the form stays on the version being edited:
+    // another device's change can arrive meanwhile and must not replace what is being typed.
+    const [pin, setPin] = useState(null);
+    const pinned = pin?.formId === formId ? pin : null;
+    const formKey = pinned?.formKey ?? latestKey;
+    const startingValues = pinned?.startingValues ?? initialState;
     const [formStateByKey, setFormStateByKey] = useState({});
     const currentFormState = formStateByKey[formKey] || {
-        values: initialState,
+        values: startingValues,
         errors: {},
         touched: {},
     };
@@ -64,7 +71,7 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
     const updateFormState = (updater) => {
         setFormStateByKey((prev) => {
             const currentState = prev[formKey] || {
-                values: initialState,
+                values: startingValues,
                 errors: {},
                 touched: {},
             };
@@ -79,6 +86,7 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
     };
 
     const setFieldValue = (field, nextValue) => {
+        if (!pinned) setPin({ formId, formKey, startingValues: initialState });
         updateFormState((prev) => {
             const nextFieldValue = resolveNextValue(nextValue, prev.values[field]);
             const nextErrors = prev.errors[field]
@@ -137,11 +145,8 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
     };
 
     const resetForm = (newValues = initialState) => {
-        updateFormState({
-            values: newValues,
-            errors: {},
-            touched: {},
-        });
+        setPin(null);
+        setFormStateByKey({ [latestKey]: { values: newValues, errors: {}, touched: {} } });
     };
 
     return {
@@ -177,5 +182,7 @@ export function useGoalForm(goal, mode, initialCompletion = null) {
         errors: currentFormState.errors,
         validateForm,
         resetForm,
+        values: currentFormState.values,
+        startingValues,
     };
 }

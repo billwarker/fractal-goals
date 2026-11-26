@@ -12,7 +12,7 @@ from validators import (
 )
 from services.account_flags import must_change_password
 from services.serializers import serialize_user
-from services.auth_service import AuthService
+from services.auth_service import MEDIA_TOKEN_AUDIENCE, SESSION_TOKEN_AUDIENCE, AuthService
 from services.user_service import UserService
 from services.data_export_service import DataExportService
 from services.demo_access_service import DemoAccessService
@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 from models import AdminAuditEvent, User, validate_root_goal
 from blueprints.api_utils import get_db_session, internal_error
+from blueprints.idempotency import IDEMPOTENCY_HEADER, idempotent
 from extensions import limiter
 from config import config
 import logging
@@ -111,7 +112,13 @@ def _clear_auth_cookie(response):
     return response
 
 
+MEDIA_TOKEN_ENDPOINTS = frozenset({'storage.content', 'storage.media_thumbnail'})
+
+
 def _get_request_token():
+    media_token = request.args.get('media_token')
+    if media_token and request.method == 'GET' and request.endpoint in MEDIA_TOKEN_ENDPOINTS:
+        return media_token, 'media'
     auth_header = request.headers.get('Authorization')
     if auth_header and auth_header.startswith('Bearer '):
         return auth_header.split(" ", 1)[1], 'bearer'
@@ -132,10 +139,23 @@ def _validate_csrf_for_cookie_auth():
         return False
     return hmac.compare_digest(cookie_token, header_token)
 
+def _is_replayable_write(handler) -> bool:
+    """Every write inside a fractal may be retried by a device; media streams have their own protocol."""
+    return (
+        _is_mutating_request()
+        and not getattr(handler, 'is_idempotent', False)
+        and request.blueprint != 'storage'
+        and (request.endpoint == 'goals.create_fractal' or 'root_id' in (request.view_args or {}))
+    )
+
+
 def token_required(f):
     """Decorator to protect routes with JWT authentication."""
     @wraps(f)
     def decorated(*args, **kwargs):
+        handler = f
+        if request.headers.get(IDEMPOTENCY_HEADER) and _is_replayable_write(f):
+            handler = idempotent(f)
         # Let CORS preflight requests pass through auth checks.
         # The real request (GET/POST/...) will still require a valid token.
         if request.method == 'OPTIONS':
@@ -161,7 +181,8 @@ def token_required(f):
                 return f(owner, *args, **kwargs)
 
             service = AuthService(db_session)
-            current_user, error, status = service.get_current_user_for_token(token)
+            audience = MEDIA_TOKEN_AUDIENCE if token_source == 'media' else SESSION_TOKEN_AUDIENCE
+            current_user, error, status = service.get_current_user_for_token(token, audience=audience)
             if error:
                 return jsonify({'error': error}), status
             # Enforced on the authenticated account before the admin-support
@@ -188,7 +209,7 @@ def token_required(f):
                     'code': 'legal_acceptance_required',
                 }), 403
             root_id = kwargs.get('root_id')
-            admin_user_id = request.args.get('admin_user_id')
+            admin_user_id = request.args.get('admin_user_id') if token_source != 'media' else None
             admin_mode = request.args.get('admin_mode')
             is_user_wide_analytics_route = request.path.startswith('/api/analytics')
             if (root_id or is_user_wide_analytics_route) and admin_user_id and admin_mode:
@@ -234,7 +255,7 @@ def token_required(f):
                 current_user.id = admin_user_id
             g.current_user = current_user
             authentication_complete = True
-            return f(current_user, *args, **kwargs)
+            return handler(current_user, *args, **kwargs)
         except SQLAlchemyError:
             if authentication_complete:
                 raise
@@ -528,10 +549,11 @@ def update_password(current_user, validated_data):
         session, error, session_status = AuthService(db_session).reissue_current_session(
             current_user.id, previous_token,
         )
-        if error:
+        if error or session is None:
             return jsonify({'error': error}), session_status
         response = jsonify({**payload, **session})
-        _set_auth_cookie(response, session['token'], remember_me=session['remember_me'])
+        if not session['device_session']:
+            _set_auth_cookie(response, session['token'], remember_me=session['remember_me'])
         return response, status
     except SQLAlchemyError:
         db_session.rollback()

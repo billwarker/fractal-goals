@@ -1,5 +1,5 @@
 // Mirror of services/circuit_ids.py: UUIDv5 derivations that let a device
-// address circuit structure it created offline before the server sees it.
+// address circuit structure, and an activity's metrics and splits, it created offline before the server sees it.
 // tests/fixtures/circuit_id_vectors.json keeps both sides identical.
 
 function uuidToBytes(uuid) {
@@ -35,3 +35,6 @@ export const initialRoundId = (runId, roundNumber) => uuidv5(runId, `round:${rou
 export const roundMemberId = (roundId, runSlotId) => uuidv5(roundId, `member:${runSlotId}`);
 export const roundMemberSetId = (roundId, runSlotId) => uuidv5(roundId, `set:${runSlotId}`);
 export const roundMemberInstanceId = (roundId, runSlotId) => uuidv5(roundId, `instance:${runSlotId}`);
+export const activityMetricId = (activityId, index) => uuidv5(activityId, `metric:${index}`);
+export const activitySplitId = (activityId, index) => uuidv5(activityId, `split:${index}`);
+export const plannedSetId = (instanceId, index) => uuidv5(instanceId, `planned-set:${index}`);

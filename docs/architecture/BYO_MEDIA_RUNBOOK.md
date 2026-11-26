@@ -68,7 +68,13 @@ apply once 50 users have linked.
 4. Request only `https://www.googleapis.com/auth/drive.file`. Users select existing files with
    Picker; uploading creates files inside a visible **Fractal Goals** folder in My Drive.
 5. Complete the provider's production publishing/verification requirements for the actual app.
-   Confirm refresh-token behavior while the consent screen remains in Testing.
+   **The consent screen must be published ("In production"): while it is in Testing, Google expires every
+   refresh token after seven days and everyone has to reconnect weekly.** Brand verification being pending
+   doesn't cause that; the publishing status does.
+6. Connections stay connected: access tokens renew from a stored refresh token, and the daily retention job
+   uses any connection idle for 30 days (`StorageConnectionService.keep_alive`) because Google drops a refresh
+   token unused for six months. Give that job the storage secrets the backend has; without them it skips this.
+   Only `invalid_grant` ends a connection: a wrong client secret, say, leaves it as it was.
 
 Picker needs a short-lived access token in browser memory. `/storage/google_drive/picker`
 returns it with `private, no-store`; it is never placed in Markdown, a URL, React Query's

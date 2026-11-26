@@ -10,6 +10,8 @@ import {
     buildInstanceUpdateRequest,
     findRunningInstance,
     instanceCoalesceKey,
+    instanceBase,
+    withSetIds,
 } from '../sessionOps';
 
 const T0 = '2026-10-13T10:00:00.000Z';
@@ -123,5 +125,31 @@ describe('session completion patch', () => {
         expect(applySessionCompletion(session, true, T2, { quick: true })).not.toHaveProperty('session_end');
         expect(applySessionCompletion({ ...session, session_end: T2, total_duration_seconds: 480 }, false, T2))
             .toMatchObject({ completed: false, completed_at: null, session_end: null, total_duration_seconds: null });
+    });
+});
+
+describe('what an edited list began from', () => {
+    const instance = {
+        sets: [{ id: 's1', status: 'completed', metrics: [{ metric_definition_id: 'reps', value: 5, split_id: null, unit: 'reps' }] }],
+        metrics: [{ metric_id: 'kg', value: '12.5' }, { metric_id: 'reps', value: '' }],
+    };
+
+    it('is the list as it was, whatever the edit made of it', () => {
+        expect(instanceBase(instance, { sets: [] }).base_sets).toEqual([
+            expect.objectContaining({ id: 's1', status: 'completed', metrics: [{ metric_id: 'reps', split_id: null, value: 5 }] }),
+        ]);
+        expect(instanceBase(instance, { metrics: [] })).toEqual({ base_metrics: [{ metric_id: 'kg', split_id: null, value: 12.5 }] });
+        expect(instanceBase(instance, { notes: 'x' })).toEqual({});
+    });
+
+    it('stays what the first unsent save began from', () => {
+        expect(instanceBase(instance, { sets: [] }, { base_sets: [] })).toEqual({ base_sets: [] });
+    });
+
+    it('gives every set an id that lasts', () => {
+        const { sets } = withSetIds({ sets: [{ id: 's1' }, { instance_id: 'i2' }, {}] });
+        expect(sets.map(({ id }) => id).slice(0, 2)).toEqual(['s1', 'i2']);
+        expect(sets[2].id).toBeTruthy();
+        expect(withSetIds({ notes: 'x' })).toEqual({ notes: 'x' });
     });
 });

@@ -19,6 +19,8 @@ from services.payload_normalizers import (
 )
 from services.quota_service import QuotaService
 from services.service_types import JsonDict, JsonList, ServiceResult
+from services.circuit_ids import activity_metric_id, activity_split_id
+from services.client_ids import new_id
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +224,7 @@ class ActivityService:
         
         # Create Activity
         new_activity = ActivityDefinition(
+            id=new_id(ActivityDefinition),
             root_id=root_id,
             name=activity_name,
             description=data.get('description', ''),
@@ -239,33 +242,33 @@ class ActivityService:
         
         # Create Metrics
         metrics_data = data.get('metrics', [])
-        for m in metrics_data:
-            if m.get('name') and m.get('unit'):
-                new_metric = MetricDefinition(
-                    activity_id=new_activity.id,
-                    root_id=root_id,
-                    fractal_metric_id=m.get('fractal_metric_id'),
-                    name=m['name'],
-                    unit=m['unit'],
-                    is_best_set_metric=m.get('is_best_set_metric', False),
-                    is_multiplicative=m.get('is_multiplicative', True),
-                    track_progress=m.get('track_progress', True),
-                    progress_aggregation=m.get('progress_aggregation'),
-                )
-                self.db_session.add(new_metric)
+        for index, m in enumerate(m for m in metrics_data if m.get('name') and m.get('unit')):
+            new_metric = MetricDefinition(
+                id=activity_metric_id(str(new_activity.id), index),
+                activity_id=new_activity.id,
+                root_id=root_id,
+                fractal_metric_id=m.get('fractal_metric_id'),
+                name=m['name'],
+                unit=m['unit'],
+                is_best_set_metric=m.get('is_best_set_metric', False),
+                is_multiplicative=m.get('is_multiplicative', True),
+                track_progress=m.get('track_progress', True),
+                progress_aggregation=m.get('progress_aggregation'),
+            )
+            self.db_session.add(new_metric)
 
         # Create Splits
         splits_data = data.get('splits', [])
-        for idx, s in enumerate(splits_data):
-            if s.get('name'):
-                new_split = SplitDefinition(
-                    activity_id=new_activity.id,
-                    root_id=root_id,
-                    name=s['name'],
-                    order=idx
-                )
-                self.db_session.add(new_split)
-                
+        for idx, s in enumerate(s for s in splits_data if s.get('name')):
+            new_split = SplitDefinition(
+                id=activity_split_id(str(new_activity.id), idx),
+                activity_id=new_activity.id,
+                root_id=root_id,
+                name=s['name'],
+                order=idx
+            )
+            self.db_session.add(new_split)
+            
         # Handle Goal Associations
         goal_ids = data.get('goal_ids', [])
         if goal_ids:

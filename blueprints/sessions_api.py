@@ -24,6 +24,8 @@ from services.session_service import SessionService
 from services.progress_service import ProgressService
 from services.completion_handlers import progress_for_saved_instance
 from services.owned_entity_queries import get_owned_session
+from blueprints.sync_merge import merges
+from blueprints.client_ids import accepts_client_id
 
 # Create blueprint
 sessions_bp = Blueprint('sessions', __name__, url_prefix='/api')
@@ -275,6 +277,7 @@ def get_flowtree_session_metrics(current_user, root_id):
 @sessions_bp.route('/<root_id>/sessions', methods=['POST'])
 @token_required
 @idempotent
+@accepts_client_id(Session)
 @validate_request(SessionCreateSchema)
 def create_fractal_session(current_user, root_id, validated_data):
     """Create a new session within a fractal."""
@@ -357,6 +360,7 @@ def complete_quick_session(current_user, root_id, validated_data):
 @sessions_bp.route('/<root_id>/sessions/<session_id>', methods=['PUT'])
 @token_required
 @idempotent
+@merges('session', 'session_id')
 @validate_request(SessionUpdateRequestSchema)
 def update_session(current_user, root_id, session_id, validated_data):
     """Update a session's details."""
@@ -588,6 +592,7 @@ def update_activity_metrics(current_user, root_id, session_id, instance_id, vali
             instance_id,
             current_user.id,
             validated_data.get('metrics', []),
+            base_metrics=validated_data.get('base_metrics'),
         )
         if error:
             if isinstance(error, dict):

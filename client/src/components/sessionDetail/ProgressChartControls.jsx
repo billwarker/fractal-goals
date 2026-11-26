@@ -4,7 +4,7 @@ import { useProgressChartMutation } from '../../hooks/useActivityTags';
 import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import { MetricChipsField, MetricSelectField, SetsHandlingField } from '../analytics/visualizations/activities/ActivityMetricFields';
-import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/MetricTrends';
+import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/yieldMetric';
 import { CHART_KINDS, chartMetrics, settingsForKind } from './progressChartSettings';
 import styles from './ProgressChartControls.module.css';
 

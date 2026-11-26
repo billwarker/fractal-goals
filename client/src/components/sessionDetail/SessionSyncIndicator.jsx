@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 
 import { useOutbox, useOutboxStatus } from '../../offline/OutboxContext';
-import { SESSION_OP } from '../../offline/opKinds';
+import { RECORD_OP, SESSION_OP } from '../../offline/opKinds';
 import { STALLED_AFTER_MS, describeQueueForSupport } from '../../offline/outboxQueue';
 import { REJECTED_TTL_MS } from '../../offline/outboxReview';
+import { fractalApi } from '../../utils/api';
 import notify from '../../utils/notify';
 import Button from '../atoms/Button';
+import { copyText } from '../../platform';
 import styles from './SessionSyncIndicator.module.css';
 
 const SYNCED_VISIBLE_MS = 2500;
@@ -16,6 +18,7 @@ const CIRCUIT_LABELS = { startRun: 'Started circuit', completeRun: 'Completed ci
 export function describeOp(op) {
     const name = op.meta?.placeholder?.name || op.meta?.note?.content?.slice(0, 40);
     switch (op.kind) {
+        case SESSION_OP.START: return op.meta?.session?.name ? `Started ${op.meta.session.name}` : 'Started session';
         case SESSION_OP.INSTANCE_UPDATE: return 'Activity values';
         case SESSION_OP.ACTIVITY_ADD: return name ? `Added ${name}` : 'Added activity';
         case SESSION_OP.ACTIVITY_REMOVE: return 'Removed activity';
@@ -41,6 +44,14 @@ export function describeOp(op) {
         case SESSION_OP.PROGRESS_COMPARISON: return 'Progress comparison';
         case SESSION_OP.PROGRESS_CHART: return 'Progress chart';
         case SESSION_OP.INSTANCE_GOAL_LINK: return op.meta?.remove ? 'Removed goal link' : 'Linked goal';
+        case RECORD_OP.GOAL_CREATE: return name ? `New goal: ${name}` : 'New goal';
+        case RECORD_OP.GOAL_UPDATE: return 'Edited goal';
+        case RECORD_OP.ACTIVITY_CREATE: return name ? `New activity: ${name}` : 'New activity';
+        case RECORD_OP.TEMPLATE_CREATE: return name ? `New template: ${name}` : 'New template';
+        case RECORD_OP.TEMPLATE_UPDATE: return 'Edited template';
+        case RECORD_OP.NOTE_CREATE: return name ? `Note: “${name}”` : 'New note';
+        case RECORD_OP.NOTE_UPDATE: return 'Edited note';
+        case RECORD_OP.NOTE_DELETE: return 'Deleted note';
         case SESSION_OP.QUICK_COMPLETE: return 'Completed quick session';
         default: return 'Change';
     }
@@ -69,10 +80,20 @@ export function describeRetryReason(error) {
 
 async function copyDiagnostics(outbox) {
     try {
-        await navigator.clipboard.writeText(JSON.stringify(describeQueueForSupport(outbox.getSnapshot(), Date.now()), null, 2));
+        await copyText(JSON.stringify(describeQueueForSupport(outbox.getSnapshot(), Date.now()), null, 2));
         notify.success('Sync details copied');
     } catch {
         notify.error("Couldn't copy the sync details");
+    }
+}
+
+/** Both sessions are kept: the other ends now, and the one waiting here syncs after it. */
+async function finishOther({ id, rootId }, outbox) {
+    try {
+        await fractalApi.updateSession(rootId, id, { completed: true });
+        await outbox.retryNow();
+    } catch {
+        notify.error("Couldn't finish the other session. Please try again.");
     }
 }
 
@@ -119,6 +140,7 @@ export default function SessionSyncIndicator({
     let label = null;
     let detail = null;
     let offerRetryNow = false;
+    let finishSession = null;
     const changes = plural(status.pendingCount, 'change');
     const stalled = Boolean(status.oldestPendingAt) && now - status.oldestPendingAt > STALLED_AFTER_MS;
     if (status.rejected.length > 0) {
@@ -137,6 +159,10 @@ export default function SessionSyncIndicator({
     } else if (status.pendingCount > 0 && status.volatile) {
         tone = 'warning';
         label = `${changes} saved in this tab only · keep it open`;
+    } else if (status.pendingCount > 0 && status.lastError?.activeSession) {
+        tone = 'warning';
+        label = `Waiting: “${status.lastError.activeSession.name || 'another session'}” is still in progress`;
+        finishSession = status.lastError.activeSession;
     } else if (status.pendingCount > 0 && status.retryAt > now) {
         tone = stalled ? 'warning' : 'muted';
         label = `Retrying ${changes} in ${Math.max(1, Math.ceil((status.retryAt - now) / 1000))} s`;
@@ -191,6 +217,11 @@ export default function SessionSyncIndicator({
                 <span className={styles.dot} aria-hidden="true" />
                 <span>{label}</span>
                 {detail && <span className={styles.detail}>· {detail}</span>}
+                {finishSession && (
+                    <button type="button" className={styles.reviewToggle} onClick={() => void finishOther(finishSession, outbox)}>
+                        Finish it
+                    </button>
+                )}
                 {offerRetryNow && (
                     <button type="button" className={styles.reviewToggle} onClick={() => void outbox.retryNow()}>
                         Retry now

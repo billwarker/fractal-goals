@@ -65,6 +65,8 @@ EXCLUDED_TABLES = {
     'storage_uploads': 'the demo serves no media',
     'goal_attachments': 'the demo serves no media',
     'note_attachments': 'the demo serves no media',
+    'sync_conflicts': 'device sync state belongs to the owner\'s account',
+    'sync_changes': 'device sync state belongs to the owner\'s account',
     'product_events': 'telemetry about the owner, not part of the fractal',
     'agent_change_cursors': 'agent state belongs to the owner\'s connections',
     'agent_embedded_conversations': 'agent state belongs to the owner\'s connections',

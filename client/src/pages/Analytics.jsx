@@ -4,7 +4,7 @@ import { formatDuration } from '../components/analytics/formatDuration';
 import AnalyticsLoading from '../components/analytics/AnalyticsLoading';
 import AnalyticsEvidenceNotice from '../components/analytics/AnalyticsEvidenceNotice';
 import AnalyticsTopBar from '../components/analytics/AnalyticsTopBar';
-import { getChartNumbers } from '../components/analytics/chartTitles';
+import { getChartNumbers } from '../components/analytics/chartNumbers';
 import fitLayoutToBounds from '../components/analytics/fitLayoutToBounds';
 import useAnalyticsDeepLink, { useAnalyticsEvidenceDemand } from '../components/analytics/useAnalyticsDeepLink';
 import {

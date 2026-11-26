@@ -18,6 +18,25 @@ describe('outboxQueue', () => {
         expect(pickNextReady(ops.slice(0, 2), 1000)).toEqual({ head: undefined, wakeAt: 5000 });
     });
 
+    it('sends what creates something before what uses it, whichever queue each is in', () => {
+        const uses = pending({ opId: 'use', scope: 'session', seq: 1, url: '/r/sessions', body: { activity: 'new-activity' } });
+        const makes = pending({ opId: 'make', scope: 'fractal', seq: 2, url: '/r/activities', body: {}, creates: ['new-activity'] });
+        const other = pending({ opId: 'other', scope: 'elsewhere', seq: 3, url: '/r/x', body: null });
+        expect(pickNextReady([uses, makes, other], 1000).head).toBe(makes);
+        // While the create backs off, only what depends on it waits.
+        const backingOff = { ...makes, nextAttemptAt: 5000 };
+        expect(pickNextReady([uses, backingOff, other], 1000)).toEqual({ head: other, wakeAt: 5000 });
+        expect(pickNextReady([uses, backingOff], 1000)).toEqual({ head: undefined, wakeAt: 5000 });
+        // Sent or refused, it no longer holds anything up.
+        expect(pickNextReady([uses, { ...makes, state: OP_STATE.REJECTED }], 1000).head).toBe(uses);
+    });
+
+    it('never lets two queues wait for each other', () => {
+        const a = pending({ opId: 'a', scope: 'a', seq: 1, url: '/x', body: { needs: 'id-b' }, creates: ['id-a'] });
+        const b = pending({ opId: 'b', scope: 'b', seq: 2, url: '/x', body: { needs: 'id-a' }, creates: ['id-b'] });
+        expect(pickNextReady([a, b], 1000).head).toBe(a);
+    });
+
     it('describes the queue for support without any content', () => {
         const ops = [pending({
             opId: 'secret-id', kind: 'note.create', url: '/root/sessions/s/notes', body: { content: 'private note' },

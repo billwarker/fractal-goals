@@ -3,7 +3,6 @@
 Mixin for GoalService (audit P1-7). Instance methods; cross-method calls use
 `self.<method>(...)` and resolve through the composed GoalService instance.
 """
-import uuid
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -18,6 +17,7 @@ from services.service_types import JsonDict, ServiceResult
 from services.storage_common import StorageError
 
 from services._goal_service_common import resolve_level_id, session_goal_insert_values
+from services.client_ids import new_id
 
 
 
@@ -101,6 +101,7 @@ class _GoalCrudMixin:
 
         with self.db_session.begin_nested():
             new_goal = Goal(
+                id=new_id(Goal),
                 level_id=level_id,
                 name=data['name'],
                 description=data.get('description', ''),
@@ -238,13 +239,14 @@ class _GoalCrudMixin:
         parent_id = data.get('parent_id')
         parent_goal = None
         if parent_id:
+            # Locked: its row version moves below, so a second device's create waits instead of failing.
             parent_goal = self.db_session.query(Goal).options(
                 selectinload(Goal.level)
             ).filter_by(
                 id=parent_id,
                 root_id=root_id,
                 deleted_at=None,
-            ).first()
+            ).with_for_update(of=Goal).populate_existing().first()
             if not parent_goal:
                 return None, "Parent goal not found in this fractal.", 400
             parent_capacity_error = self._validate_parent_capacity(
@@ -268,7 +270,7 @@ class _GoalCrudMixin:
 
         with self.db_session.begin_nested():
             new_goal = Goal(
-                id=str(uuid.uuid4()),
+                id=new_id(Goal),
                 name=data['name'],
                 description=data.get('description', ''),
                 level_id=level_id,

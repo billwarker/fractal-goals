@@ -14,15 +14,19 @@ from models import (
     AgentOAuthClient,
     AgentTaskBrief,
     BetaSignupRequest,
+    DeviceRefreshToken,
     EmailDeliveryEvent,
     EmailWebhookEvent,
     PasswordResetToken,
     ProductEvent,
+    SyncFieldEdit,
+    UserDevice,
     WebEvent,
     format_utc,
     utc_now,
 )
 from services.app_settings import DATA_RETENTION_STATE_KEY, get_app_setting, set_app_setting
+from services.sync_feed_service import prune_sync_changes
 
 
 class DataRetentionService:
@@ -98,8 +102,29 @@ class DataRetentionService:
                 AgentEmbeddedConversation.updated_at < cutoffs["agent_history"],
             ),
         }
+        counts.update(self._prune_devices(now))
+        # Older than any offline edit can be, so nothing is left to order against.
+        counts["sync_field_edits"] = self._delete(
+            SyncFieldEdit, SyncFieldEdit.edited_at < now - datetime.timedelta(days=90),
+        )
+        counts["sync_changes"] = prune_sync_changes(self.db_session, now=now)
         self.db_session.commit()
         return counts
+
+    def _prune_devices(self, now) -> dict[str, int]:
+        idle_before = now - datetime.timedelta(days=config.DEVICE_SESSION_IDLE_DAYS)
+        return {
+            "user_devices": self._delete(
+                UserDevice,
+                (UserDevice.last_seen_at < idle_before) | (UserDevice.revoked_at < idle_before),
+            ),
+            # A superseded token past the idle window can no longer be told from an unknown one,
+            # and either is refused.
+            "device_refresh_tokens": self._delete(
+                DeviceRefreshToken,
+                DeviceRefreshToken.superseded_at < idle_before,
+            ),
+        }
 
     def _delete(self, model, *conditions) -> int:
         result = self.db_session.execute(delete(model).where(*conditions))

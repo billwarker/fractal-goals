@@ -58,7 +58,22 @@ export function pickNextReady(stored, now) {
     const heads = scopeHeads(stored);
     const due = (op) => !(op.nextAttemptAt > now);
     const waits = heads.filter((op) => !due(op)).map((op) => op.nextAttemptAt);
-    return { head: heads.find(due), wakeAt: waits.length ? Math.min(...waits) : null };
+    const isWaiting = waitsForAnotherScope(pendingInOrder(stored));
+    const free = heads.filter((op) => !isWaiting(op));
+    // Two scopes waiting for each other would wait forever: then the order they were made in decides.
+    const head = free.length ? free.find(due) : heads.find(due);
+    return { head, wakeAt: waits.length ? Math.min(...waits) : null };
+}
+
+/** A change that mentions something another scope has still to create waits for it: a session using a new activity. */
+function waitsForAnotherScope(pending) {
+    const createdIn = new Map();
+    pending.forEach((op) => (op.creates || []).forEach((id) => createdIn.set(id, op.scope ?? '')));
+    if (createdIn.size === 0) return () => false;
+    return (op) => {
+        const text = `${op.url} ${JSON.stringify(op.body ?? null)}`;
+        return [...createdIn].some(([id, scope]) => scope !== (op.scope ?? '') && text.includes(id));
+    };
 }
 
 /** Read inside the cross-tab lock, so two tabs never hand out the same position. */

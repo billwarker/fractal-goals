@@ -34,6 +34,8 @@ FROM nginx:1.30.6-alpine-slim
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # The official nginx entrypoint renders templates in /etc/nginx/templates.
+# Set to <team id>.<bundle id> once the apps exist; see nginx.conf.
+ENV APPLE_APP_ID=
 ENV BACKEND_URL=https://fractal-backend-195572181270.us-east1.run.app
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY security-headers-common.conf /etc/nginx/security-headers-common.conf

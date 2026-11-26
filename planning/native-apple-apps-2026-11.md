@@ -1,4 +1,68 @@
-> **Status: deferred (2026-11-22).** Scoped and agreed, not started. Begin at stage 1 when picked up, after checking the stage-1 checkpoint data in Admin → Usage.
+> **Status: in progress (started 2026-11-25, branch `feat/device-sync-native-apps`).** All stages are being
+> built in order; the owner waived the checkpoints between them.
+>
+> | Part | State |
+> |---|---|
+> | Phase 0.2 per-device sign-in (API and Settings → Account list) | Built |
+> | Phase 0.3 client ids on creates | Built for goals, fractals, activities, groups, metrics, tags, families, circuits, templates, programs, blocks, days, calendar periods and sessions. Dashboards, note filters, surfaces and dated plans stay online-only |
+> | Phase 0.4 version gate (server) | Built (`min_supported_build`; feed carries `protocol`) |
+> | Phase S.1 change log, S.2 `snapshot` and `changes` | Built |
+> | Phase S.3 offline writes: safe retries on every fractal write, field merging, conflict records | Built; Settings → Sync shows conflicts |
+> | Web: open pages refresh on another device's changes | Built (`client/src/sync/changeListener.js`) |
+> | Phase 0.1 OpenAPI | Built: `docs/api/openapi.json` lists every API route; what the apps read (sync, sign-in, goals, sessions, notes, programs, templates, activities) is fully described and checked against every response in the test suite; other responses are listed untyped. CI refuses a breaking change |
+> | Phase 0.5 in-app storage consent | Built (`POST /api/storage/<provider>/complete`; the shell's `authorize` command) |
+> | Phase 0.5 app links | Built; the association file is absent until `APPLE_APP_ID` is set |
+> | Phase 0.5 reminders | Built as a read (`GET /api/reminders/upcoming`); notifications, and the Settings switches for `preferences.reminders`, come with the first app that shows them |
+> | Phase S conformance fixtures and two-device chaos suite | Built against the real server (`tests/fixtures/sync_merge_cases.json`, `tests/integration/test_sync_two_devices.py`); the Swift engine runs the same cases later |
+> | Phase W offline reading (every screen opened on the device) | Built (`client/src/offline/queryPersistence.js`) |
+> | Phase W offline writes outside sessions | Built for creating and editing goals and goal notes from the Goals page and note dialogs; other editors and records need signal |
+> | Phase W start a session offline | Built: templates and program days. A saved dated plan needs signal. If another session is in progress when it syncs it waits, and the sync indicator offers to finish the other |
+> | Phase W platform seam | Built (`client/src/platform/`): the shell injects `__FRACTAL_SHELL__`; `e2e/native-shell.spec.js` runs the same build as a pretend Mac shell. Private media loads with a one-hour read-only media token; an outdated build shows an update screen and keeps its queue. Not done: the Drive picker, opening an attachment's original without a browser sign-in, in-shell storage consent |
+> | Phase W offline: new activities, new templates, template edits | Built. A template edit made against an older revision is refused for review, online too |
+> | Phase W WebKit test project | Built (`webkit` in `playwright.config.js`); offline reloads are skipped there, which Playwright's WebKit can't do |
+> | Phase W browsers in the device list | Deferred: browser sessions are stateless tokens, and making each a revocable record changes sign-in for everyone and adds a lookup to every request. "Sign out everywhere" covers them |
+> | Phase M Mac app | Built, unsigned (`desktop/`): Keychain sign-in, unsent changes in app-owned files, menus and shortcuts, menu-bar session timer, window kept on close, reminders as macOS notifications (Settings → General), `fractalgoals://` links, storage consent in the system sign-in window, save dialogs. `npm run smoke` drives the real app. Not done: Developer ID signing, notarization and the updater (need an Apple Developer account), universal links. Production `CORS_ORIGINS` allows `tauri://localhost` from the next deploy |
+> | Phase I iPhone | Not started: needs full Xcode and an Apple Developer account |
+>
+> **Design changes while building:**
+> - The log is positioned by transaction id, not a per-user `change_seq`. A sequence value is assigned before
+>   commit, so a slow transaction could land behind a cursor and be lost; transaction ids read below
+>   `pg_snapshot_xmin` cannot, and need no lock.
+> - The feed is per entity (a session with its sets), in the canonical serializer's shape, not per row.
+> - Log rows are pruned after 30 days (not 90), and deletions need no separate tombstone table.
+> - No `/api/sync/ops`: devices replay the ordinary REST writes with `Idempotency-Key`, as the session outbox
+>   already does. A second write path would have duplicated every route's validation.
+> - Merging covers free-standing text and dates (`MERGE_FIELDS`); structural edits keep their existing 409s.
+> - The web keeps read results, not a mirror of records: server-computed views can't be rebuilt on the device,
+>   so each screen opened is stored as it was (400 reads, 25M characters, 30 days; sessions first).
+>   A screen never opened on that device isn't readable offline. The iPhone still needs the record mirror.
+> - Deleting stays online-only (a delete cascades to children another device may have added), and so does completing a
+>   goal until the server accepts the time it was done. Offline, both fail at once; a browser test holds that.
+> - The log's triggers look rows up by id array and plan each time (migration `e5d9b2a7f3c8`): with plain joins a
+>   stale plan scanned whole tables.
+> - Edits send only the fields that changed; a field resent unchanged is never an edit.
+> - The Mac app keeps the screens it has read in the web view's IndexedDB, the same code as the web, rather than
+>   SQLite. Its unsent-edit queue goes in a file the shell owns (Phase M), so macOS can't clear unsent work.
+> - Online edits merge too: the goal form sends only what changed and what it held when the edit began, and stays
+>   on that version while another device's changes arrive.
+> - `platform.capabilities` lists what only the app does (menus, menu-bar timer, reminders); a browser simply goes
+>   without each: its page already has shortcuts and a session timer.
+> - The Mac app has no auto-updater yet: Tauri's updater needs signed, notarized releases to install over. Until then
+>   `MIN_SUPPORTED_BUILDS` shows the update screen, and a new build is installed by hand.
+> - Reminders are planned on the Mac from `GET /api/reminders/upcoming`, at 9:00 local time; a session left running is
+>   reminded of from the app's own view of it, three hours after it began. They are switched on per Mac.
+> - Unsent changes are one file per change, written beside and renamed over, with the folder synced, so a crash leaves
+>   either version; the client sends them to the shell one at a time, in order.
+> - Programs stay online-only offline: their calendar rules can refuse a change, and one refused days later
+>   is worse than one refused now. Activity edits (not creates) too: their metrics can't be merged.
+> - A queued change waits for any change, in any queue, that creates an id it mentions.
+> - Set and value lists in a session merge: a save sends the list it began from (`base_sets`, `base_metrics`), so sets
+>   logged on two devices are all kept. The same set edited on both keeps the last to arrive.
+> - A native consent is finished by the signed-in app, never by the callback, so nobody's storage can be joined to
+>   another account; `keep_alive` uses quiet grants so providers don't expire them.
+> - No SSE stream: it would hold a Gunicorn worker per open tab. Visible clients poll every 15 s; one indexed read.
+> - Transactions anywhere on the Postgres server hold the feed back until they finish (late, never lost).
+> - After any database restore, `reset_sync_epoch` must run, because transaction ids restart.
 
 # Native Apple apps with cross-device sync: native iPhone, wrapped-web Mac
 

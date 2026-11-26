@@ -4,7 +4,6 @@ Mixin for ProgramService (audit P1-7). Methods are classmethods; cross-method
 calls use cls.<method>(...) and resolve through the composed ProgramService class.
 """
 
-import uuid
 import logging
 from typing import List, Dict, Optional
 
@@ -36,6 +35,7 @@ else:
 
 logger = logging.getLogger(__name__)
 from services.program_service_errors import ProgramServiceValidationError
+from services.client_ids import new_id
 
 
 class _ProgramCrudMixin(_ProgramMixinBase):
@@ -101,6 +101,7 @@ class _ProgramCrudMixin(_ProgramMixinBase):
         assert_no_block_overlap(session, program.id, start_date_val, end_date_val)
 
         new_block = ProgramBlock(
+            id=new_id(ProgramBlock),
             program_id=program.id,
             name=data['name'],
             start_date=start_date_val,
@@ -210,7 +211,7 @@ class _ProgramCrudMixin(_ProgramMixinBase):
         cls._check_no_program_overlap(session, root_id, start_date, end_date)
         
         new_program = Program(
-            id=str(uuid.uuid4()),
+            id=new_id(Program),
             root_id=root_id,
             name=validated_data['name'],
             description=validated_data.get('description', ''),

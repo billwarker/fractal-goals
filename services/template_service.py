@@ -16,6 +16,7 @@ from services.session_structure import build_template_data_from_session
 from services.session_template_stats_service import SessionTemplateStatsService
 from services.service_types import JsonList, ServiceResult
 from validators import validate_session_template_data
+from services.client_ids import new_id
 
 
 STARTER_TEMPLATE_NAME = "Simple Empty Template"
@@ -180,7 +181,7 @@ class TemplateService:
             return None, storage_error, storage_status
 
         new_template = SessionTemplate(
-            id=str(uuid.uuid4()),
+            id=new_id(SessionTemplate),
             name=data['name'],
             description=data.get('description', ''),
             root_id=root_id,
@@ -244,6 +245,17 @@ class TemplateService:
         template, error, status = self.get_template(root_id, template_id, current_user_id)
         if error or template is None:
             return None, error, status
+
+        expected = data.pop('expected_revision', None)
+        if expected is not None and 'template_data' in data:
+            self.db_session.refresh(template, with_for_update=True)
+            unchanged = _load_template_data(template.template_data) == data['template_data']
+            if (template.revision or 1) != expected and not unchanged:
+                self.db_session.rollback()
+                return None, {
+                    'error': 'This template was changed on another device. Open it again to see the latest version.',
+                    'code': 'template_changed',
+                }, 409
 
         if 'name' in data:
             template.name = data['name']

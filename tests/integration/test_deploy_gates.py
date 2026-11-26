@@ -239,6 +239,30 @@ def test_cloudbuild_backend_carries_both_storage_providers():
     assert env["DROPBOX_APP_FOLDER"] == "Fractal Goals"
 
 
+def test_the_retention_job_can_keep_storage_connections_alive():
+    _, _, steps = _cloudbuild_steps()
+    job = steps["Update Data Retention Job"]["args"]
+    secrets = _deploy_flag(job, "--set-secrets")
+    for name in (
+        "SUPABASE_DIRECT_DATABASE_URL", "STORAGE_ENCRYPTION_KEYS", "GOOGLE_DRIVE_CLIENT_ID",
+        "GOOGLE_DRIVE_CLIENT_SECRET", "DROPBOX_CLIENT_ID", "DROPBOX_CLIENT_SECRET",
+    ):
+        assert secrets.get(name) == f"{name}:latest", name
+    assert _deploy_flag(job, "--set-env-vars")["APP_BASE_URL"] == "https://my.fractalgoals.com"
+    # It already reads the backend's secrets as this account, so it can read these.
+    account = job[job.index("--service-account") + 1]
+    backend = steps["Deploy Backend"]["args"]
+    assert account == backend[backend.index("--service-account") + 1]
+
+
+def test_the_mac_app_may_call_the_api():
+    _, _, steps = _cloudbuild_steps()
+    origins = _deploy_flag(steps["Deploy Backend"]["args"], "--set-env-vars")["CORS_ORIGINS"].split(";")
+    # The Mac app serves its pages from this origin (desktop/tauri.conf.json).
+    assert "tauri://localhost" in origins
+    assert "https://my.fractalgoals.com" in origins
+
+
 def test_cloudbuild_shell_variables_are_escaped_from_substitution():
     import re
 

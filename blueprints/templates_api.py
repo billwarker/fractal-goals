@@ -2,15 +2,17 @@ from flask import Blueprint, request, jsonify
 import logging
 import models
 from sqlalchemy.exc import SQLAlchemyError
-from models import get_session
 from validators import (
     validate_request,
     SessionTemplateCreateSchema, SessionTemplateUpdateSchema, SessionTemplateFromSessionSchema
 )
 from blueprints.auth_api import token_required
-from blueprints.api_utils import get_db_session, parse_optional_pagination, internal_error
+from blueprints.api_utils import error_body, get_db_session, parse_optional_pagination, internal_error
 from services.serializers import serialize_session_template
 from services.template_service import TemplateService
+from blueprints.client_ids import accepts_client_id
+from models import get_session, SessionTemplate
+from blueprints.sync_merge import merges
 
 # Create blueprint
 templates_bp = Blueprint('templates', __name__, url_prefix='/api')
@@ -61,6 +63,7 @@ def get_session_template(current_user, root_id, template_id):
 
 @templates_bp.route('/<root_id>/session-templates', methods=['POST'])
 @token_required
+@accepts_client_id(SessionTemplate)
 @validate_request(SessionTemplateCreateSchema)
 def create_session_template(current_user, root_id, validated_data):
     """Create a new session template if owned by user."""
@@ -108,6 +111,7 @@ def create_template_from_session(current_user, root_id, session_id, validated_da
 
 @templates_bp.route('/<root_id>/session-templates/<template_id>', methods=['PUT'])
 @token_required
+@merges('template', 'template_id')
 @validate_request(SessionTemplateUpdateSchema)
 def update_session_template(current_user, root_id, template_id, validated_data):
     """Patch scalar fields; replace template_data only when that key is present."""
@@ -116,7 +120,7 @@ def update_session_template(current_user, root_id, template_id, validated_data):
         service = TemplateService(session)
         template, error, status = service.update_template(root_id, template_id, current_user.id, validated_data)
         if error:
-            return jsonify({"error": error}), status
+            return jsonify(error_body(error)), status
         return jsonify(serialize_session_template(template)), status
         
     except SQLAlchemyError:

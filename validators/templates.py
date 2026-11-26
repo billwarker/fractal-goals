@@ -59,6 +59,8 @@ class SessionTemplateUpdateSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=MAX_DESCRIPTION_LENGTH)
     template_data: Optional[Dict[str, Any]] = None
     is_archived: Optional[bool] = None
+    # The revision the content was edited from; a newer one is refused rather than overwritten.
+    expected_revision: Optional[int] = Field(None, ge=1)
 
     @field_validator('name')
     @classmethod

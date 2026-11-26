@@ -40,6 +40,7 @@ export function useGoalDescriptionAttachments(rootId, goalId, enabled) {
     return {
         draft,
         loaded: query.isSuccess,
+        saved: data ?? null,
         refresh: () => client.invalidateQueries({ queryKey }),
     };
 }

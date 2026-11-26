@@ -48,6 +48,8 @@ class StorageAuthorization(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey('users.id', ondelete='CASCADE'), index=True)
     provider: Mapped[str] = mapped_column(String(20))
     verifier: Mapped[str] = mapped_column(Text)
+    # Begun in a native app, which finishes it signed in as the same user instead of by a browser cookie.
+    native: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     expires_at: Mapped[datetime] = mapped_column(DateTime)
 
 

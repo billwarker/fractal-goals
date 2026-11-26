@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, dehydrate, hydrate } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryKeys } from '../../hooks/queryKeys';
@@ -111,6 +111,20 @@ describe('session op handlers', () => {
             staleTime: 0,
         });
 
+        expect(queryClient.getQueryData(activitiesKey).map((entry) => entry.id)).toEqual(['i1', 'i2']);
+    });
+
+    it('keeps a queued change over the stored copy, restored after the queue', async () => {
+        const { queryClient, outbox } = env;
+        await enqueue(outbox, queryClient, {
+            kind: SESSION_OP.ACTIVITY_ADD,
+            creates: ['i2'],
+            meta: { instanceId: 'i2', placeholder: { id: 'i2', name: 'Squat' } },
+        });
+        const stored = new QueryClient();
+        stored.setQueryData(activitiesKey, [{ id: 'i1' }]);
+        queryClient.removeQueries({ queryKey: activitiesKey });
+        hydrate(queryClient, dehydrate(stored));
         expect(queryClient.getQueryData(activitiesKey).map((entry) => entry.id)).toEqual(['i1', 'i2']);
     });
 

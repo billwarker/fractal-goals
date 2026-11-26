@@ -1,8 +1,12 @@
 import { API_BASE, axios } from './core';
 
 export const storageApi = {
+    mediaToken: () => axios.post(`${API_BASE}/auth/media-token`),
     connections: () => axios.get(`${API_BASE}/storage/connections`),
-    connect: (provider) => axios.post(`${API_BASE}/storage/${provider}/connect`),
+    connect: (provider, { native = false } = {}) => axios.post(
+        `${API_BASE}/storage/${provider}/connect`, native ? { native: true } : undefined,
+    ),
+    complete: (provider, data) => axios.post(`${API_BASE}/storage/${provider}/complete`, data),
     disconnect: (provider) => axios.delete(`${API_BASE}/storage/${provider}/connection`),
     setUploadDestination: (provider) => axios.put(`${API_BASE}/storage/upload-destination`, { provider }),
     picker: () => axios.post(`${API_BASE}/storage/google_drive/picker`),
@@ -24,16 +28,19 @@ export const storageApi = {
     goalAttachments: (rootId, goalId) => axios.get(`${API_BASE}/${rootId}/goals/${goalId}/attachments`),
 };
 
+// Where no cookie goes with an image (a native app), a short-lived read-only token does.
+const tokenQuery = (mediaToken) => (mediaToken ? `?media_token=${encodeURIComponent(mediaToken)}` : '');
+
 /** Opens the original in Google Drive or Dropbox (the server redirects after checking ownership). */
 export function mediaOpenUrl(rootId, assetId) {
     return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/open`;
 }
 
 /** The provider's preview image for a file, used as a video's poster frame. */
-export function mediaThumbnailUrl(rootId, assetId) {
-    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/thumbnail`;
+export function mediaThumbnailUrl(rootId, assetId, mediaToken) {
+    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/thumbnail${tokenQuery(mediaToken)}`;
 }
 
-export function mediaContentUrl(rootId, assetId) {
-    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/content`;
+export function mediaContentUrl(rootId, assetId, mediaToken) {
+    return `${API_BASE}/${encodeURIComponent(rootId)}/media/${encodeURIComponent(assetId)}/content${tokenQuery(mediaToken)}`;
 }

@@ -449,7 +449,8 @@ class SessionActivityService:
         }, None, 200
 
     def update_activity_metrics(
-        self, root_id, session_id, instance_id, current_user_id, metric_data_list, *, commit=True, pending_events=None,
+        self, root_id, session_id, instance_id, current_user_id, metric_data_list, *, base_metrics=None,
+        commit=True, pending_events=None,
     ) -> ServiceResult[JsonDict]:
         """Replace an instance's set-free metric values. With ``commit=False`` the caller owns the
         transaction; the event goes to ``pending_events`` when given, else is emitted."""
@@ -491,6 +492,19 @@ class SessionActivityService:
         ).all()
         existing_dict = {(metric.metric_definition_id, metric.split_definition_id): metric for metric in existing_metrics}
         updated_keys = set()
+        if base_metrics is not None:
+            base = {(row.get('metric_id'), row.get('split_id')): row.get('value') for row in base_metrics}
+            # Never seen by this device, or sent along unchanged: another device's value stands.
+            updated_keys.update(key for key in existing_dict if key not in base)
+            unchanged = {
+                key for row in metric_data_list
+                if (key := (row.get('metric_id'), row.get('split_id'))) in existing_dict
+                and key in base and base[key] == row.get('value')
+            }
+            updated_keys.update(unchanged)
+            metric_data_list = [
+                row for row in metric_data_list if (row.get('metric_id'), row.get('split_id')) not in unchanged
+            ]
 
         for metric_data in metric_data_list:
             metric_id = metric_data.get('metric_id')

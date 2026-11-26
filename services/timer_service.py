@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 import uuid
 
-from sqlalchemy import or_
+from sqlalchemy import inspect, or_
 
 from models import ActivityInstance, CircuitRun, CircuitRunSlot, CircuitRoundMember, Session, validate_root_goal
 from services.owned_entity_queries import (
@@ -13,7 +13,7 @@ from services.owned_entity_queries import (
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
 from services.progress_service import ProgressService
-from services.activity_set_service import ActivitySetValidationError, replace_activity_sets
+from services.activity_set_service import ActivitySetValidationError, merge_activity_sets, replace_activity_sets
 from services.work_interval_service import WorkIntervalConflict, WorkIntervalService
 from services.session_runtime import is_quick_session
 from services.session_template_stats_service import SessionTemplateStatsService
@@ -582,7 +582,13 @@ class TimerService:
         updated_sets = []
         if 'sets' in data:
             try:
-                updated_sets = replace_activity_sets(self.db_session, instance, data['sets'])
+                sets = data['sets']
+                if data.get('base_sets') is not None and sets is not None:
+                    self.db_session.query(ActivityInstance.id).filter_by(id=instance.id).with_for_update().all()
+                    if inspect(instance).persistent:
+                        self.db_session.expire(instance, ['sets'])
+                    sets = merge_activity_sets(instance, sets, data['base_sets'])
+                updated_sets = replace_activity_sets(self.db_session, instance, sets)
             except ActivitySetValidationError as error:
                 self.db_session.rollback()
                 return None, str(error), 400
@@ -591,7 +597,7 @@ class TimerService:
         activity_name = instance.definition.name if instance.definition else "Unknown"
         serialized = serialize_activity_instance(instance)
         events = []
-        updated_fields = list(data.keys())
+        updated_fields = [field for field in data if field != 'base_sets']
         non_metric_fields = [field for field in updated_fields if field != 'sets']
         if 'sets' in data:
             for activity_set in updated_sets:

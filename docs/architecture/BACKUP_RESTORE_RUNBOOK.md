@@ -48,6 +48,10 @@ and record them here:
 
 ## 4. Restore Procedures
 
+**After any production restore (4a or 4b), before reopening traffic, run
+`python scripts/reset_sync_epoch.py` against the restored database.** Device sync positions are
+transaction ids, which a restore rewinds; the reset makes every device start from a snapshot.
+
 ### 4a. Dashboard restore (same project — data corruption / bad migration)
 
 1. Announce downtime; scale the backend to zero if needed

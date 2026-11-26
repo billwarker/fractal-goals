@@ -1,4 +1,4 @@
-import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/MetricTrends';
+import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/yieldMetric';
 
 /** The kinds the Progress pane can draw, in the order the chart picker lists them. */
 export const CHART_KINDS = [

@@ -4,6 +4,7 @@ import { agentApi } from '../../utils/api';
 import { queryKeys } from '../../hooks/queryKeys';
 import SettingsSection from '../settings/SettingsSection';
 import LoadingState from '../common/LoadingState';
+import { canCopyText, copyText } from '../../platform';
 import styles from './AgentConnectionsPanel.module.css';
 
 const endpoint = import.meta.env.VITE_AGENT_MCP_RESOURCE_URI || '';
@@ -43,8 +44,8 @@ function AgentConnectionsPanel({ enabled = true }) {
     });
 
     const copyEndpoint = async () => {
-        if (!endpoint || !navigator.clipboard?.writeText) return;
-        await navigator.clipboard.writeText(endpoint);
+        if (!endpoint || !canCopyText()) return;
+        await copyText(endpoint);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1800);
     };

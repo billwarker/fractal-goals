@@ -43,6 +43,7 @@ from .auth import (
     UserExportSchema,
     UserEmailUpdateSchema,
     UserLoginSchema,
+    DeviceSignInSchema, DeviceRefreshSchema,
     UserPasswordUpdateSchema,
     UserPreferencesUpdateSchema,
     UserSignupSchema,

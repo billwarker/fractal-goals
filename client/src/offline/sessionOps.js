@@ -63,6 +63,31 @@ export function buildInstanceUpdateRequest({ rootId, sessionId, instance, update
     return { method: 'put', url: `/${rootId}/activity-instances/${instance.id}`, body };
 }
 
+/** Sets keep one id from the moment they are added, so the server can tell this device's from another's. */
+export function withSetIds(updates) {
+    if (!Array.isArray(updates.sets)) return updates;
+    return { ...updates, sets: updates.sets.map((set) => ({ ...set, id: set.id || set.instance_id || crypto.randomUUID() })) };
+}
+
+/** What the edited list held before, so the server keeps another device's additions to it. */
+export function instanceBase(instance, updates, replacedBody = null) {
+    const base = (field, current, pick) => {
+        const before = replacedBody && field in replacedBody ? replacedBody[field] : (current || []).map(pick);
+        return { [field]: before };
+    };
+    const metric = ({ metric_id, metric_definition_id, split_id, value }) => ({
+        metric_id: metric_id || metric_definition_id, split_id: split_id || null, value,
+    });
+    if (updates.metrics !== undefined) {
+        const entered = (instance.metrics || []).filter(({ value }) => normalizeMetricValue(value) != null);
+        return base('base_metrics', entered, (row) => ({ ...metric(row), value: normalizeMetricValue(row.value) }));
+    }
+    if (updates.sets === undefined) return {};
+    return base('base_sets', instance.sets, ({ id, instance_id, status, completed, duration_seconds, notes, metrics }) => ({
+        id: id || instance_id, status, completed, duration_seconds, notes, metrics: (metrics || []).map(metric),
+    }));
+}
+
 /** One coalescing lane per instance and field set, so unrelated fields never overwrite each other. */
 export function instanceCoalesceKey(instanceId, updates) {
     return `instance:${instanceId}:${Object.keys(updates).sort().join(',')}`;

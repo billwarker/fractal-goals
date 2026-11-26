@@ -5,7 +5,8 @@ import SidePaneHeaderButton from '../common/SidePaneHeaderButton';
 import { hasActiveGlobalFilters } from './analyticsGlobalFilters';
 import AnalyticsScopePane from './AnalyticsScopePane';
 import ChartTitle from './ChartTitle';
-import { getChartNumbers, getChartTitle } from './chartTitles';
+import { getChartNumbers } from './chartNumbers';
+import { getChartTitle } from './chartTitles';
 import styles from './AnalyticsFiltersSidebar.module.css';
 
 /** Shared filters stay above chart tabs; each tab edits only its chart's scope and settings. */

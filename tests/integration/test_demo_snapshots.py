@@ -329,6 +329,8 @@ class TestDemoSnapshots:
         assert second == first
         assert _manifest(db_session)['examples'][0]['tour'] == first_tour  # deep links survive
         after = {table.name: db_session.execute(table.select()).fetchall().__len__() for table in Base.metadata.sorted_tables}
+        # The rename of the source is the owner's own change; the copies log nothing.
+        assert after.pop('sync_changes') == counts['sync_changes'] + 1
         assert {name: count for name, count in after.items() if count != counts[name]} == {}
         assert db_session.query(Goal).filter(Goal.root_id == second, Goal.name == 'Renamed before republishing').count() == 1
 

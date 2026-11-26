@@ -34,6 +34,11 @@ export const idbGet = (key) => run('readonly', (store) => store.get(key));
 export const idbSet = (key, value) => run('readwrite', (store) => store.put(value, key));
 export const idbDelete = (key) => run('readwrite', (store) => store.delete(key));
 
+/** Every value whose key starts with ``prefix``. */
+export const idbGetPrefix = (prefix) => run('readonly', (store) => (
+    store.getAll(IDBKeyRange.bound(prefix, `${prefix}\uffff`))
+));
+
 /** Delete every key starting with ``prefix`` (string keys sort, so it's one key range). */
 export const idbDeletePrefix = (prefix) => run('readwrite', (store) => (
     store.delete(IDBKeyRange.bound(prefix, `${prefix}\uffff`))

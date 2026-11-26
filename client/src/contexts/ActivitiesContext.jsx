@@ -2,6 +2,8 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { fractalApi } from '../utils/api';
 import { formatError, withNotify } from '../utils/mutationNotify';
+import { useOutbox } from '../offline/OutboxContext';
+import { loadRecordOps, shouldQueueRecord } from '../offline/recordQueue';
 import { queryKeys } from '../hooks/queryKeys';
 import { logError } from '../utils/logger';
 import { invalidateOnboardingProgress } from '../utils/queryInvalidation';
@@ -10,9 +12,14 @@ const ActivitiesContext = createContext();
 
 export function ActivitiesProvider({ children }) {
     const queryClient = useQueryClient();
+    const outbox = useOutbox();
 
     const createActivity = useMemo(() => withNotify(
         async (rootId, activityData) => {
+            if (shouldQueueRecord(outbox, rootId)) {
+                const ops = await loadRecordOps();
+                return ops.queueActivityCreate(outbox, rootId, activityData);
+            }
             const res = await fractalApi.createActivity(rootId, activityData);
             const created = res.data;
 
@@ -32,7 +39,7 @@ export function ActivitiesProvider({ children }) {
                 logError('Failed to create activity:', err);
             },
         },
-    ), [queryClient]);
+    ), [outbox, queryClient]);
 
     const updateActivity = useMemo(() => withNotify(
         async (rootId, activityId, updates) => {

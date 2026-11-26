@@ -6,7 +6,20 @@ export const OP_STATE = Object.freeze({
     REJECTED: 'rejected',
 });
 
+// Writes to a fractal's records outside a session.
+export const RECORD_OP = Object.freeze({
+    GOAL_CREATE: 'record.goal.create',
+    GOAL_UPDATE: 'record.goal.update',
+    ACTIVITY_CREATE: 'record.activity.create',
+    TEMPLATE_CREATE: 'record.template.create',
+    TEMPLATE_UPDATE: 'record.template.update',
+    NOTE_CREATE: 'record.note.create',
+    NOTE_UPDATE: 'record.note.update',
+    NOTE_DELETE: 'record.note.delete',
+});
+
 export const SESSION_OP = Object.freeze({
+    START: 'session.start',
     INSTANCE_UPDATE: 'session.instance.update',
     ACTIVITY_ADD: 'session.activity.add',
     ACTIVITY_REMOVE: 'session.activity.remove',

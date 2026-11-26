@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+import { useMediaToken } from '../../hooks/useMediaToken';
 import { mediaContentUrl, mediaOpenUrl, mediaThumbnailUrl } from '../../utils/api/storageApi';
 import { mediaKind } from '../../utils/cloudUpload';
 import { MusicIcon } from '../atoms/AppIcons';
@@ -21,18 +22,24 @@ function extensionOf(name) {
 export default function MediaAttachment({ asset, rootId }) {
     const [attempt, setAttempt] = useState(0);
     const [failed, setFailed] = useState(false);
+    const { mediaToken, ready, refresh } = useMediaToken();
     const available = asset.available && rootId;
-    const src = available ? mediaContentUrl(rootId, asset.id) : null;
+    const src = available && ready ? mediaContentUrl(rootId, asset.id, mediaToken) : undefined;
     const providerName = asset.provider === 'google_drive' ? 'Google Drive' : 'Dropbox';
     const kind = mediaKind(asset.mime_type) || 'video';
     const playable = kind !== 'audio' || canPlayAudio(asset.mime_type);
     const label = asset.alt_text || asset.name;
+    const retry = async () => {
+        if (mediaToken) await refresh();
+        setFailed(false);
+        setAttempt(attempt + 1);
+    };
     let body;
     if (!available || failed) {
         body = (
             <div className={styles.unavailable} role="status">
                 <p>{available ? 'This file could not load. Check your connection or reconnect storage.' : 'Storage is disconnected. Reconnect the original account to view this file.'}</p>
-                {available && <Button size="sm" variant="secondary" onClick={() => { setFailed(false); setAttempt(attempt + 1); }}>Retry</Button>}
+                {available && <Button size="sm" variant="secondary" onClick={retry}>Retry</Button>}
             </div>
         );
     } else if (!playable) {
@@ -52,7 +59,7 @@ export default function MediaAttachment({ asset, rootId }) {
     } else {
         // The poster is the provider's thumbnail, so nothing of the video loads until it plays.
         body = (
-            <video key={attempt} src={src} poster={mediaThumbnailUrl(rootId, asset.id)} controls preload="none"
+            <video key={attempt} src={src} poster={ready ? mediaThumbnailUrl(rootId, asset.id, mediaToken) : undefined} controls preload="none"
                 aria-label={label}
                 onError={() => setFailed(true)} />
         );

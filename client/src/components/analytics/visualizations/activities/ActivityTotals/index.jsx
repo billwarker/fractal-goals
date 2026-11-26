@@ -1,10 +1,13 @@
 import React from 'react';
 
+import lazyChart from '../../../lazyChart';
 import GroupByControl from '../../shared/GroupByControl';
 import useGroupLookups from '../../shared/useGroupLookups';
-import ActivityTotalsChart, { ACTIVITY_TOTALS_GROUPS } from './ActivityTotalsChart';
 import ActivityTotalsControls from './ActivityTotalsControls';
 import styles from '../../../ProfileWindow.module.css';
+
+const ActivityTotalsChart = lazyChart(() => import('./ActivityTotalsChart'));
+const ACTIVITY_TOTALS_GROUPS = ['activityGroup', 'tag', 'template', 'programDay'];
 
 function ActivityTotalsVisualizationChart({ context }) {
     const { groupBy, lookups, overlap } = useGroupLookups(context, ACTIVITY_TOTALS_GROUPS);

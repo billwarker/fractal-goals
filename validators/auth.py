@@ -78,6 +78,25 @@ class UserLoginSchema(BaseModel):
     remember_me: bool = False
 
 
+class DeviceSignInSchema(BaseModel):
+    """A native app signing in; the password is exchanged for a device session."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username_or_email: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=1)
+    platform: str = Field(..., pattern=r'^(ios|macos)$')
+    device_name: str = Field(..., min_length=1, max_length=80)
+
+    @field_validator('device_name')
+    @classmethod
+    def sanitize_device_name(cls, v: str) -> str:
+        return sanitize_string(v)
+
+
+class DeviceRefreshSchema(BaseModel):
+    refresh_token: str = Field(..., min_length=20, max_length=200)
+
+
 class PasswordForgotSchema(BaseModel):
     """Schema for requesting a password reset email."""
     model_config = ConfigDict(str_strip_whitespace=True)

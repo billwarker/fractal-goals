@@ -5,7 +5,7 @@ import { useActivityProgressSeries } from '../../hooks/useActivityTags';
 import useFadeSwap from '../../hooks/useFadeSwap';
 import useProgressHover from '../../hooks/useProgressHover';
 import { buildAnalyticsLink } from '../../utils/analyticsDeepLink';
-import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/MetricTrends';
+import { YIELD_METRIC_ID } from '../analytics/visualizations/activities/yieldMetric';
 import ExpandableChartFrame from '../common/ExpandableChartFrame';
 import ProgressChartControls from './ProgressChartControls';
 import ProgressChartView from './ProgressChartView';

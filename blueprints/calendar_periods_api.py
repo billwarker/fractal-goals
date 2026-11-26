@@ -6,6 +6,8 @@ from blueprints.api_utils import get_db_session
 from blueprints.auth_api import token_required
 from services.calendar_periods import CalendarPeriodService
 from validators import CalendarPeriodCreateSchema, CalendarPeriodUpdateSchema, validate_request
+from blueprints.client_ids import accepts_client_id
+from models import CalendarPeriod
 
 calendar_periods_bp = Blueprint('calendar_periods', __name__, url_prefix='/api')
 
@@ -28,6 +30,7 @@ def list_calendar_periods(current_user, root_id):
 
 @calendar_periods_bp.route('/<root_id>/calendar-periods', methods=['POST'])
 @token_required
+@accepts_client_id(CalendarPeriod)
 @validate_request(CalendarPeriodCreateSchema)
 def create_calendar_period(current_user, root_id, validated_data):
     return _respond(CalendarPeriodService(get_db_session()).create(

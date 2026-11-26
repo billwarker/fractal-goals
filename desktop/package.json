@@ -1,0 +1,16 @@
+{
+  "name": "fractal-goals-desktop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "icons": "tauri icon icons/app-icon.png --output icons/generated && cp icons/generated/icon.icns icons/icon.icns && cp icons/generated/128x128@2x.png icons/icon.png && rm -r icons/generated",
+    "build:client": "npm --prefix ../client run build",
+    "build": "npm run build:client && tauri build --bundles app",
+    "build:local": "npm run build:client && FRACTAL_APP_URL=http://127.0.0.1:8001 tauri build --bundles app --config local.conf.json",
+    "dev": "npm run build:client && tauri dev --no-watch",
+    "smoke": "node smoke/run.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.6"
+  }
+}

@@ -2,6 +2,8 @@ import { queryKeys } from '../hooks/queryKeys';
 import notify from '../utils/notify';
 import { invalidateQueryKeys, invalidateSessionLists } from '../utils/queryInvalidation';
 import { isQuickSession } from '../utils/sessionRuntime';
+import { isLandedData } from './landedData';
+import { showStartedSession } from './startedSession';
 import { SESSION_OP } from './opKinds';
 import {
     applySessionCompletion,
@@ -63,6 +65,7 @@ function addInstances(queryClient, meta) {
 }
 
 const OPTIMISTIC = {
+    [SESSION_OP.START]: showStartedSession,
     [SESSION_OP.INSTANCE_UPDATE]: (queryClient, op) => {
         patchInstanceById(queryClient, op.meta, op.meta.instanceId, op.meta.updates);
     },
@@ -407,9 +410,9 @@ export function registerSessionOpHandlers(outbox, queryClient) {
         outbox.pendingOps(scope).forEach((op) => applyOptimistic(queryClient, op));
     };
 
-    // Server data that lands while ops are queued must not hide them.
+    // Data that lands while ops are queued must not hide them.
     const unsubscribeCache = queryClient.getQueryCache().subscribe((event) => {
-        if (event?.type !== 'updated' || event.action?.type !== 'success' || event.action.manual) return;
+        if (!isLandedData(event)) return;
         const [prefix, , scope] = event.query.queryKey || [];
         if (!SESSION_QUERY_PREFIXES.has(prefix) || !scope || !outbox.hasPending(scope)) return;
         reapply(scope);

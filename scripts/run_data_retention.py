@@ -23,6 +23,7 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from services.data_retention_service import DataRetentionService, record_retention_run  # noqa: E402
+from services.storage_connection_service import StorageConnectionService  # noqa: E402
 from services.user_service import UserService  # noqa: E402
 
 
@@ -66,6 +67,13 @@ def main():
             db_session.rollback()
             print(f"Retention prune failed: {exc}", file=sys.stderr)
             failed = True
+
+        # Best effort: needs the storage secrets, and its failure is never a failure to retain or erase.
+        try:
+            emit(f"Storage connections kept alive: {StorageConnectionService(db_session).keep_alive()}")
+        except Exception as exc:
+            db_session.rollback()
+            print(f"Storage keep-alive failed: {exc}", file=sys.stderr)
 
         # The admin System tab warns when this hasn't succeeded for two days, so a
         # missing Scheduler trigger shows up instead of passing silently.

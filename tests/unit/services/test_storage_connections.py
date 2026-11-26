@@ -228,3 +228,104 @@ def test_upload_destination_falls_back_when_the_chosen_account_disconnects(conne
 def test_upload_destination_rejects_invalid_or_unconnected_providers(connection, authed_client, body):
     assert authed_client.put('/api/storage/upload-destination', json=body).status_code == 400
     assert authed_client.put('/api/storage/upload-destination', json={'provider': 'dropbox'}).status_code == 409
+
+
+@pytest.mark.parametrize('status,payload', [
+    (401, {'error': 'invalid_client'}), (403, {'error': 'access_denied'}), (400, {'error': 'unauthorized_client'}),
+    (503, {}), (429, {}),
+])
+def test_only_a_revoked_grant_ever_ends_a_connection(connection, monkeypatch, status, payload):
+    """Google answers 401 invalid_client to a wrong client secret: our mistake, not the user's."""
+    expire(connection)
+    monkeypatch.setattr(providers.requests, 'request', lambda *args, **kwargs: provider_response(status, payload))
+    with pytest.raises(StorageError):
+        connection.service.access_token(connection.row.id, connection.user.id)
+    connection.db.rollback()
+    connection.db.refresh(connection.row)
+    assert connection.row.status == 'active' and connection.row.credentials
+
+
+def _age(conn, days):
+    old = (datetime.now(timezone.utc) - timedelta(days=days)).replace(tzinfo=None)
+    conn.db.query(StorageConnection).filter_by(id=conn.row.id).update({'updated_at': old})
+    conn.db.commit()
+
+
+def test_keep_alive_uses_quiet_connections_once(connection, monkeypatch):
+    expire(connection)
+    asked = []
+
+    def request(*args, **kwargs):
+        asked.append(kwargs['data']['refresh_token'])
+        return provider_response(200, {'access_token': 'new', 'expires_in': 3600})
+    monkeypatch.setattr(providers.requests, 'request', request)
+    assert connection.service.keep_alive() == {'kept': 0, 'failed': 0}  # used recently
+    _age(connection, 31)
+    assert connection.service.keep_alive() == {'kept': 1, 'failed': 0}
+    assert connection.service.keep_alive() == {'kept': 0, 'failed': 0}
+    assert asked == ['refresh-secret']
+
+
+def test_keep_alive_survives_a_provider_outage(connection, monkeypatch):
+    expire(connection)
+    _age(connection, 31)
+    monkeypatch.setattr(providers.requests, 'request', lambda *args, **kwargs: provider_response(503, {}))
+    assert connection.service.keep_alive() == {'kept': 0, 'failed': 1}
+    connection.db.refresh(connection.row)
+    assert connection.row.status == 'active'
+
+
+def _native_state(authed_client):
+    from urllib.parse import parse_qs, urlsplit
+    response = authed_client.post('/api/storage/google_drive/connect', json={'native': True})
+    assert 'Set-Cookie' not in response.headers
+    return parse_qs(urlsplit(response.get_json()['url']).query)['state'][0]
+
+
+def test_native_consent_returns_to_the_app_which_finishes_it(connection, client, authed_client, monkeypatch):
+    finished = []
+    monkeypatch.setattr(StorageConnectionService, 'callback', lambda self, provider, state, code: finished.append(code))
+    state = _native_state(authed_client)
+    # No cookie: a system sign-in window has none. Nothing is connected yet.
+    response = client.get(f'/api/storage/google_drive/callback?state={state}&code=the-code')
+    assert response.status_code == 303 and finished == []
+    assert response.headers['Location'] == f'fractalgoals://storage/connected?provider=google_drive&state={state}&code=the-code'
+    done = authed_client.post('/api/storage/google_drive/complete', json={'state': state, 'code': 'the-code'})
+    assert done.get_json() == {'result': 'connected'} and finished == ['the-code']
+
+
+def test_native_consent_cannot_join_another_account(connection, client, authed_client, db_session, monkeypatch):
+    """Someone lured into consenting through another account's link connects nothing to it."""
+    from config import config as app_config
+    from models import User
+    from tests.conftest import session_headers_for
+    monkeypatch.setattr(StorageConnectionService, 'callback', lambda *args: pytest.fail('connected'))
+    other = User(username='lured', email='lured@example.test', terms_accepted_version=app_config.TERMS_VERSION,
+                 privacy_accepted_version=app_config.PRIVACY_VERSION)
+    other.set_password('LuredUser123!')
+    db_session.add(other)
+    db_session.commit()
+    state = _native_state(authed_client)
+    body = {'state': state, 'code': 'the-code'}
+    response = client.post('/api/storage/google_drive/complete', json=body, headers=session_headers_for(other))
+    assert response.get_json() == {'result': 'expired'}
+    assert client.post('/api/storage/google_drive/complete', json=body).status_code == 401
+    for bad in ({}, {'state': 5, 'code': 'x'}, {'state': 'unknown-state-value-long-enough', 'code': 'x'}):
+        assert authed_client.post('/api/storage/google_drive/complete', json=bad).get_json() == {'result': 'expired'}
+
+
+def test_a_browsers_consent_cannot_be_finished_as_a_native_one(connection, client, authed_client, monkeypatch):
+    from urllib.parse import parse_qs, urlsplit
+    monkeypatch.setattr(StorageConnectionService, 'callback', lambda *args: pytest.fail('connected'))
+    url = authed_client.post('/api/storage/google_drive/connect').get_json()['url']
+    state = parse_qs(urlsplit(url).query)['state'][0]
+    response = authed_client.post('/api/storage/google_drive/complete', json={'state': state, 'code': 'c'})
+    assert response.get_json() == {'result': 'expired'}
+    bare = client.application.test_client(use_cookies=False)
+    assert 'wrong_browser' in bare.get(f'/api/storage/google_drive/callback?state={state}&code=c').headers['Location']
+
+
+def test_native_denial_goes_back_to_the_app(connection, client, authed_client):
+    state = _native_state(authed_client)
+    location = client.get(f'/api/storage/google_drive/callback?state={state}&error=access_denied').headers['Location']
+    assert location == f'fractalgoals://storage/connected?provider=google_drive&state={state}&result=cancelled'

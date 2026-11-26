@@ -60,6 +60,7 @@ test('a visitor tours the real app read-only, switches examples, and signs up', 
     await guide.getByRole('button', { name: 'Minimise the demo guide' }).click();
     await page.goto(`/demo/${DEMO_SHOWCASE}/goals?goal=${demoId('sweep-showcase-root', 'sweep-goal-ii-v-i')}`);
     await page.getByRole('button', { name: 'Edit' }).first().click();
+    await page.locator('textarea').first().fill('An edit the demo refuses');
     await page.getByRole('button', { name: /^save/i }).first().click();
     const notice = page.locator('[role="status"]', { hasText: 'Changes aren’t saved in the demo.' });
     await expect(notice).toHaveCount(1);

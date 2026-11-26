@@ -17,6 +17,7 @@ from services.activity_tag_catalog_service import serialize_family
 from services.activity_tags import canonical_tag_name, normalize_tag_name
 from services.events import Event, Events, event_bus
 from services.quota_service import QuotaService
+from services.client_ids import new_id
 
 
 class ActivityTagFamilyService:
@@ -103,6 +104,7 @@ class ActivityTagFamilyService:
             ActivityTagFamily.root_id == root_id,
         ).scalar()
         family = ActivityTagFamily(
+            id=new_id(ActivityTagFamily),
             root_id=root_id,
             name=name,
             single_select=data.get("single_select", False),

@@ -110,6 +110,6 @@ describe('useOfflineSessionWrites', () => {
 
         const ops = await store.getAll();
         expect(ops).toHaveLength(1);
-        expect(ops[0].body).toEqual({ metrics: [{ value: 82.5, metric_id: 'm1', split_id: null }] });
+        expect(ops[0].body).toEqual({ metrics: [{ value: 82.5, metric_id: 'm1', split_id: null }], base_metrics: expect.any(Array) });
     });
 });

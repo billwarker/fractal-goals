@@ -215,4 +215,5 @@ def idempotent(handler):
         finally:
             db.close()
 
+    setattr(wrapper, 'is_idempotent', True)
     return wrapper

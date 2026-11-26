@@ -19,6 +19,7 @@ from services.goal_loading import goal_serializer_relationship_loaders, load_fra
 from services.events import Event, Events, event_bus
 from services.template_service import seed_default_template
 from services.user_service import UserService
+from services.client_ids import new_id
 
 
 
@@ -147,6 +148,7 @@ class _GoalFractalsMixin:
         level = scoped_levels[selected_type]
 
         new_fractal = Goal(
+            id=new_id(Goal),
             level_id=level.id,
             name=data['name'],
             description=data.get('description', ''),

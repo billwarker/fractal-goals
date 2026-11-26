@@ -12,8 +12,10 @@ import { formatError } from '../../utils/mutationNotify';
 import notify from '../../utils/notify';
 import Switch from '../atoms/Switch';
 import { getAvailableTimezones } from '../modals/settingsModalUtils';
+import { capabilities } from '../../platform';
 import AppearanceSettings from './AppearanceSettings';
 import PrivacySettings from './PrivacySettings';
+import ReminderSettings from './ReminderSettings';
 import SettingsSection, { SettingsRow, rowDescriptionId } from './SettingsSection';
 import styles from './SettingsControls.module.css';
 
@@ -134,7 +136,7 @@ function FractalActivitySettings({ rootId }) {
     );
 }
 
-/** Settings → General: region, appearance, the current fractal's activity rules, and privacy. */
+/** Settings → General: region, appearance, the current fractal's activity rules, reminders (in the app), and privacy. */
 function GeneralSettings() {
     const { activeRootId } = useGoals();
     return (
@@ -142,6 +144,7 @@ function GeneralSettings() {
             <RegionalSettings />
             <AppearanceSettings />
             {activeRootId && <FractalActivitySettings rootId={activeRootId} />}
+            {capabilities.reminders && <ReminderSettings />}
             <PrivacySettings />
         </>
     );

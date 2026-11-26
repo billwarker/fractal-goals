@@ -168,6 +168,16 @@ class Config:
     JWT_REFRESH_WINDOW_DAYS = int(os.getenv('JWT_REFRESH_WINDOW_DAYS', '7'))
     # Absolute session lifetime from the original login, across all refreshes.
     SESSION_MAX_LIFETIME_DAYS = max(1, int(os.getenv('SESSION_MAX_LIFETIME_DAYS', '30')))
+    # Native apps: a short access token, renewed by a rotating refresh token that lapses when unused.
+    DEVICE_ACCESS_TOKEN_MINUTES = max(1, int(os.getenv('DEVICE_ACCESS_TOKEN_MINUTES', '60')))
+    DEVICE_SESSION_IDLE_DAYS = max(1, int(os.getenv('DEVICE_SESSION_IDLE_DAYS', '60')))
+    # Installed apps older than these builds are told to update (blueprints/client_version.py).
+    MIN_SUPPORTED_BUILDS = {
+        'ios': int(os.getenv('MIN_SUPPORTED_BUILD_IOS', '0')),
+        'macos': int(os.getenv('MIN_SUPPORTED_BUILD_MACOS', '0')),
+    }
+    # Change-log rows older than this are pruned; a device further behind starts from a snapshot.
+    SYNC_CHANGE_RETENTION_DAYS = max(1, int(os.getenv('SYNC_CHANGE_RETENTION_DAYS', '30')))
     AUTH_COOKIE_NAME = os.getenv('AUTH_COOKIE_NAME', 'fractal_auth_token')
     CSRF_COOKIE_NAME = os.getenv('CSRF_COOKIE_NAME', 'fractal_csrf_token')
     CSRF_HEADER_NAME = os.getenv('CSRF_HEADER_NAME', 'X-CSRF-Token')

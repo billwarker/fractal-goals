@@ -3,6 +3,8 @@
 // waits until the user chooses to reload, which the UI only offers when no
 // changes are waiting to sync.
 
+import { usesServiceWorker } from '../platform';
+
 const UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
 const listeners = new Set();
@@ -28,6 +30,7 @@ export function applyAppUpdate() {
 }
 
 export function registerAppServiceWorker() {
+    if (!usesServiceWorker) return;
     if (registered || !import.meta.env.PROD || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     registered = true;
 

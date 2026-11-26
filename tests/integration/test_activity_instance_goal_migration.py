@@ -6,6 +6,8 @@ from alembic.operations import Operations
 from sqlalchemy import inspect
 import pytest
 
+from models.sync import sync_trigger_statements
+
 @pytest.mark.integration
 def test_instance_goal_migration_is_reversible_and_indexed(db_session):
     path = Path(__file__).resolve().parents[2] / 'migrations/versions/a4c6e8f0b2d4_add_activity_instance_goals.py'
@@ -23,3 +25,6 @@ def test_instance_goal_migration_is_reversible_and_indexed(db_session):
             assert all(key['options']['ondelete'] == 'CASCADE' for key in inspector.get_foreign_keys('activity_instance_goal_associations'))
             module.downgrade()
             module.upgrade()
+        # The rebuilt table is as old as that revision; the rest of the suite expects today's.
+        for statement in sync_trigger_statements('activity_instance_goal_associations'):
+            connection.exec_driver_sql(statement)

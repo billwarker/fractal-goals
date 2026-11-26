@@ -9,6 +9,7 @@ from alembic.operations import Operations
 import pytest
 from sqlalchemy import inspect, text
 
+from models.sync import sync_trigger_statements
 from services.target_condition_conversion import _stable_id
 
 LEGACY_TABLES = """
@@ -141,3 +142,8 @@ def test_migration_converts_targets_and_is_reversible(db_session, sample_goal_hi
                     _migration(filename).upgrade()
             connection.execute(text('DROP TABLE IF EXISTS target_metric_conditions'))
             connection.execute(text('DROP TABLE IF EXISTS targets'))
+            # The rebuilt tables are as old as those revisions; the rest of the suite expects today's.
+            for table in ('goal_completion_conditions', 'goal_condition_metric_rules', 'goal_condition_tags',
+                          'goal_sequence_tracks'):
+                for statement in sync_trigger_statements(table):
+                    connection.exec_driver_sql(statement)

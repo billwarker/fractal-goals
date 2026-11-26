@@ -33,11 +33,18 @@ const isAuthFailure = (error) => (
     || (error?.response?.status === 403 && /csrf/i.test(String(error.response.data?.error || '')))
 );
 
+/** A session started here while another was in progress elsewhere: it waits its turn, or for the user. */
+export const isWaitingForSession = (error) => error?.response?.status === 409
+    && error.response.data?.code === 'active_session_exists'
+    && String(error.config?.method).toLowerCase() === 'post' && /\/sessions$/.test(String(error.config?.url || ''));
+
 /** How a failed send should be handled: retry later, pause for auth, or reject. */
 export function classifyFailure(error) {
     const status = error?.response?.status;
     if (!error?.response) return 'retry';
-    if (status === 401) return 'auth';
+    // Waits, however long, for this installed app to be updated.
+    if (status === 401 || error.response.data?.code === 'client_update_required') return 'auth';
+    if (isWaitingForSession(error)) return 'retry';
     if (TRANSIENT_STATUSES.has(status) || status >= 500 || isInFlightClaim(error)) return 'retry';
     if (isAuthFailure(error)) return 'auth';
     return 'reject';
@@ -53,7 +60,7 @@ export function countsTowardGivingUp(error) {
  * or rate limit says nothing about it): other sessions' changes may go ahead of it.
  */
 export function isOpSpecificFailure(error) {
-    return countsTowardGivingUp(error) || isInFlightClaim(error);
+    return countsTowardGivingUp(error) || isInFlightClaim(error) || isWaitingForSession(error);
 }
 
 /** The wait a `Retry-After` header asks for (seconds or a date), within reason; 0 without one. */
@@ -66,11 +73,14 @@ export function retryAfterMs(error, now = Date.now()) {
     return wait > 0 ? Math.min(wait, MAX_RETRY_AFTER_MS) : 0;
 }
 
+const pickSession = (session) => (session ? { id: session.id, rootId: session.root_id, name: session.name } : null);
+
 export function describeError(error) {
     return {
         status: error?.response?.status ?? null,
         message: error?.response?.data?.error || error?.message || 'Request failed',
         code: error?.response?.data?.code ?? null,
+        ...(isWaitingForSession(error) ? { activeSession: pickSession(error.response.data.active_session) } : {}),
     };
 }
 

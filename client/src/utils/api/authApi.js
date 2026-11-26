@@ -1,18 +1,25 @@
-import { API_BASE, axios } from './core';
+import { usesCookies } from '../../platform';
+import { API_BASE, axios, getNativeSession, refreshSession } from './core';
 
 export const authApi = {
     signup: (data) => axios.post(`${API_BASE}/auth/signup`, data),
-    login: (data) => axios.post(`${API_BASE}/auth/login`, data),
+    login: async (data) => {
+        const session = await getNativeSession();
+        return session ? session.signIn(data) : axios.post(`${API_BASE}/auth/login`, data);
+    },
     forgotPassword: (data) => axios.post(`${API_BASE}/auth/password/forgot`, data),
     resetPassword: (data) => axios.post(`${API_BASE}/auth/password/reset`, data),
-    logout: () => axios.post(`${API_BASE}/auth/logout`, {}),
-    revokeAllSessions: () => axios.post(`${API_BASE}/auth/sessions/revoke`, {}),
-    refresh: (token) => axios.post(
-        `${API_BASE}/auth/refresh`,
-        {},
-        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
-    ),
-    getCsrf: () => axios.get(`${API_BASE}/auth/csrf`),
+    logout: async () => {
+        const session = await getNativeSession();
+        return session ? session.signOut() : axios.post(`${API_BASE}/auth/logout`, {});
+    },
+    revokeAllSessions: async () => {
+        const response = await axios.post(`${API_BASE}/auth/sessions/revoke`, {});
+        await (await getNativeSession())?.forget();
+        return response;
+    },
+    refresh: (token) => refreshSession(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+    getCsrf: async () => (usesCookies ? axios.get(`${API_BASE}/auth/csrf`) : null),
     getMe: () => axios.get(`${API_BASE}/auth/me`),
     acceptLegalDocuments: (data) => axios.post(`${API_BASE}/auth/legal/acceptance`, data),
     getAccountUsage: (params = {}) => axios.get(`${API_BASE}/auth/account/usage`, { params }),

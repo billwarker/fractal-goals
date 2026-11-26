@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { getChartNumbers, getChartTitle } from '../chartTitles';
+import { getChartNumbers } from '../chartNumbers';
+import { getChartTitle } from '../chartTitles';
 
 describe('chartTitles', () => {
     it('prefers a custom name and falls back to the visualization name', () => {

@@ -1,12 +1,18 @@
 import axios from 'axios';
+import { apiBase, clientHeaders, usesCookies } from '../../platform';
+import { reportUpdateRequired } from '../../platform/updateRequired';
 import { isPublicLandingLocation } from '../marketingHost';
 import { isNetworkError } from '../networkErrors';
 import { publishGoalChangesFromResponse } from '../goalChanges';
 import { DemoReadOnlyError, isDemoMode, reportBlockedDemoWrite, shouldBlockDemoRequest } from '../../demo/demoMode';
 
-export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8001/api';
+export const API_BASE = apiBase;
 
-axios.defaults.withCredentials = true;
+// Names this tab in the server's change log, so it can tell its own writes from other devices'.
+export const CLIENT_INSTANCE = globalThis.crypto?.randomUUID?.() ?? `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+axios.defaults.withCredentials = usesCookies;
+Object.assign(axios.defaults.headers.common, clientHeaders);
 axios.defaults.timeout = Number(import.meta.env.VITE_API_TIMEOUT_MS || 20000);
 
 let accessToken = null;
@@ -80,6 +86,7 @@ const readCookie = (name) => {
 };
 
 const needsCsrfHeader = (config) => {
+    if (!usesCookies) return false;
     const method = String(config.method || 'get').toLowerCase();
     const url = String(config.url || '');
     if (!MUTATING_METHODS.has(method)) return false;
@@ -125,6 +132,24 @@ const dispatchSessionExpired = (detail = {}) => {
     window.dispatchEvent(new CustomEvent('auth:session_expired', { detail }));
 };
 
+let nativeSession = null;
+
+/** The shell's session (platform/nativeSession.js), or null in a browser. */
+export function getNativeSession() {
+    if (usesCookies) return Promise.resolve(null);
+    nativeSession ??= import('../../platform/nativeSession').then(({ createNativeSession }) => (
+        createNativeSession({ post: (url, data) => axios.post(url, data, { _skipAuth: true }), apiBase: API_BASE })
+    ));
+    return nativeSession;
+}
+
+/** A new access token from what keeps this device signed in. */
+export async function refreshSession(options = {}) {
+    const session = await getNativeSession();
+    if (session) return session.refresh();
+    return axios.post(`${API_BASE}/auth/refresh`, {}, { _skipCsrfFetch: true, ...options });
+}
+
 axios.interceptors.request.use(async (config) => {
     if (shouldBlockDemoRequest(config)) {
         reportBlockedDemoWrite(config);
@@ -133,6 +158,9 @@ axios.interceptors.request.use(async (config) => {
     const isPublicRequest = String(config.url || '').includes('/public/');
     if (accessToken && !isPublicRequest && !config._skipAuth && !getHeader(config.headers, 'Authorization')) {
         setHeader(config, 'Authorization', `Bearer ${accessToken}`);
+    }
+    if (!isPublicRequest && MUTATING_METHODS.has(String(config.method || 'get').toLowerCase())) {
+        setHeader(config, 'X-Client-Instance', CLIENT_INSTANCE);
     }
     if (String(config.url || '').includes('/auth/refresh') && !getHeader(config.headers, CSRF_HEADER_NAME)) {
         const csrfToken = readCookie(CSRF_COOKIE_NAME);
@@ -191,6 +219,8 @@ axios.interceptors.response.use(
             dispatchSessionExpired({ reason: 'csrf_expired' });
         }
 
+        if (error.response?.data?.code === 'client_update_required') reportUpdateRequired();
+
         if (isDemoMode()) {
             if (error.response?.status === 401 && originalRequest && !originalRequest._retry && demoReauthenticate) {
                 originalRequest._retry = true;
@@ -204,6 +234,7 @@ axios.interceptors.response.use(
         if (error.response?.status === 401 && !originalRequest?._retry) {
             if (
                 originalRequest?.url?.includes('/auth/refresh') ||
+                originalRequest?.url?.includes('/auth/token') ||
                 originalRequest?.url?.includes('/auth/login') ||
                 originalRequest?.url?.includes('/auth/me') ||
                 originalRequest?.url?.includes('/auth/csrf') ||
@@ -227,7 +258,7 @@ axios.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const response = await axios.post(`${API_BASE}/auth/refresh`, {}, { _skipCsrfFetch: true });
+                const response = await refreshSession();
 
                 const { token, user } = response.data;
                 hasDispatchedSessionExpired = false;

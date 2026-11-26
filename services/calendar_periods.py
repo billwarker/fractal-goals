@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 
 from models import CalendarPeriod, validate_root_goal
 from services import Event, Events, event_bus
+from services.client_ids import new_id
 
 MAX_PERIOD_DAYS = 366
 MAX_QUERY_WINDOW_DAYS = 400
@@ -66,7 +67,7 @@ class CalendarPeriodService:
     def create(self, root_id, owner_id, data):
         if not self._root(root_id, owner_id):
             return None, "Fractal not found or access denied", 404
-        period = CalendarPeriod(root_id=root_id, owner_id=owner_id, **data)
+        period = CalendarPeriod(id=new_id(CalendarPeriod), root_id=root_id, owner_id=owner_id, **data)
         self.db_session.add(period)
         self.db_session.commit()
         self._emit(Events.CALENDAR_PERIOD_CREATED, root_id, period)

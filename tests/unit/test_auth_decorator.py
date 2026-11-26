@@ -30,7 +30,7 @@ def test_token_required_does_not_relabel_protected_handler_database_errors(
     monkeypatch.setattr(
         auth_api.AuthService,
         'get_current_user_for_token',
-        lambda _service, _token: (authenticated_user, None, 200),
+        lambda _service, _token, **_options: (authenticated_user, None, 200),
     )
 
     @auth_api.token_required
@@ -53,7 +53,7 @@ def test_token_required_still_handles_authentication_database_errors(monkeypatch
     db_session = Mock()
     monkeypatch.setattr(auth_api, 'get_db_session', lambda: db_session)
 
-    def fail_authentication(_service, _token):
+    def fail_authentication(_service, _token, **_options):
         raise SQLAlchemyError('authentication failed')
 
     monkeypatch.setattr(

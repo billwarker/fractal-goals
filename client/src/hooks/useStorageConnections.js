@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { isDemoMode } from '../demo/demoMode';
+import { isNative, openConsent } from '../platform';
 import { storageApi } from '../utils/api/storageApi';
 import { STORAGE_CHANNEL, connectionResult } from '../utils/storageConnectionCopy';
 import { queryKeys } from './queryKeys';
@@ -57,15 +58,14 @@ export function useStorageConnections() {
 
     /** Opens provider consent in a new window. Must be called synchronously from a click. */
     const connect = async (provider) => {
-        const popup = window.open('about:blank', '_blank');
-        if (!popup) throw new Error('Allow the connection window to open, then try again.');
-        popup.opener = null;
-        try {
-            popup.location.href = (await storageApi.connect(provider)).data.url;
-        } catch (failure) {
-            popup.close();
-            throw failure;
-        }
+        const answer = await openConsent(async () => (await storageApi.connect(provider, { native: isNative })).data.url);
+        if (!answer) return; // A browser's own window reports through the channel above.
+        const result = answer.code
+            ? (await storageApi.complete(provider, { state: answer.state, code: answer.code })).data.result
+            : answer.result;
+        setLastResult(connectionResult(provider, result));
+        void refetch();
+        if (result === 'connected') invalidateAttachmentReadModels(client);
     };
 
     return {
