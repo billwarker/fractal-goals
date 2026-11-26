@@ -21,7 +21,8 @@
 > | Phase W offline: new activities, new templates, template edits | Built. A template edit made against an older revision is refused for review, online too |
 > | Phase W WebKit test project | Built (`webkit` in `playwright.config.js`); offline reloads are skipped there, which Playwright's WebKit can't do |
 > | Phase W browsers in the device list | Deferred: browser sessions are stateless tokens, and making each a revocable record changes sign-in for everyone and adds a lookup to every request. "Sign out everywhere" covers them |
-> | Phases M, I | Not started. M needs Rust; I needs full Xcode and an Apple Developer account |
+> | Phase M Mac app | Built, unsigned (`desktop/`): Keychain sign-in, unsent changes in app-owned files, menus and shortcuts, menu-bar session timer, window kept on close, reminders as macOS notifications (Settings → General), `fractalgoals://` links, storage consent in the system sign-in window, save dialogs. `npm run smoke` drives the real app. Not done: Developer ID signing, notarization and the updater (need an Apple Developer account), universal links. Production `CORS_ORIGINS` allows `tauri://localhost` from the next deploy |
+> | Phase I iPhone | Not started: needs full Xcode and an Apple Developer account |
 >
 > **Design changes while building:**
 > - The log is positioned by transaction id, not a per-user `change_seq`. A sequence value is assigned before
@@ -44,7 +45,14 @@
 >   SQLite. Its unsent-edit queue goes in a file the shell owns (Phase M), so macOS can't clear unsent work.
 > - Online edits merge too: the goal form sends only what changed and what it held when the edit began, and stays
 >   on that version while another device's changes arrive.
-> - There is no capabilities list yet: it starts with the first Mac-only feature in Phase M.
+> - `platform.capabilities` lists what only the app does (menus, menu-bar timer, reminders); a browser simply goes
+>   without each: its page already has shortcuts and a session timer.
+> - The Mac app has no auto-updater yet: Tauri's updater needs signed, notarized releases to install over. Until then
+>   `MIN_SUPPORTED_BUILDS` shows the update screen, and a new build is installed by hand.
+> - Reminders are planned on the Mac from `GET /api/reminders/upcoming`, at 9:00 local time; a session left running is
+>   reminded of from the app's own view of it, three hours after it began. They are switched on per Mac.
+> - Unsent changes are one file per change, written beside and renamed over, with the folder synced, so a crash leaves
+>   either version; the client sends them to the shell one at a time, in order.
 > - Programs stay online-only offline: their calendar rules can refuse a change, and one refused days later
 >   is worse than one refused now. Activity edits (not creates) too: their metrics can't be merged.
 > - A queued change waits for any change, in any queue, that creates an id it mentions.

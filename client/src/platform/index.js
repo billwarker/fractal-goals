@@ -11,8 +11,14 @@
  * @property {string} deviceName Shown in Settings → Account.
  * @property {(command: string, args?: object) => Promise<any>} invoke Commands: `secret_get`, `secret_set`,
  *     `secret_delete` ({ key, value }), `open_external` ({ url }), `save_file` ({ name, content }),
- *     `authorize` ({ url, callbackScheme }) resolving to the final address, or null if closed.
+ *     `queue_all`, `queue_put`, `queue_delete`, `queue_clear` ({ userId, opId, value }) for unsent changes,
+ *     `authorize` ({ url, callbackScheme }) resolving to the final address, or null if closed,
+ *     `set_timer` ({ session: { title, path, elapsedSeconds, running } | null }) for the menu bar,
+ *     `allow_reminders` resolving to whether notifications are allowed, and
+ *     `set_reminders` ({ reminders: [{ id, title, body, path, at: { year, month, day, hour, minute } }] }).
  * @property {(open: (link: string) => void) => () => void} [onOpenLink] Passes on each link, the launching one first.
+ * @property {(choose: (id: string) => void) => () => void} [onMenu] Passes on menu choices the app handles:
+ *     `settings`, `new-session`, `fractals`, `back`, `forward` and `page:<goals|programs|sessions|notes|analytics>`.
  */
 
 /** @type {NativeShell | null} */
@@ -28,6 +34,28 @@ export const usesCookies = !isNative;
 export const usesServiceWorker = !isNative;
 
 export const getShell = () => shell;
+
+/**
+ * What only an app can do. A browser goes without: its page has its own shortcuts and session timer,
+ * and it shows no reminders.
+ */
+export const capabilities = Object.freeze({
+    menus: Boolean(shell?.onMenu),
+    menuBarTimer: isNative,
+    reminders: isNative,
+});
+
+/** Choices from the app's menus. Returns a stop function. */
+export const onAppMenu = (choose) => (shell?.onMenu ? shell.onMenu(choose) : () => {});
+
+/** The session shown in the menu bar, or null for none. */
+export const showSessionTimer = (session) => (shell ? shell.invoke('set_timer', { session }) : Promise.resolve());
+
+/** Resolves to false when the person declined notifications. */
+export const allowReminders = () => (shell ? shell.invoke('allow_reminders') : Promise.resolve(false));
+
+/** Replaces every reminder still to come. */
+export const scheduleReminders = (reminders) => (shell ? shell.invoke('set_reminders', { reminders }) : Promise.resolve());
 
 /** Hand a page to the system browser. */
 export function openExternal(url) {

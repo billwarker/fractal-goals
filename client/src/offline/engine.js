@@ -1,11 +1,13 @@
 // The offline sync engine, loaded on demand by OutboxProvider so no route's
 // initial bundle pays for it. Everything here runs only for a signed-in user.
 
+import { isNative } from '../platform';
 import notify from '../utils/notify';
 import { API_BASE, axios, getAuthGeneration } from '../utils/api/core';
 import { trackEvent } from '../utils/telemetry';
 import { getClockOffsetMs, getOfflineReason, isOnline, subscribeConnectivity } from './connectivity';
 import { createIndexedDbStore } from './indexedDbStore';
+import { createShellStore } from './shellStore';
 import { createOutbox } from './outbox';
 
 // Loaded with the engine, so that queueing needs no fetch once there is no signal.
@@ -84,7 +86,7 @@ export function createUserOutbox(userId) {
         if (HEALTH_EVENTS[type]) trackEvent(HEALTH_EVENTS[type], { props });
     };
     const outbox = createOutbox({
-        store: createIndexedDbStore(userId, { onEvent: track }),
+        store: isNative ? createShellStore(userId) : createIndexedDbStore(userId, { onEvent: track }),
         send: sendOutboxOp,
         // Once per op: the server compares a retry's body with the first attempt's.
         prepareBody: (body) => correctActionTime(body),

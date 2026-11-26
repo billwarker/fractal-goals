@@ -1,0 +1,43 @@
+name: Desktop CI
+
+# The Mac app's shell (desktop/). Its client is the web build, tested by Frontend CI; the real app is
+# exercised by `npm run smoke` in desktop/, which needs a Mac with a screen.
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/desktop-ci.yml']
+  pull_request:
+    paths: ['desktop/**', '.github/workflows/desktop-ci.yml']
+
+jobs:
+  desktop:
+    timeout-minutes: 30
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: desktop
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache Rust builds
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            desktop/target
+          key: desktop-${{ hashFiles('desktop/Cargo.lock') }}
+
+      # tauri::generate_context! embeds the client build, so an empty one stands in for it.
+      - name: Placeholder client build
+        run: mkdir -p ../client/dist && echo '<!doctype html>' > ../client/dist/index.html
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --locked --all-targets --features smoke -- -D warnings
+
+      - name: Test
+        run: cargo test --locked

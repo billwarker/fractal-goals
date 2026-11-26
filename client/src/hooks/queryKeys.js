@@ -7,6 +7,7 @@ export const queryKeys = {
     aiChangeCursor: (rootId) => ['ai-agent', 'changes', rootId],
     aiEmbeddedProviders: () => ['ai-agent', 'embedded-providers'],
     signedInDevices: () => ['account', 'devices'],
+    upcomingReminders: (userId) => ['account', 'reminders', userId],
     syncConflicts: () => ['account', 'sync-conflicts'],
     mediaToken: () => ['account', 'media-token'],
     storageConnections: () => ['storage', 'connections'],

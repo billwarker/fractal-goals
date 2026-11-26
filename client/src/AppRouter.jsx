@@ -21,6 +21,7 @@ const UpdateRequiredScreen = lazyWithRetry(() => import('./platform/UpdateRequir
 const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'), 'pages/ResetPassword');
 const Legal = lazyWithRetry(() => import('./pages/Legal'), 'pages/Legal');
 const StorageConnected = lazyWithRetry(() => import('./pages/StorageConnected'), 'pages/StorageConnected');
+const NativeShellBridge = lazyWithRetry(() => import('./platform/NativeShellBridge'), 'platform/NativeShellBridge');
 
 const LEGAL_PATHS = ['/privacy', '/terms'];
 const SettingsModal = lazyWithRetry(() => import('./components/modals/SettingsModal'), 'components/modals/SettingsModal');
@@ -40,7 +41,7 @@ import AgentChangeSubscription from './components/agent/AgentChangeSubscription'
 import GoalChangeAnnouncer from './components/goals/GoalChangeAnnouncer';
 import SessionSyncIndicator from './components/sessionDetail/SessionSyncIndicator';
 import OfflineSignInScreen from './offline/OfflineSignInScreen';
-import { installAppLinks } from './platform';
+import { installAppLinks, isNative } from './platform';
 import { isUpdateRequired, subscribeUpdateRequired } from './platform/updateRequired';
 import { useIsOnline } from './offline/useIsOnline';
 
@@ -208,6 +209,10 @@ function App() {
             <div className="app-container">
                 <AgentChangeSubscription rootId={activeRootId} authenticated={isAuthenticated} />
                 {isAuthenticated ? <GoalChangeAnnouncer /> : null}
+                {/* The Mac app's menus, menu-bar timer and reminders. */}
+                {isAuthenticated && isNative && (
+                    <Suspense fallback={null}><NativeShellBridge onOpenSettings={openSettings} /></Suspense>
+                )}
                 {/* Session Detail shows its own indicator; elsewhere this tracks every queued change. */}
                 {isAuthenticated && !/^\/[^/]+\/session\/[^/]+/.test(location.pathname) && (
                     <SessionSyncIndicator idleOfflineLabel="Offline" className={styles.globalSyncSlot} />

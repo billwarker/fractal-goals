@@ -23,6 +23,8 @@ export const syncApi = {
         `${API_BASE}/${rootId}/${ENTITY_PATHS[/** @type {keyof typeof ENTITY_PATHS} */ (type)]}/${entityId}`,
         { [field]: value },
     ),
+    /** What may be reminded of in the next week, by this device's calendar. @param {string} timezone */
+    getUpcomingReminders: (timezone) => axios.get(`${API_BASE}/reminders/upcoming`, { params: { timezone } }),
     getDevices: () => axios.get(`${API_BASE}/auth/devices`),
     /** @param {string} id */
     revokeDevice: (id) => axios.delete(`${API_BASE}/auth/devices/${id}`),

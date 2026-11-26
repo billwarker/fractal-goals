@@ -733,6 +733,10 @@ Set and value saves send the list they began from, so another device's sets surv
 Merge rules are pinned by `tests/fixtures/sync_merge_cases.json`, and `tests/integration/test_sync_two_devices.py`
 runs simulated devices with seeded faults against the real API. After a restore, run
 `reset_sync_epoch`. Plan: `planning/native-apple-apps-2026-11.md`.
+The Mac app (`desktop/`, Tauri 2) wraps the same `client/dist`: it injects `__FRACTAL_SHELL__` (`desktop/src/shell.js`)
+and answers its commands in Rust (Keychain, a file per unsent change, menus, menu-bar timer, notifications,
+`fractalgoals://` links). The client's side is `platform/NativeShellBridge.jsx` and `platform/reminders.js`;
+`platform.capabilities` says what only the app can do. The server must allow `tauri://localhost` in `CORS_ORIGINS`.
 
 Rate limits key on the real client: `request_identity.py` trusts `X-Forwarded-For` only for
 requests attested by the nginx frontend's `TRUSTED_PROXY_SECRET`, at `TRUSTED_PROXY_HOPS`.
@@ -763,6 +767,7 @@ feature flags; provider, browser, operations and deployment evidence remain rele
 - `validators/` — input validation
 - `migrations/` — Alembic revisions
 - `client/` — React application
+- `desktop/` — the Mac app's shell around the client build ([README](desktop/README.md))
 - `tests/unit`, `tests/integration`, `tests/performance` — backend verification layers
 - `docs/architecture/` — standing decisions and runbooks
 - `planning/` — detailed feature specs, audits, and delivery records
@@ -816,7 +821,8 @@ workflow suite signs `browser_user` in once (`e2e/auth.setup.js` → `e2e/.auth/
 itself opts out with an empty `storageState`. `scripts/browser_test_server.py` serves through
 Gunicorn (`BROWSER_SERVER_WORKERS`, default 3), forking only after releasing its database connections
 and tearing down only in the owning process. `npm run test:browser:smoke` runs one journey per area on
-desktop for quick local checks; CI runs the full suite.
+desktop for quick local checks; CI runs the full suite. `npm run smoke` in `desktop/` drives the built Mac app
+itself (sign-in, restart, menu-bar timer, offline edit kept across a quit) against the same test server.
 
 Shared frontend test doubles live in `client/src/test/` (excluded from coverage), e.g.
 `test/programs/` for the FullCalendar mock and Days fixtures; test files register them with

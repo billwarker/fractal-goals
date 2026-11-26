@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "What the app's own pages may ask for. Embedded and outside pages get nothing.",
+  "windows": ["main"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:webview:allow-set-webview-zoom"]
+}
